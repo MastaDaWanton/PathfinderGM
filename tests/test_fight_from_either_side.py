@@ -227,7 +227,8 @@ def test_two_live_foes_and_no_name_hands_the_question_back(market):
     market.add(b)
     engine = Engine(market, Dice(seed=3))
     engine.run(engine.validate([{"op": "begin_encounter",
-                                 "params": {"sides": {"pc": ["pc"], "them": [a.ref, b.ref]}}}]))
+                                 "params": {"sides": {"pc": ["pc"], "them": [a.ref, b.ref]}}}],
+                               origin="author:test"))
     civilian = next(x for x in market.actors.values() if x.name == "nearby merchant")
     raw = [{"op": "attack", "actor": "pc", "target": civilian.ref}]
     fixed = judgement.check_the_target(raw, "I hit him", market)

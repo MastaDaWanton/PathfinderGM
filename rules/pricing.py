@@ -90,6 +90,55 @@ def markup_for(buyer, town) -> float:
     return 1.0
 
 
+# What the seller's own feeling for the buyer and their own nature do to a price — THIS
+# APP'S rule (owner, 2026-11-13: "keep the rulebook's base price augmented by the
+# relationship and the personality of the seller"). The Core Rulebook prices a thing and
+# never asks who sells it; Morrowind is the tradition that does (UESP, "Commerce": a
+# vendor's prices move with their Disposition towards you and your Mercantile). Percent
+# OFF, the convention `tradecraft.buy_price` and the haggle already use, so the seller's
+# term and a haggle won add into the one number that call takes. Kept inside Ultimate
+# Campaign's bargaining floor by the caller (`tradecraft.undercut`'s 25%).
+#
+# The attitude step (`attitude.of`: a held step first, else the regard band) — a friend's
+# price, dearer for somebody who does not like you. Unfriendly and hostile are priced
+# rather than refused: the counter refuses them (`views._counter_refusal`), but a
+# harbourmaster who will not book you strands you on a coast.
+REGARD_PERCENT = {"hostile": -25, "unfriendly": -10, "indifferent": 0, "friendly": 5,
+                  "helpful": 10, "devoted": 15}
+REGARD_SAID = {"hostile": "cannot stand you", "unfriendly": "does not like you",
+               "friendly": "likes you", "helpful": "would do you a good turn",
+               "devoted": "would do anything for you"}
+# Thrift (personality.json: generous ... tight-fisted), off its silent middle: a point of
+# percent per 5 points of score, so the far poles move a price 10%. Silent within 10 of
+# the middle, as `lives.roll` leaves an axis that close unspoken.
+THRIFT_PER_PERCENT = 5
+THRIFT_SAID = {"low": "is open-handed", "high": "is tight-fisted"}
+
+
+def seller_terms(scene, seller) -> tuple[int, list[str]]:
+    """(percent off, the reasons in words) this seller asks of the player: their attitude
+    towards them and their thrift. (0, []) for nobody, and for an indifferent seller of
+    middling thrift."""
+    from . import attitude, lives, population
+
+    if seller is None:
+        return 0, []
+    step = attitude.of(seller, default=attitude.DEFAULT)
+    percent = REGARD_PERCENT.get(step, 0)
+    why = [REGARD_SAID[step]] if step in REGARD_SAID else []
+    rec = population.of_ref(scene, getattr(seller, "ref", "")) if scene is not None else None
+    axes = ((rec or {}).get("life") or {}).get("axes") or {}
+    # A keeper has no life recorded; their score is seeded by their world id, which is
+    # the same person in every scene (a ref is per scene).
+    thrift = int(axes["thrift"]) if "thrift" in axes else lives.axis_score(
+        "thrift", str(getattr(seller, "world_entity_id", "") or "")
+        or f"actor|{getattr(seller, 'ref', '')}")
+    if abs(thrift - 50) > 10:
+        percent += int(round((50 - thrift) / THRIFT_PER_PERCENT))
+        why.append(THRIFT_SAID["low" if thrift < 50 else "high"])
+    return percent, why
+
+
 def _tier_base(tier: str) -> float:
     """Anything untiered is common. The only safe direction: a thing with no rarity
     should be cheap, not sold as a legendary."""

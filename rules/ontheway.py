@@ -187,6 +187,9 @@ def _band(table, roll: int) -> str:
 # hawker, the watch, travellers, a toll — are how busy a place is, not how dangerous.
 STREET_DANGER = frozenset({"cutpurse", "trouble"})
 ROAD_DANGER = frozenset({"creature", "weather"})
+# The meetings whose count the encounter budget set (`encounter_budget.choose` for a
+# creature, `most_of` for the watch): the engine marks who they bring as priced.
+PRICED = frozenset({"creature", "patrol"})
 
 
 def _weighed(table, danger: float, hostile) -> tuple[list, float]:

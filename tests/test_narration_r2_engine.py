@@ -309,7 +309,7 @@ def robbed(tmp_path):
             c.scene.add(foe)
         e = c.engine()
         e.run(e.validate([{"op": "begin_encounter", "params": {
-            "sides": {"party": ["pc"], "robbers": ["c1", "c2"]}}}]))
+            "sides": {"party": ["pc"], "robbers": ["c1", "c2"]}}}], origin="author:test"))
         yield c
         cm._LIVE.clear()
 

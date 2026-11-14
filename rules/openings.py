@@ -1189,6 +1189,8 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
             if refs:
                 slots[slot] = refs[0]
                 foes.extend(refs)
+                # The document's own fight, priced here: not again by a later model fight.
+                engine._mark_priced(refs, f"start:{doc['id']}")
                 phrases[slot] = group_phrase(label, len(refs))
                 fight = _run(engine, doc, [{
                     "op": "begin_encounter", "because": f"the start: {doc['id']}",

@@ -1184,6 +1184,9 @@ def _do(engine, inst: dict, doc: dict, act: dict, step_id: str, turn: int) -> No
         born = engine._bring_in(template, count=_hostile_count(engine, act, template, role),
                                 side=side)
         inst.setdefault("brought", []).extend(b["ref"] for b in born)
+        if side in HOSTILE_SIDES:
+            # Priced by `_hostile_count`: not again when a model's fight wraps them.
+            engine._mark_priced([b["ref"] for b in born], f"scheme:{doc['id']}")
         if "guard" in role or "watch" in role:
             for b in born:
                 _grant(scene, {"_": {"kind": "actor", "ref": b["ref"]}},

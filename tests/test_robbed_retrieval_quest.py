@@ -38,7 +38,7 @@ def _lane(seed=3, robbers=2):
     e = Engine(s, Dice(seed=seed))
     e.run(e.validate([{"op": "begin_encounter", "because": "test",
                        "params": {"sides": {"party": [pc.ref],
-                                            "robbers": [a.ref for a in gang]}}}]))
+                                            "robbers": [a.ref for a in gang]}}}], origin="author:test"))
     return s, e, pc, gang
 
 

@@ -11253,13 +11253,13 @@ class Engine:
             same_kind = kind and b.from_template == kind
             if same_name or same_kind:
                 kin.append(other)
-        # A guard rallying to a struck guard is the law coming in, and is priced as
-        # `_law_joins` prices it: the square of four guards came in whole through here
-        # whenever the first blow fell on one of them.
-        law = [r for r in kin if self.scene.actors[r].has_state(states.GUARD)]
-        coming, _held = self._law_room(side, law)
-        return [r for r in kin if (r in coming or r not in law)
-                and self.join_fight(r, side)]
+        # Everyone rallying is priced, the law as `_law_joins` prices it and any other kin
+        # the same way: the square of four guards came in whole through here whenever the
+        # first blow fell on one of them, and so did a gang for its thug or a pack for its
+        # wolf, unpriced. The guarded tier, because kin answering their own struck one
+        # are a group defending itself, the ruling's "guards and lairs".
+        coming, _held = self._law_room(side, kin)
+        return [r for r in coming if self.join_fight(r, side)]
 
     def _companions_join(self, sides: dict | None = None) -> list[str]:
         """Everyone travelling with the player comes into the fight on the player's side.
@@ -11309,9 +11309,8 @@ class Engine:
         guard in here, and only a bystander joins: a guard already on the player's side
         (an escort the GM sided) is left where they were put.
 
-        Called from `_ensure_encounter`, the door a first swing opens the fight by. A
-        fight the GM declares through `begin_encounter` names its own sides and is not
-        second-guessed here — noted as open in docs/wanted.md.
+        Called from `_ensure_encounter`, the door a first swing opens the fight by, and
+        from `begin_encounter`, whose model-proposed sides are priced there first.
 
         Not every guard standing: as many as the encounter budget's guarded tier buys
         (`_law_room`). The rest hang back and are said to (`_law_held_settle`).
@@ -11334,66 +11333,84 @@ class Engine:
         coming, _held = self._law_room(against, law)
         return [ref for ref in coming if self.join_fight(ref, against)]
 
-    def _law_room(self, side: str, law: list[str]) -> tuple[list[str], list[str]]:
-        """Of the law `law` about to come into a fight on `side`, who comes and who hangs
-        back: the guards on that side, these and the ones already there, are an
-        encounter, priced by the guarded tier (`encounter_budget.most_of`).
+    def _law_room(self, side: str, coming: list[str], *, on: list[str] | None = None,
+                  kind: str = "guarded") -> tuple[list[str], list[str]]:
+        """Of the people `coming` into a fight on `side`, who comes and who hangs back:
+        everyone standing on that side, these and the ones already there, is one
+        encounter, priced by its total XP against the rolled tier (`encounter_budget`).
 
         Measured, the owner's report of 2026-11-13 ("cover the stuff that isnt covered
         like the guards"): a wanted lone level-1 PC who swung in a square of four guards
         met all four, 1,600 XP of CR 1s against an APL of -1, when the budget the road and
-        the street spend would have sent one. Never fewer than one on the side — the
-        warrant, or the guard the words struck, is the floor, as the street patrol's is —
-        and never a guard silently gone: the held are kept for `_law_held_settle` to say.
-        A side the player is on is not a fight against the party and is not priced."""
-        if not law or any(self.scene.actors[r].is_pc
-                          for r in self.scene.sides.get(side, ()) if r in self.scene.actors):
-            return list(law), []
+        the street spend would have sent one. And the first cut priced only the guards:
+        the merchant the player struck stood on the side for free, so the merchant plus
+        the watch went over the tier. Everyone already on the side is counted now — the
+        struck, any foe already fighting. Never an empty side (the first of `coming`
+        comes when nobody is on it yet: the warrant's one guard, the model's named foe),
+        and never anybody silently gone: the held are kept for `_law_held_settle` to say.
+        A side the player is on is not a fight against the party and is not priced.
+        `on` replaces the side's present people (a fight not yet drawn)."""
+        coming = list(coming)
+        if not coming or any(self.scene.actors[r].is_pc
+                             for r in self.scene.sides.get(side, ()) if r in self.scene.actors):
+            return coming, []
         from . import xp as xp_mod
 
-        on = [r for r in self.scene.sides.get(side, ())
-              if r in self.scene.actors and not self.scene.actors[r].is_down
-              and self.scene.actors[r].has_state(states.GUARD)]
-        # The dearest of them, so a sergeant among constables is not priced as one.
-        each = max(xp_mod.worth(self.scene.actors[r]) for r in on + list(law))
+        if on is None:
+            on = [r for r in self.scene.sides.get(side, ())
+                  if r in self.scene.actors and not self.scene.actors[r].is_down]
+        already = sum(xp_mod.worth(self.scene.actors[r]) for r in on)
+        each = [xp_mod.worth(self.scene.actors[r]) for r in coming]
         party = encounter_budget.party_apl(self.scene)
-        lowest = encounter_budget.MIX["guarded"][0][0]
-        if (len(on) + len(law)) * each <= encounter_budget.budget(
-                party + encounter_budget.TIERS[lowest]):
-            # Inside the guarded tier's least budget whatever the d100 says: not rolled.
-            return list(law), []
-        hard = self.dice.roll("1d100", label="how hard the watch is",
-                              visibility="hidden").total
-        n = encounter_budget.most_of(each, len(on) + len(law), party, hard,
-                                     kind="guarded")
-        room = max(0, n - len(on))
-        held = list(law[room:])
+        lowest = encounter_budget.MIX[kind][0][0]
+        if encounter_budget.admit(already, each, encounter_budget.budget(
+                party + encounter_budget.TIERS[lowest])) == len(coming):
+            # Inside the tier's least budget whatever the d100 says: not rolled.
+            self._mark_priced(coming, "joined")
+            return coming, []
+        label = ("how hard the watch is"
+                 if any(self.scene.actors[r].has_state(states.GUARD) for r in coming)
+                 else "how many come in")
+        hard = self.dice.roll("1d100", label=label, visibility="hidden").total
+        cap = encounter_budget.budget(
+            party + encounter_budget.TIERS[encounter_budget.tier(hard, kind)])
+        room = encounter_budget.admit(already, each, cap)
+        if not on:
+            room = max(1, room)
+        held = coming[room:]
         if held:
             self._law_held = list(getattr(self, "_law_held", None) or []) + held
-        return list(law[:room]), held
+        self._mark_priced(coming[:room], "joined")
+        return coming[:room], held
 
     def _law_held_settle(self) -> list[Outcome]:
-        """The guards `_law_room` kept out of a fight, said: standing in the scene, off
-        the initiative, raising the alarm. Their own outcome at the batch's end because
-        the fight's doors are several (a swing, `begin_encounter`, a rally), and a guard
-        who neither fights nor is mentioned is the silent vanishing the request ruled
-        out."""
-        held = [self.scene.actors[r] for r in (getattr(self, "_law_held", None) or ())
+        """The people `_law_room` kept out of a fight, said: standing in the scene, off
+        the initiative — the watch raising the alarm, anyone else watching. Their own
+        outcome at the batch's end because the fight's doors are several (a swing,
+        `begin_encounter`, a rally), and somebody who neither fights nor is mentioned is
+        the silent vanishing the request ruled out."""
+        held = [self.scene.actors[r] for r in dict.fromkeys(
+                    getattr(self, "_law_held", None) or ())
                 if r in self.scene.actors and not self.scene.actors[r].is_down
                 and not any(r in refs for refs in self.scene.sides.values())]
         self._law_held = []
-        if not held:
-            return []
         from .arrest import _names
 
-        one = len(held) == 1
-        return [self._articled(Outcome(
-            intent_id="", op="law_holds_back",
-            effects=[{"kind": "law_holds_back", "refs": [a.ref for a in held]}],
-            tell=(f"{_names(held)} {'does' if one else 'do'} not come in, but "
-                  f"{'hangs' if one else 'hang'} back from the fight, shouting the "
-                  f"alarm."),
-            because="the watch that came is all the fight could hold"))]
+        out = []
+        for law, group in ((True, [a for a in held if a.has_state(states.GUARD)]),
+                           (False, [a for a in held if not a.has_state(states.GUARD)])):
+            if not group:
+                continue
+            one = len(group) == 1
+            doing = "shouting the alarm" if law else "watching"
+            out.append(self._articled(Outcome(
+                intent_id="", op="law_holds_back" if law else "holds_back",
+                effects=[{"kind": "law_holds_back" if law else "holds_back",
+                          "refs": [a.ref for a in group]}],
+                tell=(f"{_names(group)} {'does' if one else 'do'} not come in, but "
+                      f"{'hangs' if one else 'hang'} back from the fight, {doing}."),
+                because="the fight already holds as much as it can")))
+        return out
 
     def _has_acted(self, ref: str) -> bool:
         """Whether this combatant has taken a turn in the current encounter."""
@@ -15560,7 +15577,23 @@ class Engine:
             self.scene.positions.pop(m["ref"], None)
         if self.scene.grid is not None and self.scene.positions:
             self.scene.place_by_zone([m["ref"] for m in made])
+        if met.kind in ontheway.PRICED:
+            self._mark_priced([m["ref"] for m in made], f"meeting:{met.kind}")
         return made
+
+    def _mark_priced(self, refs, source: str) -> None:
+        """Mark people a budgeted source brought in (`states.PRICED`), through the one
+        applicator, the origin naming the source."""
+        from .activeeffect import ActiveEffect
+
+        for r in refs:
+            a = self.scene.actors.get(r)
+            if a is None or a.is_pc or a.has_state(states.PRICED):
+                continue
+            a.apply_effect(ActiveEffect(
+                name="priced into a fight", kind="situation", key=f"priced:{source}",
+                source=f"budget:{source}", origin=f"budget:{source}",
+                duration="until-dismissed", tags=(states.PRICED,)))
 
     def _cutpurse(self, pc, thief) -> str:
         """A hand in the purse, resolved by the book and not by a flat chance.
@@ -16301,6 +16334,7 @@ class Engine:
         made = self._bring_in(enc.creature["id"], count=1,
                                name=bestiary_mod.kind_word(enc.creature))
         ref = made[0]["ref"]
+        self._mark_priced([ref], "forage")
         self.scene.zones[ref] = "far"
         self.scene.positions.pop(ref, None)
         if self.scene.grid is not None and self.scene.positions:
@@ -16906,7 +16940,7 @@ class Engine:
         passenger ship (a keelboat on a river), the days by her speed over the world's
         miles or the tree's days, and 1 sp a mile a head (CRB Table 6-9). One rule for the
         booking and the exits row's price."""
-        from . import places as places_mod, ships as ships_mod
+        from . import places as places_mod, pricing, ships as ships_mod
 
         here = self.scene.location_id
         town = self.world.get(here) if self.world is not None else None
@@ -16918,7 +16952,61 @@ class Engine:
                                   ship.kind, leg.days_apart)
         miles = leg.miles if leg.source == "exact" and leg.miles \
             else days * ships_mod.miles_a_day(ship.kind)
-        return ship, days, ships_mod.fare_cp(miles, heads)
+        book = ships_mod.fare_cp(miles, heads)
+        percent, _why, _seller = self.passage_terms()
+        pc = self.scene.pc()
+        # The shop's own machinery (`_op_buy`): the law's markup on the book's price, then
+        # the percent off through `tradecraft.buy_price`.
+        gp = book / 100 * (pricing.markup_for(pc, str(here or "")) if pc is not None else 1.0)
+        return ship, days, max(1, int(round(tradecraft.buy_price(gp, percent) * 100)))
+
+    def _fare_moved(self) -> str:
+        """The fare's reason in words when the seller moved it off the book's ("The
+        harbourmaster likes you: 5% off the book's fare"), else ""."""
+        percent, why, seller = self.passage_terms()
+        if seller is None or not why:
+            return ""
+        said = why[0] if len(why) == 1 else f"{', '.join(why[:-1])} and {why[-1]}"
+        cost = (f"{percent}% off the book's fare" if percent > 0
+                else f"{-percent}% over the book's fare" if percent < 0
+                else "the book's fare")
+        return f"{_sentence(seller.name)} {said}: {cost}"
+
+    def passage_seller(self):
+        """Who sells a berth here: the port's harbourmaster, the keeper of its docks
+        (`places.STAFFED`), when one has been stood up. Not the ship's master, who is
+        minted on deck only once a berth is bought (`_ships_company`) — the fare is quoted
+        on the docks, in the exits row, before anybody has met her crew."""
+        from . import keepers as keepers_mod, places as places_mod
+
+        here = str(self.scene.location_id or "")
+        for a in self.scene.people.values():
+            place = keepers_mod.place_of(str(getattr(a, "world_entity_id", "") or ""))
+            if place and keepers_mod.label_of(place) == "the docks" \
+                    and places_mod.location_of(place) == here:
+                return a
+        return None
+
+    def passage_terms(self) -> tuple[int, list[str], Any]:
+        """(percent off, the reasons, the seller) a berth is sold at here: the seller's
+        own terms (`pricing.seller_terms`: their attitude to the player, their thrift)
+        plus the day's haggle with them (`_op_haggle`, keyed as every counter is), never
+        past the haggle's own 25% (Ultimate Campaign's floor)."""
+        from . import market as market_mod, pricing
+
+        seller = self.passage_seller()
+        pc = self.scene.pc()
+        if seller is None or pc is None:
+            return 0, [], None
+        percent, why = pricing.seller_terms(self.scene, seller)
+        haggled = tradecraft.haggled(
+            self.scene, pc.ref, str(self.scene.location_id or "nowhere"),
+            market_mod.stall_of(self.scene, seller),
+            market_mod.day_of(self.scene.clock_minutes))
+        if haggled:
+            why = [*why, f"gave {haggled}% to the haggle"]
+        return min(int(tradecraft.row("haggle")["max_percent"]), percent + haggled), \
+            why, seller
 
     def _book_passage(self, intent: Intent, leg) -> Outcome:
         """Buy a berth to `leg`'s port and go aboard. She lies at the quay until the party
@@ -16950,12 +17038,14 @@ class Engine:
             heads = 1 + len(escorts)
             ship, days, cost = self.passage_quote(leg, heads)
             coins = self._coins_here()
+            moved = self._fare_moved()
             purse, enough = goods.spend(pc.purse, cost)
             if not enough:
                 return self._refuse(
                     intent, f"Passage to {leg.to_name} on {ship.name} is "
                             f"{goods.purse_line(goods.coins_for(cost), coins)} for "
-                            f"{heads} (a silver piece a mile a head), and "
+                            f"{heads} (a silver piece a mile a head{moved and ', '}"
+                            f"{moved[:1].lower()}{moved[1:]}), and "
                             f"{pc.name} carries {goods.purse_line(pc.purse, coins)}.")
             pc.purse = purse
             ship.at, ship.bound_for, ship.came_from = here, leg.to_id, here
@@ -16968,7 +17058,8 @@ class Engine:
             paid = (f"{pc.name} pays {goods.purse_line(goods.coins_for(cost), coins)} for "
                     f"passage to {leg.to_name} on {ship.name}, {english.a(ship.kind)}: "
                     f"{days} day{'s' if days != 1 else ''} "
-                    f"{'on the river' if ship.river else 'at sea'}.")
+                    f"{'on the river' if ship.river else 'at sea'}."
+                    + (f" {moved}." if moved else ""))
             if not leg.from_port and not ship.river:
                 # No docks here: the passage is from where the road meets the coast, as
                 # the old free crossing said too, and costs no time of its own (as before).
@@ -16994,9 +17085,9 @@ class Engine:
         bits = [b for b in (parted, paid, f"{pc.name} goes aboard; she lies at the quay "
                             f"until you sail.") if b]
         if crew:
-            # The crew are "the captain" and "a deckhand": "the ship's master" printed as
-            # "the ship's the master" live, in a port whose harbourmaster's man is called
-            # "master" (a name rewrite downstream of the tell, not traced here).
+            # "The ship's master" printed as "The ship's the master" live: the tells'
+            # article pass (`names.with_articles`) took "master" — another person here —
+            # inside it. Fixed there, so an old save's crew reads right too.
             said = " and ".join(a.name for a in crew)
             bits.append(f"{said[:1].upper()}{said[1:]} "
                         f"{'is' if len(crew) == 1 else 'are'} on deck.")
@@ -17701,6 +17792,7 @@ class Engine:
             self.scene.add(who)
             self.scene.move(who.ref, deck)
             out.append(who)
+        self._mark_priced([w.ref for w in out], "boarding")
         return out
 
     # --- in conversation -----------------------------------------------------------------
@@ -18096,6 +18188,7 @@ class Engine:
             if row is not None:
                 born = self._bring_in(row["id"], count=1, name=row["name"])
                 ref = born[0]["ref"]
+                self._mark_priced([ref], "venture")
                 self.scene.zones[ref] = "far"
                 self.scene.positions.pop(ref, None)
                 aggressive = row.get("creature_type") in gathering.AGGRESSIVE
@@ -24188,8 +24281,48 @@ class Engine:
                 f"{goods_mod.purse_line(goods_mod.coins_for(gold * 100), coins)} "
                 f"({goods_mod.purse_line(pc.purse, coins)} in hand).")
 
+    # The origins whose `begin_encounter` a document or the author wrote, not a model.
+    _STAGED_FIGHTS = ("start:", "scheme:", "author:")
+
+    def _priced_sides(self, sides: dict) -> dict:
+        """A model-proposed fight's sides, its foes priced as one encounter.
+
+        The gap the budget lanes left (docs/encounter-budget.md): a `begin_encounter`
+        from a turn's plan that listed the four watchmen in the square as "them" put all
+        four in the initiative against a lone level-1 PC (540 XP against a hard cap of
+        400), because only the extra law it pulled in was priced. Every side the player
+        is not on is the encounter; the people who are not bystanders are listed first,
+        so the one the words meant comes before the crowd the model swept in; the first
+        always comes. Those past the budget are struck from the side and said to hang
+        back (`_law_held_settle`). Wandering tier, the street's own trouble — guarded when
+        a guard is among them.
+
+        Foes a budgeted source already priced (`states.PRICED`: a road draw, a scheme's
+        hunters, the admitted watch) are not priced again — a second roll would hold back
+        part of a fight the budget already rolled, three wolves rolled challenging coming
+        as two — but their XP still counts, so a model cannot pile extras on top."""
+        actors = self.scene.actors
+        foes = [r for side, refs in sides.items()
+                if not any(actors[x].is_pc for x in refs if x in actors)
+                for r in refs if r in actors and not actors[r].is_pc]
+        priced = [r for r in foes if actors[r].has_state(states.PRICED)]
+        foes = [r for r in foes if r not in priced]
+        foes.sort(key=lambda r: actors[r].has_state(states.BYSTANDER))
+        kind = ("guarded" if any(actors[r].has_state(states.GUARD) for r in foes)
+                else "wandering")
+        coming, held = self._law_room("", foes, on=priced, kind=kind)
+        if not held:
+            return sides
+        return {s: [r for r in refs if r not in held] for s, refs in sides.items()}
+
     def _op_begin_encounter(self, intent: Intent, partial: dict) -> Outcome:
         rolls, order = [], []
+        # A document or the author staged this fight and priced it at its source
+        # (`openings`, `schemes._hostile_count`); a model's plan did not — the player's
+        # turn (no origin) or a creature's turn (`creature:<template>`, the model again).
+        if not str(intent.origin or "").startswith(self._STAGED_FIGHTS):
+            intent.params["sides"] = self._priced_sides(
+                {k: list(v) for k, v in intent.params["sides"].items()})
         for side, refs in intent.params["sides"].items():
             for ref in refs:
                 a = self.scene.actors[ref]

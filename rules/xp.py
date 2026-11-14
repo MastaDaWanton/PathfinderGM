@@ -25,6 +25,12 @@ CR_AWARD = {
     1: 400, 2: 600, 3: 800, 4: 1200, 5: 1600, 6: 2400, 7: 3200, 8: 4800,
     9: 6400, 10: 9600, 11: 12800, 12: 19200, 13: 25600, 14: 38400, 15: 51200,
     16: 76800, 17: 102400, 18: 153600, 19: 204800, 20: 307200,
+    # CRB Table 12-2 itself runs to CR 25 (aonprd.com/Rules.aspx?ID=252).
+    21: 409600, 22: 614400, 23: 819200, 24: 1228800, 25: 1638400,
+    # 26-30 are the table's own law carried on — the award doubles every two CR (Table
+    # 12-3, "2 creatures = CR +2") — because no Paizo table prints them; the same figures
+    # the forums reach (9,830,400 at CR 30, paizo.com/threads/rzs2km2z).
+    26: 2457600, 27: 3276800, 28: 4915200, 29: 6553600, 30: 9830400,
 }
 
 
