@@ -237,4 +237,30 @@ document.addEventListener("focusout", e => {
   }).observe(box, { childList: true });
 })();
 
+// The berths a harbourmaster offers while the player talks with them (play/views.py
+// `_passage_offer`). Measured live 2026-11-13: "I ask the master for passage to
+// Mirabalos, pay the fare and go aboard" was read as talk and booked nothing. These are
+// the exits row's own passage rows, so a click attaches the same journey chip
+// (`toggleExit`) and Say books it; the page decides nothing about who sells or for what.
+function renderPassageOffer(s) {
+  const box = document.getElementById("passage-offer");
+  if (!box) return;
+  const offer = ((s && s.scene) || {}).passage_offer || {};
+  const rows = offer.rows || [];
+  if (!rows.length || s.awaiting || s.ended) { box.innerHTML = ""; return; }
+  const pressed = attachedExitId();
+  box.innerHTML = rows.map(e => `<button type="button" class="passbtn v2-btn"
+      data-passage="${esc(e.id)}" aria-pressed="${pressed === e.id}">Book passage to ${
+      esc(e.name)} · ${esc(e.time_words)}</button>`).join("");
+}
+
+document.addEventListener("click", e => {
+  const btn = e.target.closest && e.target.closest("#passage-offer .passbtn");
+  if (!btn) return;
+  toggleExit(btn.dataset.passage);
+  document.querySelectorAll("#passage-offer .passbtn").forEach(b =>
+    b.setAttribute("aria-pressed", String(b.dataset.passage === attachedExitId())));
+});
+
 onRender(s => renderExits(s));
+onRender(s => renderPassageOffer(s));

@@ -818,6 +818,11 @@ def trade_words(actor, founded=()) -> tuple[str, ...]:
     for label in dict.fromkeys((f"the {kind_of(place, founded)}", label_of(place))):
         title, words = places_mod.keeper_of(label)
         out += [w for w in (title, *words) if w and w not in out]
+    # A "-master" title is addressed as "master": measured live 2026-11-13, "I ask the
+    # master for passage" beside the harbourmaster found nobody, and a new "master" was
+    # stood up on the docks to be asked instead.
+    if any(w.split()[-1].endswith("master") and w.split()[-1] != "master" for w in out)             and "master" not in out:
+        out.append("master")
     return tuple(out)
 
 
