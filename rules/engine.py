@@ -16879,7 +16879,7 @@ class Engine:
         passenger ship (a keelboat on a river), the days by her speed over the world's
         miles or the tree's days, and 1 sp a mile a head (CRB Table 6-9). One rule for the
         booking and the exits row's price."""
-        from . import places as places_mod, ships as ships_mod
+        from . import places as places_mod, pricing, ships as ships_mod
 
         here = self.scene.location_id
         town = self.world.get(here) if self.world is not None else None
@@ -16891,7 +16891,61 @@ class Engine:
                                   ship.kind, leg.days_apart)
         miles = leg.miles if leg.source == "exact" and leg.miles \
             else days * ships_mod.miles_a_day(ship.kind)
-        return ship, days, ships_mod.fare_cp(miles, heads)
+        book = ships_mod.fare_cp(miles, heads)
+        percent, _why, _seller = self.passage_terms()
+        pc = self.scene.pc()
+        # The shop's own machinery (`_op_buy`): the law's markup on the book's price, then
+        # the percent off through `tradecraft.buy_price`.
+        gp = book / 100 * (pricing.markup_for(pc, str(here or "")) if pc is not None else 1.0)
+        return ship, days, max(1, int(round(tradecraft.buy_price(gp, percent) * 100)))
+
+    def _fare_moved(self) -> str:
+        """The fare's reason in words when the seller moved it off the book's ("The
+        harbourmaster likes you: 5% off the book's fare"), else ""."""
+        percent, why, seller = self.passage_terms()
+        if seller is None or not why:
+            return ""
+        said = why[0] if len(why) == 1 else f"{', '.join(why[:-1])} and {why[-1]}"
+        cost = (f"{percent}% off the book's fare" if percent > 0
+                else f"{-percent}% over the book's fare" if percent < 0
+                else "the book's fare")
+        return f"{_sentence(seller.name)} {said}: {cost}"
+
+    def passage_seller(self):
+        """Who sells a berth here: the port's harbourmaster, the keeper of its docks
+        (`places.STAFFED`), when one has been stood up. Not the ship's master, who is
+        minted on deck only once a berth is bought (`_ships_company`) — the fare is quoted
+        on the docks, in the exits row, before anybody has met her crew."""
+        from . import keepers as keepers_mod, places as places_mod
+
+        here = str(self.scene.location_id or "")
+        for a in self.scene.people.values():
+            place = keepers_mod.place_of(str(getattr(a, "world_entity_id", "") or ""))
+            if place and keepers_mod.label_of(place) == "the docks" \
+                    and places_mod.location_of(place) == here:
+                return a
+        return None
+
+    def passage_terms(self) -> tuple[int, list[str], Any]:
+        """(percent off, the reasons, the seller) a berth is sold at here: the seller's
+        own terms (`pricing.seller_terms`: their attitude to the player, their thrift)
+        plus the day's haggle with them (`_op_haggle`, keyed as every counter is), never
+        past the haggle's own 25% (Ultimate Campaign's floor)."""
+        from . import market as market_mod, pricing
+
+        seller = self.passage_seller()
+        pc = self.scene.pc()
+        if seller is None or pc is None:
+            return 0, [], None
+        percent, why = pricing.seller_terms(self.scene, seller)
+        haggled = tradecraft.haggled(
+            self.scene, pc.ref, str(self.scene.location_id or "nowhere"),
+            market_mod.stall_of(self.scene, seller),
+            market_mod.day_of(self.scene.clock_minutes))
+        if haggled:
+            why = [*why, f"gave {haggled}% to the haggle"]
+        return min(int(tradecraft.row("haggle")["max_percent"]), percent + haggled), \
+            why, seller
 
     def _book_passage(self, intent: Intent, leg) -> Outcome:
         """Buy a berth to `leg`'s port and go aboard. She lies at the quay until the party
@@ -16923,12 +16977,14 @@ class Engine:
             heads = 1 + len(escorts)
             ship, days, cost = self.passage_quote(leg, heads)
             coins = self._coins_here()
+            moved = self._fare_moved()
             purse, enough = goods.spend(pc.purse, cost)
             if not enough:
                 return self._refuse(
                     intent, f"Passage to {leg.to_name} on {ship.name} is "
                             f"{goods.purse_line(goods.coins_for(cost), coins)} for "
-                            f"{heads} (a silver piece a mile a head), and "
+                            f"{heads} (a silver piece a mile a head{moved and ', '}"
+                            f"{moved[:1].lower()}{moved[1:]}), and "
                             f"{pc.name} carries {goods.purse_line(pc.purse, coins)}.")
             pc.purse = purse
             ship.at, ship.bound_for, ship.came_from = here, leg.to_id, here
@@ -16941,7 +16997,8 @@ class Engine:
             paid = (f"{pc.name} pays {goods.purse_line(goods.coins_for(cost), coins)} for "
                     f"passage to {leg.to_name} on {ship.name}, {english.a(ship.kind)}: "
                     f"{days} day{'s' if days != 1 else ''} "
-                    f"{'on the river' if ship.river else 'at sea'}.")
+                    f"{'on the river' if ship.river else 'at sea'}."
+                    + (f" {moved}." if moved else ""))
             if not leg.from_port and not ship.river:
                 # No docks here: the passage is from where the road meets the coast, as
                 # the old free crossing said too, and costs no time of its own (as before).
@@ -16967,9 +17024,9 @@ class Engine:
         bits = [b for b in (parted, paid, f"{pc.name} goes aboard; she lies at the quay "
                             f"until you sail.") if b]
         if crew:
-            # The crew are "the captain" and "a deckhand": "the ship's master" printed as
-            # "the ship's the master" live, in a port whose harbourmaster's man is called
-            # "master" (a name rewrite downstream of the tell, not traced here).
+            # "The ship's master" printed as "The ship's the master" live: the tells'
+            # article pass (`names.with_articles`) took "master" — another person here —
+            # inside it. Fixed there, so an old save's crew reads right too.
             said = " and ".join(a.name for a in crew)
             bits.append(f"{said[:1].upper()}{said[1:]} "
                         f"{'is' if len(crew) == 1 else 'are'} on deck.")

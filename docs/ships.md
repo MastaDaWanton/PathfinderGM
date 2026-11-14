@@ -144,6 +144,29 @@ a town the legs reach, `interpret._road_to`), and the planner (the brief's ABOAR
    derives a ship's rooms from the place id (the kind rides in `ship-<kind>-<hex>`), the
    deck and the docks a gangplank apart while she lies at the quay. The master and a hand
    are aboard, from the NPC codex. A berth booked and not sailed is re-boarded free.
+   **The fare moves with the seller** (owner, 2026-11-13: "keep the rulebook's base price
+   augmented by the relationship and the personality of the seller"). The seller is the
+   port's harbourmaster (`Engine.passage_seller`, the docks' keeper), who is on the docks
+   when the fare is quoted; the ship's master is only minted on deck after a berth is
+   bought. `Engine.passage_terms` takes the book's fare through the shop's machinery: the
+   law's markup (`pricing.markup_for`), then percent off by `tradecraft.buy_price` — the
+   seller's attitude (`pricing.REGARD_PERCENT`: hostile +25%, unfriendly +10%, friendly
+   -5%, helpful -10%, devoted -15%), their thrift (a point per 5 off the middle, silent
+   within 10; a keeper with no life recorded has a score seeded by their world id,
+   `lives.axis_score`) and the day's haggle with them (`_op_haggle`, kept under their stall
+   key), never more than 25% off. The quote in the exits row and the coin taken are one
+   number (`passage_quote`), and the tell names the reason when it moved ("The
+   harbourmaster likes you: 5% off the book's fare."). A shop's counter does not yet read
+   the seller's terms: that is the owner's call.
+
+   **Talking with the harbourmaster offers the berths** (`views._passage_offer`,
+   `scene.passage_offer`): measured live, "I ask the master for passage to Mirabalos, pay
+   the fare and go aboard" was read as talk and booked nothing. While the engine holds the
+   player in conversation with the harbourmaster, the exits row's own passage rows are
+   offered above it as "Book passage to X"; a click attaches the same journey chip and Say
+   books it. Nothing reads the words for it, and the brief tells the narrator the fares and
+   that nothing is paid in the prose. A "-master" title answers to "the master"
+   (`keepers.trade_words`).
 2. **Sail** (`Engine._sail`): aboard a booked ship any journey is the voyage. She casts
    off (the location becomes the ship: no town's rooms are a walk from her deck at sea)
    and makes way a day at a time — the clock's day, the ship feeding, watering and

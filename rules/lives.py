@@ -233,6 +233,14 @@ def rank_score(seed: str, work_class: str = "") -> int:
     return max(0, min(100, score))
 
 
+def axis_score(axis: str, seed: str) -> int:
+    """One temperament axis, 0-100, for somebody with no life recorded (a keeper stood up
+    behind a counter has none). `rank_score`'s shape — its own seeded stream per axis, the
+    same bell curve — so the answer is fixed for that seed whenever it is first asked."""
+    rng = _rng(f"axis:{axis}", seed)
+    return int(round((sum(rng.randint(1, 6) for _ in range(3)) - 3) / 15 * 100))
+
+
 def work_class_of(work_id: str) -> str:
     """The class of an occupation id (`occupations.json`), or ""."""
     return next((o["class"] for o in tables()["occupations"] if o["id"] == work_id), "")

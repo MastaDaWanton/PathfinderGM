@@ -207,6 +207,44 @@ def _exits_state(c) -> list[dict]:
         return []
 
 
+def _passage_offer(c, exits=None) -> dict:
+    """`scene.passage_offer`: {"seller", "rows"} while the player is talking with the
+    port's harbourmaster (`Engine.passage_seller`), the rows the exits row's own passage
+    rows, so taking one is the exits row's journey (`_take_the_exit`). Else {}.
+
+    Measured live 2026-11-13: "I ask the master for passage to Mirabalos, pay the fare and
+    go aboard" was read as talk and booked nothing. The words are never read for it here:
+    who the player is talking with is the engine's (`talking_to`), and the berths and
+    their fares are the engine's (`passage_quote`, through `play/exits.py`)."""
+    try:
+        engine = c.engine()
+        seller = engine.passage_seller()
+        if seller is None or c.scene.in_encounter or engine.aboard() is not None                 or seller.ref not in {a.ref for a in engine.talking_to()}:
+            return {}
+        from rules import journey as journey_mod
+
+        berths = {leg.to_id for leg in journey_mod.legs_from(c.world, c.scene.location_id)
+                  if leg.by_sea}
+        rows = [r for r in (exits if exits is not None else _exits_state(c))
+                if r.get("journey") and r.get("id") in berths and not r.get("blocked")]
+    except Exception:      # noqa: BLE001 — an offer is never worth failing a turn
+        return {}
+    return {"seller": str(seller.name), "rows": rows} if rows else {}
+
+
+def _passage_note(c) -> str:
+    """The brief's line while the berths are offered: the prose has the harbourmaster
+    name them and settles nothing — the berth is bought from the offer on the screen."""
+    offer = _passage_offer(c)
+    if not offer:
+        return ""
+    berths = "; ".join(f"to {r['name']}, {r['time_words']}" for r in offer["rows"])
+    seller = offer["seller"][:1].upper() + offer["seller"][1:]
+    return (f"{seller} sells berths: {berths}. They may name these fares; no coin "
+            f"changes hands and nobody goes aboard in the prose — the player books a "
+            f"berth from the offer on the screen.")
+
+
 def _places_found_state(c) -> dict:
     """`scene.places_found`: the fog-of-war place chart (play/places_found.py), rebuilt
     from the engine every state beside the exits row it is read from. {} when there is
@@ -1099,7 +1137,9 @@ def _state(c) -> dict:
             "day_part": residency.day_part(c.scene.clock_minutes),
             # The "From here" row (I6): every way on, from the engine's own graph, with
             # the ones the rules would refuse greyed in the rules' own words.
-            "exits": _exits_state(c),
+            "exits": (exits_now := _exits_state(c)),
+            # The harbourmaster's berths, offered while the player talks with them.
+            "passage_offer": _passage_offer(c, exits_now),
             # The Places chart (owner, 2026-09-29): every place the player has stood in
             # and every place one way from them, by name, with the ways between; the
             # rest of the town stays under the fog.
@@ -4879,7 +4919,8 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                                                                    player_input),
                                     # And the counter the turn opens, when the player
                                     # set out to buy something (`_trade_offer`).
-                                    buying=_buying_note(c, player_input),
+                                    buying=(_buying_note(c, player_input)
+                                            or _passage_note(c)),
                                     reading=getattr(agent, "reading", None),
                                     player_text=player_text, report=report)
         agent.brief_facts = dict(report.get("facts") or {})
