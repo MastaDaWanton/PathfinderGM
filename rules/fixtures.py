@@ -38,6 +38,8 @@ import re
 from pathlib import Path
 
 from . import floorplan
+from . import places as places_mod
+from . import water
 from .grid import Grid, Point
 
 OCCUPIES = ("blocked", "difficult", "raised", "open", "overhead")
@@ -300,7 +302,15 @@ def type_the_ground(scene, place_id: str, terrain: str = "", authored=None) -> N
     # swimmer may enter and anybody may go over the side into (`Grid.passable(swims=)`).
     grid.water = {tuple(p) for f in grid.fixtures if kinds()[f["kind"]].get("swim")
                   and "blocked" in kinds()[f["kind"]]["occupies"] for p in f["squares"]}
-    grid.low = {tuple(p): grid.ground(tuple(p)) + 1 for f in grid.fixtures
+    # A wet PLACE (a lake, a river, below the surface) is water from edge to edge: every
+    # open square of it, so moving there is the swimmer's quarter speed and the Swim check
+    # (`Scene.afloat`) the same as the sea past a rail. Its pillars and wrecks stay solid.
+    # Standing water (the swamp's `water` kind, difficult) is wading and stays out: CRB
+    # p.427, a shallow bog is difficult terrain and asks no Swim check.
+    if water.is_wet(terrain or places_mod.terrain_of(place_id)):
+        grid.water |= {(x, y) for x in range(grid.width) for y in range(grid.height)
+                       if (x, y) not in grid.blocked}
+    grid.low ={tuple(p): grid.ground(tuple(p)) + 1 for f in grid.fixtures
                 if kinds()[f["kind"]].get("low") for p in f["squares"]}
     # Water you cannot walk on but can see and shoot across (the sea past a rail): its
     # top is the surface, a level under the floor, so it blocks no line and covers nobody.
