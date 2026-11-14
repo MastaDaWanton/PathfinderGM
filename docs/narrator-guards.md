@@ -996,3 +996,75 @@ Left: the finder still fires only when the player is the last one standing (`_al
 fight with a foe upright it says nothing; widening it was not done, because "your side" is
 fight prose's commonest wound and every false hit costs a whole-beat rewrite before the
 second read can refute it.
+
+## One person, one stance a beat (2026-11-14)
+
+**The report** (0.3.2, 2026-11-13, live): the harbourmaster "leans in" to the player and a
+sentence later "ignores you". The turn's save was not available to this lane, so the
+mechanism was found on the 2026-11 diagnosis corpus instead (C:\Users\natha\pgm-work\
+diag-kit, every planned beat with its slots' raw answers).
+
+**What the corpus held.** 1,462 distinct planned beats; 1,213 carried an `aside` slot
+("Nobody was spoken to. One of the people here … goes on with what they were already doing,
+in one sentence, without speaking"). A counting pass (a bench instrument, never product
+code) looked for a slot that writes somebody ignoring or turning from the player beside
+another slot of the same beat naming the same person. 36 hits:
+- 22 were `fact1`/`fact2` of the trial ("You plead…" / "Pallo Farrow ignores your plea and
+  declares you guilty"): disregarding a plea while passing sentence is no contradiction.
+- 12 were the matter slot's go-between then the aside on the same person: "The gnome
+  innkeeper mentions in passing that Peleth Ashbourne is looking for someone to fetch some
+  Glowvine." then "The gnome innkeeper ignores your presence and continues to polish a
+  heavy wooden mug." — the report's shape exactly.
+- 2 were the `still` slot then the aside ("Snik Dunmoor offers a helpful presence nearby"
+  / "Snik Dunmoor … ignoring the transaction").
+
+Every real contradiction ended in the aside. Its cause is the plan, not the model: the
+slot was free to pick anybody here, including the one another slot had just put face to
+face with the player, and its own ask ("nobody was spoken to … without speaking") reads,
+said of that person, as ignoring the player. The shape of the prompt became the output.
+
+**What the traditions and the literature say.**
+- Detecting contradiction inside a passage is hard for models. ContraDoc (Li, Raheja &
+  Kumar, NAACL 2024, arXiv 2311.09182): GPT-4 was the best and still unreliable on
+  self-contradictions needing context. Finding Flawed Fictions (Ahuja, Sclar & Tsvetkov,
+  COLM 2025, arXiv 2504.11900): continuity errors need entity-state tracking, frontier
+  models do poorly, and LLM-written stories carry more of them. This house measured the
+  same: DeBERTa-v3 NLI AUC 0.50, Granite Guardian 2/22 (2026-11-03, above).
+- What works is extracting a closed state per entity and comparing in code. Dialogue NLI
+  (Welleck et al., ACL 2019) built its contradictions exactly so: utterances annotated as
+  (entity, relation, value) triples, a contradiction being the same entity with an
+  opposing relation or another value. SCORE (arXiv 2503.23512) tracks item states and
+  refuses an update that revives a lost item. Both are the extract-then-diff shape of
+  `gm/beat_verify.py`.
+- Better still is not writing the contradiction: the planned pipeline exists because
+  constraining the narrator measured 15x better than policing it (2026-10-17).
+
+**Fixed at the source** (`planned._engaged`, `build_plan`): the aside chooses only among
+people no other slot of the beat shows — each told act's actor and `Outcome.about`, the
+matter's giver and carrier (`carrier_ref`, new on the matter slot). With nobody else here
+there is no aside. The listener of the player's own unanswered `say` stays eligible: the
+page shows only the player speaking, and that listener going on with their work is true
+(the market master's case). No model call, no English read: who is engaged is the engine's.
+
+**Not built, on purpose:** a per-person stance read (a beat_verify side question with
+`toward you` / `away from you` per sentence, a contradiction when one ref holds both). On
+this corpus it would have had nothing left to find after the fix but the two `still`
+pairs, at one more model call a beat; the literature above says such a reader is the weak
+link. If a contradiction is seen again that does not run through the aside, that read is
+the next step, built the DNLI way: closed labels per sentence, the contradiction decided in
+code, the later sentence cut through `_repair_sentences`.
+
+Left: the `still` slot names nobody by ref, so its two pairs are not covered.
+
+**Measured live** (2026-11-14, gemma-4-12B heretic, `tools/narration_diag/drive.py` through
+the real `/api/say` view, the diagnosis kit's `jason/0` snapshot, "I walk to the inn and ask
+for a room for the night"; the fix switched off in-process for the baseline). Ollama was
+shared with other sessions' lanes and suites the whole time: turns took 70-700 s, one
+stalled (ModelStalled, 120 s) and one fell back to the engine line, so the sample is small.
+- before: 1 planned beat of 2 — matter "The gnome innkeeper mentions in passing…", then
+  the aside on the same innkeeper ("returns to their task"). The corpus's runs of the same
+  line wrote that aside as "ignores your presence" in 12 beats.
+- after: 3 planned beats of 4 — fact + matter, no aside in any (the innkeeper is the only
+  person at the inn and is the matter's carrier); no beat gave anyone two stances.
+- Not separable statistically from 1 vs 3 beats; the claim rests on the plan, which is
+  deterministic (`test_the_aside_never_goes_to_somebody_another_slot_already_shows`).

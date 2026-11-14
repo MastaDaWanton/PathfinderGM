@@ -878,7 +878,27 @@ def matter_slot(pull) -> dict | None:
         return None
     return {"key": "matter", "want": MATTER_WANT, "not_own": title, "approach": how,
             "giver_ref": str((pull.get("giver") or {}).get("ref") or ""),
+            "carrier_ref": str((pull.get("carrier") or {}).get("ref") or ""),
             "say": say + " " + never + " Do not resolve it."}
+
+
+def _engaged(outcomes, matter: dict | None, me: str) -> set[str]:
+    """The refs this beat's other slots show doing or undergoing something: each told act's
+    actor and the bodies it was about (`Outcome.about`), and the matter's giver and
+    carrier. Not the listener of the player's own `say`: an unanswered word shows only
+    the player speaking, and that listener going on with their work is the true page."""
+    out: set[str] = set()
+    for o in outcomes or []:
+        if not getattr(o, "tell", ""):
+            continue
+        out.add(str(getattr(o, "actor", "") or ""))
+        if not (getattr(o, "op", "") == "say" and getattr(o, "actor", "") in ("", me)):
+            out.update(str(r) for r in getattr(o, "about", ()) or ())
+    if matter:
+        out.update((str(matter.get("giver_ref") or ""), str(matter.get("carrier_ref") or "")))
+    out.discard("")
+    out.discard(me)
+    return out
 
 
 def build_plan(engine, player_input: str, outcomes, *, pull=None,
@@ -1232,6 +1252,20 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
                    if not _holds_a_job(engine, speaker["ref"]) else {}),
                 **({"no_job": speaker["name"], "holds": held} if held else {})})
         else:
+            # Never somebody another slot of this beat already shows at the player. The
+            # owner's report (0.3.2, 2026-11-13): the harbourmaster leaned in and, a
+            # sentence later, ignored you. Counted on the 2026-11 diagnosis corpus (1,462
+            # distinct planned beats): every contradiction of one person's attention in a
+            # beat ended in this slot — 12 behind the matter slot ("The gnome innkeeper
+            # mentions in passing that Peleth Ashbourne…" then "The gnome innkeeper
+            # ignores your presence"), 2 behind "still" — because it was free to pick the
+            # same person, and "nobody was spoken to … without speaking" reads as ignoring
+            # the player. Who is engaged is the engine's (each act's actor and `about`, the
+            # matter's giver and carrier); the slot goes when nobody else is here. Not
+            # covered: the "still" pair, whose slot names nobody by ref.
+            engaged = _engaged(outcomes, matter, me)
+            people = [p for p in people if p["ref"] not in engaged]
+        if speaker is None and people:
             names = ", ".join(f'{p["name"]} ({p["ref"]})' for p in people)
             slots.append({"key": "aside", "want": ASIDE_WANT,
                           "say": f"Nobody was spoken to. One of the people here ({names}) "
