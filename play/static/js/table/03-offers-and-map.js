@@ -591,6 +591,14 @@ function renderMap(s) {
         c},${r}</title></rect>`);
   }
 
+  // A board at least twice as long one way as the other, in a box the other way about, is
+  // drawn a quarter-turn round (north to the left) so its long axis runs along the box's.
+  // Measured 2026-11-13: a ship's deck (6 x 17 with its sea) drew 15% of the width of a
+  // 692 x 272 board box. Text is turned back upright by the stylesheet (#map.turned);
+  // MapZoom reads `data-turned` for its board-to-view sums. 3D opens zoomed instead
+  // (24-map-zoom.js): a quarter-turn of an isometric board does not change its shape.
+  const W = g.width * CELL, H = g.height * CELL;
+  const turned = !MAP_3D && flatTurned(g);
   // The same board, drawn two ways. Both read the one geometry payload and both write
   // `data-sq`, so the combat builder cannot tell them apart — which is the whole reason
   // the flat one was built first.
@@ -604,8 +612,9 @@ function renderMap(s) {
                        fight: !!s.scene.in_encounter,
                        reach: !!(STATE.scene && STATE.scene.in_encounter),
                        up: s.scene.in_encounter ? s.scene.turn_ref : null })
-    : `<svg id="map" viewBox="${-MARGIN} ${-MARGIN} ${g.width * CELL + MARGIN} ${
-         g.height * CELL + MARGIN}"
+    : `<svg id="map" viewBox="${turned ? `${-MARGIN} 0 ${H + MARGIN} ${W + MARGIN}`
+         : `${-MARGIN} ${-MARGIN} ${W + MARGIN} ${H + MARGIN}`}"${
+         turned ? ` class="turned" data-turned="${W}"` : ""}
          preserveAspectRatio="xMidYMid meet"><defs>
          <pattern id="unithatch-foe" width="6" height="6" patternUnits="userSpaceOnUse"
                   patternTransform="rotate(45)">
@@ -617,7 +626,8 @@ function renderMap(s) {
            <rect width="6" height="6" fill="#d9d2c2"></rect>
            <line x1="0" y1="0" x2="0" y2="6" stroke="#f7f2e6" stroke-width="3"></line>
          </pattern>${FX_DEFS}${MAP_HATCH}
-       </defs>${parts.join("")}</svg>`;
+       </defs>${turned ? `<g transform="matrix(0 -1 1 0 0 ${W})">${parts.join("")}</g>`
+         : parts.join("")}</svg>`;
   const pools = (s.scene.pools || []).length;
   // The controls sit in the board's head as the approved design lays them out (the mock's
   // Map mode): Flat and 3D as one recessed pair, the turn beside them while it is in 3D,
@@ -693,6 +703,18 @@ function renderMap(s) {
 const MAP_HATCH = `<pattern id="maphatch" width="4" height="4" patternUnits="userSpaceOnUse"
   patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="4" stroke="#b0483c"
   stroke-width="1.1" stroke-opacity=".7"></line></pattern>`;
+
+// Whether the flat board is drawn a quarter-turn round (renderMap): long (2 : 1 or more)
+// one way, in a box that is long the other way. The box is the board's last one, or the
+// map's panel before the first; unmeasured (a hidden tab), it is taken as wide.
+function flatTurned(g) {
+  const long = Math.max(g.width, g.height), short = Math.min(g.width, g.height);
+  if (!short || long < 2 * short) return false;
+  const box = document.querySelector("#mapwrap .boardview") || document.getElementById("mapwrap");
+  const r = box ? box.getBoundingClientRect() : null;
+  const wide = !r || !r.width || !r.height || r.width >= r.height;
+  return wide !== (g.width >= g.height);
+}
 
 // The outline of a set of squares as unit edges [x1, y1, x2, y2] in squares: the edge of
 // the move, of its safe steps, of a hunch's range. Geometry only; the set is the engine's.
