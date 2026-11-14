@@ -139,6 +139,18 @@ def test_carrying_what_is_already_carried_mints_nothing():
 
 # --- 2 and 6. selling goods, at the book's half ---------------------------------------------
 
+def _half_moved(scene, keeper_ref: str, list_gp: float) -> int:
+    """Half the list price in copper, moved by this keeper's own terms (owner, 2026-11-13:
+    a keeper's attitude and seeded thrift move what they pay; `tradecraft.counter_terms`,
+    the one number `_op_sell` reads). No haggle here, so any stall name answers 0 for it."""
+    from rules import market as market_mod, tradecraft
+
+    pct, _why = tradecraft.counter_terms(
+        scene, scene.pc(), scene.actors[keeper_ref], str(scene.location_id or "nowhere"),
+        keeper_ref, market_mod.day_of(scene.clock_minutes))
+    return round(tradecraft.sell_price(list_gp / 2, pct) * 100)
+
+
 def test_a_carried_crate_sells_at_half_its_value_and_leaves_the_pack():
     """Turns 66–97: four turns of haggling over the crate resolved to `narrate_only`, and
     the save ended `goods: {"crate": 1, …}` after the sale. `_op_sell` only knew the
@@ -152,7 +164,7 @@ def test_a_carried_crate_sells_at_half_its_value_and_leaves_the_pack():
     pc = scene.pc()
     assert "crate" not in pc.goods
     assert scene.actors[clerk].goods == {"crate": 1}, "sold into his hands, not vanished"
-    assert goods.in_copper(pc.purse) == round(pricing.UNLISTED_GP * 50)
+    assert goods.in_copper(pc.purse) == _half_moved(scene, clerk, pricing.UNLISTED_GP)
     assert out[0].tell.startswith(
         "Kesst Vayr sells the crate to the clerk of the counting house for ")
 
@@ -170,15 +182,15 @@ def test_the_players_seventy_five_percent_cannot_raise_the_price():
     assert sell["params"]["to"] == clerk and sell["params"]["item"] == "crate"
     assert sell["params"]["accept"] == round(0.75 * pricing.UNLISTED_GP, 2)
     _run(scene, raw)
-    assert goods.in_copper(scene.pc().purse) == round(pricing.UNLISTED_GP / 2 * 100)
+    assert goods.in_copper(scene.pc().purse) == _half_moved(scene, clerk, pricing.UNLISTED_GP)
 
 
 def test_a_listed_thing_sells_at_half_its_core_price():
     scene = _scene("the smith")
     scene.pc().goods["lantern"] = 1
-    _run(scene, [{"op": "sell", "actor": "pc",
-                  "params": {"item": "lantern", "to": _ref(scene, "the smith")}}])
-    assert scene.pc().purse == {"gp": 3, "sp": 5}, "a hooded lantern is 7 gp, half is 3½"
+    smith = _ref(scene, "the smith")
+    _run(scene, [{"op": "sell", "actor": "pc", "params": {"item": "lantern", "to": smith}}])
+    assert goods.in_copper(scene.pc().purse) == _half_moved(scene, smith, 7),         "a hooded lantern is 7 gp, half is 3½, moved by the smith's own terms"
 
 
 def test_an_offer_is_a_haggle_and_the_close_is_the_sale():
@@ -456,4 +468,5 @@ def test_the_recorded_close_through_the_turn_sells_the_crate(monkeypatch):
     turn = gm.plan_turn(said, history=[])
     e.run(turn.intents)
     assert "crate" not in s.pc().goods
-    assert goods.in_copper(s.pc().purse) == round(pricing.UNLISTED_GP / 2 * 100)
+    clerk = next(r for r, a in s.actors.items() if "clerk" in a.name)
+    assert goods.in_copper(s.pc().purse) == _half_moved(s, clerk, pricing.UNLISTED_GP)

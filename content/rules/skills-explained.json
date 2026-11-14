@@ -92,7 +92,7 @@
         {"text": "Asking around for where someone lives takes 1d4 hours and uses your Diplomacy.",
          "file": "rules/engine.py", "find": "bonus = sum(m.value for m in stack(pc.skill_modifiers(\"diplomacy\")))"},
         {"text": "It is the way past a merchant who will not trade with you.",
-         "file": "play/views.py", "find": "the engine rolls your Diplomacy against how "}
+         "file": "rules/engine.py", "find": "the engine rolls your Diplomacy against how "}
       ],
       "not_yet": "Asking a favour by the book's table, and gathering rumours beyond where somebody lives."
     },
