@@ -508,8 +508,10 @@ def day_at_sea(dice, level: int) -> str:
 
 # The storm on deck, as the Core Rulebook's Storm entry writes it (Environment,
 # Weather): visibility cut by three quarters, "imposing a -8 penalty on Perception
-# checks", and ranged weapon attacks impossible. The penalty rides an effect that ends
-# with the day; the ranged half is not built (the attack op has no weather reader).
+# checks", and "Storms make ranged weapon attacks impossible, except for those using siege
+# weapons" (CRB p.438). Both ride one effect that ends with the day: the penalty as its
+# modifier, the ranged half as its tag (`states.NO_RANGED_WEAPONS`), which the attack op
+# refuses a ranged or thrown weapon under. Spells are not weapon attacks and fly.
 STORM_PERCEPTION = -8
 STORM_ROUNDS = 24 * 60 * 10
 
