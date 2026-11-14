@@ -101,6 +101,20 @@ def _keeper_name(c, ref) -> str:
         return ""
 
 
+def _terms_line(c, bench) -> str:
+    """"; Mira likes you: 5% off" when the keeper's own terms move the rent the line
+    quotes at the book's rate (`places._let`), else ""."""
+    try:
+        from rules import places as places_mod, tradecraft
+
+        keeper = places_mod._actor(c.scene, (bench or {}).get("keeper") or "")
+        said = tradecraft.terms_said(keeper, int(bench.get("percent") or 0),
+                                     bench.get("why") or [])
+    except Exception:      # noqa: BLE001 - a reason is never worth failing a footer for
+        said = ""
+    return f"; {said}" if said and keeper is not None else ""
+
+
 def _where(c, pc) -> dict:
     """Where the bench stands (UI plan §6.3, §6.8 "the place line"): lane G's answer, the
     place's name for the stage and for an In-progress entry's "in the vat at ...", the vats
@@ -145,6 +159,7 @@ def _where(c, pc) -> dict:
         if out["vats_in_use"]:
             line += (f"; {out['vats_in_use']} vat{'s' if out['vats_in_use'] != 1 else ''} "
                      f"holding your work")
+        line += _terms_line(c, tannery)
         out["line"] = line
         out["label"] = "a town tannery" if tannery.get("kind") == "town" else "your tannery"
     elif got.get("field_kit"):
@@ -155,6 +170,8 @@ def _where(c, pc) -> dict:
         out["name"] = ""
         out["line"] = ("No bench here: carry a leatherworker's field kit or find a tannery")
         out["label"] = "no bench"
+    if got.get("refused"):
+        out["line"] = f"{got['refused']} {out['line']}"
     try:
         from rules import places as places_mod
 
@@ -1333,7 +1350,8 @@ def tanners_here(c, pc) -> list[dict]:
             continue
         try:
             if kn.teaches(a, population.of_ref(c.scene, ref), craft):
-                out.append({"ref": ref, "name": a.name, "price": price})
+                out.append({"ref": ref, "name": a.name, "price": price and _coins(
+                    kn.lesson_price_cp(c.scene, a, craft))})
         except Exception:      # noqa: BLE001 - one odd record is no reason to lose the card
             continue
     return out
@@ -1380,7 +1398,7 @@ def leather_ask(request):
         return JsonResponse({"revealed": [], "paid": "", "minutes": 0,
                              "refused": f"{who} has nothing to tell you about {name} you "
                                         f"do not know."})
-    cp = int(rules["price_cp"])
+    cp = kn.lesson_price_cp(c.scene, person, craft)
     purse, ok = goods.spend(pc.purse, cp)
     if not ok:
         return JsonResponse({"revealed": [], "paid": "", "minutes": 0,

@@ -116,6 +116,11 @@ def lesson_size(person) -> int:
     return _k.lesson_size(person, _k.HERBALIST)
 
 
+def lesson_price_cp(scene, person) -> int:
+    """What this person asks for a lesson (`knowledge.lesson_price_cp`)."""
+    return _k.lesson_price_cp(scene, person, _k.HERBALIST)
+
+
 def is_library(place) -> bool:
     """A place that keeps records: the settlement table's library, a scriptorium, an
     archive, a temple's archive (rules/places.py names them; nothing here mints one)."""

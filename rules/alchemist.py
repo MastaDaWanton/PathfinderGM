@@ -236,9 +236,14 @@ def where_here(scene, actor, known=()) -> dict:
     never from the player's words."""
     fight = bool(getattr(scene, "in_encounter", False)) if scene is not None else False
     lab = laboratory_here(scene, known)
+    # A hostile alchemist will not let the party at the glass (`places._let`).
+    refused = str((lab or {}).get("refused") or "")
+    lab = None if refused else lab
     kit = has_kit(actor)
     if fight:
         label = "In a fight: the bench waits until it is over"
+    elif refused:
+        label = refused + (" The field kit still works." if kit else "")
     elif lab:
         label = ("In your laboratory" if lab.get("kind") == "owned"
                  else "In a laboratory, rented by the hour")
@@ -247,7 +252,7 @@ def where_here(scene, actor, known=()) -> dict:
     else:
         label = "No field kit and no laboratory here"
     return {"lab": lab, "kit": kit, "fight": fight, "protected": protected(actor, lab),
-            "label": label}
+            "label": label, "refused": refused}
 
 
 def rent_cp(scene, lab: dict | None, minutes: int, known=()) -> int:

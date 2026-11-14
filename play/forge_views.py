@@ -91,7 +91,7 @@ def _where(c, pc) -> dict:
     else:
         label = "no forge"
     return {"smithy": smithy, "kit": bool(got.get("kit")), "label": label,
-            "place": place, "biome": c.biome}
+            "place": place, "biome": c.biome, "refused": got.get("refused") or ""}
 
 
 def _reserved(c) -> dict:
@@ -261,6 +261,8 @@ def _place_line(c, where: dict) -> str:
     and metals are open, so it is said in words. "At the field kit", "At Brannoc's
     smithy, 1 sp an hour", "At your smithy"."""
     smithy = where.get("smithy")
+    if where.get("refused"):
+        return where["refused"] + (" The field kit still works." if where.get("kit") else "")
     if smithy:
         rate = int(smithy.get("rate_cp_per_hour") or 0)
         if smithy.get("kind") == "owned" and not rate:
@@ -279,7 +281,10 @@ def _place_line(c, where: dict) -> str:
         # The place the party stands in IS the smithy, so its own name says where ("the
         # smithy at the smithy" was the leather bench's twin, "the tannery at the tannery").
         whose = f"{keeper}'s smithy" if keeper else (where.get("place") or "the smithy")
-        return f"At {whose}, {_coins(rate)} an hour" if rate else f"At {whose}"
+        from .leather_views import _terms_line
+
+        return (f"At {whose}, {_coins(rate)} an hour{_terms_line(c, smithy)}" if rate
+                else f"At {whose}")
     if where.get("kit"):
         return "At the field kit"
     return "No forge here: carry a smith's field kit or find a smithy"
@@ -1261,7 +1266,8 @@ def smiths_here(c, pc) -> list[dict]:
             continue
         try:
             if kn.teaches(a, population.of_ref(c.scene, ref), kn.BLACKSMITH):
-                out.append({"ref": ref, "name": a.name, "price": price})
+                out.append({"ref": ref, "name": a.name, "price": price and _coins(
+                    kn.lesson_price_cp(c.scene, a, kn.BLACKSMITH))})
         except Exception:      # noqa: BLE001 - one odd record is no reason to lose the card
             continue
     return out
@@ -1309,7 +1315,7 @@ def forge_ask(request):
         return JsonResponse({"revealed": [], "paid": "", "minutes": 0,
                              "refused": f"{who} has nothing to tell you about {m.name} "
                                         f"you do not know."})
-    cp = int(rules["price_cp"])
+    cp = kn.lesson_price_cp(c.scene, person, kn.BLACKSMITH)
     purse, ok = goods.spend(pc.purse, cp)
     if not ok:
         return JsonResponse({"revealed": [], "paid": "", "minutes": 0,
