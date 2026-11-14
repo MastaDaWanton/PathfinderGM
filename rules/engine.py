@@ -16911,6 +16911,37 @@ class Engine:
                 else "the book's fare")
         return f"{_sentence(seller.name)} {said}: {cost}"
 
+    def _counter_keeper(self, ref, stall: str = ""):
+        """Who keeps the counter a trade is at: the person named, else the keeper of one
+        of a market's counters when the stall is one (`market:armorer`), else whoever
+        keeps a counter where the party stands. None at an open market or a peddler's."""
+        from . import keepers as keepers_mod, market as market_mod
+
+        if ref and ref in self.scene.actors:
+            return self.scene.actors[ref]
+        at = str(self.scene.at or "")
+        if str(stall).startswith(market_mod.COUNTER_PREFIX):
+            wid = keepers_mod.holder_id(at, str(stall)[len(market_mod.COUNTER_PREFIX):])
+            return next((a for a in self.scene.actors.values()
+                         if str(getattr(a, "world_entity_id", "") or "") == wid), None)
+        here = keepers_mod.keeper_in(self.scene, at)
+        return here if here is not None and here.ref in self.scene.actors             and keepers_mod.keeps_a_counter(here) else None
+
+    def _will_not_deal(self, keeper) -> str:
+        """The refusal of a keeper who will not deal with the player at all, or "".
+
+        Owner, 2026-11-13: "yes make shop prices move with attitude too". My reading of it
+        with the dislike now in the price (`pricing.REGARD_PERCENT`): an UNFRIENDLY keeper
+        trades, dearer; only a HOSTILE one — somebody who would act against you — will not
+        deal. The trade panel asks the same question (`views._counter_refusal`)."""
+        from . import attitude as attitude_mod
+
+        if keeper is None or attitude_mod.of(keeper, default="") != attitude_mod.HOSTILE:
+            return ""
+        return (f"{_sentence(keeper.name)} will not deal with you. Talk them round first: "
+                f"it takes a minute of it, and the engine rolls your Diplomacy against how "
+                f"they feel about you.")
+
     def passage_seller(self):
         """Who sells a berth here: the port's harbourmaster, the keeper of its docks
         (`places.STAFFED`), when one has been stood up. Not the ship's master, who is
@@ -16931,21 +16962,17 @@ class Engine:
         own terms (`pricing.seller_terms`: their attitude to the player, their thrift)
         plus the day's haggle with them (`_op_haggle`, keyed as every counter is), never
         past the haggle's own 25% (Ultimate Campaign's floor)."""
-        from . import market as market_mod, pricing
+        from . import market as market_mod
 
         seller = self.passage_seller()
         pc = self.scene.pc()
         if seller is None or pc is None:
             return 0, [], None
-        percent, why = pricing.seller_terms(self.scene, seller)
-        haggled = tradecraft.haggled(
-            self.scene, pc.ref, str(self.scene.location_id or "nowhere"),
+        percent, why = tradecraft.counter_terms(
+            self.scene, pc, seller, str(self.scene.location_id or "nowhere"),
             market_mod.stall_of(self.scene, seller),
             market_mod.day_of(self.scene.clock_minutes))
-        if haggled:
-            why = [*why, f"gave {haggled}% to the haggle"]
-        return min(int(tradecraft.row("haggle")["max_percent"]), percent + haggled), \
-            why, seller
+        return percent, why, seller
 
     def _book_passage(self, intent: Intent, leg) -> Outcome:
         """Buy a berth to `leg`'s port and go aboard. She lies at the quay until the party
@@ -20563,9 +20590,14 @@ class Engine:
         # The seller's standing with this town's law moves the price (docs/wanted.md):
         # a fence pays a fugitive less for the reason he charges them more.
         asking = round(pricing.what_a_shop_pays(held, seller=actor, town=place) * count, 2)
-        # A counter talked round today pays more (`_op_haggle`, the owner's option B).
-        haggled = tradecraft.haggled(self.scene, actor.ref, place, stall, day)
-        asking = tradecraft.sell_price(asking, haggled)
+        # The keeper's own terms and a counter talked round today move what they pay, the
+        # opposite way to what they charge (`tradecraft.counter_terms`).
+        keeper = self._counter_keeper(buyer, stall)
+        if self._will_not_deal(keeper):
+            return self._refuse(intent, self._will_not_deal(keeper))
+        percent, why = tradecraft.counter_terms(self.scene, actor, keeper, place, stall, day)
+        asking = tradecraft.sell_price(asking, percent)
+        moved = tradecraft.terms_said(keeper, percent, why, paying=True, who=who)
         # A price the player has already agreed to caps the ask — that is the haggle,
         # and the trade screen is where it gets named. It can only ever lower the price
         # asked: a player cannot talk a stall into paying more than the goods are worth
@@ -20606,7 +20638,7 @@ class Engine:
             # an empty till, and the difference is the whole point of the cap.
             tell += (f" — all {who} can raise today, against "
                      f"{self._coin_text(asking)} asked")
-        tell += f". ({goods.purse_line(actor.purse, coins)} in hand.)"
+        tell += (f" ({moved})" if moved else "")             + f". ({goods.purse_line(actor.purse, coins)} in hand.)"
 
         return Outcome(
             intent_id=intent.id, op="sell",
@@ -20646,8 +20678,12 @@ class Engine:
 
         asking = round(pricing.what_a_shop_pays_for_goods(key, seller=actor, town=place)
                        * count, 2)
-        asking = tradecraft.sell_price(
-            asking, tradecraft.haggled(self.scene, actor.ref, place, stall, day))
+        keeper = self._counter_keeper(buyer_ref, stall)
+        if self._will_not_deal(keeper):
+            return self._refuse(intent, self._will_not_deal(keeper))
+        percent, why = tradecraft.counter_terms(self.scene, actor, keeper, place, stall, day)
+        asking = tradecraft.sell_price(asking, percent)
+        moved = tradecraft.terms_said(keeper, percent, why, paying=True, who=who)
         agreed = intent.params.get("accept")
         if agreed is not None:
             try:
@@ -20687,7 +20723,7 @@ class Engine:
         if paid < asking:
             tell += (f" — all {who} can raise today, against "
                      f"{self._coin_text(asking)} asked")
-        tell += f". ({goods.purse_line(actor.purse, coins)} in hand.)"
+        tell += (f" ({moved})" if moved else "")             + f". ({goods.purse_line(actor.purse, coins)} in hand.)"
         effects = [{"ref": actor.ref, "kind": "sold", "item": key, "count": count,
                     "paid_cp": cp, "left": left, "to": buyer_ref or ""}]
         if rec is not None and rec.get("stolen") and rec.get("owner") \
@@ -20769,11 +20805,15 @@ class Engine:
         if count > 1 and not getattr(found, "staple", False):
             count, only_one = 1, " It was the only one on the counter."
 
-        # A counter talked round today sells for less (`_op_haggle`, the owner's option
-        # B): the price the shelf shows, moved by the percentage the haggle won.
-        haggled = tradecraft.haggled(self.scene, actor.ref, place, stall, day)
+        # The keeper's own terms and a counter talked round today (`_op_haggle`, the
+        # owner's option B) move the price the shelf shows (`tradecraft.counter_terms`).
+        keeper = self._counter_keeper(seller, stall)
+        if self._will_not_deal(keeper):
+            return self._refuse(intent, self._will_not_deal(keeper))
+        percent, why = tradecraft.counter_terms(self.scene, actor, keeper, place, stall, day)
         price = tradecraft.buy_price(
-            round(pricing.worth(found, buyer=actor, town=place) * count, 2), haggled)
+            round(pricing.worth(found, buyer=actor, town=place) * count, 2), percent)
+        moved = tradecraft.terms_said(keeper, percent, why, who=who)
         cp = int(round(price * 100))
         purse, paid = goods.spend(actor.purse, cp)
         coins = self._coins_here()
@@ -20810,7 +20850,7 @@ class Engine:
             tell=f"{actor.name} pays {who} {self._coin_text(price)} for "
                  + (f"{goods.measure(count * per, found.unit)} of {found.name}"
                     if getattr(found, "unit", "") else f"{count}x {found.name}")
-                 + (f", {haggled}% off for the haggle" if haggled else "")
+                 + (f" ({moved})" if moved else "")
                  + f". ({goods.purse_line(actor.purse, coins)} left.)" + only_one
                  + arrived_tell,
             because=intent.because,

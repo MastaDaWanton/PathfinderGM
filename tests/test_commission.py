@@ -291,7 +291,7 @@ def test_ruling_an_offered_commission_is_haggled_with_diplomacy(world):
     out = next(o for o in res.outcomes if o.op == "commission")
     eff = out.effects[0]
     assert "haggles" in out.tell and "comes down" in out.tell, out.tell
-    assert eff["cp"] < eff["listed_cp"] and "haggled down from" in out.tell
+    assert eff["cp"] < eff["listed_cp"] and "to the haggle" in out.tell and "listed" in out.tell
     assert any(r.label.startswith("Diplomacy") for r in out.rolls)
     # Once a day with a keeper: the second ask holds to the same price, no roll.
     again = e.run(e.validate([{"op": "commission", "actor": "pc", "because": "t",

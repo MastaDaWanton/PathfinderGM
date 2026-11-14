@@ -93,11 +93,15 @@ def test_haggle_at_the_counter_moves_the_prices_the_window_draws(market):
     assert not after["can_haggle"]
     pct = after["haggled"]
     if pct:
+        # The keeper's own terms already moved `before` (owner, 2026-11-13): the haggle
+        # adds to them, so the price goes from (100 - theirs)% to (100 - theirs - won)%.
+        was_pct, now_pct = before["terms_percent"], after["terms_percent"]
+        assert now_pct == min(25, was_pct + pct)
         was = {x["id"]: x["gp"] for x in before["theirs"]}
         for x in after["theirs"]:
             if x["id"] in was and was[x["id"]] >= 1:
-                assert x["gp"] == pytest.approx(round(was[x["id"]] * (100 - pct) / 100, 2),
-                                                abs=0.011)
+                assert x["gp"] == pytest.approx(
+                    was[x["id"]] * (100 - now_pct) / (100 - was_pct), abs=0.02)
 
 
 def test_the_sheet_is_told_what_a_days_work_pays_here(market):

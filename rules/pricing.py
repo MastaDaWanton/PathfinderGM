@@ -100,8 +100,10 @@ def markup_for(buyer, town) -> float:
 # Campaign's bargaining floor by the caller (`tradecraft.undercut`'s 25%).
 #
 # The attitude step (`attitude.of`: a held step first, else the regard band) — a friend's
-# price, dearer for somebody who does not like you. Unfriendly and hostile are priced
-# rather than refused: the counter refuses them (`views._counter_refusal`), but a
+# price, dearer for somebody who does not like you. Every keeper's counter reads it
+# (`tradecraft.counter_terms`; owner, 2026-11-13: "yes make shop prices move with
+# attitude too"), so an unfriendly keeper trades at the dearer price and only a hostile
+# one will not deal (`Engine._will_not_deal`). A berth is never refused by attitude: a
 # harbourmaster who will not book you strands you on a coast.
 REGARD_PERCENT = {"hostile": -25, "unfriendly": -10, "indifferent": 0, "friendly": 5,
                   "helpful": 10, "devoted": 15}

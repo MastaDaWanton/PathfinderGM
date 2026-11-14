@@ -332,7 +332,11 @@ def test_buying_a_light_horse_spends_75_gp_and_the_journey_rides_it(worlds):
                                  "params": {"item": "light horse", "stall": stall}}],
                                origin="author:test")).outcomes[0]
     assert out.status == "resolved", out.tell
-    assert goods.in_copper(pc.purse) == 25 * 100
+    # 75 gp, moved by the horse dealer's own terms since 2026-11-13 (owner: "yes make
+    # shop prices move with attitude too"); the tell names them when they moved it.
+    paid = out.effects[0]["paid_cp"]
+    assert goods.in_copper(pc.purse) == 100 * 100 - paid
+    assert paid == 75 * 100 or "% " in out.tell, out.tell
     horse = [a for a in s.actors.values()
              if not a.is_pc and a.from_template in journey.MOUNTS
              and a.has_state(states.TRAVELS_WITH_YOU)]
