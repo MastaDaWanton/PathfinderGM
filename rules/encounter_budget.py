@@ -62,6 +62,8 @@ MOST = 3
 
 # CR below 1, in the CRB's progression order: index 0 is 1/2, -1 is 1/3, ... -4 is 1/8.
 _BELOW_ONE = (0.5, 0.333, 0.25, 0.167, 0.125)
+# The highest CR Table 12-2 (extended, `xp.CR_AWARD`) prices.
+_TOP = int(max(xp_mod.CR_AWARD))
 
 
 def apl(levels) -> int:
@@ -103,8 +105,40 @@ def party_levels(scene, pc_level: int | None = None) -> list[int]:
         if any(states.TRAVELS_WITH_YOU in (e.tags or ())
                and str(e.origin or "").startswith("company:")
                for e in (getattr(a, "effects", ()) or ())):
-            out.append(max(1, int(getattr(a, "level", 1) or 1)))
+            out.append(companion_level(a))
     return out
+
+
+def companion_level(actor) -> int:
+    """The level a companion stands at in the APL: a classed person at their class level,
+    a monster (no class) at its CR, the Bestiary's "Treat the monster's CR as class levels
+    when determining the monster PC's overall levels" (Monsters as PCs, p.313,
+    aonprd.com/Rules.aspx?ID=2476). Measured: a claimed CR 7 construct with `level` 1 on
+    its sheet counted as a level-1 member. Its CR is read back from what it is worth
+    (`xp.worth`, Table 12-2); a CR below 1 counts as 1, the least a member can be. The
+    higher of that and the sheet's `level`, because `instantiate` writes 1 for every
+    stat block while a level set on purpose (a codex thug raised to 3) is meant."""
+    level = max(1, int(getattr(actor, "level", 1) or 1))
+    if getattr(actor, "char_class", None):
+        return level
+    worth = xp_mod.worth(actor)
+    if worth <= 0:
+        return level
+    cr = min(xp_mod.CR_AWARD, key=lambda k: (abs(xp_mod.CR_AWARD[k] - worth), -k))
+    return max(level, int(cr))
+
+
+def admit(already: int, each, cap: int) -> int:
+    """How many of the newcomers worth `each` (in order) join a side already worth
+    `already` before its total passes `cap` (Step 3's "does not exceed"). The first one who
+    would pass it stops the line: those behind hang back rather than squeeze past."""
+    total, n = int(already), 0
+    for x in each:
+        if total + int(x) > int(cap):
+            break
+        total += int(x)
+        n += 1
+    return n
 
 
 def party_apl(scene, pc_level: int | None = None) -> int:
@@ -116,9 +150,8 @@ def rung(index: int) -> float:
     CRB's 1/2, 1/3, 1/4, 1/6, 1/8 progression (bottoming out at 1/8)."""
     index = int(index)
     if index >= 1:
-        # shortcut: Table 12-2 stops at CR 20 here (`xp.CR_AWARD`); a mythic or 20+
-        # budget would need the table extended, not this clamp.
-        return float(min(20, index))
+        # The table's top (`xp.CR_AWARD`, CR 30): an APL 20 party's epic fight is CR 23.
+        return float(min(_TOP, index))
     return _BELOW_ONE[min(len(_BELOW_ONE) - 1, -index)]
 
 
@@ -149,10 +182,10 @@ def fits(total_xp: int, index: int) -> bool:
 
 def encounter_index(total_xp: int) -> int | None:
     """The index whose budget this total spends, or None for nothing at all."""
-    for index in range(-4, 21):
+    for index in range(-4, _TOP + 1):
         if fits(total_xp, index):
             return index
-    return None if int(total_xp) <= 0 else 20
+    return None if int(total_xp) <= 0 else _TOP
 
 
 def tier(roll: int, kind: str = "wandering") -> str:

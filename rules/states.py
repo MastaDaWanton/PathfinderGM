@@ -170,6 +170,12 @@ WANTED = "state.wanted"
 SUSPECTED = "state.suspected"
 GUARD = "role.guard"
 BYSTANDER = "role.bystander"
+# Brought in by a source that already spent the party's encounter budget on them (a road
+# or forage draw, a scheme's hostile bring_in, the law admitted, an opening's foes, a
+# boarding crew). The effect's origin names the source (`budget:<source>`). Read by
+# `Engine._priced_sides` so a model's `begin_encounter` wrapping them does not roll their
+# budget a second time and hold back part of a fight already priced.
+PRICED = "role.priced"
 KNOWS_YOU = "bond.knows-you"
 TRAVELS_WITH_YOU = "bond.travels-with-you"
 # Non-lethal damage that will not mend until a need is met (CRB p.444, Starvation and

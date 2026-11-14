@@ -417,8 +417,13 @@ def _brawl(s, e, pc):
 def test_a_guard_joins_against_the_wanted_when_a_fight_starts():
     """The plan: "guards join a fight against the player through the existing
     join-fight door". Before this a watchman watched a wanted man start a brawl and
-    stayed a bystander — off the initiative, on the map, painted as nobody's."""
+    stayed a bystander — off the initiative, on the map, painted as nobody's.
+
+    Level 5 (APL 3): the struck thug counts against the watch's budget now
+    (docs/encounter-budget.md), and at level 1 the thug alone fills the average tier, so
+    the watchman would hang back on most seeds."""
     s, e, pc = _table()
+    pc.level = 5
     _want(pc)
     thug, guard = _brawl(s, e, pc)
     assert s.in_encounter

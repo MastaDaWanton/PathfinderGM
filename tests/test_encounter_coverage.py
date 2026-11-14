@@ -57,23 +57,39 @@ def _hard_cap(apl: int) -> int:
 
 def test_a_wanted_lone_first_level_pc_meets_a_budgeted_watch_not_all_four():
     """Four watchmen (135 XP each) in the square: all four came in before, 540 XP against
-    a hard cap of 400. Now at most the guarded tier's budget joins, never none, and the
-    rest are SAID to hang back — never silently gone."""
+    a hard cap of 400. Then the first budget priced only the guards, so the thug the
+    player struck (135 XP) stood on the side for free: thug plus two watchmen, 405 XP, on 5
+    of 20 seeds — over the hard cap. Now the struck thug is counted, the whole side stays
+    inside the tier, and the rest are SAID to hang back — never silently gone."""
     joined_counts = set()
     for seed in range(20):
         s, e, pc, watch = _wanted_table(seed)
         thug = s.add(instantiate("thug", scene=s, name="a thug"), zone="near")
         res = _swing(e, thug.ref)
         them = [w for w in watch if w.ref in s.sides.get("them", ())]
-        assert 1 <= len(them) < 4, (seed, s.sides)
-        assert sum(135 for _ in them) <= _hard_cap(-1), seed
+        assert thug.ref in s.sides["them"], "the one the words struck is always in"
+        assert len(them) < 4, (seed, s.sides)
+        assert 135 * (1 + len(them)) <= _hard_cap(-1), (seed, len(them))
         held = [w for w in watch if w not in them]
         tells = " ".join(o.tell or "" for o in res.outcomes)
         for w in held:
             assert w.ref in s.actors, "a held guard is still standing in the scene"
             assert w.name in tells and "shouting the alarm" in tells, tells
         joined_counts.add(len(them))
-    assert joined_counts <= {1, 2}, joined_counts
+    assert joined_counts <= {0, 1}, joined_counts
+
+
+def test_a_struck_merchant_is_counted_against_the_watch():
+    """A merchant (400 XP, CR 1) struck by a wanted lone level-1 PC already fills the
+    hard tier's 400 alone: before, the watch priced only itself and one more watchman came
+    in on top (535 XP). Now the merchant is the side's one, and the watch hangs back."""
+    for seed in range(20):
+        s, e, pc, watch = _wanted_table(seed)
+        merchant = s.add(instantiate("merchant", scene=s, name="a merchant"), zone="near")
+        res = _swing(e, merchant.ref)
+        assert s.sides["them"] == [merchant.ref], (seed, s.sides)
+        tells = " ".join(o.tell or "" for o in res.outcomes)
+        assert "shouting the alarm" in tells, tells
 
 
 def test_striking_a_guard_rallies_only_what_the_budget_holds():
@@ -87,10 +103,92 @@ def test_striking_a_guard_rallies_only_what_the_budget_holds():
         assert len(them) * 135 <= _hard_cap(-1), (seed, len(them))
 
 
+def _square(seed: int, template: str, n: int = 4):
+    """A lone level-1 PC (APL -1), not wanted, among `n` of a kind."""
+    s = Scene(location_id=TOWN)
+    s.add(load_pc("fixtures/pc-kesst.json"))
+    e = Engine(s, Dice(seed=seed), world=WORLD)
+    e.place_party(MARKET)
+    them = [s.add(instantiate(template, scene=s, name=f"{template} {i + 1}"), zone="near")
+            for i in range(n)]
+    return s, e, them
+
+
+def test_a_gang_rallying_to_a_struck_thug_is_priced():
+    """Four thugs, the first struck: `rally` brought the other three in unpriced, all four
+    on the side (540 XP against a lone level-1's hard cap of 400). Now kin are priced like
+    the watch (guarded tier, struck one counted) and the held are said to hang back
+    watching."""
+    for seed in range(20):
+        s, e, thugs = _square(seed, "thug")
+        res = _swing(e, thugs[0].ref)
+        side = s.sides["them"]
+        assert thugs[0].ref in side
+        assert 135 * len(side) <= _hard_cap(-1), (seed, side)
+        tells = " ".join(o.tell or "" for o in res.outcomes)
+        for t in thugs[1:]:
+            if t.ref not in side:
+                assert t.name in tells and "watching" in tells, tells
+
+
+def test_a_model_proposed_fight_cannot_sweep_the_square_in():
+    """A turn's plan (no origin) declaring all four watchmen "them" against a lone
+    level-1 PC put all four in the initiative (540 XP, hard cap 400): only the extra law
+    was priced. Now the declared foes are priced; a document's staged fight (`start:`)
+    comes as written, priced at its source."""
+    for seed in range(20):
+        s, e, watch = _square(seed, "watchman")
+        refs = [w.ref for w in watch]
+        res = e.run(e.validate([{"op": "begin_encounter", "because": "t", "params": {
+            "sides": {"pc": ["pc"], "them": refs}}}]))
+        side = s.sides["them"]
+        assert 1 <= len(side) and 135 * len(side) <= _hard_cap(-1), (seed, side)
+        held = set(refs) - set(side)
+        assert not held & {r for r, _ in s.initiative}, "a held guard has no turn"
+        tells = " ".join(o.tell or "" for o in res.outcomes)
+        for w in watch:
+            if w.ref not in side:
+                assert w.name in tells and "shouting the alarm" in tells, tells
+    s, e, watch = _square(0, "watchman")
+    refs = [w.ref for w in watch]
+    e.run(e.validate([{"op": "begin_encounter", "because": "t", "params": {
+        "sides": {"pc": ["pc"], "them": refs}}}], origin="start:test"))
+    assert s.sides["them"] == refs
+
+
+def test_a_monster_companion_counts_at_its_cr():
+    """A claimed stone golem (CR 11, 12,800 XP) carries `level` 1 from `instantiate` and
+    counted as a level-1 member: party [3, 1], APL 1. By the Bestiary's Monsters as PCs
+    ("Treat the monster's CR as class levels") it is an 11th-level member."""
+    s = Scene(location_id=TOWN)
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.level = 3
+    s.add(pc)
+    e = Engine(s, Dice(seed=1))
+    golem = s.add(instantiate("stone-golem", scene=s))
+    e._travels_with_you(golem)
+    assert eb.party_levels(s) == [3, 11]
+    assert eb.party_apl(s) == 6
+    merchant = instantiate("merchant", scene=s)
+    assert eb.companion_level(merchant) == 3, "a classed person keeps their class level"
+
+
+def test_budgets_run_past_cr_20():
+    """`rung` clamped every index above 20 to CR 20: an APL 20 party's epic fight (CR 23)
+    was priced at 307,200 XP, a quarter of Table 12-2's 819,200."""
+    assert eb.budget(23) == 819_200
+    assert eb.budget(25) == 1_638_400          # the CRB table's last row
+    assert eb.budget(30) == 9_830_400          # the doubling carried on
+    assert eb.budget(40) == eb.budget(30)
+    assert eb.encounter_index(2 * 1_638_400) == 27
+    assert eb.apl([20] * 6) == 21 and eb.budget(eb.apl([20] * 6) + 3) == 1_228_800
+
+
 def test_a_watch_inside_the_least_budget_comes_whole_and_rolls_nothing():
-    """One watchman at a lone level-1 is 135 XP, the average budget itself: no d100 is
-    spent asking, so the wanted tests' single guard keeps its dice."""
+    """A lone level-5 PC (APL 3, average 800 XP): the struck thug and one watchman are
+    270 XP, inside it, so no d100 is spent asking and the side comes whole."""
     s, e, pc, watch = _wanted_table(3, guards=1)
+    pc.level = 5
     thug = s.add(instantiate("thug", scene=s, name="a thug"), zone="near")
     res = _swing(e, thug.ref)
     assert watch[0].ref in s.sides["them"]
@@ -181,3 +279,27 @@ def test_a_witness_is_not_a_fight_and_comes_as_written():
     e = _scheme_engine(0)
     assert schemes._hostile_count(e, {"count": 3, "side": ""}, "thug", "mourner") == 3
     assert schemes._hostile_count(e, {"count": 3, "side": "pc"}, "thug", "friend") == 3
+
+
+def test_a_priced_road_draw_is_not_priced_again_when_a_model_fight_wraps_it():
+    """Seed 176's forest watch draws two foxes (100 XP each, 200: the challenging budget
+    at a lone level-1's APL -1). A model's `begin_encounter` naming both foxes and the
+    merchant beside the road re-rolled the whole lot: on an average roll (135 XP) one fox
+    of the priced pair was held back. Now the road's pair is marked priced at the draw
+    (`states.PRICED`), comes whole, still counts its 200 XP, and the merchant the model
+    swept in is the one held."""
+    met = ontheway.road(Dice(seed=176), 6, "forest", 1, apl=-1)
+    assert met.kind == "creature" and met.count == 2
+    for seed in range(20):
+        s = Scene(location_id=TOWN)
+        s.add(load_pc("fixtures/pc-kesst.json"))
+        e = Engine(s, Dice(seed=seed), world=WORLD)
+        e.place_party(MARKET)
+        foxes = [m["ref"] for m in e._meet_on_the_way(met, zone="near")]
+        assert all(s.actors[r].has_state(states.PRICED) for r in foxes)
+        merchant = s.add(instantiate("merchant", scene=s, name="a merchant"), zone="near")
+        res = e.run(e.validate([{"op": "begin_encounter", "because": "t", "params": {
+            "sides": {"pc": ["pc"], "them": foxes + [merchant.ref]}}}]))
+        assert s.sides["them"] == foxes, (seed, s.sides)
+        tells = " ".join(o.tell or "" for o in res.outcomes)
+        assert merchant.name in tells and "hang" in tells, tells

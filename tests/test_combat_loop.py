@@ -33,7 +33,7 @@ def begin(engine, scene):
     return engine.run(engine.validate([{
         "op": "begin_encounter",
         "params": {"sides": {"pc": ["pc"], "them": ["c1", "c2"]}},
-    }]))
+    }], origin="author:test"))
 
 
 # --- Turn order ------------------------------------------------------------------
