@@ -196,9 +196,10 @@
   #map .coord.pinned { paint-order: stroke; stroke: #0f0c09; stroke-width: 2.5px; }
   #map .coord { fill: var(--dim); font-size: 8.5px; text-anchor: middle;
                 pointer-events: none; user-select: none; }
-  /* A long board drawn a quarter-turn round (flatTurned, 03-offers-and-map.js): every
-     letter is turned back upright about its own middle. */
-  #map.turned text { transform-box: fill-box; transform-origin: center; transform: rotate(90deg); }
+  /* A long board drawn transposed (flatTurned, 03-offers-and-map.js): every letter is
+     transposed back about its own middle, so it reads the right way round. */
+  #map.turned text { transform-box: fill-box; transform-origin: center;
+                     transform: matrix(0, 1, 1, 0, 0, 0); }
   #map .blocked { fill: #3a3128; }
   #map .difficult { fill: #2a2416; }
   #map .obscuring { fill: #23262b; }

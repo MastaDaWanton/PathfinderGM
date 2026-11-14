@@ -35,12 +35,12 @@ var MapZoom = (function () {
 
   const is3d = () => typeof MAP_3D !== "undefined" && MAP_3D;
   const turn = () => (typeof MAP_TURN !== "undefined" ? MAP_TURN : 0);
-  // A flat board drawn a quarter-turn round (flatTurned in 03): board (x, y) is drawn at
-  // (y, W - x), W its width in units (`data-turned`, kept in Z.tw).
+  // A flat board drawn transposed (flatTurned in 03, `data-turned`, kept in Z.tw): board
+  // (x, y) is drawn at (y, x).
   const toUser = b => is3d() ? Scene3D.toUser(b[0], b[1], turn())
-    : Z.tw ? [b[1] * CELL, Z.tw - b[0] * CELL] : [b[0] * CELL, b[1] * CELL];
+    : Z.tw ? [b[1] * CELL, b[0] * CELL] : [b[0] * CELL, b[1] * CELL];
   const toBoard = (u, v) => is3d() ? Scene3D.toBoard(u, v, turn())
-    : Z.tw ? [(Z.tw - v) / CELL, u / CELL] : [u / CELL, v / CELL];
+    : Z.tw ? [v / CELL, u / CELL] : [u / CELL, v / CELL];
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 
   // --- geometry --------------------------------------------------------------------------
@@ -95,7 +95,7 @@ var MapZoom = (function () {
   // across, rather than fitted whole inside it. Measured 2026-11-13: a ship's deck (6 x 17
   // with its sea) in a 692 x 245 board box, 3D, fitted into 341 x 245 with its hull a thin
   // diagonal, because an isometric board is as wide as it is long whichever way it is
-  // turned; filled, it is 692 wide. A flat one is turned instead (flatTurned in 03), so
+  // turned; filled, it is 692 wide. A flat one is transposed instead (flatTurned in 03), so
   // this is near 1 there. Any other board opens at Fit, as before.
   function opening(g) {
     const long = Math.max(g.width, g.height), short = Math.min(g.width, g.height);
@@ -110,18 +110,24 @@ var MapZoom = (function () {
   // view's top and left edges and at their Fit size while zoomed. (x0, y0) is the view's
   // top-left corner in board units.
   function pin(x0, y0) {
-    // A turned board's letters are inside its turned group: they scroll with it.
-    if (is3d() || Z.tw) return;
+    if (is3d()) return;
     const k = Z.k;
     Z.svg.querySelectorAll("text.coord").forEach(t => {
       if (!t.dataset.x) { t.dataset.x = t.getAttribute("x"); t.dataset.y = t.getAttribute("y"); }
       const col = t.classList.contains("col");
       t.style.fontSize = k > 1 ? `${8.5 / k}px` : "";
-      if (col) t.setAttribute("y", k > 1 ? Math.max(Number(t.dataset.y), y0 + 9 / k) : t.dataset.y);
+      // A transposed board (Z.tw) has its letters down the left and its numbers across the
+      // top: a letter's own y is drawn as x, a number's x as y, so each pins to the other
+      // edge (the letter's baseline sits 3 units under its middle).
+      if (Z.tw) {
+        if (col) t.setAttribute("y", k > 1 ? Math.max(Number(t.dataset.y), x0 + 11 / k) : t.dataset.y);
+        else t.setAttribute("x", k > 1 ? Math.max(Number(t.dataset.x), y0 + 6 / k) : t.dataset.x);
+      } else if (col) t.setAttribute("y", k > 1 ? Math.max(Number(t.dataset.y), y0 + 9 / k) : t.dataset.y);
       else t.setAttribute("x", k > 1 ? Math.max(Number(t.dataset.x), x0 + 8 / k) : t.dataset.x);
       t.classList.toggle("pinned", k > 1);
-      // Over the tokens once pinned, or a figure at the edge hides the name of its row.
-      if (k > 1 && t.nextSibling) Z.svg.appendChild(t);
+      // Over the tokens once pinned, or a figure at the edge hides the name of its row. In
+      // its own group, so a transposed board's label stays transposed.
+      if (k > 1 && t.nextSibling) t.parentNode.appendChild(t);
     });
   }
 
