@@ -224,10 +224,12 @@ a town the legs reach, `interpret._road_to`), and the planner (the brief's ABOAR
      over the rail. Any other surfaces, looks, and goes.
    - **The water on the board.** The rail's squares and the sea's are open water
      (`Grid.water`, a fixture kind with `swim`): solid to a walker, open to a creature with
-     a swim speed, and to anybody who goes over the side, at double cost (CRB Swim, half
-     speed). Whoever stands in it is in rules/water.py's table (`Scene.afloat`,
-     `Actor.water_row(afloat)`). The rail still covers from outboard and the sea covers
-     nobody.
+     a swim speed, and to anybody who goes over the side, at four times the cost (CRB
+     Swim: a quarter of their speed a move action). Whoever stands in it is in
+     rules/water.py's table (`Scene.afloat`, `Actor.water_row(afloat)`) and, without a swim
+     speed, makes the Swim check once a beat (`Engine.swim`: DC 10 calm, 20 stormy under
+     the storm at sea; fail by 4 or less, no progress; by 5 or more, under and onto the
+     breath clock). The rail still covers from outboard and the sea covers nobody.
    The Bestiary's own Ocean table (pp.324-327) is creatures only; no Pathfinder 1e sea
    rate or ship table could be read (Skull & Shackles, Stormwrack), and none is claimed.
 4. **The wreck** (`Engine._wreck`): the ship and her crew are lost. Passengers swim for
@@ -256,8 +258,6 @@ Stormwrack's storm and shipwreck rules could not be read; nothing here claims th
 
 ## Still open
 
-- **Swimming as movement.** A non-swimmer in the water pays double per square and is in
-  the water table, but makes no Swim check to move or stay up (water.py's own open item).
 - **The road to the coast** from an inland town takes no time, as before; the export
   would need to say how far the coast is (for-world-bible 8).
 - **Siege engines.** `arms` is on every row of the table and nothing reads it. A ballista

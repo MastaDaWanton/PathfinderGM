@@ -173,6 +173,11 @@ from __future__ import annotations
 #                             Spells are not weapon attacks and the CRB does not stop them.
 WEATHER_STORM = "weather.storm"
 NO_RANGED_WEAPONS = "weather.no-ranged-weapons"
+# Gone under in the open water beside a ship (`Engine.swim`): "If you fail by 5 or more,
+# you go underwater" (CRB, Swim). Held as a `situation` effect, key `submerged`, so the
+# breath clock and drowning (`_drowning_ground`, `Engine.breathe`) read it as they read an
+# underwater place; a made Swim check brings them up and ends it, as does leaving the water.
+UNDER_WATER = "water.under"
 BEDDING = "gear.bedding"
 SHELTER = "gear.shelter"
 WRITING = "gear.writing"
@@ -344,6 +349,8 @@ TAGS: dict[str, tuple[str, ...]] = {
     # Not re-derived on load (only conditions are, `activeeffect._tags_on_load`); no save
     # holds an untagged one, since the storm and its tag shipped together.
     "storm-at-sea": ("weather.storm", "weather.no-ranged-weapons"),
+    # Under the surface beside a ship (Engine.swim), the vocabulary for its key.
+    "submerged": ("water.under",),
     "stable":      ("state.down.stable", "state.down.fallen", "state.unable",
                     "recovery.hit-points"),
     "petrified":   ("state.down.petrified", "state.unable", "state.helpless"),

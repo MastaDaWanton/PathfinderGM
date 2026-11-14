@@ -154,7 +154,9 @@ def _drowning_ground(actor) -> bool:
     """
     from . import places as places_mod
 
-    if not water.is_under(places_mod.terrain_of(str(getattr(actor, "at", "") or ""))):
+    # Or gone under in the open water beside a ship, on a failed Swim check (`Engine.swim`).
+    if not (water.is_under(places_mod.terrain_of(str(getattr(actor, "at", "") or "")))
+            or actor.has_state(states.UNDER_WATER)):
         return False
     return not water.breathes_water(actor)
 
@@ -12765,6 +12767,14 @@ class Engine:
                 f"squares.", "legality", index,
             )
         swims = self._swims(actor, target)
+        # In the water without a swim speed, the round's Swim check decides whether they
+        # get anywhere (`Engine.swim`, CRB Swim): failed, "you make no progress".
+        if swims == "over" and self.scene.afloat(actor.ref) \
+                and (actor.swim_check_made is False or actor.has_state(states.UNDER_WATER)):
+            raise IntentError(
+                f"move: {actor.name} made no headway in the water this round (a failed "
+                f"Swim check{', and is under' if actor.has_state(states.UNDER_WATER) else ''})"
+                f". The next round's check may carry them.", "legality", index)
         for square in gridmod.footprint(target, actor.size):
             if not grid.passable(square, bool(swims)):
                 raise IntentError(
@@ -13244,6 +13254,75 @@ class Engine:
         shown = list(dict.fromkeys(things))
         return [f"{whose} is gone; what {whose} carried lies where the body fell: "
                 f"{', '.join(shown[:8])}{' and more' if len(shown) > 8 else ''}."]
+
+    def swim(self) -> list[str]:
+        """Everybody in the open water beside a ship makes the round's Swim check.
+
+        CRB, Swim (legacy.aonprd.com/coreRulebook/skills/swim.html): "Make a Swim check
+        once per round while you are in the water"; calm water DC 10, rough 15, stormy 20;
+        on a success you swim on, "If you fail by 4 or less, you make no progress through
+        the water. If you fail by 5 or more, you go underwater". Armour Check Penalty
+        applies — once, as in every skill that takes it (`Actor.skill_modifiers`); the
+        Pathfinder book has no doubling. "A creature with a swim speed can move through
+        water at its indicated speed without making Swim checks", so it makes none, nor
+        does anybody freedom of movement is on. A body that cannot act (down, helpless)
+        cannot swim and goes under.
+
+        One check a beat, beside the breath clock (`breathe`, which reads the going-under
+        this writes): the engine's round. The result governs the round after it — no
+        progress is a refused move (`_check_move`), under is the drowning clock, a made
+        check brings them up. Rolled by the engine, hidden, PC and NPC alike, as the breath
+        check beside it is; every result is told. The water is stormy under the storm at
+        sea's tag (`states.WEATHER_STORM`), calm otherwise."""
+        from . import places as places_mod
+
+        tells: list[str] = []
+        for a in list(self.scene.people.values()):
+            under = a.has_state(states.UNDER_WATER)
+            if not self.scene.afloat(a.ref):
+                # Out of the board's water: the going-under ends, and the last check with
+                # it — unless they stand in a wet PLACE, whose own rules keep it.
+                if under:
+                    a.remove_effects(match=lambda e: states.UNDER_WATER in (e.tags or ()))
+                if a.swim_check_made is not None and not water.is_wet(
+                        places_mod.terrain_of(str(a.at or ""))):
+                    a.swim_check_made = None
+                continue
+            if a.has_state("state.down.dead") or water.swim_speed(a) > 0 \
+                    or water.row_for(a) == water.FREE:
+                continue
+            rough = "stormy" if a.has_state(states.WEATHER_STORM) else "calm"
+            dc = water.swim_dc(rough)
+            if a.is_down or a.is_helpless:
+                margin = -dc
+            else:
+                roll = self.dice.d20(a.skill_modifiers("swim"),
+                                     label=f"{a.name} Swim, {rough} water (DC {dc})",
+                                     visibility="hidden")
+                margin = roll.total - dc
+            if margin >= 0:
+                a.swim_check_made = True
+                if under:
+                    a.remove_effects(match=lambda e: states.UNDER_WATER in (e.tags or ()))
+                    tells.append(f"{a.name} fights back up to the surface and breathes.")
+                else:
+                    tells.append(f"{a.name} swims, keeping their head above the "
+                                 f"{rough} water.")
+                continue
+            a.swim_check_made = False
+            if margin > -5:
+                tells.append(f"{a.name} " + ("stays under, getting nowhere." if under else
+                                             "makes no headway in the water."))
+                continue
+            if not under:
+                a.apply_effect(ActiveEffect(
+                    name="under the water", kind="situation", key="submerged",
+                    source="rule:swim", origin="rule:swim",
+                    tags=states.tags_for("submerged"), duration="until-dismissed"))
+                tells.append(f"{a.name} goes under.")
+            else:
+                tells.append(f"{a.name} is still under, sinking.")
+        return tells
 
     def breathe(self) -> list[str]:
         """Everybody underwater holds their breath, and then stops being able to.

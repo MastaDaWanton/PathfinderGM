@@ -106,11 +106,15 @@ makes:
   numbers are there; `rules/position.py` owns cover and does not read them.
 - **Fire spells underwater** (caster level check, DC 20 + spell level) and **casting while
   you cannot breathe** (concentration, DC 15 + spell level).
-- **The Swim check itself.** `swim_check_made` is a field the engine can set and the table
-  reads, and nothing rolls it yet — a creature in water is `footing` or `off-balance`
-  until something asks. `check skill=swim` resolves as an ordinary check today.
-- **Swimming as movement.** `speed_factor` is not read by the movement path, so a
-  character in water moves at their land speed.
+- **The Swim check in a wet PLACE.** Since 2026-11-13 the open water beside a ship (the
+  board's `Grid.water` squares) rolls it once a beat (`Engine.swim`: DC 10 calm, 20
+  stormy under the storm at sea; fail by 4 or less, no progress and the move refused;
+  by 5 or more, under, onto the breath clock; a swim speed makes none). A whole
+  `water`/`underwater` place still rolls nothing, and there `swim_check_made` stays as
+  something sets it. Rough water (DC 15) has nothing that says it yet.
+- **Swimming as movement in a wet place.** On the ship's board a non-swimmer pays four
+  times a square (a quarter of their speed a move action); a wet place's movement path
+  still does not read `speed_factor`.
 
 ## Not this, and not next
 
