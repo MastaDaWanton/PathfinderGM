@@ -204,7 +204,7 @@ def test_the_engine_charges_the_haggled_price_at_the_counter():
     out = _run(e, {"op": "buy", "params": {"item": thing.id, "stall": "market"}})
     want = tradecraft.buy_price(round(pricing.worth(thing, buyer=pc, town=place), 2), 20)
     assert out.effects[0]["paid_cp"] == int(round(want * 100))
-    assert "20% off for the haggle" in out.tell
+    assert "gave 20% to the haggle" in out.tell
 
 
 # --- a day's work -----------------------------------------------------------------------

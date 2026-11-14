@@ -162,8 +162,8 @@ a town the legs reach, `interpret._road_to`), and the planner (the brief's ABOAR
    `lives.axis_score`) and the day's haggle with them (`_op_haggle`, kept under their stall
    key), never more than 25% off. The quote in the exits row and the coin taken are one
    number (`passage_quote`), and the tell names the reason when it moved ("The
-   harbourmaster likes you: 5% off the book's fare."). A shop's counter does not yet read
-   the seller's terms: that is the owner's call.
+   harbourmaster likes you: 5% off the book's fare."). Every keeper's counter reads the
+   same terms since the owner's ruling of the same day (`tradecraft.counter_terms`).
 
    **Talking with the harbourmaster offers the berths** (`views._passage_offer`,
    `scene.passage_offer`): measured live, "I ask the master for passage to Mirabalos, pay

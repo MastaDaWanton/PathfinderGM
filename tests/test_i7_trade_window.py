@@ -239,7 +239,9 @@ def test_the_deal_has_one_button_and_a_coin_stack():
 def test_a_basket_line_has_a_stepper_and_the_button_names_the_sum(market, tmp_path):
     """Two tents and a day's rations bought, a garnet sold: "You buy" and "You sell"
     lines, each with minus, the count and plus; the button says what the deal comes
-    to. 2 x 10 gp + 5 sp - 1 sp 9 cp = 20 gp 3 sp 1 cp."""
+    to. 2 x 10 gp + 5 sp - 1 sp 9 cp at the book, moved by the general store keeper's own
+    terms since 2026-11-13 (open-handed, 7% your way): 2 x 9 gp 3 sp + 4 sp 7 cp - 2 sp
+    = 18 gp 8 sp 7 cp."""
     got = _draw(market["general"], tmp_path, """
       tradeAdd("buy", "gear:tent", false); tradeAdd("buy", "gear:tent", false);
       tradeAdd("buy", "gear:rations", false); tradeAdd("sell", "garnet#1", false);
@@ -256,8 +258,9 @@ def test_a_basket_line_has_a_stepper_and_the_button_names_the_sum(market, tmp_pa
         assert any(e["tag"] == "output" for e in inside)
     counts = [e["text"] for e in els if e["tag"] == "output"]
     assert counts == ["2", "1", "1"]
-    assert got["lab"] == "You pay" and got["sum"] == "20 gp 3 sp 1 cp"
-    assert got["go"] == "Trade, pay 20 gp 3 sp 1 cp" and not got["goDisabled"]
+    assert market["general"]["terms_percent"] == 7
+    assert got["lab"] == "You pay" and got["sum"] == "18 gp 8 sp 7 cp"
+    assert got["go"] == "Trade, pay 18 gp 8 sp 7 cp" and not got["goDisabled"]
 
 
 def test_a_sale_alone_says_take_and_a_short_purse_disables_the_button(market, tmp_path):

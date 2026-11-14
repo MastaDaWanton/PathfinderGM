@@ -6984,25 +6984,21 @@ def _counter_refusal(c, pc, merchant=None):
     `merchant` is the counter's keeper when the caller already knows it (a market's
     counters, I2); else whoever `_merchant_here` finds.
     """
-    from rules import attitude, states
+    from rules import states
 
     merchant = merchant if merchant is not None else _merchant_here(c.scene)
     town = str(c.scene.location_id or "")
     if merchant is None:
         return None
-    # How they feel about you, before what the law thinks of you. 1e gates what a
-    # creature will do for you on their attitude — "once a creature's attitude is
-    # indifferent or better you can make requests" — and buying from somebody is a
-    # request. A shopkeeper who has been given a reason to dislike you does not serve
-    # you, and Diplomacy is the way back in (`rules/attitude.py`). Nobody starts here:
-    # an attitude is only ever set by something that happened, so a counter the player
-    # has not poisoned opens exactly as it always did.
-    mood = attitude.of(merchant, default="")
-    if mood in ("hostile", "unfriendly"):
-        return JsonResponse({"error": (
-            f"{merchant.name} will not trade with {pc.name}. Talk them round first — "
-            f"it takes a minute of it, and the engine rolls your Diplomacy against how "
-            f"they feel about you.")}, status=409)
+    # How they feel about you, before what the law thinks of you. Until 2026-11-13 an
+    # unfriendly keeper refused too; since the owner's ruling that day ("yes make shop
+    # prices move with attitude too") the dislike is in the price
+    # (`tradecraft.counter_terms`), and only a hostile keeper will not deal — the one
+    # question the engine's buy and sell ops ask as well (`Engine._will_not_deal`).
+    # Diplomacy is the way back in (`rules/attitude.py`).
+    refused = c.engine()._will_not_deal(merchant)
+    if refused:
+        return JsonResponse({"error": refused}, status=409)
     if states.standing_with_the_law(pc, town) != "wanted":
         return None
     return JsonResponse({"error": (
@@ -7185,6 +7181,8 @@ def trade(request):
     till = market.purse(place, stall, day, tier)
     left = round(till - market.spent_today(c.scene.market_taken, place, stall, day), 2)
     haggled = tradecraft.haggled(c.scene, pc.ref, place, stall, day)
+    # The keeper's own terms and the haggle, the one number the buy and sell ops read.
+    percent, why = tradecraft.counter_terms(c.scene, pc, merchant, place, stall, day)
     haggle_spent = (tradecraft.dealing_key("haggle", pc.ref, place, stall, day)
                     in c.scene.dealings)
     shelf = market.on_sale(place, stall, day, c.scene.market_taken, tier, counter_kind=kind,
@@ -7228,13 +7226,16 @@ def trade(request):
         # owner's option B, 2026-10-07): the numbers the engine will charge and pay.
         "mine": sorted(
             (_row(s, tradecraft.sell_price(
-                pricing.what_a_shop_pays(s, seller=pc, town=place), haggled), s.count)
+                pricing.what_a_shop_pays(s, seller=pc, town=place), percent), s.count)
              for s in pc.stock.values()),
             key=lambda r: -r["gp"]),
         "theirs": sorted((_row(m, tradecraft.buy_price(
-            pricing.worth(m, buyer=pc, town=place), haggled)) for m in shelf),
+            pricing.worth(m, buyer=pc, town=place), percent)) for m in shelf),
                          key=lambda r: -r["gp"]),
         "haggled": haggled,
+        # Why the prices moved, in words ("the smith likes you: 5% off"), or "".
+        "terms": tradecraft.terms_said(merchant, percent, why),
+        "terms_percent": percent,
         "can_haggle": not haggle_spent,
         "law": states.standing_with_the_law(pc, place),
     })

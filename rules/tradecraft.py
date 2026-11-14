@@ -287,6 +287,44 @@ def haggled(scene, ref: str, place: str, stall: str, day: int) -> int:
     return int(rec.get("percent", 0) or 0)
 
 
+def counter_terms(scene, customer, keeper, place: str, stall: str,
+                  day: int) -> tuple[int, list[str]]:
+    """(percent your way, the reasons in words) at this keeper's counter today: their own
+    terms (`pricing.seller_terms`: attitude and thrift) plus the haggle won here today,
+    never past the haggle's own 25% either way (Ultimate Campaign's floor).
+
+    The one number every price at a keeper reads — what they charge (`buy_price`), what
+    they pay (`sell_price`, the same steps the other way: a friend pays more, somebody
+    disliked less), a commission's bill, and a berth (owner rulings 2026-11-13: "keep the
+    rulebook's base price augmented by the relationship and the personality of the
+    seller", then "yes make shop prices move with attitude too")."""
+    from . import pricing
+
+    percent, why = pricing.seller_terms(scene, keeper) if keeper is not None else (0, [])
+    won = haggled(scene, getattr(customer, "ref", ""), place, stall, day)
+    if won:
+        why = [*why, f"gave {won}% to the haggle"]
+    cap = int(row("haggle")["max_percent"])
+    return max(-cap, min(cap, percent + won)), why
+
+
+def terms_said(keeper, percent: int, why, *, paying: bool = False,
+               who: str = "the stallholder") -> str:
+    """The reason a keeper's price moved, for a tell: "the smith likes you: 5% off", or
+    with `paying` (the keeper buying) "...: 5% more". "" when nothing moved it. `who` names
+    a counter with no keeper stood up (a haggle won at the open market)."""
+    if not why:
+        return ""
+    said = why[0] if len(why) == 1 else f"{', '.join(why[:-1])} and {why[-1]}"
+    if not percent:
+        moved = "the list price"
+    elif paying:
+        moved = f"{abs(percent)}% {'more' if percent > 0 else 'less'}"
+    else:
+        moved = f"{abs(percent)}% {'off' if percent > 0 else 'over'}"
+    return f"{keeper.name if keeper is not None else who} {said}: {moved}"
+
+
 def buy_price(gp: float, percent: int) -> float:
     return round(float(gp) * (100 - int(percent)) / 100, 2)
 

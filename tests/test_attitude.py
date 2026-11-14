@@ -231,12 +231,12 @@ def test_a_spell_that_makes_somebody_friendly_makes_them_friendly():
 
 # --- what a step is worth ------------------------------------------------------------------
 
-def test_a_shopkeeper_who_dislikes_you_will_not_serve_you(tmp_path):
-    """The reader that makes a step bite, and the answer to "so what?". 1e gates what a
-    creature will do for you on their attitude — requests need indifferent or better —
-    and buying from somebody is a request. Nobody starts unfriendly: an attitude is only
-    ever set by something that happened, so a counter the player has not poisoned opens
-    exactly as it did before."""
+def test_a_shopkeeper_who_hates_you_will_not_serve_you(tmp_path):
+    """The reader that makes a step bite, and the answer to "so what?". Until 2026-11-13
+    an unfriendly keeper refused too; the owner's ruling that day put the dislike in the
+    price (`tradecraft.counter_terms`, 10% dearer), so an unfriendly counter opens and only
+    a hostile one refuses. Nobody starts there: an attitude is only ever set by something
+    that happened, so a counter the player has not poisoned opens exactly as before."""
     from django.test import Client, override_settings
 
     from play import campaign as cm
@@ -260,8 +260,14 @@ def test_a_shopkeeper_who_dislikes_you_will_not_serve_you(tmp_path):
         keeper.add_condition("unfriendly", source="the player was rude")
         c.save()
         r = Client().post("/api/trade", data="{}", content_type="application/json")
+        assert r.status_code == 200, "an unfriendly keeper trades, dearer"
+        assert "does not like you" in r.json()["terms"]
+        keeper.clear_states("attitude")
+        keeper.add_condition("hostile", source="the player struck them")
+        c.save()
+        r = Client().post("/api/trade", data="{}", content_type="application/json")
         assert r.status_code == 409
-        assert "will not trade" in r.json()["error"]
+        assert "will not deal" in r.json()["error"]
         assert "diplomacy" in r.json()["error"].lower(), "the refusal names no way back"
         cm._LIVE.clear()
 

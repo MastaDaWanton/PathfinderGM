@@ -100,7 +100,11 @@ def test_buying_rope_by_name_gives_fifty_feet_and_takes_a_gold_piece():
     assert out.outcomes[0].status == "resolved", out.outcomes[0].tell
     # Live: "pays the stallholder 1 gp for 1x hemp rope" — fifty feet, said as such.
     assert "50 ft of hemp rope" in out.outcomes[0].tell
-    assert goods.in_copper(pc.purse) == before - 100
+    # The book's 1 gp, moved by the keeper's own terms since 2026-11-13 (owner: "yes make
+    # shop prices move with attitude too"): this general store's keeper is open-handed,
+    # 7% off, so 93 cp.
+    assert goods.in_copper(pc.purse) == before - 93
+    assert "is open-handed: 7% off" in out.outcomes[0].tell
     rope = [st for st in pc.stock.values() if st.base == "hemp rope"]
     assert rope and rope[0].count == 50
     # A staple is not sold out: the second coil is there too.

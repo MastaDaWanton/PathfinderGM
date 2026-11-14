@@ -119,7 +119,7 @@ def _piece_shape(pc) -> str:
 
 def run(engine, intent, partial: dict | None = None):
     """Resolve a `commission`: who works, what is made, what it costs, when it is ready."""
-    from . import goods, inprogress, places as places_mod, typed_craft
+    from . import goods, inprogress, places as places_mod, tradecraft, typed_craft
     from .engine import Outcome
 
     partial = partial if partial is not None else {}
@@ -132,6 +132,9 @@ def run(engine, intent, partial: dict | None = None):
         return engine._refuse(intent, "There is nobody here by that name to do the work.")
     if scene.in_encounter:
         return engine._refuse(intent, "There is a fight going on: nobody takes work now.")
+    refused = engine._will_not_deal(keeper)
+    if refused:
+        return engine._refuse(intent, refused)
     craft_id = craft_of(keeper)
     if not craft_id:
         return engine._refuse(intent, f"{keeper.name} keeps no craft to work your things "
@@ -176,7 +179,7 @@ def run(engine, intent, partial: dict | None = None):
 
     # The haggle first, on the player's own die (Make Request, CRB p.93): asked before the
     # keeper lifts a hammer, so a suspension for the roll changes nothing yet.
-    haggled_pct, haggle_said, haggle_rolls = _haggle(engine, intent, pc, keeper, partial)
+    _haggled, haggle_said, haggle_rolls = _haggle(engine, intent, pc, keeper, partial)
 
     # The chain walked on the pack by the KEEPER's hands (owner ruling 2026-11-01): each
     # step their own Craft roll against the step's DC — a near miss is lesser work, a miss
@@ -243,7 +246,10 @@ def run(engine, intent, partial: dict | None = None):
     minutes = sum(int(s.minutes) for s in steps)
     fitting_cp = int(round(float(supplied["price_gp"]) * 100)) if supplied else 0
     listed = price_cp(minutes, sum(int(s.rent_cp or 0) for s in steps)) + fitting_cp
-    bill = _undercut(listed, haggled_pct)
+    # The day's haggle (written by `_haggle` above) and the keeper's own terms, the one
+    # number every counter reads (`tradecraft.counter_terms`).
+    percent, why = _terms(engine, pc, keeper)
+    bill = _undercut(listed, percent)
     purse, ok = goods.spend(pc.purse, bill)
     if not ok:
         _unpack(pc, before)
@@ -279,8 +285,9 @@ def run(engine, intent, partial: dict | None = None):
     _remember(scene, pc, keeper, words, "taken", cp=bill)
     tell = (f"{haggle_said}{_cap(keeper.name)} takes the job for "
             f"{goods.purse_line(_cp(bill), coins)}"
-            + (f" (haggled down from {goods.purse_line(_cp(listed), coins)})"
-               if bill < listed else "")
+            + (f" ({tradecraft.terms_said(keeper, percent, why)}, against "
+               f"{goods.purse_line(_cp(listed), coins)} listed)"
+               if bill != listed and why else "")
             + (f", {_a(supplied['name'].lower())} from the shop's own stock included"
                if supplied else "")
             + (f", and takes {gave} to work" if gave else "")
@@ -538,6 +545,17 @@ def _haggle(engine, intent, pc, keeper, partial):
         said = (f"{pc.name} haggles: Diplomacy {roll.total} against DC {value}, and "
                 f"{keeper.name} will not come down. ")
     return pct, said, [roll]
+
+
+def _terms(engine, pc, keeper) -> tuple[int, list[str]]:
+    """(percent your way, the reasons) at this keeper today, keyed as the counter is."""
+    from . import market as market_mod
+    from . import tradecraft
+
+    scene = engine.scene
+    return tradecraft.counter_terms(scene, pc, keeper, str(scene.location_id or "nowhere"),
+                                    market_mod.stall_of(scene, keeper),
+                                    market_mod.day_of(scene.clock_minutes))
 
 
 def _undercut(cp: int, percent: int) -> int:
