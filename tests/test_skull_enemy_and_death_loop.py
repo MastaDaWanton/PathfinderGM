@@ -221,7 +221,7 @@ def ambush(tmp_path):
             c.scene.add(foe)
         e = c.engine()
         e.run(e.validate([{"op": "begin_encounter", "params": {
-            "sides": {"party": ["pc"], "raiders": ["c1", "c2"], "them": ["c3"]}}}]))
+            "sides": {"party": ["pc"], "raiders": ["c1", "c2"], "them": ["c3"]}}}], origin="author:test"))
         yield c
         cm._LIVE.clear()
 

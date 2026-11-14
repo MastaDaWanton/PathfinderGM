@@ -53,7 +53,7 @@ def _lane(seed=3):
     e.settle_attitude(carrier, "friendly", None, "background:forager")
     e.run(e.validate([{"op": "begin_encounter", "because": "the start: trouble-in-the-lane",
                        "params": {"sides": {"party": [pc.ref],
-                                            "robbers": [robber.ref, second.ref]}}}]))
+                                            "robbers": [robber.ref, second.ref]}}}], origin="author:test"))
     return s, e, pc, carrier, robber, second
 
 
@@ -227,7 +227,7 @@ def test_the_aftermath_is_on_the_turn_log_and_the_stale_offers_go(tmp_path):
         e = c.engine()
         e.run(e.validate([{"op": "begin_encounter", "because": "test",
                            "params": {"sides": {"party": [pc.ref],
-                                                "robbers": [robber.ref, second.ref]}}}]))
+                                                "robbers": [robber.ref, second.ref]}}}], origin="author:test"))
         _beaten(s, pc)
         c.suggestions = ["I focus on the first robber", "I move to help the basket carrier"]
         c.save()

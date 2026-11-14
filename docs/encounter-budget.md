@@ -198,12 +198,11 @@ no fallbacks and no empty draws. Counts were 1 to 3, mostly 1. A forage found a 
   "shouting the alarm" (`Engine._law_held_settle`, its own outcome at the batch's end). A
   watch already inside the tier's least (average) budget comes whole with no d100 rolled.
   Measured: four watchmen (135 XP each) at a wanted lone level-1 PC joined 1 (15 of 20
-  seeds) or 2 (5 of 20); all four did before. Only the guards are priced: the person the
-  player struck is who the words named and is not counted against the watch.
+  seeds) or 2 (5 of 20); all four did before. Since the leftovers pass, see below: the
+  whole side is priced, not only the guards.
   Other law doors read, none brings guards into a fight: `rules/arrest.py` confronts and
   hands a blow to `_law_joins`; `rules/trial.py` holds and judges; the street patrol was
-  already budgeted (`ontheway.street`). A fight the GM declares through `begin_encounter`
-  names its own sides, which are not second-guessed; only the extra law it draws is priced.
+  already budgeted (`ontheway.street`).
 - **Schemes.** A `bring_in` whose side is `them` or `foe` arrives at
   `most_of(...)` of its count (`schemes._hostile_count`): guard and watch roles as
   `guarded`, anybody else as `opening`. A witness, a mourner, or any other side is not a
@@ -283,13 +282,48 @@ to the dice (`test_nothing_stated_is_the_published_rate_exactly`).
 - **A venture's inhabitant**: half the time, now a d100 against 50 × the factor (the d2
   that stood there could not move).
 
+## The leftovers, closed (2026-11-13, "fix what isnt fixed yet before we cut a release")
+
+- **The whole side is priced.** `Engine._law_room` sums the XP of everyone standing on the
+  side against the party — the person the player struck, any foe already fighting — plus
+  the newcomers in order, and admits newcomers until the next would pass the rolled tier's
+  budget (`encounter_budget.admit`). The side is never empty (the first newcomer comes
+  when nobody is on it yet: the warrant's one guard), but a struck person already on it is
+  the floor, so the watch may all hang back. Measured: a wanted lone level-1 PC who
+  struck a thug met thug + two watchmen (405 XP, over the 400 hard cap) on 5 of 20 seeds;
+  a struck merchant (400 XP) brought one watchman on top (535). Now neither goes over.
+- **Rally of any kin** (a gang for its thug, a pack for its wolf) goes through the same
+  pricing, guarded tier: kin answering their own struck one are a group defending itself,
+  the ruling's "guards and lairs". The held are said to hang back, "watching" (the watch
+  still "shouting the alarm"), in `_law_held_settle`'s outcome — op `holds_back` for kin,
+  `law_holds_back` for the law. Measured: four thugs, one struck, all four on the side
+  (540 XP at a 400 cap) before.
+- **A model-proposed `begin_encounter`** (no origin: the player's turn; `creature:<t>`: a
+  creature's turn, the model again) has its foes priced as one encounter before initiative
+  is rolled (`Engine._priced_sides`): every side the player is not on, non-bystanders
+  first, the first always in, wandering tier (guarded if a guard is among them); the rest
+  struck from the side and said to hang back. A staged fight — origin `start:` (openings),
+  `scheme:`, `author:` (the cheat clerk, tests) — comes as written, priced at its source.
+  Tests that stage a fight now say so with `origin="author:test"`.
+- **A monster companion counts at its CR** (`encounter_budget.companion_level`), by the
+  Bestiary's Monsters as PCs, p.313 (<https://aonprd.com/Rules.aspx?ID=2476>): "Treat the
+  monster's CR as class levels when determining the monster PC's overall levels." The CR
+  is read back from its XP; the higher of that and its sheet `level`; a classed person
+  keeps their class level. Research: the CRB's Step 1 counts "PLAYER characters" only
+  (pp.397-398, quoted in <https://paizo.com/threads/rzs2lee2>); the Leadership feat says
+  "A cohort does not count as a party member when determining the party's XP"
+  (<https://www.aonprd.com/FeatDisplay.aspx?ItemName=Leadership>); forum consensus (same
+  thread, no Paizo staff reply) treats animal companions and eidolons as class features
+  already in their master's level. I found no official PF1e rule for a cohort or ally in
+  APL. The owner's ruling counts companions anyway, and class-feature companions stay out
+  (`party_levels`), so only the level a monster companion counts at was open.
+- **Past CR 20.** `xp.CR_AWARD` now runs to CR 30. CRB Table 12-2 itself runs to CR 25
+  (<https://aonprd.com/Rules.aspx?ID=252>: 409,600 at 21 to 1,638,400 at 25). 26-30 carry
+  the table's own doubling every two CR (Table 12-3) on to 9,830,400 at CR 30. That figure
+  matches the forums (<https://paizo.com/threads/rzs2km2z>); no Paizo table I reached
+  prints it. `rung` and `encounter_index` clamp at 30; APL itself never clamped.
+
 ## Left open
 
-- The struck person is not counted against the watch's budget: a merchant the player hit
-  plus the watch can cost more than the tier. The words named the merchant.
-- `rally` of non-law kin (thugs for a thug, bandits for a bandit) is still unpriced.
-
-- A ship's boarding crew (`Engine`, `min(4, 1 + crew // 25)` sailors) is not budgeted. The
-  ship rulings of 2026-11-09 are not built yet.
-- A companion who is a monster, not a classed NPC, counts at its `level`, not its CR.
-- Above CR 20 the budget is clamped to CR 20 (`rung`).
+- A ship's boarding crew (`min(4, 1 + crew // 25)` sailors) is priced by `most_of` on its
+  own count, not against anyone already on the side. The sea lane owns that code.
