@@ -476,8 +476,10 @@ class Grid:
         map for the price of a straight line.
 
         `swims` opens the open water (`water`): "speed" for a creature with a swim speed,
-        "over" for anybody else going over the side, who pays double for every square of
-        it (CRB, Swim: "half your speed as a full-round action").
+        "over" for anybody else going over the side, who pays four times for every square
+        of it — CRB Swim: "a quarter of your speed as a move action", so half as a
+        full-round one (two moves). Whether they may swim at all this round is the Swim
+        check's (`Engine.swim`), asked by the move op.
         """
         occupied = occupied or set()
         start = tuple(start)
@@ -502,7 +504,7 @@ class Grid:
                     continue
                 step = self.enter_cost(there)
                 if swims == "over" and there in self.water:
-                    step *= 2
+                    step *= 4
                 # Every second diagonal costs an extra square. Difficult terrain doubles
                 # the whole step, expensive diagonal included.
                 if diagonal and odd:

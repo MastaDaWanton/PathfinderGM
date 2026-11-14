@@ -4881,7 +4881,8 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
     # is acting on it — and said out loud every rung of the way down, because drowning is
     # the one death in the game that arrives on a schedule and a schedule the player
     # cannot see is just a trapdoor.
-    for line in agent.engine.breathe():
+    # The round's Swim check first, since going under is what starts the breath clock.
+    for line in agent.engine.swim() + agent.engine.breathe():
         c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
     # Walking away lets the scene go: the dying resolve off-screen and the fallen
     # stay where they fell, whether or not the walk crossed a biome line.
