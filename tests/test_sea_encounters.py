@@ -144,16 +144,60 @@ def test_the_voyage_goes_on_once_the_boarders_are_down(monkeypatch):
     assert scene.location_id == "6953424c8a82", out.tell
 
 
-def test_running_from_a_pirate_sail_is_a_real_answer(monkeypatch):
-    scene, engine, _pc = _at_port()
+def _pirates_sighted(monkeypatch, seed=4, their_kind=None):
+    scene, engine, pc = _at_port(seed=seed)
     _journey(engine)
     _quiet_weather(monkeypatch)
     _forced(monkeypatch, "pirates")
     _journey(engine)
+    if their_kind:
+        theirs = engine.vessel(scene.sea["theirs"])
+        theirs.kind = their_kind
+        engine._keep_vessel(theirs)
+    return scene, engine, pc
+
+
+def test_running_from_pirates_at_equal_speed_is_a_contest_of_helms(monkeypatch):
+    """Measured 2026-11-13: sheering off at `distant` always escaped, so a pirate sail was
+    a fight only for a party that wanted one. Two hulls of 60 ft now race on opposed
+    helm checks (Profession (sailor), or Wisdom untrained), engine-rolled and hidden; over
+    twelve seeds both outcomes happen, and each is told with the two totals."""
+    outcomes = set()
+    for seed in range(12):
+        scene, engine, _pc = _pirates_sighted(monkeypatch, seed)
+        assert engine.aboard().speed == engine.vessel(scene.sea["theirs"]).speed == 60
+        out = _do(engine, "sheer off")
+        chase = next(e["chase"] for e in out.effects if e.get("chase"))
+        assert "the helms" in out.tell and len(out.rolls) >= 2, out.tell
+        assert all(r.visibility == "hidden" for r in out.rolls)
+        if chase == "escaped":
+            assert not scene.sea and "only the sea" in out.tell
+            _journey(engine)
+            assert scene.location_id == "6953424c8a82"
+        else:
+            assert chase == "lost" and scene.sea["range"] == "closing", out.tell
+        outcomes.add(chase)
+    assert outcomes == {"escaped", "lost"}, outcomes
+
+
+def test_a_faster_pirate_gains_every_leg_and_boards(monkeypatch):
+    """A galley (90 ft) against the party's sailing ship (60 ft): the faster hull gains a
+    band a leg, no roll, and alongside she comes across."""
+    scene, engine, _pc = _pirates_sighted(monkeypatch, their_kind="galley")
+    out = _do(engine, "sheer off")
+    assert not out.rolls and "she is the faster" in out.tell and scene.sea["range"] == "closing"
+    out = _do(engine, "sheer off")
+    assert scene.sea["range"] == "alongside" and scene.sea["foes"], out.tell
+    assert scene.initiative
+
+
+def test_a_slower_pirate_is_left_behind(monkeypatch):
+    scene, engine, _pc = _pirates_sighted(monkeypatch, their_kind="keelboat")
+    _do(engine, "close")                                     # bowshot
+    out = _do(engine, "sheer off")
+    assert scene.sea["range"] == "distant" and "the faster hull is yours" in out.tell
     out = _do(engine, "sheer off")
     assert not scene.sea and "only the sea" in out.tell
-    _journey(engine)
-    assert scene.location_id == "6953424c8a82"
 
 
 def test_boarding_the_pirates_starts_the_fight_on_their_deck(monkeypatch):
@@ -179,17 +223,103 @@ def test_boarding_the_pirates_starts_the_fight_on_their_deck(monkeypatch):
         "a party left on the cut-loose ship is stood back on its own"
 
 
-def test_a_sea_creature_comes_over_the_rail_and_the_fight_starts(monkeypatch):
+def test_a_sea_creature_comes_at_you_and_a_swimmer_holds_the_water(monkeypatch):
+    """Measured 2026-11-13: every square of sea round the hull was solid ground to
+    everybody, so a shark could only fight by standing on the planks. A swimmer now waits
+    in the water at the rail, beside the player, and the fight starts."""
+    from rules import water
+
     scene, engine, pc = _at_port()
     _journey(engine)
     _quiet_weather(monkeypatch)
     _forced(monkeypatch, "creature")
     out = _journey(engine)
     met = next(e for e in out.effects if e.get("kind") == "sea_encounter")
-    assert met["refs"] and "over the rail" in out.tell, out.tell
+    assert met["refs"], out.tell
     deck = ships.deck_of(engine.aboard())
     assert all(scene.people[r].at == deck for r in met["refs"])
     assert scene.initiative and set(met["refs"]) <= set(scene.sides["them"])
+    swimmers = [r for r in met["refs"] if water.swim_speed(scene.people[r]) > 0]
+    assert swimmers, "the Bestiary's sea creatures swim"
+    for r in swimmers:
+        assert scene.afloat(r) and scene.positions[r][:2] in scene.grid.water
+        assert scene.people[r].water_row(scene.afloat(r)) == water.SWIMMER
+    assert "alongside her, at the rail" in out.tell, out.tell
+
+
+def _deck_with(kind="sailing ship"):
+    from rules.bestiary import instantiate
+    from tests.test_deck_fixtures import _aboard
+
+    s, e, pc = _aboard(kind)
+    shark = instantiate("shark", scene=s, name="the shark")
+    s.add(shark, zone="near")
+    return s, e, pc, shark
+
+
+def _beside(s, square):
+    """A square of the deck orthogonally beside a water square, free."""
+    g = s.grid
+    for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+        p = (square[0] + dx, square[1] + dy)
+        if g.inside(p) and p not in g.blocked and p not in g.water:
+            return p
+    return None
+
+
+def test_the_sea_round_the_hull_is_open_to_a_swimmer_and_shut_to_a_walker():
+    from rules import water
+
+    s, e, pc, shark = _deck_with()
+    g = s.grid
+    assert g.water and g.water <= g.blocked, "water stays solid ground to the planks"
+    rail = {tuple(p) for f in g.fixtures if f["kind"] == "rail" for p in f["squares"]}
+    assert rail <= g.water, "the rail stands in the sea beside the hull"
+    start = next(p for p in sorted(g.water) if _beside(s, p))
+    deck_sq = _beside(s, start)
+    assert water.swim_speed(shark) > 0
+    swim = g.reachable(start, 60, swims="speed")
+    assert deck_sq in swim, "a swimmer climbs aboard from the water"
+    assert any(p in g.water for p in swim), "and swims along the side"
+    walk = g.reachable(deck_sq, 60)
+    assert not any(p in g.water for p in walk), "a walker's route never crosses the sea"
+
+
+def test_a_swimmer_bites_from_the_water(monkeypatch):
+    """The fight from the water: the shark in a rail square beside the player strikes
+    without coming aboard."""
+    s, e, pc, shark = _deck_with()
+    g = s.grid
+    start = next(p for p in sorted(g.water) if _beside(s, p))
+    s.positions[pc.ref] = _beside(s, start)
+    s.positions[shark.ref] = start
+    e.run(e.validate([{"op": "begin_encounter",
+                       "params": {"sides": {"you": [pc.ref], "them": [shark.ref]}}}]))
+    s.turn = [r for r, _ in s.initiative].index(shark.ref)
+    res = e.run(e.validate([{"op": "attack", "actor": shark.ref, "target": pc.ref,
+                             "visibility": "hidden", "because": "t"}]))
+    out = res.outcomes[-1]
+    assert out.op == "attack" and out.status != "refused", out.tell
+    assert s.positions[shark.ref][:2] == start, "it struck from where it swam"
+
+
+def test_anyone_may_go_over_the_side_and_is_then_in_the_water():
+    from rules import water
+
+    from tests.test_map_fixtures import _move
+
+    s, e, pc, shark = _deck_with()
+    g = s.grid
+    start = next(p for p in sorted(g.water) if _beside(s, p))
+    s.positions[pc.ref] = _beside(s, start)
+    s.positions.pop(shark.ref, None)
+    assert water.swim_speed(pc) == 0
+    assert e._swims(pc, start) == "over" and e._swims(pc, s.positions[pc.ref]) == ""
+    out = _move(e, pc.ref, start).outcomes[-1]
+    assert out.status != "refused", out.tell
+    assert tuple(s.positions[pc.ref][:2]) == start and s.afloat(pc.ref)
+    assert pc.water_row(s.afloat(pc.ref)) in (water.SWIMMING, water.OFF_BALANCE)
+    assert not pc.water_row(), "the deck itself is dry"
 
 
 def test_a_creature_that_does_not_come_at_you_surfaces_and_goes(monkeypatch):

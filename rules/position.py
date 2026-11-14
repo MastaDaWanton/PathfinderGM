@@ -446,8 +446,14 @@ def square_in_reach(scene, actor, defender, reach: int,
     was = start[2] if len(start) > 2 else grid.ground(tuple(start[:2]))
     climbs = bool(actor.can_move_vertically()) if hasattr(actor, "can_move_vertically") \
         else False
+    from . import water
+
+    # A swimmer may close through, and strike from, the open water beside a ship; anyone
+    # already in it swims on (`Engine._swims`, which the move op asks the same way).
+    swims = ("speed" if water.swim_speed(actor) > 0 else
+             "over" if tuple(start[:2]) in getattr(grid, "water", ()) else "")
     routes = grid.reachable(tuple(start[:2]), 10_000, size=actor.size,
-                            occupied=occupancy_toward(scene, actor, defender))
+                            occupied=occupancy_toward(scene, actor, defender), swims=swims)
     best = None
     for square, cost in routes.items():
         flat = tuple(square[:2])

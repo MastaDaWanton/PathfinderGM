@@ -2898,26 +2898,28 @@ class Actor:
                 best, why = m.value, m.source or "concealment"
         return best, why
 
-    def water_row(self) -> str:
+    def water_row(self, afloat: bool = False) -> str:
         """Which row of the underwater table this creature is in, or "" on dry ground.
 
         One derivation, asked in four places — the attack roll, the damage, the AC of
         whoever is being swung at, and the tell. Derived rather than stored for the reason
         every other spatial fact here is: the place id says where you are, and a stored
-        copy is a second writer waiting to disagree with it.
+        copy is a second writer waiting to disagree with it. `afloat` is the board's half
+        of the same question (`Scene.afloat`: standing in a square of open water beside a
+        ship), which the sheet cannot see and the engine passes in.
         """
         from . import places as places_mod
         from . import water as water_mod
 
         terrain = places_mod.terrain_of(str(getattr(self, "at", "") or ""))
-        if not water_mod.is_wet(terrain):
+        if not (afloat or water_mod.is_wet(terrain)):
             return ""
         return water_mod.row_for(self, self.swim_check_made)
 
-    def _water_penalty(self, weapon: dict) -> "Modifier | None":
+    def _water_penalty(self, weapon: dict, afloat: bool = False) -> "Modifier | None":
         from . import water as water_mod
 
-        row = self.water_row()
+        row = self.water_row(afloat)
         if not row:
             return None
         penalty = water_mod.attack_penalty(row, str(weapon.get("type") or ""))

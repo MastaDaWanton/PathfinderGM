@@ -548,8 +548,19 @@ def _grid_state(scene) -> dict | None:
     out["place"], out["about"] = _where_the_ground_is(scene)
     pc = scene.pc()
     if pc is not None and pc.ref in scene.positions and pc.can_act():
+        from rules import water as water_mod
+
+        taken = scene.occupied(ignore=pc.ref, seen_by=pc.ref)
+        swims = ("speed" if water_mod.swim_speed(pc) > 0
+                 else "over" if scene.afloat(pc.ref) else "")
         routes = g.reachable(scene.positions[pc.ref], pc.speed_feet, size=pc.size,
-                             occupied=scene.occupied(ignore=pc.ref, seen_by=pc.ref))
+                             occupied=taken, swims=swims)
+        if not swims and g.water:
+            # Over the side: a square of the sea is somewhere to go, at the price the move
+            # op charges going there (`Engine._swims`), and never a way round the deck.
+            over = g.reachable(scene.positions[pc.ref], pc.speed_feet, size=pc.size,
+                               occupied=taken, swims="over")
+            routes.update({p: c for p, c in over.items() if tuple(p[:2]) in g.water})
         # The level each destination stands at, carried alongside the cost, because a
         # square is only half of where somebody would end up — walking onto a dais is
         # walking up onto it, and the map has to be able to say which squares those are.
