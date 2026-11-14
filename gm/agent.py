@@ -848,9 +848,19 @@ class GMAgent:
                     raw, read_ok, self.engine.scene,
                     ask=interpret.confirm_company if interpret.ENABLED else None,
                     asked=company_answers, notes=own_words)
+                # And a hire or a guard order the words made that the plan left out
+                # (`acts_to_ops.orders_spoken`).
+                raw = acts_to_ops.orders_spoken(
+                    raw, read_ok, self.engine.scene,
+                    ask=interpret.confirm_company if interpret.ENABLED else None,
+                    asked=company_answers,
+                    ask_what=interpret.confirm_guarded if interpret.ENABLED else None,
+                    notes=own_words)
                 # The model's own coin op as a give of a denomination, and its sell
                 # pointed at the jar's id: the PLAN's shapes straightened, no words read.
                 raw = judgement.inject_payment(raw, player_input, self.engine.scene)
+                # A hire pays the engine's wage, never a coin the model added beside it.
+                raw = acts_to_ops.wage_not_tipped(raw, self.engine.scene, notes=own_words)
                 raw = judgement.resolve_sold_items(raw, self.engine.scene)
                 raw = judgement.inject_ability(raw, player_input, self.engine.scene)
                 # And its complement: a power the player named that nobody has is a

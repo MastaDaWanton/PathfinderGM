@@ -193,6 +193,13 @@ BYSTANDER = "role.bystander"
 PRICED = "role.priced"
 KNOWS_YOU = "bond.knows-you"
 TRAVELS_WITH_YOU = "bond.travels-with-you"
+# A companion the player pays (rules/hirelings.py): the wage and the minute it is paid to
+# ride in the payload; granted by `company do: hire` beside `bond.travels-with-you`, under
+# the same `company:<ref>` source, so dismissal ends both. `bond.guarding` is a companion
+# told to keep watch (`company do: guard`), its payload's `what` one of
+# `hirelings.GUARDS` — the state the party's cargo is defended by.
+HIRED = "bond.hired"
+GUARDING = "bond.guarding"
 # Non-lethal damage that will not mend until a need is met (CRB p.444, Starvation and
 # Thirst: "cannot be recovered until the character gets food or water, as needed—not even
 # magic that restores hit points heals this damage"). Granted by the `withheld` effect

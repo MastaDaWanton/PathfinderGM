@@ -3004,7 +3004,10 @@ def _company_who(scene, r) -> str:
 # question is not asked or its call fails: an `other` or a walk needs the question's yes.
 _COMPANY_ACTS = frozenset({"talk", "request", "other", "go", "journey"})
 _COMPANY_SPOKEN = frozenset({"talk", "request"})
-_COMPANY_DOES = {"join": "has them come along", "leave": "sends them away"}
+# Hiring is having them come along for pay (the demos say "hire the sellsword"); a guard
+# order is its own answer (rules/hirelings.py).
+_COMPANY_DOES = {"join": "has them come along", "hire": "has them come along",
+                 "leave": "sends them away", "guard": "sets them to guard"}
 
 
 def company_asked(raw, frame: dict | None, scene, *, ask=None, asked: dict | None = None,
@@ -3075,6 +3078,118 @@ def company_asked(raw, frame: dict | None, scene, *, ask=None, asked: dict | Non
         if notes is not None:
             notes.append(f"the plan's company of {who} struck: the player's words did not "
                          f"ask for it")
+    return out or [{"op": "narrate_only", "because": "nothing the reading stands behind"}]
+
+
+def orders_spoken(raw, frame: dict | None, scene, *, ask=None, asked: dict | None = None,
+                  ask_what=None, notes: list | None = None) -> list:
+    """A hire or a guard order the player's words make and the plan left out, added:
+    `company do: hire` for a sword for hire the plan's own `say` speaks to, `company do:
+    guard` for somebody already with the party it speaks to.
+
+    Measured live 2026-11-14 (gemma-4-12B, Scrapden tavern): "I will hire you after all,
+    sellsword. Come with me." was planned as a `say` and a `greet`, no `company`; the
+    sellsword answered "Fine. Lead the way" and stayed where they stood, unpaid (one plan in
+    two wrote the hire). The same day, "Your first job: stand over my wares in the hold and
+    let nobody near them." was planned as a `say` alone; the sellsword promised to keep
+    the wares safe and held no guard. Detected in code (a say to the person, no company op
+    for them), then the company question already asked of a plan's own company
+    (`interpret.confirm_company`), once per spoken act; for a guard, ONE more closed
+    question for what is guarded (`interpret.confirm_guarded`, `ask_what`). With no
+    question (`ask` None: the suite, the reader off) nothing is added: coin is never spent
+    and no order given on a guess."""
+    from rules import hirelings, states
+
+    from . import interpret
+
+    if ask is None or not isinstance(raw, list) or not frame or frame.get("error") \
+            or scene is None:
+        return raw
+    actors = getattr(scene, "actors", {}) or {}
+    planned = {(_company_who(scene, r),
+                str(((r or {}).get("params") or {}).get("do") or "join").lower())
+               for r in raw if _op(r) == "company"}
+    spoken = [a for a in frame.get("actions") or [] if interpret.acting(a)
+              and str(a.get("act") or "") in _COMPANY_SPOKEN]
+    if not spoken:
+        return raw
+    memo = asked if asked is not None else {}
+    out = list(raw)
+    # A line said to nobody by name, with one companion along, is said to them: measured
+    # live 2026-11-14, the guard order above was read as a `talk` with no target and
+    # planned as a `say` with no `to`, the sellsword the only one travelling with the
+    # party. Only a guard order is taken this way; a hire needs its addressee named.
+    along = [k for k, x in actors.items()
+             if not getattr(x, "is_pc", False) and x.has_state(states.TRAVELS_WITH_YOU)]
+    for r in raw:
+        if _op(r) != "say":
+            continue
+        ref = str(((r or {}).get("params") or {}).get("to") or "")
+        unnamed = not ref and len(along) == 1
+        if unnamed:
+            ref = along[0]
+        who = actors.get(ref)
+        if who is None or getattr(who, "is_pc", False):
+            continue
+        hireable = hirelings.wage(who) is None and hirelings.hires_out(scene, who) \
+            and (ref, "hire") not in planned and not unnamed
+        guardable = who.has_state(states.TRAVELS_WITH_YOU) and (ref, "guard") not in planned
+        if not (hireable or guardable):
+            continue
+        for a in spoken:
+            span = str(a.get("span") or "")
+            key = (span, who.name)
+            if key not in memo:
+                memo[key] = ask(span, who.name) or ""
+            if memo[key] == "has them come along" and hireable:
+                out.append({"op": "company", "because": "the player hired them",
+                            "params": {"who": ref, "do": "hire"}})
+                planned.add((ref, "hire"))
+                if notes is not None:
+                    notes.append(f"the hire of {who.name} the words made, added")
+                break
+            if memo[key] == "sets them to guard" and guardable:
+                what = (ask_what(span, who.name) if ask_what is not None else "") or "you"
+                out.append({"op": "company", "because": "the player set them to guard",
+                            "params": {"who": ref, "do": "guard", "what": what}})
+                planned.add((ref, "guard"))
+                if notes is not None:
+                    notes.append(f"the guard order to {who.name} the words gave, added")
+                break
+    return out
+
+
+def wage_not_tipped(raw, scene, *, notes: list | None = None) -> list:
+    """No coin `give` beside a hire to the same person: the engine's wage is the payment.
+
+    Measured live 2026-11-14: "Here is your coin, sellsword. You are hired; come with me."
+    was planned as `company do: hire` AND `give gp 1 to c10`, and the purse paid the week's
+    wage the engine named plus a gold piece the model did. No model authors a number (the
+    third law), so the give is struck and the note says why; the hire's own tell says what
+    was paid."""
+    from rules import goods
+    from rules import intents as intents_mod
+
+    if not isinstance(raw, list) or scene is None:
+        return raw
+    hired = {_company_who(scene, r) for r in raw if _op(r) == "company"
+             and str(((r or {}).get("params") or {}).get("do") or "").lower() == "hire"}
+    if not hired:
+        return raw
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    coins = {c for c, _v in goods.DENOMINATIONS} | {"coin", "coins"}
+    out = []
+    for r in raw:
+        params = (r or {}).get("params") or {}
+        to = intents_mod.normalise_ref(str(params.get("to") or ""))
+        frm = str(params.get("from_") or params.get("from") or (r or {}).get("actor") or "")
+        if (_op(r) == "give" and to in hired
+                and str(params.get("item") or "").strip().lower() in coins
+                and frm in ("", "pc", getattr(pc, "ref", "pc"))):
+            if notes is not None:
+                notes.append(f"the coin given to {to} struck: the hire pays the engine's wage")
+            continue
+        out.append(r)
     return out or [{"op": "narrate_only", "because": "nothing the reading stands behind"}]
 
 

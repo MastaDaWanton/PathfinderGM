@@ -504,7 +504,8 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     "found": (("name",), ("actor", "owner", "parent", "about", "kind"), "player"),
     "venture": (("kind",), ("actor", "parent", "name"), "player"),
     # Somebody comes along, or stops coming. `who` is a ref that is here; `do` is
-    # "join" or "leave", and defaults to join.
+    # "join", "leave", "hire" (for a wage the engine prices, rules/hirelings.py) or
+    # "guard" (a companion keeps watch over `what`: "cargo" or "you"); join by default.
     #
     # It exists because travel sheds everybody not named in `with`, so an NPC who
     # agreed to come was left in the market the moment the party walked to the green
@@ -512,7 +513,7 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # player had done nothing but cross a village. `with` was the only answer and it
     # is the wrong shape: it asks the model to remember, every single move, who the
     # party is, which is exactly the thing a language model does not do.
-    "company": (("who",), ("actor", "do", "note"), "player"),
+    "company": (("who",), ("actor", "do", "note", "what"), "player"),
     # The player ends a conversation, or refuses one. `who` is a ref, and without it
     # the whole conversation ends; `do` is "leave" (take your leave) or "ignore" (do
     # not answer somebody who spoke to you). A conversation ends this way, by walking

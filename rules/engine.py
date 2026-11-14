@@ -4461,6 +4461,10 @@ class Engine:
         from . import jobs as jobs_mod
 
         resolution.outcomes.extend(self._articled(o) for o in jobs_mod.settle(self))
+        # A hireling's week fallen due: paid from the purse, or they go (rules/hirelings.py).
+        from . import hirelings as hirelings_mod
+
+        resolution.outcomes.extend(self._articled(o) for o in hirelings_mod.settle(self))
         # The party arrived somewhere this batch: people go where their day or their road
         # puts them (rules/residency.py). No outcome and no tell — WHO IS HERE is the view
         # of who is in the room, and it simply has them or does not.
@@ -14964,6 +14968,13 @@ class Engine:
             if str(getattr(a, "from_template", "") or "") in journey_mod.MOUNTS:
                 escorts.append(r)
                 continue
+            # Nor of a hireling (rules/hirelings.py): an indifferent sellsword comes because
+            # they are paid, and leaves when they are not (`hirelings.settle`). Measured live
+            # 2026-11-14: a sellsword hired at the tavern "does not come with you any more"
+            # at the first walk, and the week's wages went with the bond.
+            if a.has_state(states.HIRED) and attitude_mod.of(a) != attitude_mod.HOSTILE:
+                escorts.append(r)
+                continue
             if (attitude_mod.step_of(attitude_mod.of(a))
                     < attitude_mod.step_of(attitude_mod.COMES_ALONG)):
                 falling.append((r, a))
@@ -18202,12 +18213,13 @@ class Engine:
         end: the follower is a property of the character, and the movement rule reads it.
         """
         do = str(intent.params.get("do") or "join").strip().lower()
-        if do not in ("join", "leave"):
+        if do not in ("join", "leave", "hire", "guard"):
             # Printed, not raised: a resolution-time raise is a 502 with the player's
             # sentence deleted, and the stage 7 ratchet says so. The fix is named, so a
             # rewrite can land it.
             return self._refuse(
-                intent, f"{do!r} is not a thing company does. It is 'join' or 'leave'.")
+                intent, f"{do!r} is not a thing company does. It is 'join', 'leave', "
+                        f"'hire' or 'guard'.")
         want = str(intent.params.get("who") or "").strip()
         who = self.scene.actors.get(want)
         if who is None:
@@ -18236,6 +18248,10 @@ class Engine:
                       if gone else f"{who.name} was not travelling with you."),
                 because=intent.because)
 
+        if do == "guard":
+            return self._company_guard(intent, who)
+        if do == "hire":
+            return self._company_hire(intent, who)
         if who.has_state(states.TRAVELS_WITH_YOU):
             return Outcome(
                 intent_id=intent.id, op="company", effects=[],
@@ -18266,16 +18282,106 @@ class Engine:
 
         mood = attitude_mod.of(who)
         if attitude_mod.step_of(mood) < attitude_mod.step_of(attitude_mod.COMES_ALONG):
+            from . import hirelings
+
+            # A sword for hire comes for a wage whatever they think of you: the other fix,
+            # named with the engine's figure (rules/hirelings.py).
+            pay = ""
+            if hirelings.hires_out(self.scene, who) and not self._will_not_deal(who):
+                day = goods.coins_for(hirelings.day_cp(self.scene, who))
+                pay = (f" Or hire them: {who.name} asks "
+                       f"{goods.purse_line(day, self._coins_here())} a day, a week of it "
+                       f"in advance.")
             return self._refuse(
                 intent, f"{who.name} is {mood} towards you and does not walk out of "
                         f"here at your word. Talk them round first — that is a "
-                        f"Diplomacy check against them.")
+                        f"Diplomacy check against them." + pay)
         self._travels_with_you(who)
         note = str(intent.params.get("note") or "").strip()
         return Outcome(
             intent_id=intent.id, op="company",
             effects=[{"ref": who.ref, "kind": "company", "travels": True}],
             tell=f"{who.name} comes with you from here." + (f" {note}" if note else ""),
+            because=intent.because)
+
+    def _company_hire(self, intent: Intent, who) -> Outcome:
+        """`company do: hire` — a sellsword, caravan guard, soldier or guard takes the
+        player's coin and comes along: a week's wage up front (Cohorts & Companions), the
+        wage the book's for their level, moved by their own terms. rules/hirelings.py
+        carries the sources and the design calls."""
+        from . import hirelings
+
+        pc = self.scene.pc()
+        if pc is None:
+            return self._refuse(intent, "Nobody is here to pay a wage.")
+        if self.scene.in_encounter:
+            return self._refuse(intent, "Nobody signs on in the middle of a fight.")
+        if hirelings.wage(who) is not None:
+            return Outcome(
+                intent_id=intent.id, op="company", effects=[],
+                tell=f"{who.name} is already in your pay.", because=intent.because)
+        if who.is_down:
+            return self._refuse(intent, f"{who.name} is in no state to sign on: they are down.")
+        if not hirelings.hires_out(self.scene, who):
+            work = hirelings.work_of(self.scene, who)
+            return self._refuse(
+                intent, f"{who.name} does not hire out a sword"
+                        + (f": their work is {work.replace('-', ' ')}" if work else "")
+                        + ". Sellswords, caravan guards, soldiers and the watch off duty "
+                          "do; anybody else comes along only as a friend.")
+        hostile = self._will_not_deal(who)
+        if hostile:
+            return self._refuse(intent, hostile)
+        coins = self._coins_here()
+        day = hirelings.day_cp(self.scene, who)
+        week = hirelings.week_cp(self.scene, who)
+        day_said = goods.purse_line(goods.coins_for(day), coins)
+        week_said = goods.purse_line(goods.coins_for(week), coins)
+        purse, enough = goods.spend(pc.purse, week)
+        if not enough:
+            return self._refuse(
+                intent, f"{who.name} asks {day_said} a day and a week in advance — "
+                        f"{week_said} — and {pc.name} carries "
+                        f"{goods.purse_line(pc.purse, coins)}.")
+        pc.purse = purse
+        joined = not who.has_state(states.TRAVELS_WITH_YOU)
+        if joined:
+            self._travels_with_you(who)
+        hirelings.take_on(who, day, int(self.scene.clock_minutes))
+        return Outcome(
+            intent_id=intent.id, op="company",
+            effects=[{"ref": who.ref, "kind": "company", "travels": True, "hired": True},
+                     {"kind": "give", "ref": pc.ref, "item": "coin", "count": week,
+                      "how": "wage", "from": pc.ref, "to": who.ref,
+                      "purse": dict(pc.purse)}],
+            tell=(f"{pc.name} pays {who.name} {week_said}: a week's wages in advance, at "
+                  f"{day_said} a day. {who.name} is in your pay"
+                  + (" and comes with you from here." if joined else " from here.")),
+            because=intent.because)
+
+    def _company_guard(self, intent: Intent, who) -> Outcome:
+        """`company do: guard` — a companion keeps watch over the party's cargo or the
+        player (`hirelings.GUARDS`), held as `bond.guarding` under their companion source
+        so dismissal ends it with the rest."""
+        from . import hirelings
+
+        what = str(intent.params.get("what") or "you").strip().lower()
+        if what not in hirelings.GUARDS:
+            return self._refuse(
+                intent, f"{what!r} is not something to guard: it is "
+                        f"{' or '.join(repr(g) for g in hirelings.GUARDS)}.")
+        if not who.has_state(states.TRAVELS_WITH_YOU):
+            return self._refuse(
+                intent, f"{who.name} is not with you, and keeps watch for nobody here. "
+                        f"Have them come along first, or hire them.")
+        hirelings.guard(who, what)
+        pc = self.scene.pc()
+        return Outcome(
+            intent_id=intent.id, op="company",
+            effects=[{"ref": who.ref, "kind": "guard", "what": what}],
+            tell=f"{who.name} keeps watch over "
+                 + ("your cargo." if what == "cargo"
+                    else f"{pc.name if pc is not None else 'you'}."),
             because=intent.because)
 
     def _op_venture(self, intent: Intent, partial: dict) -> Outcome:
