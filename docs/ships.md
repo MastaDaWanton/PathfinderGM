@@ -199,7 +199,16 @@ a town the legs reach, `interpret._road_to`), and the planner (the brief's ABOAR
    creature. Not on a river, and not on the day she makes port. Every hit stops the day.
    - a **merchantman** or a **patrol** is told and passes;
    - **pirates** are a vessel minted for the meeting (a longship or a sailing ship) and
-     the bands below at `distant`: sheer off and she is gone, close and she comes
+     the bands below at `distant`. **Sheering off is a leg of a chase** (`Engine._run_from`):
+     the faster hull (Table 7-49's speed) gains a band; at equal speed the two helms make
+     opposed checks — Profession (sailor), Ultimate Combat's driving check for a sailing
+     ship, or Wisdom for anybody untrained ("a driver can always make a Wisdom check in
+     place of a driving check") — ties to the higher modifier (CRB opposed checks), then
+     rolled again. The winner of a leg moves the band its way; a runner who wins at
+     `distant` is away. No 1e book races two ships: Ultimate Combat's vehicles say nothing
+     of pursuit, and the GameMastery Guide's chase (whose example is two sailing ships
+     racing for an island) gives +2 a check per 10 ft over the baseline instead — not used.
+     Closing, or losing the chase to alongside, and she comes
      **alongside and boards the party's deck** (`Engine._pirates_come_aboard`): the rail's
      count from the codex's pirates, trimmed on the **wandering** mix — a sail met on the
      water is a wandering encounter wherever it is fought — and the fight opens on their
@@ -209,8 +218,16 @@ a town the legs reach, `interpret._road_to`), and the planner (the brief's ABOAR
    - a **creature** is drawn from the bestiary's `water` biome narrowed to salt water by its
      own Environment line (`ontheway.open_water`: an otter, a naiad and a kappa were all
      mid-ocean meetings before), at the party's budget (wandering, `encounter_budget`). One
-     that comes at you (the road's aggressive types) comes over the rail onto the deck and
-     the fight starts with the party's turn; any other surfaces, looks, and goes.
+     that comes at you (the road's aggressive types) starts the fight with the party's
+     turn; one with a swim speed waits **in the water at the rail** beside the player
+     (`Engine._into_the_water`), to strike from it or climb aboard, and one without comes
+     over the rail. Any other surfaces, looks, and goes.
+   - **The water on the board.** The rail's squares and the sea's are open water
+     (`Grid.water`, a fixture kind with `swim`): solid to a walker, open to a creature with
+     a swim speed, and to anybody who goes over the side, at double cost (CRB Swim, half
+     speed). Whoever stands in it is in rules/water.py's table (`Scene.afloat`,
+     `Actor.water_row(afloat)`). The rail still covers from outboard and the sea covers
+     nobody.
    The Bestiary's own Ocean table (pp.324-327) is creatures only; no Pathfinder 1e sea
    rate or ship table could be read (Skull & Shackles, Stormwrack), and none is claimed.
 4. **The wreck** (`Engine._wreck`): the ship and her crew are lost. Passengers swim for
@@ -239,10 +256,8 @@ Stormwrack's storm and shipwreck rules could not be read; nothing here claims th
 
 ## Still open
 
-- **A pursuit.** Sheering off from a pirate at `distant` always escapes, as the bands
-  always allowed; nothing compares the two hulls' speeds.
-- **A swimmer at the rail.** A sea creature that comes at you is stood on the deck: the
-  deck's sea squares are blocked ground, so nothing fights from the water beside her.
+- **Swimming as movement.** A non-swimmer in the water pays double per square and is in
+  the water table, but makes no Swim check to move or stay up (water.py's own open item).
 - **The road to the coast** from an inland town takes no time, as before; the export
   would need to say how far the coast is (for-world-bible 8).
 - **Siege engines.** `arms` is on every row of the table and nothing reads it. A ballista
