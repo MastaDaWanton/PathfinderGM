@@ -120,6 +120,8 @@ def test_a_pirate_sail_closes_and_boards_the_party_deck_budgeted_as_wandering(mo
         ours = ships.deck_of(engine.aboard())
         assert all(scene.people[r].at == ours for r in foes), "they board OUR deck"
         assert all(scene.people[r].name.endswith("pirate") for r in foes)
+        # Priced by the sea's budget, so a model's begin_encounter does not re-roll them.
+        assert all(scene.people[r].has_state(states.PRICED) for r in foes)
         assert scene.initiative and set(foes) <= set(scene.sides["them"])
         each = encounter_budget.xp_of(npcs.choose(["pirate", "sailor"], pc.level))
         apl = encounter_budget.party_apl(scene)
@@ -215,6 +217,7 @@ def test_boarding_the_pirates_starts_the_fight_on_their_deck(monkeypatch):
     theirs = engine.vessel(scene.sea["theirs"])
     assert scene.at == ships.deck_of(theirs), out.tell
     assert scene.initiative, "pirates on their own deck do not wait to be talked to"
+    assert all(scene.people[r].has_state(states.PRICED) for r in scene.sea["foes"])
     for ref in scene.sea["foes"]:
         scene.people[ref].hp = -20
     scene.initiative = []
@@ -239,6 +242,7 @@ def test_a_sea_creature_comes_at_you_and_a_swimmer_holds_the_water(monkeypatch):
     deck = ships.deck_of(engine.aboard())
     assert all(scene.people[r].at == deck for r in met["refs"])
     assert scene.initiative and set(met["refs"]) <= set(scene.sides["them"])
+    assert all(scene.people[r].has_state(states.PRICED) for r in met["refs"])
     swimmers = [r for r in met["refs"] if water.swim_speed(scene.people[r]) > 0]
     assert swimmers, "the Bestiary's sea creatures swim"
     for r in swimmers:

@@ -17792,7 +17792,9 @@ class Engine:
             self.scene.add(who)
             self.scene.move(who.ref, deck)
             out.append(who)
-        self._mark_priced([w.ref for w in out], "boarding")
+        # Priced, so a model's begin_encounter round them does not roll their count again:
+        # "sea" for a pirate crew met on the water, "boarding" for anybody else's rail.
+        self._mark_priced([w.ref for w in out], "sea" if pirates else "boarding")
         return out
 
     # --- in conversation -----------------------------------------------------------------
