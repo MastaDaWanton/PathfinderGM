@@ -141,6 +141,40 @@ def seller_terms(scene, seller) -> tuple[int, list[str]]:
     return percent, why
 
 
+def seller_percent(scene, seller) -> tuple[int, list[str]]:
+    """`seller_terms` kept inside Ultimate Campaign's bargaining floor (the haggle's 25%),
+    as `tradecraft.counter_terms` keeps a counter's: the terms of a seller with no counter
+    to haggle at — a bench's rent, a bed, a stall for a horse, a teacher's fee, a bribe
+    (owner, 2026-11-13: every seller's price is the book's, moved by who sells it)."""
+    from . import tradecraft
+
+    percent, why = seller_terms(scene, seller)
+    cap = int(tradecraft.row("haggle")["max_percent"])
+    return max(-cap, min(cap, percent)), why
+
+
+def moved_cp(cp, percent: int) -> int:
+    """A copper price moved `percent` off (negative: over), a coin begun being a coin
+    paid; rounded to a millionth first so floating point cannot charge a copper for
+    nothing (`market._rent`'s reason)."""
+    import math
+
+    return int(math.ceil(round(float(cp) * (100 - int(percent)) / 100, 6)))
+
+
+def asked_cp(scene, seller, cp) -> int:
+    """What `seller` asks the player for something the book prices at `cp` copper."""
+    return moved_cp(cp, seller_percent(scene, seller)[0]) if seller is not None else int(cp)
+
+
+def refuses(seller) -> bool:
+    """Whether this seller will not deal with the player at all: only a hostile one, as
+    at a counter (`Engine._will_not_deal`, which words it)."""
+    from . import attitude
+
+    return seller is not None and attitude.of(seller, default="") == attitude.HOSTILE
+
+
 def _tier_base(tier: str) -> float:
     """Anything untiered is common. The only safe direction: a thing with no rarity
     should be cheap, not sold as a legendary."""

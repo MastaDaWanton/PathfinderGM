@@ -893,6 +893,15 @@ def lesson_size(person, craft: str = HERBALIST) -> int:
     return sizes[max(fitting)] if fitting else 0
 
 
+def lesson_price_cp(scene, person, craft: str = HERBALIST) -> int:
+    """What this person asks for a lesson: the table's fee moved by their own terms
+    (`pricing.asked_cp`: attitude and thrift; owner, 2026-11-13, every seller's price).
+    How MUCH they teach for it is `lesson_size`'s, and a hostile teacher teaches nothing."""
+    from . import pricing
+
+    return pricing.asked_cp(scene, person, int(lore(craft)["teacher"]["price_cp"]))
+
+
 def lesson_order(actor, doc) -> list[str]:
     """What a teacher tells first: the dangers, then the uses. A healer warns before they
     recommend, and so does a smith; a gate is told with its body."""

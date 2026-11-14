@@ -1534,7 +1534,10 @@ def where_here(scene, actor, known=()) -> dict:
         kit = bool(places.has_field_kit(actor))
     except Exception:              # noqa: BLE001
         kit = False
-    return {"smithy": smithy, "kit": kit}
+    # A hostile smith will not let the party at the forge (`places._let`): no smithy,
+    # and the refusal said where the footer says where you are.
+    refused = str((smithy or {}).get("refused") or "")
+    return {"smithy": None if refused else smithy, "kit": kit, "refused": refused}
 
 
 def rent_cp(scene, smithy: dict | None, minutes: int, known=()) -> int:

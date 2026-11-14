@@ -40,6 +40,8 @@ generated set exactly as before.
 """
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import hashlib
 from dataclasses import dataclass
 from dataclasses import replace as _replace
@@ -2584,15 +2586,54 @@ def _workroom_here(scene, known, place_tag: str, work_tag: str, rate,
     if holder is not None and holder.has_state(f"holds.place.{slug}"):
         pc = scene.pc() if hasattr(scene, "pc") else None
         ours = pc is not None and getattr(pc, "ref", None) == getattr(holder, "ref", None)
-        return {"kind": "owned", "place": place.id,
-                "keeper": keeper_ref if ours else (getattr(holder, "ref", None) or keeper_ref),
-                "rate_cp_per_hour": rate(owned_by_party=ours)}
+        return _let(scene, {"kind": "owned", "place": place.id,
+                            "keeper": keeper_ref if ours else (getattr(holder, "ref", None)
+                                                               or keeper_ref),
+                            "rate_cp_per_hour": rate(owned_by_party=ours)})
     if terrain_of(place.id) != URBAN and not (outside and setting_of(place.id) == "outside"):
         return None
     if not _keeper_works(scene, place, keeper, work_tag, place_tag):
         return None
-    return {"kind": "town", "place": place.id, "keeper": keeper_ref,
-            "rate_cp_per_hour": rate(owned_by_party=False)}
+    return _let(scene, {"kind": "town", "place": place.id, "keeper": keeper_ref,
+                        "rate_cp_per_hour": rate(owned_by_party=False)})
+
+
+# Set while a keeper works their own bench for the player (`commission.run`): the job's
+# bill moves by the keeper's terms once, over the whole of it, so the hours inside it are
+# counted at the book's rent — moved here too, the rent was moved twice (the commission
+# test pins the bill).
+_KEEPERS_OWN_HOURS = contextvars.ContextVar("keepers_own_hours", default=False)
+
+
+@contextlib.contextmanager
+def keepers_own_hours():
+    token = _KEEPERS_OWN_HOURS.set(True)
+    try:
+        yield
+    finally:
+        _KEEPERS_OWN_HOURS.reset(token)
+
+
+def _let(scene, here: dict) -> dict:
+    """A rented bench with its seller's terms on it (owner, 2026-11-13: the book's rent,
+    moved by the relationship and the personality of whoever takes it — `pricing.
+    seller_percent`, the counter's own steps): `percent` off the rent, `why` in words, and
+    `refused` — the keeper's own words — when they are hostile and will not let the party
+    work there at all, as a hostile keeper will not deal at a counter. Nothing on a bench
+    that is free (the party's own), and nothing for a keeper not stood up yet: nobody to
+    feel anything about the player is the book's price."""
+    from . import pricing
+
+    here.update(percent=0, why=[], refused="")
+    seller = _actor(scene, here.get("keeper") or "")
+    if not here["rate_cp_per_hour"] or seller is None or _KEEPERS_OWN_HOURS.get():
+        return here
+    here["percent"], here["why"] = pricing.seller_percent(scene, seller)
+    if pricing.refuses(seller):
+        name = str(getattr(seller, "name", "") or "the keeper")
+        here["refused"] = (f"{name[:1].upper() + name[1:]} will not let you work here. Talk "
+                           f"them round first.")
+    return here
 
 
 def smithy_here(scene, known=()) -> dict | None:
@@ -2995,6 +3036,9 @@ def leather_bench_here(scene, actor, known=()) -> dict:
     from . import market
 
     tannery = tannery_here(scene, known)
+    # A hostile tanner will not let the party into the yard (`_let`).
+    refused = str((tannery or {}).get("refused") or "")
+    tannery = None if refused else tannery
     kit = has_leather_kit(actor)
     if tannery is not None:
         tiers = tuple(market.QUOTA)
@@ -3004,4 +3048,4 @@ def leather_bench_here(scene, actor, known=()) -> dict:
         tiers = ()
     return {"at": "tannery" if tannery is not None else "field" if kit else None,
             "tannery": tannery, "field_kit": kit, "tiers": tiers,
-            "vats": tannery is not None}
+            "vats": tannery is not None, "refused": refused}

@@ -45,6 +45,17 @@ GUARDED = (["css/forge-games.css", "js/table/42-forge-stage.js"]
                                                    "03-smithy", "04-fx")])
 
 
+@pytest.fixture(autouse=True)
+def _book_terms(monkeypatch):
+    """These pin the book's prices. The seller's own terms — attitude and a thrift seeded
+    per person, which moved a stranger's forge hour to 11 cp and a bed to 53 cp here once
+    every seller's price moved (2026-11-14) — are pinned in
+    tests/test_attitude_prices_everywhere.py, and held at nothing in this file."""
+    from rules import pricing
+
+    monkeypatch.setattr(pricing, "seller_terms", lambda scene, seller: (0, []))
+
+
 def _src(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 

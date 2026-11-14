@@ -1259,7 +1259,12 @@ def _rent(hours, here) -> int:
     bench = here()
     if bench is None:
         return 0
-    return int(math.ceil(round(int(bench["rate_cp_per_hour"]) * h, 6)))
+    # The keeper's own terms (`places._let`: their attitude and thrift), on the whole
+    # rent so an hour at 10 cp moved 5% is not rounded back to the book's coin.
+    from . import pricing
+
+    return pricing.moved_cp(int(bench["rate_cp_per_hour"]) * h,
+                            int(bench.get("percent") or 0))
 
 
 # --- the town laboratory, by the hour (alchemy plan §14, contracts §9) ---------------------
@@ -1358,7 +1363,10 @@ def vat_rent(scene, days, vats: int = 1, known=()) -> int:
     here = places_mod.tannery_here(scene, known)
     if here is None:
         return 0
-    return vat_cost(d, n, int(here["vat_rate_cp_per_day"]))
+    from . import pricing
+
+    return pricing.moved_cp(vat_cost(d, n, int(here["vat_rate_cp_per_day"])),
+                            int(here.get("percent") or 0))
 
 
 def vat_cost(days, vats: int = 1, rate_cp_per_day: int = VAT_RENT_CP_PER_DAY) -> int:

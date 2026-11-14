@@ -1014,15 +1014,35 @@ def break_door(engine, intent, pc, how: str, partial: dict):
     return _cell_roll(engine, intent, pc, held, "strength", partial)
 
 
-def bribe_price_cp(guard) -> int:
+def bribe_price_cp(guard, scene=None) -> int:
     """Ultimate Intrigue p.124: the guard's CR as the heroic level on Table 14-9, a quarter
-    of that gear's value to look the other way."""
+    of that gear's value to look the other way — moved by the guard's own terms
+    (`pricing.seller_percent`: their attitude to the player and their thrift) when the
+    scene is given.
+
+    Why a bribe moves with attitude (owner, 2026-11-13: every seller's price is the book's,
+    moved by who takes it; researched 2026-11-14). The book sizes the bribe by the
+    target's CR and the favour's risk alone (Ultimate Intrigue, Tactics: Bribery,
+    aonprd.com/Rules.aspx?ID=2155: "5% for a minor favor, 10% for a larger one, and 25%
+    or more for simply letting the PCs pass") and puts attitude in the Diplomacy check that
+    gets the bribe taken (the same page: "might need to use Diplomacy ... to convince the
+    target to take the bribe"; the CRB's Diplomacy DC is set by the starting attitude).
+    This app rolls no Diplomacy for a bribe — the coin is the whole persuasion (law.json,
+    HOUSE) — so the amount is the only place attitude can reach: a guard who likes you
+    looks away for less, one who does not wants more, and a tight-fisted one is greedier.
+    A hostile one takes nothing (`bribed`), as a hostile keeper sells nothing. Not built:
+    Persuasive Bribery's corollary that a refused bribe worsens the target's attitude."""
     from . import attitude as attitude_mod
     from . import npc_gear
+    from . import pricing
 
     level = max(1, min(len(npc_gear.TABLE_14_9) - 1, int(attitude_mod._hit_dice(guard) or 1)))
     gp = npc_gear.TABLE_14_9[level][0] * float(document()["bribe"]["share"])
-    return int(math.ceil(gp)) * 100
+    book = int(math.ceil(gp)) * 100
+    if scene is None:
+        return book
+    # Whole gold still, as the book's quarter is rounded: a guard names a sum, not 37 cp.
+    return int(math.ceil(pricing.asked_cp(scene, guard, book) / 100)) * 100
 
 
 def bribed(engine, intent, outcome) -> str:
@@ -1044,9 +1064,10 @@ def bribed(engine, intent, outcome) -> str:
         if not _is_law(taker) or coin not in worth:
             continue
         cp = int(e.get("count") or 0) * worth[coin]
-        price = bribe_price_cp(taker)
+        price = bribe_price_cp(taker, scene)
         coins = engine._coins_here()
-        if cp >= price:
+        hostile = engine._will_not_deal(taker)
+        if cp >= price and not hostile:
             _set(pc, held, escaped="bribe", bribed=taker.ref)
             return (f"{taker.name} pockets it and looks the other way: the door is left "
                     f"unlocked.")
@@ -1059,6 +1080,10 @@ def bribed(engine, intent, outcome) -> str:
         mine = dict(pc.purse or {})
         mine[coin] = int(mine.get(coin, 0) or 0) + n
         pc.purse = mine
+        if hostile:
+            # Hostile takes no coin at any price (`pricing.refuses`): no figure is named,
+            # since no figure would do.
+            return f"{taker.name} pushes it back: {hostile}"
         return (f"{taker.name} pushes it back: looking the other way would take "
                 f"{goods.purse_line(goods.coins_for(price), coins)}.")
     return ""
@@ -1194,7 +1219,7 @@ def _sentence(engine, pc, held, town: str):
              gallows=gallows.id if gallows is not None else "",
              gallows_name=gallows.name if gallows is not None else "the gallows")
         jailer = next(iter(_law_here(engine)), None)
-        price = _coin(engine, bribe_price_cp(jailer)) if jailer is not None else ""
+        price = _coin(engine, bribe_price_cp(jailer, engine.scene))             if jailer is not None and not engine._will_not_deal(jailer) else ""
         tell = (f"{_cap(asker)} passes sentence: {pc.name} is to hang at first light tomorrow for "
                 f"{_charge_rows()[gravest(chs).kind]['said']}. Until then, the condemned "
                 f"cell at {pay.get('hold_name')}. "

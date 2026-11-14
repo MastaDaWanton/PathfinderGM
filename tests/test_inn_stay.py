@@ -10,6 +10,8 @@ which held no room at all.
 """
 from __future__ import annotations
 
+import pytest
+
 from gm import acts_to_ops
 from rules import cards, goods, keepers, lodging
 from rules.bestiary import instantiate
@@ -20,6 +22,17 @@ from rules.sheet import from_dict
 from test_a_take_is_not_a_boast import SAM
 
 LOC = "5bbd0c40345f"
+
+
+@pytest.fixture(autouse=True)
+def _book_terms(monkeypatch):
+    """These pin the book's prices. The seller's own terms — attitude and a thrift seeded
+    per person, which moved a stranger's forge hour to 11 cp and a bed to 53 cp here once
+    every seller's price moved (2026-11-14) — are pinned in
+    tests/test_attitude_prices_everywhere.py, and held at nothing in this file."""
+    from rules import pricing
+
+    monkeypatch.setattr(pricing, "seller_terms", lambda scene, seller: (0, []))
 
 
 def _inn(spot: str = "the-inn", purse=None, keeper_name: str = "the innkeeper"):

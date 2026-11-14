@@ -93,7 +93,7 @@
   "_cell_note": "A town's cell, not a fortress: a good wooden door on a simple lock (HOUSE: which rows). Measured on the owner's report save 2026-11-01 with the strong door and average lock first chosen: Corvin T. (level 2, Str 17, Escape Artist +7, no Disable Device) could not make any of the three on a natural 20, so the cell had no way out but a bribe he could not afford. Baldur's Gate 3 designs an escape into every cell and Divinity: Original Sin 2 leaves a lockpick in each (bg3.wiki, Crime; docs.larian.game) - the cell is a puzzle with a way out. Escape Artist stays the book's tight space, DC 30.",
   "bribe": {
     "share": 0.25,
-    "note": "Ultimate Intrigue p.124, Bribery: the bribe's base is the target's CR as the heroic level on Table 14-9 NPC Gear, and '25% or more for simply letting the PCs pass and looking the other way'. The coin is the persuasion here; no Diplomacy is rolled (HOUSE)."
+    "note": "Ultimate Intrigue p.124, Bribery: the bribe's base is the target's CR as the heroic level on Table 14-9 NPC Gear, and '25% or more for simply letting the PCs pass and looking the other way'. The coin is the persuasion here; no Diplomacy is rolled (HOUSE). The book puts the target's attitude in that Diplomacy check (UI Tactics: Bribery, aonprd Rules ID 2155; the CRB's Diplomacy DC is set by attitude), so with no check the sum carries it: moved by the guard's own terms, attitude and thrift, as any seller's price (owner, 2026-11-13; `trial.bribe_price_cp`), and a hostile guard takes nothing."
   },
   "labour": {
     "wage_cp": 10,

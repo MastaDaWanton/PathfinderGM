@@ -46,6 +46,17 @@ SYNTHETIC = loader.load_cached("fixtures/synthetic-world.json")
 VYRAKON = "5bbd0c40345f"            # Pangrella: a town whose author listed no laboratory
 
 
+@pytest.fixture(autouse=True)
+def _book_terms(monkeypatch):
+    """These pin the book's prices. The seller's own terms — attitude and a thrift seeded
+    per person, which moved a stranger's forge hour to 11 cp and a bed to 53 cp here once
+    every seller's price moved (2026-11-14) — are pinned in
+    tests/test_attitude_prices_everywhere.py, and held at nothing in this file."""
+    from rules import pricing
+
+    monkeypatch.setattr(pricing, "seller_terms", lambda scene, seller: (0, []))
+
+
 def _town(scale: str, ident: str = "aaaabbbbcccc", facts=None, prose="", authored=()):
     class Loc:
         id = ident
@@ -277,7 +288,8 @@ def test_the_city_laboratory_is_the_towns_with_an_alchemist_behind_it():
     assert keeper is not None
     assert places.laboratory_here(scene, engine.places()) == {
         "kind": "town", "place": lab.id, "keeper": keeper.ref,
-        "rate_cp_per_hour": market.LAB_RENT_CP_PER_HOUR, "fume_hood": True}
+        "rate_cp_per_hour": market.LAB_RENT_CP_PER_HOUR, "fume_hood": True,
+        "percent": 0, "why": [], "refused": ""}
     # What the teacher route reads when no population record names the work: the
     # keeper's own words say what they are.
     assert "alchemist" in (keeper.notes or "").lower()

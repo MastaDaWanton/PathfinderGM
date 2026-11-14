@@ -190,8 +190,11 @@ def run(engine, intent, partial: dict | None = None):
     before = _pack(pc)
     supplied = None
     for attempt in range(2):
-        steps, done, rolls, stopped, spoiled = _walk(engine, craft, craft_id, pc, keeper,
-                                                     target)
+        # The keeper's own hours at the book's rent: the bill below moves by their terms
+        # once, over the whole job (`places.keepers_own_hours`).
+        with places_mod.keepers_own_hours():
+            steps, done, rolls, stopped, spoiled = _walk(engine, craft, craft_id, pc,
+                                                         keeper, target)
         if (stopped is not None and stopped.code == "no_fitting" and supplied is None
                 and attempt == 0):
             # Nothing to fit the head to: the smith takes a plain one off his own shelf and

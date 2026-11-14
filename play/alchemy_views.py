@@ -35,7 +35,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from rules import alchemist as al
 from rules import alchemy_items as items
-from rules import crafting, effectspec, formulae, knowledge, survival, worldclass
+from rules import crafting, effectspec, formulae, knowledge, pricing, survival, worldclass
 
 from . import bench_clock
 from . import campaign as campaign_mod
@@ -1086,7 +1086,8 @@ def alchemists_here(c, pc) -> list[dict]:
             continue
         try:
             if knowledge.teaches(a, population.of_ref(c.scene, ref), knowledge.ALCHEMIST):
-                out.append({"ref": ref, "name": a.name, "price": price})
+                out.append({"ref": ref, "name": a.name, "price": price and _coins(
+                    knowledge.lesson_price_cp(c.scene, a, knowledge.ALCHEMIST))})
         except Exception:      # noqa: BLE001
             continue
     return out
@@ -1168,8 +1169,9 @@ def alchemy_learn(request):
             return _err(f"{teacher.name} will not teach you.", 409)
         lesson = knowledge.lore(knowledge.ALCHEMIST).get("formula_lesson") or {}
         n = int((formulae.get(fid) or {}).get("spell_level") or 0)
-        fee_cp = max(int(lesson.get("price_cp", 500)),
-                     int(lesson.get("per_spell_level_cp", 500)) * n)
+        # The teacher's own terms move the fee (`pricing.asked_cp`), as any seller's.
+        fee_cp = pricing.asked_cp(c.scene, teacher, max(
+            int(lesson.get("price_cp", 500)), int(lesson.get("per_spell_level_cp", 500)) * n))
     elif source == "companion":
         row = formulae.get(fid) or {}
         why = _companion_knows(c, pc, str(body.get("who") or ""), str(row.get("spell") or ""))
@@ -1303,7 +1305,7 @@ def alchemy_ask(request):
         return JsonResponse({"revealed": [], "paid": "", "minutes": 0,
                              "refused": f"{who} has nothing to tell you about "
                                         f"{doc.get('name')} you do not know."})
-    cp = int(rules["price_cp"])
+    cp = knowledge.lesson_price_cp(c.scene, person, knowledge.ALCHEMIST)
     purse, ok = goods.spend(pc.purse, cp)
     if not ok:
         return JsonResponse({"revealed": [], "paid": "", "minutes": 0,

@@ -116,7 +116,8 @@ def teachers_here(c, pc) -> list[dict]:
         if a is pc or getattr(a, "is_pc", False) or a.is_down:
             continue
         if hk.teaches(a, population.of_ref(c.scene, ref)):
-            out.append({"ref": ref, "name": a.name, "price": price})
+            out.append({"ref": ref, "name": a.name, "price": price and _price(
+                hk.lesson_price_cp(c.scene, a))})
     return out
 
 
@@ -334,7 +335,7 @@ def herb_ask(request):
     if not order:
         said = f"{who} has nothing to tell you about {ing.name} you do not know."
         return JsonResponse({"revealed": [], "paid": "", "minutes": 0, "refused": said})
-    cp = int(rules["price_cp"])
+    cp = hk.lesson_price_cp(c.scene, person)
     if not _pay(pc, cp):
         said = f"{who} asks {_price(cp)}, and you cannot pay it."
         return JsonResponse({"revealed": [], "paid": "", "minutes": 0, "refused": said})

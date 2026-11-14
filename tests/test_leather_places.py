@@ -38,6 +38,17 @@ VYRAKON = "5bbd0c40345f"            # Pangrella: a town whose author listed no t
 TANNERS = "The tanners work the hides of the upland herds below the town."
 
 
+@pytest.fixture(autouse=True)
+def _book_terms(monkeypatch):
+    """These pin the book's prices. The seller's own terms — attitude and a thrift seeded
+    per person, which moved a stranger's forge hour to 11 cp and a bed to 53 cp here once
+    every seller's price moved (2026-11-14) — are pinned in
+    tests/test_attitude_prices_everywhere.py, and held at nothing in this file."""
+    from rules import pricing
+
+    monkeypatch.setattr(pricing, "seller_terms", lambda scene, seller: (0, []))
+
+
 def _settlements(world):
     for row in world.play.get("settlements") or []:
         e = world.get(row["id"])
@@ -266,7 +277,7 @@ def test_a_town_tannery_is_kept_by_a_tanner_and_rented():
     assert places.tannery_here(scene, engine.places()) == {
         "kind": "town", "place": tannery.id, "keeper": keeper.ref,
         "rate_cp_per_hour": 10, "vat_rate_cp_per_day": 20,
-        "vats": 4, "vats_free": 4, "vat_units": 4}
+        "vats": 4, "vats_free": 4, "vat_units": 4, "percent": 0, "why": [], "refused": ""}
     # Read from the coordinate alone too: the id spells the ring place's name.
     assert places.tannery_here(scene)["place"] == tannery.id
 

@@ -17074,9 +17074,9 @@ class Engine:
         with the dislike now in the price (`pricing.REGARD_PERCENT`): an UNFRIENDLY keeper
         trades, dearer; only a HOSTILE one — somebody who would act against you — will not
         deal. The trade panel asks the same question (`views._counter_refusal`)."""
-        from . import attitude as attitude_mod
+        from . import pricing
 
-        if keeper is None or attitude_mod.of(keeper, default="") != attitude_mod.HOSTILE:
+        if not pricing.refuses(keeper):
             return ""
         return (f"{_sentence(keeper.name)} will not deal with you. Talk them round first: "
                 f"it takes a minute of it, and the engine rolls your Diplomacy against how "
@@ -28910,6 +28910,7 @@ class Engine:
         from . import goods
         from . import keepers
         from . import lodging
+        from . import pricing
 
         at = str(self.scene.at or "")
         if not lodging.lets_beds(self.scene, at):
@@ -28924,11 +28925,21 @@ class Engine:
             return {"tell": f"{actor.name}'s room at {name} is already paid for today.",
                     "effect": {"ref": actor.ref, "kind": "lodging", "place": at, "cp": 0,
                                "paid": 0, "why": "held", "origin": lodging.ORIGIN}}
-        cp = lodging.price_cp(self.scene, at)
-        coins = self._coins_here()
-        price = goods.purse_line(goods.coins_for(cp), coins)
         keeper = keepers.keeper_in(self.scene, at)
         asks = keeper.name if keeper is not None and keeper.at == at else ""
+        # The book's stay, moved by the keeper's own terms (owner, 2026-11-13: every
+        # seller's price is the book's, moved by their attitude and thrift); a hostile
+        # keeper lets no bed at all, as a hostile keeper sells nothing at a counter.
+        seller = keeper if asks else None
+        if self._will_not_deal(seller):
+            return {"refused": self._refuse(
+                intent, f"{self._will_not_deal(seller)} No room, and no night's sleep "
+                        f"here.", code="will_not_deal")}
+        percent, why = pricing.seller_percent(self.scene, seller)
+        cp = pricing.moved_cp(lodging.price_cp(self.scene, at), percent)
+        moved = tradecraft.terms_said(seller, percent, why) if seller is not None else ""
+        coins = self._coins_here()
+        price = goods.purse_line(goods.coins_for(cp), coins)
         purse, paid = goods.spend(actor.purse, cp)
         if not paid:
             held = goods.purse_line(actor.purse or {}, coins) or "nothing"
@@ -28941,7 +28952,7 @@ class Engine:
         actor.purse = purse
         lodging.hold(actor, at, name, self.scene.ROUNDS_PER_MINUTE)
         tell = (f"{actor.name} pays {asks or 'the house'} {price} for a room at {name} "
-                f"for the night.")
+                f"for the night" + (f" ({moved})" if moved else "") + ".")
         return {"tell": tell,
                 "effect": {"ref": actor.ref, "kind": "lodging", "place": at, "cp": cp,
                            "paid": cp, "to": getattr(keeper, "ref", ""),

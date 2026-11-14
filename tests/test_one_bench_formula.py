@@ -58,8 +58,10 @@ def test_the_half_level_term_is_written_in_one_place():
 
 def test_the_rent_arithmetic_is_written_in_one_place():
     """`math.ceil(round(rate * hours, 6))` lived in market.py, blacksmith.py and
-    alchemist.py; only market's answer was ever charged."""
-    pattern = re.compile(r"math\.ceil\(round\([^)]*rate", re.S)
+    alchemist.py; only market's answer was ever charged. The rate times the hours is
+    market's still; the coin-begun rounding is `pricing.moved_cp`'s since the keeper's own
+    terms move the rent (2026-11-14), which is one place too."""
+    pattern = re.compile(r"rate_cp_per_hour\"\]\)\s*\*\s*h(?![a-z_])")
     copies = [p.name for p in (ROOT / "rules").glob("*.py")
               if pattern.search(p.read_text(encoding="utf-8"))]
     assert copies == ["market.py"], copies

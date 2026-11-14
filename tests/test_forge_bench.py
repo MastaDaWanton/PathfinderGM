@@ -763,7 +763,7 @@ def test_the_bench_reads_lane_gs_real_smithy_kit_and_rent():
     pc.goods.clear()
     pc.stock.clear()
     outside = bs.where_here(scene, pc, engine.places())
-    assert outside == {"smithy": None, "kit": False}
+    assert outside == {"smithy": None, "kit": False, "refused": ""}
     locks = {m["id"]: m["lock_reason"] for m in bs.methods_view(1, outside)}
     assert locks["forge"] == "Needs a field kit or a smithy"
     pc.goods["Smith's Field Kit"] = 1
@@ -773,7 +773,11 @@ def test_the_bench_reads_lane_gs_real_smithy_kit_and_rent():
     here = bs.where_here(scene, pc, engine.places())
     assert here["smithy"]["kind"] == "town"
     assert {m["id"]: m["lock_reason"] for m in bs.methods_view(1, here)}["smelt"] == ""
-    assert bs.rent_cp(scene, here["smithy"], 120, engine.places()) == 20
+    # Two hours at the book's 10 cp, moved by the smith's own terms (their seeded thrift).
+    from rules import pricing
+
+    assert bs.rent_cp(scene, here["smithy"], 120, engine.places()) == pricing.moved_cp(
+        20, here["smithy"]["percent"])
 
 
 def test_assay_cuts_a_tenth_of_a_bar(pc):

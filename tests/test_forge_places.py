@@ -37,6 +37,17 @@ SYNTHETIC = loader.load_cached("fixtures/synthetic-world.json")
 VYRAKON = "5bbd0c40345f"            # Pangrella: a town whose author listed no smithy
 
 
+@pytest.fixture(autouse=True)
+def _book_terms(monkeypatch):
+    """These pin the book's prices. The seller's own terms — attitude and a thrift seeded
+    per person, which moved a stranger's forge hour to 11 cp and a bed to 53 cp here once
+    every seller's price moved (2026-11-14) — are pinned in
+    tests/test_attitude_prices_everywhere.py, and held at nothing in this file."""
+    from rules import pricing
+
+    monkeypatch.setattr(pricing, "seller_terms", lambda scene, seller: (0, []))
+
+
 def _town(scale: str, ident: str = "aaaabbbbcccc", facts=None, prose=""):
     class Loc:
         id = ident
@@ -164,7 +175,7 @@ def test_a_generated_city_smithy_is_the_towns_with_a_smith_behind_it():
     here = places.smithy_here(scene)
     assert here == {"kind": "town", "place": smithy.id,
                     "keeper": keepers.keeper_in(scene, smithy.id).ref,
-                    "rate_cp_per_hour": 10}
+                    "rate_cp_per_hour": 10, "percent": 0, "why": [], "refused": ""}
 
 
 def test_a_place_that_is_not_a_forge_is_not_a_smithy():
