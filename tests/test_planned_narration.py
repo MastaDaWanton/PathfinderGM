@@ -204,6 +204,34 @@ def test_the_v2_slots_carry_the_players_line_on_the_first_tell_and_never_close()
     assert talk == ["fact1", "reply"]
 
 
+def test_the_aside_never_goes_to_somebody_another_slot_already_shows():
+    """0.3.2, 2026-11-13: the harbourmaster "leans in" and a sentence later "ignores you".
+    On the 2026-11 diagnosis corpus (1,462 distinct planned beats) 12 beats had the matter
+    slot's go-between ("The gnome innkeeper mentions in passing…") then the aside picking
+    the same innkeeper ("…ignores your presence"): the aside was free to choose anybody
+    here. It now chooses only among people no other slot of the beat shows."""
+    s, engine = _scene()
+    smith = next(r for r, a in s.actors.items() if not a.is_pc)
+    pull = {"title": "Fetch Glowvine for Peleth", "standing": "unheard",
+            "approach": "go_between", "giver": {"name": "Peleth", "ref": "c99"},
+            "carrier": {"name": "Jarek", "ref": smith}}
+    keys = [x["key"] for x in planned.build_plan(engine, "I wait.", [], pull=pull,
+                                                  last_beat=LAST_BEAT)]
+    assert "matter" in keys and "aside" not in keys, keys
+    # Nor the one an act of the engine's was about: the smith sold, then "ignores you".
+    sold = Outcome("i1", "sell", tell="Jarek sells Kesst Vayr a hammer.", actor="pc",
+                   about=(smith,))
+    keys = [x["key"] for x in planned.build_plan(engine, "I buy a hammer.", [sold],
+                                                  last_beat=LAST_BEAT)]
+    assert "aside" not in keys, keys
+    # A bystander is still offered, and only the bystander.
+    other = instantiate("guildhand", scene=s, name="Orla")
+    s.add(other)
+    aside = [x for x in planned.build_plan(engine, "I buy a hammer.", [sold],
+                                           last_beat=LAST_BEAT) if x["key"] == "aside"]
+    assert aside and "Orla" in aside[0]["say"] and "Jarek" not in aside[0]["say"]
+
+
 def test_a_doing_slot_only_when_the_engine_decided_nothing_and_a_reply_only_out_of_fights():
     """With no tells the player's deed gets its own slot (the bench's talk run, beat 1); in
     a fight the people answer with their turns, never with a reply slot."""
