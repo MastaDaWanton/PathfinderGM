@@ -788,11 +788,16 @@ class Scene:
                                    else (spot[0], spot[1], now))
 
     def afloat(self, ref: str) -> bool:
-        """Whether `ref` stands in a square of open water on this board (`Grid.water`: the
-        sea past a ship's side), and so is in the water table (`Actor.water_row`)."""
+        """Whether `ref` is in the water here, and so in the water table (`Actor.water_row`)
+        and the Swim check (`Engine.swim`): in a square of open water on this board
+        (`Grid.water`: the sea past a ship's side or a quay, and every open square of a wet
+        place), or anywhere in a wet place (`water`/`underwater` ground) — so a lake with
+        no board laid swims too. Only somebody HERE: a lake the party is not at rolls
+        nothing anybody could see."""
         at = self.positions.get(ref)
-        return bool(self.grid is not None and at is not None
-                    and tuple(at[:2]) in self.grid.water)
+        if self.grid is not None and at is not None and tuple(at[:2]) in self.grid.water:
+            return True
+        return ref in self.actors and water.is_wet(self.biome)
 
     def occupied(self, ignore: str = "", level: int | None = None,
                  seen_by: str = "") -> set[tuple[int, int]]:
@@ -13272,40 +13277,64 @@ class Engine:
         this writes): the engine's round. The result governs the round after it — no
         progress is a refused move (`_check_move`), under is the drowning clock, a made
         check brings them up. Rolled by the engine, hidden, PC and NPC alike, as the breath
-        check beside it is; every result is told. The water is stormy under the storm at
-        sea's tag (`states.WEATHER_STORM`), calm otherwise."""
-        from . import places as places_mod
+        check beside it is; every result is told.
 
+        Every water obeys it (2026-11-14): the board's sea squares and a whole wet place
+        alike (`Scene.afloat`, the one question). Below the surface of an `underwater`
+        place there is no surface to come up to — that is a move to the place above — so
+        a made check swims on under and a bad failure sinks, on the breath clock the
+        ground already runs. How rough the water is: `water.roughness`.
+
+        The cadence. The book asks once per ROUND and has no per-minute check (CRB Swim
+        and Aquatic Terrain, read 2026-11-14; a "once a minute out of combat" rule could
+        not be found in either). What it does have is taking 10: allowed whenever you are
+        not threatened or distracted, and "You can't take 10 on a Swim check in stormy
+        water". So out of a fight and out of a storm the swimmer takes 10, and a beat of
+        many rounds comes out the same as each of its rounds would; in a fight, or in
+        stormy water, the d20 is rolled once a beat."""
         tells: list[str] = []
+        fight = self.scene.in_encounter
         for a in list(self.scene.people.values()):
             under = a.has_state(states.UNDER_WATER)
             if not self.scene.afloat(a.ref):
-                # Out of the board's water: the going-under ends, and the last check with
-                # it — unless they stand in a wet PLACE, whose own rules keep it.
+                # Out of the water: the going-under ends, and the last check with it.
                 if under:
                     a.remove_effects(match=lambda e: states.UNDER_WATER in (e.tags or ()))
-                if a.swim_check_made is not None and not water.is_wet(
-                        places_mod.terrain_of(str(a.at or ""))):
-                    a.swim_check_made = None
+                a.swim_check_made = None
                 continue
             if a.has_state("state.down.dead") or water.swim_speed(a) > 0 \
                     or water.row_for(a) == water.FREE:
                 continue
-            rough = "stormy" if a.has_state(states.WEATHER_STORM) else "calm"
+            deep = water.is_under(self.scene.biome)
+            rough = water.roughness(self.world, self.scene.at,
+                                    a.has_state(states.WEATHER_STORM))
             dc = water.swim_dc(rough)
+            # Taking 10 swims on unchanged: said once, not every beat it stays the same.
+            was, quiet = a.swim_check_made, False
             if a.is_down or a.is_helpless:
                 margin = -dc
+            elif not fight and rough != "stormy":
+                margin = 10 + sum(m.value for m in a.skill_modifiers("swim")) - dc
+                quiet = was is True
             else:
                 roll = self.dice.d20(a.skill_modifiers("swim"),
                                      label=f"{a.name} Swim, {rough} water (DC {dc})",
                                      visibility="hidden")
                 margin = roll.total - dc
+            if deep:
+                a.swim_check_made = margin >= 0
+                if not (quiet and margin >= 0):
+                    tells.append(f"{a.name} " + (
+                        f"swims on under the {rough} water." if margin >= 0 else
+                        "makes no headway under the water." if margin > -5 else
+                        "sinks, getting nowhere."))
+                continue
             if margin >= 0:
                 a.swim_check_made = True
                 if under:
                     a.remove_effects(match=lambda e: states.UNDER_WATER in (e.tags or ()))
                     tells.append(f"{a.name} fights back up to the surface and breathes.")
-                else:
+                elif not quiet:
                     tells.append(f"{a.name} swims, keeping their head above the "
                                  f"{rough} water.")
                 continue

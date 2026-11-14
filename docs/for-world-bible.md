@@ -1142,3 +1142,38 @@ An export carries `volatility` on at least its nations, `tools/check_places.py` 
 0–4 and nothing else, and a city in a nation rated 4 is measured meeting more trouble on
 its roads than one rated 0.
 
+
+## 17. `water` — how rough a wet place's water is
+
+*Asked 2026-11-14 (fix/water-everywhere). The consumer reads it the day it appears
+(`rules/water.roughness`, off the place's own `play.places[]` row). Optional: without it
+every lake, river and sea reads as calm water, which is how every world played before.*
+
+Every water a character is in now asks the Pathfinder Swim check, and its difficulty is
+the water's roughness: calm, rough or stormy. A storm at sea already makes it stormy. What
+this app cannot know is which of the world's own waters are fast: a millrace, a river in
+its gorge, the rapids below a falls. The Core Rulebook says fast rivers are always at
+least rough and whitewater rapids are stormy; the world knows which rivers those are, and
+this app cannot guess it from prose without inventing it.
+
+**Shape.** One optional word on any `play.places[]` row whose ground is wet (`water` or
+`underwater`): `"calm"`, `"rough"` or `"stormy"`. Anything else reads as calm.
+
+| value | what it is in the world |
+|---|---|
+| `calm` | a lake, a pond, a placid river, a sheltered harbour; the default |
+| `rough` | a fast river, a tide race, open sea in a hard wind |
+| `stormy` | whitewater rapids, a whirlpool's edge, a sea that is always breaking |
+
+```json
+{"id": "5bbd0c40345f~water:the-gorge", "name": "the gorge", "water": "rough"}
+```
+
+**Rule 1 still holds.** The word is the world's; the DC (10, 15, 20) and everything else a
+Swim check does are this app's, in `rules/water.py`.
+
+### Done when
+
+An export carries `water` on at least one fast river or rapids place, `tools/check_places.py`
+accepts the three words and nothing else, and a character swimming there is measured
+rolling against DC 15 or 20 instead of 10.

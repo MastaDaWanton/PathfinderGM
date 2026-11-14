@@ -106,15 +106,35 @@ makes:
   numbers are there; `rules/position.py` owns cover and does not read them.
 - **Fire spells underwater** (caster level check, DC 20 + spell level) and **casting while
   you cannot breathe** (concentration, DC 15 + spell level).
-- **The Swim check in a wet PLACE.** Since 2026-11-13 the open water beside a ship (the
-  board's `Grid.water` squares) rolls it once a beat (`Engine.swim`: DC 10 calm, 20
-  stormy under the storm at sea; fail by 4 or less, no progress and the move refused;
-  by 5 or more, under, onto the breath clock; a swim speed makes none). A whole
-  `water`/`underwater` place still rolls nothing, and there `swim_check_made` stays as
-  something sets it. Rough water (DC 15) has nothing that says it yet.
-- **Swimming as movement in a wet place.** On the ship's board a non-swimmer pays four
-  times a square (a quarter of their speed a move action); a wet place's movement path
-  still does not read `speed_factor`.
+
+## The Swim check, in every water (2026-11-13, widened 2026-11-14)
+
+`Engine.swim`, `Scene.afloat`, `water.roughness`, `tests/test_swim_checks.py`.
+
+- **One question: `Scene.afloat`.** True on any square of `Grid.water` and anywhere in a
+  `water`/`underwater` place the party is in. `fixtures.type_the_ground` makes every open
+  square of a wet place `Grid.water`, so a lake moves like the sea past a rail (a quarter
+  of your speed a move, the move refused after a failed check) and the board's sea
+  squares (a ship's side, the docks' harbour) are the same water they were. A wet place
+  with no board laid still swims. Standing water (the swamp's `water` fixture, difficult)
+  is wading and asks no check: CRB p.427, a shallow bog is difficult terrain.
+- **Below the surface** (`underwater` ground) a made check swims on under and a bad
+  failure sinks; nothing "fights back up to the surface", because coming up is a move to
+  the place above, and the breath clock is the ground's own.
+- **How rough** (`water.roughness`): a storm on the swimmer (`weather.storm`) is stormy
+  (DC 20); otherwise the place's own `play.places[]` row may say `"water": "rough"` or
+  `"stormy"` (World Bible ask 17); otherwise calm (DC 10). CRB Aquatic Terrain: "Fast
+  rivers are always at least rough water (Swim DC 15), and whitewater rapids are stormy
+  water (Swim DC 20)"; placid rivers, lakes and the sea are still water. Wind is not
+  read: no wind or storm table in the CRB sets a Swim DC. Floods ("one category harder")
+  are not read either: nothing in the engine floods yet.
+- **The cadence.** The CRB asks once per round and has no per-minute check (Swim and
+  Aquatic Terrain, read 2026-11-14 on d20pfsrd and legacy.aonprd.com; a "once a minute
+  out of combat" rule could not be sourced). It does let you take 10 when not threatened,
+  "You can't take 10 on a Swim check in stormy water". So out of a fight and out of a
+  storm the swimmer takes 10, which comes out the same every round of the beat, and an
+  unchanged success is told once; in a fight or in stormy water the d20 is rolled once a
+  beat. The hourly DC 20 fatigue check (1d6 nonlethal) is not built.
 
 ## Not this, and not next
 

@@ -181,6 +181,29 @@ def drown_dc(failed_checks: int) -> int:
     return DROWN_DC_BASE + max(0, int(failed_checks))
 
 
+def roughness(world, place_id: str, storm: bool = False) -> str:
+    """How rough the water is here: "calm", "rough" or "stormy", the Swim table's rows.
+
+    Read from state and never guessed from prose: a storm on the swimmer (`weather.storm`)
+    is stormy water; otherwise the place's own `play.places[]` row may say
+    `"water": "rough"` or `"stormy"` (World Bible ask 17). CRB Aquatic Terrain: "Fast
+    rivers are always at least rough water (Swim DC 15), and whitewater rapids are stormy
+    water (Swim DC 20)"; a placid river, a lake and the sea are calm unless something
+    says. Wind is not here: no wind or storm table in the book sets a Swim DC (read
+    2026-11-14). `world` may be None (a test, a Scene alone): then only the storm answers.
+    """
+    from . import places as places_mod
+
+    if storm:
+        return "stormy"
+    entity = world.get(places_mod.location_of(place_id)) if world is not None else None
+    for row in getattr(entity, "places", None) or ():
+        if isinstance(row, dict) and row.get("id") == place_id:
+            said = str(row.get("water") or "").strip().lower()
+            return said if said in SWIM_DC else DEFAULT_WATER
+    return DEFAULT_WATER
+
+
 def swim_dc(water: str = DEFAULT_WATER) -> int:
     return SWIM_DC.get(str(water or "").strip().lower(), SWIM_DC[DEFAULT_WATER])
 
