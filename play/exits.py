@@ -100,9 +100,27 @@ def _passage_words(engine, leg, scene) -> str:
 
     heads = 1 + sum(1 for a in scene.actors.values()
                     if not a.is_pc and a.has_state(states.TRAVELS_WITH_YOU))
-    _ship, days, cost = engine.passage_quote(leg, heads)
+    coast = engine.road_to_the_coast(leg)
+    harbour = coast.to_id if coast is not None and coast.to_id != leg.to_id else ""
+    _ship, days, cost = engine.passage_quote(leg, heads, port=harbour)
     fare = goods.purse_line(goods.coins_for(cost), engine._coins_here())
-    return f"{_days_aboard(days, leg.by == 'river')}, {fare} passage"
+    aboard = f"{_days_aboard(days, leg.by == 'river')}, {fare} passage"
+    if coast is None:
+        return aboard
+    # Inland, the road to the harbour comes first and is walked (`_op_journey`): the row
+    # says its time too, so the total is never only the days at sea (0.3.2's row was).
+    from rules import geography, journey as journey_mod
+
+    pc = scene.pc()
+    hours, _said, _how = journey_mod.hours_for(coast, pc.speed_feet if pc else 30)
+    left = scene.road or {}
+    if left.get("to") == coast.to_id and left.get("from") == scene.location_id:
+        hours = max(1, hours - int(left.get("walked") or 0))
+    walk = geography._walk_time_words(hours)
+    if riding(engine):
+        walk = geography._walk_time_words(
+            journey_mod.mounted_hours(hours, "ride")[0]).replace(" on foot", " riding")
+    return f"{walk} to {coast.to_name}, then {aboard}"
 
 
 def exits(engine, world) -> list[dict]:
@@ -242,8 +260,19 @@ def _rows_from(engine, here, known, pc, loc, scale, speed, clock,
                 mine = bool(head_slug) and \
                     outskirts._road_slug(road.to_id) == "the-road-to-" + head_slug
             else:
-                # A passage is boarded where the brief says it leaves from.
-                mine = _norm(here.name) == _norm(road.leaves_from)
+                # A passage is boarded where the brief says it leaves from — or, inland,
+                # taken up again from the stretch of the harbour road it stopped on.
+                mine = _norm(here.name) == _norm(road.leaves_from) or (
+                    outskirts.is_along(here.id)
+                    and (scene.road or {}).get("then") == road.to_id)
+                coast = engine.road_to_the_coast(legs[road.to_id]) \
+                    if road.how == "sea-after-road" and road.to_id in legs else None
+                if coast is not None and coast.to_id != road.to_id:
+                    # Inland with a road to a harbour: offered where that road leaves
+                    # (its head, or a stretch of it), as the road itself is — not from
+                    # the town's shore, five days from where the ship is.
+                    mine = bool(head_slug) and outskirts._road_slug(coast.to_id) \
+                        == "the-road-to-" + head_slug
             if not mine:
                 continue
             leg = legs.get(road.to_id)

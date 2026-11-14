@@ -243,9 +243,9 @@ a town the legs reach, `interpret._road_to`), and the planner (the brief's ABOAR
 
 **Every crossing by water is this one path** (integrator's run, 2026-11-13: Vormoor to
 Ledgerwarren was still the old free crossing while the way back was paid). From a town
-with no docks the passage is "by the road to the coast", which costs no time of its own,
-as the old crossing did not either. A river is a passage on a keelboat, and no storm is
-rolled on it. Whoever does not come aboard is left as the road leaves them. The exits
+with no docks the passage is booked where the player stands and **the road to the harbour
+is walked first** (fix/overland-to-the-port, 2026-11-14; see "The road to the
+harbour"). A river is a passage on a keelboat, and no storm is rolled on it. Whoever does not come aboard is left as the road leaves them. The exits
 row prices the passage from the same quote the booking charges (`Engine.passage_quote`).
 
 **Boarding crews are budgeted** (`Engine._defenders`): the rail's count (up to four, by
@@ -256,10 +256,47 @@ and the party chose to board.
 Researched and not used: Skull & Shackles' own weather table (Tempest Rising p.72) and
 Stormwrack's storm and shipwreck rules could not be read; nothing here claims them.
 
+## The road to the harbour (2026-11-14)
+
+0.3.2 booked a crossing from an inland town and stood the party on a deck with **0 minutes
+on the clock**: Vormoor's road to Scrapden, its nearest port, is 96 miles, five days on
+foot. Now `_op_journey` asks `journey.coast_road` first, and when a road comes before the
+ship it walks that road as **the journey it is**: the CRB's overland pace (Table 7-8 by
+speed, 7-9 by terrain and road, `journey.hours_for`), the road's watch checks
+(`ontheway.road`, budgeted by `encounter_budget.party_apl` and `volatility.scale`), the
+march's food, water and camps (`_march`), mounts, escorts, a road stopped short and
+resumed. On arrival the berth is bought at the harbour's quay at its own price
+(`passage_quote(port=)`), and the ship sails from there.
+
+**Book inland, be walked there — decided, not "go to the port first".** Measured on
+Aurvantis that day: 52 stated sea legs start inland, **36 of them end inland too**, and no
+port's legs reach an inland town (passages are offered port to port), so making the player
+walk to a port and book there would strand every one of them. 39 of the 52 have a road to
+a port; the quickest one is the coast road. The other 13 (and all 3 of Pangrella's) have
+no road to any port: those walk a derived day (`journey._depth_apart`'s smallest step,
+told "how far, nobody has written down") and board off the town's own shore, as before.
+The fare is checked before the road is walked, so nobody marches five days to be told at
+the quay that the purse is short. The From Here row and the roads-out brief both say the
+whole trip: "about five days on foot to Scrapden, then a day at sea, … passage", and a road
+stopped short keeps the crossing (`scene.road["then"]`) so the row offers it from the
+stretch of road. The row is offered where the harbour's road leaves (its head, as the road
+itself is), not from the town's shore: Vormoor's shore is a quarter of an hour out and the
+ship is five days away. Measured live (Aurvantis, Vormoor to Ledgerwarren, 500 gp): two
+watch checks met a toll-keeper on days 2 and 4, each further journey resumed the rest of
+the road, and the party boarded the Storm Compass at Scrapden on day 5, about 101 hours
+after setting out, the fare taken at Scrapden's quay.
+
+Prior art: Daggerfall's travel map quotes one total for a trip that includes the sea
+(UESP, Daggerfall:Traveling); I could not confirm from a primary source whether it forbids
+boarding outside port towns, and nothing here claims it.
+
 ## Still open
 
-- **The road to the coast** from an inland town takes no time, as before; the export
-  would need to say how far the coast is (for-world-bible 8).
+- **The derived coast.** An inland town with no road to any port walks a derived day to
+  a coast the world never placed, and boards off its own shore; the export would need to
+  say where the water is (for-world-bible 8a/8c).
+- **The far end inland.** A crossing to an inland town still ties up at that town; the
+  road up from its harbour is not walked yet.
 - **Siege engines.** `arms` is on every row of the table and nothing reads it. A ballista
   on a warship's deck is a weapon the engine has no notion of.
 - **The wind.** `days_for(with_the_wind=True)` halves a passage and nothing ever passes

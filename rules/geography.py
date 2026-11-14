@@ -748,10 +748,15 @@ def roads_out(world, settlement, speed_ft: int = 30) -> tuple[Road, ...]:
             how = ""
 
         hours, _said, _how = journey_mod.hours_for(leg, speed_ft)
+        # Inland, the road to the harbour comes first (`Engine.road_to_the_coast`).
+        coast = journey_mod.coast_road(world, sid, leg, speed_ft) if sea else None
         if leg.source != "exact":
             time_words = UNWRITTEN_DISTANCE
         elif leg.by_sea:
             time_words = _sea_time_words(hours)
+            if coast is not None:
+                walk = _walk_time_words(journey_mod.hours_for(coast, speed_ft)[0])
+                time_words = f"{walk} to {coast.to_name}, then {time_words}"
         else:
             time_words = _walk_time_words(hours)
 
@@ -768,6 +773,9 @@ def roads_out(world, settlement, speed_ft: int = 30) -> tuple[Road, ...]:
             found = next((p for p in places_mod.home_set(entity) if p.id == said_leaves),
                          None)
             leaves_from = found.name if found is not None else ""
+        if not leaves_from and coast is not None and coast.to_id != leg.to_id:
+            # Set out on the harbour's road, from its head (`outskirts`' road heads).
+            leaves_from = f"the road to {coast.to_name}"
         if not leaves_from:
             if leg.by_sea and leg.from_port:
                 leaves_from = "the docks"

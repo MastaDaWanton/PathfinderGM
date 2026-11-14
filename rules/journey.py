@@ -350,6 +350,20 @@ def legs_from(world, here: str) -> list[Leg]:
     return sorted(out, key=lambda leg: leg.to_name.lower())
 
 
+def coast_road(world, here: str, sea_leg: Leg, speed_ft: int = 30) -> Leg | None:
+    """The road a crossing from `here` walks before it boards, or None when it boards here
+    (a port, or a river). The quickest of the world's roads to a port; with none, a day's
+    derived road to a coast the world never placed, carrying the sea leg's `to_id` so a
+    stopped road resumes (`Engine.road_to_the_coast` has the measurements)."""
+    if sea_leg.from_port or sea_leg.by == "river":
+        return None
+    harbours = set(ports(world))
+    roads = [l for l in legs_from(world, here) if not l.by_sea and l.to_id in harbours]
+    if roads:
+        return min(roads, key=lambda l: hours_for(l, speed_ft)[0])
+    return Leg(to_id=sea_leg.to_id, to_name="the coast", days_apart=1)
+
+
 def _sea_days(world) -> int:
     """How wide the world's own sea is, in a sailing ship's days: the median of the
     crossings it states (`by: sea` with `miles`), or 0 when it states none. Measured on
