@@ -163,6 +163,16 @@ from __future__ import annotations
 #   gear.writing       ink and paper: a note or a map can be written (`/api/write`)
 #   gear.fire-lighting flint and steel; nothing reads it yet (no fire in the engine)
 #   gear.rope          a rope; nothing reads it yet (no climb DC or bind op takes it)
+# The weather on whoever is out in it (rules/ships.py's storm at sea). Not `state.*`: a
+# storm stops nobody acting and impairs no body; it is the air between them and a target.
+#
+#   weather.storm             a storm is on them (CRB, Weather: Storms)
+#   weather.no-ranged-weapons "Storms make ranged weapon attacks impossible, except for
+#                             those using siege weapons" (CRB p.438): the attack op
+#                             refuses a ranged or thrown weapon from anybody holding it.
+#                             Spells are not weapon attacks and the CRB does not stop them.
+WEATHER_STORM = "weather.storm"
+NO_RANGED_WEAPONS = "weather.no-ranged-weapons"
 BEDDING = "gear.bedding"
 SHELTER = "gear.shelter"
 WRITING = "gear.writing"
@@ -330,6 +340,10 @@ TAGS: dict[str, tuple[str, ...]] = {
     # ordinary knockout do not lift this one; only its clock does.
     "knocked out": ("state.down.unconscious", "state.down.fallen", "state.unable",
                     "state.helpless", "state.exposed"),
+    # A storm at sea (Engine._sail), a `situation` effect: the vocabulary for its key.
+    # Not re-derived on load (only conditions are, `activeeffect._tags_on_load`); no save
+    # holds an untagged one, since the storm and its tag shipped together.
+    "storm-at-sea": ("weather.storm", "weather.no-ranged-weapons"),
     "stable":      ("state.down.stable", "state.down.fallen", "state.unable",
                     "recovery.hit-points"),
     "petrified":   ("state.down.petrified", "state.unable", "state.helpless"),

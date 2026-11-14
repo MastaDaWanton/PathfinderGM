@@ -295,12 +295,18 @@ class Grid:
     # The named fixtures on this ground (`rules/fixtures.py`), derived on lay and on load.
     # None until typed — "no fixtures" is an answer and untyped is not (empty vs absent).
     fixtures: list | None = None
+    # Blocked squares that are open water (a fixture kind with `swim`: the sea past a
+    # ship's side, the rail's squares of it). Solid to a walker; open to a creature that
+    # swims and to anybody who goes over the side (`passable(swims=True)`), who is then in
+    # the water (`Scene.afloat`, rules/water.py's table). Derived with the fixtures and
+    # never saved, like `low`.
+    water: set[Point] = field(default_factory=set)
 
     def inside(self, p: Point) -> bool:
         return 0 <= p[0] < self.width and 0 <= p[1] < self.height
 
-    def passable(self, p: Point) -> bool:
-        return self.inside(p) and p not in self.blocked
+    def passable(self, p: Point, swims: bool = False) -> bool:
+        return self.inside(p) and (p not in self.blocked or (swims and p in self.water))
 
     def ground(self, p: Point) -> int:
         """The level the floor stands at in this square. Zero unless it says otherwise."""
@@ -457,7 +463,7 @@ class Grid:
     # --- movement ------------------------------------------------------------------------
 
     def reachable(self, start: Point, feet: int, size: str = "medium",
-                  occupied: set[Point] | None = None) -> dict[Point, int]:
+                  occupied: set[Point] | None = None, swims: str = "") -> dict[Point, int]:
         """Every square this creature can end its move in, and what it costs to get there.
 
         Dijkstra rather than a flood fill, because difficult terrain means the cheapest
@@ -468,6 +474,10 @@ class Grid:
         The alternating diagonal is tracked per path in the priority queue. Rounding it at
         the end instead, which is the obvious shortcut, lets a character zig-zag across a
         map for the price of a straight line.
+
+        `swims` opens the open water (`water`): "speed" for a creature with a swim speed,
+        "over" for anybody else going over the side, who pays double for every square of
+        it (CRB, Swim: "half your speed as a full-round action").
         """
         occupied = occupied or set()
         start = tuple(start)
@@ -485,12 +495,14 @@ class Grid:
 
             for (dx, dy) in DIRECTIONS.values():
                 there = (here[0] + dx, here[1] + dy)
-                if not self._fits(there, size, occupied):
+                if not self._fits(there, size, occupied, bool(swims)):
                     continue
                 diagonal = dx and dy
-                if diagonal and not self._corner_open(here, there):
+                if diagonal and not self._corner_open(here, there, bool(swims)):
                     continue
                 step = self.enter_cost(there)
+                if swims == "over" and there in self.water:
+                    step *= 2
                 # Every second diagonal costs an extra square. Difficult terrain doubles
                 # the whole step, expensive diagonal included.
                 if diagonal and odd:
@@ -506,11 +518,11 @@ class Grid:
         out.pop(start, None)
         return out
 
-    def _fits(self, anchor: Point, size: str, occupied: set[Point]) -> bool:
+    def _fits(self, anchor: Point, size: str, occupied: set[Point], swims: bool = False) -> bool:
         squares = footprint(anchor, size)
-        return all(self.passable(p) and p not in occupied for p in squares)
+        return all(self.passable(p, swims) and p not in occupied for p in squares)
 
-    def _corner_open(self, a: Point, b: Point) -> bool:
+    def _corner_open(self, a: Point, b: Point, swims: bool = False) -> bool:
         """1e: "you can't move diagonally past a corner (even by taking a different
         diagonal to avoid the corner)". Either orthogonal neighbour being solid makes this
         a corner, so both must be open.
@@ -518,7 +530,7 @@ class Grid:
         Only blocking terrain counts, not other creatures: squeezing diagonally between two
         allies is legal and slipping between two wall corners is not.
         """
-        return (a[0], b[1]) not in self.blocked and (b[0], a[1]) not in self.blocked
+        return self.passable((a[0], b[1]), swims) and self.passable((b[0], a[1]), swims)
 
     def path_cost(self, path: list[Point]) -> int:
         """What a specific route costs, diagonals alternating along it."""

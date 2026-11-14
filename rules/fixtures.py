@@ -296,6 +296,10 @@ def type_the_ground(scene, place_id: str, terrain: str = "", authored=None) -> N
         if "blocked" in kinds()[f["kind"]]["occupies"]:
             grid.blocked.update(tuple(p) for p in f["squares"])
     grid.fixtures = derive(grid, place_id, terrain, authored) + [dict(f) for f in named]
+    # Open water (a `swim` kind: the sea past the side, the rail's squares of it), which a
+    # swimmer may enter and anybody may go over the side into (`Grid.passable(swims=)`).
+    grid.water = {tuple(p) for f in grid.fixtures if kinds()[f["kind"]].get("swim")
+                  and "blocked" in kinds()[f["kind"]]["occupies"] for p in f["squares"]}
     grid.low = {tuple(p): grid.ground(tuple(p)) + 1 for f in grid.fixtures
                 if kinds()[f["kind"]].get("low") for p in f["squares"]}
     # Water you cannot walk on but can see and shoot across (the sea past a rail): its

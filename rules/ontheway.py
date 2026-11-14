@@ -87,6 +87,7 @@ plan's target — which is why it is five.)
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from . import npcs
@@ -347,14 +348,89 @@ def night(dice, hours: int, biome: str, level: int = 1, *,
     return None
 
 
-def _the_land(dice, biome: str, level: int, apl: int | None):
+# --- the sea -----------------------------------------------------------------------------
+#
+# A day at sea, checked once (`Engine._sail`, after the weather), researched 2026-11-13:
+#
+#   How often. Ultimate Wilderness p.127 (AoN Rules ID 2388) checks the land four times a
+#   day at 20%; no Pathfinder 1e book I could read prints a rate for open water (the
+#   Skull & Shackles volumes and 3.5's Stormwrack could not be read, and are not claimed).
+#   Pathfinder 2e's Gamemastery Guide rolls one check a DAY of travel and, on a hit, the
+#   kind: harmless 1-5, hazard 6-7, creature 8-10 (2e.aonprd.com Rules ID 3114). Here: one
+#   check a day at the published 20% — a ship keeps one course on empty water, and a road's
+#   four checks would put something on most days of every crossing.
+#
+#   What. The Bestiary's Ocean table (Bestiary pp.324-327, legacy.aonprd.com/bestiary/
+#   encounterTables.html) is creatures only, sharks to a kraken, so the creature band draws
+#   from the bestiary by the same budget the road spends. Ships on the water are the older
+#   tables' (AD&D's salt-water surface tables list merchant and pirate men among the
+#   monsters, 1eonline.info/6mm2/aret.htm, unsourced to a page); their widths here are the
+#   app's, shaped to 2e's half-harmless split: half the hits are a sail that passes.
+#
+#   merchant   a trader on her own course: hailed, passed               (harmless)
+#   naval      a warship on patrol looks her over and lets her go        (harmless)
+#   pirates    a sail that comes about to close: the ship-to-ship bands  (danger)
+#   creature   something out of the water, budgeted (wandering)          (danger)
+#
+# The two danger bands move with the waters' volatility (`_weighed`), the merchant and the
+# patrol never do: a lawless sea is not busier, it is worse.
+SEA_PERCENT = ROAD_PERCENT
+SEA = (
+    ("merchant", 35),
+    ("naval", 50),
+    ("pirates", 70),
+    ("creature", 100),
+)
+SEA_DANGER = frozenset({"pirates", "creature"})
+
+# What the open sea stocks: a creature whose own Environment line names salt water. The
+# bestiary's `water` biome is fresh and salt together (an otter, a poison frog, a kappa),
+# and a river-boat's creatures have no business at a ship's rail in mid-ocean.
+_SALT = re.compile(r"\b(oceans?|seas?|saltwater|any aquatic)\b")
+_FRESH_ONLY = re.compile(r"\b(fresh ?water|plane of)\b")
+
+
+def open_water(row: dict) -> bool:
+    env = str(row.get("environment") or "").lower()
+    return bool(_SALT.search(env)) and not _FRESH_ONLY.search(env)
+
+
+def sea(dice, level: int = 1, *, apl: int | None = None,
+        danger: float = 1.0) -> Meeting | None:
+    """One day on open water: None most days, else who or what is out there.
+
+    `danger` is the waters' (`volatility.factor` of the worse port, as the storm's is)."""
+    table, top = _weighed(SEA, danger, SEA_DANGER)
+    if dice.roll("1d100", label="the sea", visibility="hidden").total \
+            > SEA_PERCENT * top / 100:
+        return None
+    r = dice.roll("1d100", label="what is on the water", visibility="hidden").total
+    kind = _weighed_band(table, top, r)
+    level = max(1, int(level or 1))
+    if kind == "creature":
+        got = _the_land(dice, "water", level, apl, keep=open_water)
+        if got is not None:
+            row = got.row
+            return Meeting(kind="creature", roll=r, creature=row,
+                           template=str(row.get("id") or ""), count=got.count,
+                           aggressive=row.get("creature_type") in AGGRESSIVE)
+        kind = "merchant"           # a sea the book stocks nothing for still has ships
+    if kind == "pirates":
+        got = npcs.choose(["pirate", "sailor"], level) or {}
+        return Meeting(kind="pirates", roll=r, words=("pirate",), count=0,
+                       template=str(got.get("id") or "thug"), aggressive=True)
+    return Meeting(kind=kind, roll=r, count=0)
+
+
+def _the_land(dice, biome: str, level: int, apl: int | None, keep=None):
     """What the ground holds, at the party's budget (`encounter_budget.choose`): a creature
     and how many, or None for ground that stocks nothing the party could fairly meet.
 
     `apl` is the party's (`encounter_budget.party_apl`); without it the walker is taken to
     be alone at `level`, which is the cautious answer — a lone PC's APL is the lowest one.
     Only the ground's own creatures (`bestiary.ground_stated`), never an adventure's named
-    somebody whose ground was guessed for them."""
+    somebody whose ground was guessed for them. `keep` narrows the rows further (the sea's
+    `open_water`)."""
     from . import bestiary
     from . import encounter_budget as eb
     from .gathering import pick_index
@@ -362,7 +438,7 @@ def _the_land(dice, biome: str, level: int, apl: int | None):
     party = eb.apl([level]) if apl is None else int(apl)
     rows = [x for x in bestiary.search(biome=biome, cr_max=eb.highest_cr(party),
                                        stated=True, limit=5000)
-            if x.get("cr_value") is not None]
+            if x.get("cr_value") is not None and (keep is None or keep(x))]
     if not rows:
         return None
     hard = dice.roll("1d100", label="how hard it is", visibility="hidden").total

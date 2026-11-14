@@ -785,6 +785,13 @@ class Scene:
             self.positions[ref] = ((spot[0], spot[1]) if not now
                                    else (spot[0], spot[1], now))
 
+    def afloat(self, ref: str) -> bool:
+        """Whether `ref` stands in a square of open water on this board (`Grid.water`: the
+        sea past a ship's side), and so is in the water table (`Actor.water_row`)."""
+        at = self.positions.get(ref)
+        return bool(self.grid is not None and at is not None
+                    and tuple(at[:2]) in self.grid.water)
+
     def occupied(self, ignore: str = "", level: int | None = None,
                  seen_by: str = "") -> set[tuple[int, int]]:
         """Every square something is standing on, for movement to route around.
@@ -8725,6 +8732,16 @@ class Engine:
                                                         thrown_any)
         if out_of_range and partial.get("attack_state") is None:
             return self._refuse(intent, out_of_range)
+        # A storm (CRB p.438): "Storms make ranged weapon attacks impossible, except for
+        # those using siege weapons", which nothing here fires. Asked of the attacker's
+        # tag (`states.NO_RANGED_WEAPONS`, the storm effect's), never of a weather word.
+        if (thrown_any or weapon.get("category") == "ranged") \
+                and actor.has_state(states.NO_RANGED_WEAPONS) \
+                and partial.get("attack_state") is None:
+            return self._refuse(
+                intent, f"Not in this storm: the wind takes any arrow, bolt or throw "
+                        f"{actor.name} looses, and ranged weapon attacks are impossible "
+                        f"until it passes. A spell still flies, or close to blade's reach.")
         if thrown_any:
             # Thrown, it is a ranged attack for everything that asks the blow's kind: the
             # AC it is rolled against (cover, a helpless target's -4 is melee-only),
@@ -8819,7 +8836,7 @@ class Engine:
         # and applied to the number being rolled against — the same reasoning the cover
         # block below states, and for the same reason: everything that reads an AC should
         # see the real one.
-        wet_defender = defender.water_row()
+        wet_defender = defender.water_row(self.scene.afloat(defender.ref))
         flounders = wet_defender and water.loses_dex_to_ac(wet_defender)
         # The attacker rides along so a term scoped to THIS attacker counts: a smiting
         # paladin's deflection is against the creature she smote (`_effect_scope_holds`).
@@ -9379,7 +9396,7 @@ class Engine:
                 # is a rule about the roll's result. Halved here, where the weapon's type
                 # and the swinger's footing are both known, and never below one: a hit
                 # that lands is a hit.
-                wet_row = actor.water_row()
+                wet_row = actor.water_row(self.scene.afloat(actor.ref))
                 if wet_row and water.damage_halved(wet_row, str(weapon["type"])):
                     amount = max(1, amount // 2)
                     state["tells"].append("The water takes half the force out of it.")
@@ -9833,6 +9850,12 @@ class Engine:
 
         out = compulsion.penalty_against(actor, defender.ref) + position_mod.attack_mods(
             self.scene, actor, defender, weapon)
+        # In the open water beside a ship: the water table's attack penalty, which the
+        # sheet charges only for a wet PLACE (`Actor._water_penalty`) and cannot see here.
+        if self.scene.afloat(actor.ref) and not actor.water_row():
+            wet = actor._water_penalty(weapon, afloat=True)
+            if wet is not None:
+                out = out + [wet]
         return out + [range_pen] if range_pen is not None else out
 
     def attack_preview(self, actor: Actor, defender: Actor,
@@ -12741,8 +12764,9 @@ class Engine:
                 f"move: {target} is off the map, which is {grid.width} by {grid.height} "
                 f"squares.", "legality", index,
             )
+        swims = self._swims(actor, target)
         for square in gridmod.footprint(target, actor.size):
-            if not grid.passable(square):
+            if not grid.passable(square, bool(swims)):
                 raise IntentError(
                     f"move: {actor.name} cannot stand at {target} — {square} is solid.",
                     "legality", index,
@@ -12768,17 +12792,20 @@ class Engine:
             # Straight up or down its own column: no floor to cross (`_move_cost` costs
             # the climb), and `reachable` omits the square you stand on.
             return
-        routes = grid.reachable(origin, budget, size=actor.size, occupied=occupied)
+        routes = grid.reachable(origin, budget, size=actor.size, occupied=occupied,
+                                swims=swims)
         if flat in routes:
             return
         # Distinguish "too far" from "no way through". They lead to different next moves:
         # one wants a double move, the other wants a different route.
-        anywhere = grid.reachable(origin, 10_000, size=actor.size, occupied=occupied)
+        anywhere = grid.reachable(origin, 10_000, size=actor.size, occupied=occupied,
+                                  swims=swims)
         if flat in anywhere:
             # The square this round's movement gets them nearest it, named and carried as
             # the fix: live 2026-11-12, told only the distance, the plan proposed a square
             # 45-55 ft off seven times running and the turn fell to narration.
-            back = grid.reachable(flat, 10_000, size=actor.size, occupied=occupied)
+            back = grid.reachable(flat, 10_000, size=actor.size, occupied=occupied,
+                                  swims=swims)
             toward = min((p for p in routes if p in back), default=None,
                          key=lambda p: (back[p], -routes[p], p))
             fix, said = None, ""
@@ -17115,6 +17142,7 @@ class Engine:
                         f"her, or go ashore when she makes port.")
         if self.scene.initiative:
             return self._refuse(intent, "Not while there is fighting on deck.")
+        settled = self._sea_settled()
         if self.scene.sea:
             return self._refuse(intent, "Another ship is on the water with you: close "
                                         "with her or sheer off first.")
@@ -17132,7 +17160,7 @@ class Engine:
             cap = ship.days_left            # "a few" is not a number: sail until port
         aboard = [self.scene.people[r] for r in ship.passengers if r in self.scene.people]
         told: list[str] = []
-        weather, sailed = "calm", 0
+        weather, sailed, met = "calm", 0, None
         while ship.days_left > 0 and sailed < cap:
             due = int(ship.sailed_at) + ships_mod.MINUTES_A_DAY
             if self.scene.clock_minutes < due:
@@ -17147,6 +17175,15 @@ class Engine:
             weather = "calm" if ship.river else ships_mod.day_at_sea(self.dice, level)
             if weather != "calm":
                 break
+            # And who else is out on the water (`ontheway.sea`, hidden, once a day, the
+            # danger scaled as the storm is). Open water only, and not on the day she
+            # makes port: that day ends in harbour.
+            if not ship.river and ship.days_left > 0:
+                met = ontheway.sea(self.dice, int(getattr(pc, "level", 1) or 1),
+                                   apl=encounter_budget.party_apl(self.scene),
+                                   danger=volatility.factor(level))
+                if met is not None:
+                    break
         self._journeyed = ship.name
         if weather == "wreck":
             return self._wreck(intent, ship, sailed)
@@ -17162,6 +17199,7 @@ class Engine:
                 a.apply_effect(ActiveEffect(
                     name="a storm at sea", kind="situation", key="storm-at-sea",
                     source="rule:storm-at-sea", origin="rule:storm-at-sea",
+                    tags=states.tags_for("storm-at-sea"),
                     duration="rounds", rounds_left=ships_mod.STORM_ROUNDS,
                     modifiers=[{"kind": "skill_mod", "target": "perception",
                                 "amount": ships_mod.STORM_PERCEPTION,
@@ -17169,7 +17207,14 @@ class Engine:
                 effects.append({"kind": "condition", "ref": a.ref,
                                 "condition": "storm-at-sea", "origin": "rule:storm-at-sea"})
             bits.append(f"A storm comes down on her: wind and black water over the rail, "
-                        f"nothing to see past the bow (-8 Perception), and she rides it out.")
+                        f"nothing to see past the bow (-8 Perception), no bow or throw that "
+                        f"the wind does not take, and she rides it out.")
+        if settled:
+            bits.insert(0, settled)
+        if met is not None:
+            said, fx = self._met_at_sea(ship, met)
+            bits.append(said)
+            effects.extend(fx)
         if ship.days_left > 0:
             self._keep_vessel(ship)
             bits.append(f"{dest_name} is {ship.days_left} day"
@@ -17192,6 +17237,106 @@ class Engine:
                     f"goes ashore at {self.here().name}.")
         return Outcome(intent_id=intent.id, op="journey", effects=effects,
                        tell=" ".join(bits + told), because=intent.because)
+
+    def _met_at_sea(self, ship, met) -> tuple[str, list[dict]]:
+        """What the day's sea check found (`ontheway.sea`), put on the water: the tell and
+        its records. A passing sail is told and gone; pirates are the ship-to-ship bands
+        (`_op_sea`), at `distant`, coming; a creature that comes at you comes over the rail
+        by the door creatures arrive by, and the fight starts with the party's turn."""
+        from . import ships as ships_mod
+
+        fx = {"kind": "sea_encounter", "met": met.kind, "origin": "rule:sea-encounter"}
+        if met.kind == "merchant":
+            return ("A sail on the horizon: a merchantman on her own course, who dips her "
+                    "flag and holds on.", [fx])
+        if met.kind == "naval":
+            return ("A warship on patrol comes down on her, looks her over from a "
+                    "cable off, and lets her go.", [fx])
+        if met.kind == "pirates":
+            pick = self.dice.roll("1d2", label="what the pirates sail", visibility="hidden")
+            kind = ("sailing ship", "longship")[pick.total - 1]
+            vid = ships_mod.vessel_id(f"pirates|{ship.id}", kind, int(self.scene.clock_minutes))
+            row = ships_mod.VESSELS[kind]
+            theirs = ships_mod.Vessel(id=vid, name=ships_mod.name_for(vid), kind=kind,
+                                      hp=int(row["hp"]), crew=int(row["crew"][0]))
+            self._keep_vessel(theirs)
+            self.scene.sea = {"ours": ship.id, "theirs": theirs.id, "range": "distant",
+                              "grappled": False, "hostile": True, "foes": []}
+            fx.update(vessel=theirs.id, range="distant")
+            return (f"A sail on the horizon, and she comes about to close: {theirs.name}, "
+                    f"{english.a(kind)} flying no colours an honest ship flies. Pirates. "
+                    f"Sheer off and run, or close with her.", [fx])
+        made = self._meet_on_the_way(met, zone="near") if met.aggressive else []
+        name = str((met.creature or {}).get("name") or "something").lower()
+        many = int(met.count or 1) > 1
+        what = f"{met.count} {english.plural(name)}" if many else english.a(name)
+        fx.update(creature=name, count=int(met.count or 1),
+                  refs=[m["ref"] for m in made])
+        pc = self.scene.pc()
+        if not made or pc is None:
+            return (f"{_sentence(what)} {'surface' if many else 'surfaces'} alongside, "
+                    f"{'look' if many else 'looks'} her over, and "
+                    f"{'go' if many else 'goes'} down again.", [fx])
+        self._ensure_encounter(pc.ref, target=made[0]["ref"])
+        for m in made[1:]:
+            self.join_fight(m["ref"])
+        # A swimmer stays in the water alongside, to strike from it or climb aboard; one
+        # with no swim speed has come over the rail onto the planks.
+        afloat = self._into_the_water([m["ref"] for m in made])
+        if afloat:
+            return (f"{_sentence(what)} {'come' if many else 'comes'} up out of the water "
+                    f"alongside her, at the rail.", [fx])
+        return (f"{_sentence(what)} {'come' if many else 'comes'} up out of the water and "
+                f"over the rail.", [fx])
+
+    def _into_the_water(self, refs) -> list:
+        """Stand each swimmer among `refs` in the open water beside the hull (`Grid.water`),
+        as near the player as it can be. Returns the refs that went in."""
+        from . import water as water_mod
+
+        grid, pc = self.scene.grid, self.scene.pc()
+        here = self.scene.positions.get(pc.ref) if pc is not None else None
+        if grid is None or not grid.water or here is None:
+            return []
+        taken = self.scene.occupied()
+        went = []
+        for ref in refs:
+            a = self.scene.people.get(ref)
+            if a is None or water_mod.swim_speed(a) <= 0:
+                continue
+            mine = set(gridmod.footprint(tuple(self.scene.positions.get(ref, here)[:2]),
+                                         a.size)) if ref in self.scene.positions else set()
+            free = [p for p in sorted(grid.water)
+                    if all(grid.passable(q, True) and (q not in taken or q in mine)
+                           for q in gridmod.footprint(p, a.size))]
+            if not free:
+                continue
+            best = min(free, key=lambda p: (max(abs(p[0] - here[0]), abs(p[1] - here[1])), p))
+            taken -= mine
+            taken |= set(gridmod.footprint(best, a.size))
+            self.scene.positions[ref] = best
+            went.append(ref)
+        return went
+
+    def _sea_settled(self) -> str:
+        """A pirate engagement that is over: everybody who came across is down or gone,
+        and no fight runs. The other ship is cut loose and the voyage can go on; a party
+        still on her deck is stood back on their own. "" while it is not over."""
+        from . import ships as ships_mod
+
+        sea = dict(self.scene.sea or {})
+        if not sea.get("hostile") or not sea.get("foes") or self.scene.initiative:
+            return ""
+        if any(r in self.scene.people and not self.scene.people[r].is_down
+               for r in sea["foes"]):
+            return ""
+        ours, theirs = self.vessel(sea.get("ours", "")), self.vessel(sea.get("theirs", ""))
+        self.scene.sea = {}
+        if ours is not None and theirs is not None \
+                and ships_mod.vessel_of(self.scene.at) == theirs.id:
+            self.place_party(ships_mod.deck_of(ours))
+        return (f"{_sentence(theirs.name) if theirs else 'The other ship'} is cut loose and "
+                f"falls astern.")
 
     def _wreck(self, intent: Intent, ship, sailed: int) -> Outcome:
         """A storm breaks her. The vessel is lost with her crew; her passengers swim for
@@ -17331,6 +17476,8 @@ class Engine:
                 return self._refuse(
                     intent, f"The grapnels are in. {ours.name} is not going anywhere "
                             f"until they are cut.")
+            if do != "close" and sea.get("hostile"):
+                return self._run_from(intent, sea, ours, theirs, band)
             now = ships_mod.closer(band) if do == "close" else ships_mod.further(band)
             sea["range"] = now
             if do != "close" and now == "distant":
@@ -17347,10 +17494,11 @@ class Engine:
             said = {"closing": "is within bowshot now",
                     "alongside": "is alongside, close enough to throw to",
                     "distant": "is hull down again"}[now]
+            came, came_fx = self._pirates_come_aboard(ours, theirs)
             return Outcome(
                 intent_id=intent.id, op="sea",
-                effects=[{"kind": "sea", "range": now}],
-                tell=f"{_sentence(theirs.name)} {said}.", because=intent.because)
+                effects=[{"kind": "sea", "range": now}, *came_fx],
+                tell=f"{_sentence(theirs.name)} {said}.{came}", because=intent.because)
 
         if do == "ram":
             if band != "closing":
@@ -17381,11 +17529,12 @@ class Engine:
             self.scene.sea = sea
             if roll.total < theirs.ac:
                 self._keep_vessel(ours)
+                came, came_fx = self._pirates_come_aboard(ours, theirs)
                 return Outcome(
                     intent_id=intent.id, op="sea", rolls=[roll],
-                    effects=[{"kind": "sea", "range": "alongside", "hit": False}],
+                    effects=[{"kind": "sea", "range": "alongside", "hit": False}, *came_fx],
                     tell=f"{_sentence(theirs.name)} turns inside it. {ours.name} slides "
-                         f"past her beam, close enough to touch.",
+                         f"past her beam, close enough to touch.{came}",
                     because=intent.because)
             hit = self.dice.roll(ships_mod.ram_damage(ours.kind),
                                  label=f"{ours.name} rams", visibility="hidden")
@@ -17393,12 +17542,13 @@ class Engine:
             back = ships_mod.take_damage(ours, ships_mod.ram_self_damage(ours.kind))
             self._keep_vessel(theirs)
             self._keep_vessel(ours)
+            came, came_fx = self._pirates_come_aboard(ours, theirs)
             return Outcome(
                 intent_id=intent.id, op="sea", rolls=[roll, hit],
                 effects=[{"kind": "sea", "range": "alongside", "hit": True,
-                          "target": theirs.id, "sinking": theirs.sinking}],
+                          "target": theirs.id, "sinking": theirs.sinking}, *came_fx],
                 tell=f"{_sentence(ours.name)} goes into her. "
-                     f"{_sentence(said)} {_sentence(back)}",
+                     f"{_sentence(said)} {_sentence(back)}{came}",
                 because=intent.because)
 
         if do == "grapple":
@@ -17441,6 +17591,15 @@ class Engine:
             # two hundred rowers is not an encounter, it is a reason the fight has to be
             # won before the rest of them come up.
             met = self._defenders(theirs, deck)
+            fought = ""
+            if sea.get("hostile") and met:
+                # Pirates do not wait to be talked to: the fight is on as the party lands.
+                sea["foes"] = [*sea.get("foes", []), *(a.ref for a in met)]
+                self.scene.sea = sea
+                self._ensure_encounter(met[0].ref, target=actor.ref)
+                for a in met[1:]:
+                    self.join_fight(a.ref)
+                fought = " They come at the boarders with steel out."
             return Outcome(
                 intent_id=intent.id, op="sea",
                 effects=[{"kind": "sea", "boarded": theirs.id, "place": deck,
@@ -17448,14 +17607,142 @@ class Engine:
                 tell=f"{said} {verb} over the rail onto {theirs.name}'s deck."
                      + (f" {_and_list([a.name for a in met])} "
                         f"{'is' if len(met) == 1 else 'are'} waiting at the rail."
-                        if met else " Nobody is on it."),
+                        if met else " Nobody is on it.") + fought,
                 because=intent.because)
 
         return self._refuse(
             intent, f"{do or 'that'} is not something to do to a ship. There is close, "
                     f"sheer off, ram, grapple and board.")
 
-    def _defenders(self, vessel, deck: str) -> list:
+    def _helm(self, people) -> tuple[str, list]:
+        """(who, the modifiers) of the best hand at a helm among `people`: Profession
+        (sailor), the vehicle rules' driving check for a ship (Ultimate Combat, Vehicles:
+        the sailing ship's "Profession (sailor)"), or Wisdom for anybody untrained — "a
+        driver can always make a Wisdom check in place of a driving check" (same)."""
+        from .sheet import IllegalSheet
+
+        best = ("nobody", [])
+        for a in people:
+            try:
+                mods = list(a.skill_modifiers("profession"))
+            except IllegalSheet:
+                mods = list(a.ability_check_modifiers("wis"))
+            if best[0] == "nobody" or sum(m.value for m in mods) > sum(m.value for m in best[1]):
+                best = (a.name, mods)
+        return best
+
+    def _run_from(self, intent: Intent, sea: dict, ours, theirs, band: str) -> Outcome:
+        """Sheering off from a ship that wants you: a leg of a chase, not a free escape.
+
+        No Pathfinder 1e rule I could read races two ships: Ultimate Combat's vehicles
+        accelerate and turn but say nothing of pursuit, and the GameMastery Guide's chase
+        (its own example is "two sailing ships racing to reach a distant island") is
+        cards and obstacles, with +2 a check for every 10 ft faster than the baseline. The
+        simplest faithful version, the integrator's ask (2026-11-13): the faster hull
+        (Table 7-49's speed) gains a band every leg; at equal speed the two helms make
+        opposed checks (the driving check above, `_helm`), ties to the higher modifier
+        (CRB, opposed checks) and then rolled again. Each `sheer off` is one leg. The
+        runner who wins from `distant` is away; the pursuer who wins comes a band closer,
+        and alongside she boards (`_pirates_come_aboard`). Every roll hidden; told."""
+        from . import npcs, ships as ships_mod
+        from .bestiary import instantiate
+
+        rolls, how = [], ""
+        if ours.speed != theirs.speed:
+            won = ours.speed > theirs.speed
+            how = (f" ({ours.speed} ft against her {theirs.speed}: "
+                   f"{'the faster hull is yours' if won else 'she is the faster'})")
+        else:
+            rooms = {p.id for p in ships_mod.places_of(ours)}
+            hands = [a for a in self.scene.people.values()
+                     if a.at in rooms and not a.is_down]
+            mine, my_mods = self._helm(hands)
+            level = int(getattr(self.scene.pc(), "level", 1) or 1)
+            row = npcs.choose(["pirate", "sailor"], level) or {}
+            try:
+                master = instantiate(str(row.get("id") or "thug"), scene=self.scene,
+                                     name="her master")
+                _them, their_mods = self._helm([master])
+            except Exception:  # noqa: BLE001 — no codex pirate: an untrained helm, +0
+                their_mods = []
+            won = None
+            while won is None:
+                a = self.dice.d20(my_mods, label=f"{mine} at the helm, running",
+                                  visibility="hidden")
+                b = self.dice.d20(their_mods, label=f"{theirs.name}'s helm, chasing",
+                                  visibility="hidden")
+                rolls += [a, b]
+                mine_bonus = sum(m.value for m in my_mods)
+                their_bonus = sum(m.value for m in their_mods)
+                if a.total != b.total:
+                    won = a.total > b.total
+                elif mine_bonus != their_bonus:
+                    won = mine_bonus > their_bonus
+            how = f" (the helms, {rolls[-2].total} against {rolls[-1].total})"
+        if won:
+            if band == "distant":
+                self.scene.sea = {}
+                return Outcome(
+                    intent_id=intent.id, op="sea", rolls=rolls,
+                    effects=[{"kind": "sea", "range": "away", "chase": "escaped",
+                              "origin": "rule:sea-chase"}],
+                    tell=f"{_sentence(ours.name)} runs, and gains{how}: {theirs.name} "
+                         f"falls astern, and then there is only the sea.",
+                    because=intent.because)
+            sea["range"] = ships_mod.further(band)
+            self.scene.sea = sea
+            return Outcome(
+                intent_id=intent.id, op="sea", rolls=rolls,
+                effects=[{"kind": "sea", "range": sea["range"], "chase": "gained",
+                          "origin": "rule:sea-chase"}],
+                tell=f"{_sentence(ours.name)} runs, and gains{how}: {theirs.name} is hull "
+                     f"down astern, still coming.",
+                because=intent.because)
+        sea["range"] = ships_mod.closer(band)
+        self.scene.sea = sea
+        said = {"closing": "is within bowshot now", "alongside": "is alongside"}.get(
+            sea["range"], "holds her distance")
+        came, came_fx = self._pirates_come_aboard(ours, theirs)
+        return Outcome(
+            intent_id=intent.id, op="sea", rolls=rolls,
+            effects=[{"kind": "sea", "range": sea["range"], "chase": "lost",
+                      "origin": "rule:sea-chase"}, *came_fx],
+            tell=f"{_sentence(ours.name)} runs, and {theirs.name} gains on her{how}: she "
+                 f"{said}.{came}",
+            because=intent.because)
+
+    def _pirates_come_aboard(self, ours, theirs) -> tuple[str, list[dict]]:
+        """A pirate ship that comes alongside throws her grapnels and boards: her rail's
+        boarders onto the party's deck, and the fight starts on their turn (the struck-
+        first door). (" tell", records), or ("", []) for anything but a hostile ship
+        alongside that has not yet come across.
+
+        Priced on the WANDERING mix, unlike `_defenders`' guarded one: a crew holding its
+        own deck is a guarded fight the party chose to storm, and a sail met on the water
+        is a wandering encounter wherever the fight happens to be fought."""
+        from . import ships as ships_mod
+
+        sea = dict(self.scene.sea or {})
+        if not sea.get("hostile") or sea.get("range") != "alongside" or sea.get("foes"):
+            return "", []
+        deck = ships_mod.deck_of(ours)
+        met = self._defenders(theirs, deck, mix="wandering")
+        pc = self.scene.pc()
+        if not met or pc is None:
+            return "", []
+        sea.update(grappled=True, foes=[a.ref for a in met])
+        self.scene.sea = sea
+        self._ensure_encounter(met[0].ref, target=pc.ref)
+        for a in met[1:]:
+            self.join_fight(a.ref)
+        names = _and_list([a.name for a in met])
+        return (f" The grapnels come across from {theirs.name} and bite, and {names} "
+                f"{'comes' if len(met) == 1 else 'come'} over the rail with steel out.",
+                [{"kind": "sea", "range": "alongside", "grappled": True,
+                  "boarded_by": theirs.id, "place": deck, "met": [a.ref for a in met],
+                  "origin": "rule:sea-encounter"}])
+
+    def _defenders(self, vessel, deck: str, mix: str = "guarded") -> list:
         """Whoever meets a boarding party at the rail.
 
         From the NPC codex by role words, at the party's own level — the same door a
@@ -17475,20 +17762,26 @@ class Engine:
             return []
         pc = self.scene.pc()
         level = int(getattr(pc, "level", 1) or 1)
-        row = npcs.choose(["sailor", "pirate"], level) or {}
+        sea = self.scene.sea or {}
+        # A pirate ship's people are pirates (`ontheway.sea`'s band); anybody else's sail.
+        pirates = bool(sea.get("hostile")) and sea.get("theirs") == vessel.id
+        row = npcs.choose(["pirate", "sailor"] if pirates else ["sailor", "pirate"],
+                          level) or {}
         template = str(row.get("id") or "thug")
         # Priced by the party's XP budget (rules/encounter_budget.py, owner 2026-11-13).
         # The GUARDED mix: a crew on her own deck is defending it, the ruling's "guards
-        # and lairs may be challenging or hard" — and the party chose to board. The rail
-        # count is the ceiling, the budget trims it, one is always there.
+        # and lairs may be challenging or hard" — and the party chose to board. A pirate
+        # crew boarding the party's ship is `mix="wandering"` (`_pirates_come_aboard`).
+        # The rail count is the ceiling, the budget trims it, one is always there.
         roll = self.dice.roll("1d100", label="how hard the rail is held",
                               visibility="hidden").total
         how_many = encounter_budget.most_of(
             encounter_budget.xp_of(row), max(1, min(4, 1 + vessel.crew // 25)),
-            encounter_budget.party_apl(self.scene), roll, kind="guarded")
+            encounter_budget.party_apl(self.scene), roll, kind=mix)
         # Named apart, because the brief lists people by name beside their ref and three
         # actors all called "a hand" is a narrator writing about one person three times.
-        called = ("a hand", "a second hand", "a third hand", "a fourth hand")
+        called = (("a pirate", "a second pirate", "a third pirate", "a fourth pirate")
+                  if pirates else ("a hand", "a second hand", "a third hand", "a fourth hand"))
         out = []
         for i in range(how_many):
             try:
@@ -17499,7 +17792,9 @@ class Engine:
             self.scene.add(who)
             self.scene.move(who.ref, deck)
             out.append(who)
-        self._mark_priced([w.ref for w in out], "boarding")
+        # Priced, so a model's begin_encounter round them does not roll their count again:
+        # "sea" for a pirate crew met on the water, "boarding" for anybody else's rail.
+        self._mark_priced([w.ref for w in out], "sea" if pirates else "boarding")
         return out
 
     # --- in conversation -----------------------------------------------------------------
@@ -23679,6 +23974,22 @@ class Engine:
         return (f"{actor.name} has no way up: no fly speed and no climb speed, and "
                 f"nothing here to climb.")
 
+    def _swims(self, actor, square=None) -> str:
+        """How `actor` may use the board's open water (`Grid.water`, `Grid.reachable`'s
+        `swims`): "speed" with a swim speed of its own; "over" for anybody else going over
+        the side to `square`, or already in the water and swimming on; "" on dry planks."""
+        from . import water as water_mod
+
+        grid = self.scene.grid
+        if grid is None or not grid.water:
+            return ""
+        if water_mod.swim_speed(actor) > 0:
+            return "speed"
+        if square is not None and tuple(square[:2]) in grid.water or \
+                self.scene.afloat(actor.ref):
+            return "over"
+        return ""
+
     def _move_cost(self, ref: str, start: tuple[int, ...] | None,
                    end: tuple[int, ...]) -> int | None:
         """What the move actually cost, routed around terrain and other creatures.
@@ -23718,7 +24029,9 @@ class Engine:
             # still paid, so the square it stops in is not a wall to it.
             if gridmod.enters_occupied(size):
                 occupied -= set(gridmod.footprint(there, size))
-            reach = self.scene.grid.reachable(here, 10_000, size=size, occupied=occupied)
+            reach = self.scene.grid.reachable(
+                here, 10_000, size=size, occupied=occupied,
+                swims=self._swims(self.scene.actors[ref], there))
             flat = reach.get(there)
             if flat is None:
                 return None
@@ -24824,7 +25137,7 @@ class Engine:
         if not fires:
             return self._refuse(intent, f"{actor.name} is not on fire; there is nothing to "
                                         f"put out.")
-        if actor.water_row():
+        if actor.water_row(self.scene.afloat(actor.ref)):
             actor.remove_effects(match=lambda e: e in fires)
             return Outcome(
                 intent_id=intent.id, op="extinguish",
