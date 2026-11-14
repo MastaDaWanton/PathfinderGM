@@ -229,6 +229,7 @@ narration had the clerk at his counter at that hour; whether he should be is Lan
   thing the PROSE puts in somebody's hands needs the prose read for things the way
   `seen-people` reads it for people. Logged, not built.
 - **No reaction to a theft.** `stolen` is recorded; nobody notices it yet.
-- **Trade goods at full value** (PF1e p.140) needs a trade-goods table; nothing here
-  lists one, so a sack of grain sells at half like anything else.
+- **Trade goods at full value** (PF1e p.140): built 2026-11-14 for bulk cargo bought
+  by the unit (`rules/trade.py`, docs/trade-goods.md). A sack of grain picked up in a
+  pack still sells at half like anything else.
 - **Putting a thing INTO a container** ("I put the ring in the pouch") is not read.

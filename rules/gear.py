@@ -343,6 +343,10 @@ def capacity(strength: int, size: str = "medium") -> tuple[int, int, int]:
     return tuple(int(x * f) for x in base)
 
 
+# Bought at the stables (CRB Table 6-9: cart 15 gp, wagon 35 gp) and hitched to beasts.
+VEHICLES = frozenset({"cart", "wagon"})
+
+
 def _good_weight(name: str, count: int) -> float | None:
     """A general-store good's weight for `count` of it (counted in its unit), or None."""
     from .goods import GEAR
@@ -447,7 +451,7 @@ def load(actor) -> dict:
         if n <= 0:
             continue
         low = _norm(name)
-        if "outfit" in low or "clothes" in low:
+        if "outfit" in low or "clothes" in low or low in VEHICLES:
             continue
         if weapons_mod.is_ammunition(name):
             k = weapons_mod.key_for(name)
@@ -467,7 +471,8 @@ def load(actor) -> dict:
     for s in (getattr(actor, "stock", None) or {}).values():
         n = int(getattr(s, "count", 0) or 0)
         base = str(getattr(s, "base", "") or "")
-        if n <= 0 or "outfit" in base.lower():
+        # A cart or a wagon is hitched, not carried (rules/trade.py hauls with it).
+        if n <= 0 or "outfit" in base.lower() or _norm(base) in VEHICLES:
             continue
         forged = _forged_weight(s)
         if forged is not None:

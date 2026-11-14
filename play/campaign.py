@@ -378,6 +378,11 @@ class Campaign:
             # the player put a back to keeps its square across a reload and a revisit.
             "fixtures_named": ({k: [dict(f) for f in v]
                                 for k, v in self.scene.fixtures_named.items()}, {}),
+            # The party's trade goods and how far each market has been pushed
+            # (2026-11-14, rules/trade.py).
+            "cargo": ([dict(x) for x in self.scene.cargo], []),
+            "trade_pressure": ({k: dict(v) for k, v in self.scene.trade_pressure.items()},
+                               {}),
         }
         payload["scene"].update({k: v for k, (v, default) in kept.items() if v != default})
         p = self.path()
@@ -496,6 +501,9 @@ class Campaign:
             staffed=[str(x) for x in (s.get("staffed") or [])],
             swayed={str(k): int(v) for k, v in (s.get("swayed") or {}).items()},
             vessels=[dict(v) for v in (s.get("vessels") or [])],
+            cargo=[dict(x) for x in (s.get("cargo") or []) if isinstance(x, dict)],
+            trade_pressure={str(k): dict(v) for k, v in (s.get("trade_pressure") or {}).items()
+                            if isinstance(v, dict)},
             sea=dict(s.get("sea") or {}),
             road=dict(s.get("road") or {}),
             at=str(s.get("at") or ""),

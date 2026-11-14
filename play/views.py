@@ -7239,7 +7239,56 @@ def trade(request):
         "terms_percent": percent,
         "can_haggle": not haggle_spent,
         "law": states.standing_with_the_law(pc, place),
+        # Bulk trade goods (rules/trade.py): what this place makes, and the party's lots.
+        "cargo": _cargo_block(c, pc, merchant),
     })
+
+
+def _cargo_block(c, pc, merchant) -> dict:
+    """The counter's bulk goods: {"offers", "lots", "haul", "carried_lb", "terms"}.
+
+    `offers` are the trade goods the world says this settlement makes (a route's origin
+    or its `sells` line), each with the next unit's price to the player, how much the
+    market still has and where it sells dear (the routes' destinations first). `lots` are
+    the party's cargo wherever it is, with what this market pays for the next unit of
+    those that are here. Every number is the engine's (`trade.unit_now`, the seller's
+    terms through `Engine._cargo_terms`); the totals are the engine's when the trade is
+    made, since every unit moves the price. Empty lists where there is nothing."""
+    from rules import goods as goods_mod, trade
+
+    place = str(c.scene.location_id or "")
+    engine = c.engine()
+    percent, moved, markup = engine._cargo_terms(pc, merchant)
+    coins = goods_mod.coins_here(c.world, c.scene)
+
+    def text(cp):
+        return goods_mod.purse_line(goods_mod.coins_for(max(1, int(round(cp)))), coins)
+
+    offers = []
+    for key, word in sorted(trade.supplied_at(c.world, place).items()):
+        r = trade.row(key)
+        each = trade.unit_now(c.scene, c.world, place, key) * markup * (100 - percent) / 100
+        offers.append({"id": trade.PREFIX + key, "name": r["name"], "word": word,
+                       "unit": r["unit"], "lb": r["lb"], "each_cp": round(each, 2),
+                       "each": text(each), "left": trade.can_buy(c.scene, c.world, place, key),
+                       "dear_in": trade.sells_dear_in(c.world, key, place)[:4]})
+    reach = {id(x) for x in trade.reachable(c.scene)}
+    lots = []
+    for lot in trade.lots(c.scene):
+        key = lot["key"]
+        row = {"id": trade.PREFIX + key, "lot": lot["id"], "name": lot["name"],
+               "said": trade.said(lot), "units": int(lot["units"]),
+               "where": trade.where_said(c.scene, c.world, lot), "here": id(lot) in reach,
+               "paid": text(lot.get("paid_cp", 0)) if lot.get("paid_cp") else ""}
+        if id(lot) in reach:
+            each = trade.unit_now(c.scene, c.world, place, key) / markup                 * (100 + percent) / 100
+            row.update(each_cp=round(each, 2), each=text(each),
+                       takes=trade.can_sell(c.scene, c.world, place, key),
+                       wanted=trade.standing(c.world, place, key) == "demand")
+        lots.append(row)
+    haul = trade.haul_lb(c.scene)
+    return {"offers": offers, "lots": lots, "haul": haul,
+            "carried_lb": trade.with_party_lb(c.scene), "terms": moved}
 
 
 @require_POST
