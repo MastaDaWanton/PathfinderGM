@@ -7599,7 +7599,7 @@ class Engine:
         # tell that quotes it hands the narrator the player's own framing to put in
         # somebody's mouth.
         said = (f'{who} says{at}: "{words}"' if intent.params.get("quoted")
-                else f"{who} speaks{at}, to the effect that {words}")
+                else reported_speech(who, at, words, heard.name if heard else ""))
         effects = [{"kind": "said", "who": intent.actor or "",
                     "to": heard.ref if heard is not None else "",
                     "words": words}]
@@ -9314,7 +9314,8 @@ class Engine:
                     self._judge(atk, False)
                     state.setdefault("blows", []).append(
                         {"result": "miss", "how": "wild", "ref": defender.ref,
-                         "weapon": str(weapon.get("name") or weapon_key)})
+                         "weapon": str(weapon.get("name") or weapon_key),
+                         "in_hand": _in_hand(weapon, weapon_key)})
                     state["tells"].append(
                         f"{actor.name}'s attack{_instrument(weapon, weapon_key)} goes "
                         f"badly wide (natural 1).")
@@ -9331,6 +9332,7 @@ class Engine:
                     state.setdefault("blows", []).append(
                         {"result": "miss", "ref": defender.ref,
                          "weapon": str(weapon.get("name") or weapon_key),
+                         "in_hand": _in_hand(weapon, weapon_key),
                          # The cover took it only when, without it, the roll would hit.
                          "how": miss_how(swing_ac - atk.total, bool(cover_mods) and (
                              swing_ac - atk.total <= sum(m.value for m in cover_mods)))})
@@ -9392,7 +9394,8 @@ class Engine:
                         # 2026-10-27; docs/ally-swings.md).
                         state.setdefault("blows", []).append(
                             {"result": "miss", "how": "unseen", "ref": defender.ref,
-                             "weapon": str(weapon.get("name") or weapon_key)})
+                             "weapon": str(weapon.get("name") or weapon_key),
+                             "in_hand": _in_hand(weapon, weapon_key)})
                         state["tells"].append(
                             f"{actor.name} finds nothing there — {why}, {chance}% miss "
                             f"chance ({miss.total}).")
@@ -9707,7 +9710,9 @@ class Engine:
                 # engine's bands, words not numbers, read off what it just did.
                 state.setdefault("blows", []).append({
                     "result": "hit", "ref": defender.ref,
-                    "weapon": hit["weapon"], "type": str(hit.get("type") or ""),
+                    "weapon": hit["weapon"],
+                    "in_hand": _in_hand(weapon, weapon_key),
+                    "type": str(hit.get("type") or ""),
                     "nonlethal": hit.get("lethality") == "nonlethal",
                     "critical": bool(state.get("crit")),
                     "severity": blow_severity(int(hit.get("amount") or 0),
@@ -17665,7 +17670,12 @@ class Engine:
                 self.scene.move(ref, deck)
         crew = self._ships_company(ship, deck)
         bits = [b for b in (parted, paid, reached,
-                            f"{pc.name} goes aboard; she lies "
+                            # The ship by name, and the party on her deck: "goes aboard;
+                            # she lies at the quay" read as the PC lying at the quay, and
+                            # came back "You collapse against the quay" (playtest
+                            # 2026-11-15 #86).
+                            f"{pc.name} goes aboard and is on the deck of {ship.name}; "
+                            f"{ship.name} lies "
                             f"{'off the shore' if off_shore else 'at the quay'} "
                             f"until you sail.") if b]
         if crew:
@@ -31948,6 +31958,19 @@ def _ward_tell(scene: Scene, e: dict) -> str:
     if kind == "summon_ended":
         return f"{str(e.get('what') or 'The summoned creature').capitalize()} is gone."
     if kind == "effect_ended":
+        # A step of the attitude track ran out (an Intimidate's "friendly for 1d6x10
+        # minutes", CRB p.99): a change of manner, told as one. "Friendly wears off the
+        # merchant" came back "the lingering aura of warmth and peace dissipates from the
+        # merchant's body" (playtest 2026-11-15 #49) — the shape of a spell ending.
+        from . import attitude as attitude_mod
+
+        step = str(e.get("what") or "").strip().lower()
+        if who is not None and step in attitude_mod.TRACK:
+            pc = scene.pc()
+            toward = f" toward {pc.name}" if pc is not None and pc is not who else ""
+            now = attitude_mod.of(who)
+            back = f"; {name} is {now} again" if now and now != step else ""
+            return f"{name} no longer acts {step}{toward}{back}."
         return f"{e.get('what', 'Something')} wears off {name}."
     if kind == "ward_ended":
         return f"{e.get('what') or source} fades."
@@ -32077,6 +32100,50 @@ def _ac_said(kind: str, base: int, flat_footed: bool, parts=()) -> str:
         [first, *(f"{amount:+d} {what}" for what, amount in parts)]) + ")")
 
 
+# The verbs that only frame reported speech (`interpret.words_said` keeps the speech from
+# its own verb, so "invite" is never lost): "tell X that …" says nothing a "speaks to X"
+# does not. "ask" is kept as the tell's verb: a question is not a statement.
+_TELLS_FRAME = frozenset({"tell", "inform", "assure", "remind", "warn"})
+_ASKS_FRAME = frozenset({"ask"})
+
+
+def reported_speech(who: str, at: str, words: str, heard: str = "") -> str:
+    """The tell of a reported `say`. Playtest 2026-11-15 #58: the words came from their own
+    verb ("tell the sergeant of the watch that I am the one…") and the tell read "speaks to
+    the sergeant of the watch, to the effect that tell the sergeant of the watch that I am
+    the one…". A frame verb opening the words, then the one spoken to (`heard`'s name, or
+    its first words: "the sergeant" of "the sergeant of the watch"), then "that", is the
+    frame, and it goes; "ask" becomes the tell's own verb ("asks the harbourmaster what
+    passage costs"). Anything else is told as before. Words, not meaning: the reader has
+    already decided this is speech and whom it is to."""
+    plain = f"{who} speaks{at}, to the effect that {words}"
+    toks = str(words or "").split()
+    if len(toks) < 3:
+        return plain
+    verb = toks[0].lower()
+    if verb in _ASKS_FRAME:
+        return f"{who} asks " + " ".join(toks[1:])
+    if verb not in _TELLS_FRAME:
+        return plain
+    rest = toks[1:]
+    name = [t.lower() for t in str(heard or "").split()]
+    k = 0
+    while k < len(rest) and k < len(name) and rest[k].lower().strip(",") == name[k]:
+        k += 1
+    # A name is said by more than its article ("the" alone is not "the sergeant").
+    if k and name[:1] in (["the"], ["a"], ["an"]) and k < 2:
+        k = 0
+    if k and k < len(rest) and rest[k].lower() == "that":
+        k += 1
+    elif not k and "that" in (t.lower() for t in rest[:8]):
+        # Somebody named some other way ("him", "the man"): up to the first "that".
+        k = [t.lower() for t in rest].index("that") + 1
+    content = " ".join(rest[k:])
+    if not k or not content:
+        return plain
+    return f"{who} speaks{at}, to the effect that {content}"
+
+
 def _instrument(weapon: dict, weapon_key: str) -> str:
     """" with the sap" — what the blow was struck with, for the tell — or "" for a
     bare hand or an improvised thing (whose own tell names it).
@@ -32093,8 +32160,29 @@ def _instrument(weapon: dict, weapon_key: str) -> str:
     key = str(weapon_key or "").lower()
     if key in ("unarmed", "improvised"):
         return ""
-    name = " ".join(str(weapon.get("name") or key).split())
+    name = spoken_weapon(weapon.get("name") or key)
     return f" with the {name}" if name else ""
+
+
+def _in_hand(weapon: dict, weapon_key: str) -> bool:
+    """Whether a blow was struck with a made weapon kept in the hand — a melee stroke, not
+    a throw, a shot, a bite or a fist. Playtest 2026-11-15 #95: the captain's dagger stab
+    came back "The captain's dagger flies through the air"; the blow's fact said only
+    "weapon: dagger", and a dagger is also a thrown weapon (CRB p.142)."""
+    key = str(weapon_key or "").lower()
+    return (weapon.get("category") != "ranged" and not weapon.get("thrown")
+            and not weapon.get("natural") and key not in ("unarmed", "improvised"))
+
+
+_MWK = re.compile(r"\bmwk\b", re.I)
+
+
+def spoken_weapon(name) -> str:
+    """A weapon's name as a sentence says it: the stat block's "mwk" (masterwork, CRB
+    p.149) written out. Playtest 2026-11-15 #95: "A mwk dagger finds its mark" — the
+    abbreviation went from the tell and the blow's fact to the page. The sheet, the roll
+    label and the effect records keep the block's own name."""
+    return _MWK.sub("masterwork", " ".join(str(name or "").split()))
 
 
 def _a_person(template: str) -> bool:

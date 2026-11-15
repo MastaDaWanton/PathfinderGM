@@ -6767,6 +6767,16 @@ def own_words_only(raw_intents, player_text: str, reading=None, *,
     # more"). The deed was dressed as speech by the planner, not by the reader.
     wordless = isinstance(reading, dict) and "error" not in reading and not says
     need = 1.0 if wordless else OWN_WORDS
+    # And when the reader read a speech act done now and gave it no words, it read that
+    # nothing was said. Playtest 2026-11-15 #68: "I say nothing and stare at the wall" was
+    # read `talk` with no `says`; `inject_say`'s redactor took "nothing and stare at the
+    # wall" for the words, every one of them the player's, and the tell booked silence as
+    # a spoken line. A quotation is still speech: its marks are read in code.
+    from . import interpret as _interpret_mod
+
+    silent = wordless and any(
+        isinstance(a, dict) and a.get("act") in _interpret_mod._SPEECH_ACTS
+        and _interpret_mod.acting(a) for a in reading.get("actions") or [])
     out: list = []
     for entry in raw_intents:
         if not (isinstance(entry, dict) and str(entry.get("op", "")).lower() == "say"
@@ -6775,6 +6785,10 @@ def own_words_only(raw_intents, player_text: str, reading=None, *,
             continue
         params = dict(entry.get("params") or {})
         words = str(params.get("words") or "").strip()
+        if silent and not params.get("quoted"):
+            if notes is not None:
+                notes.append(f"a say the reader read as nothing said: dropped {words[:80]!r}")
+            continue
         theirs = _content_words(words)
         if words and (not theirs or len(theirs & mine) / len(theirs) >= need):
             # Part of what the player said is not what they said: a say whose words are a
@@ -6790,7 +6804,12 @@ def own_words_only(raw_intents, player_text: str, reading=None, *,
                 entry = dict(entry, params=params)
             out.append(_said_whole(entry))
             continue
-        instead = says or spoken(player_text)
+        # The redactor's guess only when the reader did not read the line. Playtest
+        # 2026-11-15 #68: "I say nothing and stare at the wall" was read as a talk with
+        # no words said, and the redactor's complement of "say" ("nothing and stare at
+        # the wall") was booked as her line — silence told as speech. The reader is the
+        # one that reads (docs/structured-turn.md); a regex never overrules it.
+        instead = says or ("" if wordless else spoken(player_text))
         if instead:
             params["words"] = instead
             out.append(_said_whole(dict(entry, params=params, because="the player said it")))

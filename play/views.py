@@ -4712,7 +4712,9 @@ def _cheat(c, wish: str, shown: str):
         return JsonResponse(
             {"error": "Say what is true. For example: /cheat I have 1000 gold"},
             status=400)
-    c.transcript.append({"who": "player", "text": shown})
+    # An aside, as a `/gm` question is: the readers of the player's lines (the companions,
+    # the corrections, the table talk) read the fiction's lines only.
+    c.transcript.append({"who": "player", "text": shown, "kind": "aside"})
     agent = GMAgent(c.world, c.engine())
     # A wish that is a number is read in code: "/cheat I gain 2000 experience" did
     # nothing twice (items 1 and 20) because no op carried experience and the model
@@ -4725,7 +4727,7 @@ def _cheat(c, wish: str, shown: str):
                                       origin_name="the author's word"), wish)
             plan = TurnPlan(narration="", intents=intents,
                             repairs=["cheat: read in code, the author's number kept"])
-            return _advance(c, agent, "", plan, f"(the author writes: {wish})")
+            return _author_turn(c, agent, plan)
         except IntentError as exc:
             c.transcript.pop()
             return JsonResponse({"error": f"That could not be turned into anything the "
@@ -4741,10 +4743,38 @@ def _cheat(c, wish: str, shown: str):
         return JsonResponse(
             {"error": f"That could not be turned into anything the engine can do. "
                       f"{exc}"}, status=502)
-    # Straight into the ordinary turn from here: same resolution, same rollback on a
-    # refusal, same prose call, same scrubber. The only thing a cheat skips is the
-    # fiction's permission, and that was spent in the prompt.
-    return _advance(c, agent, "", plan, f"(the author writes: {wish})")
+    return _author_turn(c, agent, plan)
+
+
+def _author_turn(c, agent, plan):
+    """A cheat's intents through the engine, and its tells on the page as the author's
+    word — never narrated, never in the history, and no NPC turn after it.
+
+    Playtest 2026-11-15 #85: "/cheat give me 40 gold pieces" went through the ordinary
+    turn, and the narrator told it in the fiction ("You reach into your purse and take
+    forty … gold pieces") and the harbourmaster answered it ("I see the coin. It is a fair
+    start…"). A cheat is the author changing the facts, not something the character did:
+    it is no event the world saw. So it is told the way the gear buttons tell what they did
+    (`_page_tells`), out of the fiction (`who: "table"`, which no narrator reader takes,
+    play/table_talk.py), and the history the narrator reads gets nothing of it. What the
+    engine now holds — the coin in the purse — is what later turns see, as they see any
+    other fact."""
+    engine = agent.engine
+    undo = c.scene.snapshot()
+    try:
+        resolution = engine.run(plan.intents)
+    except (IntentError, ValueError, KeyError) as exc:
+        c.scene.restore(undo)
+        c.transcript.pop()
+        return JsonResponse(
+            {"error": f"The engine refused the GM's intents: {exc}"}, status=502)
+    _log_turn(c, plan, resolution)
+    tell = _page_tells(c, resolution.outcomes)
+    c.transcript.append({"who": "table", "kind": "author",
+                         "text": f"By the author's word: {tell}" if tell
+                         else "By the author's word: nothing changed."})
+    c.save()
+    return JsonResponse(_state(c))
 
 
 def _advance(c, agent, narration, plan, player_input):

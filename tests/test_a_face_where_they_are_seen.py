@@ -60,11 +60,15 @@ class TestTheLine:
         said = narration.a_face_for("the drover", "Korvu: Korvu have four limbs.")
         assert "Korvu have four limbs" in said
 
-    def test_a_residents_own_words_keep_the_label_form(self):
+    def test_a_residents_own_words_are_kept_in_a_whole_sentence(self):
         """Free text from the world's `Appearance` fact: there is no reliable sentence to
-        make of it without writing it ourselves."""
+        make of it without writing it ourselves, so its words are kept — but as a whole
+        sentence the player sees, never a label: playtest 2026-11-15 #75 pasted
+        "Miorintha: Short stature, dark hair, Kelvaxian tattoos Each breath pulls…"."""
         said = narration.a_face_for("Drenn Ironvale", "favors plain dress")
-        assert said == "Drenn Ironvale: favors plain dress"
+        assert said == "You see Drenn Ironvale: favors plain dress."
+        said = narration.a_face_for("Miorintha", "Short stature, dark hair, Kelvaxian tattoos")
+        assert said == "You see Miorintha: short stature, dark hair, Kelvaxian tattoos."
 
     def test_a_common_noun_takes_its_article(self):
         assert narration.a_face_for("sailor", "Orc: tall.").startswith("The sailor is")

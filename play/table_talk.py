@@ -24,7 +24,10 @@ code, never instruct and hope (CLAUDE.md).
   own outcomes (the PC's, never an NPC's), each tell through `views.plain_tell`, plus the
   beat already on the page and the player's own line. No brief, no cards, no hidden roll,
   no withheld fact: a GM who grins before you open the door has told you about the trap.
-  A layer that cannot see a secret cannot leak it.
+  A layer that cannot see a secret cannot leak it. Since 2026-11-15 it also sees the
+  scene as the narrator does — who is here and how, what the others did this turn
+  (`scene_facts`) — and its line is read against those and the tells by the narrator's own
+  check (`_held_to_the_tells`): six of its lines in one playtest contradicted the engine.
 * **No model authors a number** (the third law). A table line holding a digit is dropped.
   A voiced `/gm` record must carry every number the record had and no other.
 * **No invented names.** A capitalised word mid-sentence that the moment never used is
@@ -139,7 +142,14 @@ def moments(c, resolution) -> tuple[list[str], list[str]]:
         if isinstance(dc, dict) and dc.get("circumstance") and dc.get("circumstance_why"):
             word = "bonus" if int(dc["circumstance"]) > 0 else "penalty"
             kinds.append("bend")
-            facts.append(f"You gave a {word} for how it was done: {dc['circumstance_why']}")
+            # And how it came out, beside the reason: told only the penalty, the GM said
+            # "his status makes that direct challenge a lot harder to pull off" over an
+            # Intimidate that had just succeeded (playtest 2026-11-15 #54).
+            verdict = str(getattr(o, "verdict", "") or "")
+            came = (" It worked all the same." if verdict == "success"
+                    else " It failed." if verdict == "failure" else "")
+            facts.append(f"You gave a {word} for how it was done: "
+                         f"{str(dc['circumstance_why']).rstrip('. ')}.{came}")
         for r in getattr(o, "rolls", None) or []:
             if getattr(r, "visibility", "") != "player":
                 continue
@@ -170,6 +180,53 @@ def moments(c, resolution) -> tuple[list[str], list[str]]:
             facts.append(f"{pc.name} is down.")
         said_mem["table:down"] = down
     return list(dict.fromkeys(kinds)), facts
+
+
+# How a body here is, by the vocabulary's own tags, first match wins (`states`).
+_HOW_THEY_ARE = (("state.down.dead", "dead"), ("state.down.dying", "dying"),
+                 ("state.down.unconscious", "unconscious"), ("state.down.stable", "stable"),
+                 ("state.down", "down"))
+
+
+def scene_facts(c) -> tuple[list[str], list[str]]:
+    """(said, checked): the scene as the narrator is given it, for the GM at the table —
+    who is here and how, and what the others did after the player's act this turn — and,
+    for the check alone, what the player's character is trained in.
+
+    Playtest 2026-11-15: fed only the PC's outcomes, the table talk said "The man is long
+    gone" of a merchant lying unconscious in the scene (#44), "A solid gut punch" over a
+    tell that said nothing had landed (#25), and "You don't have the skill" to a character
+    with ranks in Disguise (#81). The narrator is held to the scene and the tells; the GM
+    at the table now is too (`after_the_beat`'s tells check). Somebody hidden from the
+    player is left out, as the plan's own list leaves them (`planned.present`), and every
+    other turn's tell is one the narrator has already put on the page."""
+    from .views import plain_tell
+
+    scene = c.scene
+    said: list[str] = []
+    here = []
+    for a in (getattr(scene, "actors", {}) or {}).values():
+        if a.is_pc or not a.name or a.has_state("state.hidden"):
+            continue
+        how = next((w for tag, w in _HOW_THEY_ARE if a.has_state(tag)), "")
+        here.append(f"{a.name} ({how})" if how else str(a.name))
+    said.append(("Here with you: " + "; ".join(here) + ".") if here
+                 else "Nobody else is here.")
+    # The others' turns after the player's act: the rows since the player's own.
+    others: list[str] = []
+    for row in reversed(list(getattr(c, "turn_log", None) or [])):
+        if row.get("kind") in ("turn", "resolution"):
+            break
+        if row.get("kind") == "npc-turn":
+            others[:0] = [plain_tell(str(o.get("tell") or ""), scene)
+                          for o in row.get("outcomes") or [] if o.get("tell")]
+    said += [f"Then: {t}" for t in others if t]
+    checked: list[str] = []
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    ranks = sorted(k for k, v in (getattr(pc, "ranks", None) or {}).items() if v)
+    if pc is not None and ranks:
+        checked.append(f"{pc.name} is trained in these skills: {', '.join(ranks)}.")
+    return said, checked
 
 
 def wanted(kinds: list[str], facts: list[str], mode: str | None = None) -> bool:
@@ -265,7 +322,7 @@ def job_for(kinds: list[str]) -> str:
 
 
 def table_messages(v: dict, facts: list[str], player_line: str, beat: str,
-                   job: str = "quiet") -> list[dict]:
+                   job: str = "quiet", scene=()) -> list[dict]:
     """The voice's own examples as earlier turns, then this moment in the same shape."""
     msgs = [{"role": "system", "content": TABLE_SYSTEM.format(
         name=v["name"] + " GM", manner=v["manner"], never=v["never"])}]
@@ -277,6 +334,8 @@ def table_messages(v: dict, facts: list[str], player_line: str, beat: str,
     ask = f"YOUR JOB: {JOBS.get(job, JOBS['quiet'])}\nMOMENT: " + (
         " ".join(facts) or "No roll and no ruling: they did what they wrote, and the story "
         "told it.")
+    if scene:
+        ask += "\n\nTHE SCENE NOW (true): " + " ".join(scene)
     if player_line:
         ask += f"\n\nThe player wrote: {player_line}"
     if beat:
@@ -487,6 +546,45 @@ def _log(c, row: dict) -> None:
         mem["table:log"] = log[-KEEP_LOG:]
 
 
+def _held_to_the_tells(agent, ask, msgs, line: str, said: str, premises: list[str], pc,
+                       allowed: str, recent: list[str]) -> tuple[str, str, bool]:
+    """(line, why, remade): the line read against the turn's tells and the scene, as the
+    narrator's beat is (`beat_verify.against_tells`, the same first read) — and on a clash,
+    asked once more with the fact it breaks named, read again, and dropped if it still
+    breaks one. Detect, then repair only what was found (CLAUDE.md).
+
+    Playtest 2026-11-15, all six said over an engine that had decided otherwise: a mugging
+    called a plea for help (#23), "A solid gut punch" before any blow had landed (#25),
+    "The man is long gone" of a man lying there unconscious (#44), "a lot harder" over a
+    success (#54), "You don't have the skill" to a trained character (#81). Off with the
+    read back (the suite), as every read back is."""
+    from gm import beat_verify
+    from gm.client import ModelUnavailable
+
+    if not (beat_verify.ENABLED and getattr(agent, "prose_model", "")):
+        return line, "", False
+    route = {"model": agent.prose_model, "host": agent.prose_host,
+             "provider": agent.prose_provider, "api_key": agent.prose_key}
+    who = str(getattr(pc, "name", "") or "")
+    read = beat_verify.against_tells(strip_gestures(line), premises, who=who, **route)
+    if not read.clashes:
+        return line, "", False
+    c0 = read.clashes[0]
+    mend = (f'"{c0.words}" is not true: {c0.tell} Say it again so that it agrees with '
+            f"that, and add nothing the MOMENT does not say.")
+    try:
+        again = ask(msgs + [{"role": "assistant", "content": said},
+                            {"role": "user", "content": mend}])
+    except ModelUnavailable:
+        return "", f"contradicts the engine: {c0.words}", True
+    line2, why = check(again, allowed, recent) if again else ("", "empty")
+    if not line2:
+        return "", f"contradicts the engine: {c0.words} (remake: {why})", True
+    if beat_verify.against_tells(strip_gestures(line2), premises, who=who, **route).clashes:
+        return "", f"contradicts the engine twice: {c0.words}", True
+    return line2, "", True
+
+
 def after_the_beat(c, agent, resolution) -> None:
     """One or two lines of the GM's own voice under the beat, when the house rule asks.
 
@@ -515,7 +613,8 @@ def after_the_beat(c, agent, resolution) -> None:
         v = voice()
         player, beat = _beat_since_player(c)
         job = job_for(kinds)
-        msgs = table_messages(v, facts, player, beat, job)
+        here, trained = scene_facts(c)
+        msgs = table_messages(v, facts, player, beat, job, scene=here)
         started = time.monotonic()
 
         def ask(messages):
@@ -565,6 +664,11 @@ def after_the_beat(c, agent, resolution) -> None:
                 line, why = check(again, allowed, recent) if again else ("", "no model")
                 if line and not gives_the_reason(line, facts):
                     line, why = "", "never said why it was refused"
+            if line:
+                line, why, again = _held_to_the_tells(agent, ask, msgs, line, said,
+                                                      [*facts, *here, *trained], pc,
+                                                      allowed, recent)
+                remade = remade or again
         seconds = round(time.monotonic() - started, 1)
         _log(c, {"moments": kinds, "job": job, "said": line, "dropped": why,
                  "seconds": seconds, "voice": v["id"], "remade": remade})
