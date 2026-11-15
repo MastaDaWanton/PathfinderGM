@@ -1257,6 +1257,31 @@ def beat_correct(request):
 
 
 @require_http_methods(["GET", "POST"])
+def beat_engine(request):
+    """"That's wrong" on what the engine did (play/engine_corrections.py). GET `?beat=i`:
+    the turn's record as the player may see it, one line each. POST `{"beat": i, "marks":
+    [{"line", "kind", "note"}]}`: log the marks; the page's lines back, with the id."""
+    from . import engine_corrections as ec
+
+    c = campaign_mod.current()
+    body = read_body(request) if request.method == "POST" else request.GET
+    try:
+        i = int(body.get("beat"))
+    except (TypeError, ValueError):
+        return JsonResponse({"error": "Which beat?"}, status=400)
+    if not (0 <= i < len(c.transcript)):
+        return JsonResponse({"error": "There is no such beat."}, status=404)
+    if request.method == "GET":
+        return JsonResponse(ec.page(c, i))
+    try:
+        rec = ec.log(c, i, body.get("marks"))
+    except ec.Refused as exc:
+        return JsonResponse({"error": exc.words}, status=exc.status)
+    # No save: the game is unchanged (`engine_corrections.log`).
+    return JsonResponse({**ec.page(c, i), "logged": rec["id"], "marks": len(rec["marks"])})
+
+
+@require_http_methods(["GET", "POST"])
 def corrections_info(request):
     """GET: how many corrections are logged, for the Settings line. POST: open the folder
     they are in — on this machine only, as the report is (`report_views._refused`): a

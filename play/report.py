@@ -81,7 +81,7 @@ LEFT_OUT = (
 
 
 # The kinds of member that go only when "Include the save" is ticked.
-WITH_THE_SAVE = ("save", "corrections", "auto-corrections")
+WITH_THE_SAVE = ("save", "corrections", "auto-corrections", "engine-corrections")
 
 
 @dataclass
@@ -89,7 +89,7 @@ class Member:
     name: str        # the path inside the zip
     data: bytes
     kind: str        # manifest, words, log, turnlog, transcript, save, corrections,
-                     # auto-corrections
+                     # auto-corrections, engine-corrections
     note: str = ""
 
 
@@ -353,6 +353,20 @@ def members(description: str = "", include_save: bool = True, *,
             out.append(Member("training/auto-corrections.jsonl",
                               _clean(auto, secrets).encode("utf-8"), "auto-corrections",
                               "sentences the narration check caught and remade"))
+        # And the engine lines the player marked wrong, with the start-of-turn saves that
+        # reproduce them (play/engine_corrections.py, the owner, 2026-11-15).
+        try:
+            from . import engine_corrections
+
+            engine = engine_corrections.for_report()
+        except Exception:  # noqa: BLE001 — a report never fails over its extras
+            engine = []
+        for name, text in engine:
+            out.append(Member(name, _clean(text, secrets).encode("utf-8"),
+                              "engine-corrections",
+                              "what the engine did that you marked wrong"
+                              if name.endswith(".jsonl") else
+                              "the game as that turn began"))
 
     roles = models()
     manifest = {

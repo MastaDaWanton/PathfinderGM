@@ -14,13 +14,126 @@
    the page never offers what the server would refuse.
 
    The open slip is held here (`FIX`), not in the DOM: render() rebuilds the whole story
-   on every state, and the slip is put back by the render hook below. */
+   on every state, and the slip is put back by the render hook below.
+
+   Below the narration's half, the same slip lists what the ENGINE did that turn
+   (play/engine_corrections.py, the owner, 2026-11-15): the reading of the player's line,
+   each outcome in the engine's own words with the rolls the Rolls panel shows, and what
+   the plan did nothing for. A line is picked as a sentence is (the same red ink), given a
+   kind from the owner's fixed list and an optional note, and "Log the engine's mistake"
+   writes them to the training log. Nothing is undone: pinpoint and log only. The lines
+   come from the server already filtered (no hidden creature, no hidden roll). */
 (function () {
-  const FIX = { beat: -1, mode: "", picked: [], note: "", text: "", busy: false, error: "" };
+  const FIX = { beat: -1, mode: "", picked: [], note: "", text: "", busy: false, error: "",
+                engine: null };
 
   function reset() {
     FIX.beat = -1; FIX.mode = ""; FIX.picked = []; FIX.note = ""; FIX.text = "";
-    FIX.busy = false; FIX.error = "";
+    FIX.busy = false; FIX.error = ""; FIX.engine = null;
+  }
+
+  // The engine's half: {beat, loading, lines, kinds, max_note, recorded, marks: {id:
+  // {kind, note}}, busy, error, logged}. Fetched when the slip opens, never in the state,
+  // so a long campaign's state carries no turn records.
+  async function loadEngine(i) {
+    FIX.engine = { beat: i, loading: true, lines: [], kinds: {}, marks: {}, max_note: 400 };
+    try {
+      const r = await fetch(`/api/beat/engine?beat=${encodeURIComponent(i)}`);
+      const d = await readJSON(r);
+      if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+      if (!FIX.engine || FIX.engine.beat !== i) return;
+      Object.assign(FIX.engine, d, { loading: false });
+    } catch (err) {
+      if (!FIX.engine || FIX.engine.beat !== i) return;
+      FIX.engine.loading = false;
+      FIX.engine.error = (err && err.message) || String(err);
+    }
+    paint(STATE);
+  }
+
+  const MISSING = "missing";
+
+  function kindPicker(id, mark, kinds, off) {
+    const opts = Object.entries(kinds).filter(([k]) => k !== MISSING)
+      .map(([k, label]) => `<option value="${esc(k)}"${mark.kind === k ? " selected" : ""}>${
+        esc(label)}</option>`).join("");
+    const pick = id === MISSING ? "" : `<select class="v2-well" data-enkind="${esc(id)}"
+        aria-label="What kind of mistake"${off}><option value="">What kind of mistake?</option>${
+        opts}</select>`;
+    return `<div class="enmark">${pick}
+      <input class="v2-well" type="text" data-ennote="${esc(id)}" maxlength="${
+        esc(FIX.engine.max_note)}" value="${esc(mark.note || "")}"
+        aria-label="A short note (optional)" placeholder="A short note (optional)"${off}></div>`;
+  }
+
+  function engineBox() {
+    const E = FIX.engine;
+    if (!E) return "";
+    const head = `<label class="enhead">What the engine did this turn</label>`;
+    if (E.loading) return `${head}<p class="fixhint">Reading the turn’s record…</p>`;
+    if (E.error && !E.lines.length) {
+      return `${head}<p class="fixerr" role="alert">${esc(E.error)}</p>`;
+    }
+    const off = E.busy ? " disabled" : "";
+    const rows = (E.lines || []).map(ln => {
+      const mark = E.marks[ln.id];
+      const rolls = (ln.rolls || []).map(r => `<span class="enroll">${esc(r)}</span>`).join("");
+      return `<li class="enline">
+        <span class="sent" role="button" tabindex="0" data-enline="${esc(ln.id)}"
+          aria-pressed="${mark ? "true" : "false"}">${esc(ln.text)}</span>${rolls}
+        ${mark ? kindPicker(ln.id, mark, E.kinds, off) : ""}</li>`;
+    }).join("");
+    const miss = E.marks[MISSING];
+    const list = E.lines.length ? `<ul class="enlines">${rows}</ul>`
+      : `<p class="fixhint">${E.recorded ? "The engine resolved nothing you can be shown this turn."
+          : "No engine record was kept for this turn."}</p>`;
+    const n = Object.keys(E.marks).length;
+    const ready = n > 0 && Object.entries(E.marks).every(([id, m]) => id === MISSING || m.kind);
+    const done = E.logged ? `<p class="fixhint" role="status">Logged ${esc(E.logged)} mark${
+      E.logged === 1 ? "" : "s"} on the engine.</p>` : "";
+    return `${head}
+      <p class="fixhint">Click a line the engine got wrong, then say how. Nothing is undone:
+        it is logged so the rules can be fixed.</p>
+      ${list}
+      <div class="enmiss">
+        ${btn("fixlink", "enmissing", miss ? "Nothing is missing after all" : "Something’s missing", off)}
+        ${miss ? kindPicker(MISSING, miss, E.kinds, off) : ""}</div>
+      ${E.error ? `<p class="fixerr" role="alert">${esc(E.error)}</p>` : ""}
+      ${done}
+      <div class="fixgo">${btn("v2-btn is-small is-quiet", "enlog",
+        E.busy ? "Logging…" : "Log the engine’s mistake", ready && !E.busy ? "" : " disabled")}</div>`;
+  }
+
+  async function sendEngine(i) {
+    const E = FIX.engine;
+    if (!E) return;
+    E.busy = true; E.error = ""; E.logged = 0;
+    paint(STATE);
+    const marks = Object.entries(E.marks).map(([line, m]) =>
+      ({ line, kind: line === MISSING ? MISSING : m.kind, note: m.note || "" }));
+    try {
+      const d = await post("/api/beat/engine", { beat: i, marks });
+      if (FIX.engine !== E) return;
+      Object.assign(E, { lines: d.lines || E.lines, marks: {}, busy: false,
+                         logged: d.marks || marks.length });
+    } catch (err) {
+      if (FIX.engine !== E) return;
+      E.busy = false;
+      E.error = (err && err.message) || String(err);
+    }
+    paint(STATE);
+  }
+
+  function toggleLine(id) {
+    const E = FIX.engine;
+    if (!E || E.busy) return;
+    if (E.marks[id]) delete E.marks[id]; else E.marks[id] = { kind: "", note: "" };
+    E.logged = 0;
+    paint(STATE);
+    const back = id === MISSING
+      ? document.querySelector(`#story .fixpanel [data-fix="enmissing"]`)
+      : document.querySelector(`#story .fixpanel [data-enline="${CSS.escape(id)}"]`);
+    if (back) back.focus({ preventScroll: true });
   }
 
   function offers(s, i) {
@@ -146,7 +259,8 @@
       ${FIX.busy && FIX.mode === "fix" ? `<p class="fixhint">The narrator is writing it
         again. On a model on this machine that can take a minute.</p>` : ""}
       ${err}
-      <div class="fixgo">${go.join("")}</div></div>`;
+      <div class="fixgo">${go.join("")}</div>
+      ${engineBox()}</div>`;
   }
 
   function paint(s) {
@@ -204,13 +318,19 @@
   document.addEventListener("click", e => {
     const span = e.target.closest("#story .beat.picking .sent");
     if (span) { toggleSentence(span); return; }
+    const line = e.target.closest("#story .fixpanel [data-enline]");
+    if (line) { toggleLine(line.dataset.enline); return; }
     const b = e.target.closest("#story .beatfix [data-fix]");
     if (!b || b.disabled) return;
     const i = Number(b.closest(".beatfix").dataset.beat);
     const act = b.dataset.fix;
     const beat = (STATE.transcript || [])[i] || {};
-    if (act === "open") {
-      reset(); FIX.beat = i; FIX.mode = "pick"; paint(STATE);
+    if (act === "enmissing") {
+      toggleLine(MISSING);
+    } else if (act === "enlog") {
+      sendEngine(i);
+    } else if (act === "open") {
+      reset(); FIX.beat = i; FIX.mode = "pick"; loadEngine(i); paint(STATE);
       const first = document.querySelector("#story .beat.picking .sent");
       if (first) first.focus({ preventScroll: true });
       // The slip opens under the beat, often below the fold of a short page.
@@ -241,6 +361,10 @@
   document.addEventListener("keydown", e => {
     const span = e.target.closest && e.target.closest("#story .beat.picking .sent");
     if (span && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggleSentence(span); }
+    const line = e.target.closest && e.target.closest("#story .fixpanel [data-enline]");
+    if (line && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault(); toggleLine(line.dataset.enline);
+    }
     if (e.key === "Escape" && FIX.beat >= 0 && !FIX.busy
         && e.target.closest && e.target.closest("#story")) { reset(); paint(STATE); }
   });
@@ -249,6 +373,18 @@
   document.addEventListener("input", e => {
     if (e.target.id === "fixnote") FIX.note = e.target.value;
     if (e.target.id === "fixtext") FIX.text = e.target.value;
+    const E = FIX.engine, id = e.target.dataset && e.target.dataset.ennote;
+    if (E && id && E.marks[id]) E.marks[id].note = e.target.value;
+  });
+
+  // A kind picked: the Log button may wake, so the slip is drawn again.
+  document.addEventListener("change", e => {
+    const E = FIX.engine, id = e.target.dataset && e.target.dataset.enkind;
+    if (!E || !id || !E.marks[id]) return;
+    E.marks[id].kind = e.target.value;
+    paint(STATE);
+    const back = document.querySelector(`#story .fixpanel [data-enkind="${CSS.escape(id)}"]`);
+    if (back) back.focus({ preventScroll: true });
   });
 
   onRender(s => paint(s));

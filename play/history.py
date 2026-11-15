@@ -41,6 +41,9 @@ def stamp(c, entry: dict) -> dict:
     scene = c.scene
     entry.setdefault("clock", int(getattr(scene, "clock_minutes", 0) or 0))
     entry.setdefault("at", str(getattr(scene, "at", "") or ""))
+    # How long the transcript was: the beats a row belongs to, so "That's wrong" can show
+    # a beat's turn as the engine resolved it (play/engine_corrections.py `rows_for`).
+    entry.setdefault("transcript_at", len(getattr(c, "transcript", None) or []))
     return entry
 
 

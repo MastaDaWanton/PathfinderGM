@@ -2337,6 +2337,30 @@
   .fixpanel textarea { resize: vertical; min-height: 9em; white-space: pre-wrap; }
   .fixpanel .fixgo { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .fixpanel .fixerr { color: var(--alarm); }
+  /* The engine's half of the slip: its lines in the slip's own ink, a hairline in the
+     slip's own edge colour above it, and a picked line struck in the same red ink a
+     picked sentence is. The rolls under a line are the Rolls panel's small print. */
+  .fixpanel .enhead { margin-top: 6px; padding-top: 10px; border-top: 1px solid #2e251a; }
+  .fixpanel .enlines { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .fixpanel .enline { display: grid; gap: 4px; }
+  .fixpanel .enline .sent { cursor: pointer; border-radius: 2px; padding: 1px 2px;
+                            transition: background-color .15s ease, color .15s ease; }
+  .fixpanel .enline .sent:hover { background: rgba(var(--ember), .09); }
+  .fixpanel .enline .sent:focus-visible { outline: 1px solid var(--candle); outline-offset: 1px; }
+  .fixpanel .enline .sent[aria-pressed="true"] {
+    color: #e2b4a4; background: rgba(176, 72, 60, .13);
+    text-decoration: line-through; text-decoration-color: var(--alarm);
+    text-decoration-thickness: 2px; }
+  .fixpanel .enroll { color: var(--dim); font-size: 13.5px; padding-left: 14px; }
+  /* Side by side where the slip is wide, stacked where it is not: the story column is
+     ~330px in a fight at 800x600, where the note box shrank to "A short not". */
+  .fixpanel .enmark { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(13em, 100%), 1fr));
+                      gap: 6px; padding-left: 14px; }
+  .fixpanel .enmiss { display: grid; gap: 6px; }
+  .fixpanel .enmiss .enmark { grid-template-columns: minmax(0, 1fr); padding-left: 0; }
+  .fixpanel .enmark select { padding: 6px 8px; font: 15px/1.4 var(--body); min-width: 0; }
+  .fixpanel .enmiss .fixlink { font: 400 14px/1.3 var(--display); letter-spacing: .06em;
+                               font-variant: small-caps; opacity: .85; justify-self: start; }
   .beat.picking .sent { cursor: pointer; border-radius: 2px;
                         transition: background-color .15s ease, color .15s ease; }
   .beat.picking .sent:hover { background: rgba(var(--ember), .09); }

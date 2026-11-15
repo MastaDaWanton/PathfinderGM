@@ -47,7 +47,7 @@ BACKUPS_KEPT = 3
 TURN_LOG_WHOLE = 300
 # What an old row keeps: the Journal's history (play/history.py) reads the event rows'
 # intents and outcomes with their clock and place; every other row keeps its kind.
-_EVENT_KEEPS = ("kind", "clock", "at", "level", "intents", "outcomes", "error")
+_EVENT_KEEPS = ("kind", "clock", "at", "level", "intents", "outcomes", "error", "transcript_at")
 _OTHER_KEEPS = ("kind", "clock", "at")
 
 

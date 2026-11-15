@@ -88,6 +88,7 @@ urlpatterns = [
     # "That's wrong" on a narrated beat, and the Settings line that counts what it logged
     # (play/corrections.py).
     path("api/beat/correct", views.beat_correct, name="beat_correct"),
+    path("api/beat/engine", views.beat_engine, name="beat_engine"),
     path("api/corrections", views.corrections_info, name="corrections_info"),
     path("api/cast", views.cast_act, name="cast_act"),
     path("api/roll", views.roll, name="roll"),
