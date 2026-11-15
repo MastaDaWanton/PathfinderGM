@@ -117,6 +117,8 @@ const TRADE_ITEM_ICONS = {
 // tack (the owner, 2026-09-29): developer language, and an alarm for what is only the
 // reason a price is low.
 const TRADE_INERT = "for show, no effect in play";
+// "50 ft", "1 day": a count in its unit, singular for one (`goods.measure`).
+const tradeMeasure = (n, unit) => `${n} ${n === 1 ? String(unit).replace(/s$/, "") : unit}`;
 
 const tradeShelf = x => (TRADE_SHELVES[x.shelf] ? x.shelf : "gear");
 function tradeIcon(x) {
@@ -274,7 +276,8 @@ function tradeAdd(side, id, draw = true) {
   const lines = tradeDeal();
   const have = lines.find(l => l.side === side && l.id === id);
   if (have) have.n = Math.min(tradeMax(side, x), have.n + 1);
-  else lines.push({ side, id, n: 1 });
+  // A measured thing you sell goes in whole — all fifty feet of the rope — not a foot.
+  else lines.push({ side, id, n: side === "sell" && x.unit ? Math.max(1, x.count || 1) : 1 });
   if (draw) tradeRedraw();
 }
 function tradeStep(side, id, by) {
@@ -561,15 +564,19 @@ function drawMine() {
     // Rarity only. "For show" is said once, on the deal's line, where the price is
     // decided: under every row it was eight lines of the same sentence in a pack of eight.
     const notes = tradeRarity(x) ? `<span class="tr-rare">${esc(tradeRarity(x))}</span>` : "";
+    // A measured thing (`unit`: rope in ft, rations in days) is one length, priced by
+    // its unit: "hemp rope ×50 … each" read as fifty ropes (playtest 2026-11-15 #76).
+    const many = x.unit ? tradeMeasure(x.count, x.unit) : `×${x.count}`;
+    const per = x.unit ? `a ${x.unit.replace(/s$/, "")}` : "each";
     return `<button type="button" class="traderow${inDeal.has(x.id) ? " on" : ""}"
       data-side="sell" data-id="${esc(x.id)}"
-      aria-label="Sell ${esc(x.name)}${x.count > 1 ? `, you have ${esc(x.count)}` : ""}, ${
-        esc(x.price)}${x.count > 1 ? " each" : ""}">
+      aria-label="Sell ${esc(x.name)}${x.count > 1 ? `, you have ${esc(x.unit ? many : x.count)}` : ""}, ${
+        esc(x.price)}${x.count > 1 ? ` ${esc(per)}` : ""}">
       ${tradeGlyph(tradeIcon(x))}
       <span class="tr-nm"><b>${esc(x.name)}</b>${
-        x.count > 1 ? ` <span class="tr-n">×${esc(x.count)}</span>` : ""}${
+        x.count > 1 ? ` <span class="tr-n">${esc(many)}</span>` : ""}${
         notes ? `<span class="tr-note">${notes}</span>` : ""}</span>
-      <span class="gp">${esc(x.price)}${x.count > 1 ? "<small>each</small>" : ""}</span>
+      <span class="gp">${esc(x.price)}${x.count > 1 ? `<small>${esc(per)}</small>` : ""}</span>
     </button>`;
   }).join("") : `<p class="tr-empty">${mine.length
     ? "Nothing of that kind in your pack."
@@ -615,7 +622,7 @@ function drawDeal() {
         <span class="tr-step" role="group" aria-label="How many ${esc(x.name)}">
           <button type="button" data-act="dec" aria-label="One fewer"${
             l.n <= 1 ? " disabled" : ""}>−</button>
-          <output aria-live="polite">${esc(l.n)}</output>
+          <output aria-live="polite">${esc(x.unit ? tradeMeasure(l.n, x.unit) : l.n)}</output>
           <button type="button" data-act="inc" aria-label="One more"${
             l.n >= max ? " disabled" : ""}>+</button>
         </span>

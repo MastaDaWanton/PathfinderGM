@@ -1051,10 +1051,56 @@ def deliver(scene, actor, found, count: int = 1) -> tuple[list[dict], str]:
         return [], ""
     from .crafting import Stock
 
-    actor.add_stock(Stock(base=found.name, tier=str(getattr(found, "tier", "common")),
-                          potency=1.0, craft=str(getattr(found, "track", "") or "")),
+    actor.add_stock(lit(Stock(base=found.name, tier=str(getattr(found, "tier", "common")),
+                              potency=1.0, craft=str(getattr(found, "track", "") or ""))),
                     count * per)
     return [], ""
+
+
+# What a plain light source does when it is lit, in the light model's own document (the
+# tindertwig's core, content/rules/alchemy-formulae.json): CRB Vision and Light, the light
+# source table — "Torch: normal 20 ft, increased 40 ft, 1 hr". Playtest 2026-11-15 #78: a
+# looted torch read "for show, no effect in play" in the deal while the engine models light
+# (`Scene.light_at`) and a lit tindertwig's torch already burns through it. Lit, it is
+# spent as a tool is (`consumables`, how "light"): a torch burns one hour and is gone.
+# shortcut: the torch only; a hooded lantern burns oil (6 hours a pint, CRB) and wants a
+# fuel rule before it can be lit here.
+LIGHT_SOURCES: dict[str, dict] = {
+    "torch": {"type": "light", "radius_ft": 20, "raised_ft": 40,
+              "duration": {"amount": 1, "unit": "hour"}, "book": True,
+              "note": "a torch burns 1 hour (CRB, the light source table)"},
+}
+
+
+def lit(stock):
+    """`stock` with its light document when it is a light source and has none yet (an
+    old save's torch, a purchase, a body's pocket); anything else as it came."""
+    spec = LIGHT_SOURCES.get(str(getattr(stock, "base", "") or "").strip().lower())
+    if spec is None or getattr(stock, "specs", None):
+        return stock
+    import dataclasses
+
+    from . import effectspec
+
+    # A shelf entry's `effects` are its card's words, not an actor's effect store.
+    return dataclasses.replace(stock, specs=[dict(spec)], how=["light"],
+                               effects=[effectspec.render(dict(spec))])
+
+
+def lit_record(d) -> dict | None:
+    """An old save's torch, loaded with its light document (`sheet._migrated`); None for
+    anything else, which then loads as it was."""
+    if not isinstance(d, dict) or d.get("specs"):
+        return None
+    if str(d.get("base") or "").strip().lower() not in LIGHT_SOURCES:
+        return None
+    from .crafting import from_stock_dict
+
+    try:
+        st = lit(from_stock_dict(d))
+    except Exception:  # noqa: BLE001 — a record the loader cannot read stays as it was
+        return None
+    return st.as_dict()
 
 
 # The words a purchase is measured in and nothing else: "a coil of rope" is rope, "a loaf

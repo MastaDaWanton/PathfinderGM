@@ -481,6 +481,16 @@ def _valid_garnish(data: dict, known) -> dict | None:
     table = _table_id(item)
     if table:
         return {"kind": "table", "id": table}
+    # A thing a general store sells, whatever the adjective: "a notched whetstone" is a
+    # whetstone, at the book's 2 cp, not a "modest" trinket at 7 sp 5 cp beside the
+    # store's own whetstone (playtest 2026-11-15 #77, 37 times the price). The pack's
+    # closed vocabulary decides, by the phrase's head noun (`holding.head_of`), never the
+    # model's band.
+    from rules import goods, holding
+
+    head = holding.head_of(item)
+    if goods.good(head) is not None:
+        return {"kind": "good", "key": head}
     return {"kind": "trinket", "name": item, "band": band}
 
 
@@ -807,6 +817,15 @@ def _apply_garnish(c, p: dict) -> bool:
     if p["apply"]["kind"] == "table":
         a.carry(p["apply"]["id"], 1)
         label = p["apply"]["id"]
+    elif p["apply"]["kind"] == "good":
+        from rules import goods
+
+        good = goods.good(p["apply"]["key"])
+        if good is None:
+            return False
+        # Filed as a purchase of it would be: the store's whetstone, at its price.
+        goods.deliver(None, a, good, 1)
+        label = good.name
     else:
         from rules.crafting import Stock
 

@@ -8607,6 +8607,7 @@ def _migrated(d):
     if not isinstance(d, dict):
         return d
     from . import alchemy_migration, blacksmith, enchanter, leather_migration
+    from . import goods as goods_mod
 
     # Each migration answers None for a record that is not its own, and none claims
     # another's (`craft` "blacksmith", "enchanter", or the alchemist's: old work with
@@ -8624,7 +8625,8 @@ def _migrated(d):
     # hide's numbers gone.
     for migrate in (blacksmith.migrate_old_record, enchanter.migrate_old_record,
                     alchemy_migration.migrate_old_record,
-                    leather_migration.migrate_old_record):
+                    leather_migration.migrate_old_record,
+                    goods_mod.lit_record):
         try:
             new = migrate(d)
         except Exception:  # noqa: BLE001 — a record the migration cannot read stays as it was
