@@ -18,6 +18,7 @@ What is deliberately simple, stated so it reads as a decision:
 """
 from __future__ import annotations
 
+import logging
 import re
 
 from . import backgrounds as backgrounds_mod
@@ -25,7 +26,7 @@ from . import casting, classes as classes_mod, dice, feats as feats_mod, houseru
 from . import races as races_mod
 from . import leveling
 from .sheet import from_dict, gender_from_pronouns, pronouns_for_gender
-from .tables import ARMOUR, SKILLS, WEAPONS
+from .tables import SKILLS
 
 # The races used to be a seven-row table here. They are documents in content/races
 # now (rules/races.py), in the feat grammar, so a world's own peoples and a table's
@@ -460,7 +461,10 @@ def _world(world_id: str):
         from play import library
 
         return library.world(world_id)
+    except LookupError:                 # no such world: the shipped races
+        return None
     except Exception:
+        logging.getLogger(__name__).exception("world %r did not load for its races", world_id)
         return None
 
 
@@ -1139,7 +1143,7 @@ def _provisional(payload: dict):
     cls = classes_mod.get(cid)
     if not race:
         said = str(payload.get("race", "")).strip()
-        return (None, f"no race chosen yet" if not said else
+        return (None, "no race chosen yet" if not said else
                 f"{said!r} is not one of the races this world offers "
                 f"({', '.join(sorted(offered)[:6])}…)")
     if not cls:

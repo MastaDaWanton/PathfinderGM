@@ -10,6 +10,7 @@ and let natural 1s and 20s decide, against the live forge.
 from __future__ import annotations
 
 
+import logging
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -77,7 +78,7 @@ def _craft_materials(track_id: str) -> list[dict]:
     for p in (Path(settings.BASE_DIR) / "content" / "materials").glob("*.json"):
         try:
             data = json_mod.loads(p.read_text(encoding="utf-8"))
-        except Exception:
+        except (OSError, ValueError):
             continue
         shipped[p.stem] = {str(m.get("id", "")).strip().lower()
                            for m in data.get("materials", [])}
@@ -193,7 +194,7 @@ def _raw_track(track) -> dict:
         if path.is_file():
             try:
                 return json_mod.loads(path.read_text(encoding="utf-8"))
-            except Exception:
+            except (OSError, ValueError):
                 return {}
     return {}
 
@@ -384,7 +385,7 @@ def _narrate(messages, cfg, *, as_json=False, num_predict=220, schema=None):
         # `chat` returns a Reply, not a string — the first live forage wrote
         # "Reply(text='You push aside…', model='llama3.1:8b')" into the book verbatim.
         return reply.json() if (as_json or schema is not None) else reply.text
-    except Exception:
+    except Exception:  # noqa: BLE001 - logged with the traceback below; the caller's floor stands
         # The caller's floor still stands; the log says whether it was the model or us.
         import logging
 
@@ -518,6 +519,7 @@ def _moves_words(row: dict) -> str:
     try:
         kinds = [k for k, v in bestiary.speeds(row).items() if v]
     except Exception:
+        logging.getLogger(__name__).exception("a creature row's speeds did not read")
         kinds = []
     said = {"land": "on foot", "fly": "flies", "swim": "swims", "climb": "climbs",
             "burrow": "burrows"}
@@ -544,6 +546,7 @@ def encounter_facts(c, enc: dict, haul: list[dict], place: str, when: str) -> di
             land = geography.land_around(c.world, c.location)
             land_near = list(land.near)
     except Exception:
+        logging.getLogger(__name__).exception("the land around the forage did not read")
         land_near = []
     ground = biomes.describe(c.biome) if c.biome else ""
     return {
@@ -658,6 +661,7 @@ def _known_for_scene(c, f: dict) -> set[str]:
 
         known |= GMAgent(c.world, c.engine())._known_names()
     except Exception:
+        logging.getLogger(__name__).exception("the known names for a forage scene did not load")
         pass
     known |= {f["name"], f["place"], f["town"], *f["carried"]}
     pc = c.scene.pc()
@@ -838,7 +842,7 @@ def _sells_its_own_trade(track_id: str, pool: list) -> list:
     for p in (Path(settings.BASE_DIR) / "content" / "materials").glob("*.json"):
         try:
             data = json_mod.loads(p.read_text(encoding="utf-8"))
-        except Exception:                              # pragma: no cover - guard
+        except (OSError, ValueError):                              # pragma: no cover - guard
             continue
         shipped[p.stem] = {str(m.get("id", "")).strip().lower()
                            for m in data.get("materials", [])}

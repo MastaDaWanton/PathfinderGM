@@ -6,6 +6,7 @@ means one place to seed for tests and one place to log.
 """
 from __future__ import annotations
 
+import logging
 import random
 import re
 from dataclasses import dataclass, field
@@ -57,6 +58,7 @@ def _house_stacking() -> bool:
 
         return bool(houserules.magic_stacking())
     except Exception:
+        logging.getLogger(__name__).exception("the magic-stacking house rule did not read; the book rule stands")
         return False
 
 

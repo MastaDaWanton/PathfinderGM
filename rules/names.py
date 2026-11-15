@@ -34,7 +34,7 @@ def peoples(world) -> dict[str, str]:
     try:
         return {e.id: e.name for e in world.entities.values()
                 if str(getattr(e, "kind", "")).upper() == "PEOPLE"}
-    except Exception:
+    except (AttributeError, TypeError):
         return {}
 
 
@@ -55,7 +55,7 @@ def people_of(world, location_id: str | None) -> str | None:
         residents = [e for e in world.entities.values()
                      if str(getattr(e, "kind", "")).upper() == "CHARACTER"
                      and getattr(e, "parent_id", None) == location_id]
-    except Exception:
+    except (AttributeError, TypeError):
         residents = []
     for r in residents:
         text = " ".join(str(p) for s in (getattr(r, "sections", None) or [])
@@ -244,7 +244,7 @@ def resident_appearance(world, entity_id: str | None) -> str:
         return ""
     try:
         ent = world.get(entity_id)
-    except Exception:
+    except (AttributeError, TypeError):
         ent = None
     if ent is None:
         return ""

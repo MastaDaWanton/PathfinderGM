@@ -112,7 +112,7 @@ OPEN = """## Open rows for the owner
 def _render(spec: dict) -> str:
     try:
         line = effectspec.render(spec)
-    except Exception:
+    except Exception:  # noqa: BLE001 - a dev tool: an unrenderable spec shows its type
         line = spec.get("type", "?")
     return f"**{line}**" if materials.is_negative(spec) else line
 
@@ -137,7 +137,7 @@ def _old(path: str):
         raw = subprocess.run(["git", "show", f"{BEFORE}:{path}"], cwd=ROOT,
                              capture_output=True, check=True).stdout
         return json.loads(raw.decode("utf-8"))
-    except Exception:
+    except Exception:  # noqa: BLE001 - a dev tool: no old copy in git is None
         return None
 
 

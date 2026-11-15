@@ -2,7 +2,19 @@
 # about and another thing that can break in the frozen build, so the Ollama client is
 # stdlib urllib rather than requests, and the tests configure Django themselves rather
 # than pulling in pytest-django.
-Django>=5.0
-pytest>=8.0
-# Test-only: the suite in parallel (`python -m pytest -n 12`). Never bundled.
-pytest-xdist>=3.5
+#
+# Pinned to what the suite last passed on (2026-11-15). `>=` let a new Django major into
+# a build nobody had tested; bump a pin on purpose, then run the whole suite.
+Django==6.0.6
+pytest==9.1.1
+# Test-only: the suite in parallel (`python -m pytest -n 4`). Never bundled.
+pytest-xdist==3.8.0
+# Test-only: read by tests that check the narration schema and the bestiary's PDF sources
+# (tests/test_narration.py, tools/extract_bestiary_pdfs.py). Listed because 14 tests failed
+# in a fresh environment without them (review 2026-11-11). Never bundled.
+jsonschema==4.26.0
+pypdf==6.16.1
+# Build-only: makes the .exe (docs/packaging.md). Never bundled into itself.
+pyinstaller==6.20.0
+# Lint-only: `ruff check .` against ruff.toml. Never bundled.
+ruff==0.14.5

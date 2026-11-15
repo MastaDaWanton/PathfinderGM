@@ -2003,7 +2003,7 @@ def _layer_read_mechanics(folder: Path, raw: dict[str, dict]) -> dict[str, dict]
     for path in sorted(folder.glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - reported: files.unreadable names the file
             files.unreadable(path, exc)
             continue
         spells = data.get("spells") if isinstance(data, dict) else None
@@ -2031,29 +2031,6 @@ def _layer_read_mechanics(folder: Path, raw: dict[str, dict]) -> dict[str, dict]
                 entry["effects_read"] = True
             raw[key] = entry
     return raw
-
-
-def read_mechanics_problems() -> dict[str, list[str]]:
-    """Every hand-read spec that does not validate, by spell id.
-
-    The merge gate. Twenty agents wrote these in parallel and none of them could see
-    each other's work, so the file that proves they agreed with the schema is this one.
-    """
-    from django.conf import settings
-
-    out: dict[str, list[str]] = {}
-    folder = Path(settings.BASE_DIR) / "content" / "spells" / "mechanics"
-    if not folder.is_dir():
-        return out
-    for path in sorted(folder.glob("*.json")):
-        data = json.loads(path.read_text(encoding="utf-8"))
-        for sid, got in (data.get("spells") or {}).items():
-            found: list[str] = []
-            for spec in got.get("effects") or []:
-                found.extend(effectspec.validate(spec, str(sid)))
-            if found:
-                out[str(sid)] = found
-    return out
 
 
 def all_spells() -> dict[str, Spell]:
@@ -2092,7 +2069,7 @@ def _build_spells() -> tuple[dict[str, Spell], dict]:
                 continue                        # old id -> new id, read by `aliases()`
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - reported: files.unreadable names the file
                 files.unreadable(path, exc)
                 continue
             entries = data.get("spells") if isinstance(data, dict) else None

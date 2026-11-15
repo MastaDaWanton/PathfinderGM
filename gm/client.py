@@ -315,7 +315,7 @@ def warm(model: str, host: str, provider: str = "ollama") -> bool:
         with urllib.request.urlopen(req, timeout=600) as resp:
             resp.read()
         return True
-    except Exception:
+    except Exception:  # noqa: BLE001 - warming is best-effort; the real call reports its own failure
         return False
 
 
@@ -469,7 +469,7 @@ def chat(
             detail = ""
             try:
                 detail = exc.read().decode("utf-8", "replace")
-            except Exception:
+            except Exception:  # noqa: BLE001 - the error body is best-effort; the HTTP error is raised below
                 pass
             if exc.code == 400 and "grammar" in detail and schema:
                 def _strip(node):

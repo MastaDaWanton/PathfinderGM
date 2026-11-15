@@ -62,7 +62,7 @@ def _build_classes() -> dict[str, dict]:
         for path in sorted(folder.glob("*.json")):
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - reported: files.unreadable names the file
                 files.unreadable(path, exc)
                 continue
             entries = data.get("classes") if isinstance(data, dict) else None
@@ -158,7 +158,7 @@ def _build_npc_classes() -> dict[str, dict]:
         for path in sorted(folder.glob("*.json")):
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - reported: files.unreadable names the file
                 files.unreadable(path, exc)
                 continue
             key = str(data.get("id") or "").strip().lower() if isinstance(data, dict) else ""
@@ -284,7 +284,7 @@ def _build_catalogues() -> dict[str, dict]:
         for path in sorted(folder.glob("*.json")):
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - reported: files.unreadable names the file
                 files.unreadable(path, exc)
                 continue
             if not isinstance(data, dict):
@@ -402,11 +402,6 @@ def chosen_ids(actor, choice_id: str) -> list[str]:
     """The ids `chosen` returns, in pick order (repeats kept: a favoured enemy raised twice
     appears twice in "favored enemy bonus")."""
     return [p["id"] for p in chosen(actor, choice_id)]
-
-
-def has_chosen(actor, choice_id: str, entry_id: str) -> bool:
-    """Whether this character took this entry under this choice."""
-    return _norm(entry_id) in chosen_ids(actor, choice_id)
 
 
 # --- what is owed, and judging a pick ------------------------------------------------------

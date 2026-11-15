@@ -28,6 +28,7 @@ never wrote, which is the failure `CLAUDE.md` files under "ground every name".
 """
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, replace
 
@@ -962,6 +963,7 @@ def the_land(campaign) -> str:
     try:
         land = geography.land_around(world, place)
     except Exception:
+        logging.getLogger(__name__).exception("the land around the start did not read")
         return ""
     near = [g for g in land.near if g != "coast"]
     coast = "coast" in land.near or land.coast
@@ -985,6 +987,7 @@ def the_spot(campaign, here: Situation) -> str:
     try:
         spot = places_mod.find(campaign.engine().places(), campaign.scene.at)
     except Exception:
+        logging.getLogger(__name__).exception("the starting spot did not resolve")
         spot = None
     if here.start_id and spot is not None and outside_start(campaign):
         # A road start is described as the road and the land, not as a room: the owner's

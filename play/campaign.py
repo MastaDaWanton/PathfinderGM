@@ -18,7 +18,6 @@ from pathlib import Path
 from django.conf import settings
 
 from pathfindergm import files
-from rules import biomes
 from rules.bestiary import instantiate
 from rules.dice import Dice
 from rules.engine import BloodPool, Engine, Manifestation, Scene, Ward
@@ -1170,7 +1169,7 @@ def _restore_from_backup(path: Path, why: Exception) -> Campaign | None:
     for backup in files.backups(path, keep=BACKUPS_KEPT):
         try:
             c = Campaign.load(backup)
-        except Exception:
+        except Exception:  # noqa: BLE001 - a backup that does not read is skipped for the next
             continue
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         aside = path.with_name(f"{path.name}.unreadable-{stamp}")

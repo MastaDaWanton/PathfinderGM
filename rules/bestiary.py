@@ -201,16 +201,6 @@ def speeds(doc: dict) -> dict[str, int]:
     return out
 
 
-def fly_grade(doc: dict) -> str:
-    """The manoeuvrability written beside a fly speed, or "" — "average" when a creature
-    flies and does not say, which is the Bestiary's own default."""
-    note = str((doc or {}).get("speed_note") or "")
-    found = _FLY_GRADE.search(note)
-    if found:
-        return found.group(1).lower()
-    return "average" if _SPEED_MODE.search(note) and "fly" in note.lower() else ""
-
-
 def split_collective_name(name: str) -> tuple[int, str]:
     """"pair of guards" is two guards, not one creature with a plural name.
 
@@ -766,7 +756,7 @@ def _build_imported(printed_only: bool = False) -> dict[str, dict]:
                 continue
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - reported: files.unreadable names the file
                 files.unreadable(path, exc)
                 continue
             entries = data.get("creatures") if isinstance(data, dict) else None
@@ -822,7 +812,7 @@ def _people(out: dict[str, dict], folders) -> None:
                 continue
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - reported: files.unreadable names the file
                 files.unreadable(path, exc)
                 continue
             for doc in (data.get("builds") if isinstance(data, dict) else None) or []:

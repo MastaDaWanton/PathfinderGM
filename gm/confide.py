@@ -104,7 +104,7 @@ _STOP = frozenset({
     "again", "still", "same", "own", "see", "get", "got", "find", "take", "keep", "kept",
     "let", "the", "and", "for", "not", "one", "who", "two", "all", "any", "can", "out",
     "way", "day", "year", "years", "time", "come", "came", "goes", "went", "gone", "anyone",
-    "worth", "real", "actually", "nothing", "anything", "else", "able", "lot", "bit",
+    "worth", "real", "nothing", "anything", "else", "able", "lot", "bit",
 })
 
 

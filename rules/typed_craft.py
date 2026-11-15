@@ -43,7 +43,7 @@ mastery and the first-work bonuses have one copy each.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Callable, ClassVar
 
 from . import worldclass as wc
 from . import words as english
@@ -248,7 +248,6 @@ class Blacksmith:
     # --- the next step of the chain ------------------------------------------------------
     def next_step(self, engine, actor, target: Target, done: list) -> Step | Refusal | None:
         from . import blacksmith as bs
-        from . import goods
 
         if any(d.get("final") and d.get("made") for d in done):
             return None
@@ -260,7 +259,7 @@ class Blacksmith:
                            "field kit in the pack.", "no_forge")
         progress = actor.track(self.track)
         info, want = target.data["info"], target.data.get("metal") or ""
-        shape, gear = info["id"], info["gear"]
+        shape = info["id"]
         items = bs.rack(actor)
         name = info["name"].lower()
 
@@ -481,7 +480,7 @@ class Herbalist:
 
     track = "herbalist"
     # Each base product, by the catalogue's own id, and the methods that make it.
-    CHAINS = {"infusion": ("brew",), "decoction": ("brew",), "powder": ("grind",),
+    CHAINS: ClassVar[dict] = {"infusion": ("brew",), "decoction": ("brew",), "powder": ("grind",),
               "salve-base": ("grind",), "poultice": ("grind", "mix")}
 
     def _products(self) -> dict[str, str]:
@@ -576,8 +575,6 @@ class Herbalist:
             want = crafting.product_row(form).get("name", form)
             return Refusal(f"{crafting._lead_name(m)} makes {_a(str(got).lower())} by "
                            f"{method}, not {_a(str(want).lower())}.", "cannot_craft")
-        name = crafting.product_row(plan.form).get("name", plan.form or "")
-
         def settle(made: bool, margin: int, quality: int | None = None) -> dict:
             now = int(engine.scene.clock_minutes or 0)
             if made:

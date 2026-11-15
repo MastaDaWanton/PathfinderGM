@@ -330,7 +330,7 @@ def recall(world_entity_id: str) -> dict | None:
         return None
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, ValueError):
         return None
     return data if isinstance(data, dict) and data.get("creature") else None
 
@@ -349,7 +349,7 @@ def remembered() -> dict[str, dict]:
     for path in sorted(_dir().glob("*.json")) if _dir().is_dir() else []:
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - reported: files.unreadable names the file
             files.unreadable(path, exc)
             continue
         if isinstance(data, dict):

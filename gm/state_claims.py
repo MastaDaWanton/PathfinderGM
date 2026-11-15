@@ -363,7 +363,7 @@ def _holding(actor) -> str | None:
     key = (actor.equipped or "unarmed").strip().lower()
     try:
         w = actor.weapon(key)
-    except Exception:  # an unknown name is still something held
+    except Exception:  # an unknown name is still something held  # noqa: BLE001
         return key if key != "unarmed" else None
     if w.get("granted_by"):
         return str(w.get("name") or key).lower()

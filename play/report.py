@@ -37,6 +37,7 @@ read, change or throw away.
 """
 from __future__ import annotations
 
+import logging
 import io
 import json
 import os
@@ -123,6 +124,7 @@ def _secrets() -> dict[str, str]:
 
         out.update({v: redact.KEY for v in modelcfg.keys().values()})
     except Exception:
+        logging.getLogger(__name__).exception("the report could not collect the model keys to redact")
         pass
     key = _read_text(data_root() / "secret.key")
     if key and key.strip():
@@ -133,6 +135,7 @@ def _secrets() -> dict[str, str]:
         if lan.token():
             out[lan.token()] = "(the pass)"
     except Exception:
+        logging.getLogger(__name__).exception("the report could not collect the LAN pass to redact")
         pass
     return out
 
@@ -183,7 +186,7 @@ def models() -> dict:
 
         roles = modelcfg.roles()
         keyed = sorted(modelcfg.keys())
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - reported: the error goes in the report
         return {"error": f"{type(exc).__name__}: {exc}"}
     return {
         "roles": {role: {"provider": cfg.get("provider", ""),
@@ -207,7 +210,7 @@ def _ollama(roles: dict, probe: bool) -> dict:
 
         host = modelcfg.roles().get("narrator", {}).get("host") or "http://localhost:11434"
         found = ask(host, timeout=2)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - reported: the error goes in the report
         return {"asked": True, "error": f"{type(exc).__name__}: {exc}"}
     return {"asked": True, "reachable": found.reachable, "installed": list(found.installed),
             "why": found.why}
@@ -221,7 +224,7 @@ def system() -> dict:
         out["windows"] = f"{release} {build}".strip()
         try:
             out["windows_edition"] = platform.win32_edition()
-        except Exception:
+        except Exception:  # noqa: BLE001 - the Windows edition is a nicety in the report
             pass
     return out
 
@@ -247,6 +250,7 @@ def _campaign() -> tuple[str, Path] | None:
         cid = campaign_mod.active_id()
         path = files.child(Path(settings.CAMPAIGN_DIR), cid)
     except Exception:
+        logging.getLogger(__name__).exception("the report could not find the active campaign")
         return None
     return (cid, path) if path.is_file() else None
 
@@ -374,7 +378,7 @@ def _build() -> str:
 
         # A working copy asks git on a thread; a second is plenty, and frozen it is a file.
         return version.build(wait=1.0)
-    except Exception:
+    except Exception:  # noqa: BLE001 - the build is reported as unknown
         return "unknown"
 
 

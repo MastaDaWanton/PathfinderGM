@@ -26,6 +26,7 @@ grant like anything else without a line changing here.
 """
 from __future__ import annotations
 
+import logging
 import re
 
 from . import classes as classes_mod
@@ -76,6 +77,7 @@ def control_blood(actor) -> dict:
         features = classes_mod.features_at(getattr(actor, "char_class", "") or "",
                                            int(getattr(actor, "level", 1) or 1))
     except Exception:
+        logging.getLogger(__name__).exception("a class's features did not read for control blood")
         return reached
     for feature in features:
         m = re.fullmatch(r"control blood\s*(\d+)\s*([ab])", str(feature).strip().lower())
@@ -369,6 +371,7 @@ def resolve_effect(spec: dict, actor, path: str = "") -> dict:
         try:
             out["amount"] = resources.evaluate(spec["formula"], actor)
         except Exception:
+            logging.getLogger(__name__).exception("a level effect's formula did not evaluate; marked inactive")
             out["inactive"] = True
     return out
 

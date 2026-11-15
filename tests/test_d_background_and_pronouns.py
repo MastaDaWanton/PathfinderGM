@@ -137,7 +137,7 @@ def test_the_brief_states_pronouns_that_are_set(worlds):
     s, e = _market(worlds)
     d = _drenn(s, "man")
     brief = _brief(worlds, s, e)
-    assert f"SPEAK OF THEM AS" in brief and f"{d.name} ({d.ref}) he/him" in brief
+    assert "SPEAK OF THEM AS" in brief and f"{d.name} ({d.ref}) he/him" in brief
     other = _drenn(s)
     assert f"{other.name} ({other.ref})" not in brief.split("SPEAK OF THEM AS")[1] \
         .split("\n")[0]

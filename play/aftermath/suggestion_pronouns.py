@@ -30,7 +30,7 @@ _OBJECT_NEXT = frozenset({
     "what", "where", "why", "how", "who", "whether", "if", "to", "for", "about", "and",
     "or", "a", "an", "the", "that", "this", "again", "directly", "once", "more", "some",
     "any", "in", "on", "at", "with", "by", "from", "out", "up", "down", "back", "away",
-    "off", "over", "into", "if", "when", "while", "as", "so", "but", "too", "now", "then",
+    "off", "over", "into", "when", "while", "as", "so", "but", "too", "now", "then",
     "here", "there", "anything", "something", "everything", "nothing", "one", "my",
 })
 

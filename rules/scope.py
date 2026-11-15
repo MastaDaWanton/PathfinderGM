@@ -302,7 +302,7 @@ def elsewhere_by_name(scene, said: list[str], location_id: str | None, world) ->
     town = None
     try:
         town = world.get(location_id) if world is not None and location_id else None
-    except Exception:
+    except (AttributeError, TypeError):
         town = None
     town_name = str(getattr(town, "name", "") or "")
     in_town = (bool(at) and places_mod.location_of(at) == (location_id or "")
@@ -387,7 +387,7 @@ def look_for(world, phrase: str, scene=None, location_id: str | None = None, *,
     town = None
     try:
         town = world.get(location_id) if location_id else None
-    except Exception:
+    except (AttributeError, TypeError):
         town = None
     town_name = str(getattr(town, "name", "") or "")
 
@@ -407,7 +407,7 @@ def look_for(world, phrase: str, scene=None, location_id: str | None = None, *,
         try:
             parent = world.get(getattr(who, "parent_id", None))
             where = str(getattr(parent, "name", "") or "")
-        except Exception:
+        except (AttributeError, TypeError):
             where = ""
         role = _role_of(who)
         named = f"{who.name}" + (f", {role}" if role else "")

@@ -42,7 +42,7 @@ def sources() -> dict[str, collections.Counter]:
             continue
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - a dev tool: printed
             print(f"  ! {rel}: unreadable ({exc})")
             continue
         rows = data.get(key) if isinstance(data, dict) else data

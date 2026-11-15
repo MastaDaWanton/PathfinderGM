@@ -145,7 +145,7 @@ def lint_set(docs: dict[str, dict]) -> list[str]:
 def lint_file(path: Path) -> list[str]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as ex:
+    except Exception as ex:  # noqa: BLE001 - a dev tool: reported
         return [f"{path}: not JSON — {ex}"]
     entries = data.get("schemes") if isinstance(data, dict) and "schemes" in data else [data]
     docs = {str(e.get("id")): e for e in entries or [] if isinstance(e, dict) and e.get("id")}

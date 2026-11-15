@@ -754,22 +754,6 @@ def making_cost(row_or_fid, *, caster_level: int | None = None) -> float:
     return round((book_price(row, caster_level=caster_level) or 0.0) * making_fraction(row), 2)
 
 
-def spent_worth(spent) -> float:
-    """What the inputs a step used up are worth, in gold: {material id: units}. A found or
-    harvested material that no counter sells (no `price_gp`) is still worth its rung on the
-    ladder (`worth`), so gathering saves a little; a catalyst or apparatus is never spent,
-    and the caller leaves it out."""
-    from . import materials
-
-    total = 0.0
-    for mid, n in dict(spent or {}).items():
-        doc = materials.alchemy_doc(str(mid))
-        if doc is None:
-            continue
-        total += worth(doc) * max(0.0, float(n or 0))
-    return round(total, 2)
-
-
 def coin_to_make(row_or_fid, spent_gp: float = 0.0, *, caster_level: int | None = None) -> float:
     """The coin Bottle takes for a formula product, in gold: the book's making cost less
     what the spent inputs are worth, never below nothing. A house compound (no formula)

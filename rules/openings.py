@@ -40,6 +40,7 @@ digit is refused with the fix named (`validate`).
 """
 from __future__ import annotations
 
+import logging
 import json
 import random
 import re
@@ -187,7 +188,7 @@ def all_starts() -> dict[str, dict]:
         for path in sorted(folder.glob("*.json")):
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - reported: files.unreadable names the file
                 files.unreadable(path, exc)
                 continue
             entries = data.get("starts") if isinstance(data, dict) else None
@@ -524,6 +525,7 @@ def towns(world) -> list:
             if not places_mod.spots_for(e):
                 continue
         except Exception:
+            logging.getLogger(__name__).exception("a town's places did not derive; it is not offered as a start")
             continue
         out.append(e)
     if not out:
@@ -571,6 +573,7 @@ def _ring_of(world, town) -> tuple:
 
         return tuple(outskirts.ring(world, town))
     except Exception:
+        logging.getLogger(__name__).exception("a town's outskirts did not derive")
         return ()
 
 
@@ -618,6 +621,7 @@ def _has_water(world, town, labels: set[str]) -> bool:
         land = geography.land_around(world, town)
         return bool(land.coast or land.water)
     except Exception:
+        logging.getLogger(__name__).exception("a town's water did not read")
         return False
 
 
@@ -1144,7 +1148,6 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
             level = int(getattr(pc, "level", 1) or 1)
             party = encounter_budget.party_apl(scene)
             label, count, template = str(step.get("label")), count_of(step), ""
-            got_land_row = None
             if str(step.get("from") or "") == "land":
                 # What this ground holds, at the party's level (`foes_from_the_land`):
                 # the owner's caravan under attack is attacked by the land it crosses.
@@ -1154,7 +1157,6 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
                                               rng_for(story_seed, f"foes:{slot}"))
                 if got_land is not None:
                     row, count = got_land
-                    got_land_row = row
                     template = str(row.get("id") or "")
                     label = "the " + creature_noun(str(row.get("name") or template))
             if not template:

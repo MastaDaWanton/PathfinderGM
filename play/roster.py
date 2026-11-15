@@ -11,9 +11,10 @@ only record of it.
 """
 from __future__ import annotations
 
+import logging
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -99,7 +100,7 @@ class Entry:
         }
         try:
             a = self.actor
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - reported: the card shows why the character is unreadable
             # Every key a caller or template reads, so an unreadable character produces a
             # card rather than a KeyError one frame later — which would move the crash
             # rather than fix it. The reason is shown: a player who cannot see why cannot
@@ -154,7 +155,7 @@ def load(character_id: str) -> Entry | None:
         return None
     try:
         d = json.loads(p.read_text(encoding="utf-8"))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - reported: files.unreadable names the file
         files.unreadable(p, exc)    # named: a character that vanished from the shelf
         return None
     # Only NEWER is refused — the rule `Campaign.load` already learned. Written `!=`
@@ -311,6 +312,7 @@ def pregens() -> list[dict]:
             data = json.loads(p.read_text(encoding="utf-8"))
             actor = from_dict(data, ref="pc")
         except Exception:
+            logging.getLogger(__name__).exception("a shipped pregen did not load and is left off the list")
             continue
         cls = actor.class_data.get("name", "")
         out.append({

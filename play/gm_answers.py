@@ -40,6 +40,7 @@ cut. That house rule existed with no reader anywhere in the app until this file.
 """
 from __future__ import annotations
 
+import logging
 import re
 
 from rules import cards as cards_mod
@@ -504,6 +505,7 @@ def _look_up(c, engine, question: str) -> tuple[str, list[str]]:
             try:
                 got = finder(c, engine, term, bool(hint))
             except Exception:
+                logging.getLogger(__name__).exception("a /gm finder raised; the next one is tried")
                 got = []
             if got:
                 return term, got
@@ -657,6 +659,7 @@ def _index(kind, build):
         try:
             _INDEX[kind] = build()
         except Exception:
+            logging.getLogger(__name__).exception("a /gm index did not build")
             _INDEX[kind] = {}
     return _INDEX[kind]
 

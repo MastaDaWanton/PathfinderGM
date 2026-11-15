@@ -55,7 +55,7 @@ def _count(name: str, key: str) -> int:
     for path in folder(name).glob("*.json"):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - reported: files.unreadable names the file
             files.unreadable(path, exc)
             continue
         if isinstance(data, dict) and isinstance(data.get(key), list):
@@ -290,7 +290,7 @@ def rows_for(bench_id: str) -> list[dict]:
     for path in sorted(folder(bench.dir).glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - reported: the row says the file is unreadable
             rows.append({"name": path.name, "kind": "yours", "note": f"unreadable: {exc}",
                          "mine": True})
             continue

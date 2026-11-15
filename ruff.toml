@@ -1,0 +1,18 @@
+# The rule set the 2026-11-11 Python review found real things with (F, B, BLE, RUF012),
+# and nothing stylistic. Run: `ruff check .` (ruff is a dev tool, never bundled).
+target-version = "py313"
+extend-exclude = ["reference", "fixtures", "content", "electron", "docs"]
+
+[lint]
+select = ["E9", "F", "B", "BLE", "RUF012"]
+ignore = [
+    "B905",   # zip() without strict=: style; the pairs zipped here are built together
+    "B007",   # unused loop variable: style
+    "B023",   # loop variable in a closure: every one read in 2026-11 is consumed in the
+              # same iteration (review §4); ruff cannot see that, so it is not a signal here
+]
+
+[lint.per-file-ignores]
+# Fixtures are imported for pytest to find by name, which F401/F811 read as unused and
+# redefined; a test may catch anything it is asserting about.
+"tests/**" = ["F401", "F811", "F841", "BLE", "B017", "RUF012"]

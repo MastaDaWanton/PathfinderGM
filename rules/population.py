@@ -26,6 +26,7 @@ the life, and when the player last met them.
 """
 from __future__ import annotations
 
+import logging
 import re
 
 from . import lives
@@ -1058,6 +1059,7 @@ def _place_name(place_id: str, scene, world=None) -> str:
         place = places_mod.find(known, place_id)
         return str(getattr(place, "name", "") or "")
     except Exception:
+        logging.getLogger(__name__).exception("a place could not be named")
         return ""
 
 

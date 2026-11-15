@@ -341,7 +341,7 @@ def pull(model: str, host: str = "", timeout: int = 60):
         detail = ""
         try:
             detail = json.loads(exc.read().decode("utf-8")).get("error", "")
-        except Exception:
+        except Exception:  # noqa: BLE001 - the refusal's detail is best-effort; the refusal is said
             pass
         yield {"error": detail or f"Ollama refused the pull ({exc.code}). "
                                   f"Check the model name."}
@@ -504,22 +504,25 @@ def signature_of(path: Path) -> tuple[bool, str]:
     from ctypes import wintypes
 
     class GUID(ctypes.Structure):
-        _fields_ = [("Data1", wintypes.DWORD), ("Data2", wintypes.WORD),
-                    ("Data3", wintypes.WORD), ("Data4", ctypes.c_byte * 8)]
+        _fields_ = [  # noqa: RUF012 - ctypes reads this list, never mutates it
+            ("Data1", wintypes.DWORD), ("Data2", wintypes.WORD),
+            ("Data3", wintypes.WORD), ("Data4", ctypes.c_byte * 8)]
 
     class FileInfo(ctypes.Structure):
-        _fields_ = [("cbStruct", wintypes.DWORD), ("pcwszFilePath", wintypes.LPCWSTR),
-                    ("hFile", wintypes.HANDLE), ("pgKnownSubject", ctypes.c_void_p)]
+        _fields_ = [  # noqa: RUF012 - ctypes reads this list, never mutates it
+            ("cbStruct", wintypes.DWORD), ("pcwszFilePath", wintypes.LPCWSTR),
+            ("hFile", wintypes.HANDLE), ("pgKnownSubject", ctypes.c_void_p)]
 
     class TrustData(ctypes.Structure):
-        _fields_ = [("cbStruct", wintypes.DWORD), ("pPolicyCallbackData", ctypes.c_void_p),
-                    ("pSIPClientData", ctypes.c_void_p), ("dwUIChoice", wintypes.DWORD),
-                    ("fdwRevocationChecks", wintypes.DWORD),
-                    ("dwUnionChoice", wintypes.DWORD),
-                    ("pFile", ctypes.POINTER(FileInfo)),
-                    ("dwStateAction", wintypes.DWORD), ("hWVTStateData", wintypes.HANDLE),
-                    ("pwszURLReference", wintypes.LPCWSTR), ("dwProvFlags", wintypes.DWORD),
-                    ("dwUIContext", wintypes.DWORD), ("pSignatureSettings", ctypes.c_void_p)]
+        _fields_ = [  # noqa: RUF012 - ctypes reads this list, never mutates it
+            ("cbStruct", wintypes.DWORD), ("pPolicyCallbackData", ctypes.c_void_p),
+            ("pSIPClientData", ctypes.c_void_p), ("dwUIChoice", wintypes.DWORD),
+            ("fdwRevocationChecks", wintypes.DWORD),
+            ("dwUnionChoice", wintypes.DWORD),
+            ("pFile", ctypes.POINTER(FileInfo)),
+            ("dwStateAction", wintypes.DWORD), ("hWVTStateData", wintypes.HANDLE),
+            ("pwszURLReference", wintypes.LPCWSTR), ("dwProvFlags", wintypes.DWORD),
+            ("dwUIContext", wintypes.DWORD), ("pSignatureSettings", ctypes.c_void_p)]
 
     # WINTRUST_ACTION_GENERIC_VERIFY_V2
     guid = GUID(0x00AAC56B, 0xCD44, 0x11D0,
@@ -538,7 +541,7 @@ def signature_of(path: Path) -> tuple[bool, str]:
         rc = wintrust.WinVerifyTrust(None, ctypes.byref(guid), ctypes.byref(data))
         data.dwStateAction = 2       # WTD_STATEACTION_CLOSE, always, or the handle leaks
         wintrust.WinVerifyTrust(None, ctypes.byref(guid), ctypes.byref(data))
-    except Exception:
+    except Exception:  # noqa: BLE001 - anything ctypes raises reads as unsigned: refused, never run
         return False, ""
     if rc != 0:
         return False, ""

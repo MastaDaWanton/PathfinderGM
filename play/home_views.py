@@ -13,7 +13,7 @@ import json
 import re
 
 from django.http import JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
@@ -134,7 +134,7 @@ def import_world(request):
         return JsonResponse({"error": str(exc)}, status=400)
     except ValueError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - reported: the player gets the reason in the 400
         return JsonResponse(
             {"error": f"{upload.name} could not be read as a world: {exc}"}, status=400)
     return JsonResponse({"ok": True, "world": card.as_dict()})
@@ -192,8 +192,6 @@ def start_in_world(request):
     campaign already carried `world_source` and already loaded its world from it; the
     setting was only ever the *default*, and it is passed explicitly now.
     """
-    from django.conf import settings
-    from pathlib import Path
 
     body = read_body(request)
     world_id = str(body.get("world", "")).strip()
@@ -428,7 +426,7 @@ def save_thing(request, bench_id: str):
     if path.exists():
         try:
             entry = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
+        except (OSError, ValueError):
             entry = {}
     entry.update({"id": slug, "name": name})
     if kind:
@@ -498,11 +496,6 @@ def spell_detail(request, spell_id: str):
         return JsonResponse(spells.get(spell_id).as_dict())
     except KeyError as exc:
         return JsonResponse({"error": str(exc)}, status=404)
-
-
-@require_GET
-def to_table(request):
-    return redirect("table")
 
 
 @require_GET
@@ -576,7 +569,7 @@ def import_races(request):
         world = library.world(world_id)
     except LookupError as exc:
         return JsonResponse({"error": str(exc)}, status=404)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - reported: the player gets the reason in the 400
         return JsonResponse({"error": f"{world_id}: {exc}"}, status=400)
     written = races_mod.import_from_world(world, overwrite=bool(body.get("overwrite")))
     offered = [d["name"] for d in races_mod.from_world(world)]

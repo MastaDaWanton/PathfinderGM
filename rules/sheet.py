@@ -15,6 +15,7 @@ import functools
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import TYPE_CHECKING, ClassVar
 
 import re
 
@@ -22,10 +23,16 @@ from . import goods
 from . import houserules
 from . import troops as _troops
 from .activeeffect import ActiveEffect
+
+if TYPE_CHECKING:   # annotation names only: each of these imports the sheet back
+    from .compulsion import Compulsion
+    from .crafting import Stock
+    from .resources import Pool
+    from .worldclass import Progress
 from .dice import Modifier, stack
 from .tables import (
     ABILITIES, ABILITY_FULL, ABILITY_NAMES, ARMOUR, ARMOUR_SPEED,
-    CLASSES, CONDITIONS, FEAT_TARGET_RE, LETHALITY_SWAP_PENALTY,
+    CONDITIONS, FEAT_TARGET_RE, LETHALITY_SWAP_PENALTY,
     MANEUVERS, NON_PROFICIENT_PENALTY, SAVE_ABILITY, SAVES, SHIELDS, SIZES, SKILLS,
     SLOT_ORDER_LEFT, SLOT_ORDER_RIGHT, SLOT_RULES_LIMIT, SLOTS,
     WEAPONS, ENERGY_DAMAGE, ENERGY_VS_OBJECTS_HALVED, ability_modifier, bab_for,
@@ -1033,7 +1040,6 @@ class Actor:
         must be the suit `armour` names.
         """
         from . import forge_items
-        from . import armour as armour_mod
 
         if self.armour in ("", "none", None):
             return None
@@ -1067,7 +1073,6 @@ class Actor:
         Wave 1 refused a forged shield with a sentence ("forged shields cannot be carried
         into a fight yet") although the bench made them (contracts §12 item 6)."""
         from . import forge_items
-        from . import armour as armour_mod
 
         if self.shield in ("", "none", None):
             return None
@@ -1091,16 +1096,6 @@ class Actor:
         if rec is None:
             return base
         return forge_items.armour_row(base, self._live_build(rec))
-
-    def _armour_build_specs(self, kind: str) -> list[dict]:
-        """The worn forged suit's specs of one type — its DR, its resistances."""
-        from . import forge_items
-
-        rec = self.armour_record()
-        if rec is None:
-            return []
-        return [s for s in forge_items.roll_specs(self._live_build(rec))
-                if str(s.get("type") or "") == kind]
 
     def wielded_record(self) -> dict | None:
         """The crafted weapon record in hand, or None."""
@@ -1809,7 +1804,7 @@ class Actor:
     # The executor's clock is rounds: a disease's "1/day" waits 14,400 of them, which a
     # stretch of time spends in one subtraction (`Scene.advance` passes the stretch's
     # rounds), never 14,400 iterations.
-    AFFLICTION_ROUNDS = {"round": 1, "minute": 10, "hour": 600, "day": 14400,
+    AFFLICTION_ROUNDS: ClassVar[dict] = {"round": 1, "minute": 10, "hour": 600, "day": 14400,
                          "week": 100800}
 
     def take_affliction(self, aff: dict, *, name: str, source: str, origin: str,
@@ -7438,7 +7433,7 @@ _CHOOSE_PAGE = 60
 
 def _choosable(actor: Actor) -> list[dict]:
     """Every spell this caster may prepare or learn right now, by level."""
-    from . import casting, spells as spells_mod
+    from . import casting
 
     out = []
     reach = casting.highest_spell_level(actor)
@@ -8399,10 +8394,6 @@ def _castable_summary(actor: Actor) -> list[dict]:
     """
     from . import casting
 
-    try:
-        data = casting.profile(actor) if hasattr(casting, "profile") else None
-    except Exception:                                   # pragma: no cover - guard
-        data = None
     book = list(getattr(actor, "spellbook", None) or [])
     prepared = dict(getattr(actor, "prepared", None) or {})
     if not book and not prepared:
@@ -8421,9 +8412,8 @@ def _castable_summary(actor: Actor) -> list[dict]:
 
             spell = spells_mod.get(sid)
             name, summary = spell.name, spell.line
-            level = casting.spell_level_for(actor, spell)
-        except Exception:
-            name, summary, level = sid, "", None
+        except KeyError:
+            name, summary = sid, ""
         # Cantrips too, since 2026-09-29: a prepared caster casts the cantrips prepared
         # today, at will, and not the rest of the book (`casting.at_will`).
         if kind == "prepared" and not left:

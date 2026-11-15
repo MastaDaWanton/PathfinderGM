@@ -82,7 +82,7 @@ _NOT_A_NAME = {
     "you", "your", "yours", "he", "she", "it", "they", "him", "her", "them", "his",
     "hers", "its", "their", "there", "here", "this", "that", "these", "those", "what",
     "who", "whom", "why", "how", "then", "than", "now", "not", "no", "yes", "one", "two",
-    "three", "his", "someone", "something", "nothing", "nobody", "anyone", "everyone",
+    "three", "someone", "something", "nothing", "nobody", "anyone", "everyone",
     "i", "we", "us", "our", "my", "me", "mine",
     # Days, and the handful of common capitalised nouns that show up in rules prose.
     "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
@@ -3230,7 +3230,6 @@ def misgendered_tokens(text: str, pc_name: str, pronouns: str,
     wrong = {w for fam, words in _PRONOUN_SETS.items()
              if fam != family and fam != "they" for w in words}
     names = [n for n in others if n and n.lower() != pc_name.lower()]
-    first = pc_name.split()[0]
     # A window of characters around the name, not a sentence. `_SENTENCE` splits on
     # "!", so the line that prompted this - "It's him! Thessaly Corr!" - puts the
     # pronoun and the name in two different sentences, and a per-sentence rule sees

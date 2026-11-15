@@ -817,8 +817,6 @@ def escape(engine, intent, actor, how: str, partial: dict):
     or force — Strength against the door), or out of the escort's hands on the walk (Escape
     Artist or a combat manoeuvre against the best CMD among them). None when not in custody
     at a stage an escape means anything."""
-    from .dice import d20_succeeds
-    from .engine import Outcome
 
     held = custody(actor) if actor is not None and actor.is_pc else None
     if held is None:

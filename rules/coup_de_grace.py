@@ -52,6 +52,7 @@ read either: an incorporeal creature is refused whatever the weapon.
 """
 from __future__ import annotations
 
+import logging
 import re
 
 # "DC 10 + damage dealt". The damage the defender actually lost, after DR and
@@ -91,6 +92,7 @@ def _doc_of(defender) -> dict:
         try:
             return getter() or {}
         except Exception:
+            logging.getLogger(__name__).exception("a creature document did not read")
             return {}
     return {}
 

@@ -96,7 +96,7 @@ class Http:
 def j(raw: bytes) -> dict:
     try:
         return json.loads(raw)
-    except Exception:
+    except Exception:  # noqa: BLE001 - a dev tool: not JSON is reported as such
         return {"_not_json": raw[:120].decode(errors="replace")}
 
 
@@ -983,7 +983,7 @@ def main() -> None:
                 s, _b = http.get("/")
                 if s == 200:
                     break
-            except Exception:
+            except Exception:  # noqa: BLE001 - a dev tool: retried until the exe answers
                 pass
             time.sleep(1)
         else:
@@ -1019,7 +1019,7 @@ def main() -> None:
             try:
                 if http2.get("/")[0] == 200:
                     break
-            except Exception:
+            except Exception:  # noqa: BLE001 - a dev tool: retried until the exe answers
                 pass
             time.sleep(1)
         check_it_survived_the_restart(http2)

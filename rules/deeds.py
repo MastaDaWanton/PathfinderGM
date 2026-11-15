@@ -45,9 +45,9 @@ suspension for the player's d20. Never prose. The harvest is the one direct door
 """
 from __future__ import annotations
 
+import logging
 import functools
 import json
-import logging
 import re
 from pathlib import Path
 
@@ -255,7 +255,7 @@ def _witnesses(scene, actor, subject, unseen: bool) -> list[str]:
             continue
         try:
             awake = scene.conscious(ref)
-        except Exception:
+        except AttributeError:
             awake = not getattr(a, "is_down", False)
         if not awake:
             continue
@@ -275,6 +275,7 @@ def _place_name(place: str, scene) -> str:
 
         return population._place_name(place, scene) or ""
     except Exception:
+        logging.getLogger(__name__).exception("a deed's place could not be named")
         return ""
 
 
@@ -410,7 +411,7 @@ def before(engine) -> dict:
     no attitude, a cure lifts dying — so the reader asks this, taken on the intent's first
     entry and kept through a suspension for the player's d20 (`partial["deeds_before"]`,
     the pattern `attack_state["seen"]` uses). JSON-safe, since a suspension is saved."""
-    from . import attitude, population, states
+    from . import attitude, states
 
     scene = engine.scene
     pc = scene.pc()
@@ -468,6 +469,7 @@ def _recorder(engine, pc, out: list):
     try:
         here = engine._place_name(scene.at) if getattr(scene, "at", None) else ""
     except Exception:
+        logging.getLogger(__name__).exception("the deed recorder could not name the place")
         here = ""
 
     def rec(tag, subject, *, how="meant", what="", unseen=False, name=None, manner=""):
@@ -561,6 +563,7 @@ def _acts(engine, pc, intent, outcome, before_: dict) -> list[dict]:
             try:
                 name = engine._place_name(house)
             except Exception:
+                logging.getLogger(__name__).exception("a break-in's house could not be named")
                 name = ""
             rec("deed.trespass", house, name=name or "a house")
             continue
@@ -710,6 +713,7 @@ def _shown(row: dict, n: int) -> dict:
     try:
         phase = sky.phase_at(minute)["phase"]
     except Exception:
+        logging.getLogger(__name__).exception("the sky phase for a deed did not read")
         phase = ""
     return {"n": n, "day": day_of(minute), "phase": phase,
             "where": str(row.get("place_name") or ""), "said": said_of(row),

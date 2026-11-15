@@ -1902,7 +1902,7 @@ def finish(actor, progress, plan: StepPlan, tier: int, *, engine=None, now: int 
     """Land a step whose roll succeeded (or a Bind that took, flawed): spend, make, pay.
 
     Returns {"products", "lines", "levelled", "discoveries", "said", "work"}."""
-    from . import inprogress, magic_layer
+    from . import inprogress
 
     track = wc.get(TRACK_ID)
     lines: list[dict] = []
@@ -2017,7 +2017,7 @@ def _land_binding(actor, progress, plan: StepPlan, tier: int, *, engine, now: in
     """Spend the essences (one may be spared by the Yield perk, the roll shown), set the
     vessel In progress for the book's days, and keep everything Collect needs in the
     block's craft-owned `result` (never sent to the page)."""
-    from . import inprogress, magic_layer
+    from . import inprogress
 
     lines: list[dict] = []
     v = plan.vessel
@@ -2111,7 +2111,6 @@ def _land_refined(actor, plan: StepPlan, tier: int) -> tuple[str, str, int]:
 
 def _land_unbind(actor, progress, plan: StepPlan, *, now: int) -> dict:
     from . import magic_layer
-    from .crafting import Stock
 
     v = plan.vessel
     st = _stock_of(actor, v.key)
@@ -3035,7 +3034,7 @@ def materials() -> dict[str, Material]:
 def _entries(path: Path):
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, ValueError):
         return
     entries = data.get("materials") if isinstance(data, dict) else None
     if not isinstance(entries, list):

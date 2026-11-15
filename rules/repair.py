@@ -157,8 +157,8 @@ def repair_refusal(scene, actor, subject) -> str:
     if subject.hp >= subject.hp_max:
         return f"{name} is undamaged; there is nothing to repair."
     if getattr(scene, "in_encounter", False):
-        return (f"A repair is ten minutes' work at the least; it cannot be done in the "
-                f"middle of a fight.")
+        return ("A repair is ten minutes' work at the least; it cannot be done in the "
+                "middle of a fight.")
     if _working_against_you(subject):
         return (f"{name} is still working, and not for you: it has to be stopped before "
                 f"it can be mended.")

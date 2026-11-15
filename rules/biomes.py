@@ -314,10 +314,6 @@ def parse_environment(prose: str) -> Environment:
                        unrestricted)
 
 
-def describe_climate(climate: str) -> str:
-    return CLIMATES.get(climate, climate.title())
-
-
 def from_world(world, entity) -> list[str]:
     """What biomes a place sits in, read from the export's own facts.
 

@@ -25,6 +25,7 @@ so yesterday's sales stop mattering on their own.
 """
 from __future__ import annotations
 
+import logging
 import random
 import re
 
@@ -260,6 +261,7 @@ def everything_priced() -> list:
         try:
             found = benches.obtainable(track, "bought")
         except Exception:
+            logging.getLogger(__name__).exception("a bench's bought goods did not list")
             continue
         for m in found:
             mid = str(getattr(m, "id", ""))
@@ -585,6 +587,7 @@ def has_stables(location) -> bool:
         return any(str(p.name).strip().lower() == "the stables"
                    for p in places_mod.home_set(location))
     except Exception:
+        logging.getLogger(__name__).exception("the town's stables did not resolve")
         return False
 
 
@@ -807,6 +810,7 @@ def priced_from(tracks) -> list:
             try:
                 found = benches.obtainable(track, "bought")
             except Exception:
+                logging.getLogger(__name__).exception("a bench's bought goods did not list")
                 continue
             for m in found:
                 mid = str(getattr(m, "id", ""))
@@ -995,6 +999,7 @@ def consumables_of(crafts) -> list:
             try:
                 known = benches.module_for(craft).materials()
             except Exception:
+                logging.getLogger(__name__).exception("a craft's materials did not load for consumables")
                 known = {}
             for row in _catalogue_rows(craft):
                 mid = str(row["id"])
@@ -1084,6 +1089,7 @@ def kind_staples(craft: str, kinds) -> list:
         try:
             known = benches.module_for(craft).materials()
         except Exception:
+            logging.getLogger(__name__).exception("a craft's materials did not load for staples")
             known = {}
         seen: dict[str, object] = {}
         for row in _catalogue_rows(craft):

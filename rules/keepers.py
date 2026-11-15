@@ -48,6 +48,7 @@ this module mints in.
 """
 from __future__ import annotations
 
+import logging
 from . import places as places_mod
 
 # What a keeper is filed under in the codex and in the world. Not a world entity id —
@@ -546,6 +547,7 @@ def _mint(scene, world, at: str, wid: str, title: str, words, *, seed_place, wha
     try:
         actor = instantiate(template, scene=scene, name=shown, world_entity_id=wid)
     except Exception:
+        logging.getLogger(__name__).exception("a keeper's template did not instantiate (a content problem)")
         # An unknown template is a content problem, not a reason for the turn to fail.
         return None
     # The name behind the descriptor: what they answer when asked
@@ -560,7 +562,7 @@ def _mint(scene, world, at: str, wid: str, title: str, words, *, seed_place, wha
     town = str(getattr(world.get(scene.location_id), "name", "") or "") \
         if world is not None else ""
     if places_mod.runs_it(label_of(at)) and not counter_of(wid):
-        head = (f"The master of the market" + (f" in {town}" if town else "")
+        head = ("The master of the market" + (f" in {town}" if town else "")
                 + ": they run it and sell nothing.")
     else:
         head = (f"{what[:1].upper()}{what[1:]}" + (f", in {town}" if town else "") + ".")

@@ -181,7 +181,7 @@ def active() -> dict:
     out = dict(DEFAULTS)
     try:
         raw = json.loads(_path().read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, ValueError):
         return out
     if isinstance(raw, dict):
         if raw.get("point_buy") in {t["points"] for t in POINT_BUY_TIERS}:

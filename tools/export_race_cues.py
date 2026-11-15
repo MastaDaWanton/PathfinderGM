@@ -29,7 +29,7 @@ try:
     import django
 
     django.setup()
-except Exception:                                    # the table needs no settings
+except Exception:                                    # the table needs no settings  # noqa: BLE001
     pass
 
 from rules import races                              # noqa: E402

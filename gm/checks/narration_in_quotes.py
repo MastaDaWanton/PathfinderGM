@@ -69,7 +69,6 @@ def _names_self(line: str, name: str) -> bool:
 
 def quoted_narration(text: str, said, actors) -> list[tuple[str, str]]:
     """(line, why) for every quotation on the page that is narration in quotes."""
-    from gm.checks._people import names_person
     from gm.checks._quotes import speakers
     from gm.narration import introductions
 
