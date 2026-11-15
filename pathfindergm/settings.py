@@ -41,6 +41,9 @@ MIDDLEWARE = [
     # (review 2026-11-11, finding 16). Up here so the door's own refusals carry the header
     # too; it only sets a response header.
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    # Script only from this origin or a nonced inline block (pathfindergm/csp.py). Up here
+    # with the frame header so the door's own pages carry it too.
+    "pathfindergm.csp.ContentSecurityPolicy",
     # Before CSRF, and inert unless `desktop.py --lan` armed it. A request from off this
     # machine with no pass must be turned away at the door rather than a step inside it:
     # CSRF's answer to a stranger is a 403 about a token, which tells somebody who

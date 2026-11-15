@@ -126,7 +126,7 @@
   </div>
 </main>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 const STATE = {{ state_json|safe }};
 const CAT = STATE.catalogue;
 const $ = s => document.querySelector(s);
@@ -205,20 +205,20 @@ function draw() {
     <input type="text" data-name value="${esc(D.name)}" placeholder="Korvu">
     <div class="row">
       <div><label>Creature type</label>
-        <select data-set="type">${CAT.types.map(t => `<option value="${t}" ${D.type === t ? "selected" : ""}>${cap(t)}</option>`).join("")}</select></div>
+        <select data-set="type">${CAT.types.map(t => `<option value="${esc(t)}" ${D.type === t ? "selected" : ""}>${esc(cap(t))}</option>`).join("")}</select></div>
       <div><label>Size</label>
-        <select data-set="size">${CAT.sizes.map(t => `<option value="${t}" ${D.size === t ? "selected" : ""}>${cap(t)}</option>`).join("")}</select></div>
+        <select data-set="size">${CAT.sizes.map(t => `<option value="${esc(t)}" ${D.size === t ? "selected" : ""}>${esc(cap(t))}</option>`).join("")}</select></div>
       <div><label>Base speed</label>
-        <select data-set="speed">${CAT.speeds.map(t => `<option value="${t}" ${D.speed === t ? "selected" : ""}>${t} ft${t === 20 ? " (slow)" : t === 40 ? " (fast)" : ""}</option>`).join("")}</select></div>
+        <select data-set="speed">${CAT.speeds.map(t => `<option value="${esc(t)}" ${D.speed === t ? "selected" : ""}>${esc(t)} ft${t === 20 ? " (slow)" : t === 40 ? " (fast)" : ""}</option>`).join("")}</select></div>
     </div>
 
     <h2 class="sect">Ability scores</h2>
     <p class="note">The Race Builder's options. The first three are placed by the player at the forge.</p>
     <div class="picks">${CAT.ability_options.map(o => `
-      <button type="button" class="${D.option === o.id ? "on" : ""}" data-option="${o.id}">${esc(o.name)}</button>`).join("")}</div>
+      <button type="button" class="${D.option === o.id ? "on" : ""}" data-option="${esc(o.id)}">${esc(o.name)}</button>`).join("")}</div>
     ${D.option === "fixed" ? `<div class="row" style="margin-top:8px">${CAT.abilities.map(a => `
-      <div><label>${a.toUpperCase()}</label>
-        <select data-mod="${a}">${[-4, -2, 0, 2, 4].map(v => `<option value="${v}" ${D.mods[a] === v ? "selected" : ""}>${v > 0 ? "+" : ""}${v}</option>`).join("")}</select></div>`).join("")}</div>` : ""}
+      <div><label>${esc(a.toUpperCase())}</label>
+        <select data-mod="${esc(a)}">${[-4, -2, 0, 2, 4].map(v => `<option value="${v}" ${D.mods[a] === v ? "selected" : ""}>${v > 0 ? "+" : ""}${v}</option>`).join("")}</select></div>`).join("")}</div>` : ""}
 
     <h2 class="sect">Feats, ranks and languages</h2>
     <div class="picks">
@@ -226,11 +226,11 @@ function draw() {
       <button type="button" class="${D.budget.ranks ? "on" : ""}" data-budget="ranks">+1 skill rank per level</button>
     </div>
     <p class="note" style="margin-top:8px">Languages. The race's own tongue is always spoken.</p>
-    <div>${CAT.languages.map(l => `<label class="chk"><input type="checkbox" data-lang="${l}" ${D.languages.includes(l) ? "checked" : ""}> ${cap(l)}</label>`).join("")}</div>
+    <div>${CAT.languages.map(l => `<label class="chk"><input type="checkbox" data-lang="${esc(l)}" ${D.languages.includes(l) ? "checked" : ""}> ${esc(cap(l))}</label>`).join("")}</div>
 
     <h2 class="sect">Anatomy — the eidolon's evolutions</h2>
     <p class="note">Advanced Player's Guide. Free of cost here; the summoner's points are shown for the record. What the sheet cannot read yet is said on the card rather than dropped.</p>
-    ${groups.map(g => `<h3 style="margin:14px 0 0;color:var(--dim);font:italic 13px var(--body)">${cap(g)}</h3>
+    ${groups.map(g => `<h3 style="margin:14px 0 0;color:var(--dim);font:italic 13px var(--body)">${esc(cap(g))}</h3>
       <div class="grid">${CAT.evolutions.filter(e => e.group === g).map(ev => {
         // One row per take. A repeatable evolution ("I should be able to have as many
         // arms and legs as I want") gets an add button and every take its own picker,
@@ -240,15 +240,15 @@ function draw() {
         const opts = choicesFor(ev);
         const repeatable = ev.takes > 1;
         return `<div class="evo ${on ? "on" : ""}">
-          <label class="chk" style="margin:0"><input type="checkbox" data-evo="${ev.id}" ${on ? "checked" : ""}>
-            <b>${esc(ev.name)}</b> <span style="color:var(--dim)">· ${ev.points} pt${repeatable ? " · repeatable" : ""}</span></label>
-          <small>${esc(ev.line.replace("$choice", ev.choice ? "…" : ""))}${ev.needs ? ` — needs ${ev.needs.join(", ")}` : ""}</small>
+          <label class="chk" style="margin:0"><input type="checkbox" data-evo="${esc(ev.id)}" ${on ? "checked" : ""}>
+            <b>${esc(ev.name)}</b> <span style="color:var(--dim)">· ${esc(ev.points)} pt${repeatable ? " · repeatable" : ""}</span></label>
+          <small>${esc(ev.line.replace("$choice", ev.choice ? "…" : ""))}${ev.needs ? ` — needs ${esc(ev.needs.join(", "))}` : ""}</small>
           ${takes.map((pk, n) => `<div class="times" style="gap:8px">
             ${repeatable ? `<span>${n + 1}.</span>` : ""}
-            ${ev.choice ? `<select data-evochoice="${pk.i}" style="margin-top:0"><option value="">— pick the ${ev.choice} —</option>${opts.map(c => `<option value="${c}" ${pk.choice === c ? "selected" : ""}>${cap(c)}</option>`).join("")}</select>` : `<span style="color:var(--dim)">${esc(ev.line)}</span>`}
-            ${repeatable ? `<button type="button" data-drop="${pk.i}" title="remove this one">−</button>` : ""}
+            ${ev.choice ? `<select data-evochoice="${esc(pk.i)}" style="margin-top:0"><option value="">— pick the ${esc(ev.choice)} —</option>${opts.map(c => `<option value="${esc(c)}" ${pk.choice === c ? "selected" : ""}>${esc(cap(c))}</option>`).join("")}</select>` : `<span style="color:var(--dim)">${esc(ev.line)}</span>`}
+            ${repeatable ? `<button type="button" data-drop="${esc(pk.i)}" title="remove this one">−</button>` : ""}
           </div>`).join("")}
-          ${on && repeatable ? `<div class="times"><button type="button" data-add="${ev.id}">+ another</button></div>` : ""}
+          ${on && repeatable ? `<div class="times"><button type="button" data-add="${esc(ev.id)}">+ another</button></div>` : ""}
           ${on && ev.not_yet ? `<small style="margin-top:4px">not yet: ${esc(ev.not_yet.replace("$choice", takes[0].choice || "…"))}</small>` : ""}
         </div>`; }).join("")}</div>`).join("")}`;
   drawSummary();
@@ -264,10 +264,10 @@ function drawSummary() {
   const mods = D.option === "fixed"
     ? Object.entries(D.mods).filter(([, v]) => v).map(([a, v]) => `${a.toUpperCase()} ${v > 0 ? "+" : ""}${v}`).join(", ") || "no adjustments"
     : opt.name.split(" — ")[1];
-  $("#summary").innerHTML = `<b>${esc(D.name || "Unnamed")}</b> — ${esc(D.type)}, ${esc(D.size)}, ${D.speed} ft · ${esc(mods)}
+  $("#summary").innerHTML = `<b>${esc(D.name || "Unnamed")}</b> — ${esc(D.type)}, ${esc(D.size)}, ${esc(D.speed)} ft · ${esc(mods)}
     ${D.budget.feats ? " · bonus feat" : ""}${D.budget.ranks ? " · +1 rank/level" : ""}
     <br>${lines.length ? esc(lines.join(" · ")) : "<span style='color:var(--dim)'>no anatomy chosen yet</span>"}
-    <br><span style="color:var(--dim)">The table accepts up to ${STATE.race_rp} RP; evolutions cost none.</span>`;
+    <br><span style="color:var(--dim)">The table accepts up to ${esc(STATE.race_rp)} RP; evolutions cost none.</span>`;
 }
 
 document.addEventListener("input", e => {

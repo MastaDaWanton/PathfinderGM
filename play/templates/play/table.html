@@ -3619,7 +3619,7 @@
 <script src="{% asset 'js/skillhelp.js' %}"></script>
 </head>
 <body class="page-backdrop-room mode-table">
-<script>
+<script nonce="{{ request.csp_nonce }}">
 // The sheet hidden or shown, decided before the first paint, so a desktop that hid the
 // sheet never flashes it back. First in <body> because <head> has no body to mark. No
 // template variables in here: a variable Django renders as "" is a syntax error that
@@ -4435,7 +4435,7 @@
   </div>
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 // The two things the play table's scripts need from the server, handed over once.
 // Everything else lives in static/js/table/, split out of this template 2026-09-25.
 // The revision is parsed rather than printed bare: in a test render Django writes an
@@ -4487,7 +4487,7 @@ window.PATHFINDER_BOOT = {
      stage (32, Lane F) and the games (33 and bench-games/, Lane E) are optional
      providers (contracts §5): the bench runs flat without them, so a file not in this
      build yet is left out rather than named, by the same "?v=" test as the head's. -->
-<script>
+<script nonce="{{ request.csp_nonce }}">
 // The bench's icon art with its content stamp: "?v=" only on a file the server found, so
 // the Electron cache can never serve an old glyph, and a build without the art draws the
 // roundel instead of a broken mask (bench-icons.js says why). One entry per name in
@@ -4611,7 +4611,7 @@ bench, before the forge; both benches look it up when they draw.{% endcomment %}
      lane U4's stage parts and adapter; then 40 to 44 in number order. 42 (lane U4) is an
      optional provider (§11), named only once it is in the build; 44 (lane U5's ledger
      card, merged 2026-10-04) always is. -->
-<script>
+<script nonce="{{ request.csp_nonce }}">
 window.FORGE_ICON_URLS = {
   smelt: "{% asset 'img/icons/smelt.svg' %}", alloy: "{% asset 'img/icons/alloy.svg' %}",
   forge: "{% asset 'img/icons/forge.svg' %}", quench: "{% asset 'img/icons/quench.svg' %}",
@@ -4666,7 +4666,7 @@ the build, so the circle runs flat without them.{% endcomment %}
      order. 50, 51 and 53 are lane U1's and always named; 52 (lane U3's adapter,
      window.AlchemyStage) and 54 (lane U4's books, window.AlchemyBooks) are optional
      providers named only once they are in the build, so the bench runs flat without them. -->
-<script>
+<script nonce="{{ request.csp_nonce }}">
 window.ALCHEMY_ICON_URLS = {
   calcine: "{% asset 'img/icons/calcine.svg' %}", dissolve: "{% asset 'img/icons/dissolve.svg' %}",
   filter: "{% asset 'img/icons/filter.svg' %}", distill: "{% asset 'img/icons/distill.svg' %}",
@@ -4698,7 +4698,7 @@ window.ALCHEMY_ICON_URLS = {
      enchanting circle and the alchemy bench, so this bench took the next free numbers: 55, 56
      and 58 are lane U1's and always named; 57 (lane U4's adapter, window.TanneryStage) and 59
      (lane U2's harvest sheet) are optional providers named only once they are in the build. -->
-<script>
+<script nonce="{{ request.csp_nonce }}">
 window.LEATHER_ICON_URLS = {
   flense: "{% asset 'img/icons/flense.svg' %}", salt: "{% asset 'img/icons/salt.svg' %}",
   tan: "{% asset 'img/icons/tan.svg' %}", curry: "{% asset 'img/icons/curry.svg' %}",
