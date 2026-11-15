@@ -344,6 +344,25 @@ Once aboard she lies off the shore (the deck has no gangplank to anything) and `
 unchanged. The brief says LYING OFF with both ops spelled out. Going back ashore from her
 before she sails is not built.
 
+## Morale and taking a ship (2026-11-15)
+
+Playtest 2026-11-15: a blade at the captain's throat, "the Red Gull is mine now" and "yield
+the Red Gull to me or die" (the captain at 1 of 11) did nothing at all, and a ship could not
+be taken without killing her crew. Now:
+
+- **Her people defend her.** A creature that comes over the rail (`_met_at_sea`) meets her
+  master and hand on the party's side, not idle (#92).
+- **Nobody fights to the death by default** (`rules/morale.py`, the GameMastery Guide's
+  "few creatures fight to the death if there's an alternative"): at half hit points a
+  person checks once (Basic D&D's 2d6 against 8), and on a deck at sea, with nowhere to
+  run, a broken person yields rather than runs.
+- **A threat is Intimidate** (the reader's `threaten` act): Demoralize in a fight, and a
+  demand to yield made good on somebody shaken or at half their blood.
+- **Her master's yielding is her people's**: those not fighting stand down, those fighting
+  check (5e's group trigger). When every one has yielded or is down she is the party's.
+
+The same rules hold ashore, where a broken person runs home instead (`Engine._flee`).
+
 ## Still open
 
 - **The derived coast.** An inland town with no road to any port walks a derived day to
@@ -356,8 +375,13 @@ before she sails is not built.
   on a warship's deck is a weapon the engine has no notion of.
 - **The wind.** `days_for(with_the_wind=True)` halves a passage and nothing ever passes
   `True`, because the app has no weather.
-- **Ships the party owns.** A vessel is bought, crewed, provisioned and repaired by
-  nothing; `crewed()` answers the question and nothing asks it outside a boarding.
+- **Ships the party owns — taken, 2026-11-15; still not bought, provisioned or repaired.**
+  A ship whose people have all yielded or are down is the party's (`Engine._ship_taken`,
+  `Vessel.held_by`): her master yields to a threat made good or at the end of his nerve
+  (`rules/morale.py`), her people stand down with him, and `_sail` then takes her to any
+  port the world has a sea leg to from her waters (`_come_about`). Her crew is still the
+  table's abstract number; who of them is aboard as a person is still the master and a
+  hand. Buying one, wages, stores and repair are unbuilt.
 - **A ship as a place to live between passages.** The deck exists while an engagement
   does. Sleeping aboard, keeping cargo in the hold, and coming back to the same ship in
   port are all unbuilt.

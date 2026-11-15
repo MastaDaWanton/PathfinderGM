@@ -1447,3 +1447,34 @@ party's level. No number in this ask reaches a die.
 An export carries `dungeons` on at least one place, `tools/check_places.py` accepts the
 fields above and nothing else, and a party venturing into that kind of ground there finds
 the named way down every time, with the given number of levels.
+
+
+## 26. `climate` on a sea route — what waters a crossing sails
+
+*Asked 2026-11-15 (fix/threats-morale-ships). Optional: without it a crossing reads the two
+ports' own Climate facts and uses one only when it names a single climate
+(`Engine._waters_climates`), which is how every world plays today.*
+
+Playtest 2026-11-15 #89: a penguin ("cold oceans") came up at the rail on a crossing between
+Zhilvarnia and Mirabalos in a desert-and-silk world. The only climate either port carries is
+its continent's ("temperate near the equator, polar at the edges"; "variable with latitude
+and season"), a whole continent's span, which says nothing about one stretch of sea, so the
+app cannot keep cold-water creatures out of warm water.
+
+**Shape.** One optional word on a `travel` row whose `by` is `sea`:
+
+```json
+{"from": "6953424c8a82", "to": "7ef5e373c993", "by": "sea", "climate": "warm"}
+```
+
+| field | what it is |
+|---|---|
+| `climate` | `cold`, `temperate` or `warm`: the waters the crossing sails (`rules/biomes.CLIMATES`) |
+
+**Rule 1 still holds.** A word, never a temperature: which creatures live in those waters is
+the Bestiary's Environment line (`biomes.parse_environment`).
+
+### Done when
+
+An export carries `climate` on its sea routes, and a crossing marked `warm` never meets a
+creature whose Environment line says cold oceans.
