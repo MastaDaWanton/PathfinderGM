@@ -205,9 +205,21 @@ def ways_from(engine, world, place_ids) -> dict[str, list[dict]]:
                "time_words": _days_aboard(days, ship.river) + (
                    f" to {engine._settlement_name(ship.lands_at)}, then the road inland"
                    if ship.lands_at else "")}
+        more = []
+        if ship.held_by:
+            # Hers to sail anywhere her waters reach (`Engine._come_about`, 2026-11-15):
+            # a row per port, its id the port's, which the journey op re-aims her for.
+            for leg in journey_mod.legs_from(world, ship.came_from or ship.at):
+                if (leg.by_sea or leg.by in ("sea", "river")) and leg.to_id != ship.bound_for:
+                    days = ships.days_for(leg.miles if leg.source == "exact" else None,
+                                          ship.kind, leg.days_apart)
+                    more.append({"id": leg.to_id, "name": leg.to_name, "group": "road",
+                                 "blocked": "", "journey": True, "minutes": 0,
+                                 "time_words": _days_aboard(days, leg.by == "river")})
         for place_id, rows in out.items():
             if ships.vessel_of(place_id) == ship.id:
                 rows.append(dict(row))
+                rows.extend(dict(m) for m in more)
     return out
 
 

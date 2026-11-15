@@ -1793,6 +1793,31 @@ def inject_fight(raw_intents, player_text: str, scene, *, rows=(), frame=None,
                 hit.add(b["target"])
         return out
 
+    # A blow the table left for after somebody is found (`acts_to_ops.DEFERRED`), when the
+    # plan has found them: its one newcomer is who the blow is at, and the plan wrote no
+    # blow of its own. Playtest 2026-11-15 #18: "I pick out a well-dressed merchant passing
+    # through the warrens, shove him against the wall and demand his purse" introduced the
+    # merchant, and the shove was never struck: "no rule was applied".
+    from rules.intents import INTRODUCED_REFS
+
+    later = [r for r in blows if not r.intents and r.note == acts_to_ops.DEFERRED]
+    intros = [r for r in out if isinstance(r, dict)
+              and str(r.get("op", "")).lower() == "introduce"]
+    # One newcomer: the plan's one introduce of one person, whose ref validation stamps as
+    # the first placeholder (`Engine.validate`, `INTRODUCED_REFS`).
+    met = ([INTRODUCED_REFS[0]] if len(intros) == 1
+           and int((intros[0].get("params") or {}).get("count") or 1) == 1 else [])
+    if later and len(met) == 1 and not any(mine(r) for r in out):
+        a = actions[later[0].index]
+        man = acts_to_ops.MANOEUVRE_OF_BLOW.get(str(a.get("blow") or ""))
+        at = next(k for k, r in enumerate(out) if isinstance(r, dict)
+                  and str(r.get("op", "")).lower() == "introduce") + 1
+        out.insert(at, {"op": "attack", "actor": pc.ref, "target": met[0],
+                        "because": "the player strikes the one they found",
+                        **({"params": {"manoeuvre": man}} if man else {})})
+        if notes is not None:
+            notes.append(f"the blow after the finding is at {met[0]}, whom the plan found")
+
     if getattr(scene, "in_encounter", False):
         standing = [a for a in actors.values() if not getattr(a, "is_pc", False)
                     and _can_be_fought(a)]

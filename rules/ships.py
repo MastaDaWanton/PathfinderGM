@@ -154,6 +154,10 @@ class Vessel:
     # the destination's quickest road (`journey.harbour_road`), walked from there. "" when
     # she ties up at `bound_for` itself.
     lands_at: str = ""
+    # Whose she is, when she is somebody's in play (2026-11-15, playtest #94): the ref of
+    # the PC whose threat or blade made her people yield (`Engine._ship_taken`). "" for a
+    # ship that is her owners' still; `_sail` takes a held ship wherever the holder says.
+    held_by: str = ""
 
     def as_dict(self) -> dict:
         return {"id": self.id, "name": self.name, "kind": self.kind, "hp": self.hp,
@@ -162,7 +166,8 @@ class Vessel:
                 "came_from": self.came_from, "days_total": self.days_total,
                 "sailed_at": self.sailed_at, "passengers": list(self.passengers),
                 "river": self.river,
-                **({"lands_at": self.lands_at} if self.lands_at else {})}
+                **({"lands_at": self.lands_at} if self.lands_at else {}),
+                **({"held_by": self.held_by} if self.held_by else {})}
 
     @classmethod
     def from_dict(cls, d: dict) -> "Vessel | None":
@@ -182,7 +187,8 @@ class Vessel:
                    sailed_at=(int(d["sailed_at"]) if d.get("sailed_at") is not None
                               else None),
                    passengers=[str(r) for r in (d.get("passengers") or [])],
-                   river=bool(d.get("river")), lands_at=str(d.get("lands_at") or ""))
+                   river=bool(d.get("river")), lands_at=str(d.get("lands_at") or ""),
+                   held_by=str(d.get("held_by") or ""))
 
     @property
     def row(self) -> dict:
@@ -424,6 +430,47 @@ def ram_self_damage(kind: str) -> int:
     dice, _, bonus = spec.partition("+")
     count = int(dice.split("d")[0] or 1)
     return count + (int(bonus) if bonus else 0)
+
+
+def aboard(scene) -> "Vessel | None":
+    """The vessel the party stands on, read from the scene alone, or None ashore."""
+    vid = vessel_of(str(getattr(scene, "at", "") or ""))
+    for raw in (getattr(scene, "vessels", None) or ()) if vid else ():
+        if isinstance(raw, dict) and str(raw.get("id")) == vid:
+            return Vessel.from_dict(raw)
+    return None
+
+
+def crew_of(scene, ship) -> list:
+    """The people who work her: anybody standing on her rooms who is not a passenger, not
+    the party's, not a boarder (`scene.sea["foes"]`), and a person by their stat block
+    (`npcs._PEOPLE_TYPES`) — never the creature that came over the rail.
+
+    shortcut: read from where they stand rather than a crew tag laid when they are minted
+    (`Engine._ships_company`), so saves from before 2026-11-15 read the same; a tag at
+    minting is the upgrade when a ship carries more than her master and a hand."""
+    from . import bestiary, npcs, states
+
+    if ship is None or scene is None:
+        return []
+    rooms = {p.id for p in places_of(ship)}
+    boarders = set((getattr(scene, "sea", None) or {}).get("foes") or ())
+
+    def a_person(a) -> bool:
+        row = bestiary.raw_block(str(getattr(a, "from_template", "") or "")) or {}
+        return row.get("creature_type") in npcs._PEOPLE_TYPES
+
+    return [a for r, a in (getattr(scene, "people", None) or {}).items()
+            if a.at in rooms and not a.is_pc and r not in ship.passengers
+            and r not in boarders and not a.has_state(states.TRAVELS_WITH_YOU)
+            and not a.has_state("state.down.dead") and a_person(a)]
+
+
+def master_of(crew: list):
+    """Who answers for her: the most Hit Dice among her people, the lower ref on a tie."""
+    from . import attitude
+
+    return min(crew, key=lambda a: (-attitude._hit_dice(a), a.ref)) if crew else None
 
 
 def crewed(vessel: Vessel) -> bool:

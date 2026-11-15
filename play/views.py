@@ -5486,7 +5486,7 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
     # the panel, with the shopkeeper never acting (live, 2026-10-16). The turn ends here.
     if joined and _told_by_its_blows(resolution):
         joined = False
-    if hand_over and not joined:
+    if hand_over and not joined and not _only_spoke(c.scene, resolution):
         _run_npc_turns(c, agent)
     # A death outside a fight — the law's sentence carried out (rules/trial.py) — ends the
     # campaign in this reply, as a death on the creatures' turns does inside one. Measured
@@ -5908,6 +5908,22 @@ def _brief_the_npc_turns(c, agent, events=None) -> None:
         agent.brief_facts = dict(report.get("facts") or {})
 
 
+# Ops that are words and nothing else. Speaking is a free action in a fight (CRB p.181,
+# "Speak": "In general, speaking is a free action that you can perform even when it isn't
+# your turn"), so a turn of them hands the order on to nobody.
+_SPEECH_OPS = frozenset({"say", "narrate_only", "provoke"})
+
+
+def _only_spoke(scene, resolution) -> bool:
+    """Whether the player's turn in a fight was words alone, which spend no action.
+    Playtest 2026-11-15 #98: "yield the Red Gull to me or die" used Vesna's whole turn —
+    no attack — and the captain and the penguin both swung."""
+    outcomes = [o for o in (getattr(resolution, "outcomes", None) or ())
+                if not getattr(o, "actor", "") or o.actor == getattr(scene.pc(), "ref", "")]
+    return (bool(getattr(scene, "in_encounter", False)) and bool(outcomes)
+            and all(o.op in _SPEECH_OPS for o in outcomes))
+
+
 def _side_stands(scene) -> bool:
     """Somebody on the player's side, other than the player, is still on their feet."""
     pc = scene.pc()
@@ -6102,6 +6118,20 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
             if o.tell:
                 c.transcript.append({"who": "gm", "kind": "consequence",
                                      "text": _plain_tells(c, [o])})
+        # Whether it fights on at all (`Engine.morale_turn`, rules/morale.py): a civilian
+        # hurt ashore runs, anybody at half their blood checks once, and a broken creature
+        # runs or yields — its turn, said, and no model asked. Playtest 2026-11-15 #30: a
+        # merchant punched in round 2 "remains unmoving in your space".
+        broke = engine.morale_turn(ref)
+        if broke:
+            for o in broke:
+                if o.tell:
+                    c.transcript.append({"who": "gm", "kind": "consequence",
+                                         "text": _plain_tells(c, [o])})
+            c.turn_log.append(history_mod.stamp(c, {
+                "kind": "npc-turn", "ref": ref, "morale": True,
+                "outcomes": [o.as_dict() for o in broke]}))
+            continue
         # A creature holding somebody in a grapple spends its turn keeping the hold (CRB
         # p.200: "you must continue to make a check each round, as a standard action, to
         # maintain the hold"), rolled by the engine — the grab's damage on a kept hold, the

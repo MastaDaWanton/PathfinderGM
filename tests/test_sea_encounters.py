@@ -29,7 +29,7 @@ def _forced(monkeypatch, kind: str, aggressive: bool = True):
     real = ontheway._the_land
     left = [kind]
 
-    def sea(dice, level=1, *, apl=None, danger=1.0):
+    def sea(dice, level=1, *, apl=None, danger=1.0, climates=()):
         if not left:
             return None
         left.pop()
