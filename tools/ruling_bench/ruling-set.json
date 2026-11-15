@@ -1,0 +1,3023 @@
+{
+ "version": 1,
+ "built": "2026-11-14",
+ "sources": {
+  "set1": {
+   "file": "answer-key-set1-v2.json",
+   "sha256": "519c6061fb4e6ee69943804186dd9852ae6265c76e6ce43ea91ede847df7d642",
+   "frozen": "2026-11-06",
+   "version": 2
+  },
+  "set2": {
+   "file": "answer-key-set2.json",
+   "sha256": "2d894301e7d770c2f012d871ecfc65cdf03b29915772e85bcdc331fbf2ee2bc9",
+   "frozen": "2026-11-06",
+   "version": 2
+  }
+ },
+ "pcs": {
+  "borin": "Borin Achereth (he/him), human fighter 1. Str 17, Dex 13, Con 14, Int 10, Wis 12, Cha 8. 12 hp. Chain shirt, heavy shield, longsword (equipped), dagger, shortbow. Feats: Power Attack, Weapon Focus (longsword). Ranks: Climb, Intimidate, Survival.",
+  "kesst": "Kesst Vayr (she/her), human rogue 1. Str 12, Dex 17, Con 12, Int 13, Wis 10, Cha 14. 9 hp. Leather armour, rapier (equipped), dagger, thieves' tools. Feats: Weapon Finesse, Stealthy. Ranks: Acrobatics, Appraise, Bluff, Climb, Diplomacy, Disable Device, Knowledge (local), Perception, Sense Motive, Stealth.",
+  "thessaly": "Thessaly Corr (they/them), human wizard 1. Str 9, Dex 14, Con 12, Int 17, Wis 12, Cha 11. 7 hp. No armour, quarterstaff (equipped), dagger, light crossbow. Feat: Iron Will. Ranks: Knowledge (arcana), Knowledge (local), Linguistics, Spellcraft. Prepared: magic missile, grease (one each). Cantrips: detect magic, light, mage hand, prestidigitation. Arcane bond: a bonded ring, no familiar. Mage armor is NOT prepared today."
+ },
+ "scenes": {
+  "s1": {
+   "id": "s1",
+   "pc": "borin",
+   "title": "The clan-hall at Thornstead, evening meal",
+   "facts": [
+    "Thornstead, a human town in Ardenhale; houses of coral and driftwood on stilts over the water.",
+    "Communal meal in the clan-hall: about twenty diners on benches at long trestle tables.",
+    "Aldric Ashbourne, mercenary captain, sits at the head table beside Delyth Sootspar, the law-speaker. They talk low; the hall is noisy.",
+    "A serving boy carries stew and ale. A hearth fire, ale casks by the wall, iron lamp chains overhead.",
+    "There are gaps between the floorboards; the water is about ten feet below.",
+    "The hall charges each guest a copper for the meal. Borin has 14 silver."
+   ],
+   "fight": false
+  },
+  "s2": {
+   "id": "s2",
+   "pc": "kesst",
+   "title": "Night chase on the Thornstead stilt-walks",
+   "facts": [
+    "Out of combat, but a chase: a pickpocket (human, unarmed) has Kesst's purse and is 30 feet ahead, running along a plank walkway five feet wide.",
+    "Walkways run between stilt-houses ten feet above the water; rope lines strung between houses hold drying nets; lanterns hang on poles.",
+    "Two fishermen stand mending nets 20 feet beyond the thief.",
+    "A gap of about eight feet separates this walkway from a parallel one that bends round to where the thief is heading."
+   ],
+   "fight": false
+  },
+  "s3": {
+   "id": "s3",
+   "pc": "kesst",
+   "title": "Marigold Krell's counting room, Greenbrook",
+   "facts": [
+    "Greenbrook, a halfling town in Sandmere Shire; a dawn bell opens the markets.",
+    "Marigold Krell, halfling dockside moneylender, counts coin at her desk. Her clerk copies figures at a side table.",
+    "A locked iron strongbox sits behind the desk. A small brass key lies on the desk beside an open ledger, an inkpot and a candle.",
+    "A hired sellsword stands outside the only door. A window looks onto the dock.",
+    "Kesst came to clear a friend's debt of 40 silver. Kesst knows nothing yet about any side business of Marigold's."
+   ],
+   "fight": false
+  },
+  "s4": {
+   "id": "s4",
+   "pc": "borin",
+   "title": "The cellar under an Ashwatch blockhouse (fight, round 2)",
+   "facts": [
+    "In combat, Borin's turn, round 2. Ashwatch is a half-orc village of black basalt blockhouses in Ashgate Reach.",
+    "Three cutthroats: one adjacent to Borin with a club; two 15 feet away at the foot of a narrow stair, short swords drawn.",
+    "Ruk Halloran, a caravan factor, is tied to a chair 10 feet from Borin.",
+    "Barrels of lamp oil line one wall. A lit lantern hangs on a hook by Borin. A wine rack stands behind the clubman. The ceiling beams are low (about 7 feet).",
+    "Borin has no ally who can flank. He has no Improved Trip, Bull Rush or Dirty Trick."
+   ],
+   "fight": true
+  },
+  "s5": {
+   "id": "s5",
+   "pc": "thessaly",
+   "title": "Corwyn Krell's workshop, Glimgear",
+   "facts": [
+    "Glimgear, a gnome town in Tinkerhome Delve; guild rank matters more than birth.",
+    "Thessaly wants into the study of Corwyn Krell, the gnome guildmaster. Its door has a brass lock of gears, locked.",
+    "Sprig Krell, a gnome, idles by the workbench as a lookout. He does not know Thessaly.",
+    "A key ring hangs on a hook 20 feet across the room. A gear-driven lift rises to a gallery with a skylight over the study.",
+    "A small high window sits above the study door, 12 feet up a rough wall."
+   ],
+   "fight": false
+  },
+  "s6": {
+   "id": "s6",
+   "pc": "kesst",
+   "title": "Inspection on the Deepshoal docks",
+   "facts": [
+    "Deepshoal, an undine town of the Tidewrought Commonwealth; ritual bathing before any formal business is the custom.",
+    "Kesst's crate holds smuggled blue dye. Aurenna Ashbourne, the harbor-reeve, is inspecting crates one by one, two of the harbor watch with her. Kesst's crate is fourth in line.",
+    "Calyx Greymantle, a smuggler-broker Kesst has dealt with once, loiters nearby.",
+    "A dockside crane with a cargo net swings crates onto a ship whose gangplank is still down. Another crate in the line holds live crabs.",
+    "Nothing is known about the reeve's family or private dealings."
+   ],
+   "fight": false
+  },
+  "s7": {
+   "id": "s7",
+   "pc": "thessaly",
+   "title": "Wolves on the road outside Ashwatch (fight, round 1)",
+   "facts": [
+    "In combat, Thessaly's turn, round 1. Dusk on the road.",
+    "Three wolves, 30 feet away, spreading out. Thessaly is alone with a pack mule tied to a small cart.",
+    "A campfire burns beside the cart. A dead tree leans over the road. A shallow stream (knee-deep to a human) runs ten feet behind Thessaly.",
+    "Thessaly has trail rations, a bedroll and the light crossbow (unloaded)."
+   ],
+   "fight": true
+  },
+  "s8": {
+   "id": "s8",
+   "pc": "borin",
+   "title": "Rosalie Duskwatch's quarry, Greenbrook",
+   "facts": [
+    "Out of combat, midday. A loaded stone cart is stuck: a boulder (about 400 lb) has slid off the load and jammed against a wheel.",
+    "Rosalie Duskwatch, the halfling quarry foreman, is short-handed and cross; six quarrymen stand about.",
+    "A timber crane with ropes and pulleys stands by the ramp. Wedges, crowbars, chisels and a water barrel are to hand.",
+    "Borin has never met Rosalie before today."
+   ],
+   "fight": false
+  },
+  "s9": {
+   "id": "s9",
+   "pc": "thessaly",
+   "title": "The archive at Thornstead",
+   "facts": [
+    "Brenna Farrow, human archivist, keeps the town's records. Priest-scribes hold informal authority in Thornstead.",
+    "Shelves of ledgers and old treaties; a rolling ladder to the top shelves; a locked glass case of older documents.",
+    "Open flame is forbidden among the shelves. Some old pages are spotted with mould.",
+    "Some of the older documents are written in Dwarven."
+   ],
+   "fight": false
+  },
+  "s10": {
+   "id": "s10",
+   "pc": "kesst",
+   "title": "Karsh Halloran's house of healing, Ashwatch",
+   "facts": [
+    "Kesst is at 2 of 9 hp after a knife fight, not dying.",
+    "Karsh Halloran, half-orc healer, charges for care. Kesst has 3 silver left.",
+    "Herbs hang drying; bandages and a healer's kit on the table; two cots, one empty.",
+    "Karsh mentioned she is short of marsh-mallow root."
+   ],
+   "fight": false
+  },
+  "s11": {
+   "id": "s11",
+   "pc": "borin",
+   "title": "The Salt Lamp tavern, Deepshoal (a brawl brewing)",
+   "facts": [
+    "Out of combat, but tense. Four sailors at a table; one, drunk and angry, says Borin took his seat, and has a knife at his belt.",
+    "A driftwood chandelier with candles hangs 10 feet up over the middle of the room. A long bar runs along one wall; tankards everywhere.",
+    "Merrin Ashbourne, an undine beast-handler, sits by the door with a leashed hound.",
+    "There is a stair to a balcony. The barkeep watches nervously."
+   ],
+   "fight": false
+  },
+  "t1": {
+   "id": "t1",
+   "pc": "kesst",
+   "title": "A cane platform in Skyreach, the moneylender's stall",
+   "facts": [
+    "Skyreach, a tengu town in Skyreach Aerie: woven cane platforms strung between great trees, joined by rope bridges; a dawn bell opens the markets.",
+    "Kesst stands at the stall of Mira-ka Duskwatch, a tengu dockside moneylender, who sits behind a low counter with a strongbox chained to it and a ledger open.",
+    "Ruska Duskwatch, a tengu smuggler-broker, leans on the platform's rail a few paces away, pretending not to listen.",
+    "Cargo baskets hang from pulleys at the platform's edge; the forest floor is about forty feet below.",
+    "A rope bridge, swaying, runs from this platform to the next tree about thirty feet away.",
+    "Kesst owes Mira-ka nothing. Kesst wants to borrow 30 silver."
+   ],
+   "fight": false
+  },
+  "t2": {
+   "id": "t2",
+   "pc": "thessaly",
+   "title": "Reedsink at dusk, the curfew hour",
+   "facts": [
+    "Reedsink, a grippli town of the Mireflote Concord: timber longhalls with steep thatch roofs on a marsh; a dusk curfew for the unescorted young; seniority is set by age and deed.",
+    "The curfew bell has just rung. A grippli child, perhaps eight, is crying by a mooring post, lost.",
+    "Kwolla Ashbourne, a grippli border scout, is walking the boardwalk with a lantern, sending stragglers home. She has not reached this end yet.",
+    "A flat-bottomed punt is tied to the mooring post; reeds stand head-high on both sides of the channel.",
+    "Thessaly is a stranger here, arrived this afternoon."
+   ],
+   "fight": false
+  },
+  "t3": {
+   "id": "t3",
+   "pc": "borin",
+   "title": "The terraces above Harforge (fight, round 1)",
+   "facts": [
+    "In combat, Borin's turn, round 1. Harforge is a half-orc town of terraced stone built into a hillside; a warrior caste ranks above artisans.",
+    "Two bandits with spears stand on the terrace 20 feet ahead; a war dog crouches beside them.",
+    "Ruk Ironvale, a half-orc border scout, lies wounded (down, not dying) on the terrace behind Borin.",
+    "Each terrace drops about five feet to the next; a narrow stone stair links them.",
+    "A hay cart stands on Borin's terrace; a rain barrel sits by the stair. It is raining and the stone is slick.",
+    "Borin has no ally standing who could flank. He has no Improved Bull Rush, Trip or Dirty Trick."
+   ],
+   "fight": true
+  },
+  "t4": {
+   "id": "t4",
+   "pc": "borin",
+   "title": "The drying roofs of Highcrown",
+   "facts": [
+    "Highcrown, a vanara city of the Kaudrai Canopy: salt-washed adobe houses with flat roofs where goods are laid out to dry; ritual bathing comes before any formal business.",
+    "Borin is on a merchant's roof among racks of drying figs. Tovek Ashbourne, the vanara harbor-reeve, is arguing with Ranja Greymantle, a vanara smuggler-broker, about a missing crate.",
+    "Vanara children leap from roof to roof; the next roof is about six feet away across an alley twelve feet down.",
+    "A ladder leads down to the street. A water jar stands by the parapet.",
+    "Borin was hired this morning by Tovek to find the crate. He has not yet been told what is in it."
+   ],
+   "fight": false
+  }
+ },
+ "lines": [
+  {
+   "id": "s1-01",
+   "split": "set1",
+   "scene": "s1",
+   "kind": "mundane",
+   "text": "I sit at the end of the nearest bench and help myself to the stew.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "owner",
+   "note": ""
+  },
+  {
+   "id": "s1-02",
+   "split": "set1",
+   "scene": "s1",
+   "kind": "mundane",
+   "text": "I ask the serving boy what's in the stew.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "owner",
+   "note": ""
+  },
+  {
+   "id": "s1-03",
+   "split": "set1",
+   "scene": "s1",
+   "kind": "check",
+   "text": "I try to catch what Aldric and the law-speaker are muttering about at the head table.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": -2,
+    "multi": false,
+    "what": "skill:Perception"
+   },
+   "refuse": null,
+   "author": "owner",
+   "note": ""
+  },
+  {
+   "id": "s1-04",
+   "split": "set1",
+   "scene": "s1",
+   "kind": "social",
+   "text": "I walk up to Aldric Ashbourne and tell him I'm looking for sellsword work.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "owner",
+   "note": ""
+  },
+  {
+   "id": "s1-05",
+   "split": "set1",
+   "scene": "s1",
+   "kind": "social",
+   "text": "I tell Delyth Sootspar her law is a joke and I won't pay the hall's copper.",
+   "verdict": "roll",
+   "roll": {
+    "against": "defence",
+    "bonus": -2,
+    "defence": "dc:intimidate",
+    "multi": false,
+    "what": "skill:Intimidate"
+   },
+   "refuse": null,
+   "author": "owner",
+   "note": ""
+  },
+  {
+   "id": "s1-06",
+   "split": "set1",
+   "scene": "s1",
+   "kind": "creative",
+   "text": "I slam my fist on the table and challenge anyone in the hall to arm-wrestle me for their ale, so people start talking to me.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "owner",
+   "note": ""
+  },
+  {
+   "id": "s1-07",
+   "split": "set1",
+   "scene": "s1",
+   "kind": "argue",
+   "text": "I have 17 Strength and I'm a fighter, so obviously I win any arm-wrestle in here without rolling.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "npc_choice",
+   "author": "owner",
+   "note": "\"Hold your horses, muscleman! Strength 17 is formidable, absolutely—you're built like an ox. But out here in a sea-town hall, these fishermen spend sixteen hours a day hauling heavy nets out of the ocean. Raw strength gives you a huge advantage, but luck, technique, and leverage still matter. At this table, power doesn't grant automatic victories without a contest—if it did, the dice would never leave the bag! If you want to pin his hand to the wood and claim that silver, you're going to have to prove it on the mat. Give me an Opposed Athletics check—roll your d20 and add your +3 Strength modi"
+  },
+  {
+   "id": "s1-08",
+   "split": "set1",
+   "scene": "s1",
+   "kind": "creative",
+   "text": "I say loudly that I saw the captain's men take a bribe at the gate, and watch who at the head table reacts.",
+   "verdict": "roll",
+   "roll": {
+    "against": "opposed",
+    "bonus": 0,
+    "multi": false,
+    "opposed_by": "skill:Sense Motive",
+    "what": "skill:Bluff"
+   },
+   "refuse": null,
+   "author": "owner",
+   "note": "I lean forward, resting my forearms on the weathered wood of the table with a sharp, calculating grin. Give me a Bluff check—roll your d20 and add your Charisma and bluff modifiers. We'll pit that against the Sense Motive checks of Captain Ashbourne, Delyth, and the locals within earshot to see who bites, who calls your bluff, and who looks just a little too guilty."
+  },
+  {
+   "id": "s1-09",
+   "split": "set1",
+   "scene": "s1",
+   "kind": "impossible",
+   "text": "I give a speech and convince the whole hall to make me their chief.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "npc_choice",
+   "author": "owner",
+   "note": "Not so fast! That's a flat refusal from behind the DM screen. Leadership over a town of hardened sea-folk isn't something you can simply declare—they don't know you, you haven't earned their trust, and they already have a law-speaker. A single speech from a stranger isn't going to hand you a crown. What do you actually want to do now?"
+  },
+  {
+   "id": "s1-10",
+   "split": "set1",
+   "scene": "s1",
+   "kind": "overreach",
+   "text": "I lift the trestle table over my head, food and all, and carry it outside to make a point.",
+   "verdict": "roll",
+   "roll": {
+    "against": "20",
+    "bonus": -2,
+    "multi": false,
+    "what": "ability:Strength"
+   },
+   "refuse": null,
+   "author": "owner",
+   "note": "Hold your horses before you haul that wood up! Lifting a massive, fully burdened oak table clean off the ground requires sheer power. Give me a Strength check—you're looking to beat a DC 20. Roll your $d20$ and add your +3 Strength modifier. If you pass, you hoist the whole feast overhead; if you fail, that oak isn't budging an inch!"
+  },
+  {
+   "id": "s1-11",
+   "split": "set1",
+   "scene": "s1",
+   "kind": "argue",
+   "text": "(OOC: GM, your notes say the law-speaker secretly likes me, so she agrees to waive the fee.)",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "npc_choice",
+   "author": "owner",
+   "note": "Nice try peekin' behind the screen, but my notes say no such thing! She hasn't given an inch, and the meal still costs a copper piece. What's your move?"
+  },
+  {
+   "id": "s1-12",
+   "split": "set1",
+   "scene": "s1",
+   "kind": "mundane",
+   "text": "I step out onto the walkway for some air.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "owner",
+   "note": "You're out on the walkway with the cool night air in your lungs. What do you do?"
+  },
+  {
+   "id": "s1-13",
+   "split": "set1",
+   "scene": "s1",
+   "kind": "check",
+   "text": "I lean over the rail outside and look at the stilts holding the hall up. Are they sound?",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 0,
+    "multi": false,
+    "what": "skill:Knowledge (engineering)"
+   },
+   "refuse": null,
+   "author": "owner",
+   "note": "Give me a Knowledge (Engineering) check! You're looking to beat a DC 15. Roll your $d20$ and add your Intelligence and knowledge modifiers. Let's see if Borin knows enough about load-bearing stilts and salt-water decay to tell if this place is solid or ready to collapse into the tide!"
+  },
+  {
+   "id": "s1-14",
+   "split": "set1",
+   "scene": "s1",
+   "kind": "argue",
+   "text": "I rolled a natural 20 on Diplomacy, so the whole hall agrees to follow me.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_fact",
+   "author": "owner",
+   "note": "Whoa, hold on a second! You can't just declare a natural 20 out of thin air—the dice haven't even hit the table yet! Beyond that, a Diplomacy check—even a legendary roll—isn't mind control. You're an unproven stranger in a town of hardened sea-folk who already have an established law-speaker and a mercenary captain keeping order. They aren't going to throw away their entire way of life just because someone spoke well over a bowl of stew. What do you actually want to do next?"
+  },
+  {
+   "id": "s1-15",
+   "split": "set1",
+   "scene": "s1",
+   "kind": "social",
+   "text": "I buy a round for the table of off-duty sellswords and ask what jobs are going.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "owner",
+   "note": "The mercenaries have warmed up to you, and you've got two solid leads on local work. What's your next move?"
+  },
+  {
+   "id": "s2-01",
+   "split": "set1",
+   "scene": "s2",
+   "kind": "creative",
+   "text": "I cut the rope line holding the drying nets so they drop across the walkway in front of him.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 0,
+    "multi": false,
+    "what": "save:ref"
+   },
+   "refuse": null,
+   "author": "owner",
+   "note": "I'll roll a Reflex save for the pickpocket against a DC of 15... Rolling d20+2... total of 8. He's down and tangled, but he's already scrambling to free his legs. What do you do?"
+  },
+  {
+   "id": "s2-02",
+   "split": "set1",
+   "scene": "s2",
+   "kind": "creative",
+   "text": "Instead of following him along the planks I jump the gap to the parallel walkway and cut him off where it bends round.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 0,
+    "multi": false,
+    "what": "skill:Acrobatics"
+   },
+   "refuse": null,
+   "author": "owner",
+   "note": "Give me an Acrobatics check to clear the eight-foot leap! You're aiming to beat a DC 15. Roll your d20 and add your +7 Acrobatics modifier (Dexterity +3, 1 rank, +3 class skill). Let's see if Kesst sticks the landing like a shadow or takes an unexpected bath in the tide!"
+  },
+  {
+   "id": "s2-04",
+   "split": "set1",
+   "scene": "s2",
+   "kind": "check",
+   "text": "I run after him.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "owner",
+   "note": "You're running full tilt straight down the main path and closing in on him fast while he's trapped in the nets. What's your move as you reach him?"
+  },
+  {
+   "id": "s2-05",
+   "split": "set1",
+   "scene": "s2",
+   "kind": "overreach",
+   "text": "I dive into the water, swim under the walkways, climb up ahead of him and tackle him.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "too_much",
+   "author": "owner",
+   "note": "Hold your horses! That's way too much for a single turn—diving, navigating under the walkways in the dark, hauling yourself back up, and executing a tackle is a whole sequence of actions, not just one. You've made the leap and hit the water clean, but that's your turn. Give me a Swim check to navigate the current beneath the stilts and get into position under the walkway ahead of him! What's your play once you're in position?"
+  },
+  {
+   "id": "s2-06",
+   "split": "set1",
+   "scene": "s2",
+   "kind": "argue",
+   "text": "Rogues are the fastest class and I have 17 Dex, so I just catch him.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_rule",
+   "author": "owner",
+   "note": "I grin and shake my head. Rogues are quick hands, not quick feet. You're a human like him, same thirty feet a stride. If you want to catch him, give me a way to cut the distance, not a class feature that doesn't exist."
+  },
+  {
+   "id": "s2-07",
+   "split": "set1",
+   "scene": "s2",
+   "kind": "creative",
+   "text": "I yell \"Stop, thief!\" so the two fishermen ahead block the walkway.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "npc_choice",
+   "author": "owner",
+   "note": "I can certainly have Kesst yell out, but I've got to refuse the second half of that instruction! you can't decide how NPC fishermen will react—their choices and courage are entirely up to them behind the screen. Your shout has put the fishermen on high alert, but the pickpocket is still bolting down the five-foot wide walkway. What's your move?"
+  },
+  {
+   "id": "s2-08",
+   "split": "set1",
+   "scene": "s2",
+   "kind": "combat",
+   "text": "I throw my dagger at his leg to slow him down.",
+   "verdict": "roll",
+   "roll": {
+    "against": "defence",
+    "bonus": 0,
+    "defence": "ac",
+    "multi": false,
+    "what": "attack:ranged"
+   },
+   "refuse": null,
+   "author": "owner",
+   "note": "I'm going to refuse the slowing part of that attempt—there's no automatic slow effect tied to a standard weapon attack, so a hit will just deal normal damage. Go ahead and roll for it! Make a Ranged Attack roll against the pickpocket's Armor Class: roll a $d20$, add your Dexterity modifier of +3, and take a -4 penalty for the range penalty since he's 30 feet out with a 10-foot range increment. That gives you a net -1 modifier to your $d20$ roll. Let's see if the steel finds its mark!"
+  },
+  {
+   "id": "s2-09",
+   "split": "set1",
+   "scene": "s2",
+   "kind": "impossible",
+   "text": "I whistle and the gulls swarm him.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "character",
+   "author": "owner",
+   "note": "Nice idea, but nothing in your kit talks to birds. They're not your gulls."
+  },
+  {
+   "id": "s2-10",
+   "split": "set1",
+   "scene": "s2",
+   "kind": "check",
+   "text": "I've lost him. I check the planks for wet footprints.",
+   "verdict": "roll",
+   "roll": {
+    "against": "10",
+    "bonus": 0,
+    "multi": false,
+    "what": "skill:Survival"
+   },
+   "refuse": null,
+   "author": "owner",
+   "note": "I'll let you roll for it! Go ahead and give me a Survival check against a DC of 10 to track his prints down the planks—even though, funnily enough, you can still see the guy running full tilt right in front of you thirty feet out! Roll your d20 and add your Wisdom modifier (+0). Let's see how clearly those tracks stand out!"
+  },
+  {
+   "id": "s2-11",
+   "split": "set1",
+   "scene": "s2",
+   "kind": "overreach",
+   "text": "I stamp on a loose plank so it flips up and trips him as he runs.",
+   "verdict": "roll",
+   "roll": {
+    "against": "defence",
+    "bonus": 2,
+    "defence": "cmd",
+    "multi": false,
+    "what": "cmb:trip"
+   },
+   "refuse": null,
+   "author": "owner",
+   "note": "Roll for it! That's a Trip combat maneuver aimed right at his shins. Go ahead and roll a Combat Maneuver Check (CMB) against the pickpocket's CMD. Roll a $d20$, add your base CMB (+0), and add a +2 circumstance bonus for the clever setup! Let's see if that plank catches him out!"
+  },
+  {
+   "id": "s2-12",
+   "split": "set1",
+   "scene": "s2",
+   "kind": "social",
+   "text": "I shout that I'll pay ten silver to whoever stops him.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "owner",
+   "note": "That offer did the trick! The pickpocket is caught completely off guard, skidding on the damp planks as two burly fishermen block his route. He's trapped between them and you—what's your next move?"
+  },
+  {
+   "id": "s2-13",
+   "split": "set1",
+   "scene": "s2",
+   "kind": "mundane",
+   "text": "I stop and catch my breath.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "owner",
+   "note": "The pickpocket keeps sprinting ahead down the walkway, widening the gap between you. What would you like Kesst to do next?"
+  },
+  {
+   "id": "s2-14",
+   "split": "set1",
+   "scene": "s2",
+   "kind": "argue",
+   "text": "He's a pickpocket, he can't have more than 1 hit point, so my thrown dagger kills him.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_rule",
+   "author": "owner",
+   "note": "Ooh, I love the confidence, but no."
+  },
+  {
+   "id": "s2-15",
+   "split": "set1",
+   "scene": "s2",
+   "kind": "creative",
+   "text": "I yank one of the drying nets off the line and throw it over him.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 0,
+    "multi": false,
+    "what": "save:ref"
+   },
+   "refuse": null,
+   "author": "owner",
+   "note": "I'm making a secret Reflex saving throw (DC 15) behind the screen for the pickpocket to see if his reflexes are fast enough to dodge the heavy mesh as it swoops down over him. Let me roll the d20... He failed the save and is now pinned under the net! What's Kesst doing now that he's down?"
+  },
+  {
+   "id": "s3-01",
+   "split": "set1",
+   "scene": "s3",
+   "kind": "social",
+   "text": "I tell Marigold Krell I'm from the guild and I've come to audit her books.",
+   "verdict": "roll",
+   "roll": {
+    "against": "20",
+    "bonus": 0,
+    "multi": false,
+    "what": "skill:Bluff"
+   },
+   "refuse": null,
+   "author": "owner",
+   "note": "Roll for it! Give me a Bluff check against DC 20. Roll your d20 and add your +6 Bluff modifier (+2 Charisma, 1 rank, +3 class skill bonus). Let's see if your brass nerve is enough to convince a sharp dockside loan shark!"
+  },
+  {
+   "id": "s3-02",
+   "split": "set1",
+   "scene": "s3",
+   "kind": "check",
+   "text": "While she counts coins I palm the small brass key off her desk.",
+   "verdict": "roll",
+   "roll": {
+    "against": "opposed",
+    "bonus": 0,
+    "multi": false,
+    "opposed_by": "skill:Perception",
+    "what": "skill:Sleight of Hand"
+   },
+   "refuse": null,
+   "author": "owner",
+   "note": "Give me Sleight of Hand. She rolls Perception to notice, and she's sitting right there, so it's a straight contest."
+  },
+  {
+   "id": "s3-03",
+   "split": "set1",
+   "scene": "s3",
+   "kind": "creative",
+   "text": "I knock the inkpot over onto her ledger so she rushes to save it, and while she does I slide the brass key into my sleeve.",
+   "verdict": "roll",
+   "roll": {
+    "against": "opposed",
+    "bonus": 2,
+    "multi": false,
+    "opposed_by": "skill:Perception",
+    "what": "skill:Sleight of Hand"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Give me a Sleight of Hand check, opposed by Perception from both Marigold and the clerk; if either of them beats you, they see it. You have no ranks, but Sleight of Hand can be tried untrained, so it's your Dexterity, +3. Take a +2 circumstance bonus for the diversion: they're both looking at the ink, not at you. One more thing rides on this same roll. Spilling the pot is easy; making it look like an accident is part of the trick. If it goes wrong, she won't only be asking where her key went, she'll be wondering about that clumsy elbow too."
+  },
+  {
+   "id": "s3-04",
+   "split": "set1",
+   "scene": "s3",
+   "kind": "check",
+   "text": "I look over the strongbox's lock without touching it.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 0,
+    "multi": false,
+    "what": "skill:Perception"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Give me a Perception check, DC 15, to read that lock from where you stand without laying a finger on it: how good a lock it is, how much work it would be with your thieves' tools, and whether anything about it looks wrong. If what you're really hunting for is a trap, your trapfinding adds +1 to the check for that. Your Perception is +5. It's only a few feet away, so there's no distance penalty. This only tells you what you're up against. It doesn't open anything, and it won't tell you what's inside. And she has noticed where your eyes went."
+  },
+  {
+   "id": "s3-05",
+   "split": "set1",
+   "scene": "s3",
+   "kind": "argue",
+   "text": "I'm a rogue, I can open any lock with my eyes closed, so I just open the strongbox.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_rule",
+   "author": "owner",
+   "note": "I laugh. With your eyes closed? You've got one rank in Disable Device and a set of picks. That's a real chance, not a guarantee. Want to try the lock properly? It's a roll, and it takes time with her sitting right there."
+  },
+  {
+   "id": "s3-06",
+   "split": "set1",
+   "scene": "s3",
+   "kind": "mundane",
+   "text": "I ask what interest she charges on a loan of fifty silver.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "owner",
+   "note": "Plain question, plain answer. No roll."
+  },
+  {
+   "id": "s3-07",
+   "split": "set1",
+   "scene": "s3",
+   "kind": "social",
+   "text": "I threaten to tell the harbor watch about her side business unless she forgives my friend's debt.",
+   "verdict": "roll",
+   "roll": {
+    "against": "unlikely",
+    "bonus": 0,
+    "multi": false,
+    "what": "oracle"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Here's how this one works. Kesst doesn't actually know Marigold has a side business; you're guessing, and saying it with confidence doesn't make it known. So before anything else I roll the odds behind the screen on whether your guess happens to be true. I've set those odds from what I know about her, and I won't tell you what they were or how they fell. If you guessed right, it's real leverage: Intimidate against her, ten plus her Hit Dice plus her Wisdom. If you guessed wrong, you're bluffing whether you meant to or not: your Bluff against her Sense Motive, at −4 for an unlikely claim (the b"
+  },
+  {
+   "id": "s3-08",
+   "split": "set1",
+   "scene": "s3",
+   "kind": "overreach",
+   "text": "I convince her to sign the whole business over to me.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "npc_choice",
+   "author": "owner",
+   "note": "That's her whole livelihood. No roll in the world talks a moneylender out of her own business. That's hers to give, and she won't."
+  },
+  {
+   "id": "s3-09",
+   "split": "set1",
+   "scene": "s3",
+   "kind": "creative",
+   "text": "I set my purse down hard so it clinks heavily, to make her think I'm rich, then ask her to forgive the debt as a favour to a future client.",
+   "verdict": "roll",
+   "roll": {
+    "against": "opposed",
+    "bonus": 0,
+    "multi": true,
+    "opposed_by": "skill:Sense Motive",
+    "what": "skill:Bluff"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Two rolls, one after the other. First, a Bluff check against her Sense Motive: the purse is a lie told with sound, and she has to believe you're worth courting. A heavy purse is a believable lie, so there's no modifier on it. Your Bluff is +6. Roll that first. Then comes the ask itself, a Diplomacy check. You're a stranger to her, so she's indifferent: DC 15 plus her Charisma modifier, and +5 on top, because writing off forty silver she's owed is a costly favour, not a small one. If she believes the purse, you get +2 on that Diplomacy for the promise of future business. If she doesn't, she'll "
+  },
+  {
+   "id": "s3-10",
+   "split": "set1",
+   "scene": "s3",
+   "kind": "impossible",
+   "text": "I walk through the wall into the back room.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "character",
+   "author": "owner",
+   "note": "I raise an eyebrow. You're a rogue, not a ghost. Walls stay walls for you. There's a door with a sellsword outside it, and a window onto the dock if you still want to enter the backroom."
+  },
+  {
+   "id": "s3-11",
+   "split": "set1",
+   "scene": "s3",
+   "kind": "argue",
+   "text": "You told me last scene the strongbox was unlocked, so I open it.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_fact",
+   "author": "owner",
+   "note": "I flip back through my notes. Nope. I never said that. The strongbox is locked, and the key is lying on her desk. Nice try, though."
+  },
+  {
+   "id": "s3-12",
+   "split": "set1",
+   "scene": "s3",
+   "kind": "check",
+   "text": "I wait until she goes out for her midday meal and then pick the office lock.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "world",
+   "author": "claude-draft, owner-approved",
+   "note": "I can't give you that one as you've said it. First, whether Marigold goes out for a midday meal, and when, is hers to decide; I won't promise you an empty room on a schedule you've picked for her. Second, and bigger: whatever lock that office has is on the only door, and there's a hired sellsword standing outside it. Picking it means kneeling at his feet with your picks out. There's no Disable Device roll that makes that quiet, because the problem isn't the lock, it's the man. If you want this room empty and open, you need a way past him or another way in, and there is a window looking onto th"
+  },
+  {
+   "id": "s3-13",
+   "split": "set1",
+   "scene": "s3",
+   "kind": "social",
+   "text": "I flirt with the clerk to get him to show me the list of debtors.",
+   "verdict": "roll",
+   "roll": {
+    "against": "25",
+    "bonus": 0,
+    "multi": false,
+    "what": "skill:Diplomacy"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Give me a Diplomacy check. Flirting your way to a favour is still a request, so it runs off his attitude. He doesn't know you, so he's indifferent: DC 15 plus his Charisma modifier. Then I'm adding +10, because what you're asking for is his employer's private business, the kind of favour that could cost him his place, and she's sitting a few strides away. Call it DC 25. Your Diplomacy is +6. If you could get him alone, away from her desk, I'd bring that down. Roll it here or pick your moment?"
+  },
+  {
+   "id": "s3-14",
+   "split": "set1",
+   "scene": "s3",
+   "kind": "social",
+   "text": "I offer to work off my friend's debt by collecting from one of her late payers.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 2,
+    "multi": false,
+    "what": "skill:Diplomacy"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "It's a fair offer and she's interested enough to hear it out, but she hasn't said yes. Give me a Diplomacy check. You're a stranger to her, so she's indifferent: DC 15 plus her Charisma modifier. Take +2, because you're offering her something she wants, money she's owed and isn't getting, at no cost to herself. Your Diplomacy is +6. Answer her question in your own words as you roll; what you say will shape the terms if she agrees. A good roll gets you a deal on her terms. A poor one gets you a polite no, and the forty silver still standing."
+  },
+  {
+   "id": "s3-15",
+   "split": "set1",
+   "scene": "s3",
+   "kind": "mundane",
+   "text": "I thank her and leave.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "owner",
+   "note": "You're out. Where to?"
+  },
+  {
+   "id": "s4-01",
+   "split": "set1",
+   "scene": "s4",
+   "kind": "creative",
+   "text": "I kick over a barrel of lamp oil so it floods toward the two at the stairs, then throw the lit lantern into the oil.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 0,
+    "multi": true,
+    "what": "ability:Strength"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "I like it, but it's more than one turn's work, so here's how it splits. This turn: tipping a full barrel over with a kick is a Strength check, DC 15, and it takes your standard action. It doesn't provoke. Your Strength is +3. Roll that first. If it goes over, the oil runs out across the floor. By the book a single pint covers a five-foot square, so a barrel's worth will spread a long way, but it runs where the floor takes it, not only toward the stair. Some of it may come your way. Next turn is the lantern. Your hands are full of sword and shield, so you'd drop the sword (free), unhook the lan"
+  },
+  {
+   "id": "s4-02",
+   "split": "set1",
+   "scene": "s4",
+   "kind": "creative",
+   "text": "I slam into the clubman with my shield and drive him back into the wine rack.",
+   "verdict": "roll",
+   "roll": {
+    "against": "defence",
+    "bonus": 0,
+    "defence": "cmd",
+    "multi": false,
+    "what": "cmb:bull rush"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "That's a bull rush. Roll your Combat Maneuver Bonus, +4 (base attack +1, Strength +3), against his CMD. You don't have Improved Bull Rush, so this provokes: he gets an attack of opportunity on you before you connect, and I'll roll that first. Unless it drops you, the shove still goes ahead. Beat his CMD and he's driven back five feet, plus five more for every five you beat it by. Here the extra hardly matters: the rack is right behind him, so he goes back into it and stops there. The book gives no bonus damage for slamming a man into furniture, so what this buys you is position and a lot of br"
+  },
+  {
+   "id": "s4-03",
+   "split": "set1",
+   "scene": "s4",
+   "kind": "creative",
+   "text": "I knock the lantern off its hook so the cellar goes dark.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Done. Knocking it off the hook is a move action, so you still have your standard action this turn. Now the bad news, and it's yours as much as theirs. You're human, with no darkvision, so in total darkness you're effectively blinded: everything you swing at has total concealment, a 50% miss chance even when your roll would hit; you take −2 to AC and lose your Dexterity bonus to AC; and moving faster than half speed takes a DC 10 Acrobatics check or you fall prone. The same goes for anyone else down here who can't see in the dark. Whether any of these three can is something you're about to find"
+  },
+  {
+   "id": "s4-04",
+   "split": "set1",
+   "scene": "s4",
+   "kind": "combat",
+   "text": "I attack the clubman with my longsword.",
+   "verdict": "roll",
+   "roll": {
+    "against": "defence",
+    "bonus": 0,
+    "defence": "ac",
+    "multi": false,
+    "what": "attack:melee"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Roll your attack against his AC. Your longsword is +5 to hit: base attack +1, Strength +3, and +1 from Weapon Focus. If it lands, damage is 1d8+3. You also have Power Attack. If you want it, say so before you roll: −1 to hit for +2 damage. A one-handed sword doesn't care about the low beams, so there's no penalty for the ceiling. The attack is a standard action, which leaves you a move afterwards if you want it, though stepping away from him with anything more than a five-foot step will draw a swing from that club."
+  },
+  {
+   "id": "s4-05",
+   "split": "set1",
+   "scene": "s4",
+   "kind": "overreach",
+   "text": "I cleave through all three of them in one swing.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "character",
+   "author": "claude-draft, owner-approved",
+   "note": "No, and it isn't close. One swing of a longsword hits one man. Even the Cleave feat, which you don't have, only lets you carry a hit on into a second foe who's standing next to the first and also within your reach, and it costs you −2 to AC until your next turn. Two of these three are fifteen feet away, well out of your reach. Nothing in your hands touches them from here; your shortbow could, but you're holding a sword and a shield. So pick a target. The clubman is right there. Attack him, shove him, trip him, or do something clever with the room; there's plenty in this cellar to work with. Wh"
+  },
+  {
+   "id": "s4-06",
+   "split": "set1",
+   "scene": "s4",
+   "kind": "argue",
+   "text": "They're just cutthroats, so once I kill one the other two run. I kill the clubman and the fight's over.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "npc_choice",
+   "author": "claude-draft, owner-approved",
+   "note": "Two things in that, and I can't give you either one. First, you don't get to say \"I kill the clubman.\" You get to attack him, and the dice say whether you hit, how hard, and whether that's enough to put him down. I know how much he can take. You don't, yet. Second, what the other two do when their friend falls is their call, not yours. Cutthroats do break, sometimes. Plenty of them also get angry, or decide that two short swords against one man are still good odds. I'll play them as the people they are when it happens, and I'm not promising you they run. If you want to find out, swing at him. "
+  },
+  {
+   "id": "s4-07",
+   "split": "set1",
+   "scene": "s4",
+   "kind": "creative",
+   "text": "I move to Ruk and cut his ropes so he can help me.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Yes. I'm reading \"move to Ruk\" as a five-foot step: he's ten feet off, so one step puts you beside him, and a five-foot step doesn't provoke. Cutting a bound man loose with your sword is a standard action, so that's your turn. If you meant a full move instead, you'd be leaving the clubman's reach and he'd get an attack of opportunity on you; tell me now if that's what you wanted. Ruk is free and can get out of the chair on his own turn. Whether he helps you is up to him. He's a caravan factor, not a fighter, and he hasn't got a weapon. He might grab one, he might get behind you, he might freez"
+  },
+  {
+   "id": "s4-08",
+   "split": "set1",
+   "scene": "s4",
+   "kind": "creative",
+   "text": "I put my back to the narrow stair so only one of them can come at me at a time.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "world",
+   "author": "claude-draft, owner-approved",
+   "note": "You can't get your back to that stair. It's fifteen feet away, and the two swordsmen are standing at its foot. To put your back to it you'd have to go through both of them, and the clubman next to you gets an attack of opportunity the moment you leave his reach. The stair is their ground right now, not yours. The instinct is good, though: find a place where only one of them can reach you at a time. Look at what this cellar gives you to work with: the wall of oil barrels, the wine rack, the low beams, and Ruk in his chair. If there's somewhere you can stand so they can't come at you side by sid"
+  },
+  {
+   "id": "s4-09",
+   "split": "set1",
+   "scene": "s4",
+   "kind": "creative",
+   "text": "I roll a barrel to the foot of the stairs to block the two from coming at me together.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "world",
+   "author": "claude-draft, owner-approved",
+   "note": "I can't give you this one. You can't block them at the foot of the stair, because that's where they already are; a barrel rolled there would arrive among them, not in front of them. And one barrel lying loose in an open cellar is an obstacle in a single square: they'd simply step round it. Getting a full barrel over and rolling it fifteen feet straight is more than one turn's work as well, with the clubman swinging at you the whole time. You'd spend your round building a bump in the floor. If those barrels are what you want to use, there's a better question to ask: what's in them, and what hap"
+  },
+  {
+   "id": "s4-10",
+   "split": "set1",
+   "scene": "s4",
+   "kind": "creative",
+   "text": "I duck under a low beam so the clubman's overhead swing hits the beam instead of me.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "npc_choice",
+   "author": "claude-draft, owner-approved",
+   "note": "I can't make his swing go where you want it. It's your turn, not his, so he isn't swinging right now. When he does, how he swings is his choice, and he can see that beam as clearly as you can. Seven feet of ceiling is a reason for him to swing short, not a trap he's bound to walk into. What you can do is make yourself hard to hit. Total defense is a standard action and gives you +4 dodge to AC until your next turn, but no attack. Or attack while fighting defensively: −4 on the attack roll, +2 dodge to AC. You don't have the three ranks in Acrobatics that would raise either bonus. Which will it"
+  },
+  {
+   "id": "s4-11",
+   "split": "set1",
+   "scene": "s4",
+   "kind": "argue",
+   "text": "I'm in the doorway so I have cover against all of them, and I'm flanking the clubman, so +6 to hit.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_fact",
+   "author": "claude-draft, owner-approved",
+   "note": "I'll stop you there, because neither of those is true. There's no doorway where you're standing, so there's no cover. And cover in Pathfinder adds to your AC against their attacks; it never adds anything to your own attack roll. Flanking needs an ally on the opposite side of him who threatens him too. Ruk's tied to a chair ten feet away and can't threaten anyone, and nobody else down here is on your side. Even with a real flank, it would be +2 on your attack, not +6. There's no rule that adds up to six here. So it's your longsword at its usual +5: base attack +1, Strength +3, Weapon Focus +1, "
+  },
+  {
+   "id": "s4-12",
+   "split": "set1",
+   "scene": "s4",
+   "kind": "impossible",
+   "text": "I cast fireball at the stairs.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "character",
+   "author": "claude-draft, owner-approved",
+   "note": "You're a fighter, Borin. First level, no spellcasting at all, and fireball is a third-level spell that even a wizard doesn't get until fifth level. Nothing on your sheet makes fire come out of your hands. But look where you're standing. There's a wall of lamp-oil barrels along one side of this cellar and a lit lantern hanging on the hook right beside you. If it's fire you want, the room has it; you'd just have to do it the hard way, and you'd have to think about Ruk tied to his chair in the middle of it. What do you actually do with your turn?"
+  },
+  {
+   "id": "s4-13",
+   "split": "set1",
+   "scene": "s4",
+   "kind": "social",
+   "text": "I roar at them to drop their weapons or die.",
+   "verdict": "roll",
+   "roll": {
+    "against": "defence",
+    "bonus": 0,
+    "defence": "dc:intimidate",
+    "multi": false,
+    "what": "skill:Intimidate"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "That's Intimidate to demoralize, a standard action in a fight. Pick one of them, because by the book demoralizing works on one opponent within thirty feet who can see and hear you. The DC is that man's own: 10 + his Hit Dice + his Wisdom modifier. Your Intimidate is +3: one rank, +3 for a class skill, −1 for your Charisma. Be clear about what you're buying. Success leaves him shaken for 1 round, plus another round for every 5 you beat the DC by: −2 on his attacks, saves and checks. It doesn't make anyone drop a weapon. Making a man do what you tell him is the other use of Intimidate, and that "
+  },
+  {
+   "id": "s4-14",
+   "split": "set1",
+   "scene": "s4",
+   "kind": "creative",
+   "text": "I grab a wine bottle off the rack and smash it in the clubman's face to blind him.",
+   "verdict": "roll",
+   "roll": {
+    "against": "defence",
+    "bonus": 0,
+    "defence": "cmd",
+    "multi": false,
+    "what": "cmb:dirty trick"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Here's how that turn runs. Dropping the sword is free. The five-foot step puts the rack in reach and doesn't provoke. Pulling a bottle loose is a move action, and the smash is your standard. That's your whole turn, and your sword is on the floor at the end of it. Blinding a man is a dirty trick, a combat manoeuvre: roll your CMB, +4 (base attack +1, Strength +3), against his CMD. You don't have Improved Dirty Trick, so he gets an attack of opportunity on you first, and I'll roll that. Beat his CMD and he's blinded for 1 round, plus a round for every 5 you beat it by, until he spends a move act"
+  },
+  {
+   "id": "s4-15",
+   "split": "set1",
+   "scene": "s4",
+   "kind": "overreach",
+   "text": "I grab the clubman, hold him as a shield against the other two, then throw him into them.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "too_much",
+   "author": "claude-draft, owner-approved",
+   "note": "That's three things, and they won't fit into one turn. Grabbing him is a grapple, a combat manoeuvre all on its own. Holding him up as a living shield isn't something the Core Rulebook gives you; a man in your grip doesn't give you cover. And throwing him fifteen feet into his friends isn't something a first-level fighter can do to a grown man at all. The grapple you can try this turn. It's your CMB, +4, against his CMD, as a standard action. You don't have Improved Grapple, so it provokes an attack of opportunity from him. And without two free hands you take −4 on the roll; even if you drop t"
+  },
+  {
+   "id": "s4-16",
+   "split": "set1",
+   "scene": "s4",
+   "kind": "combat",
+   "text": "I trip the clubman.",
+   "verdict": "roll",
+   "roll": {
+    "against": "defence",
+    "bonus": 0,
+    "defence": "cmd",
+    "multi": false,
+    "what": "cmb:trip"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "That's a trip. Roll your CMB, +4 (base attack +1, Strength +3), against his CMD. You don't have Improved Trip, so it provokes: he gets an attack of opportunity on you before the trip lands, and I'll roll that first. Beat his CMD and he goes down prone: −4 on his melee attacks, −4 to his AC against your sword, and getting up costs him a move action that provokes from you. Miss his CMD by 10 or more, though, and you're the one who ends up on the floor. It's a standard action, so it leaves you your move, though walking away from him afterwards will draw another swing unless he's lying down. Still"
+  },
+  {
+   "id": "s4-17",
+   "split": "set1",
+   "scene": "s4",
+   "kind": "mundane",
+   "text": "I shout to Ruk to keep still, I'm getting him out.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Yes. Speaking is a free action, and a shout like that costs you nothing in a fight as long as you keep it short. Ruk hears you and does as he's told. You've still got your whole turn: a move and a standard, or one full-round action. What are you doing with it?"
+  },
+  {
+   "id": "s5-01",
+   "split": "set1",
+   "scene": "s5",
+   "kind": "creative",
+   "text": "I cast grease on the floor in front of the study door so anyone who comes out slips.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Grease is down, covering the square before the study door. At your level it lasts one minute, so ten rounds, and it was your only grease today. It doesn't drop people automatically: anyone stepping out through that door needs a DC 10 Acrobatics check to walk through it at half speed. Fail and they can't move that round and must make a Reflex save, DC 14, or fall prone; fail the Acrobatics by 5 or more and they simply go down. So it turns coming out of there into a gamble, not a certainty. And you cast it with words and gestures in full view of the lookout, so Sprig saw every bit of it. What do"
+  },
+  {
+   "id": "s5-02",
+   "split": "set1",
+   "scene": "s5",
+   "kind": "creative",
+   "text": "I use mage hand to lift the key ring off its hook across the room while Sprig isn't looking.",
+   "verdict": "roll",
+   "roll": {
+    "against": "opposed",
+    "bonus": -4,
+    "multi": false,
+    "opposed_by": "skill:Perception",
+    "what": "skill:Stealth"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Mage hand can do the lifting: a ring of keys is well under 5 pounds, and twenty feet is inside the spell's 25-foot range. But the hand only carries it 15 feet a round, so the ring spends two rounds in the air, and you spend a move action each round steering it. Whether Sprig is looking isn't something you get to declare; that's what the dice are for. Give me a Stealth check opposed by his Perception. You have no ranks in Stealth, so it's your Dexterity, +2, and take a -4: you're speaking and gesturing in the same room as a lookout, and a bunch of keys sailing across a workshop is not an easy t"
+  },
+  {
+   "id": "s5-03",
+   "split": "set1",
+   "scene": "s5",
+   "kind": "check",
+   "text": "I study the brass lock to work out how the gears move.",
+   "verdict": "roll",
+   "roll": {
+    "against": "10",
+    "bonus": 0,
+    "multi": false,
+    "what": "skill:Knowledge (engineering)"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Working out how a mechanism moves is Knowledge (engineering), and Thessaly isn't trained in it. Untrained, you can still try a Knowledge check, but the book won't let you succeed at anything above DC 10, so that's the roll: DC 10, with your Intelligence, +3. A success gets you the broad shape of it, how the gears are meant to turn and what sort of key it wants. Anything finer is beyond untrained eyes. And understanding it isn't opening it: picking a lock is Disable Device, which is trained only, and you have no ranks in that either. Roll it."
+  },
+  {
+   "id": "s5-04",
+   "split": "set1",
+   "scene": "s5",
+   "kind": "argue",
+   "text": "I have 17 Intelligence, I understand any mechanism instantly, so the lock opens.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_rule",
+   "author": "claude-draft, owner-approved",
+   "note": "I'm going to stop you there, kindly. Seventeen Intelligence is sharp, and it does help: it's your bonus on every Knowledge check, including working out how this thing moves. But there's no rule that a high score understands a mechanism instantly, and no rule at all that understanding a lock opens it. Opening it is Disable Device, which is trained only, and Thessaly has no ranks in it, so you can't pick it whatever the dice say. What you can do is study it, which is a Knowledge (engineering) check, untrained and capped at DC 10. Or find another way in: the key ring on its hook, the window above"
+  },
+  {
+   "id": "s5-05",
+   "split": "set1",
+   "scene": "s5",
+   "kind": "creative",
+   "text": "Before touching anything I cast detect magic on the door to see if there's a magical trap.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Detect magic is running, and remember the cone takes in Sprig and his bench too. The first round tells you only whether there's any magic in the cone at all, and I'll tell you that straight. Concentrate for a second round and you learn how many auras there are and the strength of the strongest. A third round gives you each aura's strength and where it sits. Naming an aura's school is Knowledge (arcana), DC 15 plus the spell's level, and you're trained in that. Each round of concentrating is a standard action. Do you keep at it, or answer Sprig?"
+  },
+  {
+   "id": "s5-06",
+   "split": "set1",
+   "scene": "s5",
+   "kind": "overreach",
+   "text": "I cast magic missile at the lock to blow it open.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_rule",
+   "author": "claude-draft, owner-approved",
+   "note": "I'm stopping this one on the rules. Magic missile strikes a creature, and the spell says plainly that objects aren't damaged by it. It can't blow open a lock, and Thessaly knows that from their own spellbook, so I won't let you spend your only one for nothing. If you want to force the door, that's a Strength check to break it, and with Strength 9 against a guildmaster's study door I wouldn't bet your supper on it. Meanwhile the key ring is still on its hook, the window still sits above the door, and the lift still runs up to the skylight. What do you do instead?"
+  },
+  {
+   "id": "s5-07",
+   "split": "set1",
+   "scene": "s5",
+   "kind": "creative",
+   "text": "I chat with Sprig about gnome lockwork, pretending to be a guild apprentice, hoping he lets slip how the lock opens.",
+   "verdict": "roll",
+   "roll": {
+    "against": "opposed",
+    "bonus": -2,
+    "multi": true,
+    "opposed_by": "skill:Sense Motive",
+    "what": "skill:Bluff"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Two checks here. The first is the lie itself: Bluff against Sprig's Sense Motive. You have no ranks in Bluff, so it's straight Charisma, +0, and I'm giving you a -2. You're a human claiming a place in a gnome guild, in a town where guild rank matters more than birth, with nothing on you that marks you as guild. It isn't far-fetched, but it raises an eyebrow, and it already has. If he buys it, getting him to talk about the study lock is a second check: a request, so Diplomacy against his attitude, indifferent to start, DC 15 plus his Charisma modifier. Answer his question, then roll the Bluff."
+  },
+  {
+   "id": "s5-08",
+   "split": "set1",
+   "scene": "s5",
+   "kind": "impossible",
+   "text": "I cast knock on the door.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "character",
+   "author": "claude-draft, owner-approved",
+   "note": "Knock is a second-level spell, and Thessaly is a first-level wizard, so it's out of reach for now. Today you prepared magic missile and grease, one of each, plus your cantrips: detect magic, light, mage hand and prestidigitation. None of those opens a lock. Mage hand could fetch the key ring off its hook twenty feet away, though, and there's still the window above the door and the lift up to the skylight. What do you try?"
+  },
+  {
+   "id": "s5-09",
+   "split": "set1",
+   "scene": "s5",
+   "kind": "creative",
+   "text": "I use prestidigitation to colour my robes like a Glimgear guild apprentice's before I talk to Sprig.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Prestidigitation can colour cloth, but only a one-foot cube of it each round, so dyeing a whole robe takes several rounds, and the change holds for an hour before it fades. It alters how you look, not who you are. When you go to Sprig and claim to be an apprentice, that's still a Bluff against his Sense Motive; the robes just mean you won't take a penalty for looking out of place. If you want to be sure you've matched what Glimgear's apprentices actually wear, that's a Knowledge (local) check, and you're trained in it. Ready to talk to him?"
+  },
+  {
+   "id": "s5-10",
+   "split": "set1",
+   "scene": "s5",
+   "kind": "mundane",
+   "text": "I look around the workshop.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "That's the room as it stands. Nothing else jumps out at you at a glance; if you want a closer look at something in particular, the lock, the lift, the window or Sprig, tell me which and I'll tell you what a careful look turns up. What catches your interest?"
+  },
+  {
+   "id": "s5-11",
+   "split": "set1",
+   "scene": "s5",
+   "kind": "check",
+   "text": "I climb up the wall to the small window above the study door.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 0,
+    "multi": false,
+    "what": "skill:Climb"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Climb check, DC 15: a rough wall gives you holds enough to grip and stand on. You have no ranks in Climb and your Strength is 9, so it's -1 on the die. You climb at a quarter of your speed, so twelve feet is about a round of hard work, and I'll take this one roll for the whole short climb. Fail by 4 or less and you simply make no progress; fail by 5 or more and you fall, which from that height is 1d6. And as you can see, the lookout isn't pretending not to notice. Roll it."
+  },
+  {
+   "id": "s5-12",
+   "split": "set1",
+   "scene": "s5",
+   "kind": "creative",
+   "text": "I ride the gear lift up to the gallery and look down into the study through the skylight.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "You're up on the gallery, looking down into the study. Through dirty glass from up here you get the shape of the room and no detail; if you want to make out something specific down there, that's a Perception check, and the distance and the glass will both count against you. Sprig is calling you down, loudly. What do you do?"
+  },
+  {
+   "id": "s5-13",
+   "split": "set1",
+   "scene": "s5",
+   "kind": "argue",
+   "text": "I send my familiar in through the window to open the door from the inside.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_fact",
+   "author": "claude-draft, owner-approved",
+   "note": "Check your sheet with me: Thessaly's arcane bond is the ring, not a familiar, so there's no creature to send in through the window. Clever plan, wrong wizard. The ring does have its uses: once a day it lets you cast any one spell from your spellbook that you're able to cast, even if you didn't prepare it, though at first level that still means first-level spells. The window above the door is still there if you fancy the climb yourself, as is the lift up to the skylight. What's your move?"
+  },
+  {
+   "id": "s5-14",
+   "split": "set1",
+   "scene": "s5",
+   "kind": "social",
+   "text": "I tell Sprig that Corwyn Krell sent me to fetch a notebook from the study.",
+   "verdict": "roll",
+   "roll": {
+    "against": "opposed",
+    "bonus": 0,
+    "multi": false,
+    "opposed_by": "skill:Sense Motive",
+    "what": "skill:Bluff"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Give me a Bluff check against Sprig's Sense Motive. You have no ranks in Bluff, so it's your Charisma, +0. I'm not adding a penalty: a guildmaster sending someone to fetch a notebook is a believable errand, the kind that happens every day. You get no help either, though. He has never met you, and keeping an eye on that door is the whole reason he's standing here. Win, and he believes you were sent; whether that stretches to handing you the keys is a short step further, and we'll see. Roll it."
+  },
+  {
+   "id": "s6-01",
+   "split": "set1",
+   "scene": "s6",
+   "kind": "social",
+   "text": "When she gets to my crate I tell the reeve it's pickled fish.",
+   "verdict": "roll",
+   "roll": {
+    "against": "opposed",
+    "bonus": 0,
+    "multi": false,
+    "opposed_by": "skill:Sense Motive",
+    "what": "skill:Bluff"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Bluff against her Sense Motive, and you're at +6. Pickled fish is a perfectly believable thing for a crate on a dock to hold, so there's no penalty; it's the sort of answer she must hear a dozen times a morning. Keep in mind what this roll can and can't do. It can make her believe you. It can't change what's actually in the crate, and if she decides to lift the lid anyway, the lie is over whatever you rolled. Let's see it."
+  },
+  {
+   "id": "s6-02",
+   "split": "set1",
+   "scene": "s6",
+   "kind": "creative",
+   "text": "I 'accidentally' knock over the crate of live crabs so the watch are busy chasing them while my crate goes through.",
+   "verdict": "roll",
+   "roll": {
+    "against": "opposed",
+    "bonus": 0,
+    "multi": false,
+    "opposed_by": "skill:Sense Motive",
+    "what": "skill:Bluff"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Knocking the crate over just happens; that part's yours. Making it look like an accident is a Bluff, against the reeve's Sense Motive and the watch's as well. Docks are slick and people stumble, so it's believable, no penalty. Two things before you roll. The crabs buy you a distraction, not a pass: she inspects crates one by one, and yours is still fourth in line with her standing right there. And the watch chasing crabs is their choice, not a promise. Roll your Bluff."
+  },
+  {
+   "id": "s6-03",
+   "split": "set1",
+   "scene": "s6",
+   "kind": "creative",
+   "text": "Before she reaches my crate I swap its tag with the tag on the crate ahead of it.",
+   "verdict": "roll",
+   "roll": {
+    "against": "opposed",
+    "bonus": 0,
+    "multi": false,
+    "opposed_by": "skill:Perception",
+    "what": "skill:Sleight of Hand"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "This is Sleight of Hand against the Perception of the reeve and both watchmen. Kesst has no ranks in it, so it's raw Dexterity, +3, and the book is hard on untrained hands: without training you can't beat anything over 10 at this skill. In your favour, all three of them are busy with the first crate, and that distraction counts against their Perception. Be clear about what you're buying, too. The tags change; the crates don't. Your dye stays in your crate, still fourth in line. What changes is whose name it sits under when she lifts the lid. Roll it."
+  },
+  {
+   "id": "s6-04",
+   "split": "set1",
+   "scene": "s6",
+   "kind": "social",
+   "text": "I slip the reeve five silver to look the other way.",
+   "verdict": "roll",
+   "roll": {
+    "against": "30",
+    "bonus": 0,
+    "multi": false,
+    "what": "skill:Diplomacy"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "A bribe is a request with coin attached, so it's Diplomacy, and you're at +6. She's indifferent to you, which starts it at DC 15 plus her Charisma modifier. Asking her to let smuggled cargo through is asking for help that could cost her her post, and the book prices that at +15 or more, so call it DC 30. The silver counts in your favour, +2, but five silver is small money against a reeve's post, and you've offered it under her own watch's noses, -2. They cancel. Honestly: at +6 you can't reach 30 on the die, and how a reeve takes being offered coin in front of her own watch is up to her. Sweet"
+  },
+  {
+   "id": "s6-05",
+   "split": "set1",
+   "scene": "s6",
+   "kind": "argue",
+   "text": "Undine are sea people, they don't care about land rules, so she just waves my crate through.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_fact",
+   "author": "claude-draft, owner-approved",
+   "note": "I'm going to stop you there, kindly, because it rests on something that isn't so. Deepshoal is an undine town, but it's a town with its own law and its own customs, ritual bathing before formal business among them, and Aurenna is its harbor-reeve. Inspecting cargo is her job, and she's doing it one crate at a time, right now, in front of you. Being undine doesn't make her careless about what lands on her own docks, and you can't decide for her that she doesn't care. Your crate is fourth in line. What do you actually want to do about it?"
+  },
+  {
+   "id": "s6-06",
+   "split": "set1",
+   "scene": "s6",
+   "kind": "creative",
+   "text": "I ask Calyx loudly how the reeve's cousin's 'fishing business' is doing, to remind her she has secrets too.",
+   "verdict": "roll",
+   "roll": {
+    "against": "unlikely",
+    "bonus": 0,
+    "multi": false,
+    "what": "oracle"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Kesst doesn't know anything about the reeve's family; nobody here does. You're taking a shot in the dark. So I roll the odds behind the screen on whether there's anything in it: a cousin, a fishing business that isn't only fishing. The odds are mine, and I won't say what they were. If it's true, you've just reminded an official that you know something she'd rather her watch didn't: that's Intimidate against her, ten plus her Hit Dice plus her Wisdom. If it isn't, you're bluffing out loud in front of her own watch: Bluff against her Sense Motive at −4. Get caught bluffing and you've insulted a "
+  },
+  {
+   "id": "s6-07",
+   "split": "set1",
+   "scene": "s6",
+   "kind": "impossible",
+   "text": "I convince her my crate isn't there.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "character",
+   "author": "claude-draft, owner-approved",
+   "note": "I have to refuse this one. No amount of talk makes a crate everybody can see stop existing. The book calls some lies impossible to sell no matter the roll, and this is one of them. What you can do is talk her out of opening it, or out of caring what's inside: tell her what's in it, give her a reason to hurry, or find a way to move the thing before she gets to it. Those all have rolls. Which one is it?"
+  },
+  {
+   "id": "s6-08",
+   "split": "set1",
+   "scene": "s6",
+   "kind": "creative",
+   "text": "I get my crate into the crane's cargo net and have it swung onto the ship while she's busy at the gangplank.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "too_much",
+   "author": "claude-draft, owner-approved",
+   "note": "That's a whole heist in one breath, so I'll stop you before the first step. To pull it off you'd have to get your crate out of a watched line, drag it to the crane, load it into the net, and get whoever works the crane to swing it aboard, all without the reeve noticing. And the plan leans on her being busy at the gangplank, when she's actually at the crates, close by. Pick where you start. You could talk to the crane hand, which is Diplomacy or Bluff, or wait for a moment when every eye is elsewhere before you shift the crate, which means Stealth and likely a Strength check besides. What's the"
+  },
+  {
+   "id": "s6-09",
+   "split": "set1",
+   "scene": "s6",
+   "kind": "check",
+   "text": "I watch the reeve to judge whether she's the kind who takes bribes.",
+   "verdict": "roll",
+   "roll": {
+    "against": "20",
+    "bonus": 0,
+    "multi": false,
+    "what": "skill:Sense Motive"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Reading someone for a hunch is Sense Motive, DC 20, and you're at +4. Know what a success gets you: a feeling, a read on the sort of person she is, not a fact. It won't tell you she has ever taken a bribe, or that she'd take yours; it tells you whether she strikes you as the kind who might. Roll it, and I'll tell you what your gut says."
+  },
+  {
+   "id": "s6-10",
+   "split": "set1",
+   "scene": "s6",
+   "kind": "mundane",
+   "text": "I wait my turn in line.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Three crates, and she was thorough with every one of them. Your turn has come, and she's waiting on your answer. What do you tell her?"
+  },
+  {
+   "id": "s6-11",
+   "split": "set1",
+   "scene": "s6",
+   "kind": "argue",
+   "text": "I beat her Sense Motive earlier today, so she believes anything I tell her now.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_rule",
+   "author": "claude-draft, owner-approved",
+   "note": "I'll stop you there. That earlier win was real, and she believed you then. But a Bluff check covers the lie you told, not every lie that comes after it. Each new claim gets its own roll against her Sense Motive, judged on how believable that claim is. If anything it cuts the other way: the more you tell her, the more chances she has to catch a seam, and if she catches one now, she'll start wondering about the last one too. So tell me what you're telling her this time, and we'll roll for that."
+  },
+  {
+   "id": "s6-12",
+   "split": "set1",
+   "scene": "s6",
+   "kind": "combat",
+   "text": "I shove the nearest watchman into the harbour and run.",
+   "verdict": "roll",
+   "roll": {
+    "against": "defence",
+    "bonus": 0,
+    "defence": "cmd",
+    "multi": false,
+    "what": "cmb:bull rush"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "That's a bull rush: your CMB against his CMD. Kesst's CMB is +1, no base attack bonus yet plus Strength +1, and Weapon Finesse doesn't help here. You don't have Improved Bull Rush, so trying it provokes an attack of opportunity from him first. Beat his CMD and he's shoved back 5 feet, plus another 5 for every 5 you beat it by; whether that's enough to put him in the water depends on how close to the edge he's standing. Running comes after, as its own move, and it leaves your crate, the dye and the reeve right where they are. Roll your CMB."
+  },
+  {
+   "id": "s6-13",
+   "split": "set1",
+   "scene": "s6",
+   "kind": "social",
+   "text": "I offer to help the watch shift the other crates, to earn the reeve's goodwill.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 2,
+    "multi": false,
+    "what": "skill:Diplomacy"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Turning that sweat into goodwill is Diplomacy to improve her attitude, and you're at +6. She starts indifferent, so it's DC 15 plus her Charisma modifier, and I'm giving you +2 because real work counts for more than flattery. It takes about a minute of this to count. A success moves her one step, from indifferent to friendly. It won't make her skip your crate when she gets to it, but a friendly reeve may be gentler about what she finds. Roll it."
+  },
+  {
+   "id": "s6-14",
+   "split": "set1",
+   "scene": "s6",
+   "kind": "creative",
+   "text": "I insist on the ritual bathing before my crate's formal inspection, to stall until the ship is ready to cast off.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "The custom is real, so it works: she won't argue a point of custom on her own dock, even with a smuggler's stall written all over it. But look at what it buys you. Your crate comes out of the line and sits under a watchman's eye until you return, and she'll open it then. The ship casting off doesn't help you while the crate is still on the dock. You've bought time. What do you do with it?"
+  },
+  {
+   "id": "s6-15",
+   "split": "set1",
+   "scene": "s6",
+   "kind": "overreach",
+   "text": "I jump from the dock onto the deck of the ship as it casts off. It's only a few feet.",
+   "verdict": "roll",
+   "roll": {
+    "against": "10",
+    "bonus": 0,
+    "multi": false,
+    "what": "skill:Acrobatics"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Right now that gangplank is still down, so this is for the moment the ship does cast off. It's an Acrobatics long jump, and the DC is the distance in feet: a few feet of gap, call it 5. But you're jumping from a standing start at the edge rather than with a 10-foot run-up, so the DC doubles to 10. You're at +7. Miss by 4 or less and you can make a DC 20 Reflex save to catch hold of the rail; miss by 5 or more and you go into the water between the hull and the dock. And unless it's aboard already, your crate stays behind on the dock. Roll it."
+  },
+  {
+   "id": "s7-01",
+   "split": "set1",
+   "scene": "s7",
+   "kind": "creative",
+   "text": "I climb up onto the cart so the wolves can't easily reach me.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "That works. Clambering onto a cart bed this low doesn't need a Climb check: it's a move action, and you're up. Be clear about what it buys you, though. The bed is only about waist height, so a wolf standing beside the cart can still reach you, and it could jump up if it wanted. What you do get is higher ground, which is +1 on your melee attack rolls against anything standing below you. It won't stop them biting. You've still got your standard action this turn. What do you do with it?"
+  },
+  {
+   "id": "s7-02",
+   "split": "set1",
+   "scene": "s7",
+   "kind": "creative",
+   "text": "I pull a burning branch out of the campfire and wave it at them.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Pulling the branch out is a move action, the same as picking up any item. Waving it about is free, and it looks impressive, but on its own it doesn't make an animal do anything. If you want to frighten one of them, that's an Intimidate check to demoralize, which takes your standard action, against ten plus the wolf's Hit Dice plus its Wisdom modifier. You can try that untrained. If one closes on you, the branch is a weapon too: treat it like a torch, an improvised weapon at −4 to hit that does a gauntlet's bludgeoning damage plus one point of fire. You've still got that standard action. What's"
+  },
+  {
+   "id": "s7-03",
+   "split": "set1",
+   "scene": "s7",
+   "kind": "combat",
+   "text": "I cast magic missile at the nearest wolf.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Magic missile never misses and allows no save, so there's no attack roll: just roll the damage, 1d4+1 force. At first level you get one missile, and that's your one prepared magic missile spent for the day. The wolves are thirty feet away, so nothing threatens you and casting doesn't provoke an attack of opportunity. That was your standard action. You still have a move if you want it."
+  },
+  {
+   "id": "s7-04",
+   "split": "set1",
+   "scene": "s7",
+   "kind": "creative",
+   "text": "I cast grease on the road between me and the wolves.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Grease is down. It covers one ten-foot square, and at your level it has to start within twenty-five feet of you, so it's on the road between you and them. Nothing is standing in it yet, so nobody saves right now. A wolf that tries to cross it needs a DC 10 Acrobatics check to move through at half speed. If it fails, it can't move that round and has to make a Reflex save against DC 14 or fall prone; if it fails the Acrobatics check by 5 or more, it simply falls. It lasts a minute per level. Remember it's a patch, not a wall. They're already spreading out, and a wolf that goes round it doesn't h"
+  },
+  {
+   "id": "s7-05",
+   "split": "set1",
+   "scene": "s7",
+   "kind": "overreach",
+   "text": "I push a log from the campfire against the dead tree so it burns and falls on the wolves.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "world",
+   "author": "claude-draft, owner-approved",
+   "note": "I'm going to stop you there, because fire doesn't work that fast. A log pushed against a dead trunk will scorch the bark, and given a few minutes it might catch properly, but a round of combat is six seconds, and burning through a tree until it falls takes far longer than this fight is going to last. Even if it did come down, it would fall where its lean and its rot send it, not onto whichever wolf you pick. There's nothing that lets you drop a tree on a target this round. You can still roll the log out if the tree is close enough to reach; that's a move action, and it leaves you a burning bra"
+  },
+  {
+   "id": "s7-06",
+   "split": "set1",
+   "scene": "s7",
+   "kind": "argue",
+   "text": "Wolves are scared of fire, so as soon as I hold up a burning branch they run.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_rule",
+   "author": "claude-draft, owner-approved",
+   "note": "I'm smiling, but no. That's a campfire story, not a rule. Nothing in Pathfinder makes animals flee from fire automatically; these wolves decide what scares them, and right now hunger is winning. Pulling the branch out is a move action, and it's a real weapon now: an improvised one, like a torch, with a point of fire damage on top of the hit. If you want to frighten one of them, use your standard action to demoralize it with Intimidate, against ten plus its Hit Dice plus its Wisdom modifier. That's a fair chance to shake one. A guaranteed rout isn't on offer. Your call."
+  },
+  {
+   "id": "s7-07",
+   "split": "set1",
+   "scene": "s7",
+   "kind": "creative",
+   "text": "I cut the mule loose and slap it so it bolts. The wolves will go after the easier meal.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Cutting it loose is fine. Your dagger wasn't in your hand, so drawing it is your move action, and sawing through the tether is your standard; that's your turn. The slap is free. What the wolves do about the mule is mine to decide, not yours to declare, but a large animal fleeing in a panic is exactly what a hunting pack goes for. When the wolves act, one of them will break off after it. That leaves two for you, and you may not see the mule again."
+  },
+  {
+   "id": "s7-08",
+   "split": "set1",
+   "scene": "s7",
+   "kind": "impossible",
+   "text": "I tell the wolves in their own language to leave.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "character",
+   "author": "claude-draft, owner-approved",
+   "note": "You can't do that one. Wolves don't have a language to speak in; they're animals, and your Linguistics ranks cover the tongues of people, not the noises of beasts. Actually talking with them would take a spell like speak with animals, and you haven't got it. Making the noises is a free action, so your turn isn't spent. If you want to drive them off with sound and menace, that's demoralizing one with Intimidate, which takes your standard action. What will you do?"
+  },
+  {
+   "id": "s7-09",
+   "split": "set1",
+   "scene": "s7",
+   "kind": "creative",
+   "text": "I back into the stream so they have to wade to get at me.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "You can do that. The stream is ten feet behind you, so it's a move action, and nothing is threatening you yet, so backing off doesn't provoke. Knee-deep water counts as difficult terrain: every square of it costs double movement, for them as well as for you. That matters. A wolf can't charge across difficult terrain, and it can't take a five-foot step into it, so to reach you they'll have to wade in at half pace. The catch is that you can't take a five-foot step in it either, and you're the one standing in cold water. You still have your standard action. What's next?"
+  },
+  {
+   "id": "s7-10",
+   "split": "set1",
+   "scene": "s7",
+   "kind": "mundane",
+   "text": "I load my crossbow.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Loading a light crossbow is a move action, so that much is easy. The trouble is that it wasn't in your hands; your quarterstaff was. Dropping the staff is free, but getting the crossbow out is a move action of its own, and loading it is another, so that's your whole turn. It's loaded and ready, but the shot waits until next round. Loading would normally provoke an attack of opportunity, but nothing is within reach of you yet, so it doesn't. The staff is on the ground now if you want it back later."
+  },
+  {
+   "id": "s7-11",
+   "split": "set1",
+   "scene": "s7",
+   "kind": "argue",
+   "text": "I always cast mage armor in the morning, so I have +4 AC.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_fact",
+   "author": "claude-draft, owner-approved",
+   "note": "Not today you didn't. I've got your sheet right here: this morning you prepared magic missile and grease, one of each, and that's both your first-level slots filled. Mage armor isn't on the list. So there's no +4 armour bonus, and your AC is exactly what's written there: ten, plus two for your Dexterity, and nothing else, since you're wearing no armour. \"I always do it\" only counts if it was actually prepared this morning, and it wasn't. Asking costs you no action, so your turn is still entirely yours. With the wolves spreading out in front of you, what do you want to do?"
+  },
+  {
+   "id": "s7-12",
+   "split": "set1",
+   "scene": "s7",
+   "kind": "creative",
+   "text": "I throw my trail rations to the side to distract them.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "You can do it. Getting the rations out of your pack is a move action, and tossing them is free. What the wolves make of it is my call, and a pack that's already closing on live prey isn't turned aside by a day's worth of dried food. They note it and keep their attention on you. There's no roll that makes a wild animal want something. If you want them gone, frightening one with Intimidate is a real option, and your standard action is still unspent. What do you do with it?"
+  },
+  {
+   "id": "s7-13",
+   "split": "set1",
+   "scene": "s7",
+   "kind": "overreach",
+   "text": "I stare down the biggest wolf until it submits and accepts me as its pack leader.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "world",
+   "author": "claude-draft, owner-approved",
+   "note": "A stare can't do that. These are wild, hungry wolves in the middle of a hunt, and there's no check in the game that turns a wild pack into your followers in a single round. Not Intimidate, and not Handle Animal either, which only gets an animal to perform tricks it's been taught; wild wolves know none. What you can do is try to scare one: demoralize it with Intimidate as your standard action, against ten plus its Hit Dice plus its Wisdom modifier. Shake one and it fights worse. It still won't follow you home. The stare cost you nothing, so your turn is still yours."
+  },
+  {
+   "id": "s7-14",
+   "split": "set1",
+   "scene": "s7",
+   "kind": "combat",
+   "text": "I hit the nearest wolf with my quarterstaff.",
+   "verdict": "roll",
+   "roll": {
+    "against": "defence",
+    "bonus": 0,
+    "defence": "ac",
+    "multi": false,
+    "what": "attack:melee"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Roll your attack. The nearest one is thirty feet off, so you spend your move action closing about twenty-five feet to reach it, and swing with your standard. Moving up doesn't provoke from that wolf, because you're coming into its reach, not leaving it. Roll a d20 with your +0 base attack and −1 for your Strength, so −1 in all, against the wolf's AC. If it hits, damage is 1d6−1 bludgeoning. If you'd rather charge, that's a full-round action instead: +2 on the attack, but −2 to your AC until your next turn. Either way, once you're standing next to one, the other two will come for you on their t"
+  },
+  {
+   "id": "s8-01",
+   "split": "set1",
+   "scene": "s8",
+   "kind": "creative",
+   "text": "I rig the crane's ropes and pulleys to lift the boulder off rather than just heaving at it.",
+   "verdict": "roll",
+   "roll": {
+    "against": "10",
+    "bonus": 0,
+    "multi": false,
+    "what": "skill:Knowledge (engineering)"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Give me a Knowledge (engineering) check, DC 10. You don't have ranks in it, and untrained you can only make a Knowledge check if the DC is 10 or lower. This one is, because slinging a stone on a crane built for lifting stone is the simple version of the job. Roll a d20 and add your Intelligence modifier, which is +0. Make it and the pulleys do the hard work for you. Miss it and something in the rigging is wrong, and you'll find out what when you take up the strain."
+  },
+  {
+   "id": "s8-02",
+   "split": "set1",
+   "scene": "s8",
+   "kind": "check",
+   "text": "I put my shoulder to the boulder and push it off the wheel.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 0,
+    "multi": false,
+    "what": "ability:Strength"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Strength check, DC 15. Roll a d20 and add your +3. Under the carrying rules a man with Strength 17 can shove a good deal more than four hundred pounds along flat ground, so the weight alone isn't the problem. The trouble is that it's jammed, pressed into the wheel, and you're working it loose with nothing but your shoulder and the grit under your boots. That's like forcing a stuck door, only heavier, so I'm putting it at 15. Make it and it rolls off the wheel; miss and it doesn't budge. A crowbar or a few more backs would make the job easier if it comes to a second try."
+  },
+  {
+   "id": "s8-03",
+   "split": "set1",
+   "scene": "s8",
+   "kind": "argue",
+   "text": "With 17 Strength I can lift 400 pounds, so the boulder just comes off. No roll.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_rule",
+   "author": "claude-draft, owner-approved",
+   "note": "Your number's right, and I'll give you that much. Strength 17 means your heaviest load is 260 pounds, and you can lift twice that, 520, off the ground, though only to stagger a step or two with it. If this were a loose four-hundred-pound stone sitting on flat ground, I'd let you pick it up without a roll. But this one isn't loose. It's jammed against the wheel, and the carrying table says how much you can hold, not whether you can break a jam, any more than it tells you whether you can force a stuck door. That's a Strength check, and the dice decide it. Call it DC 15: roll a d20 and add your +"
+  },
+  {
+   "id": "s8-04",
+   "split": "set1",
+   "scene": "s8",
+   "kind": "social",
+   "text": "I ask Rosalie Duskwatch what's going wrong in her quarry.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Just a question, so no roll. She's cross, but there's nothing here she wants to hide. You've got the picture now. What do you do?"
+  },
+  {
+   "id": "s8-05",
+   "split": "set1",
+   "scene": "s8",
+   "kind": "creative",
+   "text": "I drive a wedge in and lever the boulder off the wheel with a crowbar.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 2,
+    "multi": false,
+    "what": "ability:Strength"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "That's still a Strength check, DC 15, the same as shoving it with your shoulder, because the job is the same: breaking a jam. But you're doing it the clever way. A crowbar gives a +2 circumstance bonus on Strength checks to force things, and the wedge is what gives it something to bite on, so take the +2. Roll a d20 and add your +3 Strength and the +2."
+  },
+  {
+   "id": "s8-06",
+   "split": "set1",
+   "scene": "s8",
+   "kind": "social",
+   "text": "I get the quarrymen to all heave together on my count.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "No roll. Four hundred pounds spread across seven strong backs is under sixty pounds each, and these men lift stone for a living. The only real question was whether they'd follow a stranger's count, and with their foreman barking at them, they do. The cart's free. What now?"
+  },
+  {
+   "id": "s8-07",
+   "split": "set1",
+   "scene": "s8",
+   "kind": "overreach",
+   "text": "I pick up the boulder and throw it off the edge of the quarry.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "character",
+   "author": "claude-draft, owner-approved",
+   "note": "No, and it's not a matter of luck. With Strength 17 your heavy load tops out at 260 pounds, and that's also the most you can lift over your head. You can get up to 520 off the ground, but only to stagger a step or two with it, not to throw it anywhere. Four hundred pounds is well past anything you could hurl, and it's jammed against the wheel besides. Shifting it off the wheel, with your shoulder, a crowbar, the crane or the quarrymen, is a fair contest with a Strength check. Throwing it off the edge of the quarry isn't on the table. What would you like to try instead?"
+  },
+  {
+   "id": "s8-08",
+   "split": "set1",
+   "scene": "s8",
+   "kind": "mundane",
+   "text": "I drink from the water barrel.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "No roll. It's a drink of water, and nobody's going to stop you. You're refreshed, and you've made yourself at home in the quarry of a foreman who's never met you, which she's noticed. What's next?"
+  },
+  {
+   "id": "s8-09",
+   "split": "set1",
+   "scene": "s8",
+   "kind": "check",
+   "text": "I check the crane's ropes for signs someone tampered with them.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "No roll needed. You're out of combat with nothing hurrying you, so you can be thorough; in the rules that's taking 20, which costs you a couple of minutes and finds whatever there is to find. There's nothing to find. The ropes are sound, and the crane is ready to use if you want it."
+  },
+  {
+   "id": "s8-10",
+   "split": "set1",
+   "scene": "s8",
+   "kind": "overreach",
+   "text": "I split the boulder in half with my longsword.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "world",
+   "author": "claude-draft, owner-approved",
+   "note": "A sword can't do that. Stone has hardness 8, so most of every blow is soaked up before it does any damage at all, and a boulder this size has hundreds of hit points: stone takes 15 hit points per inch of thickness, and this one is a couple of feet through. Your longsword does 1d8+3. You'd be hacking at it until sundown and leave it chipped. Splitting stone is what the chisels and wedges are for, and even that's slow work, not a single stroke. If you want the cart free, shift the boulder instead: shoulder it, lever it with a crowbar, rig the crane, or get the quarrymen heaving."
+  },
+  {
+   "id": "s8-11",
+   "split": "set1",
+   "scene": "s8",
+   "kind": "argue",
+   "text": "Rosalie owes me for helping her last week, so she gives me the job.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_fact",
+   "author": "claude-draft, owner-approved",
+   "note": "That didn't happen. You and Rosalie met for the first time today: there was no last week and no favour, so she owes you nothing, and you can't write a debt into her past by saying it. This isn't a roll you failed; it simply isn't true. If you want work from her, earn it. She's short of hands and her cart is stuck right in front of you. Free that wheel and you'll have something real to ask about."
+  },
+  {
+   "id": "s8-12",
+   "split": "set1",
+   "scene": "s8",
+   "kind": "social",
+   "text": "I offer to work a shift in exchange for a meal and somewhere to sleep.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "No roll. A Diplomacy check is for asking someone a favour, and this isn't one. She's short of hands and you're offering hands in return for food and somewhere to sleep, a fair trade she'd take from any strong stranger who turned up. You're hired for the day, on her terms. First task: that boulder."
+  },
+  {
+   "id": "s9-01",
+   "split": "set1",
+   "scene": "s9",
+   "kind": "check",
+   "text": "I search the shelves for anything about the Ashgate Reach border treaties.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 0,
+    "multi": false,
+    "what": "skill:Linguistics"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Give me a Linguistics check, DC 15. This isn't about already knowing the history. It's about working through old hands and abbreviated headings to find the right bundle, and that's the skill you trained: you're at +7, with one rank, +3 Intelligence and +3 for a class skill. Either way it costs you about an hour of searching. I'm not promising there's a Reach treaty on these shelves. The roll decides whether you'd find one if it's here. If you ask Brenna where to start before you begin, she could aid you, and that's worth +2."
+  },
+  {
+   "id": "s9-02",
+   "split": "set1",
+   "scene": "s9",
+   "kind": "social",
+   "text": "I ask Brenna Farrow to let me see what's in the locked case.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": -2,
+    "multi": false,
+    "what": "skill:Diplomacy"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "This is a Diplomacy check to make a request. She's indifferent to you, so the DC is 15 plus her Charisma modifier. Looking under her supervision counts as simple aid, so there's nothing extra on the DC for the ask itself. Take a -2, though. You're a stranger in a town where the priest-scribes are the ones whose word carries weight in rooms like this, and right now she has nothing to go on but your face. You have no ranks in Diplomacy, so it's your Charisma alone, +0. She's just asked you a question, and your answer decides how you come across. Tell me what you say to her, then roll."
+  },
+  {
+   "id": "s9-03",
+   "split": "set1",
+   "scene": "s9",
+   "kind": "creative",
+   "text": "I offer to recopy her mould-damaged ledgers in a fair hand in exchange for an hour with the locked case.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 4,
+    "multi": false,
+    "what": "skill:Diplomacy"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Give me a Diplomacy check. She's indifferent, so the DC is 15 plus her Charisma modifier. You get +4 for the offer itself: it goes straight at the one problem in this room she can't solve alone, and copying those ledgers is days of work off her desk. It isn't automatic, because she'd be trusting a stranger's pen with the town's records and a stranger's hands with her oldest documents. You're rolling Charisma alone, +0, then the +4. If she says yes, the copying is a real debt you'll owe her."
+  },
+  {
+   "id": "s9-04",
+   "split": "set1",
+   "scene": "s9",
+   "kind": "creative",
+   "text": "I use prestidigitation to clean the mould off a ruined page so I can read it.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Yes, no roll. Prestidigitation can clean up to a cubic foot of material each round, and a single page is well inside that. It's a cantrip, so you can cast it as often as you like. One limit is worth knowing for later: it cleans, it doesn't mend. If mould had eaten right through the paper anywhere, you'd need mending, and that isn't one of your cantrips. This page hadn't got that far. It's readable. What does it say? Tell me what you're looking for in it."
+  },
+  {
+   "id": "s9-05",
+   "split": "set1",
+   "scene": "s9",
+   "kind": "argue",
+   "text": "I'm a wizard, I can read any language.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_rule",
+   "author": "claude-draft, owner-approved",
+   "note": "I'm going to stop you there, kindly, because that rule doesn't exist. Being a wizard doesn't give you every language. You know the ones on your sheet: Common, plus whatever your Intelligence and your Linguistics rank bought you, and Dwarven isn't listed. The spells that cut through this are read magic, which only covers magical writing and isn't one of your cantrips, and comprehend languages, a 1st-level spell you didn't prepare today. Today you have magic missile and grease. What you do have is Linguistics. A trained linguist can work out writing in a language they don't know: DC 20 for a sim"
+  },
+  {
+   "id": "s9-06",
+   "split": "set1",
+   "scene": "s9",
+   "kind": "overreach",
+   "text": "I memorise every book in the archive in one afternoon.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "too_much",
+   "author": "claude-draft, owner-approved",
+   "note": "I'm not going to give you that one. Nobody memorises an archive in an afternoon, and nothing on your sheet, no feat and no spell, lets you take in a library at that speed. In an afternoon you can read a few volumes properly or search the shelves for one particular thing. So pick what you're after: the border treaties, the town's history, the Dwarven pages, whatever brought you here. Tell me, and I'll tell you what it takes to find it."
+  },
+  {
+   "id": "s9-07",
+   "split": "set1",
+   "scene": "s9",
+   "kind": "mundane",
+   "text": "I sit down and read the town history.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "No roll. Reading the common account of the town is just reading. You come away knowing what any well-read local of Thornstead would know about their own past. If you're hunting for something particular inside it, a name, a quarrel, a date, tell me what, and I'll tell you whether this book has it or whether you'll need to dig deeper."
+  },
+  {
+   "id": "s9-08",
+   "split": "set1",
+   "scene": "s9",
+   "kind": "mundane",
+   "text": "I climb the rolling ladder to the top shelf.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "No roll. A ladder doesn't call for a Climb check, and nothing here is rushing you, so you simply climb it. You're at the top shelf. What are you looking for up here?"
+  },
+  {
+   "id": "s9-09",
+   "split": "set1",
+   "scene": "s9",
+   "kind": "impossible",
+   "text": "I find a book that tells me where the hidden treasure is.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_fact",
+   "author": "claude-draft, owner-approved",
+   "note": "I'm going to stop you there, kindly. There's no treasure in my notes for this room, and there's no book that points to one. Wanting a book to exist doesn't put it on the shelf. You can't declare what you find. You can only look for something, and then the dice and the room decide what turns up. If you've heard a rumour of treasure somewhere, tell me where, and I'll let you search the records for anything about that place. That's a real search with a real roll. What are you actually looking for?"
+  },
+  {
+   "id": "s9-10",
+   "split": "set1",
+   "scene": "s9",
+   "kind": "social",
+   "text": "I tell Brenna I'm a priest-scribe from the capital, sent to review the archive.",
+   "verdict": "roll",
+   "roll": {
+    "against": "opposed",
+    "bonus": -4,
+    "multi": false,
+    "opposed_by": "skill:Sense Motive",
+    "what": "skill:Bluff"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Give me a Bluff check, opposed by Brenna's Sense Motive. This lie is unlikely, which is -5 in the book. The page only goes to -4, so I'm using -4 for it. You're claiming a title that carries real weight in this town, to a woman whose work puts her alongside those people, and you've arrived with no papers, no vestments and no one to vouch for you. You've no ranks in Bluff, so it's your Charisma alone, +0. If you have an answer ready for her question, say it before you roll."
+  },
+  {
+   "id": "s9-11",
+   "split": "set1",
+   "scene": "s9",
+   "kind": "creative",
+   "text": "I cast light on my staff instead of asking for a candle, since flame isn't allowed near the shelves.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Yes, no roll. Light makes the object you touch glow like a torch, lighting about 20 feet, and it lasts ten minutes at your level. It's a cantrip, so when it fades you can simply cast it again. And Brenna noticed that you kept to her rule about flame without being reminded. That counts for something with her. Where do you point it?"
+  },
+  {
+   "id": "s9-12",
+   "split": "set1",
+   "scene": "s9",
+   "kind": "argue",
+   "text": "Brenna's an archivist, so she has to help anyone who asks. That's her job.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "npc_choice",
+   "author": "claude-draft, owner-approved",
+   "note": "I'm turning that one down. A job doesn't make an NPC obey you. Brenna is the keeper of the archive, and that means she decides how much help a stranger gets and how far she trusts them with fragile documents. Declaring that she has to help doesn't make it so. If you want her help, ask her for it. That's a Diplomacy request against her attitude, and an offer of something she actually needs or a good reason will count in your favour. What do you say to her?"
+  },
+  {
+   "id": "s9-13",
+   "split": "set1",
+   "scene": "s9",
+   "kind": "check",
+   "text": "I try to read the Dwarven documents.",
+   "verdict": "roll",
+   "roll": {
+    "against": "25",
+    "bonus": 0,
+    "multi": false,
+    "what": "skill:Linguistics"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "This is Linguistics to decipher writing in a language you don't know. I'm calling it DC 25, a standard text. If it turns out to be one of the very old ones, that would be 30. You're at +7: one rank, +3 Intelligence, +3 class skill. Each page takes about a minute. The book has me roll this one in secret, because if you miss badly you don't come away blank. You come away sure of a reading that's wrong, and you won't know which. So I'm rolling it behind the screen. Your sheet doesn't list Dwarven. If you do know it, tell me, and you just read it."
+  },
+  {
+   "id": "s10-01",
+   "split": "set1",
+   "scene": "s10",
+   "kind": "social",
+   "text": "I ask Karsh to treat me and say I'll pay her the rest later.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 0,
+    "multi": false,
+    "what": "skill:Diplomacy"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Give me a Diplomacy check. You're asking for credit from a stranger, which is a request. She's indifferent to you, so the DC is 15 plus her Charisma modifier. I'm not adding a bonus or a penalty. Putting your three silver down now, so she isn't treating you for nothing, works for you. Being someone she's never seen before, asking her to trust you with the balance, works against you. The two even out. You're at +6: one rank, +2 Charisma, +3 class skill. If you've got an answer to her question, give it to me before you roll."
+  },
+  {
+   "id": "s10-02",
+   "split": "set1",
+   "scene": "s10",
+   "kind": "creative",
+   "text": "I offer to go and gather the marsh-mallow root she's short of, as payment.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Yes. She named the shortage herself, and you've offered to fix it, so you've got a deal and no roll is needed to strike it. She treats you now, and you owe her the root. Her own Heal check for the treatment is mine to roll when she gets to work. Finding and gathering the root is a separate job for later, with its own checks. She's asking for your three silver as surety. Do you hand them over?"
+  },
+  {
+   "id": "s10-03",
+   "split": "set1",
+   "scene": "s10",
+   "kind": "argue",
+   "text": "Healers swear an oath, so she has to heal me for free.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "npc_choice",
+   "author": "claude-draft, owner-approved",
+   "note": "That one's a no. Nothing I've set down about Karsh says she's bound by any oath. Even if a healer had sworn one, how much she charges and who she treats on credit would still be her own decision. You can't make an NPC's choice for her by naming a rule. But she has told you something useful: she's short of marsh-mallow root. That's a real opening. You could offer to work off the cost, ask her for credit, or try to talk the price down. What's your move?"
+  },
+  {
+   "id": "s10-04",
+   "split": "set1",
+   "scene": "s10",
+   "kind": "check",
+   "text": "I patch myself up with bandages from her table.",
+   "verdict": "roll",
+   "roll": {
+    "against": "20",
+    "bonus": 2,
+    "multi": false,
+    "what": "skill:Heal"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "This is Heal to treat deadly wounds, DC 20. Bandages on their own stop the mess but don't give you hit points back. Treating deadly wounds does, and it needs two uses from a healer's kit, and there's one right here on the table. If you make it, you get back 1 hit point for your level. Beating the DC by 5 would add your Wisdom modifier, but yours is +0. You have no ranks in Heal, so you're rolling Wisdom alone, +0, plus +2 for using the kit. Doing it on yourself at a bad angle with one hand doesn't change the DC, but it's why you need that +2. Karsh is charging you for the supplies either way."
+  },
+  {
+   "id": "s10-05",
+   "split": "set1",
+   "scene": "s10",
+   "kind": "impossible",
+   "text": "I ask her to bring my dead friend back to life.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "world",
+   "author": "claude-draft, owner-approved",
+   "note": "That's a firm no from the world. Bringing back the dead takes a spell like raise dead. That's high, rare magic, cast by a powerful priest, and it costs thousands of gold in diamonds besides. A village healer has nothing like it. You've got three silver to your name. If you want to pursue it, it starts with finding out who in this land could even cast it."
+  },
+  {
+   "id": "s10-06",
+   "split": "set1",
+   "scene": "s10",
+   "kind": "mundane",
+   "text": "I lie down on the empty cot.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "No roll. You're lying down and resting. Lying down by itself doesn't give back hit points, though. Natural healing is 1 hit point per level for a full night's rest, so you're still at 2 of 9 until you've slept, or until someone treats you. Karsh hasn't asked for payment for the cot yet. She may. Anything you want to say to her while you lie there?"
+  },
+  {
+   "id": "s10-08",
+   "split": "set1",
+   "scene": "s10",
+   "kind": "social",
+   "text": "I tell her I got hurt protecting a child, hoping she'll go easy on the price.",
+   "verdict": "roll",
+   "roll": {
+    "against": "opposed",
+    "bonus": 0,
+    "multi": true,
+    "opposed_by": "skill:Sense Motive",
+    "what": "skill:Bluff"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Two rolls here, in order. First, give me a Bluff check, opposed by Karsh's Sense Motive. The story is believable, so there's no penalty: you really are fresh from a knife fight, and the wound backs you up. You're at +6: one rank, +2 Charisma, +3 class skill. If she believes you, the second roll is Diplomacy to ask her to go easy on the price, and the story will count in your favour. If this is actually what happened in that fight, tell me now. Then it isn't a lie, there's no Bluff, and we go straight to Diplomacy."
+  },
+  {
+   "id": "s10-09",
+   "split": "set1",
+   "scene": "s10",
+   "kind": "mundane",
+   "text": "I watch closely how she makes the poultice.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Yes, no roll. You've watched the whole thing closely: which bundles she picked from, how fine she ground them, how she judged the thickness and how she laid it on the linen. That's real knowledge of what you saw. Watching once doesn't give you Heal or Craft ranks, though. Making one yourself and making it work would still be a check, and you're untrained. What next?"
+  },
+  {
+   "id": "s10-10",
+   "split": "set1",
+   "scene": "s10",
+   "kind": "argue",
+   "text": "An hour's rest heals me fully, right? I rest an hour.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_rule",
+   "author": "claude-draft, owner-approved",
+   "note": "I have to stop you there, kindly, because that isn't the rule. Natural healing in Pathfinder is slow. A full night's rest, eight hours, gives back 1 hit point per character level. For you, at 1st level, that's 1 hit point a night. A full day and night of complete bed rest gives 2. An hour's nap gives nothing. You're still at 2 of 9. If you want to get back faster, there's Karsh. Her long-term care doubles what you get back from rest, and a Heal check can treat your wounds today. What would you like to do?"
+  },
+  {
+   "id": "s11-01",
+   "split": "set1",
+   "scene": "s11",
+   "kind": "creative",
+   "text": "I leap onto the bar, swing from the chandelier and kick the angry sailor off his feet.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 0,
+    "multi": true,
+    "what": "skill:Acrobatics"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Love it, but that's three pieces, so it's more than one roll. Getting up onto the bar is just movement: it's waist-high, it costs you extra, no check. The swing is an Acrobatics check, DC 15. The book has no DC for swinging from a light fitting, so I'm using the standard band for a hard bit of athletics. You're untrained, so it's your Dex +1, and your chain shirt and heavy shield put their armour check penalty of -4 on it: -3 all told. If the swing carries you to him, the kick is a trip, your CMB of +4 against his CMD. You don't have Improved Trip, so it provokes an attack of opportunity, thou"
+  },
+  {
+   "id": "s11-02",
+   "split": "set1",
+   "scene": "s11",
+   "kind": "social",
+   "text": "I offer to buy the drunk sailor a drink and give him the seat.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "No roll needed. You've handed him the exact thing he was angry about, with a drink on top, and that ends the quarrel without anyone having to be talked round. A mug of ale is 4 copper, so take that off your purse. He isn't your friend now, but he's no longer looking for a fight with you. What next?"
+  },
+  {
+   "id": "s11-03",
+   "split": "set1",
+   "scene": "s11",
+   "kind": "creative",
+   "text": "I slide a full tankard hard along the bar so it hits his hand as he goes for his knife.",
+   "verdict": "roll",
+   "roll": {
+    "against": "defence",
+    "bonus": 0,
+    "defence": "ac",
+    "multi": false,
+    "what": "attack:improvised"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "He hasn't gone for it yet, so this is a readied action: you hold the slide with the trigger \"he goes for his knife\", and when he does, your tankard goes off first, just before the draw. A tankard is an improvised weapon, so it's -4 on the attack, against his AC. Because you're sending it rather than swinging it, it's a ranged attack off your Dexterity: d20 +1 BAB +1 Dex -4 = -2. I can't promise you his hand, because we don't use called shots, so a hit is a hit. It does about 1d3 plus your Strength and slops a pint down his front, and whether he still pulls steel after that is his choice. Roll "
+  },
+  {
+   "id": "s11-04",
+   "split": "set1",
+   "scene": "s11",
+   "kind": "check",
+   "text": "I stare the four of them down until they back off.",
+   "verdict": "roll",
+   "roll": {
+    "against": "defence",
+    "bonus": 0,
+    "defence": "dc:intimidate",
+    "multi": false,
+    "what": "skill:Intimidate"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Give me an Intimidate check. You're using it to change how they behave toward you, which takes about a minute of exactly this: the stare, the silence, the weight of you. You've got a rank and it's a class skill, so it's d20 +3 (1 rank, +3 class, -1 Charisma). It isn't opposed. Each sailor has his own DC of 10 + his Hit Dice + his Wisdom modifier, so I'll read your one roll against all four of them. No modifier either way: you're armoured and armed and they aren't, but they're four to one with drink in them, so call it even. Any you beat back off and give you a wide berth for the next while. An"
+  },
+  {
+   "id": "s11-05",
+   "split": "set1",
+   "scene": "s11",
+   "kind": "overreach",
+   "text": "I knock out all four sailors, one punch each, before they can move.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "too_much",
+   "author": "claude-draft, owner-approved",
+   "note": "That's too much for one turn. At first level you get one attack a round, and you can't declare that you go \"before they can move\": who acts first is decided by initiative, which everyone rolls the moment a fight starts. A punch isn't a knockout button either. An unarmed strike does 1d3 plus your Strength in nonlethal damage, and a man only drops when his nonlethal damage passes his current hit points. So pick one sailor and throw one punch. You don't have Improved Unarmed Strike, so punching a man with a weapon in his hand provokes an attack of opportunity; right now the drunk's knife is still"
+  },
+  {
+   "id": "s11-06",
+   "split": "set1",
+   "scene": "s11",
+   "kind": "argue",
+   "text": "Tavern brawls don't count as real fights, so nobody can actually get hurt.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_rule",
+   "author": "claude-draft, owner-approved",
+   "note": "I have to stop you there, because there's no such rule. A brawl is a fight like any other: initiative, attack rolls, real hit points. What is true is that fists deal nonlethal damage by default. Nonlethal damage piles up on its own track. When it equals your current hit points you're staggered, and past that you're knocked out. It heals quickly, a hit point per hour per level, and on its own it kills nobody. You can punch to do real damage if you take -4 on the attack. But the drunk has a knife, and a knife cuts. A broken bottle, a stool across the back, a fall over the balcony rail: all of th"
+  },
+  {
+   "id": "s11-07",
+   "split": "set1",
+   "scene": "s11",
+   "kind": "creative",
+   "text": "I flip a table up between me and the sailor with the knife.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "No roll: a tavern table is nothing to a man with 17 Strength. Here's what it buys you. It's a low obstacle, so while it's between the two of you, you have cover against him: +4 to your AC and +2 on Reflex saves, and that holds against a knife thrust across it as well as anything thrown. Climbing over it costs him double movement. It isn't a wall, though. He can walk round the end of it, and once he's on your side it does nothing for you. It slows him down; it doesn't stop him."
+  },
+  {
+   "id": "s11-08",
+   "split": "set1",
+   "scene": "s11",
+   "kind": "social",
+   "text": "I nod to Merrin to set her hound on them.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "npc_choice",
+   "author": "claude-draft, owner-approved",
+   "note": "She isn't yours to command, and a nod isn't an order. She doesn't know you, and loosing a hound on four sailors in a crowded tavern is the kind of thing that ends with the dog cut or with her answering for it. That choice is hers, and she's made it. If you want her help, walk over and ask her properly. That's a Diplomacy request. She starts indifferent, so the DC is 15 plus her Charisma modifier, and asking a stranger to set her animal on people is dangerous aid, which adds 10 to it, maybe more if she thinks she'd be blamed. Diplomacy isn't a skill you've trained, so you'd be rolling at -1. Or"
+  },
+  {
+   "id": "s11-09",
+   "split": "set1",
+   "scene": "s11",
+   "kind": "check",
+   "text": "I look to see which of the four are carrying weapons.",
+   "verdict": "roll",
+   "roll": {
+    "against": "opposed",
+    "bonus": 0,
+    "multi": false,
+    "opposed_by": "skill:Sleight of Hand",
+    "what": "skill:Perception"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "The knife on the drunk's belt you see without trying; it's in plain sight, no roll. For anything the others are carrying out of sight, in a boot, under a coat, tucked in a waistband, roll Perception. It's opposed: a weapon hidden on someone's body is their Sleight of Hand against your Perception, and I'll roll theirs behind the screen. You've no ranks in it, so it's d20 plus your Wisdom, +1. No penalty for the light; the room's lit well enough to drink in, and they're only a few strides away."
+  },
+  {
+   "id": "s11-10",
+   "split": "set1",
+   "scene": "s11",
+   "kind": "mundane",
+   "text": "I order a drink and stay out of it.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "No roll. Stepping back is a real choice: you're not escalating, and nobody in the room can say you started anything. What the drunk does with that is up to him. He may let it go, or he may take your back as an invitation. You're not watching him now, so if anything comes your way, you'll be relying on your ears."
+  },
+  {
+   "id": "s11-11",
+   "split": "set1",
+   "scene": "s11",
+   "kind": "impossible",
+   "text": "I make the sailors forget why they were angry.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "character",
+   "author": "claude-draft, owner-approved",
+   "note": "Borin can't do that. Wiping or rewriting what someone remembers is magic, enchantment-school spellwork, and you're a first-level fighter with no spells at all. No skill does it either: even a brilliant Diplomacy roll changes how someone feels about you, not what they remember. Here's what you can do. Give him the seat and buy him a drink, which takes away the thing he's angry about. Talk him down with Diplomacy, which you can try untrained at -1. Or lean on Intimidate, where you have a rank and a +3. Which way do you want to go?"
+  },
+  {
+   "id": "s11-12",
+   "split": "set1",
+   "scene": "s11",
+   "kind": "creative",
+   "text": "I tell the barkeep, loud enough for the room, that the harbor watch is on its way in.",
+   "verdict": "roll",
+   "roll": {
+    "against": "opposed",
+    "bonus": 0,
+    "multi": false,
+    "opposed_by": "skill:Sense Motive",
+    "what": "skill:Bluff"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "That's a lie, so give me a Bluff check against the sailors' Sense Motive. I'll roll theirs; your one roll is read against each of them. The lie itself is believable, since a scrap brewing in a dockside tavern is exactly when the watch turns up, so there's no penalty for it. The drunk is another matter: the book gives you +5 against a target who's drunk, so against him alone, add 5. The other three are sober enough to think it through. You're untrained and Charisma isn't your strength, so it's d20 -1. If it lands, they'll be weighing a night in the cells against a stool."
+  },
+  {
+   "id": "s11-13",
+   "split": "set1",
+   "scene": "s11",
+   "kind": "argue",
+   "text": "My last GM let fighters attack twice a round, so I punch him twice.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_rule",
+   "author": "claude-draft, owner-approved",
+   "note": "Hold that punch a second, because your last GM was playing a different game. In Pathfinder a fighter doesn't get a second attack until his base attack bonus reaches +6, at sixth level. Borin's is +1, so \"twice because I'm a fighter\" isn't a thing here. What is real: you can fight with two weapons, and an unarmed strike counts as a light weapon. With the shield strapped to one arm, that's a punch from your free hand and a knee or a kick as the second blow. It's a full-round action, so no moving beyond a five-foot step, and without the Two-Weapon Fighting feat you take -4 on the first blow and -"
+  },
+  {
+   "id": "s11-14",
+   "split": "set1",
+   "scene": "s11",
+   "kind": "combat",
+   "text": "He swings at me, so I punch him.",
+   "verdict": "roll",
+   "roll": {
+    "against": "defence",
+    "bonus": 0,
+    "defence": "ac",
+    "multi": false,
+    "what": "attack:melee"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "That's the fight on. He threw first, so his swing is resolved first; that's his roll, and I'll make it behind the screen. Then it's your turn, and your answer is an unarmed strike: attack roll against his AC, d20 +1 BAB +3 Strength = +4. Weapon Focus is for the longsword, so it does nothing for your fists. A hit does 1d3+3 nonlethal; if you want it to do real damage, that's -4 on the attack. His hand is empty and his knife is still in its sheath, so he isn't armed, and your punch doesn't provoke even though you don't have Improved Unarmed Strike. Roll it."
+  },
+  {
+   "id": "t1-01",
+   "split": "set2",
+   "scene": "t1",
+   "kind": "mundane",
+   "text": "I ask Mira-ka what she charges to lend thirty silver for a month.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "That's her price, straight answer to a straight question. Six on thirty for a month is steep, but it's what a dockside lender charges a stranger. The surety is her condition, not a trick. You've asked and she's answered, so the turn passes; next time round you can haggle, offer her something, or walk away."
+  },
+  {
+   "id": "t1-02",
+   "split": "set2",
+   "scene": "t1",
+   "kind": "social",
+   "text": "I try to talk her down to a lower rate. I'm good for it, and I'll be back with more business.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 0,
+    "multi": false,
+    "what": "skill:Diplomacy"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Give me a Diplomacy check. Asking for a better rate is a request, and she's indifferent to you, so the DC is 15 plus her Charisma modifier. I'm not adding a bonus or a penalty. The promise of more business is worth something to a lender, but it's only a promise, from a stranger with no history at her counter, and the two cancel out. You're at +6: one rank, +2 Charisma, +3 class skill. Beat it and she shaves the rate. Miss, and the price stays where she set it."
+  },
+  {
+   "id": "t1-03",
+   "split": "set2",
+   "scene": "t1",
+   "kind": "check",
+   "text": "While we talk, I watch Ruska out of the corner of my eye to see if he's signalling anyone.",
+   "verdict": "roll",
+   "roll": {
+    "against": "opposed",
+    "bonus": -2,
+    "multi": false,
+    "opposed_by": "skill:Bluff",
+    "what": "skill:Sense Motive"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "This one's Sense Motive. When somebody passes a hidden signal, the book sets the watcher's Sense Motive against the signaller's Bluff, so I'll roll a Bluff for Ruska behind the screen. I roll it whether or not he's signalling anyone, so the dice won't tell you which. Take −2 for splitting your attention: you're keeping up a conversation about money while you watch him out of the corner of your eye. Your Sense Motive is +4, one rank and +3 class skill, so +2 with the penalty."
+  },
+  {
+   "id": "t1-04",
+   "split": "set2",
+   "scene": "t1",
+   "kind": "creative",
+   "text": "I tell her I'll sign over my thieves' tools as surety, but I swap in a cheap pick set from my pack when she isn't looking.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_fact",
+   "author": "claude-draft, owner-approved",
+   "note": "Hold up. Your sheet lists one set of thieves' tools, and they're the ones lying on her counter. There's no second, cheaper pick set in your pack, so there's nothing to swap in. I can't let the plan lean on something Kesst doesn't own. Here's what you can do. You can offer the real tools as surety, honestly. She's plainly interested, and that would be a Diplomacy request. Or, if you can lay hands on something worth swapping first, palming one thing for another under her nose is Sleight of Hand against her Perception. Which way do you want to go?"
+  },
+  {
+   "id": "t1-05",
+   "split": "set2",
+   "scene": "t1",
+   "kind": "argue",
+   "text": "Tengu love shiny things, so she'll obviously take my silver ring instead of interest.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_fact",
+   "author": "claude-draft, owner-approved",
+   "note": "Two problems here, and both are facts. First, Kesst doesn't have a silver ring. Your sheet lists leather armour, a rapier, a dagger and thieves' tools, and that's all. Second, nothing we know about Skyreach says its tengu prize shiny things over coin. That's an old storybook idea about crows. The tengu of this world are their own people, and Mira-ka is a moneylender: what she prizes is being paid. And even with a ring in your hand, whether she'd take it in place of interest would be her choice, not something you can declare for her. If you want to pay in goods instead of coin, put something re"
+  },
+  {
+   "id": "t1-06",
+   "split": "set2",
+   "scene": "t1",
+   "kind": "creative",
+   "text": "I lean close and say, quietly, that I know Ruska has been moving goods without paying the tree-toll, and I'll keep quiet for a better rate.",
+   "verdict": "roll",
+   "roll": {
+    "against": "even",
+    "bonus": 0,
+    "multi": false,
+    "what": "oracle"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Here's how this works. Kesst doesn't actually know this about Ruska; you're guessing. So before anything else I roll the odds behind the screen on whether your guess happens to be true. I've set those odds from what I know about him, and I won't tell you what they are or how the roll came out. If the guess is true, you've got real leverage, and it's Intimidate against her: 10 + her Hit Dice + her Wisdom modifier. If it isn't, you're bluffing, and it's your Bluff against her Sense Motive at −4, because a stranger claiming to know her business is an unlikely thing to believe (the book says −5; t"
+  },
+  {
+   "id": "t1-07",
+   "split": "set2",
+   "scene": "t1",
+   "kind": "overreach",
+   "text": "I run across the rope bridge, grab a cargo basket rope on the way and swing down to the forest floor before anyone can follow.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "too_much",
+   "author": "claude-draft, owner-approved",
+   "note": "I'm stopping you there. That's three separate stunts strung into one breath: running a swaying rope bridge flat out, snatching a rope as you pass, and riding it forty feet down to the forest floor. Each one is its own feat with its own roll, and they don't all happen in a single instant. There's a snag in the middle, too. The cargo baskets hang from pulleys at the edge of this platform, behind you now, not out along the bridge. There's nothing to grab \"on the way\". So pick your piece. Running the bridge is an Acrobatics check. Going forty feet down a pulley rope is Climb, DC 15 for an unknotte"
+  },
+  {
+   "id": "t1-08",
+   "split": "set2",
+   "scene": "t1",
+   "kind": "impossible",
+   "text": "I make Mira-ka forget I owe her anything.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_fact",
+   "author": "claude-draft, owner-approved",
+   "note": "Two things. First, Kesst doesn't owe Mira-ka anything. You've never borrowed from her, so there's no debt to forget; you came here to start one. Second, even if there were a debt, Kesst has no way to make anyone forget anything. You're a rogue with no spells, and nothing you can say or do wipes a memory. Talk can change what people are willing to do. It doesn't change what they remember. If what you're after is thirty silver on easy terms, ask her for it, and we'll see how she takes to you."
+  },
+  {
+   "id": "t1-09",
+   "split": "set2",
+   "scene": "t1",
+   "kind": "check",
+   "text": "I cross the rope bridge to the next tree.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "There's no roll in this. Skyreach folk cross these bridges all day long. If it's narrow enough to count as a balancing act at all, it's a low Acrobatics DC, and with +7 Kesst can't fail it walking with care. If you'd tried to run it, or cross in a gale, I'd have asked for a check. You're on the next tree now, and the thirty silver you came for is still unasked for, back there."
+  },
+  {
+   "id": "t1-10",
+   "split": "set2",
+   "scene": "t1",
+   "kind": "argue",
+   "text": "The dawn bell has rung, so by market law she has to lend to anyone who asks.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_fact",
+   "author": "claude-draft, owner-approved",
+   "note": "That law isn't real. What we know about Skyreach is that a dawn bell opens the markets, and that's all the bell does. Nothing obliges a lender to lend, and whom Mira-ka trusts with her silver is her business. If you want to know how Skyreach's markets really work, Kesst's Knowledge (local) can tell you something. If you want the thirty silver, ask her for it properly; that's a Diplomacy request."
+  },
+  {
+   "id": "t2-01",
+   "split": "set2",
+   "scene": "t2",
+   "kind": "mundane",
+   "text": "I kneel down and ask the child their name.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "You asked and the child answered, the way a frightened eight-year-old would. You're a stranger who arrived this afternoon, and somebody has told this one not to talk to strangers after dark. Winning their trust will take more than a question, and the next move is yours."
+  },
+  {
+   "id": "t2-02",
+   "split": "set2",
+   "scene": "t2",
+   "kind": "creative",
+   "text": "I cast light on a reed and hand it to the child so they're not frightened of the dark.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "That works exactly as you'd hope. Light is one of your cantrips, so there's nothing to roll. The reed shines like a torch, good light for twenty feet around and dim light twenty feet past that, and at your level it lasts ten minutes. The child has a lamp of their own now. What next?"
+  },
+  {
+   "id": "t2-03",
+   "split": "set2",
+   "scene": "t2",
+   "kind": "social",
+   "text": "I call out to Kwolla and tell her I've found a lost child and I'll walk them home.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": -2,
+    "multi": false,
+    "what": "skill:Diplomacy"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Roll Diplomacy for me. You're asking her to let you take a child home after curfew, which is a request, and she's indifferent to you, so the DC is 15 plus her Charisma modifier. Take −2: in Reedsink, standing comes from age and deed, and to her you're a stranger with neither, arrived this afternoon, offering to walk off with one of their young. Your Diplomacy is +0, so −2 in all. If you've got an answer to her question, give it to me before you roll."
+  },
+  {
+   "id": "t2-04",
+   "split": "set2",
+   "scene": "t2",
+   "kind": "check",
+   "text": "I try to work out from the child's clothes and markings which clan longhall they belong to.",
+   "verdict": "roll",
+   "roll": {
+    "against": "20",
+    "bonus": 0,
+    "multi": false,
+    "what": "skill:Knowledge (local)"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "I'll need a Knowledge (local) check, DC 20. Telling which clan a child belongs to from what they're wearing is fine local detail about a small town you first set eyes on this afternoon. That isn't the common knowledge you'd pick up from books; it sits at the hard end of local lore. No bonus or penalty: you're close enough to see whatever there is to see, dusk or not. You're at +7: one rank, +3 Intelligence, +3 class skill. Whatever you make of it, I'll tell you, including if there's nothing there to read."
+  },
+  {
+   "id": "t2-05",
+   "split": "set2",
+   "scene": "t2",
+   "kind": "creative",
+   "text": "I use prestidigitation to make a little frog of light hop along the boardwalk, and tell the child to follow it home.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_rule",
+   "author": "claude-draft, owner-approved",
+   "note": "Prestidigitation can do part of this, but not the part that matters. It can make a small, crude, obviously false object, colour it, and move it slowly by lifting it. It can't make it shine; that's light, a different spell, and prestidigitation can't copy another spell's effect. Its range is ten feet, so the frog can't hop off up the boardwalk unless you walk right behind it. And above all, the frog doesn't know where the child lives, because you don't. A spell can't lead anyone to an answer its caster hasn't got. Still: the child is watching the frog, not crying. That's worth something. What d"
+  },
+  {
+   "id": "t2-06",
+   "split": "set2",
+   "scene": "t2",
+   "kind": "argue",
+   "text": "I'm an adult, so the curfew doesn't apply to me or to anyone I'm with.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "You've read the rule right, as far as it goes. The curfew binds the unescorted young, so it doesn't bind you, and a child at your side is escorted. Nobody is going to drag you indoors for standing on the boardwalk after the bell. What the curfew doesn't settle is everything else. You're a stranger who arrived this afternoon, in a town where standing comes from age and deed, and you'd be walking about after dark with a child who isn't yours. When Kwolla's lantern reaches this end, she won't be asking about the curfew. She'll be asking who you are, and why that child is with you, and the answer "
+  },
+  {
+   "id": "t2-07",
+   "split": "set2",
+   "scene": "t2",
+   "kind": "overreach",
+   "text": "I untie the punt, pole the child down the channel, find their longhall, and get back before Kwolla notices.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Untying the punt is quick, and it's done. Asking the child to come with you is speaking to someone who'll answer, so your turn stops there. The rest of the plan waits, and the world takes its beat first, starting with whatever the child decides. Three things for when you get there. This punt isn't yours, and somebody in Reedsink will miss it. Poling down the channel in the dark is a long job, and it will take your whole next turn. And you don't know which longhall is the child's, so you'd be poling blind. As for getting back before Kwolla notices, I can't promise you that. She's out here with "
+  },
+  {
+   "id": "t2-08",
+   "split": "set2",
+   "scene": "t2",
+   "kind": "impossible",
+   "text": "I read the child's mind to find out where they live.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "character",
+   "author": "claude-draft, owner-approved",
+   "note": "Thessaly can't do that. Reading a mind takes a spell like detect thoughts, and that isn't yours: it's a second-level spell, beyond a first-level wizard anyway. Today you have magic missile and grease prepared, and your cantrips are detect magic, light, mage hand and prestidigitation. Detect magic would show you magical auras, not what a child is thinking. And staring hard at a frightened eight-year-old has mostly made them hide. There are ordinary ways to the answer. You can ask them, gently. You can look at what they're wearing and see whether your Knowledge (local) makes anything of it. Or y"
+  },
+  {
+   "id": "t2-09",
+   "split": "set2",
+   "scene": "t2",
+   "kind": "check",
+   "text": "I listen for anyone calling a child's name across the marsh.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 0,
+    "multi": false,
+    "what": "skill:Perception"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Make me a Perception check, DC 15. A shout is easy to hear close by, but every ten feet of marsh adds to it, and frogs, wind and water do the rest; that's where I've set it. Perception isn't one of your trained skills, so it's just your Wisdom, +1. I'm not going to tell you whether anyone out there is calling. The roll decides what you'd hear if they were."
+  },
+  {
+   "id": "t2-10",
+   "split": "set2",
+   "scene": "t2",
+   "kind": "creative",
+   "text": "I tell Kwolla the child's family sent me to fetch them, so she lets us pass after curfew.",
+   "verdict": "roll",
+   "roll": {
+    "against": "opposed",
+    "bonus": -4,
+    "multi": false,
+    "opposed_by": "skill:Sense Motive",
+    "what": "skill:Bluff"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Bluff, against her Sense Motive. I'm calling the lie unlikely, so take −4 (the book says −5; the chips stop at four). You arrived this afternoon, nobody here knows you, you can't name the family she's asking about, and a child who'd been sent for wouldn't be crying lost at a mooring post. Your Bluff is +0, so −4 in all. If she sees through it, you aren't just turned down; she'll think worse of you for having tried."
+  },
+  {
+   "id": "t3-01",
+   "split": "set2",
+   "scene": "t3",
+   "kind": "combat",
+   "text": "I charge the nearer bandit and swing my longsword.",
+   "verdict": "roll",
+   "roll": {
+    "against": "defence",
+    "bonus": 2,
+    "defence": "ac",
+    "multi": false,
+    "what": "attack:melee"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "That's a charge, your full-round action. You cover about 15 feet in a straight line to reach him, which clears the 10-foot minimum, and the five-foot drop doesn't stop it: it's too short to hurt you and it isn't difficult terrain. The wet stone would matter if you were tumbling. You're just running. Roll your melee attack against his AC. Your longsword is +5 (BAB +1, Strength +3, Weapon Focus +1), and the charge adds +2, so +7. If you want Power Attack, say so before the die leaves your hand: −1 to hit, +2 damage. A hit does 1d8+3. Remember the price of charging, too: you're at −2 AC until you"
+  },
+  {
+   "id": "t3-02",
+   "split": "set2",
+   "scene": "t3",
+   "kind": "creative",
+   "text": "I put my shoulder to the hay cart and shove it down the slope at the bandits.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 0,
+    "multi": true,
+    "what": "ability:Strength"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "I like it. Getting a loaded cart rolling is a Strength check, DC 15, and it takes your standard action. Your Strength is +3. The slick stone under your boots works against you, but you're shoving downhill, and I'm calling those two even: no bonus, no penalty. Nobody is next to you, so it doesn't provoke. If it goes, it rolls to the lip of your terrace and pitches over the five-foot drop toward them. It won't steer, though; a tumbling cart goes where the ground sends it, and they may not all be in its way. That's the second roll: I'll make Reflex saves behind the screen, DC 15, for whoever is i"
+  },
+  {
+   "id": "t3-03",
+   "split": "set2",
+   "scene": "t3",
+   "kind": "creative",
+   "text": "I kick the rain barrel over so the water floods the stair and the stone gets even slicker under them.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "world",
+   "author": "claude-draft, owner-approved",
+   "note": "I'll stop you before you spend the action, because it won't buy you anything. Tipping a full barrel is a move action and you can certainly do it, but the rain has already done the job you want the water for. The book treats wet stone as slippery: +5 to the DC of any Acrobatics check made on it. That's already true of every surface out there, their terrace, yours and the stair, and a second soaking doesn't stack on the first. The water would also run down the stair, where nobody is standing. Your turn is untouched. If you want them on bad footing, make them move: they're the ones who'll have to"
+  },
+  {
+   "id": "t3-04",
+   "split": "set2",
+   "scene": "t3",
+   "kind": "combat",
+   "text": "I draw my shortbow and shoot the war dog.",
+   "verdict": "roll",
+   "roll": {
+    "against": "defence",
+    "bonus": -4,
+    "defence": "ac",
+    "multi": false,
+    "what": "attack:ranged"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "You can do it, just not all of it this turn. A heavy shield leaves that hand good for nothing else, so the shield has to come off first. Dropping your longsword is free. Unstrapping the shield is a move action. Drawing the bow is a second move action. That's your whole turn, and you end it holding a bow with no shield on your arm, so your AC drops by 2 if they come for you. The shot itself comes next turn. It's a ranged attack against the dog's AC: BAB +1 and Dexterity +1, then −4 for the rain, which the book applies to every ranged attack made in it. Twenty feet is well inside the shortbow's "
+  },
+  {
+   "id": "t3-05",
+   "split": "set2",
+   "scene": "t3",
+   "kind": "creative",
+   "text": "I step back to stand over Ruk so they have to come through me to reach him.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Yes. Getting there is a move action, which leaves you your standard action. Be clear about what it buys you, though. It doesn't force them through you. Nobody armed with an ordinary spear can stab Ruk without standing next to him, and every square next to him is one you threaten, so anyone who wants him has to come into your reach first. But stepping into your reach doesn't provoke an attack of opportunity; leaving it does, or doing something careless inside it. And without Combat Reflexes you only get one attack of opportunity a round. You've made yourself the wall. You haven't made it a wall"
+  },
+  {
+   "id": "t3-06",
+   "split": "set2",
+   "scene": "t3",
+   "kind": "argue",
+   "text": "The dog's only an animal, so if I shout at it, it runs away. No roll.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_rule",
+   "author": "claude-draft, owner-approved",
+   "note": "I can't give you that one for free. A war dog isn't a stray that bolts at a raised voice. It's bred and trained for fights exactly like this one, with steel and shouting all around it. There's no rule that an animal flees from a shout, and when the outcome is in doubt it doesn't happen without a roll. What the book does give you is Intimidate to demoralize. It's a standard action; the dog has to be within 30 feet and able to see and hear you, and it is. You roll Intimidate, +3, against the dog's DC: 10 + its Hit Dice + its Wisdom modifier. Beat it and the dog is shaken for a round, plus a roun"
+  },
+  {
+   "id": "t3-07",
+   "split": "set2",
+   "scene": "t3",
+   "kind": "overreach",
+   "text": "I leap down a terrace onto the first bandit, knock him flat, and kill the second before he can lift his spear.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "too_much",
+   "author": "claude-draft, owner-approved",
+   "note": "Hold on. That's three separate deeds crammed into one instant, and a round is six seconds. Getting down there and onto him is movement. Knocking him flat is a trip, a combat manoeuvre against his CMD, and without Improved Trip it provokes an attack of opportunity from him. Killing the second man is an attack roll and damage, and a bandit doesn't die because you'd like him to. On your turn you get a move and a standard, or one full-round action, and that's all of it. Here's what this turn can hold. Charge the nearer one: about 15 feet, the five-foot drop doesn't stop it, +2 to hit and −2 to you"
+  },
+  {
+   "id": "t3-08",
+   "split": "set2",
+   "scene": "t3",
+   "kind": "creative",
+   "text": "I bull rush the nearer bandit off the edge of the terrace.",
+   "verdict": "roll",
+   "roll": {
+    "against": "defence",
+    "bonus": 2,
+    "defence": "cmd",
+    "multi": true,
+    "what": "cmb:bull rush"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "That's a bull rush as part of a charge, which the book lets you do in place of the charge's attack. It's your full-round action. You don't have Improved Bull Rush, so it provokes an attack of opportunity from him, and he gets that stab before your check. Then roll your CMB against his CMD. Your CMB is +4 (BAB +1, Strength +3), and the charge adds +2. Beat his CMD and he's shoved 5 feet straight away from you, plus 5 more for every 5 you beat it by; you can follow him if you like. If that carries him past the lip, he goes over. A five-foot fall does no damage by the book, but landing on wet sto"
+  },
+  {
+   "id": "t3-09",
+   "split": "set2",
+   "scene": "t3",
+   "kind": "social",
+   "text": "I shout that the warrior caste will hang them both from the town gate if they don't drop their spears.",
+   "verdict": "roll",
+   "roll": {
+    "against": "defence",
+    "bonus": 0,
+    "defence": "dc:intimidate",
+    "multi": false,
+    "what": "skill:Intimidate"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "That's Intimidate to demoralize, a standard action, and two things about it. First, a demoralize works on one target, not both, so tell me which bandit you're glaring at; the other hears it, but he isn't the one you're working on. Second, it can't make anyone surrender. Success leaves him shaken for a round, plus a round for every 5 you beat the DC by: −2 on attacks, saves, skill checks and ability checks. Whether he drops his spear is his choice, and I'll make it. Roll Intimidate, your +3, against his DC: 10 + his Hit Dice + his Wisdom modifier. The threat is real enough, because the caste re"
+  },
+  {
+   "id": "t3-10",
+   "split": "set2",
+   "scene": "t3",
+   "kind": "argue",
+   "text": "It's raining, so their spears are too slippery to hold. They'll drop them.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_fact",
+   "author": "claude-draft, owner-approved",
+   "note": "No, they won't drop them. A spear is a wooden shaft made to be gripped wet, muddy or bloody, and men have fought in the rain for as long as there have been men to fight. The book's rain rule is narrow: −4 on ranged attacks and Perception, and it puts out unprotected flames. Nothing in it touches a grip on a melee weapon. If you want a spear out of a man's hands, that's a disarm: your CMB against his CMD, and it provokes an attack of opportunity from him, since you don't have Improved Disarm. You'd need to be next to him for that, and he's 20 feet off. Saying it cost you nothing, so the whole t"
+  },
+  {
+   "id": "t4-01",
+   "split": "set2",
+   "scene": "t4",
+   "kind": "mundane",
+   "text": "I ask Tovek what was in the crate.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "That's your turn: you asked, and he answered. He hasn't refused you outright. He's refused to say it in front of the woman he's arguing with about it. If you want it out of him, you'll need him alone. Where do you go from here?"
+  },
+  {
+   "id": "t4-02",
+   "split": "set2",
+   "scene": "t4",
+   "kind": "check",
+   "text": "I look over the drying racks for any sign the crate was dragged across this roof.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": -2,
+    "multi": false,
+    "what": "skill:Perception"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Give me a Perception check, DC 15. You're at −2: children have been landing on and leaping off these roofs, and their scuffs are laid over whatever else is here. Your Perception is +1, all of it Wisdom. Going over the whole roof like this is a search, the kind of deed that takes time, so your turn ends here whatever you turn up."
+  },
+  {
+   "id": "t4-03",
+   "split": "set2",
+   "scene": "t4",
+   "kind": "creative",
+   "text": "I insist that we all take the ritual bath before this business goes any further, so I can watch who stalls.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 2,
+    "multi": true,
+    "what": "skill:Diplomacy"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "I like it, and the custom is real: in Highcrown, ritual bathing comes before any formal business. But you can't make them go. You're a stranger hired this morning, and each of them decides for themselves. That's a Diplomacy request. Neither is any friendlier to you than indifferent yet, so it's DC 15 plus their Charisma, and asking them to bathe is simple aid, no change to the DC. You get +2 for having their own custom on your side. Your Diplomacy is −1, and I'll set your one roll against each of them. Saying it ends your turn; they'll answer. If they go, the watching comes after, a Sense Moti"
+  },
+  {
+   "id": "t4-04",
+   "split": "set2",
+   "scene": "t4",
+   "kind": "check",
+   "text": "I jump the alley to the next roof.",
+   "verdict": "roll",
+   "roll": {
+    "against": "10",
+    "bonus": -2,
+    "multi": false,
+    "what": "skill:Acrobatics"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "A long jump's DC is the distance, 6, doubled to 12 because you're jumping from a standstill: the racks crowd this roof and the parapet is in the way, so there's no ten-foot run-up to be had. On the page that's DC 10 at −2. Your Acrobatics is −3: Dexterity +1, no ranks, and −4 armour check penalty from the chain shirt and the heavy shield together. You need a 15 on the die. Miss by 4 or less and you get a DC 20 Reflex save to catch the far edge. Miss by more and it's twelve feet to the alley, 1d6 damage. Jumping is moving, so a clean landing doesn't end your turn. Roll it."
+  },
+  {
+   "id": "t4-05",
+   "split": "set2",
+   "scene": "t4",
+   "kind": "social",
+   "text": "I tell Ranja straight out that I think she took it, and watch her face.",
+   "verdict": "roll",
+   "roll": {
+    "against": "opposed",
+    "bonus": 0,
+    "multi": false,
+    "opposed_by": "skill:Bluff",
+    "what": "skill:Sense Motive"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "That's your turn: you said it to her face and she answered. Now give me a Sense Motive check, your +1, against whatever she's doing behind the screen. If she's lying to you, it's opposed by her Bluff. I roll her side in secret and you read what you can from her face; the answer comes from her, never from me. One more thing: calling a broker a thief to her face in front of the harbor-reeve won't warm her to you, whether she did it or not."
+  },
+  {
+   "id": "t4-06",
+   "split": "set2",
+   "scene": "t4",
+   "kind": "creative",
+   "text": "I offer one of the roof-hopping children a copper to tell me if they saw anyone carrying a crate this morning.",
+   "verdict": "roll",
+   "roll": {
+    "against": "10",
+    "bonus": 2,
+    "multi": false,
+    "what": "skill:Diplomacy"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Asking ends your turn. It's a Diplomacy request for simple information, which is an easy ask: DC 10. The copper buys you +2. Your Diplomacy is −1. These are children, and they'll tell you something for a copper either way; the roll decides whether it's what they really saw or whatever they think will earn the coin. Roll it."
+  },
+  {
+   "id": "t4-07",
+   "split": "set2",
+   "scene": "t4",
+   "kind": "argue",
+   "text": "Tovek hired me, so I have the harbor-reeve's authority. I order Ranja to open her warehouse.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_fact",
+   "author": "claude-draft, owner-approved",
+   "note": "I have to stop you there, because it isn't true. Tovek hired you this morning to find the crate, and that's all: a job, not an office. Being someone's hired hand doesn't put his authority in your mouth, and Ranja knows the difference as well as anyone on this roof. And nobody has said she keeps a warehouse. Your character doesn't know whether she does, or where. What you can do: ask Tovek to make the demand himself, since it's his office and his crate. Or try to bluff her that he's sent you with it, which would be Bluff against her Sense Motive, an unlikely claim with the reeve himself standin"
+  },
+  {
+   "id": "t4-08",
+   "split": "set2",
+   "scene": "t4",
+   "kind": "impossible",
+   "text": "I follow the crate's trail by its smell, like a hound.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "character",
+   "author": "claude-draft, owner-approved",
+   "note": "That one's beyond you. You're human, and there's no scent ability on your sheet; a hound has it, you don't. A crate doesn't leave a trail a nose could follow across a city's worth of figs and salt anyway. What you do have is ranks in Survival, and that's the honest way to follow a trail: drag marks, scuffs, a rack knocked out of its line, the way a tracker reads ground. If you want to look for that, say so and I'll set the DC. The sniffing took no time worth counting, so your turn is still yours."
+  },
+  {
+   "id": "t4-09",
+   "split": "set2",
+   "scene": "t4",
+   "kind": "mundane",
+   "text": "I eat a dried fig off the rack.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Done, no roll. These are a merchant's goods, drying for sale, so strictly you've just eaten someone's stock, but one fig isn't going to start a feud. Eating is a quick deed, so it doesn't end your turn: you've room for one more quick one, or something that takes longer, before the turn's done. What else?"
+  },
+  {
+   "id": "t4-10",
+   "split": "set2",
+   "scene": "t4",
+   "kind": "creative",
+   "text": "I climb down the ladder, go round to Ranja's warehouse, and wait in the shadows to see who comes to it at dusk.",
+   "verdict": "roll",
+   "roll": {
+    "against": "15",
+    "bonus": 0,
+    "multi": true,
+    "what": "skill:Diplomacy"
+   },
+   "refuse": null,
+   "author": "claude-draft, owner-approved",
+   "note": "Down the ladder is free; moving round the place costs nothing. But nobody has told you Ranja keeps a warehouse, let alone where. You'd be guessing on both counts, so before you can watch it, you have to find it. That's Diplomacy to gather information: 1d4 hours working the streets, asking porters and stallholders where the smuggler-broker keeps her goods. It isn't common knowledge, so DC 15, no adjustment. Your Diplomacy is −1. The street will tell you whether she keeps a warehouse at all, and where. A long task like that ends your turn, and waiting in the shadows until dusk is a second deed t"
+  },
+  {
+   "id": "r-01",
+   "split": "rulings",
+   "scene": "s1",
+   "kind": "derived",
+   "text": "I draw my longsword and stab the priest.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "false_fact",
+   "author": "claude-derived",
+   "note": "",
+   "source": "declared-violence-victim-ruling.md (2026-10-10): 'stab the priest' with no priest present is refused, never turned on a bystander"
+  },
+  {
+   "id": "r-02",
+   "split": "rulings",
+   "scene": "s1",
+   "kind": "derived",
+   "text": "I tell the serving boy I know he's been watering the ale, so he'd better bring me a free bowl of stew.",
+   "verdict": "roll",
+   "roll": {
+    "what": "oracle",
+    "against": "unlikely"
+   },
+   "refuse": null,
+   "author": "claude-derived",
+   "note": "",
+   "source": "shot-in-the-dark-ruling.md (2026-11-06): an unknown secret used as leverage is a hidden odds roll, not a refusal"
+  },
+  {
+   "id": "r-03",
+   "split": "rulings",
+   "scene": "s9",
+   "kind": "derived",
+   "text": "While Brenna has her back to me I cast charm person on her, then ask her to open the glass case.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "character",
+   "author": "claude-derived",
+   "note": "",
+   "source": "rulings-2026-11-09.md (charm unseen then talk) — but Thessaly has not prepared charm person, so the sheet refuses it first"
+  },
+  {
+   "id": "r-04",
+   "split": "rulings",
+   "scene": "s1",
+   "kind": "derived",
+   "text": "I nod to Delyth, thank her for her time, and leave the hall.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-derived",
+   "note": "",
+   "source": "conversation-state-ruling.md (2026-09-24, 2026-10-17): leaving a conversation is a free exit"
+  },
+  {
+   "id": "r-05",
+   "split": "rulings",
+   "scene": "s11",
+   "kind": "derived",
+   "text": "The drunk sailor backs down and buys me a drink to say sorry.",
+   "verdict": "refuse",
+   "roll": {},
+   "refuse": "npc_choice",
+   "author": "claude-derived",
+   "note": "",
+   "source": "companions-obey-in-character.md / seen-people-are-real.md: another person's choice is theirs, never the player's to declare"
+  },
+  {
+   "id": "r-06",
+   "split": "rulings",
+   "scene": "s7",
+   "kind": "derived",
+   "text": "I wade back into the stream so the wolves have to come at me through the water.",
+   "verdict": "say_yes",
+   "roll": {},
+   "refuse": null,
+   "author": "claude-derived",
+   "note": "",
+   "source": "set1 s7 precedent and continue-means-the-scene-moves.md: a plain move nobody contests needs no roll"
+  }
+ ],
+ "left_out": [
+  {
+   "id": "s2-03",
+   "why": "flagged unclear by the owner"
+  },
+  {
+   "id": "s10-07",
+   "why": "flagged unclear by the owner"
+  }
+ ]
+}
