@@ -2007,6 +2007,8 @@ def validate(spec: dict, path: str = "effect", *, inherits_window: bool = False)
             if not _is_dice(str(value)):
                 problems.append(
                     f"{path}: {value!r} is not dice. Write 1d4, 2d6+2 or a number.")
+        elif f.kind == "duration":
+            problems.extend(_duration_problems(value, path))
         elif f.kind == "effects":
             for i, nested in enumerate(value or []):
                 problems.extend(validate(
@@ -2565,6 +2567,30 @@ def is_drawback(spec: dict) -> bool:
              "speed"):
         return amount < 0
     return False
+
+
+def _duration_problems(duration, path: str) -> list[str]:
+    """What is wrong with an authored duration. `Engine._duration_rounds` reads a bad one
+    as a guess: measured 2026-11-15, `{"amount": "2d", "unit": "hour"}` and `"banana"`
+    both validated clean and became PERMANENT, an unknown unit became rounds, and -3
+    became 1 round."""
+    if not isinstance(duration, dict):
+        return [f"{path}: a duration is {{\"amount\": 3, \"unit\": \"round\"}}."]
+    out = []
+    units = {o["id"] for o in VOCAB["duration_unit"]}
+    unit = duration.get("unit")
+    if unit not in (None, "") and str(unit) not in units:
+        out.append(f"{path}: {unit!r} is not a unit of time. One of: "
+                   f"{', '.join(sorted(units))}.")
+    amount = duration.get("amount")
+    if amount not in (None, ""):
+        text = str(amount).strip()
+        if text.lstrip("-").isdigit():
+            if int(text) < 0:
+                out.append(f"{path}: a duration cannot be negative ({text}).")
+        elif not _is_dice(text):
+            out.append(f"{path}: {amount!r} is not a length of time. Write 3 or 1d4.")
+    return out
 
 
 def _lasts(duration) -> bool:

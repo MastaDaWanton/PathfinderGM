@@ -1109,7 +1109,7 @@ def _validate_grants(d: dict, path: dict, at: str, resolved_names: set,
 # key, and the homebrew editor has offered feats an `effects` field for a year that
 # `feats.from_dict` dropped on the floor.
 _FEAT_DOC_KEYS = frozenset({"modifiers", "tags", "budget", "choice", "attack_ability",
-                            "not_yet", "requires", "requires_not"})
+                            "cmb_ability", "not_yet", "requires", "requires_not"})
 _FEAT_MOD_KEYS = frozenset({"type", "target", "amount", "formula", "bonus_type", "scope",
                             "when", "note"})
 
@@ -1191,6 +1191,19 @@ def validate_feat_document(feat_id: str, doc) -> list[str]:
                 problems.append(
                     f"{mat}.{cond}: an object — scope {{\"weapon\": \"$target\"}}, "
                     f"when {{\"range_ft\": {{\"lte\": 30}}}}.")
+        scope = spec.get("scope")
+        if isinstance(scope, dict):
+            # Measured 2026-11-15: `{"maneuver": "tripp"}` loaded clean, and an Improved
+            # Trip written so would never add its +2 — `_scope_holds` compares words.
+            from .tables import MANEUVERS
+
+            for key, want in scope.items():
+                if key not in ("weapon", "maneuver", "school"):
+                    problems.append(f"{mat}.scope: {key!r} binds nothing. One of: "
+                                    f"maneuver, school, weapon.")
+                elif key == "maneuver" and str(want) not in MANEUVERS:
+                    problems.append(f"{mat}.scope.maneuver: {want!r} is not a combat "
+                                    f"maneuver. One of: {', '.join(sorted(MANEUVERS))}.")
         when = spec.get("when")
         if isinstance(when, dict) and when:
             # The `when` grammar's own check (2026-10-09): until now a feat's clause was
@@ -1231,6 +1244,14 @@ def validate_feat_document(feat_id: str, doc) -> list[str]:
             problems.append(
                 f"{at}.attack_ability: {{\"use\": \"dex\", \"if_better\": true}} — "
                 f"which score feeds the attack roll instead of Strength.")
+    sub = doc.get("cmb_ability")
+    if sub is not None:
+        from .tables import ABILITIES
+
+        if not isinstance(sub, dict) or str(sub.get("use", "")) not in ABILITIES:
+            problems.append(
+                f"{at}.cmb_ability: {{\"use\": \"dex\"}} — which score feeds the "
+                f"combat maneuver bonus instead of Strength (Agile Maneuvers).")
     return problems
 
 
