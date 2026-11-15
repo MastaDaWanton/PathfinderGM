@@ -319,6 +319,11 @@
       }
     ]
   },
+  "agile-maneuvers": {
+    "cmb_ability": {
+      "use": "dex"
+    }
+  },
   "weapon-finesse": {
     "attack_ability": {
       "use": "dex",

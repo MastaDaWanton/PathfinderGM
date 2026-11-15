@@ -1368,6 +1368,10 @@ class Scene:
     def lift(self, made: "Manifestation") -> None:
         """Take one back off the map. Squares another live manifestation also claims stay."""
         self.manifests = [m for m in self.manifests if m is not made]
+        if made.creature:
+            # "When the spell ends or is dispelled, a summoned creature is instantly sent
+            # back" (CRB, Conjuration (Summoning)). Before 2026-11-15 it had no lifetime.
+            self.remove(made.creature)
         if self.grid is None or not made.added:
             return
         still = set()
@@ -2034,6 +2038,13 @@ class Scene:
                 if who is None or not who.has_condition(stops):
                     out.append(self._end_standing(holder))
                     continue
+            # "A summoned creature also goes away if it is killed or if its hit points
+            # drop to 0 or lower" (CRB, Conjuration (Summoning)).
+            if getattr(holder, "creature", ""):
+                who = self.people.get(holder.creature)
+                if who is None or who.hp <= 0:
+                    out.append(self._end_standing(holder))
+                    continue
             if holder.rounds_left is None:
                 continue
             holder.rounds_left -= rounds
@@ -2053,6 +2064,9 @@ class Scene:
         """
         if isinstance(holder, Manifestation):
             self.lift(holder)
+            if holder.creature:
+                return {"kind": "summon_ended", "what": holder.what, "id": holder.id,
+                        "ref": holder.creature}
             return {"kind": "manifest_ended", "what": holder.what, "id": holder.id}
         if holder in self.wards:
             self.wards.remove(holder)
@@ -2899,6 +2913,9 @@ class Manifestation:
     source: str = ""
     owner: str = ""                             # who put it there
     id: str = ""
+    # A summoned creature's ref: its lifetime is this manifestation's, so it leaves by
+    # the same doors (expiry, dispel, the fight ending) — `Scene.lift`.
+    creature: str = ""
 
     def covers(self, squares) -> bool:
         """Whether this manifestation is in any of these cells.
@@ -2930,7 +2947,7 @@ class Manifestation:
                 "squares": [list(s) for s in self.squares],
                 "added": [list(s) for s in self.added],
                 "rounds_left": self.rounds_left, "source": self.source,
-                "owner": self.owner, "id": self.id}
+                "owner": self.owner, "id": self.id, "creature": self.creature}
 
     @classmethod
     def from_dict(cls, d: dict) -> "Manifestation":
@@ -2939,7 +2956,8 @@ class Manifestation:
             squares=[tuple(s) for s in d.get("squares") or []],
             added=[tuple(s) for s in d.get("added") or []],
             rounds_left=d.get("rounds_left"), source=d.get("source", ""),
-            owner=d.get("owner", ""), id=d.get("id", ""))
+            owner=d.get("owner", ""), id=d.get("id", ""),
+            creature=d.get("creature", ""))
 
 
 @dataclass
@@ -4251,6 +4269,15 @@ class Engine:
                             f"target at most one size category larger.",
                             "legality", index, code="too_large",
                         )
+                # "Some creatures—such as oozes, creatures without legs, and flying
+                # creatures—cannot be tripped" (CRB, Trip). Measured 2026-11-15: an ooze
+                # and a creature hovering a level above its ground were both knocked
+                # prone. Legless and the +2 per extra leg wait on a legs count the
+                # bestiary does not carry.
+                if man == "trip" and (why := self._untrippable(defender)):
+                    raise IntentError(
+                        f"attack: {defender.name} cannot be tripped — {why}.",
+                        "legality", index, code="cannot_trip")
                 # Two already locked in a grapple: keeping the hold or breaking it, not a
                 # second grapple (`_resolve_maneuver`, `_maintain_grapple`, `_escape_from`).
                 locked = man == "grapple" and (self._holds(actor, defender)
@@ -18906,6 +18933,10 @@ class Engine:
             return []                           # already held by this one
         if key == "trip" and defender.has_state("state.position.prone"):
             return []
+        if key == "trip" and (why := self._untrippable(defender)):
+            return [{"effect": {"ref": defender.ref, "kind": "rider_refused",
+                                "rider": word, "why": why, "origin": origin},
+                     "tell": f"{actor.name}'s {word} finds nothing to take: {why}."}]
         if word in ("pull", "push"):
             return self._rider_shove(actor, defender, rule, origin, state)
         sub = Intent(op="attack", actor=actor.ref, target=defender.ref,
@@ -20783,6 +20814,11 @@ class Engine:
                 return self._refuse(intent, f"The {name}'s power names a spell the Spells "
                                             f"bench does not have ({spec['spell']}).")
             level = min((int(v) for v in (spell.lists or {}).values()), default=0)
+            if not (spec.get("caster_level") or (lay or {}).get("caster_level")):
+                # No caster level written: the lowest that can cast the spell (CRB, Magic
+                # Item Creation), as a potion's is (`consumables`). It was 1, so a 3rd-level
+                # fireball power rolled 1d6.
+                cl = max(1, 2 * level - 1)
             if not resuming:
                 partial["item_cast"] = {"cl": cl, "level": level,
                                         "dc": 10 + level + level // 2,
@@ -22049,6 +22085,19 @@ class Engine:
             if resisted:
                 live = [r for r in live if r not in resisted]
                 cast_effect["resisted"] = sorted(resisted)
+        # An immunity naming this very spell (shield: "negates magic missile attacks
+        # directed at you", CRB). Measured 2026-11-15: a shielded wizard took all five
+        # missiles and went to -7.
+        warded = {r: why for r in live
+                  if (why := self._immune_to_spell(self.scene.actors[r], spell))}
+        if warded:
+            live = [r for r in live if r not in warded]
+            cast_effect["immune"] = sorted(warded)
+            if "immune_said" not in state:
+                state["immune_said"] = True
+                state["tells"].extend(
+                    f"{spell.name} does not touch {self.scene.actors[r].name}: immune "
+                    f"to {why}." for r, why in warded.items())
         # A touch spell's attack roll (the spell's `touch_attack` document; leatherworking
         # plan §18.5): before it, shocking grasp landed on whoever it was aimed at and its
         # +3 against metal was read by nothing. The caster's roll, once per target, kept in
@@ -22814,7 +22863,10 @@ class Engine:
                  "apply_condition",
                  # A save-or-suffer rider (hold person, sleep): rendered and never run
                  # until 2026-11-08 (audit #36). `_gate_rider`.
-                 "save_gate")
+                 "save_gate",
+                 # A spell's immunity (shield against magic missile, fiery body against
+                 # fire): rendered and never granted until 2026-11-15. `_grant_immunity`.
+                 "immunity")
 
     def _executes(self, spec: dict) -> bool:
         # An ITEM's trigger (hit, crit, first_wound_daily, carried — contracts §2) is not a
@@ -23162,6 +23214,8 @@ class Engine:
             return self._rust(spec, ctx)
         if kind == "touch_attack":
             return [], []              # rolled before anything landed (`_touches`)
+        if kind == "immunity":
+            return self._grant_immunity(spec, ctx)
         if _ac_grant(spec) is not None:
             return self._grant_ac(spec, ctx)
         return self._stand_by(spec, ctx)
@@ -23585,7 +23639,15 @@ class Engine:
             # spell the player paid a slot for and cannot tell did not work.
             return ([{"kind": "summon_refused", "creature": name, "why": str(exc)}],
                     [f"Nothing arrives: {exc}"])
-        return ([{"kind": "summon", "actors": made, "side": side}],
+        # Each arrival is held by a manifestation carrying the spell's clock, so it goes
+        # when the duration ends, when it is dispelled, or with the fight (`Scene.lift`).
+        for m in made:
+            self.scene.place(Manifestation(
+                what=f"the summoned {m['name']}", rounds_left=ctx.get("rounds"),
+                source=ctx.get("source", ""), owner=ctx.get("caster", ""),
+                creature=m["ref"]))
+        return ([{"kind": "summon", "actors": made, "side": side,
+                  "rounds": ctx.get("rounds")}],
                 ["Answering the call: "
                  + ", ".join(f"{m['name']} ({m['ref']})" for m in made) + "."])
 
@@ -23759,6 +23821,40 @@ class Engine:
         if "amount" in out and effectspec.is_formula(out["amount"]):
             out["amount"] = effectspec.evaluate(out["amount"], ctx.get("vars") or {})
         return out
+
+    def _grant_immunity(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
+        """A spell's immunity, held for the spell's duration through the one door every
+        defence comes by (`Actor.grant_defence`). A damage type is then refused by
+        `immune_to`, a condition by `states.immunity_blocks`, and a spell by its own
+        name by the cast loop (`_immune_to_spell`) — shield's "negates magic missile"."""
+        who = self._recipient(spec, ctx)
+        against = str(spec.get("target") or "").strip()
+        if who is None or not against:
+            return [], []
+        rounds = ctx.get("rounds")
+        who.grant_defence("immunity", against, source=ctx.get("source", ""),
+                          rounds=rounds, origin=str(ctx.get("origin") or ""))
+        return ([{"kind": "defence", "ref": who.ref, "defence": "immunity",
+                  "against": against, "rounds": rounds}],
+                [f"{who.name} is immune to {against}."])
+
+    def _untrippable(self, defender: Actor) -> str:
+        """Why the trip cannot work on this creature (CRB, Trip), or ""."""
+        if defender.has_state("type.ooze"):
+            return "an ooze has no legs to sweep"
+        spot = self.scene.positions.get(defender.ref)
+        if spot is not None and len(spot) > 2 and self.scene.grid is not None                 and spot[2] > self.scene.grid.ground(spot):
+            return "it is in the air"
+        return ""
+
+    @staticmethod
+    def _immune_to_spell(target: Actor, spell) -> str:
+        """The immunity on `target` that names this spell outright, or "" — matched on the
+        whole name, never a stem, so an immunity to "magic" is not one to magic missile."""
+        names = {" ".join(str(spell.name).lower().split()),
+                 str(getattr(spell, "id", "")).replace("-", " ")}
+        return next((str(i) for i in target.immunities
+                     if " ".join(str(i).lower().split()) in names), "")
 
     def _recipient(self, spec: dict, ctx: dict) -> Actor | None:
         """Which creature a spec lands on, at cast time."""
@@ -31276,6 +31372,8 @@ def _ward_tell(scene: Scene, e: dict) -> str:
                 f"{e.get('harm')}.")
     if kind == "manifest_ended":
         return f"{e.get('what', 'It')} thins out and is gone."
+    if kind == "summon_ended":
+        return f"{str(e.get('what') or 'The summoned creature').capitalize()} is gone."
     if kind == "effect_ended":
         return f"{e.get('what', 'Something')} wears off {name}."
     if kind == "ward_ended":

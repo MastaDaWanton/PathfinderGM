@@ -3687,6 +3687,16 @@ class Actor:
             return use
         return None
 
+    def _cmb_ability(self) -> str | None:
+        """A feat document's `cmb_ability` substitution: Agile Maneuvers' Dex for Str."""
+        from . import feats as feats_mod
+
+        for raw in self.feats:
+            sub = (feats_mod.document(raw) or {}).get("cmb_ability")
+            if isinstance(sub, dict) and sub.get("use"):
+                return str(sub["use"]).lower()
+        return None
+
     @staticmethod
     def _feat_name(feat: str) -> str:
         """"Weapon Focus (rapier)" -> "weapon focus"."""
@@ -4381,9 +4391,10 @@ class Actor:
 
     def cmb_modifiers(self, maneuver: str | None = None,
                       power_attack: bool = False) -> list[Modifier]:
-        # Tiny or smaller creatures use Dex in place of Str for CMB.
+        # Tiny or smaller creatures use Dex in place of Str for CMB, and so does a feat
+        # document's `cmb_ability` (Agile Maneuvers, which did nothing before 2026-11-15).
         uses_dex = self.size in ("fine", "diminutive", "tiny")
-        ab = "dex" if uses_dex else "str"
+        ab = "dex" if uses_dex else (self._cmb_ability() or "str")
         if self.flat_cmb is not None:
             # The block's printed CMB (`flat_cmb`), moved by what has happened to the
             # ability since (`printed_shift`).
@@ -7519,6 +7530,9 @@ def _document_effect_text(doc: dict) -> str:
     if doc.get("attack_ability"):
         bits.append(f"{str(doc['attack_ability'].get('use', '')).title()} in place of "
                     f"Str on attack rolls")
+    if doc.get("cmb_ability"):
+        bits.append(f"{str(doc['cmb_ability'].get('use', '')).title()} in place of "
+                    f"Str on combat maneuver checks")
     text = "; ".join(bits) or "no mechanical effect recorded"
     if doc.get("not_yet"):
         text += ". Not yet: " + "; ".join(str(x) for x in doc["not_yet"])

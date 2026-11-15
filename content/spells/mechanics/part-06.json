@@ -40,8 +40,13 @@
   "displacement": {
    "effects": [
     {
+     "type": "concealment",
+     "miss_chance": 50,
+     "blocks_targeting": "no"
+    },
+    {
      "type": "narrative",
-     "target": "The subject appears about 2 feet from its true location and gains a 50% miss chance, as though it had total concealment. Enemies can still target it normally. True seeing reveals its true location and negates the miss chance."
+     "target": "The subject appears about 2 feet from its true location. Enemies can still target it normally. True seeing reveals its true location and negates the miss chance."
     }
    ],
    "duration": {
@@ -51,7 +56,7 @@
     "dismissible": true
    },
    "converted_by": "read",
-   "notes": "The vocabulary has no miss-chance/concealment effect type. This is the one thing the spell does, so it cannot go further than narrative until such a type exists."
+   "notes": "The 50% miss chance is the concealment type (rules audit 2026-11-15); before it the spell was prose and changed no roll. True seeing's exception is still narrated."
   },
   "display-aversion": {
    "effects": [

@@ -435,8 +435,12 @@
   "blur": {
    "effects": [
     {
+     "type": "concealment",
+     "miss_chance": 20
+    },
+    {
      "type": "narrative",
-     "target": "The subject's outline blurs and wavers, granting concealment - a 20% miss chance. See invisibility does not counteract it; true seeing does. Opponents who cannot see the subject at all ignore the effect."
+     "target": "The subject's outline blurs and wavers. See invisibility does not counteract it; true seeing does. Opponents who cannot see the subject at all ignore the effect."
     }
    ],
    "duration": {
@@ -445,7 +449,7 @@
     "unit": "minute"
    },
    "converted_by": "read",
-   "notes": "VOCABULARY GAP: concealment and percentage miss chance have no spec type and no condition. combat_target has no miss-chance entry, so a 20% miss chance cannot be expressed as a modifier either."
+   "notes": "The 20% miss chance is the concealment type (rules audit 2026-11-15); before it the spell was prose and changed no roll. True seeing's exception is still narrated."
   },
   "blurred-movement": {
    "effects": [
