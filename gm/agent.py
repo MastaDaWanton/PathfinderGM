@@ -574,7 +574,10 @@ class GMAgent:
             self.reading["detectors"] = list(detectors)
             # The reading decides where the two disagree (`interpret.supported`); the
             # overruled op is kept on the record.
-            declared, overruled = interpret.supported(detectors, self.reading)
+            check_skill = (judgement.declared_check_skill(player_input, self.engine.scene)
+                           if "check" in detectors else "")
+            declared, overruled = interpret.supported(detectors, self.reading,
+                                                      check_skill=check_skill)
             self.reading["overruled"] = overruled
             # A held power the words reached for is the player's declaration as much as
             # an act of the table is: its refusal ("did not prepare Charm Person today")

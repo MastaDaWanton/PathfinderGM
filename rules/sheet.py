@@ -2983,7 +2983,9 @@ class Actor:
                     best = (name, int(total))
         return best
 
-    def skill_modifiers(self, skill: str) -> list[Modifier]:
+    def skill_modifiers(self, skill: str, opposed: bool = False) -> list[Modifier]:
+        """`opposed`: the check is rolled against another creature's (Perception against
+        Stealth or Sleight of Hand), which is where blinded's Perception penalty lands."""
         skill = skill.strip().lower()
         if skill not in SKILLS:
             raise KeyError(f"no such skill {skill!r}")
@@ -3037,6 +3039,8 @@ class Actor:
         # Perception").
         mods.extend(self._condition_mods(f"{ability}_skills"))
         mods.extend(self._condition_mods(f"skill_{skill}"))
+        if opposed:
+            mods.extend(self._condition_mods(f"opposed_skill_{skill}"))
         mods.extend(self._buff_mods("skill_mod", skill))
         # "On all skill checks": a skill_mod aimed at `all` — Touch of Good, Inspiring
         # Word, Diviner's Fortune, Aura of Despair. Foundry PF1's change target `skills`
@@ -3663,6 +3667,8 @@ class Actor:
                 "origin": f"creature:{self.from_template}",
             },
         })
+        base["stat_block"]["strength_share"] = sa.strength_share(
+            a, option, int(base.get("hands", 1) or 1))
         if a["natural"]:
             base.update({"hands": 0, "prof": "natural", "light": False})
         return base
@@ -3755,6 +3761,14 @@ class Actor:
                 "nonlethal": False, "prof": "natural", "natural": True,
                 "count": int(w.get("count", 1) or 1),
                 "secondary": bool(w.get("secondary")),
+                # "If a creature has only one natural attack, it is always made using the
+                # creature's full base attack bonus and adds 1-1/2 times the creature's
+                # Strength bonus on damage rolls" (Bestiary, Universal Monster Rules,
+                # Natural Attacks; d20pfsrd.com/bestiary/rules-for-monsters/
+                # universal-monster-rules/#Natural_Attacks). One attack in all, counted
+                # across the body's whole list.
+                "sole": sum(int(x.get("count", 1) or 1)
+                            for x in doc.get("weapons") or ()) == 1,
                 "hands": 0,
             })
             return base
@@ -3868,11 +3882,15 @@ class Actor:
         self, weapon_key: str | None = None, iteration: int = 0,
         power_attack: bool = False, lethality: str | None = None, defender=None,
         thrown: bool = False, range_ft: float | None = None,
+        beside_weapons: bool = False,
     ) -> list[Modifier]:
         """`range_ft` is the distance to the defender when the board can measure it
         (`Engine._gap_ft`); a `when: {"range_ft": {"lte": 30}}` term asks it —
         Point-Blank Shot's "+1 ... on ranged weapons at ranges of up to 30 feet". None
-        (no map, the sheet's own line) drops the term, as every unevaluable clause is."""
+        (no map, the sheet's own line) drops the term, as every unevaluable clause is.
+
+        `beside_weapons`: this natural attack follows a manufactured weapon's this turn,
+        which makes it secondary (`strength_share`)."""
         w = self.weapon(weapon_key)
         key = (weapon_key or self.wielded_key()).strip().lower()
         mods: list[Modifier] = []
@@ -3916,6 +3934,17 @@ class Actor:
             if not self.is_proficient(key):
                 mods.append(Modifier(NON_PROFICIENT_PENALTY,
                                      f"not proficient with {w['name']}"))
+            # "If your Strength bonus is less than the strength rating of the composite
+            # bow, you can't effectively use it, so you take a –2 penalty on attacks with
+            # it. The default composite longbow requires a Strength modifier of +0 or
+            # higher" (d20pfsrd.com/equipment/weapons/weapon-descriptions/
+            # longbow-composite/).
+            from . import weapons as weapons_mod
+
+            rating = weapons_mod.strength_rating(w, key) if ranged and not thrown else None
+            if rating is not None and self.ability_mod("str") < rating:
+                mods.append(Modifier(-2, f"{w['name']} drawn below its Strength rating "
+                                         f"(+{rating})"))
             # What is worn, on the swing (owner's ruling E3): an armour or shield the
             # wearer is not trained in puts its check penalty on attack rolls, the two
             # stacking, and a tower shield takes 2 off every attack. Penalties, so the
@@ -3934,6 +3963,14 @@ class Actor:
 
         if iteration and not printed:
             mods.append(Modifier(-5 * iteration, f"iterative #{iteration + 1}"))
+        # "Secondary attacks are made using the creature's base attack bonus –5"
+        # (Bestiary, Universal Monster Rules, Natural Attacks; d20pfsrd.com/bestiary/
+        # rules-for-monsters/universal-monster-rules/#Natural_Attacks). Derived numbers
+        # only: a printed bonus already holds it. Before 2026-11-15 a companion's
+        # secondary tail slap rolled at full base attack, as a primary bite does.
+        share = self.strength_share(w, beside_weapons)
+        if not printed and self.flat_attack is None and w.get("natural") and share == 0.5:
+            mods.append(Modifier(-5, f"{w['name']}, secondary natural attack"))
         # Declared with the swing, like Power Attack, and charged whether the numbers
         # are derived or printed: a thug's stat-block bonus assumes the sap does what
         # a sap does, so swinging it to kill is still the -4 the book asks.
@@ -3961,6 +3998,7 @@ class Actor:
                                     self._roll_context(key, power_attack=power_attack,
                                                       defender=defender,
                                                       thrown=ranged and thrown,
+                                                      share=share,
                                                       **_ranged_at(range_ft))))
         if w.get("bash_plus"):
             # A bashing shield "acts as a +1 weapon when used to bash" (`shield_bash`).
@@ -4069,9 +4107,11 @@ class Actor:
     def damage_modifiers(
         self, weapon_key: str | None = None, power_attack: bool = False, defender=None,
         thrown: bool = False, range_ft: float | None = None,
+        beside_weapons: bool = False,
     ) -> list[Modifier]:
-        """`thrown` and `range_ft` as `attack_modifiers` takes them: a thrown dagger is
-        a ranged weapon for Point-Blank Shot's damage as it is for the attack roll."""
+        """`thrown`, `range_ft` and `beside_weapons` as `attack_modifiers` takes them: a
+        thrown dagger is a ranged weapon for Point-Blank Shot's damage as it is for the
+        attack roll."""
         w = self.weapon(weapon_key)
         key = (weapon_key or self.wielded_key()).strip().lower()
         mods: list[Modifier] = []
@@ -4087,14 +4127,16 @@ class Actor:
                                      f"{w['name']} (stat block)"))
             # What has happened to Strength since the print (`printed_shift`), at the
             # same multiple the rule below takes a derived Strength at.
-            moved = self._strength_on_damage(w, key, thrown, self.printed_shift("str"))
+            moved = self._strength_on_damage(w, key, thrown, self.printed_shift("str"),
+                                             self.strength_share(w, beside_weapons))
             if moved:
                 mods.append(Modifier(moved, "Strength since printed"))
         else:
             # Str applies to melee damage even when Finesse supplied the attack roll —
             # Weapon Finesse changes the attack, never the damage. This is a standard
             # place to get 1e wrong.
-            am = self._strength_on_damage(w, key, thrown, self.ability_mod("str"))
+            am = self._strength_on_damage(w, key, thrown, self.ability_mod("str"),
+                                          self.strength_share(w, beside_weapons))
             if am:
                 mods.append(Modifier(am, "Str"))
         mods.extend(self._condition_mods("damage"))
@@ -4107,40 +4149,80 @@ class Actor:
                                     self._roll_context(
                                         key, power_attack=power_attack, defender=defender,
                                         thrown=bool(thrown and w.get("range_ft")),
+                                        share=self.strength_share(w, beside_weapons),
                                         **_ranged_at(range_ft))))
         if w.get("bash_plus"):
             mods.append(Modifier(int(w["bash_plus"]), f"{w['name']}, bashing",
                                  "enhancement"))
         return stack(mods)
 
+    def strength_share(self, w: dict, beside_weapons: bool = False) -> float:
+        """The multiple of the Strength BONUS this swing's damage takes: 1.5, 1 or 0.5.
+
+        Core Rulebook, Combat, "Strength Bonus": "when you deal damage with a weapon that
+        you are wielding two-handed, you add 1-1/2 times your Strength bonus" and "when
+        you deal damage with a weapon in your off hand, you add only 1/2 your Strength
+        bonus" (legacy.aonprd.com/coreRulebook/combat.html). Bestiary, Natural Attacks:
+        secondary attacks "add only 1/2 the creature's Strength bonus on damage rolls";
+        a sole natural attack "adds 1-1/2 times"; and creatures that also attack with
+        manufactured weapons "treat all of their available natural attacks as secondary
+        attacks" (d20pfsrd.com/bestiary/rules-for-monsters/universal-monster-rules/
+        #Natural_Attacks). The app has no off hand (`shield_bash`), so that case is not
+        reached. A printed attack carries its own (`statblock_attacks.strength_share`).
+
+        One reader for both things the book hangs on these cases: the damage's Strength
+        (`_strength_on_damage`) and Power Attack's rungs (the roll context's
+        `strength_share`). Power Attack (CRB p.131, aonprd.com/FeatDisplay.aspx?
+        ItemName=Power%20Attack): "This bonus to damage is increased by half (+50%) if
+        you are making an attack with a two-handed weapon, a one handed weapon using two
+        hands, or a primary natural attack that adds 1-1/2 times your Strength modifier on
+        damage rolls. This bonus to damage is halved (–50%) if you are making an attack
+        with an off-hand weapon or secondary natural attack." Before 2026-11-15 the feat's
+        document asked `hands: 2`, so a lone bite took the plain rung and a secondary
+        tail slap the full one."""
+        printed = w.get("stat_block")
+        if printed and printed.get("strength_share") is not None:
+            return float(printed["strength_share"])
+        if w.get("natural"):
+            if w.get("secondary") or beside_weapons:
+                return 0.5
+            return 1.5 if w.get("sole") else 1.0
+        if w.get("category") == "melee" and int(w.get("hands", 1) or 1) >= 2:
+            return 1.5
+        return 1.0
+
     @staticmethod
-    def _strength_on_damage(w: dict, key: str, thrown: bool, am: int) -> int:
-        """The Strength a swing's damage takes, given the modifier `am`.
+    def _strength_on_damage(w: dict, key: str, thrown: bool, am: int,
+                            share: float = 1.0) -> int:
+        """The Strength a swing's damage takes, given the modifier `am` and the multiple
+        `share` of it this swing takes (`strength_share`).
 
         Core Rulebook, Combat, "Strength Bonus" (legacy.aonprd.com/coreRulebook/
-        combat.html): a melee or thrown weapon adds the Strength modifier; "when you deal
-        damage with a weapon that you are wielding two-handed, you add 1-1/2 times your
-        Strength bonus" — the bonus, so a penalty stays whole, and a thrown two-hander
-        (a spear) is not wielded two-handed when it leaves the hand; slings add it too;
-        a bow that is not composite takes a penalty and never a bonus; a crossbow or a
-        firearm takes neither. Measured 2026-11-07 (ponytail audit #31) before this: with
-        Str 16 a greatsword added +3 where the book says +4, and a sling and every thrown
-        javelin and dart added nothing, because only the `melee` category was read.
+        combat.html): a melee or thrown weapon adds the Strength modifier; the 1-1/2 and
+        1/2 multiples are of the BONUS, so a penalty stays whole (rounded down, as 1e
+        rounds), and a thrown two-hander (a spear) is not wielded two-handed when it
+        leaves the hand; slings add it too; a bow that is not composite takes a penalty
+        and never a bonus; a crossbow or a firearm takes neither. Measured 2026-11-07
+        (ponytail audit #31) before this: with Str 16 a greatsword added +3 where the book
+        says +4, and a sling and every thrown javelin and dart added nothing.
+
+        A composite bow: "this feature allows you to add your Strength bonus to damage, up
+        to the maximum bonus indicated for the bow. ... If you have a penalty for low
+        Strength, apply it to damage rolls when you use a composite longbow"
+        (d20pfsrd.com/equipment/weapons/weapon-descriptions/longbow-composite/). Its
+        rating is `weapons.strength_rating`; until 2026-11-15 there was no field and a
+        composite bow at Str 16 added nothing.
 
         A thrown ranged-row weapon is one the table knows with a range and no ammunition
         (javelin, dart, bolas); a ranged row the table does not know (a granted ray) is
-        left at nothing, as before. Composite bows' Strength rating has no field yet, so a
-        composite bow is treated as a plain one: its penalty, never its bonus. A natural
-        attack keeps 1x here — the lone-natural 1.5x and secondary 0.5x need the attack's
-        place in its routine, which the printed numbers already carry."""
+        left at nothing, as before."""
         from . import weapons as weapons_mod
 
         if not am:
             return 0
         if w.get("category") == "melee":
-            two_handed = int(w.get("hands", 1) or 1) >= 2 and not w.get("natural")
-            if am > 0 and two_handed and not (thrown and w.get("range_ft")):
-                return int(am * 1.5)
+            if am > 0 and share != 1.0 and not (thrown and w.get("range_ft")):
+                return int(am * share)
             return am
         base = str(w.get("crafted_base") or key)
         if weapons_mod.key_for(base) is None:
@@ -4152,6 +4234,9 @@ class Actor:
             return am
         if "arrows" in families and am < 0:
             return am
+        rating = weapons_mod.strength_rating(w, key)
+        if "arrows" in families and rating is not None:
+            return min(am, rating)
         return 0
 
     def damage_dice(self, weapon_key: str | None = None) -> str:
@@ -5916,6 +6001,7 @@ class Actor:
         """
         w = self.weapon(weapon_key)
         key = (weapon_key or self.wielded_key()).strip().lower()
+        share = extra.pop("share", None)
         weapon = {"key": key, "hands": w.get("hands", 1),
                   "category": w.get("category", "melee"),
                   "light": bool(w.get("light", False)),
@@ -5930,6 +6016,9 @@ class Actor:
                   "slashing_or_piercing": any(
                       word in str(w.get("type") or "").lower()
                       for word in ("slashing", "piercing"))}
+        # The multiple of Strength this swing's damage takes (`strength_share`): Power
+        # Attack's two rungs ask it, as the book ties them to the same three cases.
+        weapon["strength_share"] = share if share is not None else self.strength_share(w)
         rec = w.get("crafted_record")
         if isinstance(rec, dict):
             weapon["key"] = str(w.get("crafted_base") or key)
@@ -9105,8 +9194,11 @@ def validate(actor: Actor) -> None:
     from . import feats as feats_mod
 
     for f in actor.feats:
-        # A document means the engine applies something, and the note would lie.
-        if feats_mod.document(f):
+        # A document means the engine applies something, and the note would lie. A
+        # bestiary creature's printed feats (on the sheet since 2026-11-15) are the book's
+        # own block, shown on the bestiary page; a note per undocumented feat on every
+        # monster would only fill its notes.
+        if feats_mod.document(f) or actor.from_template:
             continue
         # Not fatal: an unrecognised feat contributes nothing and says so, which is
         # better than silently pretending it applied.

@@ -476,7 +476,7 @@ def check(engine, observer, subject, *, searching: bool = False) -> dict | None:
     if notice is None:
         return None
     try:
-        mods = list(observer.skill_modifiers("perception"))
+        mods = list(observer.skill_modifiers("perception", opposed=True))
     except Exception:  # noqa: BLE001 — a body with no sheet notices with its d20 alone
         mods = []
     roll = engine.dice.d20(mods, label=f"{observer.name} Perception"

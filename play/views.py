@@ -5991,6 +5991,26 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
             scene.end_encounter()
             return
         actor = scene.get(ref)
+        if actor is not None and actor.is_pc and scene.held_pc(ref) is not None:
+            # Held (hold person): the turn is the player's own save to break free, on the
+            # dice popup (`Engine.held_save_turn`). The roll view resumes it and hands the
+            # round on, as it does after any player die. Until 2026-11-15 the scene rolled
+            # it hidden and the player never saw the die that kept them paralysed.
+            engine = c.engine()
+            try:
+                tried = engine.held_save_turn(ref)
+            except (IntentError, ValueError, KeyError) as exc:
+                c.turn_log.append({"kind": "held-save", "ref": ref,
+                                   "error": str(exc)[:400]})
+                tried = None
+            if tried is not None and not tried.awaiting:
+                for o in tried.outcomes:
+                    if o.tell:
+                        c.transcript.append({"who": "gm", "kind": "consequence",
+                                             "text": _plain_tells(c, [o])})
+                continue
+            if tried is not None:
+                return
         if actor is None or actor.is_pc:
             # Back to the player; stop and wait for input. Down, they are told so once:
             # their next line, or Continue, goes through the downed door (`say`), which

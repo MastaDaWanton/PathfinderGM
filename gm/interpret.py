@@ -2578,7 +2578,19 @@ _OP_NEEDS = {
 UNJUDGED = frozenset({"use_ability"})
 
 
-def supported(ops: list[str], frame: dict | None) -> tuple[list[str], list[str]]:
+# The acts that are only words, and the skills words alone can roll. A detector's check of
+# any other skill (Disable Device, Climb, Stealth) is a deed, and a reading of nothing but
+# speech does not stand behind it. Measured 2026-11-15: "I tell the guard I pick the lock
+# on that gate every night" read `talk` and nothing else, the check detector's "i pick the
+# lock" still matched inside the boast, and `talk` backed the check (the row is wide so a
+# persuasion stands) — a Disable Device rolled for a sentence that did nothing. The
+# audit's limit on #7, "a talk-backed check can still fire from 'I'll never pick the lock'".
+SPEECH_ACTS = frozenset({"talk", "request", "insult"})
+SPOKEN_SKILLS = frozenset({"bluff", "diplomacy", "intimidate", "sense motive"})
+
+
+def supported(ops: list[str], frame: dict | None,
+              check_skill: str = "") -> tuple[list[str], list[str]]:
     """(the detectors' ops the reading supports, the ones it does not). Measured live
     2026-09-27: a detector required `give` for "I buy a dragon's egg", which the reading
     read — rightly — as a purchase. On the labelled set the reading's acts score F1 0.91
@@ -2588,7 +2600,10 @@ def supported(ops: list[str], frame: dict | None) -> tuple[list[str], list[str]]
     A `seek` of somebody HERE (`ops_for` marks it `here`) licenses no travel: you do not
     walk to another place to find the person beside you. Measured on the 2026-09-30 save
     (turn_log row 82). Inform's GO TO takes only a room for the same reason (Emily
-    Short's *Approaches*, "go to [any visited room]")."""
+    Short's *Approaches*, "go to [any visited room]").
+
+    `check_skill` is the skill the check detector read (`judgement.inject_checks`): a
+    check of a skill words cannot roll needs a deed behind it (`SPEECH_ACTS`)."""
     # Only what is done or tried now stands behind an op (`COMMITS`).
     actions = [a for a in (frame or {}).get("actions") or [] if acting(a)]
     acts = {a.get("act") for a in actions}
@@ -2607,6 +2622,9 @@ def supported(ops: list[str], frame: dict | None) -> tuple[list[str], list[str]]
             continue
         need = _OP_NEEDS.get(op)
         have = elsewhere if op == "travel" else acts
+        if op == "check" and check_skill and check_skill.lower() not in SPOKEN_SKILLS:
+            # A deed's skill: words alone (`SPEECH_ACTS`) do not stand behind it.
+            have = have - SPEECH_ACTS
         backed = op in UNJUDGED if need is None else bool(have & need)
         (kept if backed else dropped).append(op)
     return kept, dropped

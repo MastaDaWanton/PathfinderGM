@@ -595,7 +595,7 @@ def perceived(engine, by, victim, *, rolls: list | None = None) -> bool:
     stealth = engine.dice.d20(list(by.skill_modifiers("stealth"))
                               + [Modifier(-20, "sniping, to stay hidden")],
                               label=f"{by.name} Stealth, sniping", visibility="hidden")
-    notice = engine.dice.d20(list(victim.skill_modifiers("perception")),
+    notice = engine.dice.d20(list(victim.skill_modifiers("perception", opposed=True)),
                              label=f"{victim.name} Perception", visibility="hidden")
     if rolls is not None:
         rolls.extend([stealth.as_dict(), notice.as_dict()])
@@ -617,6 +617,10 @@ def harmed(engine, victim, by, source: str, *, seen: bool | None = None,
     `gated` is harm that only an unfriendly eye resents — a charm, a magical sleep
     (`harm_of` == "gated"): a victim who is friendly or better, or travels with you, is
     not moved by it at all (owner's ruling; `resents`)."""
+    if victim is not None and by is not None and victim is not by and not gated \
+            and not getattr(by, "is_pc", False) and not getattr(victim, "is_pc", False) \
+            and _with_the_player(engine, by):
+        return _charm_broken(engine, victim, by, source, seen)
     if victim is None or by is None or victim is by or not getattr(by, "is_pc", False):
         return None
     if getattr(victim, "is_pc", False) or victim.has_state("state.down.dead"):
@@ -649,6 +653,40 @@ def harmed(engine, victim, by, source: str, *, seen: bool | None = None,
     engine._set_attitude(victim, HOSTILE, None, source)
     return {"kind": "attitude", "ref": victim.ref, "from": was, "to": HOSTILE,
             "why": "harmed", "source": source}
+
+
+def _with_the_player(engine, who) -> bool:
+    """Whether `who` is one of the player's apparent allies: travelling with them, or on
+    the player's side of the fight (`Scene.sides`)."""
+    if who.has_state(states.TRAVELS_WITH_YOU):
+        return True
+    scene = getattr(engine, "scene", None)
+    pc = scene.pc() if scene is not None else None
+    return pc is not None and any(pc.ref in refs and who.ref in refs
+                                  for refs in (getattr(scene, "sides", None) or {}).values())
+
+
+def _charm_broken(engine, victim, by, source: str, seen: bool | None) -> dict | None:
+    """Harm by one of the player's allies: the charm breaks, and nothing else moves.
+
+    Charm Person (CRB p.251, aonprd.com/SpellDisplay.aspx?ItemName=Charm%20Person): "Any
+    act by you or your apparent allies that threatens the charmed person breaks the
+    spell." Before 2026-11-15 only the player's own harm was read (`harmed` returned at
+    once for anybody else), so a companion could knife a charmed guard and the guard
+    stayed the player's trusted friend. Attitudes here are towards the player, so the
+    ally's blow takes the charm and no grudge: the step falls back to the victim's own
+    standing (`of`). Unseen, the victim cannot know whose ally struck, and keeps it."""
+    charm = [e for e in victim.effects if (e.payload or {}).get("charm")]
+    if not charm or victim.has_state("state.down.dead"):
+        return None
+    if seen is None:
+        seen = perceived(engine, by, victim)
+    if not seen:
+        return None
+    was = of(victim)
+    victim.remove_effects(match=lambda e: any(e is c for c in charm))
+    return {"kind": "attitude", "ref": victim.ref, "from": was, "to": of(victim),
+            "why": "charm_broken", "by": by.ref, "source": source}
 
 
 def _hostile_for_good(actor) -> bool:

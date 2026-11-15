@@ -265,10 +265,12 @@ def test_ruling_a_keeper_who_misses_by_five_spoils_it_and_asks_no_fee(world, mon
 
 def test_ruling_the_smiths_craft_is_off_his_own_sheet(world):
     """NPC builds carry ranks: the smithy's keeper is a blacksmith-level-1 build with Craft
-    +6 (1 rank, class skill, Int +2), and that is the roll."""
+    +9 (1 rank, class skill, Int +2, and the build's own Skill Focus (Craft) +3), and that
+    is the roll. It read +6 until 2026-11-15: the build's feats were stripped on the way to
+    the sheet (`bestiary._NOT_ON_THE_SHEET`)."""
     e, pc = _engine(world)
     smith, _ = _smith(e)
-    assert sum(m.value for m in smith.skill_modifiers("craft")) == 6
+    assert sum(m.value for m in smith.skill_modifiers("craft")) == 9
 
 
 # --- the haggle (owner ruling 2026-11-01) ------------------------------------------------

@@ -3232,6 +3232,13 @@ def inject_checks(raw_intents, player_text: str, scene) -> list:
     return raw_intents
 
 
+def declared_check_skill(player_text: str, scene) -> str:
+    """The skill the check detector reads off the words (`inject_checks`), or "": what
+    `interpret.supported` weighs a talk-only reading against."""
+    found = inject_checks([], player_text, scene) or ()
+    return next((str((r.get("params") or {}).get("skill") or "") for r in found), "")
+
+
 def _perception(actor) -> int:
     try:
         return sum(int(m.value) for m in actor.skill_modifiers("perception"))

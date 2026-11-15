@@ -380,14 +380,25 @@
           "choice": "power_attack",
           "weapon": {
             "category": "melee",
-            "hands": 2
+            "strength_share": 1.5
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "formula": "-(1 + bab // 4)",
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "power_attack",
+          "weapon": {
+            "category": "melee",
+            "strength_share": 0.5
           }
         }
       }
     ],
     "not_yet": [
-      "off-hand weapons and secondary natural attacks are halved by the feat; the sheet has no off-hand and the roll context does not say primary or secondary",
-      "a primary natural attack adding 1-1/2 times Strength takes the two-handed rung; the roll context does not say so",
       "touch attacks and effects that deal no hit-point damage are not excluded"
     ]
   },

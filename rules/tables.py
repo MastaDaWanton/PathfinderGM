@@ -294,11 +294,13 @@ CONDITIONS: dict[str, dict] = {
         # CRB, Blinded: "-4 penalty on most Strength- and Dexterity-based skill checks and
         # on opposed Perception skill checks". Until 2026-11-08 this row said "skills": -4,
         # so a blinded wizard took -4 on Knowledge and Spellcraft. Read by
-        # `Actor.skill_modifiers` as `<ability>_skills` and `skill_<name>`. Perception is
-        # charged on every check: nearly every Perception check this game rolls is the
-        # opposed one (against Stealth), and a sight-based one fails outright anyway.
+        # `Actor.skill_modifiers` as `<ability>_skills` and `opposed_skill_perception`.
+        # Perception only when OPPOSED, as the text says (`skill_modifiers(opposed=True)`):
+        # until 2026-11-15 it was charged on every check, so a blinded guard listening at
+        # a door against a flat DC took -4 the book never gives (a sight-based check
+        # "automatically fails" instead, which no DC roll here models).
         "lose_dex_to_ac": True, "ac": -2,
-        "str_skills": -4, "dex_skills": -4, "skill_perception": -4,
+        "str_skills": -4, "dex_skills": -4, "opposed_skill_perception": -4,
         "note": "-2 AC, loses Dex to AC, -4 on most Dex- and Str-based skills",
     },
     "grappled": {
