@@ -290,13 +290,68 @@ Prior art: Daggerfall's travel map quotes one total for a trip that includes the
 (UESP, Daggerfall:Traveling); I could not confirm from a primary source whether it forbids
 boarding outside port towns, and nothing here claims it.
 
+## The road up from the harbour (2026-11-15)
+
+The mirror of the road to the harbour. Until now a crossing to an inland town tied up at
+the inland town itself, and the road up from the coast was never walked. Now the booking
+(`_book_passage`) asks `journey.harbour_road` for the destination's quickest stated road
+to a port and keeps that port as the ship's `lands_at`; she sails there, ties up, and the
+same turn walks the road inland through `_op_journey` (pace, watch checks, camps, a road
+stopped short and resumed). The booking tell, the exits row and the brief's ABOARD line all
+say "to Ledgernook, and the road inland from there". Of Aurvantis's 52 stated sea legs
+ending inland, 39 have such a road. The other 13 (and Pangrella's 3) still tie up at the
+town itself; that is 8d's gap at the far end. Measured: Vormoor to Moldwarren, booked at
+Scrapden, sailed one day to Ledgernook and walked the 48-mile mountain road, 77 hours
+from casting off to Moldwarren's gate. A wreck washes up near `lands_at`, the port she was
+making for.
+
+## A ship lying off a shore with no docks (2026-11-15)
+
+> Owner, 2026-11-14: if a ship is lying off a coastal town that has no docks, the player
+> can reach it by swimming out or by a smaller boat, then board and sail exactly as from a
+> dock. With no ship there, the road to a port stands.
+
+**When she is there** (`journey.calls_off`, `lying_off`). The data this rests on is the
+world's own routes. A stated `by: "sea"` travel row from a settlement on the water (a
+`coast` or a water phrase in its land facts, the same test that gives it "the shore")
+with no docks is a ship's call. She lies off once a week, on a day fixed by the route
+(a CRC of the two ids, mod 7), so a player who waits learns when she comes. The weekly
+cadence is this app's number (ask 22). A route the tree only infers from two continents
+is no call, because nobody wrote it. On Aurvantis that is 6 dockless towns and 9 calls.
+Three of them read as "on the water" only because their land facts name a canal.
+
+**Getting out to her** (`Engine._out_to_her`). The berth is booked where the player stands
+(no harbourmaster, so the book's fare). She lies a cable off, about 600 feet (the app's
+number; Madras's open roadstead had ships anchored over a kilometre out, so this is the
+near end). Two ways:
+
+- **By boat** (the default, the exits row's passage row): Ultimate Equipment's rowboat
+  (p.87, CRB p.159): passage 2 cp a mile, which is 1 cp a head at a cable; 1.5 mph, which
+  is 5 minutes out; three to a trip, so a bigger party takes trips out and back.
+- **Swimming** (the row's "~swim" twin, or `journey out=swim`): each swimmer swims the
+  distance round by round on real Swim checks at the shore's roughness (`_swim_out`). A
+  made check covers half their speed (a full-round action), a miss by 4 or less makes no
+  progress, a miss by 5 or more puts them under, a made check brings them up. Under
+  water, the breath clock and drowning ladder are `breathe`'s own. An hour of it asks the
+  hourly fatigue check. Taking 10 is used when it makes the DC and the die is rolled when
+  it does not. Measured: Kesst (leather) swam out in 4 minutes on take 10. Borin (chain
+  shirt) rolled, went under again and again, and made it in 10 minutes, told "Borin
+  Achereth's armour drags at them in the water." A swimmer who drowns is lost, and a PC
+  who drowns is left on the shore. Nobody hauls them out, because no rule says anybody
+  would.
+
+Once aboard she lies off the shore (the deck has no gangplank to anything) and `_sail` is
+unchanged. The brief says LYING OFF with both ops spelled out. Going back ashore from her
+before she sails is not built.
+
 ## Still open
 
 - **The derived coast.** An inland town with no road to any port walks a derived day to
   a coast the world never placed, and boards off its own shore; the export would need to
-  say where the water is (for-world-bible 8a/8c).
-- **The far end inland.** A crossing to an inland town still ties up at that town; the
-  road up from its harbour is not walked yet.
+  say where the water is (for-world-bible 8a/8c). Its mirror at the far end, an inland
+  destination with no road up from any port, still ties up at the town itself.
+- **Ashore from a ship lying off.** Once aboard there is no way back to the beach but
+  sailing; rowing or swimming back in is unbuilt.
 - **Siege engines.** `arms` is on every row of the table and nothing reads it. A ballista
   on a warship's deck is a weapon the engine has no notion of.
 - **The wind.** `days_for(with_the_wind=True)` halves a passage and nothing ever passes

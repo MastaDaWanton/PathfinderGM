@@ -282,6 +282,9 @@ def _bounded(value, low: int, high: int, index: int, what: str) -> int:
 
 # --- The op table ------------------------------------------------------------------
 
+# A journey's `out`: how the party reaches a ship lying off a shore with no docks.
+JOURNEY_OUT = ("boat", "swim")
+
 # op -> (required params, optional params, default visibility)
 OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # `request`: a Diplomacy request (CRB p.93, `rules/requests.py`), written only by the
@@ -467,7 +470,7 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # not be able to reach it by naming a biome.
     # `days` (2026-11-13): aboard a booked ship, how many days to sail this turn before
     # the deck is the player's again; absent, she sails until port or weather stops her.
-    "journey": (("to",), ("note", "with", "pace", "days"), "hidden"),
+    "journey": (("to",), ("note", "with", "pace", "days", "out"), "hidden"),
     # Doors two and three of rules/places.py. `found`: the player makes a place from
     # where they stand — a base at a friend's house, the alley behind the market —
     # with an owner the engine knows; the engine mints the id, the narrator never
@@ -1526,6 +1529,16 @@ def _check_params(intent: Intent, index: int) -> None:
                     f"square is point:<x>,<y>, a thing here is object:<its name>.",
                     "schema", index)
             p["aim"] = said
+
+    elif op == "journey" and p.get("out") not in (None, ""):
+        # How the party goes out to a ship lying off a shore with no docks (owner ruling
+        # 2026-11-14): by boat, the default, or swimming. A closed word, as a pace is.
+        said = str(p["out"]).strip().lower()
+        if said not in JOURNEY_OUT:
+            raise IntentError(
+                f"journey: out {p['out']!r} is not a way out to a ship. It is one of "
+                f"{', '.join(JOURNEY_OUT)}; leave it out to take the boat.", "schema", index)
+        p["out"] = said
 
     elif op == "travel":
         # A closed word, refused with the words named rather than read as a walk: a

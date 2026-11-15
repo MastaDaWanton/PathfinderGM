@@ -6930,9 +6930,12 @@ def travel_to_the_attached(raw_intents, scene, attached) -> list:
             continue
         kept.append(r)
     if chip.get("journey"):
-        params = {"to": str(chip["id"])}
+        # A row may name its journey apart from its id (the swim-out row, play/exits.py).
+        params = {"to": str(chip.get("to") or chip["id"])}
         if chip.get("pace"):
             params["pace"] = str(chip["pace"])
+        if chip.get("out"):
+            params["out"] = str(chip["out"])
         op = "journey"
     else:
         params, op = {"place": str(chip["id"])}, "travel"

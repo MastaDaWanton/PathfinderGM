@@ -126,15 +126,39 @@ makes:
   `"stormy"` (World Bible ask 17); otherwise calm (DC 10). CRB Aquatic Terrain: "Fast
   rivers are always at least rough water (Swim DC 15), and whitewater rapids are stormy
   water (Swim DC 20)"; placid rivers, lakes and the sea are still water. Wind is not
-  read: no wind or storm table in the CRB sets a Swim DC. Floods ("one category harder")
-  are not read either: nothing in the engine floods yet.
+  read: no wind or storm table in the CRB sets a Swim DC. Floods and currents are read
+  since 2026-11-15, from the place's row (below).
 - **The cadence.** The CRB asks once per round and has no per-minute check (Swim and
   Aquatic Terrain, read 2026-11-14 on d20pfsrd and legacy.aonprd.com; a "once a minute
   out of combat" rule could not be sourced). It does let you take 10 when not threatened,
   "You can't take 10 on a Swim check in stormy water". So out of a fight and out of a
   storm the swimmer takes 10, which comes out the same every round of the beat, and an
   unchanged success is told once; in a fight or in stormy water the d20 is rolled once a
-  beat. The hourly DC 20 fatigue check (1d6 nonlethal) is not built.
+  beat. Since 2026-11-15 taking 10 is used only where it makes the DC. A swimmer whose 10
+  fails rolls, because nobody chooses to fail (`Engine._swim_margin`).
+
+## Long swims, currents, floods and armour (2026-11-15)
+
+Read before building: CRB Swim (d20pfsrd), Aquatic Terrain and Water Dangers
+(legacy.aonprd.com Environment, aonprd.com Rules ID 336).
+
+- **The hourly check.** "Each hour that you swim, you must make a DC 20 Swim check or take
+  1d6 points of nonlethal damage from fatigue." It is a Swim check in the book's words, not
+  a Constitution check. One copy, `Engine._an_hour_swum`, is used by the water beside a
+  ship or in a lake (`Actor.swum_rounds`, a counter `Scene.advance` moves beside the
+  breath's; `swim` asks it per 600 rounds), the swim out to a ship lying off, and a wreck.
+- **Currents** (`water.current`, a place row's `"current": "fast"|"rapids"`, ask 23).
+  "A DC 15 Swim check or a DC 15 Strength check to avoid going under"; the swimmer uses
+  whichever is better. On a failure, 1d3 nonlethal (rapids, the rocks and cascades: 1d6
+  lethal). A fast current makes the water at least rough and rapids stormy. The book's
+  10-90 ft a round downstream is told and not moved, because the board has no downstream.
+- **Floods** (`"flooded": true`, ask 23): one category harder (`water.HARDER`). Nothing in
+  this app floods a river by itself.
+- **Armour.** A heavy-armoured swimmer going under in a calm lake is book-correct: Swim
+  takes the armour check penalty, and Water Dangers says "armor or heavy gear makes any
+  attempt at swimming much more difficult". Every failure the penalty caused (it failed,
+  and would have passed without it, `water.armour_is_why`) now says so: "Their armour
+  drags at them."
 
 ## Not this, and not next
 

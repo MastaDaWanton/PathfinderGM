@@ -100,7 +100,9 @@ def _passage_words(engine, leg, scene) -> str:
 
     heads = 1 + sum(1 for a in scene.actors.values()
                     if not a.is_pc and a.has_state(states.TRAVELS_WITH_YOU))
-    coast = engine.road_to_the_coast(leg)
+    # A ship lying off this shore is boarded here, by boat or swimming (`lies_off`).
+    off = engine.lies_off(leg)
+    coast = None if off else engine.road_to_the_coast(leg)
     harbour = coast.to_id if coast is not None and coast.to_id != leg.to_id else ""
     _ship, days, cost = engine.passage_quote(leg, heads, port=harbour)
     fare = goods.purse_line(goods.coins_for(cost), engine._coins_here())
@@ -112,6 +114,8 @@ def _passage_words(engine, leg, scene) -> str:
         # The fare carries the party's cargo as freight (`trade.freight_cp`, in the quote).
         lb = sum(trade.lb_of(x) for x in shipped)
         aboard += f" and freight for {lb:g} lb of cargo"
+    if off:
+        return f"lying off the shore today, a rowboat out to her: {aboard}"
     if coast is None:
         return aboard
     # Inland, the road to the harbour comes first and is walked (`_op_journey`): the row
@@ -198,7 +202,9 @@ def ways_from(engine, world, place_ids) -> dict[str, list[dict]]:
         days = ship.days_left
         row = {"id": ship.id, "name": str(getattr(dest, "name", "") or "port"),
                "group": "road", "blocked": "", "journey": True, "minutes": 0,
-               "time_words": _days_aboard(days, ship.river)}
+               "time_words": _days_aboard(days, ship.river) + (
+                   f" to {engine._settlement_name(ship.lands_at)}, then the road inland"
+                   if ship.lands_at else "")}
         for place_id, rows in out.items():
             if ships.vessel_of(place_id) == ship.id:
                 rows.append(dict(row))
@@ -272,9 +278,15 @@ def _rows_from(engine, here, known, pc, loc, scale, speed, clock,
                 mine = _norm(here.name) == _norm(road.leaves_from) or (
                     outskirts.is_along(here.id)
                     and (scene.road or {}).get("then") == road.to_id)
+                off = road.to_id in legs and engine.lies_off(legs[road.to_id])
                 coast = engine.road_to_the_coast(legs[road.to_id]) \
-                    if road.how == "sea-after-road" and road.to_id in legs else None
-                if coast is not None and coast.to_id != road.to_id:
+                    if road.how == "sea-after-road" and road.to_id in legs and not off \
+                    else None
+                if off:
+                    # She lies off this town's own shore (no docks): offered there, by
+                    # boat and by swimming out (owner ruling 2026-11-14).
+                    mine = _norm(here.name) == _norm(outskirts.SHORE)
+                elif coast is not None and coast.to_id != road.to_id:
                     # Inland with a road to a harbour: offered where that road leaves
                     # (its head, or a stretch of it), as the road itself is — not from
                     # the town's shore, five days from where the ship is.
@@ -299,6 +311,16 @@ def _rows_from(engine, here, known, pc, loc, scale, speed, clock,
                 "time_words": (_passage_words(engine, leg, scene) if voyage else
                                _road_words(road, leg, hours, ride and not sea)),
                 "blocked": watched, "journey": True, "minutes": 0}))
+            if voyage and engine.lies_off(leg):
+                # The same berth, reached swimming: its own row, so the choice is a click
+                # and never a reading of the player's words. The chip carries `to` and
+                # `out` (play/views.py `_read_attachments`).
+                roads.append((hours, {
+                    "id": f"{road.to_id}~swim", "name": road.to_name, "group": "road",
+                    "time_words": "swimming out to her, a cable off the shore; "
+                                  + _passage_words(engine, leg, scene).split(": ", 1)[-1],
+                    "blocked": watched, "journey": True, "minutes": 0,
+                    "to": road.to_id, "out": "swim"}))
         out.extend(entry for _h, entry in sorted(roads, key=lambda t: t[0]))
     return out
 

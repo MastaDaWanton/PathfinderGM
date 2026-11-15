@@ -150,6 +150,10 @@ class Vessel:
     passengers: list = field(default_factory=list)
     # A river passage: no storm is rolled on it (the weather table is open water's).
     river: bool = False
+    # Where she ties up when `bound_for` is inland (2026-11-15): the port at the foot of
+    # the destination's quickest road (`journey.harbour_road`), walked from there. "" when
+    # she ties up at `bound_for` itself.
+    lands_at: str = ""
 
     def as_dict(self) -> dict:
         return {"id": self.id, "name": self.name, "kind": self.kind, "hp": self.hp,
@@ -157,7 +161,8 @@ class Vessel:
                 "bound_for": self.bound_for, "days_left": self.days_left,
                 "came_from": self.came_from, "days_total": self.days_total,
                 "sailed_at": self.sailed_at, "passengers": list(self.passengers),
-                "river": self.river}
+                "river": self.river,
+                **({"lands_at": self.lands_at} if self.lands_at else {})}
 
     @classmethod
     def from_dict(cls, d: dict) -> "Vessel | None":
@@ -177,7 +182,7 @@ class Vessel:
                    sailed_at=(int(d["sailed_at"]) if d.get("sailed_at") is not None
                               else None),
                    passengers=[str(r) for r in (d.get("passengers") or [])],
-                   river=bool(d.get("river")))
+                   river=bool(d.get("river")), lands_at=str(d.get("lands_at") or ""))
 
     @property
     def row(self) -> dict:
@@ -523,7 +528,29 @@ STORM_ROUNDS = 24 * 60 * 10
 # nonlethal damage from fatigue." How many hours to land is the app's (1d4: the wreck is
 # within sight of a coast, which is why anybody lives) — no source states it.
 WRECK_SWIM_HOURS = "1d4"
-WRECK_HOURLY_NONLETHAL = "1d6"
+# The hourly 1d6 is the Swim skill's, kept once in `water.HOURLY_NONLETHAL`.
+
+# Out to a ship lying off a shore with no docks (owner ruling 2026-11-14). How far off
+# she lies is this app's number, not a source's: a cable's length (a tenth of a nautical
+# mile, about 600 feet). World Bible ask 22 would make it the world's.
+ANCHORED_OFF_FT = 600
+# The boat out: Ultimate Equipment p.87 (and CRB p.159), the rowboat, "about 1-1/2 miles
+# per hour", holding "two or three Medium passengers", passage 2 cp per mile. A party
+# bigger than the boat takes more than one trip; a head pays at least 1 cp.
+ROWBOAT_CP_PER_MILE = 2
+ROWBOAT_FT_PER_MINUTE = 132          # 1.5 mph
+ROWBOAT_HEADS = 3
+
+
+def rowboat_cp(heads: int, feet: int = ANCHORED_OFF_FT) -> int:
+    """The boat out's fare for `heads`, by UE's 2 cp a mile, never under 1 cp a head."""
+    return max(1, -(-ROWBOAT_CP_PER_MILE * feet // 5280)) * max(1, int(heads))
+
+
+def rowboat_minutes(heads: int, feet: int = ANCHORED_OFF_FT) -> int:
+    """Minutes until the last of `heads` is aboard: out, and back for the next load."""
+    trips = -(-max(1, int(heads)) // ROWBOAT_HEADS)
+    return -(-feet // ROWBOAT_FT_PER_MINUTE) * (2 * trips - 1)
 # A wreck comes ashore near the end of the crossing she was nearer, most of the time; a
 # storm that carries a ship far off her course puts her people somewhere else. The
 # share is the app's, stated and not sourced.
@@ -541,4 +568,4 @@ def wash_up_near(vessel: "Vessel") -> str:
     sailed = max(0, int(vessel.days_total) - int(vessel.days_left))
     if vessel.came_from and sailed * 2 < max(1, int(vessel.days_total)):
         return vessel.came_from
-    return vessel.bound_for or vessel.came_from
+    return vessel.lands_at or vessel.bound_for or vessel.came_from

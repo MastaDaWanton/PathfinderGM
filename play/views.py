@@ -4189,7 +4189,9 @@ def _read_place(c, item: dict, text: str, carry_on: bool) -> tuple[tuple, str]:
         return (), (f"{exit_['name']}: {exit_['time_words']}. Confirm the journey "
                     f"before setting out.")
     return ({"kind": "place", "id": exit_["id"], "name": exit_["name"],
-             "journey": bool(exit_["journey"])},), ""
+             "journey": bool(exit_["journey"]),
+             # The swim-out row's journey and how (play/exits.py): the server's own row.
+             **{k: exit_[k] for k in ("to", "out") if exit_.get(k)}},), ""
 
 
 def _norm_line(text: str) -> str:
@@ -4214,7 +4216,9 @@ def _take_the_exit(c, chip: dict, text: str):
     _arm_cards(agent, c)
     agent.attachments = (dict(chip),)
     if chip.get("journey"):
-        params = {"to": chip["id"]}
+        params = {"to": chip.get("to") or chip["id"]}
+        if chip.get("out"):
+            params["out"] = chip["out"]
         if exits_mod.riding(engine):
             params["pace"] = "ride"
         op = {"op": "journey", "actor": pc.ref, "params": params,
@@ -4297,8 +4301,13 @@ def _the_way_there(c, chip: dict, text: str, typed: bool, acting: tuple, claim: 
     cannot drop the move silently either."""
     before = _where(c)
     resp = _toward(c, chip, text, typed, acting, claim, beat)
-    if getattr(resp, "status_code", 0) != 200 or c.ended or c.scene.awaiting \
-            or _where(c) != before:
+    if getattr(resp, "status_code", 0) == 200 and not c.ended and _where(c) != before:
+        # Said, so the page's own check (04-combat-and-turns.js) does not read a road
+        # stopped short as a move that never happened: the stretch of road still offers
+        # the same town's row, so the page kept the chip and said "The move did not
+        # happen" after hours walked and a meeting on the road.
+        return _with(resp, {"moved": True})
+    if getattr(resp, "status_code", 0) != 200 or c.ended or c.scene.awaiting:
         return resp
     try:
         payload = json.loads(resp.content)

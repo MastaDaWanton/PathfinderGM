@@ -1675,6 +1675,16 @@ class Scene:
             elif a.held_breath_rounds or a.drown_failures:
                 a.held_breath_rounds = 0
                 a.drown_failures = 0
+            # And the hours swum, for the Swim skill's hourly fatigue check
+            # (`Engine.swim`). A swimmer by nature, or anybody out of the water, owes none.
+            # (`water` is this method's local for the body's water; the module is
+            # asked by its own name.)
+            from . import water as water_rules
+
+            if self.afloat(a.ref) and water_rules.swim_speed(a) <= 0:
+                a.swum_rounds += rounds
+            elif a.swum_rounds:
+                a.swum_rounds = 0
             # A day's periodic work, once per day boundary the clock crossed — the
             # executor's "per day" clock (`Actor.run_periodic`). A day boundary is a fact
             # of the clock like the hour boundaries above; the per-ROUND work stays with
@@ -13448,26 +13458,39 @@ class Engine:
             deep = water.is_under(self.scene.biome)
             rough = water.roughness(self.world, self.scene.at,
                                     a.has_state(states.WEATHER_STORM))
-            dc = water.swim_dc(rough)
+            # The hours swum, each owing the Swim skill's fatigue check (`swum_rounds`,
+            # moved by `Scene.advance`). Before 2026-11-15 only a shipwreck asked it.
+            while a.swum_rounds >= water.ROUNDS_AN_HOUR:
+                a.swum_rounds -= water.ROUNDS_AN_HOUR
+                tells.extend(self._an_hour_swum(a, rough, fight))
+            flow = water.current(self.world, self.scene.at)
+            dc = max(water.swim_dc(rough), water.CURRENT_DC if flow else 0)
             # Taking 10 swims on unchanged: said once, not every beat it stays the same.
-            was, quiet = a.swim_check_made, False
-            if a.is_down or a.is_helpless:
-                margin = -dc
-            elif not fight and rough != "stormy":
-                margin = 10 + sum(m.value for m in a.skill_modifiers("swim")) - dc
-                quiet = was is True
-            else:
-                roll = self.dice.d20(a.skill_modifiers("swim"),
-                                     label=f"{a.name} Swim, {rough} water (DC {dc})",
-                                     visibility="hidden")
-                margin = roll.total - dc
+            was = a.swim_check_made
+            mods = list(a.skill_modifiers("swim"))
+            margin, quiet = self._swim_margin(a, mods, dc, rough, fight)
+            if flow == "fast" and margin < 0:
+                # "a DC 15 Swim check or a DC 15 Strength check" (CRB Water Dangers):
+                # whichever the swimmer is better at keeps them up.
+                margin = max(margin, self._swim_margin(
+                    a, list(a.ability_check_modifiers("str")), dc, rough, fight,
+                    what="Strength")[0])
+            quiet = quiet and was is True
+            why = (" Their armour drags at them." if water.armour_is_why(mods, margin)
+                   else "")
+            if flow and margin < 0:
+                dice, kind = water.CURRENT_HURT[flow]
+                hurt = self.dice.roll(dice, label="the current", visibility="hidden").total
+                a.take_damage(hurt, lethality=kind)
+                tells.append(f"The current takes {a.name} downstream and batters them"
+                             + (" on the rocks." if flow == "rapids" else "."))
             if deep:
                 a.swim_check_made = margin >= 0
                 if not (quiet and margin >= 0):
                     tells.append(f"{a.name} " + (
                         f"swims on under the {rough} water." if margin >= 0 else
                         "makes no headway under the water." if margin > -5 else
-                        "sinks, getting nowhere."))
+                        "sinks, getting nowhere.") + why)
                 continue
             if margin >= 0:
                 a.swim_check_made = True
@@ -13481,17 +13504,47 @@ class Engine:
             a.swim_check_made = False
             if margin > -5:
                 tells.append(f"{a.name} " + ("stays under, getting nowhere." if under else
-                                             "makes no headway in the water."))
+                                             "makes no headway in the water.") + why)
                 continue
             if not under:
                 a.apply_effect(ActiveEffect(
                     name="under the water", kind="situation", key="submerged",
                     source="rule:swim", origin="rule:swim",
                     tags=states.tags_for("submerged"), duration="until-dismissed"))
-                tells.append(f"{a.name} goes under.")
+                tells.append(f"{a.name} goes under.{why}")
             else:
-                tells.append(f"{a.name} is still under, sinking.")
+                tells.append(f"{a.name} is still under, sinking.{why}")
         return tells
+
+    def _swim_margin(self, a, mods, dc: int, rough: str, fight: bool,
+                     what: str = "Swim") -> tuple[int, bool]:
+        """(margin over the DC, taken 10) for one Swim check, by the cadence `swim` states:
+        a body that cannot act fails it; out of a fight and out of stormy water the
+        swimmer takes 10 when 10 makes it ("You can't take 10 on a Swim check in stormy
+        water"); otherwise the d20 is rolled, hidden. Taking 10 where it fails would be
+        a swimmer choosing to fail, which nobody does, so then the die is rolled."""
+        if a.is_down or a.is_helpless:
+            return -dc, False
+        ten = 10 + sum(m.value for m in mods) - dc
+        if not fight and rough != "stormy" and ten >= 0:
+            return ten, True
+        roll = self.dice.d20(mods, label=f"{a.name} {what}, {rough} water (DC {dc})",
+                             visibility="hidden")
+        return roll.total - dc, False
+
+    def _an_hour_swum(self, a, rough: str, fight: bool = False) -> list[str]:
+        """The Swim skill's hourly price, once: "Each hour that you swim, you must make a
+        DC 20 Swim check or take 1d6 points of nonlethal damage from fatigue" (CRB Swim).
+        One copy for every long swim: the water beside a ship or in a lake hour on hour
+        (`swim`), the swim out to a ship lying off (`_swim_out`), a wreck (`_wreck`)."""
+        margin, _ten = self._swim_margin(a, list(a.skill_modifiers("swim")),
+                                         water.HOURLY_DC, rough, fight, what="Swim, an hour in")
+        if margin >= 0:
+            return []
+        hurt = self.dice.roll(water.HOURLY_NONLETHAL, label="an hour's swimming",
+                              visibility="hidden").total
+        a.take_damage(hurt, lethality="nonlethal")
+        return [f"An hour in the water tells on {a.name}: they are tiring."]
 
     def breathe(self) -> list[str]:
         """Everybody underwater holds their breath, and then stops being able to.
@@ -14399,6 +14452,10 @@ class Engine:
         # to Ledgerwarren cost nothing and Ledgerwarren to Vormoor a platinum piece.
         sea_leg, harbour = None, ""
         if how == "sea":
+            # A ship lying off this town's own shore (no docks): booked here, and reached
+            # by boat or by swimming out (`_out_to_her`), not by the road to a port.
+            if self.lies_off(leg):
+                return self._book_passage(intent, leg, off_shore=True)
             coast = self.road_to_the_coast(leg)
             if coast is None:
                 return self._book_passage(intent, leg)
@@ -14719,9 +14776,20 @@ class Engine:
         if stopped_short:
             # The march is over for this turn, and the road remembers how much of it is
             # still to walk.
-            bits = [f"{hours} hour{'s' if hours != 1 else ''} out of "
+            # The whole road so far, not only today's: a resumed road said "3 hours out
+            # of Vormoor" on its fifth day. Counted ON FOOT, as the road remembers it
+            # (`scene.road["walked"]`), a day being a day's march.
+            behind = int(self.scene.road.get("walked") or 0)
+            out_words = (f"{behind} hour{'s' if behind != 1 else ''}"
+                         if behind < journey_mod.HOURS_PER_DAY else
+                         journey_mod.describe(leg, behind)
+                         .replace(" on the road", ""))
+            bits = [f"{out_words} on foot out of "
                     f"{getattr(self.world.get(self.scene.location_id), 'name', 'town') if self.world else 'town'} "
-                    f"on the road to {leg.to_name}, and the road stops being yours.",
+                    f"on the road to {leg.to_name}"
+                    + (f" ({hours} hour{'s' if hours != 1 else ''} of it this time)"
+                       if resumed else "")
+                    + ", and the road stops being yours.",
                     ontheway.describe(met, who=[self.scene.actors[m["ref"]].name
                                                 for m in made
                                                 if m["ref"] in self.scene.actors])]
@@ -17379,12 +17447,27 @@ class Engine:
             market_mod.day_of(self.scene.clock_minutes))
         return percent, why, seller
 
-    def _book_passage(self, intent: Intent, leg) -> Outcome:
+    def lies_off(self, leg) -> bool:
+        """Whether the ship on this sea route lies off this town's shore today: a town on
+        the water with no docks, a stated sea route from it, and her day to call
+        (`journey.lying_off`; owner ruling 2026-11-14). A river is a keelboat's, and goes
+        by the road to the coast as before."""
+        from . import journey as journey_mod
+
+        if leg is None or leg.by == "river" or not leg.by_sea:
+            return False
+        day = int(self.scene.clock_minutes or 0) // (24 * 60)
+        return leg.to_id in journey_mod.lying_off(self.world, self.scene.location_id, day)
+
+    def _book_passage(self, intent: Intent, leg, off_shore: bool = False) -> Outcome:
         """Buy a berth to `leg`'s port and go aboard. She lies at the quay until the party
         sails (`_sail`), so the deck is somewhere to stand, talk and sleep first.
 
         The fare is the book's: 1 sp a mile a passenger (CRB Table 6-9), the miles the
-        world's when it stated them, else the ship's own day's run times the days."""
+        world's when it stated them, else the ship's own day's run times the days.
+
+        `off_shore`: she lies off a shore with no docks (`lies_off`), and the party goes
+        out to her by boat or, with `out: "swim"`, swims (`_out_to_her`)."""
         from . import ships as ships_mod
 
         pc = self.scene.pc()
@@ -17394,6 +17477,8 @@ class Engine:
             return self._refuse(intent, "Nobody sells a berth in the middle of a fight.")
         here = self.scene.location_id
         escorts = self._passage_party(intent)
+        swim_out = off_shore and str(intent.params.get("out") or "").lower() == "swim"
+        boat = ships_mod.rowboat_cp(1 + len(escorts)) if off_shore and not swim_out else 0
         # A berth booked here and not yet sailed is the same berth: aboard again, free.
         ship = next((v for v in (ships_mod.Vessel.from_dict(r) for r in self.scene.vessels)
                      if v is not None and v.at == here and v.bound_for == leg.to_id
@@ -17401,24 +17486,45 @@ class Engine:
         effects: list[dict] = []
         if ship is not None:
             paid = f"Your berth on {ship.name} is still yours."
+            if boat:
+                purse, enough = goods.spend(pc.purse, boat)
+                if not enough:
+                    return self._refuse(intent, f"The boat out to {ship.name} is "
+                                                f"{goods.purse_line(goods.coins_for(boat), self._coins_here())}, "
+                                                f"and {pc.name} has not got it. Swim out "
+                                                f"to her, or come back with the coin.")
+                pc.purse = purse
         else:
             heads = 1 + len(escorts)
             ship, days, cost = self.passage_quote(leg, heads)
             coins = self._coins_here()
             moved = self._fare_moved()
-            purse, enough = goods.spend(pc.purse, cost)
+            purse, enough = goods.spend(pc.purse, cost + boat)
             if not enough:
                 return self._refuse(
                     intent, f"Passage to {leg.to_name} on {ship.name} is "
                             f"{goods.purse_line(goods.coins_for(cost), coins)} for "
                             f"{heads} (a silver piece a mile a head{moved and ', '}"
-                            f"{moved[:1].lower()}{moved[1:]}), and "
-                            f"{pc.name} carries {goods.purse_line(pc.purse, coins)}.")
+                            f"{moved[:1].lower()}{moved[1:]})"
+                            + (f", and the boat out to her "
+                               f"{goods.purse_line(goods.coins_for(boat), coins)}"
+                               if boat else "")
+                            + f", and {pc.name} carries {goods.purse_line(pc.purse, coins)}.")
             pc.purse = purse
             ship.at, ship.bound_for, ship.came_from = here, leg.to_id, here
             ship.days_left = ship.days_total = days
             ship.sailed_at = None
             ship.river = leg.by == "river"
+            # Bound inland (the mirror of the road to the coast, 2026-11-15): she puts in
+            # at the port at the foot of the destination's quickest road, and that road
+            # is walked when she makes it (`_sail`). 52 of Aurvantis's stated sea legs
+            # end inland and 39 of those have a road up from a port; the other 13 (and
+            # Pangrella's 3) tie up at the town itself, as before (for-world-bible 8d).
+            from . import journey as journey_mod
+
+            up = None if ship.river or leg.to_port else journey_mod.harbour_road(
+                self.world, leg.to_id, pc.speed_feet)
+            ship.lands_at = up.to_id if up is not None else ""
             effects.append({"kind": "give", "ref": pc.ref, "item": "coin", "count": cost,
                             "how": "fare", "from": pc.ref, "to": ship.id,
                             "purse": dict(pc.purse), "goods": dict(pc.goods)})
@@ -17432,7 +17538,9 @@ class Engine:
             paid = (f"{pc.name} pays {goods.purse_line(goods.coins_for(cost), coins)} for "
                     f"passage to {leg.to_name} on {ship.name}, {english.a(ship.kind)}: "
                     f"{days} day{'s' if days != 1 else ''} "
-                    f"{'on the river' if ship.river else 'at sea'}."
+                    f"{'on the river' if ship.river else 'at sea'}"
+                    + (f" to {self._settlement_name(ship.lands_at)}, and the road inland "
+                       f"from there" if ship.lands_at else "") + "."
                     + (f" {moved}." if moved else ""))
         ship.passengers = [pc.ref, *escorts]
         self._keep_vessel(ship)
@@ -17447,12 +17555,28 @@ class Engine:
                     and not self._stays_in_the_world(a):
                 self.scene.depart(ref)
         deck = ships_mod.deck_of(ship)
+        reached = ""
+        if off_shore:
+            # Out to her: the boat, or the swim, with every consequence the water has.
+            reached, fx, lost = self._out_to_her(pc, escorts, ship, swim_out, boat)
+            effects.extend(fx)
+            ship.passengers = [r for r in ship.passengers if r not in lost]
+            self._keep_vessel(ship)
+            if pc.ref in lost:
+                shore = next((p for p in self.places()
+                              if " ".join(str(p.name).split()).lower() == "the shore"), None)
+                self.place_party(shore.id if shore is not None else "")
+                return Outcome(intent_id=intent.id, op="journey", effects=effects,
+                               tell=" ".join(b for b in (parted, paid, reached) if b),
+                               because=intent.because)
         self.place_party(deck)
         for ref in escorts:
-            if ref in self.scene.people:
+            if ref in self.scene.people and ref in ship.passengers:
                 self.scene.move(ref, deck)
         crew = self._ships_company(ship, deck)
-        bits = [b for b in (parted, paid, f"{pc.name} goes aboard; she lies at the quay "
+        bits = [b for b in (parted, paid, reached,
+                            f"{pc.name} goes aboard; she lies "
+                            f"{'off the shore' if off_shore else 'at the quay'} "
                             f"until you sail.") if b]
         if crew:
             # "The ship's master" printed as "The ship's the master" live: the tells'
@@ -17491,6 +17615,104 @@ class Engine:
             out.append(who)
         return out
 
+    def _out_to_her(self, pc, escorts, ship, swim: bool, boat_cp: int
+                    ) -> tuple[str, list[dict], list[str]]:
+        """Out from the shore to a ship lying off it (owner ruling 2026-11-14): (the tell,
+        its records, the refs who never reached her).
+
+        By boat: Ultimate Equipment's rowboat, 2 cp a mile a head (`ships.rowboat_cp`,
+        already taken from the purse) and 1.5 mph, three to a trip. Swimming: every
+        swimmer swims the cable's length round by round on real Swim checks at the sea's
+        roughness (`_swim_out`), going under, the breath clock and drowning included."""
+        from . import ships as ships_mod
+
+        here = [pc.ref, *[r for r in escorts if r in self.scene.people]]
+        if not swim:
+            minutes = ships_mod.rowboat_minutes(len(here))
+            self.scene.advance(minutes, charge_body=False)
+            coins = self._coins_here()
+            return (f"A rowboat takes {'them' if len(here) > 1 else pc.name} out to "
+                    f"{ship.name} for {goods.purse_line(goods.coins_for(boat_cp), coins)}"
+                    f"{', in more than one trip' if len(here) > ships_mod.ROWBOAT_HEADS else ''}.",
+                    [{"kind": "give", "ref": pc.ref, "item": "coin", "count": boat_cp,
+                      "how": "boat out", "from": pc.ref, "to": ship.id,
+                      "purse": dict(pc.purse), "goods": dict(pc.goods)}], [])
+        shore = next((p for p in self.places()
+                      if " ".join(str(p.name).split()).lower() == "the shore"), None)
+        rough = water.roughness(self.world, shore.id if shore is not None else "")
+        told, fx, lost, longest = [], [], [], 0
+        for ref in here:
+            a = self.scene.people[ref]
+            made, rounds, said = self._swim_out(a, ships_mod.ANCHORED_OFF_FT, rough)
+            longest = max(longest, rounds)
+            told.extend(said)
+            fx.append({"kind": "swim", "ref": ref, "to": ship.id, "made": made,
+                       "rounds": rounds, "water": rough, "origin": "rule:swim"})
+            if not made:
+                lost.append(ref)
+        self.scene.advance(max(1, -(-longest // 10)), charge_body=False)
+        for ref in lost:
+            if ref != pc.ref and ref in self.scene.people:
+                self.scene.depart(ref)
+        return " ".join(told), fx, lost
+
+    def _swim_out(self, a, feet: int, rough: str) -> tuple[bool, int, list[str]]:
+        """Swim `feet` of open water, round by round by the Swim skill (CRB): a made check
+        moves half your speed (a full-round action), a miss by 4 or less makes no
+        progress, a miss by 5 or more puts you under, and a made check brings you up.
+        Under, the breath clock and the drowning ladder are the water's own (`breathe`);
+        an hour of it asks the hourly fatigue check (`_an_hour_swum`). The swimmer takes
+        10 where 10 makes it and rolls where it does not (`_swim_margin`). A swim speed or
+        freedom of movement crosses without a check. (made, rounds, tells)."""
+        speed = water.swim_speed(a)
+        if speed > 0 or water.row_for(a) == water.FREE:
+            rounds = -(-feet // max(5, speed or a.speed_feet))
+            return True, rounds, [f"{a.name} swims out to her with ease."]
+        step = max(5, int(a.speed_feet or 30) // 2)
+        dc = water.swim_dc(rough)
+        mods = list(a.skill_modifiers("swim"))
+        gone = rounds = went_under = 0
+        under = dragged = False
+        ladder: list[str] = []
+        sink = ActiveEffect(name="under the water", kind="situation", key="submerged",
+                            source="rule:swim", origin="rule:swim",
+                            tags=states.tags_for("submerged"), duration="until-dismissed")
+        # Ten hours is past any body's endurance at the hourly 1d6; a guard, not a rule.
+        while gone < feet and rounds < 10 * water.ROUNDS_AN_HOUR \
+                and not a.has_state("state.down.dead"):
+            rounds += 1
+            if rounds % water.ROUNDS_AN_HOUR == 0:
+                ladder.extend(self._an_hour_swum(a, rough))
+            margin, _ten = self._swim_margin(a, mods, dc, rough, False)
+            dragged = dragged or water.armour_is_why(mods, margin)
+            if margin >= 0:
+                gone += step
+                if under:
+                    a.remove_effects(match=lambda e: states.UNDER_WATER in (e.tags or ()))
+                    a.held_breath_rounds = 0
+                under = False
+            elif margin <= -5 and not under:
+                a.apply_effect(copy.deepcopy(sink))
+                under, went_under = True, went_under + 1
+            if under:
+                a.held_breath_rounds += 1
+                ladder.extend(t for t in self.breathe()
+                              if t.startswith(a.name) and not t.endswith("holds on."))
+        if under:
+            a.remove_effects(match=lambda e: states.UNDER_WATER in (e.tags or ()))
+            a.held_breath_rounds = 0
+        made = gone >= feet and not a.has_state("state.down.dead")
+        how = f"{a.name} swims out to her" if made else f"{a.name} never reaches her"
+        if went_under:
+            how += ", going under " + ("once" if went_under == 1 else
+                                       "twice" if went_under == 2 else "again and again")
+        if made and rounds > 2 * -(-feet // step):
+            how += ", slow and hard going"
+        said = [how + "."]
+        if dragged:
+            said.append(f"{a.name}'s armour drags at them in the water.")
+        return made, rounds, said + list(dict.fromkeys(ladder))
+
     def _sail(self, intent: Intent, ship, want: str = "") -> Outcome:
         """The ship makes way, a day at a time, until she makes port or the weather turns.
 
@@ -17504,8 +17726,11 @@ class Engine:
         dest = ship.bound_for
         dest_name = self._settlement_name(dest)
         # The exits row names the ship by id, which `intents.normalise_ref` cuts to its hex.
-        if want and want not in (dest, ship.id) and not ship.id.endswith("-" + want) \
+        port_name = self._settlement_name(ship.lands_at) if ship.lands_at else ""
+        if want and want not in (dest, ship.id, ship.lands_at or dest) \
+                and not ship.id.endswith("-" + want) \
                 and want.lower() not in dest_name.lower() \
+                and not (port_name and want.lower() in port_name.lower()) \
                 and want.lower() != ship.name.lower():
             return self._refuse(
                 intent, f"{ship.name} is bound for {dest_name}, nowhere else. Sail on with "
@@ -17587,31 +17812,48 @@ class Engine:
             effects.extend(fx)
         if ship.days_left > 0:
             self._keep_vessel(ship)
-            bits.append(f"{dest_name} is {ship.days_left} day"
-                        f"{'s' if ship.days_left != 1 else ''} on.")
+            bits.append(f"{port_name or dest_name} is {ship.days_left} day"
+                        f"{'s' if ship.days_left != 1 else ''} on"
+                        + (f", and {dest_name} a road inland from it" if port_name else "")
+                        + ".")
             return Outcome(intent_id=intent.id, op="journey", effects=effects,
                            tell=" ".join(bits + told), because=intent.because)
-        # Making port: the ship ties up, and the party goes down the gangplank.
-        ship.at, ship.bound_for, ship.sailed_at = dest, "", None
+        # Making port: the ship ties up, and the party goes down the gangplank — at the
+        # destination, or at the harbour below it when it is inland (`lands_at`).
+        port = ship.lands_at or dest
+        port_name = self._settlement_name(port)
+        ship.at, ship.bound_for, ship.sailed_at, ship.lands_at = port, "", None, ""
         self._keep_vessel(ship)
-        self.scene.location_id = dest
+        self.scene.location_id = port
         quay = next((p for p in self.places() if " ".join(str(p.name).split()).lower()
                      in ships_mod.PORT_PLACES), None)
         self.place_party(quay.id if quay is not None else "")
         for a in aboard:
             if not a.is_pc:
                 self.scene.move(a.ref, self.scene.at)
-        effects.append({"kind": "journey", "to": dest, "to_name": dest_name,
+        effects.append({"kind": "journey", "to": port, "to_name": port_name,
                         "arrived": True, "how": "sea", "place": self.scene.at})
-        bits.append(f"She makes {dest_name} and ties up; {pc.name if pc else 'the party'} "
+        bits.append(f"She makes {port_name} and ties up; {pc.name if pc else 'the party'} "
                     f"goes ashore at {self.here().name}.")
-        landed = trade_mod.unload(self.scene, ship.id, dest)
+        landed = trade_mod.unload(self.scene, ship.id, port)
         if landed:
             bits.append(f"{_sentence(_and_list(landed))} {'is' if len(landed) == 1 else 'are'}"
                         f" swung onto the quay.")
-            effects.append({"kind": "cargo", "how": "landed", "at": dest, "lots": landed})
-        return Outcome(intent_id=intent.id, op="journey", effects=effects,
+            effects.append({"kind": "cargo", "how": "landed", "at": port, "lots": landed})
+        done = Outcome(intent_id=intent.id, op="journey", effects=effects,
                        tell=" ".join(bits + told), because=intent.because)
+        if port != dest and pc is not None:
+            # And the road inland, walked as the journey it is (`_op_journey`: the CRB's
+            # pace, the road's watch checks, camps, a road stopped short and resumed),
+            # in the same turn, as the road down to a harbour is walked before boarding.
+            # Until 2026-11-15 she tied up at the inland town itself, the road uncounted.
+            self._journeyed = ""
+            inland = self._op_journey(Intent(
+                op="journey", actor=pc.ref, id=intent.id, because=intent.because,
+                params={"to": dest, "with": [a.ref for a in aboard if not a.is_pc]}), {})
+            done.effects += inland.effects
+            done.tell = f"{done.tell} {inland.tell}".strip()
+        return done
 
     def _met_at_sea(self, ship, met) -> tuple[str, list[dict]]:
         """What the day's sea check found (`ontheway.sea`), put on the water: the tell and
@@ -17738,22 +17980,16 @@ class Engine:
                                                visibility="hidden").total - 1], True
         hours = self.dice.roll(ships_mod.WRECK_SWIM_HOURS, label="hours in the water",
                                visibility="hidden").total
-        dc = water.SWIM_DC["stormy"]
         effects: list[dict] = [{"kind": "wreck", "vessel": ship.id, "days": sailed,
                                 "hours": hours, "origin": "rule:shipwreck"}]
         hurt: list[str] = []
         for a in swimmers:
-            taken = 0
+            # The Swim skill's hourly check in stormy water, the one copy of it.
+            had = int(a.nonlethal or 0)
             for _ in range(hours):
-                roll = self.dice.d20(list(a.skill_modifiers("swim")),
-                                     label=f"{a.name} Swim, stormy water",
-                                     visibility="hidden")
-                if roll.total < dc:
-                    taken += self.dice.roll(ships_mod.WRECK_HOURLY_NONLETHAL,
-                                            label="the sea's toll",
-                                            visibility="hidden").total
+                self._an_hour_swum(a, "stormy", fight=True)
+            taken = int(a.nonlethal or 0) - had
             if taken:
-                a.take_damage(taken, lethality="nonlethal")
                 effects.append({"kind": "damage", "ref": a.ref, "amount": taken,
                                 "lethality": "nonlethal", "origin": "rule:shipwreck"})
             a.add_condition(journey_mod.MOUNT_FATIGUE, rounds=journey_mod.FATIGUE_ROUNDS,

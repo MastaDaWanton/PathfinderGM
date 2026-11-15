@@ -35,6 +35,7 @@ SCAFFOLD = (
     "ABOARD (fact):",
     "bound for",
     "a journey to it sails on; anything else is done aboard.",
+    "LYING OFF (fact):",
 )
 # The SCAFFOLD strings printed only on some turns: a bearing asked for, a mount in the
 # party, a world that states bearings. Named so the scaffold's own test knows which
@@ -72,8 +73,15 @@ def _aboard(ctx) -> tuple[str, dict]:
         return "", {}
     found = ctx.world.get(ship.bound_for) if ctx.world is not None else None
     dest = str(getattr(found, "name", "") or "port")
-    where = "at the quay" if ship.sailed_at is None else "at sea"
+    from rules import journey
+
+    where = ("at sea" if ship.sailed_at is not None else "at the quay"
+             if journey.is_port(ctx.world, ship.at) else "lying off the shore")
     days = f"{ship.days_left} day{'s' if ship.days_left != 1 else ''} on"
+    if ship.lands_at:
+        # Bound inland: she ties up at the harbour below it, and the road is walked.
+        port = ctx.world.get(ship.lands_at) if ctx.world is not None else None
+        days += (f" to {getattr(port, 'name', '') or 'port'}, then the road inland")
     return (f"  ABOARD (fact): {ship.name}, {words.a(ship.kind)}, {where}, bound "
             f"for {dest}, {days}; a journey to it sails on; anything else is done "
             f"aboard."), {"aboard": ship.id, "bound_for": ship.bound_for, "where": where}
@@ -135,10 +143,31 @@ def _roads(ctx) -> tuple[str, dict]:
                      f"takes half the time on foot, and \"gallop\" a third, though a "
                      f"mount pushed past its first hour of galloping in a day is hurt by "
                      f"it and tires.")
+    off = _lying_off(ctx, roads)
+    if off:
+        lines.append(off)
     return "\n".join(lines), {"roads": [r.to_name for r in roads],
                               "to_ids": [r.to_id for r in roads],
                               "rows": facts_rows, "bearings_asked": asked,
                               "bearings": bearings, "mounts": mounts}
+
+
+def _lying_off(ctx, roads) -> str:
+    """A ship lying off this shore today (no docks; owner ruling 2026-11-14), and the two
+    ways out to her, in the op's own words."""
+    from rules import journey
+
+    day = int(getattr(ctx.scene, "clock_minutes", 0) or 0) // (24 * 60)
+    here = str(getattr(ctx.location, "id", "") or "")
+    bound = set(journey.lying_off(ctx.world, here, day))
+    names = [r.to_name for r in roads if r.to_id in bound]
+    if not names:
+        return ""
+    first = names[0]
+    return (f"  LYING OFF (fact): a ship bound for {', '.join(names)} lies off the shore "
+            f"today, with no docks to tie up at; a rowboat takes passengers out "
+            f'({{"op": "journey", "params": {{"to": "{first}"}}}}), or they swim out to '
+            f'her ({{"op": "journey", "params": {{"to": "{first}", "out": "swim"}}}}).')
 
 
 def _mounts(scene) -> list[str]:
