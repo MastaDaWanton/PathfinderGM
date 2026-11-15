@@ -8,11 +8,12 @@ Everything the model produces is checked in code before it touches the engine.
 """
 from __future__ import annotations
 
+import logging
 import os
 import re
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, ClassVar
 
-from django.conf import settings
 
 from rules.intents import (Intent, IntentError, claims_held_by_hiding,
                           claims_the_engine_backs, cut_outcome_claims,
@@ -22,6 +23,9 @@ from . import client, judgement, narration as narration_mod, prompts
 from . import intimate as intimate_mod
 from . import mentions as mentions_mod
 from . import speech as speech_mod
+
+if TYPE_CHECKING:   # an annotation name only: gm.checks loads every check module
+    from .checks import BeatContext
 
 
 def surfaces_a_stall(method):
@@ -214,7 +218,7 @@ class GMAgent:
                                          + (" — still strikes" if still else "")))
             if text2 and not still and not narration_mod.reads_as_a_refusal(text2):
                 return text2, f"an undeclared blow by {names}: rewritten without it", attempts
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - a model call; recorded on attempts, the turn goes on
             attempts.append(Attempt("prose", 0.0, self.prose_model,
                                     note=f"blow retry failed: {str(exc)[:100]}"))
         # The backstop: the sentences that throw the blow are cut.
@@ -293,7 +297,7 @@ class GMAgent:
                                             if still else "")))
             if text2 and not still and not narration_mod.reads_as_a_refusal(text2):
                 return text2, f"undeclared arrivals in a fight ({who}): rewritten", attempts
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - a model call; recorded on attempts, the turn goes on
             attempts.append(Attempt("prose", 0.0, self.prose_model,
                                     note=f"arrival retry failed: {str(exc)[:100]}"))
         return text, f"undeclared arrivals in a fight ({who}): could not be removed", attempts
@@ -1422,6 +1426,7 @@ class GMAgent:
         messages = base
         attempts: list[Attempt] = []
         rejections: list[str] = []
+        last = ""
 
         for n in range(max_attempts):
             reply = client.chat(
@@ -1436,6 +1441,7 @@ class GMAgent:
                 data = reply.json()
             except ValueError as exc:
                 rejections.append(f"attempt {n + 1}: {exc}")
+                last = str(exc)
                 messages = _with_correction(base, reply.text, str(exc))
                 continue
             try:
@@ -1452,19 +1458,20 @@ class GMAgent:
                                          origin_name="the author's word"), wish)
             except IntentError as exc:
                 rejections.append(f"attempt {n + 1} [{exc.check}]: {exc}")
+                last = str(exc)
                 messages = _with_correction(base, reply.text, str(exc))
                 continue
             return TurnPlan(narration="", intents=intents, attempts=attempts,
                             rejections=rejections)
 
-        # Every attempt refused. A cheat that cannot be mechanised is still a thing the
-        # author said, so it becomes a beat rather than an error: the wish reaches the
-        # narrator and nothing pretends a number changed.
-        return TurnPlan(
-            narration="", intents=self.engine.validate(
-                [{"op": "narrate_only",
-                  "because": f"the author wrote: {wish}"}]),
-            attempts=attempts, rejections=rejections)
+        # Every attempt refused: said, never narrated. This used to become a
+        # `narrate_only` beat carrying "the author wrote: <wish>", and the narrator made
+        # the wish true in prose — measured live 2026-11-09, three refusals and the
+        # wished-for ogre stood on the page with no actor behind it (beat-verify flagged
+        # "arrived: someone not listed" and nothing cut it). A person the narration shows
+        # is a real actor (ruling 2026-10-01), so a wish the engine could not run is
+        # refused with the engine's own last reason, as the code-read cheat already is.
+        raise IntentError(last or "no plan the engine could run came back", "cheat")
 
     def _continue_plan(self) -> TurnPlan:
         """The plan for a Continue press, written in code: the player holds their
@@ -2063,7 +2070,7 @@ class GMAgent:
     # freed and another loaded at the same address answered with the first one's words.
     # The ingredient table is part of it because its names are folded in below — a
     # table rebuilt for a homebrew herb must not go on being read as the old one.
-    _VOCAB: dict[int, tuple] = {}
+    _VOCAB: ClassVar[dict[int, tuple]] = {}
     _CAPITALISED = re.compile(r"\b[A-Z][a-zA-Z'’-]{2,}\b")
 
     def _world_vocabulary(self) -> set[str]:
@@ -2079,6 +2086,7 @@ class GMAgent:
 
             herbs = ing_mod.all_ingredients()
         except Exception:
+            logging.getLogger(__name__).exception("the ingredient catalogue did not load for the vocabulary")
             herbs = None
         got = GMAgent._VOCAB.get(key)
         if got is not None and got[0] is world and got[1] is herbs:
@@ -2105,6 +2113,7 @@ class GMAgent:
                 # are allowed by the same comparison the names are.
                 found |= {w for w in re.findall(r"[a-z][a-z'-]{3,}", chunk.lower())}
         except Exception:
+            logging.getLogger(__name__).exception("the world's words did not load for the vocabulary")
             pass
         # And the things the game itself ships. "Hypericum" and "Wolfweed" were reported
         # as invented people: they are herbs in `content/ingredients`, which the narrator
@@ -2114,6 +2123,7 @@ class GMAgent:
             for i in (herbs or {}).values():
                 found |= set(GMAgent._CAPITALISED.findall(str(getattr(i, "name", ""))))
         except Exception:
+            logging.getLogger(__name__).exception("the herb names did not load for the vocabulary")
             pass
         try:
             from rules import market as market_mod
@@ -2121,6 +2131,7 @@ class GMAgent:
             for m in market_mod.everything_priced():
                 found |= set(GMAgent._CAPITALISED.findall(str(getattr(m, "name", ""))))
         except Exception:
+            logging.getLogger(__name__).exception("the priced goods did not load for the vocabulary")
             pass
         # Bounded, now that an entry keeps its world alive: `load_cached` holds four.
         if len(GMAgent._VOCAB) >= 8:
@@ -2185,7 +2196,7 @@ class GMAgent:
                 continue
             try:
                 alive = self.engine.scene.conscious(ref)
-            except Exception:
+            except AttributeError:
                 alive = (a.hp or 0) > 0
             # A role (`bystander`) is a condition on the sheet and not a wound: it
             # must not let the prose bleed an untouched merchant.
@@ -2885,7 +2896,7 @@ class GMAgent:
                         fixed = self._lift(str(reply.json().get("sentence", "")).strip())
                         if fixed and pc is not None:
                             fixed, _ = narration_mod.pc_to_second_person(fixed, pc.name)
-                    except Exception as exc:  # a failed repair must not lose the turn
+                    except Exception as exc:  # a failed repair must not lose the turn  # noqa: BLE001
                         attempts.append(Attempt("repair", 0.0, self.prose_model,
                                                 note=f"truth: {f.kind}: failed: {exc}"))
                         fixed = ""
@@ -3145,7 +3156,7 @@ class GMAgent:
         try:
             fixed, attempt = _rewrite(review.complaint(), "; ".join(review.as_log()))
             attempts.append(attempt)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - a model call; the findings are cut instead, the turn goes on
             # A failed call is a rewrite that did not hold: the truth findings are cut, and
             # a pronoun of the player's swapped.
             text, swapped, _cleared = self._swap_pronouns(text)
@@ -3235,7 +3246,7 @@ class GMAgent:
                 if _accept(second):
                     second, swapped, _cleared = self._swap_pronouns(second)
                     return second, made + review.as_log() + swapped, attempts
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - a model call; recorded on attempts, the turn goes on
                 attempts.append(Attempt("polish", 0.0, self.model,
                                         note=f"retry failed: {str(exc)[:100]}"))
 
@@ -3532,7 +3543,7 @@ class GMAgent:
                 attempts.append(Attempt("repair", reply.seconds, reply.model, reply.text,
                                         note=claim.why))
                 fixed = str(reply.json().get("sentence", "")).strip()
-            except Exception as exc:  # a failed repair must not lose the turn
+            except Exception as exc:  # a failed repair must not lose the turn  # noqa: BLE001
                 attempts.append(Attempt("repair", 0.0, self.model, note=f"failed: {exc}"))
                 fixed = ""
 
@@ -3619,7 +3630,7 @@ class GMAgent:
                     fixed = str(reply.json().get("sentence", "")).strip()
                     if fixed and pc is not None:
                         fixed, _ = narration_mod.pc_to_second_person(fixed, pc.name)
-                except Exception as exc:  # a failed repair must not lose the turn
+                except Exception as exc:  # a failed repair must not lose the turn  # noqa: BLE001
                     attempts.append(Attempt("repair", 0.0, self.prose_model,
                                             note=f"state claim: failed: {exc}"))
                     fixed = ""
@@ -3675,7 +3686,7 @@ class GMAgent:
             attempts.append(Attempt("repair", reply.seconds, reply.model, reply.text,
                                     note=f"wrong actor: {why}"))
             fixed = self._lift(str(reply.json().get("narration", "")).strip())
-        except Exception as exc:  # a failed repair must not lose the turn
+        except Exception as exc:  # a failed repair must not lose the turn  # noqa: BLE001
             attempts.append(Attempt("repair", 0.0, self.prose_model,
                                     note=f"wrong actor: failed: {exc}"))
             fixed = ""
@@ -4130,7 +4141,7 @@ class GMAgent:
             attempt = Attempt("repair", reply.seconds, reply.model, reply.text,
                               note=f"misnamed: {len(flagged)} sentence(s)")
             got = reply.json() or {}
-        except Exception as exc:  # a failed repair must not lose the turn
+        except Exception as exc:  # a failed repair must not lose the turn  # noqa: BLE001
             return text, [f"misnamed: the rewrite failed ({type(exc).__name__}); "
                           f"{len(flagged)} sentence(s) left as written"], []
         fixed, notes = text, []
