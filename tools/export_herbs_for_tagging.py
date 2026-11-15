@@ -344,7 +344,7 @@ def write_review(everything, before_path: Path | None) -> Path:
         f"- **Routes, all entries:** {counted(every)} ({sum(every.values())} effects).",
         f"- **Routes, hybrid entries:** {counted(hyb)}.",
         f"- **Parts:** {counted(parts)}.",
-        f"- **Bases:** "
+        "- **Bases:** "
         + ", ".join(f"{form} {sum(1 for i in everything.values() if form in i.base_for)}"
                     for form in ing.BASE_FORMS) + ".",
         "",

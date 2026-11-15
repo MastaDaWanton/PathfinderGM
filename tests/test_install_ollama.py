@@ -84,7 +84,7 @@ def test_it_refuses_when_ollama_is_already_installed(monkeypatch, rf):
 
 # --- what it refuses to run ----------------------------------------------------------------
 
-def _frames(monkeypatch, tmp_path, payload: bytes, *, signed=(True, "Ollama"),
+def _frames(monkeypatch, tmp_path, payload: bytes, *, signed=(True, "Ollama Inc."),
             claimed: int | None = None):
     """Drive the generator with a fake download and a fake signature."""
     target = tmp_path / "OllamaSetup.exe"
@@ -152,6 +152,32 @@ def test_a_signature_by_somebody_else_is_refused(monkeypatch, tmp_path):
                                 signed=(True, "Some Other Publisher Ltd"))
     assert opened == []
     assert any("Some Other Publisher" in f.get("error", "") for f in frames), frames
+
+
+@pytest.mark.parametrize("signer", ["Ollama Tools Ltd", "Not Ollama Inc.", "ollama inc."])
+def test_a_name_that_only_contains_ollama_is_refused(monkeypatch, tmp_path, signer):
+    """Review 2026-11-11 finding 17: the check was `"ollama" in signer.lower()`, so any
+    publisher who registered a name with the word in it ("Ollama Tools Ltd") passed. The
+    real installer's signer, read off OllamaSetup.exe on 2026-11-15, is "Ollama Inc."."""
+    exe = b"MZ" + b"\0" * preflight.SMALLEST_PLAUSIBLE
+    frames, opened, target = _frames(monkeypatch, tmp_path, exe, signed=(True, signer))
+    assert opened == [], f"it ran an installer signed by {signer!r}"
+    assert not target.exists()
+
+
+@pytest.mark.skipif(not preflight.on_windows(), reason="WinVerifyTrust is Windows only")
+def test_the_signer_is_read_off_a_real_signed_file_without_crashing():
+    """Measured 2026-11-15: `_signer_name` died with an access violation on Ollama's real
+    OllamaSetup.exe (an untyped ctypes pointer truncated to 32 bits), so the install
+    button could never have opened the installer. Python's own signed interpreter stands
+    in for it here: the same embedded-signature path, a name that is not Ollama's."""
+    import sys
+    from pathlib import Path
+
+    trusted, signer = preflight.signature_of(Path(sys.executable))
+    if not trusted:
+        pytest.skip("this interpreter is not Authenticode-signed")
+    assert signer and signer != preflight.OLLAMA_SIGNER, signer
 
 
 def test_an_implausible_content_length_is_refused_before_a_byte_is_written(

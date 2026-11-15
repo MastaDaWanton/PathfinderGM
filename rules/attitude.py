@@ -46,6 +46,7 @@ carries this as an open gap rather than a quiet one.
 """
 from __future__ import annotations
 
+import logging
 import re
 
 from . import states
@@ -367,12 +368,14 @@ def _mod(actor, ability: str) -> int:
         try:
             return int(fn(ability))
         except Exception:
+            logging.getLogger(__name__).exception("an actor's ability modifier raised; read as 0")
             return 0
     score = getattr(actor, "ability_score", None)
     if callable(score):
         try:
             return (int(score(ability)) - 10) // 2
         except Exception:
+            logging.getLogger(__name__).exception("an actor's ability score raised; read as 0")
             return 0
     return 0
 
@@ -386,6 +389,7 @@ def _hit_dice(actor) -> int:
             try:
                 got = got()
             except Exception:
+                logging.getLogger(__name__).exception("an actor's hit dice raised")
                 got = None
         try:
             if got is not None:

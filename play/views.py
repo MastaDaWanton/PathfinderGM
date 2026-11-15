@@ -6,6 +6,7 @@ cosmetic prompt: the engine is genuinely stopped mid-list until the player answe
 """
 from __future__ import annotations
 
+import logging
 import json
 import re
 
@@ -19,7 +20,7 @@ from gm import (client, intimate as intimate_mod, judgement, ledger as ledger_mo
                 narration as narration_mod, prompts, speech as speech_mod, watcher)
 from gm.agent import GMAgent, TurnPlan
 from gm.client import ModelUnavailable, available
-from rules import awareness, biomes, grid, ingredients as ing_mod
+from rules import awareness, biomes, grid
 from rules import places as places_mod
 from rules.intents import IntentError
 
@@ -2346,8 +2347,8 @@ def _carried(pc) -> list[dict]:
                         acts.append({"label": label, "api": "/api/use", "menu": at,
                                      "body": dict(at[0]["body"])})
                     else:
-                        no_target = (f"Thrown, it needs somebody to throw it at; there is "
-                                     f"nobody here.")
+                        no_target = ("Thrown, it needs somebody to throw it at; there is "
+                                     "nobody here.")
                 continue
             if usable and d.get(f"{how}able"):
                 acts.append({"label": label, "api": "/api/use",
@@ -2631,6 +2632,7 @@ def write(request):
     try:
         page["where"] = c.engine().here().name
     except Exception:
+        logging.getLogger(__name__).exception("a written page could not name where it was written")
         page["where"] = ""
     c.scene.writings.append(page)
     c.save()
@@ -5407,7 +5409,7 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             # The tell renders raw and play continues. The narrator is a garnish on a
             # game that works without it.
             _note_stall(agent, exc)
-            text, attempt = "", None
+            text = ""
         if not text:
             pc = c.scene.pc()
             text = " ".join(plain_tell(o.tell, c.scene) for o in outcomes)
@@ -6538,7 +6540,7 @@ def wear_item(request):
                     {"error": f"{record['name']} is not something you wear"}, status=400)
             slot = pc.wear(record, read_int(body, "index", 0))
             tell = f"{pc.name} puts on {record['name']} ({slot})."
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - the slot rules refuse with a sentence, shown in the 400
         # Slot rules refuse with a sentence — already occupied, no such slot. A 400 with
         # the reason, because the page prints it verbatim beside the button.
         return JsonResponse({"error": str(exc)}, status=400)
@@ -6665,6 +6667,7 @@ def use_item(request):
         c.scene.restore(undo)
         return JsonResponse({"error": str(exc)}, status=400)
     except Exception as exc:
+        logging.getLogger(__name__).exception("using an item raised; the scene is restored and the player told")
         c.scene.restore(undo)
         # A jar with authored effects the engine chokes on must be a sentence in the
         # sheet, not a 500 with an invisible error — "clicking the drink button does
@@ -6748,7 +6751,7 @@ def set_gender(request):
     derived from it. Guessing from a name is precisely the thing this whole field exists
     to stop, so it is asked rather than inferred.
     """
-    from rules.sheet import gender_from_pronouns, pronouns_for_gender
+    from rules.sheet import pronouns_for_gender
 
     c = campaign_mod.current()
     pc = c.scene.pc()
@@ -7385,6 +7388,7 @@ def trade_do(request):
         c.scene.restore(undo)
         return JsonResponse({"error": str(exc)}, status=400)
     except Exception as exc:
+        logging.getLogger(__name__).exception("a counter trade raised; the scene is restored and the player told")
         c.scene.restore(undo)
         # The same rule the drink button learned: a trade that cannot happen is a
         # sentence on the screen, never a 500 with an invisible error.

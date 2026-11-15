@@ -358,7 +358,7 @@ def _role(world, actor) -> str:
     if world is not None and entity:
         try:
             ent = world.get(entity)
-        except Exception:
+        except (AttributeError, TypeError):
             ent = None
         facts = dict(getattr(ent, "facts", {}) or {}) if ent is not None else {}
         for k in _ROLE_KEYS:
@@ -373,7 +373,7 @@ def _scheme_hook(scene, card) -> dict:
     Read from the shipped document through the instance that opened the card."""
     try:
         from . import schemes as schemes_mod
-    except Exception:  # pragma: no cover - schemes is always importable
+    except ImportError:  # pragma: no cover - schemes is always importable
         return {}
     for inst in getattr(scene, "schemes", None) or []:
         key = next((k for k, cid in (inst.get("cards") or {}).items() if cid == card.id), "")
@@ -450,7 +450,7 @@ def demonstrations() -> dict:
         path = Path(settings.BASE_DIR) / "content" / "hooks" / "approaches.json"
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
+        except (OSError, ValueError):
             data = {}
         _DEMOS = {k: str(v) for k, v in (data.get("approaches") or {}).items()}
     return _DEMOS

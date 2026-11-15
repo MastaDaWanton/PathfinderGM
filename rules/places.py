@@ -40,6 +40,7 @@ generated set exactly as before.
 """
 from __future__ import annotations
 
+import logging
 import contextlib
 import contextvars
 import hashlib
@@ -1350,7 +1351,6 @@ def _wanted(scale: str, earned: tuple[tuple[str, str], ...],
     # cities came out with the same eighteen rooms in the same order. The rotation is
     # inside the floor group so the scale preference still holds — a city varies among
     # city things, never by dropping down to a village thing.
-    rank = {name: i for i, name in enumerate(SCALES)}
     ordered: list[tuple] = []
     for floor in reversed(SCALES):
         group = sorted((r for r in rows if r[2] == floor), key=lambda r: r[0])
@@ -2407,10 +2407,6 @@ def _occupation_works(work: dict | None, tag: str) -> bool:
     return bool(work) and tag in (work.get("tags") or ())
 
 
-def _occupation_works_forge(work: dict | None) -> bool:
-    return _occupation_works(work, FORGE_WORK)
-
-
 def _kind_works(kind: str, tag: str) -> bool:
     """Whether the keeper of a place of this kind works at `tag` by occupation: the
     keeper's title (`STAFFED`) read through the occupation table (`lives.occupation_for`)."""
@@ -2536,7 +2532,7 @@ def _actor(scene, ref: str):
         return people[ref]
     try:
         return (getattr(scene, "actors", None) or {}).get(ref)
-    except Exception:
+    except (AttributeError, TypeError):
         return None
 
 
@@ -2554,10 +2550,6 @@ def _keeper_works(scene, place, keeper, work_tag: str, place_tag: str) -> bool:
                        None)
             return _occupation_works(row, work_tag)
     return has_place_tag(place, place_tag)
-
-
-def _keeper_works_forge(scene, place, keeper) -> bool:
-    return _keeper_works(scene, place, keeper, FORGE_WORK, SMITHY)
 
 
 def _workroom_here(scene, known, place_tag: str, work_tag: str, rate,
@@ -2741,10 +2733,6 @@ def _said(name) -> str:
     return " ".join(str(name or "").lower().replace("’", "'").split())
 
 
-def _kit_name(name) -> bool:
-    return _said(name) in FIELD_KIT_NAMES
-
-
 def _carries(actor, names: frozenset, gear_key: str) -> bool:
     """Whether `actor` carries a thing called one of `names`: both stores a carried thing
     can be in, as `gear.carried` reads them, then `gear.holds` for the goods row."""
@@ -2762,6 +2750,7 @@ def _carries(actor, names: frozenset, gear_key: str) -> bool:
 
         return bool(gear.holds(actor, gear_key))
     except Exception:
+        logging.getLogger(__name__).exception("whether an actor carries a field kit did not read")
         return False
 
 

@@ -18,7 +18,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .worldclass import TIERS, tier_rank
+from .worldclass import tier_rank
 from pathfindergm import files
 
 # Named in the Herbalist and Blood Bending documents as growing somewhere specific, or
@@ -289,7 +289,7 @@ def load_dir(path: str | Path, key: str = "ingredients") -> dict[str, dict]:
     for p in sorted(Path(path).glob("*.json")):
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - reported: files.unreadable names the file
             files.unreadable(p, exc)
             continue
         entries = data.get(key) if isinstance(data, dict) else None

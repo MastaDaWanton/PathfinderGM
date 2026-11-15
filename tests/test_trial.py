@@ -756,12 +756,12 @@ def test_ruling_a_small_favours_captain_is_granted_the_officer_tag_and_old_saves
     assert cap.has_state(states.GUARD)
 
 
-def test_a_confiscation_that_cannot_give_is_logged_and_still_ends_the_matter(caplog):
-    """Review 2026-11-11, finding 10: `_confiscate` wrapped the give in `except Exception:
-    pass`, so a give that raised left no trace anywhere. The record still goes back to
-    its owner — `charges` charges theft afresh for anything still held, so a thing that
-    can never be given would otherwise be charged at every arrest — but the log now says
-    the give failed, and why."""
+def test_a_confiscation_whose_give_fails_leaves_the_thing_stolen(caplog):
+    """Review 2026-11-11, finding 10: the record flipped back to its owner whether or not
+    the give moved anything, so with the give door broken the apple stayed in the pack
+    while the ledger had returned it — stolen goods the watch "took back" and no later
+    search could find. Now the failure is logged and the apple is still the stolen apple
+    in the player's hands; the sentence itself still ends the matter."""
     import logging
 
     s, e, pc, g, _ = _taken_for_theft()
@@ -775,6 +775,23 @@ def test_a_confiscation_that_cannot_give_is_logged_and_still_ends_the_matter(cap
     with caplog.at_level(logging.WARNING, logger="rules.trial"):
         res = _wait(e)                              # sentence
     assert any("giving up 'apple' failed" in r.getMessage() for r in caplog.records)
+    assert e._carried_by(pc, "apple") is not None
+    rec = next(r for r in s.props if r["name"] == "apple")
+    assert rec["held_by"] == pc.ref and rec.get("stolen"), rec
+    assert "Taken back" not in _tells(res), _tells(res)
+    assert trial.custody(pc) is None, _tells(res)
+
+
+def test_a_confiscation_of_a_thing_no_longer_carried_still_closes_its_record():
+    """The case the unconditional flip was kept for: a ledger record the pack does not
+    bear out (the apple is gone) would otherwise be charged at every arrest, forever."""
+    s, e, pc, g, _ = _taken_for_theft()
+    pc.purse = {"gp": 30}
+    _check(e, "diplomacy", g.ref, face=1)           # guilty
+    for key in [k for k in pc.goods if "apple" in k.lower()]:
+        del pc.goods[key]
+    assert e._carried_by(pc, "apple") is None
+    res = _wait(e)                                  # sentence
     rec = next(r for r in s.props if r["name"] == "apple")
     assert rec["held_by"] == "c90" and not rec.get("stolen")
     assert trial.custody(pc) is None, _tells(res)

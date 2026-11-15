@@ -105,9 +105,9 @@ def _read() -> dict:
     try:
         raw = json.loads(p.read_text(encoding="utf-8-sig"))
     except json.JSONDecodeError as exc:
-        raise _Unreadable(f"not valid JSON at line {exc.lineno}, column {exc.colno}")
+        raise _Unreadable(f"not valid JSON at line {exc.lineno}, column {exc.colno}") from None
     except Exception as exc:
-        raise _Unreadable(type(exc).__name__)
+        raise _Unreadable(type(exc).__name__) from exc
     if not isinstance(raw, dict):
         raise _Unreadable("not a JSON object")
     return raw

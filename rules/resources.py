@@ -19,11 +19,10 @@ from __future__ import annotations
 
 import ast
 import operator
-import re
 from collections.abc import Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from .tables import ABILITIES, ability_modifier
+from .tables import ABILITIES
 
 # --- formulas -------------------------------------------------------------------------------
 #

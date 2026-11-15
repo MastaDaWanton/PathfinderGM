@@ -19,7 +19,7 @@ from __future__ import annotations
 
 
 from django.http import JsonResponse
-from .apiutil import read_body, read_int, script_json
+from .apiutil import read_body, script_json
 from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
@@ -104,7 +104,7 @@ def spell_save(request):
                             status=400)
     try:
         saved = registry.save("spells", body)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - reported: the player gets the reason in the 400
         return JsonResponse({"error": str(exc)}, status=400)
     # Drop the cache so the new spell is castable without a restart — the same reason
     # the class builder clears `classes._ALL` after a save.

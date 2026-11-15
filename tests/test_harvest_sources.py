@@ -32,8 +32,8 @@ BY_RULE = {"bone-chalk", "brain-paste", "currier-tallow", "generic-chitin",
 # No shipped creature, measured 2026-10-30. The first three had none at 0.2.22 either
 # (no shipped great wyrm, frost worm, greasefish or giant eel); the last two lost theirs to
 # option D.
-OPEN = {"dragon-heart-blood", "frostworm-chill-gland", "slick-jelly",
-        "glowlizard-hide", "white-dragon-ichor"}
+# The glowlizard hide left this list on 2026-11-15, re-attributed to the shocker lizard.
+OPEN = {"dragon-heart-blood", "frostworm-chill-gland", "slick-jelly", "white-dragon-ichor"}
 
 
 def _sourceless() -> set[str]:

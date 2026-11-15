@@ -133,9 +133,6 @@ class Attribution:
                 return m.ref
         return None
 
-    def mentions_ref(self, ref: str) -> bool:
-        return any(m.ref == ref for m in self.mentions)
-
     def mentioned_in(self, text: str, ref: str) -> bool | None:
         """Whether `text` — the beat as it stands NOW, after whatever was cut — mentions
         `ref` in a sentence this attribution read. True when one does; None when none
@@ -316,7 +313,6 @@ def find(text: str, cast: list[dict]) -> list[Mention]:
                 heads.add(w.lower())
     heads.discard("you")
 
-    word = r"[A-Za-z][A-Za-z'’-]*"
     name_re = None
     if owners:
         alt = "|".join(sorted((re.escape(w) for w in owners), key=len, reverse=True))
@@ -506,7 +502,7 @@ def attribute(text: str, scene, *, acting: str = "", facts: list[str] | None = N
             if got in refs or got == NOBODY:
                 m.model = got
         result.labelled = True
-    except Exception as exc:  # a failed label must never lose the turn
+    except Exception as exc:  # a failed label must never lose the turn  # noqa: BLE001
         result.error = f"{type(exc).__name__}: {str(exc)[:160]}"
     result.seconds = round(time.monotonic() - started, 2)
     return result

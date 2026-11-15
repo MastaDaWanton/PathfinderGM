@@ -506,7 +506,7 @@ def audit(turns: int, script: str, world: str, character: str,
                 why = ""
                 try:
                     why = json.dumps(r.json())[:200]
-                except Exception:
+                except Exception:  # noqa: BLE001 - a dev tool: the raw body stands in
                     why = (r.content or b"")[:200].decode("utf-8", "replace")
                 # A 422 is the player-fixable refusal (docs/fix-interfaces.md §2.6):
                 # no turn was spent and the reason came back in plain words, which is
@@ -735,7 +735,7 @@ def _known_names(c) -> set[str]:
 
     try:
         return GMAgent(c.world, c.engine())._known_names()
-    except Exception:
+    except Exception:  # noqa: BLE001 - a dev tool: the scene's names stand in
         return {a.name for a in c.scene.actors.values() if a.name}
 
 

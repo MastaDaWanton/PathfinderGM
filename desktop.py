@@ -304,7 +304,7 @@ def _let_the_last_turn_land(timeout: float = LAST_TURN_WAIT) -> bool:
     """
     try:
         from play import concurrency
-    except Exception:
+    except ImportError:
         return False
     return concurrency._GAME.acquire(timeout=timeout)
 
@@ -451,7 +451,7 @@ def main(argv: list[str] | None = None) -> int:
         def _watch():
             try:
                 sys.stdin.read()
-            except Exception:
+            except Exception:  # noqa: BLE001 - stdin closed or absent; the shutdown below is the point
                 pass
             server.shutdown()
         threading.Thread(target=_watch, daemon=True).start()
@@ -548,7 +548,7 @@ def _report_only(argv: list[str]) -> int:
     words = "The game did not start."
     try:
         path = report.save_to(folder, words, True, note=note)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - reported: printed on the report line for the shell
         print(f"{REPORT_LINE} " + json.dumps({"error": f"{type(exc).__name__}: {exc}"}),
               flush=True)
         return 1
@@ -627,24 +627,24 @@ def _self_check() -> int:
             module_name, _, func = target.partition(":")
             try:
                 __import__(module_name)
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - reported: the self-check lists it
                 problems.append(f"registry {kind_id}: {target} -> {exc!r}")
     for track, module_name in benches.BENCHES.items():
         try:
             __import__(module_name)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - reported: the self-check lists it
             problems.append(f"bench {track}: {module_name} -> {exc!r}")
     for mode, (_owner, module_name) in benches.MODES.items():
         try:
             __import__(module_name)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - reported: the self-check lists it
             problems.append(f"mode {mode}: {module_name} -> {exc!r}")
 
     from rules import spells
 
     try:
         n_spells = len(spells.all_spells())
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - reported: the self-check lists it
         n_spells = -1
         problems.append(f"spells did not load: {exc!r}")
     print(f"spells loaded {n_spells}")
@@ -664,7 +664,7 @@ def _self_check() -> int:
         try:
             get_template(tpl)
             print(f"template {tpl:<24} ok")
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - reported: the self-check lists it
             problems.append(f"template {tpl}: {exc!r}")
 
     if problems:

@@ -100,7 +100,7 @@ def _is_json(response) -> bool:
     try:
         response.json()
         return True
-    except Exception:
+    except Exception:  # noqa: BLE001 - a dev tool: not JSON is the answer asked for
         return False
 
 

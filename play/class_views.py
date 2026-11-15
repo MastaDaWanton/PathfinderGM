@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 
 from django.http import JsonResponse
-from .apiutil import read_body, read_int, script_json
+from .apiutil import read_body, script_json
 from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST

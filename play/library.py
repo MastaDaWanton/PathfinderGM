@@ -17,7 +17,7 @@ from pathlib import Path
 
 from django.conf import settings
 
-from world.loader import SUPPORTED_MAJOR, UnsupportedSchema, load, load_cached
+from world.loader import UnsupportedSchema, load, load_cached
 from pathfindergm import files
 
 
@@ -70,7 +70,7 @@ def _card(path: Path, shipped: bool) -> WorldCard:
         # because of a version number is indistinguishable from one the user lost.
         return WorldCard(id=ident, name=path.stem.replace("-", " ").title(),
                          source=str(path), shipped=shipped, problem=str(exc))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - reported: the card shows the problem
         return WorldCard(id=ident, name=path.stem.replace("-", " ").title(),
                          source=str(path), shipped=shipped,
                          problem=f"could not be read: {exc}")
@@ -204,7 +204,7 @@ def _saves() -> list[tuple[str, Path, dict]]:
     for path in sorted(d.glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - reported: files.unreadable names the file
             files.unreadable(path, exc)
             continue
         if isinstance(data, dict):

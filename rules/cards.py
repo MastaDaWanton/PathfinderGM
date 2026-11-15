@@ -102,8 +102,7 @@ _STOP = {"the", "and", "that", "with", "from", "this", "here", "there", "their",
          "have", "been", "were", "your", "into", "over", "under", "than", "them", "they",
          "what", "when", "where", "about", "after", "before", "through", "while", "would",
          "could", "should", "these", "those", "other", "every", "still", "being", "came",
-         "come", "will", "just", "only", "some", "more", "much", "very", "then", "than",
-         "also", "does", "done", "make", "made", "take", "took", "gets", "goes", "went",
+         "come", "will", "just", "only", "some", "more", "much", "very", "then", "also", "does", "done", "make", "made", "take", "took", "gets", "goes", "went",
          "know", "knows", "something", "anything", "nothing", "somebody", "anybody"}
 
 
@@ -1186,7 +1185,6 @@ def from_world(world, place_id: str = "") -> list[Card]:
             origin=f"world:{cid}", secret=bool(raw.get("secret", False)),
             always_on=bool(raw.get("always_on", False)),
         ))
-    entities = getattr(world, "entities", None) or {}
     # The starting settlement's strain, from its own facts: "tensions between Vyrakon
     # and Oorvieth's city government" — border control and taxation. Public knowledge
     # in the place, so a visible card.

@@ -56,7 +56,6 @@ from __future__ import annotations
 
 import copy
 import importlib
-import math
 import re
 from dataclasses import dataclass, field
 
@@ -1030,7 +1029,6 @@ def _build_react(plan, actor, body, row):
 
 
 def _build_bottle(plan, actor, body, row):
-    from . import formulae
 
     if not _need_inputs(plan, 1, "Put a liquid or a powder on the bench to bottle."):
         return

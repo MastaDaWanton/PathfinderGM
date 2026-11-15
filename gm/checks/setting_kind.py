@@ -115,7 +115,7 @@ def find(ctx) -> list[Finding]:
         + ([] if roofed else ["room", "rafters", "ceiling"])
     return [Finding(
         kind="wrong-kind-of-place",
-        detail=f"the page furnishes another kind of place ("
+        detail="the page furnishes another kind of place ("
                + ", ".join(repr(c) for c in said[:4]) + f") — the party is at {name}",
         fix_hint=(f"The player is at {name}{sky}. There is no "
                   + ", no ".join(absent)

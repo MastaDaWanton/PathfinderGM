@@ -166,7 +166,7 @@ the effect vocabulary, so they stay honest prose rather than guessed specs).
 | Grizzly Hide | grizzly, bear | L | +2 Intimidate worn as a mantle, head and claws attached |
 | Polar Bear Hide | bear, polar | L | Resist cold 2; +1 Stealth in snow and ice |
 | Frostfallen Bison Hide | bison | H | Resist cold 1; Huge single panels: the largest seamless barding a tannery can produce below rare work |
-| Glowlizard Hide | glowlizard | S | Sheds dim light in a 5-foot radius for a year; enough to read by, not enough to reveal the carrier at distance |
+| Shocker Lizard Hide (was Glowlizard Hide, re-attributed 2026-11-15) | shocker lizard | S | Sheds dim light in a 5-foot radius for a year; enough to read by, not enough to reveal the carrier at distance |
 | Giant Frilled Lizard Hide | lizard, giant frilled | L | +1 Intimidate the frill worked into a flaring collar |
 | Electric Eel Skin | eel, electric | M | Resist electricity 2 |
 | Ankheg Shell Leather | ankheg | L | +2 Armour class plates worked over a leather backing; Resist acid 1; Plated and rigid: check penalty one worse |

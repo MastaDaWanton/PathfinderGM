@@ -148,7 +148,7 @@ def who_would_be_here(scene, world=None, level: int = 1, limit: int = 6) -> list
     if world is not None and getattr(scene, "location_id", None):
         try:
             residents = world.residents(scene.location_id)
-        except Exception:
+        except (AttributeError, TypeError):
             residents = []
         town = getattr(world.get(scene.location_id), "name", "this town")
         for ent in residents[:2]:

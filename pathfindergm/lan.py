@@ -261,7 +261,7 @@ def _carries_the_pass(request) -> bool:
     try:
         held = request.get_signed_cookie(COOKIE, salt=COOKIE_SALT, default=None,
                                          max_age=PASS_SECONDS)
-    except Exception:
+    except Exception:  # noqa: BLE001 - a bad cookie is no pass: the check fails closed
         # A tampered, truncated or expired cookie reads as no cookie. There is nothing to
         # report and nobody to report it to.
         return False

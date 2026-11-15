@@ -33,6 +33,7 @@ what could I do about it.
 """
 from __future__ import annotations
 
+import logging
 import json
 import re
 
@@ -258,6 +259,7 @@ def the_room(campaign) -> str:
         here = opening.situation_for(campaign)
         return opening.the_spot(campaign, here).removeprefix("You are ")
     except Exception:
+        logging.getLogger(__name__).exception("the opening's room did not resolve")
         return ""
 
 
@@ -323,6 +325,7 @@ def land_lines(campaign) -> list[str]:
     try:
         land = geography.land_around(world, place)
     except Exception:
+        logging.getLogger(__name__).exception("the opening's land did not read")
         return []
     if land.source == "unknown":
         return []
@@ -332,6 +335,7 @@ def land_lines(campaign) -> list[str]:
 
         terrain = places_mod.terrain_of(campaign.scene.at or "")
     except Exception:
+        logging.getLogger(__name__).exception("the opening's terrain did not read")
         terrain = ""
     if terrain:
         out.append(f"  underfoot here: {terrain}.")

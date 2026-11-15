@@ -44,6 +44,7 @@ scene away, or the campaign may save mid-flight while the model is still thinkin
 """
 from __future__ import annotations
 
+import logging
 import json
 import re
 import threading
@@ -265,6 +266,7 @@ def _known(c) -> set[str]:
     try:
         return GMAgent(c.world, c.engine())._known_names()
     except Exception:
+        logging.getLogger(__name__).exception("the watcher could not list the known names")
         return set()
 
 
@@ -294,17 +296,16 @@ def _work(jobs: list[dict]) -> None:
     try:
         cfg = modelcfg.for_role("watcher")
     except Exception:
+        logging.getLogger(__name__).exception("the watcher has no model settings; it does nothing this round")
         return
     for job in jobs:
         try:
             proposal = (_propose_garnish(job, cfg) if job["job"] == "garnish"
                         else _propose_cards(job, cfg) if job["job"] == "cards"
                         else _propose_undercurrent(job, cfg))
-        except Exception:
+        except Exception:  # noqa: BLE001 - logged with the traceback below
             # Said, not swallowed: a bug in a proposer read as a model with nothing to
             # offer. A warning with the traceback, since a model that is down lands here.
-            import logging
-
             logging.getLogger(__name__).warning(
                 "the watcher's %s proposal failed", job.get("job"), exc_info=True)
             proposal = None
@@ -503,6 +504,7 @@ def _table_id(item: str) -> str:
                 found[_slug(iid)] = iid
                 found[_slug(getattr(ing, "name", ""))] = iid
         except Exception:
+            logging.getLogger(__name__).exception("the watcher's ingredient table did not load")
             pass
         try:
             from rules import market as market_mod
@@ -513,6 +515,7 @@ def _table_id(item: str) -> str:
                     found[_slug(mid)] = mid
                     found[_slug(getattr(m, "name", ""))] = mid
         except Exception:
+            logging.getLogger(__name__).exception("the watcher's market table did not load")
             pass
         found.pop("", None)
         _TABLE = found

@@ -108,7 +108,7 @@ def _read(folder: Path, *, homebrew: bool) -> list[dict]:
     for path in sorted(folder.glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - reported: files.unreadable names the file
             files.unreadable(path, exc)
             continue
         entries = data.get("weapons") if isinstance(data, dict) else None

@@ -153,7 +153,7 @@ def _read_folder(folder: Path) -> dict[str, dict]:
     for path in sorted(folder.glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - reported: files.unreadable names the file
             files.unreadable(path, exc)
             continue
         if not isinstance(data, dict):
@@ -810,9 +810,6 @@ def fill_text(text: str, filled: dict) -> str:
 
 # --- instances ---------------------------------------------------------------------------------
 
-def _instances(scene) -> list[dict]:
-    return scene.schemes
-
 
 def _find(scene, sid: str) -> dict | None:
     return next((i for i in scene.schemes if i.get("scheme") == sid), None)
@@ -824,7 +821,6 @@ def open_scheme(engine, doc: dict, turn: int = 0) -> dict:
     inst = {"scheme": doc["id"], "opened_at": int(scene.clock_minutes),
             "opened_turn": int(turn), "slots": filled, "fired": {}, "skipped": [],
             "cards": {}, "outcome": "", "news": [], "visited": [], "last_at": scene.at}
-    pc = scene.pc()
     for card in doc.get("cards") or []:
         # A deferred card is declared here and opened later, by a step's `open_card`.
         # Everything a scheme knows at open used to arrive at open, which meant a line
@@ -989,8 +985,6 @@ def _holds(pc, slot: dict) -> bool:
     iid = str(slot.get("id") or "").lower()
     inv = getattr(pc, "inventory", None) or {}
     return bool(iid) and int(inv.get(iid, 0) or 0) > 0
-    return any(str(s.base).lower() == want and s.count > 0 for s in pc.stock.values()) \
-        or str(slot.get("id") or "") in (pc.materials if hasattr(pc, "materials") else {})
 
 
 def _item_is(said, slot: dict) -> bool:

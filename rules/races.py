@@ -153,7 +153,7 @@ def evolutions() -> dict[str, dict]:
     path = _content_dir() / "evolutions.json"
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, ValueError):
         return {}
     return {str(e["id"]): e for e in data.get("evolutions") or [] if isinstance(e, dict)}
 
@@ -472,7 +472,7 @@ def _read_folder(folder: Path) -> dict[str, dict]:
     for path in sorted(folder.glob("*.json")):
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - reported: files.unreadable names the file
             files.unreadable(path, exc)
             continue
         if not isinstance(data, dict):

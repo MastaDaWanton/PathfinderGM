@@ -86,7 +86,6 @@ def trails(scene) -> list[dict]:
 
     People standing here (not the player, not who came with the party — their tracks are
     the party's own), then people the party saw here who have gone, newest first."""
-    from . import population
 
     at = str(getattr(scene, "at", "") or "")
     now = int(getattr(scene, "clock_minutes", 0) or 0)

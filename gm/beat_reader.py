@@ -728,7 +728,7 @@ def read(text: str, scene, *, engine=None, said=(), acting: str = "",
                       away=[p["ref"] for p in away], gone=[p["ref"] for p in left])
         reading.read = True
         reading.labelled = True
-    except Exception as exc:  # a failed read must never lose the turn
+    except Exception as exc:  # a failed read must never lose the turn  # noqa: BLE001
         reading.error = f"people: {type(exc).__name__}: {str(exc)[:160]}"
     reading.timings["people"] = round(time.monotonic() - started, 2)
     reading.seconds = reading.timings["people"]

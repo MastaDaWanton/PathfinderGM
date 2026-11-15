@@ -10,12 +10,13 @@ same list from exactly where it stopped.
 """
 from __future__ import annotations
 
+import logging
 import contextlib
 import copy
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, ClassVar
 
 from . import biomes
 from . import goods
@@ -32,7 +33,6 @@ from . import effectspec
 from . import finish_uses
 from . import foraging
 from . import ingredients as ing_mod
-from . import resources
 from . import states
 from . import survival
 from . import object_numbers
@@ -65,7 +65,7 @@ from . import words as english
 from .tables import (
     CONDITIONS,
     ABILITY_FULL, AID_ANOTHER_BONUS, AID_ANOTHER_DC, MANEUVERS, SAVES, SIZE_ORDER,
-    WEAPONS, ability_check_of, maneuver_text, normalise_damage_type,
+    ability_check_of, maneuver_text, normalise_damage_type,
 )
 
 
@@ -1442,6 +1442,7 @@ class Scene:
         try:
             roofed = places_mod.is_indoors(at)
         except Exception:
+            logging.getLogger(__name__).exception("whether a place is roofed did not read; read as open sky")
             roofed = False
         if roofed:
             return "normal"
@@ -2873,7 +2874,7 @@ def _spawn_names_a_thing(name) -> bool:
         return False
     try:
         from gm.judgement import names_a_thing
-    except Exception:            # pragma: no cover — rules standing alone
+    except ImportError:            # pragma: no cover — rules standing alone
         return False
     return names_a_thing(str(name))
 
@@ -3918,9 +3919,9 @@ class Engine:
         if intent.op == "resource" and not intent.params.get("spend") \
                 and not intent.origin:
             raise IntentError(
-                f"resource: a pool is not gained by saying so. Pools refill by "
-                f"rest ({{\"op\": \"rest\"}}) or by an ability's document "
-                f"(use_ability ability=<name>); spend=true spends one.",
+                "resource: a pool is not gained by saying so. Pools refill by "
+                "rest ({\"op\": \"rest\"}) or by an ability's document "
+                "(use_ability ability=<name>); spend=true spends one.",
                 "legality", index, code="no_document")
         # Stage 8's rule, asked of a mind instead of a number.
         #
@@ -4699,7 +4700,7 @@ class Engine:
     # Called by the doors where the deed is done, at their end, never by a settle: an
     # attack's tell is where "the blow gives you away" belongs, and the next blow in the
     # same list must already find the attacker seen.
-    _ACT_SAID = {"attack": "attacking", "cast_offensive": "a spell aimed at a foe"}
+    _ACT_SAID: ClassVar[dict] = {"attack": "attacking", "cast_offensive": "a spell aimed at a foe"}
 
     def _ends_on_act(self, actor, act: str, *, keep=()) -> tuple[list[dict], list[str]]:
         """End every effect on `actor` its own deed `act` ends. (records, tells)."""
@@ -5363,7 +5364,7 @@ class Engine:
     # An attack's own outcome says "hit" if ANY swing hit, which is not this roll's answer
     # on a full attack — so the attack stages judge their d20s themselves, and this map is
     # only read for an outcome whose deciding roll was the player's (`_drive`).
-    _VERDICT_OF = {"success": "success", "hit": "success",
+    _VERDICT_OF: ClassVar[dict] = {"success": "success", "hit": "success",
                    "failure": "failure", "miss": "failure"}
 
     def _judge(self, roll: Roll, made: bool) -> None:
@@ -6954,6 +6955,7 @@ class Engine:
         try:
             bonus = sum(m.value for m in stack(pc.skill_modifiers("diplomacy")))
         except Exception:
+            logging.getLogger(__name__).exception("the player's Diplomacy modifiers raised; read as 0")
             bonus = 0
         if 10 + bonus < self.HOME_DC:
             return False, ("Nobody you ask around will say where they live. Somebody "
@@ -7302,7 +7304,6 @@ class Engine:
         loses a great deal of regard, and a witnessed break-in is a crime — suspected the
         first time, wanted the next, the warning before the warrant (Skyrim's trespass
         warns before it fines)."""
-        from . import places as places_mod
         from . import residency
         from .dice import Modifier
         from .sheet import IllegalSheet
@@ -7370,6 +7371,7 @@ class Engine:
                 heard = self.dice.d20(body.skill_modifiers("perception"),
                                       label=f"{body.name} listens", visibility="hidden")
             except Exception:
+                logging.getLogger(__name__).exception("a listener's Perception modifiers raised; rolled flat")
                 heard = self.dice.d20([], label=f"{body.name} listens", visibility="hidden")
             if heard.total >= dc_hear:
                 from . import attitude as attitude_mod
@@ -10916,7 +10918,7 @@ class Engine:
     # Slots a steal may reach: "tucked into a belt or loosely attached — brooches and
     # necklaces" are easy, a cloak is fastened (+5). Everything else a slot holds is
     # "closely worn" (armour, boots, clothing, rings) and is not a steal at all.
-    _STEAL_SLOTS = {"neck": False, "shoulders": True}
+    _STEAL_SLOTS: ClassVar[dict] = {"neck": False, "shoulders": True}
     _PURSE_WORDS = re.compile(r"(?i)\b(purse|pouch|coins?|money|silver|gold|copper)\b")
 
     def _steal_choice(self, defender: Actor, named: str):
@@ -11219,7 +11221,7 @@ class Engine:
             break
         return say(m["blocked"], False), [], []
 
-    _MANEUVER_OUTCOMES = {
+    _MANEUVER_OUTCOMES: ClassVar[dict] = {
         "drop": _outcome_drop, "take": _outcome_take, "trick": _outcome_trick,
         "push": _outcome_push, "drag": _outcome_drag, "shift": _outcome_shift,
         "pass": _outcome_pass,
@@ -12384,7 +12386,6 @@ class Engine:
         whole and lifts broken; a failure by 5 or more ruins half the materials. A
         magic item is past Craft (mending or make whole only), and a ruined one — 0 hit
         points — is past mending."""
-        from . import pricing
 
         actor = self.scene.actors.get(intent.actor or "") or self.scene.pc()
         owner = self.scene.actors.get(intent.target or "") or actor
@@ -13157,7 +13158,7 @@ class Engine:
             return refused("There is a fight going on: no craft is worked until it is "
                            "over.", "in_a_fight")
         if str(intent.params.get("work") or "plain") != "plain":
-            return refused(f"That is finer work than the plain item a few words can make.",
+            return refused("That is finer work than the plain item a few words can make.",
                            "beyond_base")
         target = craft.target(str(intent.params.get("item") or ""), actor,
                               str(intent.params.get("words") or ""))
@@ -16160,7 +16161,7 @@ class Engine:
                             "from": body.ref, "items": taken})
             tell = (f"{looter.name} strips {body.name}: "
                     + ", ".join(taken) + ". It is all real now — carried, counted, "
-                    f"and on the sheet.")
+                    "and on the sheet.")
         else:
             tell = f"{body.name} has nothing left worth taking."
         return Outcome(intent_id=intent.id, op="loot", effects=effects,
@@ -16384,7 +16385,7 @@ class Engine:
             because=intent.because)
 
     # The word for a refused excursion, by op: "No foraging happens."
-    _GATHER_NOUN = {"forage": "foraging", "prospect": "prospecting"}
+    _GATHER_NOUN: ClassVar[dict] = {"forage": "foraging", "prospect": "prospecting"}
 
     def _gather(self, intent: Intent, partial: dict, key: str, *,
                 level_track: str | None = None) -> Outcome:
@@ -16777,7 +16778,7 @@ class Engine:
                 f"comes at you nor gives way.")
 
     # How close each zone is, for "has the player closed on it?" (intents.ZONES order).
-    _CLOSENESS = {"far": 0, "near": 1, "engaged": 2}
+    _CLOSENESS: ClassVar[dict] = {"far": 0, "near": 1, "engaged": 2}
 
     def _holding_refusal(self, intent: Intent) -> str:
         """Why a creature holding its ground does not do this, or "".
@@ -17082,9 +17083,7 @@ class Engine:
         one applicator; and the base gets a situation card so what is done to it
         accumulates (Blades in the Dark's lair). Standing there is a separate `travel`.
         """
-        from . import cards as cards_mod
         from . import places as places_mod
-        from .activeeffect import ActiveEffect
 
         name = " ".join(str(intent.params.get("name") or "").split()).strip(".")
         if not (3 <= len(name) <= 60):
@@ -17802,9 +17801,9 @@ class Engine:
                                 "note": "a storm at sea"}]))
                 effects.append({"kind": "condition", "ref": a.ref,
                                 "condition": "storm-at-sea", "origin": "rule:storm-at-sea"})
-            bits.append(f"A storm comes down on her: wind and black water over the rail, "
-                        f"nothing to see past the bow (-8 Perception), no bow or throw that "
-                        f"the wind does not take, and she rides it out.")
+            bits.append("A storm comes down on her: wind and black water over the rail, "
+                        "nothing to see past the bow (-8 Perception), no bow or throw that "
+                        "the wind does not take, and she rides it out.")
         if settled:
             bits.insert(0, settled)
         if met is not None:
@@ -17961,10 +17960,9 @@ class Engine:
         it and come ashore on a real coast, paying the Swim skill's hourly price in
         stormy water, and the sea keeps some of what they carried (ships.py, "the
         wreck"). Every roll the engine's and hidden; the narrator gets the tell."""
-        from . import journey as journey_mod, outskirts, places as places_mod
+        from . import journey as journey_mod, outskirts
         from . import ships as ships_mod, water
 
-        pc = self.scene.pc()
         swimmers = [self.scene.people[r] for r in ship.passengers if r in self.scene.people]
         rooms = {p.id for p in ships_mod.places_of(ship)}
         for ref in [r for r, a in self.scene.people.items()
@@ -18069,7 +18067,6 @@ class Engine:
         put between you and them and a rail with the sea past it — which is ground this
         app has always been good at and Pathfinder's own fast-play rules stop short of.
         """
-        from . import places as places_mod
         from . import ships as ships_mod
 
         from .sheet import IllegalSheet
@@ -18402,6 +18399,7 @@ class Engine:
                 who = instantiate(template, scene=self.scene,
                                   name=called[min(i, len(called) - 1)])
             except Exception:
+                logging.getLogger(__name__).exception("a ship's defender did not instantiate; fewer stand")
                 break
             self.scene.add(who)
             self.scene.move(who.ref, deck)
@@ -19116,7 +19114,7 @@ class Engine:
     # the same *fork* — a roll the defender makes, at a DC off the attacker — and it is
     # marked as a simplification in docs/races.md rather than presented as the book's
     # rule. The alternative was leaving five evolutions inert, which is what they were.
-    _NATURAL_RIDERS = {
+    _NATURAL_RIDERS: ClassVar[dict] = {
         "trip":   ("ref", "prone", "is knocked off their feet"),
         "grab":   ("ref", "grappled", "is caught and held"),
         "pull":   ("ref", "", "is dragged in a step"),
@@ -19198,7 +19196,7 @@ class Engine:
     # tell — nothing happened, so the narrator is told nothing — and the counts are in
     # docs/attack-riders.md.
 
-    _RIDER_TYPE_WORD = {"paralyzed": "paralysis", "stunned": "stun", "dazed": "daze"}
+    _RIDER_TYPE_WORD: ClassVar[dict] = {"paralyzed": "paralysis", "stunned": "stun", "dazed": "daze"}
 
     def _printed_riders(self, intent: Intent, actor: Actor, defender: Actor,
                         printed: dict, state: dict) -> list[dict]:
@@ -19700,7 +19698,7 @@ class Engine:
                                     "(effectspec negative_level, engine=False)")},
                  "tell": ""}]
 
-    _RIDERS = {
+    _RIDERS: ClassVar[dict] = {
         "maneuver": _rider_maneuver,
         "attach": _rider_attach,
         "save_condition": _rider_save_condition,
@@ -20962,7 +20960,7 @@ class Engine:
                 return rec
         return None
 
-    _TAG_POWERS = {
+    _TAG_POWERS: ClassVar[dict] = {
         "dancing": ("property.dancing", "dancing"), "dance": ("property.dancing", "dancing"),
         "animated": ("property.animated", "animated"),
         "animate": ("property.animated", "animated"),
@@ -26276,7 +26274,6 @@ class Engine:
         self.lay_the_ground(even_nowhere=True, place=False)
         if self.scene.grid is None:
             return
-        from . import floorplan, places as places_mod
 
         # The ground the party is standing on, not a blank field. Derived from the place
         # id, so the market has the same stalls every time anybody fights in it and none
@@ -30636,9 +30633,9 @@ class Engine:
             return self._refuse(
                 intent, f"introduce brings in a PERSON, and {who!r} is not somebody"
                         + (f" ({why})" if why else "") + ". "
-                        f"Words the player says are a `say` (its `words`), never who is "
-                        f"spoken to; asking a name, a price or a question of somebody "
-                        f"here is `say` to them, or narrate_only.")
+                        "Words the player says are a `say` (its `words`), never who is "
+                        "spoken to; asking a name, a price or a question of somebody "
+                        "here is `say` to them, or narrate_only.")
         # A job's caravan standing here is its real people (rules/jobs.py): "the wagons" or
         # "the caravan" is them, never somebody new. Measured live 2026-10-27: "I walk out
         # to the road to Kalixiri to meet the wagons" had the plan introduce "the wagons",

@@ -46,6 +46,7 @@ traits nobody here has heard of still behaves correctly.
 """
 from __future__ import annotations
 
+import logging
 import re
 
 from . import classes as classes_mod
@@ -91,6 +92,7 @@ def _doc_of(defender) -> dict:
         try:
             doc = getter()
         except Exception:
+            logging.getLogger(__name__).exception("a creature document did not read")
             doc = None
     return doc or {}
 

@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 
 from .tables import (
     CIRCUMSTANCE, CONDITIONS, DC_BANDS, LETHALITIES, MANEUVER_ALIASES, MANEUVERS, SAVES,
-    SKILLS, WEAPONS, base_skill,
+    SKILLS, base_skill,
 )
 
 # Hyphens and spaces are already gone when this is read ("non-lethal" -> "nonlethal").
@@ -116,7 +116,7 @@ def normalise_dc(spec, op: str, index: int) -> dict:
         except (TypeError, ValueError):
             raise IntentError(
                 f"{op}: dc value {spec['value']!r} is not a number", "schema", index
-            )
+            ) from None
 
     band = str(spec.get("band", "")).strip().lower().replace(" ", "_")
     if band in DC_BANDS:
@@ -278,7 +278,7 @@ def _bounded(value, low: int, high: int, index: int, what: str) -> int:
     try:
         return max(low, min(high, int(value)))
     except (TypeError, ValueError, OverflowError):
-        raise IntentError(f"{what}. {value!r} is not a number.", "schema", index)
+        raise IntentError(f"{what}. {value!r} is not a number.", "schema", index) from None
 
 # --- The op table ------------------------------------------------------------------
 
@@ -1281,7 +1281,7 @@ def _check_params(intent: Intent, index: int) -> None:
         if raw_skill in ("attack", "melee", "melee attack", "ranged attack", "to hit",
                          "weapon", "combat", "strike", "hit"):
             raise IntentError(
-                f"check: attacking is not a skill check. Use "
+                "check: attacking is not a skill check. Use "
                 '{"op": "attack", "actor": "...", "target": "..."} — the engine works '
                 "out the attack bonus, the target's AC and the damage from the sheets.",
                 "schema", index,
@@ -1766,7 +1766,7 @@ def _check_params(intent: Intent, index: int) -> None:
         try:
             p["count"] = max(1, min(12, int(p.get("count", 1) or 1)))
         except (TypeError, ValueError, OverflowError):
-            raise IntentError("spawn: count must be a number", "schema", index)
+            raise IntentError("spawn: count must be a number", "schema", index) from None
 
     elif op == "introduce":
         # "merchant_with_herbs" is a ref-shaped description (live, 2026-09-25): words.
@@ -1783,7 +1783,8 @@ def _check_params(intent: Intent, index: int) -> None:
         try:
             p["count"] = max(1, min(len(INTRODUCED_REFS), int(p.get("count", 1) or 1)))
         except (TypeError, ValueError, OverflowError):
-            raise IntentError("introduce: count must be a number", "schema", index)
+            raise IntentError("introduce: count must be a number", "schema",
+                              index) from None
         # Read, not refused. Measured live 2026-09-25: `"how": "already_there"` cost a whole
         # attempt on a param whose only choice is "new, or somebody standing here". A word
         # of arriving means arrives; anything else is the safe reading, already here.

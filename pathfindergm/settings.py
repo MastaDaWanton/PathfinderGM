@@ -5,7 +5,6 @@ in a database — the same file-native choice World Bible made, for the same rea
 files are the data, and a save you can read in a text editor survives the app.
 """
 
-from pathlib import Path
 
 from .paths import is_frozen, resource_root, secret_key, user_data_root
 

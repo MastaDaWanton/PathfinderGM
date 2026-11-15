@@ -79,7 +79,7 @@ def test_a_wrong_pass_is_refused_and_a_right_one_is_spent_for_a_cookie(client, a
     A token left sitting in the address bar is one that gets bookmarked, screenshotted,
     and written into browser history, so the answer is a redirect to the same path
     without it. Jupyter's shape, for Jupyter's reasons."""
-    assert client.get(f"/api/state?k=WRONGPASS1",
+    assert client.get("/api/state?k=WRONGPASS1",
                       REMOTE_ADDR=ELSEWHERE).status_code == 403
 
     opened = client.get(f"/api/state?k={armed}", REMOTE_ADDR=ELSEWHERE)

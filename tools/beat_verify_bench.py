@@ -266,7 +266,7 @@ def run_model(model: str, runs: int, host: str, record: dict, verbose: bool,
             if replay is not None:
                 kept = (replay.get(beat["id"]) or [{}])[r % max(1, len(replay.get(beat["id"]) or [1]))]
 
-                def chat(*a, _raw=kept.get("raw", ""), **k):
+                def chat(*a, _raw=kept.get("raw", ""), **k):  # noqa: B008 - bound per beat
                     return SimpleNamespace(text=_raw, seconds=0.0, model="replay",
                                            json=lambda: json.loads(_raw))
             reading = bv.read(beat["text"], facts, model=model, host=host, chat=chat)

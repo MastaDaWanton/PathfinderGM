@@ -36,6 +36,7 @@ penalty, the cover from land, the caster level check for fire), "Aquatic Terrain
 Swim skill, and the drowning rules under Environment.
 """
 from __future__ import annotations
+import logging
 
 # The two grounds this module speaks for. `terrain_of` parses one off a place id and
 # nothing here looks anything up, which is the arrangement the whole place model keeps.
@@ -134,6 +135,7 @@ def swim_speed(actor) -> int:
         try:
             return int((speeds() or {}).get("swim", 0) or 0)
         except Exception:
+            logging.getLogger(__name__).exception("an actor's speeds raised; no swim speed read")
             pass
     elif isinstance(speeds, dict):
         return int(speeds.get("swim", 0) or 0)
@@ -171,6 +173,7 @@ def breath_rounds(actor) -> int:
         try:
             con = int(mod("con"))
         except Exception:
+            logging.getLogger(__name__).exception("an actor's Constitution raised; read as 10")
             con = 10
     rounds = max(1, con) * BREATH_ROUNDS_PER_CON
     return rounds * 2 if _has(actor, "hold-breath") else rounds
@@ -307,6 +310,7 @@ def _tags(actor) -> tuple:
         try:
             got = got()
         except Exception:
+            logging.getLogger(__name__).exception("an actor's tags raised; read as none")
             got = ()
     return tuple(got or ())
 
@@ -321,6 +325,7 @@ def _has(actor, tag: str) -> bool:
             if fn(tag):
                 return True
         except Exception:
+            logging.getLogger(__name__).exception("an actor's state check raised")
             pass
     return any(str(t) == tag or str(t).startswith(tag + ".") for t in _tags(actor))
 
@@ -342,6 +347,7 @@ def _weighed_down(actor) -> bool:
         try:
             return str(load()).strip().lower() in ("medium", "heavy", "overloaded")
         except Exception:
+            logging.getLogger(__name__).exception("an actor's load raised; read as light")
             return False
     return False
 

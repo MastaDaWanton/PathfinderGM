@@ -716,7 +716,6 @@ def report(argv: list[str]) -> None:
         print(f"- Q pages: kappa {kappa(qa, qb):.2f}")
         matched = total = 0
         same_code = 0
-        recs_turn = {}
         for d in ids:
             ea = [e for e in a.get(d, []) if e[0].startswith("E")]
             eb = [e for e in b.get(d, []) if e[0].startswith("E")]

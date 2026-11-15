@@ -113,9 +113,3 @@ def secret_key() -> str:
         # rather than a lost campaign.
         pass
     return made
-
-
-def campaigns_root() -> Path:
-    p = user_data_root() / "campaigns"
-    p.mkdir(parents=True, exist_ok=True)
-    return p

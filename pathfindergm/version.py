@@ -49,7 +49,7 @@ def _ask_git() -> None:
         if out.returncode == 0 and out.stdout.strip():
             _dev_stamp = out.stdout.strip() + " (dev)"
             return
-    except Exception:
+    except (OSError, subprocess.SubprocessError):
         pass
     _dev_stamp = UNSTAMPED
 

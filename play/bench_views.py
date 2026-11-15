@@ -28,7 +28,7 @@ import secrets
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 
-from rules import crafting, herbknowledge, ingredients, knowledge, worldclass
+from rules import crafting, herbknowledge, knowledge, worldclass
 
 from . import bench_clock
 from . import campaign as campaign_mod

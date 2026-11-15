@@ -52,7 +52,7 @@ from __future__ import annotations
 
 import math
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 # Morale scores, Basic D&D's 2-12 scale. 8 is where the published bandits and raiders sit:
 # they will fight, and they will not die for it. 12 means no check is ever made.
@@ -300,16 +300,6 @@ def damage_multiplier(troop: Troop, traits: tuple[str, ...] = ()) -> float:
         return 1.0
     words = {str(t).strip().lower() for t in (traits or ())}
     return 1.5 if words & {"area", "burst", "spread", "cone", "line", "emanation"} else 1.0
-
-
-def immune_to_single_target(troop: Troop, targets: int) -> bool:
-    """"A troop is immune to any spell or effect that targets a specific number of
-    creatures (including single-target spells such as disintegrate and multiple-target
-    spells such as haste)."
-
-    An effect with no stated target count is an area or a whole-scene effect and lands.
-    """
-    return troop is not None and not troop.routed and int(targets or 0) > 0
 
 
 def tell_of(troop: Troop, name: str, fell: int) -> str:

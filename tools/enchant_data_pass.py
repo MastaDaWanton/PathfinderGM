@@ -40,7 +40,6 @@ from __future__ import annotations
 
 import copy
 import json
-import math
 import os
 import sys
 from pathlib import Path
@@ -95,7 +94,7 @@ FAMILIES: dict[str, dict] = {
                                 f"made stone by the sunrise ({ALVISSMAL}). A house pairing "
                                 "with earth; no separate source."),
     "light": dict(phase="dawn", color="#fff4c2",
-                  affinity=["silver", "gold", "glowlizard-hide"], working=["pure"],
+                  affinity=["silver", "gold", "shocker-lizard-hide"], working=["pure"],
                   why="First light, the cockcrow: in the folk belief the crow before dawn "
                       f"sends the night's spirits home ({COCKCROW}); Hamlet's ghost fades "
                       "at it."),

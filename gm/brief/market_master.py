@@ -18,6 +18,7 @@ something invented. Being brushed off costs no regard (the owner, Q29): the sect
 so, because a narrator left to guess writes the master's contempt.
 """
 from __future__ import annotations
+import logging
 
 ORDER = 45
 SLOT = "people"
@@ -51,6 +52,7 @@ def section(ctx) -> tuple[str, dict]:
     try:
         choices = market.counters(location)
     except Exception:
+        logging.getLogger(__name__).exception("the market brief could not list the counters")
         return "", {}
     lines, facts = [], {}
     if choices:

@@ -20,6 +20,8 @@ scrubber deletes any sentence stating a mechanic no tell backs.
 """
 from __future__ import annotations
 
+import json
+
 from rules import states
 from rules.dice import Dice
 from rules.engine import Engine, Scene
@@ -311,3 +313,75 @@ def test_the_number_in_the_wish_is_the_number():
     for wish in ("2 potions of 3 doses", "give me a potion"):
         same = parse_all([{"op": "give", "params": {"item": "potion", "count": 2}}])
         assert judgement.keep_the_authors_numbers(same, wish)[0].params["count"] == 2
+
+
+# --- the 2026-11-09 live check: "one hostile ogre 25 feet from me" -------------------------
+
+def _spawn(count=1, **extra):
+    from rules.intents import parse_all
+
+    return parse_all([{"op": "spawn", "params": {"template": "ogre", "count": count,
+                                                 **extra}}])
+
+
+def test_a_distance_in_the_wish_is_where_and_never_how_many():
+    """Measured live 2026-11-09: "/cheat one hostile ogre 25 feet from me" spawned
+    count=25 (a 750 hp Colossal troop), because the wish named one number and
+    `keep_the_authors_numbers` made it the count. A number with feet after it is where."""
+    from gm import judgement
+
+    got = judgement.keep_the_authors_numbers(_spawn(1), "one hostile ogre 25 feet from me")
+    assert got[0].params["count"] == 1
+    assert got[0].params["distance_ft"] == 25
+    # The model's own misreading of the same figure is put right too.
+    got = judgement.keep_the_authors_numbers(_spawn(25), "one hostile ogre 25 ft. from me")
+    assert got[0].params["count"] == 1 and got[0].params["distance_ft"] == 25
+    # A count in figures beside a distance is still the count.
+    got = judgement.keep_the_authors_numbers(_spawn(1), "3 ogres 30 feet away")
+    assert got[0].params["count"] == 3 and got[0].params["distance_ft"] == 30
+
+
+def test_an_ogre_within_reach_stands_in_the_next_square():
+    """The same check: the wish said "within reach" and the ogre stood at the forty-foot
+    spawn default, so the narration's "within reach" was 40 ft short. Within reach is the
+    next square (CRB p.182: a normal weapon reaches 5 feet), and the board says so."""
+    from gm import judgement
+
+    scene = _scene()
+    engine = Engine(scene, Dice(seed=1))
+    intents = judgement.keep_the_authors_numbers(
+        engine.validate([{"op": "spawn", "because": "the author's word",
+                          "params": {"template": "ogre"}}], origin="author:cheat"),
+        "an ogre within reach of me")
+    assert intents[0].params["distance_ft"] == 5
+    engine.run(intents)
+    ogre = next(a for a in scene.actors.values() if not a.is_pc)
+    assert scene.spawn_feet.get(ogre.ref) == 5, scene.spawn_feet
+
+
+def test_a_cheat_the_engine_refused_three_times_is_said_and_never_narrated(monkeypatch):
+    """Measured live 2026-11-09: the cheat planner was refused three times and the page
+    still showed the wished-for ogre — the fallback handed the narrator "the author
+    wrote: ..." as a beat, and a person the prose shows is a real actor (ruling
+    2026-10-01) that nothing had made. Now the last refusal is raised, and the view turns
+    it into the "could not be turned into anything the engine can do" answer."""
+    import pytest
+
+    from gm import agent as agent_mod
+    from rules.intents import IntentError
+
+    class Reply:
+        text, seconds, model = json.dumps({"narration": "", "intents": [
+            {"op": "spawn", "params": {"template": "no-such-beast"}}]}), 0.0, "stub"
+
+        def json(self):
+            return json.loads(self.text)
+
+    monkeypatch.setattr(agent_mod.client, "chat", lambda *a, **k: Reply())
+    from world.loader import load_cached
+
+    world = load_cached("fixtures/aurvantis-campaign.json")
+    agent = agent_mod.GMAgent(world, Engine(_scene(), Dice(seed=1), world=world))
+    with pytest.raises(IntentError) as got:
+        agent.plan_cheat("an ogre appears")
+    assert "no-such-beast" in str(got.value)

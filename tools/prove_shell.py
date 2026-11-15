@@ -101,7 +101,7 @@ def main() -> None:
         try:
             with urllib.request.urlopen(url, timeout=30) as r:
                 ok = r.status == 200
-        except Exception as exc:
+        except Exception:  # noqa: BLE001 - a dev tool: reported as did not answer
             ok = False
         note("the shell's URL answers", [] if ok else [f"{url} did not answer"])
     finally:

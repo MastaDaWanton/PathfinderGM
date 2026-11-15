@@ -1536,13 +1536,13 @@
    "effects_converted": true
   },
   {
-   "id": "glowlizard-hide",
-   "name": "Glowlizard Hide",
+   "id": "shocker-lizard-hide",
+   "name": "Shocker Lizard Hide",
    "kind": "hide",
    "tier": "uncommon",
-   "text": "A faint mothlight lingers in the scales for a year after the skinning — enough to read by, too little to be seen by.",
+   "text": "Static crawls in the scales for a year after the skinning, a faint blue glimmer — enough to read by, too little to be seen by.",
    "surface": "scale",
-   "creature_type": "animal",
+   "creature_type": "magical-beast",
    "color": "#9ad0a0",
    "pieces": {
     "armour": [
@@ -1588,7 +1588,7 @@
    "size": "small",
    "fresh_hours": 48,
    "from_creatures": [
-    "glowlizard"
+    "shocker lizard"
    ],
    "craft_dc": null,
    "risky": false,

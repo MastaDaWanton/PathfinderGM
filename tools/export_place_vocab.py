@@ -33,7 +33,7 @@ try:
     import django
 
     django.setup()
-except Exception:                                    # the tables need no settings
+except Exception:                                    # the tables need no settings  # noqa: BLE001
     pass
 
 from rules import biomes, floorplan, places          # noqa: E402
@@ -74,7 +74,7 @@ def _scheme_place_kinds() -> dict:
     try:
         from rules import schemes
         return dict(schemes.PLACE_KINDS)
-    except Exception:
+    except Exception:  # noqa: BLE001 - a dev tool: no schemes is an empty table
         return {}
 
 

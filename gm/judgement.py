@@ -24,6 +24,7 @@ Two kinds of finding:
 """
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass, field
 
@@ -3675,7 +3676,7 @@ _NOT_A_POSSESSION = frozenset({
     "brand", "mark", "marks", "bruise", "bruises", "burn", "burns",
     # Ways and directions. "I take the true road north" is a route, not a thing in a
     # coat, and the first cut read it as a claim to own a road.
-    "road", "path", "way", "route", "trail", "street", "lane", "stairs", "stair",
+    "road", "path", "route", "trail", "street", "lane", "stairs", "stair",
     "steps", "turn", "corner", "door", "gate", "north", "south", "east", "west",
     "left", "right", "lead", "reins", "first", "last",
 })
@@ -5143,7 +5144,7 @@ def refuse_leaving_in_place(raw_intents, player_text: str, scene, world=None,
     if world is not None and getattr(scene, "location_id", None):
         try:
             location = world.get(scene.location_id)
-        except Exception:
+        except (AttributeError, TypeError):
             location = None
     known = places_mod.for_scene(location or getattr(scene, "location_id", None),
                                  getattr(scene, "at", ""))
@@ -5596,7 +5597,7 @@ def _named_settlement(text: str, world) -> str:
     try:
         places = [e for e in world.entities.values()
                   if str(getattr(e, "kind", "") or "").upper() in _SETTLEMENT_KINDS]
-    except Exception:                                  # pragma: no cover - guard
+    except (AttributeError, TypeError):                                  # pragma: no cover - guard
         return ""
     for place in sorted(places, key=lambda e: -len(str(getattr(e, "name", "") or ""))):
         name = str(getattr(place, "name", "") or "").strip()
@@ -6453,7 +6454,7 @@ def declare_leaving(raw_intents, player_text: str, scene, world=None) -> list:
     if world is not None and getattr(scene, "location_id", None):
         try:
             location = world.get(scene.location_id)
-        except Exception:
+        except (AttributeError, TypeError):
             location = None
     known = places_mod.for_scene(location or getattr(scene, "location_id", None),
                                  getattr(scene, "at", ""))
@@ -6491,7 +6492,7 @@ def declare_going_to_a_place(raw_intents, player_text: str, scene, world=None) -
     if world is not None and getattr(scene, "location_id", None):
         try:
             location = world.get(scene.location_id)
-        except Exception:
+        except (AttributeError, TypeError):
             location = None
     known = places_mod.for_scene(location or getattr(scene, "location_id", None),
                                  getattr(scene, "at", ""),
@@ -6818,6 +6819,7 @@ def declared_ops(player_text: str, scene, world=None, *, attached=None) -> list[
             # *or* a handing-over, never both.
             found = list(run(found, player_text, scene, world) or found)
         except Exception:
+            logging.getLogger(__name__).exception("a declared-op detector raised; the others still run")
             continue
     ops: list[str] = []
     for entry in found:
@@ -7311,6 +7313,11 @@ def aim_the_cast(raw_intents, player_text: str, scene, reading=None) -> list:
 
 
 _A_NUMBER = re.compile(r"\b(\d[\d,]*)\b")
+# The cheat's own measures (`keep_the_authors_numbers`): a figure with a unit of distance,
+# and the words for the next square. Read off the author's slash line, never a turn.
+_A_DISTANCE = re.compile(r"\b(\d[\d,]*)\s*-?\s*(feet|foot|ft\b|squares?)", re.I)
+_IN_REACH = re.compile(r"\b(?:within (?:arm'?s )?reach|in reach|adjacent|next to me|"
+                       r"beside me)\b", re.I)
 
 
 def keep_the_authors_numbers(intents, wish: str):
@@ -7335,7 +7342,36 @@ def keep_the_authors_numbers(intents, wish: str):
     """
     if not isinstance(intents, list):
         return intents
-    found = _A_NUMBER.findall(str(wish or ""))
+    wish = str(wish or "")
+    # A number with a unit of distance says where, not how many. Measured live
+    # 2026-11-09: "/cheat one hostile ogre 25 feet from me" named one number, so the
+    # spawn's count became 25 (a 750 hp Colossal troop) and the ogre stood at the
+    # forty-foot default. The distance is the author's number too: it goes on the spawn.
+    measures = list(_A_DISTANCE.finditer(wish))
+    taken = {m.span(1) for m in measures}
+    found = [m.group(1) for m in _A_NUMBER.finditer(wish) if m.span(1) not in taken]
+    feet = None
+    if len(measures) == 1:
+        m = measures[0]
+        feet = int(m.group(1).replace(",", "")) * (
+            5 if m.group(2).lower().startswith("sq") else 1)
+    elif not measures and _IN_REACH.search(wish):
+        # "within reach" left the player 40 ft short on the same check: no distance was
+        # the spawn default. Within reach is the next square, 5 ft (CRB p.182).
+        feet = 5
+    for one in intents:
+        params = getattr(one, "params", None)
+        if feet is None or getattr(one, "op", "") != "spawn" or not isinstance(params, dict):
+            continue
+        params["distance_ft"] = feet
+        params.pop("zone", None)
+        # A count copied off the distance is the same misreading; with no count in
+        # figures the spawn's default of one stands. shortcut: a count in words the model
+        # read as the distance ("three ogres 25 feet away" as 25) becomes 1, not 3; read
+        # number words here if that is ever measured.
+        # (12 is the most `intents.parse` lets a spawn ask for: the copy arrives clamped.)
+        if not found and params.get("count") in (feet, min(feet, 12)) and feet > 1:
+            params["count"] = 1
     if len(found) != 1:
         return intents
     wanted = int(found[0].replace(",", ""))
@@ -9921,7 +9957,6 @@ def embody_sought(scene, player_text: str, world=None) -> str:
     finder, `scope.look_for`) and she walks on wearing the face she was rolled. Returns
     the ref, or "". Only somebody found HERE — a glimpse elsewhere is answered, not
     fetched — and only when the words picked out one person."""
-    from rules import population
     from rules import scope as scope_mod
 
     phrase = person_sought(player_text)

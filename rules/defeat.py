@@ -286,7 +286,6 @@ def carried_things(actor) -> list[dict]:
     anything in a body slot), the body's own weapons (the unarmed strike, a natural
     attack, a weapon a class forms), clothes, and coin, which is the purse's."""
     from . import pricing
-    from . import weapons as weapons_mod
 
     out: list[dict] = []
     worn = _worn_counts(actor)

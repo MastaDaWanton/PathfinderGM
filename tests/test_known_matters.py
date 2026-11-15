@@ -72,7 +72,7 @@ def test_a_schemes_quest_opens_unheard_and_is_nobodys_goal_of_the_players(worlds
     prose = cards.brief(s, [], turn=2)
     assert quest.title not in prose
     plan = cards.brief(s, [], turn=2, secret=True)
-    assert f"NOT YET PUT TO THE PLAYER" in plan and quest.title in plan
+    assert "NOT YET PUT TO THE PLAYER" in plan and quest.title in plan
     assert "QUEST: " + quest.title not in plan
 
 

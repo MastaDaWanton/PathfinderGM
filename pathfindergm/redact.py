@@ -70,7 +70,7 @@ def _home_variants() -> list[tuple[str, str]]:
     out: list[tuple[str, str]] = []
     try:
         home = Path.home()
-    except Exception:
+    except (RuntimeError, OSError, KeyError):
         return out
     if not home.name:
         return out

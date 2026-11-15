@@ -141,14 +141,6 @@ def grants(actor, level: int) -> list[str]:
     return out
 
 
-def is_domain_spell(actor, spell_id: str, level: int | None = None) -> bool:
-    """Whether this spell is one of theirs, at that level or at any level."""
-    sid = str(spell_id or "").strip().lower()
-    if level is not None:
-        return sid in grants(actor, level)
-    return any(sid in spells_of(d) for d in of(actor))
-
-
 def rule_for(cid: str, answers=None, level: int = 1) -> dict | None:
     """How many domains this class takes and from which list, or None for none.
 

@@ -898,7 +898,7 @@ def alchemy_finish(request):
                              [(fresh[it.key], n) for it, n in plan.consumes],
                              dice=engine.dice, now=now, where=_where(c, pc),
                              after_firsts=learned)
-    made, landed = settled["made"], settled["landed"]
+    landed = settled["landed"]
     lines, levelled = settled["lines"], settled["levelled"]
     discoveries = settled["discoveries"]
 

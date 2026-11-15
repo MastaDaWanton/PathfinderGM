@@ -54,7 +54,6 @@ def check(race: dict, cues: dict) -> tuple[list[str], list[str], list[dict]]:
     """(problems, notes, cues that fired) for one card."""
     problems: list[str] = []
     notes: list[str] = []
-    name = str(race.get("name") or "(unnamed)")
     # Which half of the contract this card is playing by, decided once at the top: a card
     # that STATES its tags is read from them and its prose is description. Half of the
     # checks below are about prose that reaches nothing, and on a stated card that is the

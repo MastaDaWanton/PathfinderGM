@@ -50,6 +50,7 @@ stored on the record, so a reload never re-walks a road.
 """
 from __future__ import annotations
 
+import logging
 import hashlib
 import random
 from dataclasses import dataclass
@@ -226,11 +227,12 @@ def _derive_places(location_id: str, world, founded) -> tuple:
     loc = None
     try:
         loc = world.get(location_id) if world is not None else None
-    except Exception:
+    except (AttributeError, TypeError):
         loc = None
     try:
         return places_mod.for_scene(loc or location_id, "", founded=founded)
     except Exception:
+        logging.getLogger(__name__).exception("a town's places did not derive for residency")
         return ()
 
 
@@ -328,6 +330,7 @@ def _legs(world, loc: str):
         try:
             return journey.legs_from(world, loc) if world is not None else []
         except Exception:
+            logging.getLogger(__name__).exception("a town's road legs did not derive")
             return []
     return _memo(("legs", id(world), loc), make, world)
 
@@ -339,6 +342,7 @@ def _hours(world, leg) -> int:
         try:
             return max(1, int(journey.hours_for(leg, 30)[0]))
         except Exception:
+            logging.getLogger(__name__).exception("a road leg's hours did not compute; a day is used")
             return 24
     return _memo(("hours", id(world), leg.to_id, leg.miles, leg.by_sea), make, world)
 
@@ -350,7 +354,7 @@ def _trade_partners(world, loc: str) -> set[str]:
 def _find_partners(world, loc: str) -> set[str]:
     try:
         rows = world.routes_touching(loc) or []
-    except Exception:
+    except (AttributeError, TypeError):
         return set()
     out = set()
     for r in rows:
@@ -566,7 +570,7 @@ def line(who: str, where: Where, *, here_loc: str, clock: int, world=None,
     def name_of(loc_id: str) -> str:
         try:
             return str(getattr(world.get(loc_id), "name", "") or "") if world else ""
-        except Exception:
+        except (AttributeError, TypeError):
             return ""
 
     if where.kind == "gone":

@@ -446,7 +446,7 @@ def pinpoint(scene, observer, subject, why: str) -> ActiveEffect:
 def hunch(scene, observer, subject) -> ActiveEffect:
     at, _square = _spot(scene, subject)
     return observer.apply_effect(ActiveEffect(
-        name=f"senses something unseen", kind="situation",
+        name="senses something unseen", kind="situation",
         key=f"knows-near:{subject.ref}", source=f"{PERCEPTION_ORIGIN}:{subject.ref}",
         origin=PERCEPTION_ORIGIN, duration="until-dismissed",
         tags=(near_tag(subject.ref),), payload={"at": at}))
