@@ -8204,7 +8204,7 @@
   },
   {
    "id": "death-frombelow",
-   "name": "Death Frombelow",
+   "name": "Death from Below",
    "types": [
     "combat"
    ],
@@ -33956,7 +33956,7 @@
   },
   {
    "id": "seeds-ofdoubt",
-   "name": "Seeds Ofdoubt",
+   "name": "Seeds of Doubt",
    "types": [
     "general"
    ],
@@ -43232,7 +43232,7 @@
   },
   {
    "id": "wall-offlesh",
-   "name": "Wall Offlesh",
+   "name": "Wall of Flesh",
    "types": [
     "general"
    ],
