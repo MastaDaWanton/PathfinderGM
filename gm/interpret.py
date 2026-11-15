@@ -344,6 +344,16 @@ def within_place(action: dict, places=(), here: str = "") -> bool:
 
     if not isinstance(action, dict) or action.get("act") != "go":
         return False
+    # A place of its own by that exact name is a walk there, whatever its last word: live
+    # 2026-11-15, "I walk to the long gallery" (a dungeon room, one exit away) was read
+    # with fixture `gallery`, and the plan's travel was dropped as a walk inside the
+    # undercroft. Exact names only (`places.find`'s first pass), so "the gallery of the
+    # hall" still reads as the fixture.
+    said = " ".join(str(action.get("place") or "").lower().split())
+    if said and places and any(
+            said in (p.name.lower(), p.name.lower().removeprefix("the ")) and p.id != here
+            for p in places):
+        return False
     if action.get("within_place") is True or action.get("fixture"):
         return True
     words = " ".join(str(action.get("place") or "").lower().replace("’", "'").split())

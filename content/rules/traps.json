@@ -1,0 +1,21 @@
+{
+  "_about": "Sample traps from the PF1e Core Rulebook p.420 (aonprd.com/Traps.aspx), the stat block as printed. Mechanical traps: Perception to find, Disable Device to disarm (a difficult device, 2d4 rounds; failing by 5 or more springs it, CRB p.94). `effect` is either an attack (bonus, dice, crit) or a pit (depth, Reflex DC to avoid; the fall rolls the hazards.json `falling` row). Read by rules/dungeons.py; nothing here is a number a model writes.",
+  "arrow-trap": {"name": "an arrow trap", "cr": 1, "perception": 20, "disable": 20,
+                 "trigger": "touch", "reset": "none", "source": "CRB p.420",
+                 "effect": {"attack": 15, "against": "ranged", "dice": "1d8+1", "crit": 3,
+                            "type": "piercing"}},
+  "swinging-axe-trap": {"name": "a swinging axe trap", "cr": 1, "perception": 20, "disable": 20,
+                        "trigger": "location", "reset": "manual", "source": "CRB p.420",
+                        "effect": {"attack": 10, "against": "melee", "dice": "1d8+1", "crit": 3,
+                                   "type": "slashing", "multiple": true}},
+  "pit-trap": {"name": "a pit trap", "cr": 1, "perception": 20, "disable": 20,
+               "trigger": "location", "reset": "manual", "source": "CRB p.420",
+               "effect": {"pit_ft": 20, "reflex": 20, "multiple": true}},
+  "javelin-trap": {"name": "a javelin trap", "cr": 2, "perception": 20, "disable": 20,
+                   "trigger": "location", "reset": "none", "source": "CRB p.420",
+                   "effect": {"attack": 15, "against": "ranged", "dice": "1d6+6", "crit": 2,
+                              "type": "piercing"}},
+  "camouflaged-pit-trap": {"name": "a camouflaged pit trap", "cr": 3, "perception": 25, "disable": 20,
+                           "trigger": "location", "reset": "manual", "source": "CRB p.420",
+                           "effect": {"pit_ft": 30, "reflex": 20, "multiple": true}}
+}

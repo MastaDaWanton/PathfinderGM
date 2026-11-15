@@ -5156,7 +5156,11 @@ class Engine:
             if got["found"]:
                 recs.extend(got["effects"])
                 said.append(got["tell"])
-        return recs, said
+        # A way down and a dungeon's traps hide at their own DCs (rules/dungeons.py).
+        from . import dungeons
+
+        fx, found = dungeons.searched(self, pc, total)
+        return recs + fx, said + found
 
     def turn_begins(self, ref: str) -> list:
         """The top of a creature's turn in a fight: its reactive Perception against
@@ -7324,6 +7328,12 @@ class Engine:
         cell = trial_mod.break_door(self, intent, pc, how, partial)
         if cell is not None:
             return cell
+        # A shut door or way down in a dungeon (rules/dungeons.py), at the book's DCs.
+        from . import dungeons
+
+        door = dungeons.break_door(self, intent, pc, how, partial)
+        if door is not None:
+            return door
         house, callee = self._door_to_break(str(intent.params.get("who") or ""))
         if house is None:
             return self._refuse(intent, callee)
@@ -7739,6 +7749,23 @@ class Engine:
 
         heard = (trial_mod.hearing(self, intent, actor, skill)
                  if helped is None and not searching else None)
+        # Disable Device at a trap the party has found (rules/dungeons.py): the trap's own
+        # DC, never the plan's (CRB p.94).
+        from . import dungeons
+
+        disarming = (dungeons.disarm_target(self) if str(skill).lower() == "disable device"
+                     and actor.is_pc and helped is None and not opposed else None)
+        # Strength, or Disable Device with no found trap to work, beside a shut dungeon
+        # door IS that door's check, at its own DC: measured live 2026-11-15, "I heave the
+        # stuck trapdoor open" was planned as a plain Strength check at the plan's DC 10,
+        # rolled 9, and opened nothing whatever it rolled.
+        if actor.is_pc and helped is None and not opposed and disarming is None and (
+                ability == "str" or str(skill).lower() == "disable device"):
+            door = dungeons.break_door(self, intent, actor,
+                                       "force" if ability == "str" else "pick", partial,
+                                       strict=True)
+            if door is not None:
+                return door
         if heard is not None and heard.refused:
             return self._refuse(intent, heard.refused, code="already_heard")
         if heard is not None:
@@ -7828,6 +7855,10 @@ class Engine:
             resolved_dc = dc_mod.ResolvedDC(value=firstaid.DC, band=None)
         elif heard is not None and heard.dc is not None:
             resolved_dc = dc_mod.ResolvedDC(value=heard.dc, band=None, basis=heard.basis)
+        elif disarming is not None:
+            resolved_dc = dc_mod.ResolvedDC(
+                value=int(dungeons.traps()[disarming["id"]]["disable"]), band=None,
+                basis="the trap's Disable Device DC (CRB p.420)")
         elif opposed:
             target = opposing_roll.total
             resolved_dc = dc_mod.ResolvedDC(value=target, band=None)
@@ -7939,6 +7970,10 @@ class Engine:
         if patient is not None:
             aided, effects = firstaid.settle(actor, patient, verdict == "success")
             tell += aided
+        if disarming is not None:
+            done_fx, done_said = dungeons.disarm_lands(self, actor, disarming, margin)
+            effects.extend(done_fx)
+            tell = " ".join([tell, *done_said])
         if swayed is not None:
             moved_tell, effects = self._sway(actor, swayed, skill, margin,
                                              intent.because)
@@ -14925,8 +14960,14 @@ class Engine:
         watched`) — the moment it was built. A gate passed through on a walk that stays
         inside is a square, not the way out.
         """
+        from . import dungeons
         from . import places as places_mod
 
+        # A shut door in a dungeon (rules/dungeons.py): the same one question for the walk
+        # and the exits row, as the watch is.
+        shut = dungeons.shut_line(self.scene, was_place, getattr(going_to, "id", ""))
+        if shut:
+            return shut, ""
         if pc is None:
             return "", ""
         town = places_mod.location_of(was_place) or self.scene.location_id
@@ -15828,9 +15869,18 @@ class Engine:
         if moved and pc is not None:
             self._mark_the_walk_cut(pc, extra["stopped_short"], meant_place, meant_for,
                                     met_refs, met.kind if met is not None else "watch")
+        # A way down's spot, or a dungeon room: the look, the trap, the stocking
+        # (rules/dungeons.py), after the arrival so whatever lives there is brought in
+        # onto the room's own ground.
+        more: list[dict] = []
+        if moved and not self.scene.in_encounter:
+            from . import dungeons
+
+            more, said = dungeons.arrived(self, going_to)
+            bits.extend(said)
         return Outcome(
             intent_id=intent.id, op="travel",
-            effects=[effect],
+            effects=[effect, *more],
             tell=" ".join(bits),
             because=intent.because,
         )
@@ -18869,7 +18919,6 @@ class Engine:
         kind says, through the same body toll foraging pays; and something may live
         there — from the bestiary, by the ground, never invented. The party is moved in.
         """
-        from . import gathering
         from . import places as places_mod
         from . import trial as trial_mod
 
@@ -18956,32 +19005,55 @@ class Engine:
         tell = (f"{head.name}, {'found for the first time' if fresh else 'as before'}, off "
                 f"{parent.name}" + (f" — {hours} hour{'s' if hours != 1 else ''} away" if hours else "")
                 + ". " + moved.tell + toll_note)
-        # Something may live here. Half the time, by the ground, from the bestiary.
-        pc = self.scene.pc()
-        level = getattr(pc, "level", 1) if pc is not None else 1
-        # Half the time where nothing rates the ground; a place's stated danger moves it
-        # (`volatility.scale`: a third as often on calm ground, twice on lawless). A d100
-        # against 50 where a d2 stood: the same half, with room to move.
+        # Something may live here. Half the time where nothing rates the ground; a
+        # place's stated danger moves it (`volatility.scale`: a third as often on calm
+        # ground, twice on lawless). A d100 against 50 where a d2 stood: the same half,
+        # with room to move.
         inhabited = 50 * volatility.scale(self.world, head.id, parent.id)
         if self.dice.roll("1d100", label="is it inhabited",
                           visibility="hidden").total <= inhabited:
-            row = gathering.creature_for(head.terrain, max(1, int(level)), self.dice,
-                                         apl=encounter_budget.party_apl(self.scene))
-            if row is not None:
-                born = self._bring_in(row["id"], count=1, name=row["name"])
-                ref = born[0]["ref"]
-                self._mark_priced([ref], "venture")
-                self.scene.zones[ref] = "far"
-                self.scene.positions.pop(ref, None)
-                aggressive = row.get("creature_type") in gathering.AGGRESSIVE
-                effects.append({"kind": "gathering", "encounter": "creature",
-                                "creature": row["name"], "aggressive": aggressive})
-                tell += (f" Something lives here: {gathering._an(row['name'])}"
-                         + (", and it has seen you." if aggressive else ", further in."))
-                if aggressive and pc is not None and actor.ref == pc.ref:
-                    self._ensure_encounter(pc.ref, target=ref)
+            got, said = self._inhabit(head, by=actor)
+            effects.extend(got)
+            if said:
+                tell += " " + said
+        # A way deeper (rules/dungeons.py): the venture's own seeded d100, the same every
+        # time, marked on its saved record on a hit. Hidden: the feature is found, not told.
+        rec = next((p for p in self.scene.founded if p.get("id") == head.id), None)
+        if rec is not None:
+            from . import dungeons
+
+            effects.append(dungeons.on_entering(self.world, self.scene, rec, kind,
+                                                [m.id for m in made[1:]]))
         return Outcome(intent_id=intent.id, op="venture", effects=effects, tell=tell,
                        because=intent.because)
+
+    def _inhabit(self, place, *, guarding: bool = False, by=None) -> tuple[list[dict], str]:
+        """Something that lives here, by the ground, from the bestiary through the party's
+        encounter budget (`gathering.creature_for`): brought in, kept far, and the fight
+        opened when it is a kind that attacks on sight. A venture's inhabitant and a dungeon
+        room's both come in by this door. (effects, tell), both empty when the book has
+        nothing for this ground at the party's budget."""
+        from . import gathering
+
+        pc = self.scene.pc()
+        level = getattr(pc, "level", 1) if pc is not None else 1
+        row = gathering.creature_for(place.terrain, max(1, int(level)), self.dice,
+                                     guarding=guarding,
+                                     apl=encounter_budget.party_apl(self.scene))
+        if row is None:
+            return [], ""
+        born = self._bring_in(row["id"], count=1, name=row["name"])
+        ref = born[0]["ref"]
+        self._mark_priced([ref], "venture")
+        self.scene.zones[ref] = "far"
+        self.scene.positions.pop(ref, None)
+        aggressive = row.get("creature_type") in gathering.AGGRESSIVE
+        tell = (f"Something lives here: {gathering._an(row['name'])}"
+                + (", and it has seen you." if aggressive else ", further in."))
+        if aggressive and pc is not None and (by is None or by.ref == pc.ref):
+            self._ensure_encounter(pc.ref, target=ref)
+        return ([{"kind": "gathering", "encounter": "creature", "creature": row["name"],
+                  "aggressive": aggressive, "ref": ref}], tell)
 
     def _duration_rounds(self, duration, default_unit: str = "round") -> int | None:
         """A `{amount, unit}` duration in rounds, rolling the amount when it is dice, or
