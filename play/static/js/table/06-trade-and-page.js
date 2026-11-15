@@ -249,6 +249,15 @@ function reflectMerchant(s) {
   if (!tab) return;
   const who = (s && s.merchant) || "";
   tab.title = who ? `Trade with ${who}` : NO_COUNTER;
+  // Walked away from the keeper, the counter goes with them: the general store's panel
+  // was still open after Vesna walked from the market to the warrens (playtest
+  // 2026-11-15 #20). The state, not the way the walk came, decides: whatever moved the
+  // party, nobody here keeps a counter. Only "nobody": a haggle or a word with another
+  // stall's keeper moves `merchant` to them while the counter is rightly open.
+  if (!who && $("#tradepanel").classList.contains("on")) {
+    if (typeof Shell === "object" && Shell && Shell.mode() === "trade") Shell.show("table");
+    else leaveCounter();
+  }
 }
 
 // --- the basket ---------------------------------------------------------------------
