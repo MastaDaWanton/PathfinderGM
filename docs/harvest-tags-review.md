@@ -130,7 +130,7 @@ Animals and magical beasts default to fur; these were proposed otherwise from th
 
 | Surface | Block | Name |
 |---|---|---|
-| feather | `ac-chicken` | Ac Chicken |
+| feather | `ac-chicken` | Chicken |
 | feather | `axe-beak` | Axe Beak |
 | feather | `eagle` | Eagle |
 | feather | `eagle-giant` | Giant Eagle |
