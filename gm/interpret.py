@@ -41,8 +41,18 @@ ACTS = (
     "go", "journey", "leave", "look", "search", "track", "seek", "talk", "insult", "buy",
     "sell", "give", "take", "drop", "steal", "attack", "cast", "use", "consume", "wait",
     "rest", "rise", "call_on", "break_in", "stealth", "athletics", "exert", "gather",
-    "follow", "request", "claim", "craft", "commission", "escape", "loot", "harvest", "other",
+    "follow", "request", "claim", "craft", "commission", "escape", "loot", "harvest", "prone",
+    "other",
 )
+# `prone` since 2026-11-15, from the playtest that day (#62, #64): "I drop to my knees, put
+# my hands behind my head" was read `go`, the engine told "Vesna Kroll moves from near to
+# near", no prone state was laid, and the sergeant's spear swung at her standing AC. Going
+# prone is its own deed in the book — "Drop Prone: Dropping to a prone position in your
+# space is a free action" (CRB p.188) — and Prone is -4 AC against melee, +4 against
+# ranged (CRB Appendix 2). `prone` owes the engine's `condition` op on the player, built
+# whole (`acts_to_ops._prone`); getting up again is `rise`, which stands a prone player up
+# (a move action, CRB Move Actions: Stand Up; its attack of opportunity is not built). PF1
+# has no kneeling condition: kneeling is read as prone, the nearest rule the book has.
 # `commission` since 2026-11-01. Owner report that day (Corvin, turns 21-29): "can you put
 # them together and i will give you 10 gold peices" to the smith, about a forged blank for a
 # trident — read as a question with no action, then a `give` of "the money" with no
@@ -248,7 +258,7 @@ ACT_COSTS: dict[str, str] = {
     "look": "quick", "take": "quick", "give": "quick", "drop": "quick", "consume": "quick",
     "use": "quick", "steal": "quick", "cast": "quick", "break_in": "quick",
     "athletics": "quick", "exert": "quick", "escape": "quick", "rise": "quick",
-    "other": "quick",
+    "other": "quick", "prone": "free",
     "journey": "takes_time", "search": "takes_time", "track": "takes_time",
     "gather": "takes_time", "craft": "takes_time", "harvest": "takes_time",
     "loot": "takes_time", "wait": "takes_time", "rest": "takes_time",
@@ -443,6 +453,7 @@ ACT_SLOTS: dict[str, tuple[str, ...]] = {
     "escape": ("target",),
     # Whose body is searched; what creature is cut up, and which part when one is named.
     "loot": ("target",), "harvest": ("target", "object"),
+    "prone": (),
     "other": ("target", "object", "place"),
 }
 
@@ -496,7 +507,7 @@ rest      sleep, go to bed, lie down for the night, make camp, rest, take a room
           day is morning; first light or sunrise is dawn; dark or nightfall is dusk; a
           clock hour said ("ten at night") is an hour named; a length ("for an hour",
           "two days") is a while; none when no time is said)
-rise      get up, wake, break camp, pack up: the end of a rest
+rise      get up, wake, break camp, pack up: the end of a rest; stand up from the ground
 call_on   go to somebody's house, knock at their door, visit them at home
 break_in  kick in, force or pick the lock of a door
 stealth   sneak, hide, slip past. `pace` is careful, or hurried when the words hurry
@@ -522,6 +533,8 @@ commission pay or offer to pay somebody to make, fit, finish, mend or put togeth
 escape    break free of a grapple, a hold, a grip or a pin; wriggle, twist or force your
           way out of somebody's hands. `way` is force (overpower the hold), slip (wriggle
           out, Escape Artist), or either when the words say neither
+prone     drop to the ground, throw yourself flat, hit the deck, lie down in a fight,
+          drop to your knees or kneel
 other     anything else
 
 Each action also says by what MEANS it is done:
@@ -1096,6 +1109,15 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "try to get loose", "commit": "tried", "way": "either",
           "act": "escape"}]}),
+    # Going down on the ground (playtest 2026-11-15 #62): a deed of its own, not a walk.
+    ("I drop to my knees and put my hands behind my head.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "drop to my knees", "act": "prone"},
+         {"span": "put my hands behind my head", "act": "other"}]}),
+    ("I throw myself flat as the arrows come in, then get back up.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "throw myself flat as the arrows come in", "act": "prone"},
+         {"span": "get back up", "act": "rise"}]}),
     ("I walk over to the tannery and look at the drying hides.",
      {"question": False, "claims": [], "actions": [
          {"span": "walk over to the tannery", "place": "the tannery", "act": "go"},
