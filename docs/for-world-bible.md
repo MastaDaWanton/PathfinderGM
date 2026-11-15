@@ -1407,3 +1407,43 @@ Anything else reads as unsaid.
 An export carries `customs` on the settlements that tax goods (and `free` on any port the
 world means to be a free port), and a party landing cargo at a `levied` town is measured
 paying the levy, and at a `free` one paying none.
+
+## 25. `dungeons` on a place — the ways deeper a world knows of
+
+*Asked 2026-11-15 (feat/hidden-dungeons). Optional: without it a venture rolls for its
+own way down (`rules/dungeons.py`: a seeded d100 off the venture's id, 20% on uneasy
+ground, moved by `volatility`, ask 16), which is how every world plays today.*
+
+The owner: "perhaps a percentage roll to turn any of those ventures into a full dungeon,
+like you go to the cave and you find a boulder that has broken revealing a small gap and a
+passage". The roll is the app's fallback. A world that knows where its old works lie — the
+barrow under the hill the ballads name, the drowned mine its people will not reopen — should
+be able to say so, and the app should find that dungeon there every time, at the depth and
+in the theme the world gave it, instead of rolling.
+
+**Shape.** An optional list on any `play.places[]` row or settlement entity:
+
+```json
+{"id": "5bbd0c40345f", "name": "Pangrella",
+ "dungeons": [{"under": "cave", "name": "the Sunken Barrow", "depth": 2,
+               "theme": "tomb", "about": "a barrow older than the town, sealed by its builders"}]}
+```
+
+| field | what it is |
+|---|---|
+| `under` | the venture kind it lies under: `cave`, `mine`, `ruins`, `crypt`, `sewers`, `cellar` or `tower` (never `rooftops`, never `alley`) |
+| `name` | what it is called, a proper name in the world's own words |
+| `depth` | how many levels, `1`–`3` |
+| `theme` | one word from `tomb`, `lair`, `mine`, `temple`, `vault`, `warren` — what the rooms are drawn from |
+| `about` | one sentence, the world's own prose |
+
+**Rule 1 still holds.** The world names it, places it and says what it is. The rooms, the
+doors, the traps, the creatures and the treasure are this app's: drawn from the bestiary
+by the ground, the CRB's traps and door DCs, and the CRB's treasure per encounter at the
+party's level. No number in this ask reaches a die.
+
+### Done when
+
+An export carries `dungeons` on at least one place, `tools/check_places.py` accepts the
+fields above and nothing else, and a party venturing into that kind of ground there finds
+the named way down every time, with the given number of levels.

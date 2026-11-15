@@ -361,6 +361,10 @@ def hop_minutes(frm, to, scale: str, speed_ft: int = 30) -> int:
       rate, over its ground's road column.
     """
     speed = max(5, int(speed_ft or 30))
+    # A step between the rooms of a dungeon, or down into one, is local movement: a
+    # minute, not the overland hour between two places out in the land (rules/dungeons.py).
+    if "dungeon" in (getattr(frm, "origin", ""), getattr(to, "origin", "")):
+        return 1
     a = places_mod.setting_of(getattr(frm, "id", "") or "")
     b = places_mod.setting_of(getattr(to, "id", "") or "")
     if a != "outside" and b != "outside":
