@@ -406,7 +406,7 @@ function drawCargo() {
   const row = (side, x, max, words, label) => `
     <div class="tr-cg" data-cargo="${side}" data-id="${esc(x.id)}">
       <span class="nm">${esc(label)}<small>${esc(words)}</small></span>
-      <label>How many <input type="number" min="1" max="${Math.max(1, Math.min(500, max))}"
+      <label>How many <input type="number" min="1" max="${Math.max(1, max)}"
         value="${Math.max(1, Math.min(10, max))}" inputmode="numeric"
         aria-label="How many ${esc(x.name)}"></label>
       <button type="button" class="v2-btn is-small"${max > 0 ? "" : " disabled"}>${
@@ -438,7 +438,7 @@ $("#tradecargo") && $("#tradecargo").addEventListener("click", async e => {
   const n = parseInt(line.querySelector("input").value, 10);
   if (!(n >= 1)) return;
   btn.disabled = true;
-  const body = { op: line.dataset.cargo, item: line.dataset.id, count: Math.min(500, n) };
+  const body = { op: line.dataset.cargo, item: line.dataset.id, count: n };
   if (TRADE.line) body.line = TRADE.line;
   let said = "";
   try {

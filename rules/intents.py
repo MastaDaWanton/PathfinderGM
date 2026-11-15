@@ -258,6 +258,11 @@ def _suggest(name: str, candidates) -> str:
     return ""
 
 
+# A bulk lot's count (pounds, heads): a metropolis on a heavy route stocks 3.2 million lb
+# of wheat (`trade.volume`), so this is a sanity bound, never the limit that bites.
+CARGO_COUNT_MAX = 10_000_000
+
+
 def _bounded(value, low: int, high: int, index: int, what: str) -> int:
     """A model-authored count, coerced and clamped, refusing what is not a number.
 
@@ -1615,9 +1620,15 @@ def _check_params(intent: Intent, index: int) -> None:
         # `give`'s bound, for the two ops that had none: the handlers read
         # `max(1, int(count))`, and "two" was a ValueError at resolution — a 502 and the
         # player's line lost (review 2026-11-11, finding 5).
+        # A bulk trade good (`cargo:<row>`, rules/trade.py) is counted in pounds and heads,
+        # and 500 was 500 lb of iron: asked for 600 at the counter, the party got 500 and
+        # nothing said so (live, 2026-11-15). Nothing mints there — the purse, the
+        # market's stock and appetite and the lots held bound it in the engine — so the
+        # ceiling only keeps the number a number.
+        cargo = str(p.get("item") or "").strip().lower().startswith("cargo:")
         if p.get("count") not in (None, ""):
             p["count"] = _bounded(
-                p["count"], 1, 500, index,
+                p["count"], 1, CARGO_COUNT_MAX if cargo else 500, index,
                 f"{op}: count is how many of the item change hands")
 
     elif op == "blood_pool":

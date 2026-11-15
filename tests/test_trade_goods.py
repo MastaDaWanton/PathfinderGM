@@ -179,7 +179,10 @@ def test_a_mule_and_a_cart_haul_five_times_the_beasts_heavy_load():
 
     mule = next(g for g in goods_mod.stables_goods() if g.key == "mule")
     goods_mod.deliver(scene, pc, mule)
-    beast = trade.haul_lb(scene)["lb"]
+    # A pack beast carries on a pack saddle (CRB; tests/test_merchant_road.py).
+    goods_mod.deliver(scene, pc, next(g for g in goods_mod.stables_goods()
+                                      if g.key == trade.PACK_SADDLE))
+    beast = trade.haul_lb(scene)["lb"] + trade.PACK_SADDLE_LB
     assert beast > on_foot
     cart = next(g for g in goods_mod.stables_goods() if g.key == "cart")
     goods_mod.deliver(scene, pc, cart)

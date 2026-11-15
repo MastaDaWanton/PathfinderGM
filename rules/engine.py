@@ -3103,6 +3103,9 @@ class Engine:
         self.scene = scene
         self.dice = dice or Dice()
         self.scene._dice = self.dice
+        # Outcomes an op makes for somebody else, said beside it at the end of the batch:
+        # a hireling who will not take the road (`hirelings.balk`).
+        self._side_outcomes: list = []
         # Lent like the dice, so the clock's door can ask what the hour means for the world
         # around the party (`Scene._engine`): keepers on their hours, the town's well.
         self.scene._engine = self
@@ -4527,6 +4530,8 @@ class Engine:
         from . import hirelings as hirelings_mod
 
         resolution.outcomes.extend(self._articled(o) for o in hirelings_mod.settle(self))
+        side, self._side_outcomes = self._side_outcomes, []
+        resolution.outcomes.extend(self._articled(o) for o in side)
         # The party arrived somewhere this batch: people go where their day or their road
         # puts them (rules/residency.py). No outcome and no tell — WHO IS HERE is the view
         # of who is in the room, and it simply has them or does not.
@@ -13682,7 +13687,9 @@ class Engine:
         from . import residency
 
         wid = str(getattr(a, "world_entity_id", "") or "")
-        if not wid or a.is_down or a.has_state(states.TRAVELS_WITH_YOU):
+        # Nor a hireling holding a post (`hirelings.post`): paid to stay where they were
+        # left, not to go home to their day.
+        if not wid or a.is_down or a.has_state(states.TRAVELS_WITH_YOU)                 or a.has_state(states.GUARDING):
             return False
         if a.has_state(states.TALKING) and not waited:
             return False
@@ -13861,7 +13868,7 @@ class Engine:
         for ref, a in list(scene.actors.items()):
             if (a.is_pc or ref in moved or ref in fighting or before.get(ref) != scene.at
                     or a.is_down or a.is_helpless or a.has_state("state.held")
-                    or a.has_state(states.TRAVELS_WITH_YOU)):
+                    or a.has_state(states.TRAVELS_WITH_YOU) or a.has_state(states.GUARDING)):
                 continue
             if not self._away_between(a, since, int(scene.clock_minutes)):
                 continue
@@ -14010,7 +14017,7 @@ class Engine:
             # feats included: about a millisecond each, measured 2026-09-27) only of
             # somebody who would otherwise move.
             if (a.is_down or a.is_helpless or a.has_state("state.held")
-                    or a.has_state(states.TRAVELS_WITH_YOU)
+                    or a.has_state(states.TRAVELS_WITH_YOU) or a.has_state(states.GUARDING)
                     or (a.has_state(states.TALKING) and not waited)):
                 continue
             # Living their day, they ate, drank and slept. The clock's one door charges
@@ -14396,6 +14403,21 @@ class Engine:
                                    charge_body=False)
         return True, "; ".join(told)
 
+    def _books_a_berth_here(self, intent: Intent) -> bool:
+        """Whether this journey is a passage booked at this port — boarding, which leaves
+        the party at the quay — rather than a road or a voyage."""
+        from . import journey as journey_mod
+
+        if self.aboard() is not None or self.world is None:
+            return False
+        legs = journey_mod.legs_from(self.world, self.scene.location_id)
+        leg = journey_mod.find(legs, " ".join(str(intent.params.get("to") or "").split()))
+        if leg is None:
+            return False
+        pc = self.scene.pc()
+        _h, _m, how = journey_mod.hours_for(leg, pc.speed_feet if pc is not None else 30)
+        return how == "sea" and self.road_to_the_coast(leg) is None
+
     def _op_journey(self, intent: Intent, partial: dict) -> Outcome:
         """Leave the town, for another one, and pay the road for it.
 
@@ -14413,8 +14435,11 @@ class Engine:
 
         # One journey a turn, from this side too (item 35): a plan that walks across
         # town and then takes the road out is the same defect wearing a longer coat,
-        # and this one costs days on the clock rather than minutes.
-        if self._journeyed:
+        # and this one costs days on the clock rather than minutes. A berth booked at
+        # this port is not the road out: she "lies at the quay until you sail". Live
+        # 2026-11-15, "I head to the docks with my guard and book passage to Mirabalos"
+        # walked to the docks and was refused the booking.
+        if self._journeyed and not self._books_a_berth_here(intent):
             return self._refuse(
                 intent, f"The party has already travelled this turn and is at "
                         f"{self._journeyed}. One journey a turn — the road out is the "
@@ -14517,6 +14542,14 @@ class Engine:
             return stopped
         # Setting out is walking away, whatever the road then does.
         parted = self.end_talk("walked away")
+        # Hirelings weigh a road riskier than their Trust (Cohorts & Companions,
+        # rules/hirelings.py `balk`): won over, or left here out of the party's pay.
+        from . import jobs as jobs_mod
+        from . import hirelings as hirelings_mod
+
+        for o in hirelings_mod.balk(self, jobs_mod.risk_of("escort", leg.crosses),
+                                    leg.to_name):
+            self._side_outcomes.append(o)
         # The cargo goes with the party as far as its backs, beasts and wagon can take it
         # (`trade.load_up`); the rest stays where it was left, said.
         took_up, set_down = trade_mod.load_up(self.scene)
@@ -14840,12 +14873,17 @@ class Engine:
         note = str(intent.params.get("note") or "").strip()
         if note:
             bits.append(note)
+        # The town's customs on the goods brought in (`_customs`), at the gate reached.
+        levied, customs_fx = self._customs(leg.to_id) if sea_leg is None else ("", [])
+        if levied:
+            bits.append(levied)
         done = Outcome(
             intent_id=intent.id, op="journey",
             effects=[{"kind": "journey", "to": leg.to_id, "to_name": leg.to_name,
                       "hours": hours, "measured": measured, "how": how,
                       "left": left, "fight_ended": fight_ended,
-                      "met": met.kind if met is not None else "", **common}] + keep_fx,
+                      "met": met.kind if met is not None else "", **common}] + keep_fx
+                    + customs_fx,
             tell=" ".join(bits),
             because=intent.because,
         )
@@ -17361,10 +17399,10 @@ class Engine:
         miles = leg.miles if leg.source == "exact" and leg.miles \
             else days * ships_mod.miles_a_day(ship.kind)
         book = ships_mod.fare_cp(miles, heads)
-        # Freight for the party's cargo, by the berth rate for its weight
-        # (`trade.freight_cp`): one quote for the exits row and the booking.
-        book += trade_mod.freight_cp(
-            sum(trade_mod.lb_of(x) for x in trade_mod.shipping(self.scene)), miles)
+        # Freight for the party's cargo, by the berth rate for its weight, and feed for
+        # any livestock aboard (`trade.hold_cp`): one quote for the exits row and the
+        # booking.
+        book += trade_mod.hold_cp(trade_mod.shipping(self.scene), miles, days)
         percent, _why, _seller = self.passage_terms()
         pc = self.scene.pc()
         # The shop's own machinery (`_op_buy`): the law's markup on the book's price, then
@@ -17532,7 +17570,9 @@ class Engine:
             if freight:
                 moved = (f"{moved}. " if moved else "") + (
                     f"The fare carries {_and_list(freight)} in her hold as freight, at the "
-                    f"berth rate for its weight")
+                    f"berth rate for its weight"
+                    + (", and feed for the beasts aboard"
+                       if trade_mod.heads(trade_mod.shipping_in(self.scene, ship.id)) else ""))
                 effects.append({"kind": "cargo", "how": "shipped", "vessel": ship.id,
                                 "lots": freight})
             paid = (f"{pc.name} pays {goods.purse_line(goods.coins_for(cost), coins)} for "
@@ -17840,6 +17880,11 @@ class Engine:
             bits.append(f"{_sentence(_and_list(landed))} {'is' if len(landed) == 1 else 'are'}"
                         f" swung onto the quay.")
             effects.append({"kind": "cargo", "how": "landed", "at": port, "lots": landed})
+            # Customs on what came ashore (`_customs`), at the quay she tied up at.
+            levied, customs_fx = self._customs(port)
+            if levied:
+                bits.append(levied)
+                effects += customs_fx
         done = Outcome(intent_id=intent.id, op="journey", effects=effects,
                        tell=" ".join(bits + told), because=intent.because)
         if port != dest and pc is not None:
@@ -18684,10 +18729,21 @@ class Engine:
                       f"{(bound.job.get('route') or {}).get('to_name')}."),
                 because=intent.because)
         from . import attitude as attitude_mod
+        from . import hirelings
 
+        if hirelings.wage(who) is not None:
+            # In the party's pay and holding a post (`do: guard what: here`): the word
+            # that has them come along again is the employer's, whatever they think of
+            # them. The post ends; the wage goes on.
+            who.remove_effects(match=lambda e: e.key == f"{source}:guarding")
+            self._travels_with_you(who)
+            return Outcome(
+                intent_id=intent.id, op="company",
+                effects=[{"ref": who.ref, "kind": "company", "travels": True}],
+                tell=f"{who.name} leaves the post and comes with you from here.",
+                because=intent.because)
         mood = attitude_mod.of(who)
         if attitude_mod.step_of(mood) < attitude_mod.step_of(attitude_mod.COMES_ALONG):
-            from . import hirelings
 
             # A sword for hire comes for a wage whatever they think of you: the other fix,
             # named with the engine's figure (rules/hirelings.py).
@@ -18779,8 +18835,25 @@ class Engine:
             return self._refuse(
                 intent, f"{who.name} is not with you, and keeps watch for nobody here. "
                         f"Have them come along first, or hire them.")
-        hirelings.guard(who, what)
         pc = self.scene.pc()
+        if what == "here":
+            # A post held while the party goes on (rules/hirelings.py, "A post"): paid
+            # work, so only a hireling holds one; a friend left behind is just left.
+            if hirelings.wage(who) is None:
+                return self._refuse(
+                    intent, f"{who.name} is not in your pay, and holds no post for you "
+                            f"while you are gone. Hire them, or have them come along.")
+            here = self.here()
+            hirelings.post(who, here.id)
+            return Outcome(
+                intent_id=intent.id, op="company",
+                effects=[{"ref": who.ref, "kind": "guard", "what": what, "at": here.id},
+                         {"ref": who.ref, "kind": "company", "travels": False}],
+                tell=f"{who.name} holds {here.name} for "
+                     f"{pc.name if pc is not None else 'you'}, still in your pay, and stays "
+                     f"here when you go.",
+                because=intent.because)
+        hirelings.guard(who, what)
         return Outcome(
             intent_id=intent.id, op="company",
             effects=[{"ref": who.ref, "kind": "guard", "what": what}],
@@ -21867,8 +21940,7 @@ class Engine:
             # tools" in a town that ships "iron tools" is a tool, not a pound of iron.
             bulk = trade_mod.row_for(item_id)
             made = trade_mod.supplied_at(self.world, place)
-            if bulk in made and item_id in (trade_mod.ROWS[bulk][0],
-                                             " ".join(made[bulk].lower().split())):
+            if bulk in made and trade_mod.names_the_good(item_id, bulk, made[bulk]):
                 return self._buy_cargo(intent, actor, bulk, count,
                                        self._counter_keeper(seller, stall), who)
             # Named the way a person names it ("rope", "a coil of rope") rather than by
@@ -22004,11 +22076,20 @@ class Engine:
                                 made.get(key, ""))
         waits = ""
         haul = trade_mod.haul_lb(self.scene)
-        if trade_mod.with_party_lb(self.scene) > haul["lb"]:
+        with_party = [x for x in trade_mod.lots(self.scene) if x.get("stowed") == "party"]
+        if trade_mod.heads(with_party) > haul["head"]:
+            _up, behind = trade_mod.load_up(self.scene)
+            waits = (f" The party has drovers for {haul['head']} head, one to every "
+                     f"{trade_mod.DROVER_HEAD}; {_and_list(behind)} "
+                     f"{'wait' if len(behind) > 1 else 'waits'} here until there are hands "
+                     f"to drive {'them' if len(behind) > 1 else 'it'} or a ship to take "
+                     f"{'them' if len(behind) > 1 else 'it'}.")
+        elif trade_mod.with_party_lb(self.scene) > haul["lb"]:
             _up, behind = trade_mod.load_up(self.scene)
             how = f" ({_and_list(haul['how'])})" if haul["how"] else ""
             waits = (f" The party can haul {haul['lb']:g} lb{how}; {_and_list(behind)} "
-                     f"waits here until it can be carried or shipped.")
+                     f"{'wait' if len(behind) > 1 else 'waits'} here until "
+                     f"{'they' if len(behind) > 1 else 'it'} can be carried or shipped.")
         dear = trade_mod.sells_dear_in(self.world, key, place)
         tell = (f"{actor.name} pays {who} {goods.purse_line(goods.coins_for(cost), coins)} "
                 f"for {trade_mod.said({'key': key, 'name': r['name'], 'units': units})}, "
@@ -22046,25 +22127,35 @@ class Engine:
             return self._refuse(
                 intent, f"Nobody here will take more {name}: the market is full of it, "
                         f"and it clears over {trade_mod.RECOVER_DAYS} days.")
+        # No count said is the lot: "I sell my iron" sold 1 lb of 2000 (live, 2026-11-15).
+        if intent.params.get("count") in (None, ""):
+            count = have
         units = min(int(count), have, room)
         percent, moved, markup = self._cargo_terms(actor, keeper)
         book = trade_mod.book_cp(self.scene, self.world, place, key, units, buying=False)
         got = int(tradecraft.sell_price(book / markup, percent))
-        taken, cost = trade_mod.take_units(self.scene, key, units)
+        taken, cost, owed = trade_mod.take_units(self.scene, key, units)
         trade_mod.record(self.scene, self.world, place, key, taken, buying=False)
+        # The customs still owed on them (`_customs`), out of the price. shortcut: taken at
+        # whichever counter sells them, not only the levying town's; upgrade if carrying
+        # goods out unpaid should be smuggling.
+        owed = min(got, owed)
+        got -= owed
         actor.purse = goods.credit(actor.purse, got)
         coins = self._coins_here()
         why = {"demand": "wanted here", "supply": "made here, so cheap"}.get(
             trade_mod.standing(self.world, place, key), "")
         net = got - cost
         tell = (f"{actor.name} sells {trade_mod.said({'key': key, 'name': name, 'units': taken})} "
-                f"to {who} for {goods.purse_line(goods.coins_for(got), coins)}"
+                f"to {who} for {goods.purse_line(goods.coins_for(got + owed), coins)}"
                 + (f", {why}" if why else "") + (f" ({moved})" if moved else "")
                 + (f": {'a profit of' if net >= 0 else 'a loss of'} "
                    f"{goods.purse_line(goods.coins_for(abs(net)), coins)} on what it cost"
                    if cost else "")
                 + "." + (" That is all the market will take." if taken < min(count, have)
                          else "")
+                + (f" {goods.purse_line(goods.coins_for(owed), coins)} of it goes to the "
+                   f"customs owed on the goods." if owed else "")
                 + f" ({goods.purse_line(actor.purse, coins)} in hand.)")
         return Outcome(
             intent_id=intent.id, op="sell",
@@ -30204,6 +30295,39 @@ class Engine:
                  else f"; the {danger} did not get in.")
         line += self._hp_state_tell(crossed)
         return rolls, effects, line
+
+    def _customs(self, place: str) -> tuple[str, list[dict]]:
+        """(tell, effects) for the party's goods coming into `place` (`trade.levies_customs`):
+        the levy (`trade.customs_cp`, the engine's figure) out of the purse, and what the
+        purse cannot cover a lien on the goods, settled out of their sale here. ("", [])
+        where nothing is levied or nothing comes in."""
+        pc = self.scene.pc()
+        coming = trade_mod.entering(self.scene, place)
+        if pc is None or not coming or not trade_mod.levies_customs(self.world, place):
+            return "", []
+        levy = trade_mod.customs_cp(coming)
+        for lot in coming:
+            lot["cleared"] = place
+        if levy <= 0:
+            return "", []
+        coins = self._coins_here()
+        purse, paid = goods.spend(pc.purse, levy)
+        if paid:
+            pc.purse = purse
+            return (f"At the customs house, {pc.name} pays "
+                    f"{goods.purse_line(goods.coins_for(levy), coins)} on "
+                    f"{_and_list([trade_mod.said(x) for x in coming])}, an eightieth of "
+                    f"its worth."), [{"kind": "give", "ref": pc.ref, "item": "coin",
+                                      "count": levy, "how": "customs", "from": pc.ref,
+                                      "to": place, "purse": dict(pc.purse)}]
+        worth = max(1, trade_mod.book_value_cp(coming))
+        for lot in coming:
+            share = -(-levy * int(lot["units"]) * trade_mod.ROWS[lot["key"]][1] // worth)
+            lot["customs_due"] = int(lot.get("customs_due", 0)) + share
+        return (f"The customs house wants {goods.purse_line(goods.coins_for(levy), coins)} "
+                f"on {_and_list([trade_mod.said(x) for x in coming])}, an eightieth of its "
+                f"worth, and {pc.name} carries {goods.purse_line(pc.purse, coins)}: it is "
+                f"owed on the goods, and comes out of what they fetch here."), []
 
     def _keep_the_mounts(self, days: int, *, stabled: bool = False) -> tuple[str, list[dict]]:
         """Charge the party's mounts their keep: (the tell, the effect records).

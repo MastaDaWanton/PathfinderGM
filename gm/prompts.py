@@ -794,7 +794,8 @@ journey, without being named again; {"do": "leave"} ends it. Only somebody frien
 helpful will come, and the engine refuses anyone else — talk them round first. When the
 player hires a sellsword, caravan guard, soldier or guard to come with them: {"do":
 "hire"}; the engine names the wage and takes it. When the player tells somebody with them
-to keep watch over their goods or over them: {"do": "guard", "what": "cargo"} (or "you").
+to keep watch over their goods or over them: {"do": "guard", "what": "cargo"} (or "you"),
+or to stay and hold this place while the party goes on: {"what": "here"}.
 Somebody travelling with the party is a person in the scene with their own eyes: let them speak
 about what is around them.
 When somebody gives the party a task and the player takes it on, it is a quest:

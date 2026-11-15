@@ -878,6 +878,15 @@ class GMAgent:
                 raw = judgement.inject_payment(raw, player_input, self.engine.scene)
                 # A hire pays the engine's wage, never a coin the model added beside it.
                 raw = acts_to_ops.wage_not_tipped(raw, self.engine.scene, notes=own_words)
+                # The other ship, at sea: the order the words gave about her
+                # (`acts_to_ops.sea_spoken`), one closed question per deed.
+                raw = acts_to_ops.sea_spoken(
+                    raw, read_ok, self.engine.scene,
+                    ask=interpret.confirm_sea if interpret.ENABLED else None,
+                    notes=own_words)
+                # A journey the plan wrote with nowhere to go, given the place the reading's
+                # journey names (`acts_to_ops.journey_named`).
+                raw = acts_to_ops.journey_named(raw, read_ok, notes=own_words)
                 raw = judgement.resolve_sold_items(raw, self.engine.scene)
                 raw = judgement.inject_ability(raw, player_input, self.engine.scene)
                 # And its complement: a power the player named that nobody has is a
@@ -2041,6 +2050,16 @@ class GMAgent:
                         + list(getattr(actor, "prepared", {}) or {})):
                 names.add(str(sid).replace("-", " "))
         names |= self._engine_place_names()
+        # And the coin the engine names in its tells (`goods.coins_here`, the coin-names
+        # ruling). Live 2026-11-15, a sale at Zhilvarnia: "Eldrida" read as an invented
+        # person and the page said "18 the stranger platinum pieces".
+        try:
+            for coin in self.engine._coins_here() or ():
+                said = str((coin or {}).get("name") or "")
+                names.add(said)
+                names |= {w for w in said.split() if w[:1].isupper()}
+        except Exception:  # noqa: BLE001 - no coin table is no coin names, never a lost turn
+            pass
         return {n for n in names if n}
 
     def _engine_place_names(self) -> set[str]:

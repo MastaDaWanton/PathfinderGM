@@ -1379,3 +1379,31 @@ leave it out rather than set it once for ever.
 An export carries `current` on at least one river place, `tools/check_places.py` accepts
 the two words and `true`, and a swimmer there is measured taking the current's damage on
 a failed check.
+
+## 24. `customs` on a settlement — whether it taxes goods coming in
+
+*Asked 2026-11-15 (fix/merchant-road). The consumer reads it the day it appears
+(`rules/trade.levies_customs`). Optional: without it a town levies customs when this app
+has given it a customs house among its places, which is how every world plays today (1 of
+Pangrella's 12 settlements, 2 of Aurvantis's 64).*
+
+Towns taxed goods at their gates: France's octroi, England's murage and petty custom. This
+app now takes the levy when the party's cargo comes into a town that keeps a customs
+house (an eightieth of its book value, `trade.CUSTOMS_SHARE`, England's petty custom of
+1303). Which towns do that is a fact about the world, not about the size of a city: a free
+port levies nothing, and a toll town on a river levies whatever its size.
+
+**Shape.** One optional word on each `play.settlements[]` row: `"levied"` or `"free"`.
+Anything else reads as unsaid.
+
+```json
+{"id": "c0a1f5e20013", "name": "Marrowby", "customs": "levied"}
+```
+
+**Rule 1 still holds.** The word is the world's. The rate is this app's.
+
+### Done when
+
+An export carries `customs` on the settlements that tax goods (and `free` on any port the
+world means to be a free port), and a party landing cargo at a `levied` town is measured
+paying the levy, and at a `free` one paying none.

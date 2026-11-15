@@ -22,7 +22,7 @@ from gm.agent import GMAgent, TurnPlan
 from gm.client import ModelUnavailable, available
 from rules import awareness, biomes, grid
 from rules import places as places_mod
-from rules.intents import IntentError
+from rules.intents import CARGO_COUNT_MAX, IntentError
 
 from . import campaign as campaign_mod
 from . import concurrency
@@ -3426,6 +3426,21 @@ def say(request):
     if place is not None and _off_turn(c.scene, pc):
         # The combat bar's rule for a button that acts: not off-turn.
         return _wait_your_turn(c.scene, pc)
+    if downed.state_of(pc) not in ("fine", "disabled") and c.scene.in_encounter             and downed.state_of(pc) in ("dying", "stable") and _side_stands(c.scene):
+        # Down, with somebody on the player's side still standing: the fight is not lost,
+        # and it goes on a round a line (the ruling of 2026-09-18, "fights run to their
+        # end"). Live 2026-11-15 (fix/merchant-road): Kesst fell to a pirate on her own
+        # deck with her hired guard unhurt and the pirate at half his hit points; the next
+        # line went to `downed.resolve`, which ended the fight on the spot, and the pirate
+        # robbed her and made off with the hold's silk past a guard who never swung.
+        c.transcript.append(beat)
+        _run_npc_turns(c, GMAgent(c.world, c.engine()))
+        if _the_player_died(c):
+            _end_campaign(c, pc)
+            c.save()
+            return JsonResponse({**_state(c), **_ended_payload(c)}, status=200)
+        c.save()
+        return JsonResponse(_state(c))
     if downed.state_of(pc) not in ("fine", "disabled"):
         c.transcript.append(beat)
         outcome = downed.resolve(c)
@@ -5868,6 +5883,14 @@ def _brief_the_npc_turns(c, agent, events=None) -> None:
         agent.brief_facts = dict(report.get("facts") or {})
 
 
+def _side_stands(scene) -> bool:
+    """Somebody on the player's side, other than the player, is still on their feet."""
+    pc = scene.pc()
+    mine = next((refs for refs in (scene.sides or {}).values()
+                 if pc is not None and pc.ref in refs), None)
+    return bool(mine) and any(r != pc.ref and scene.conscious(r) for r in mine)
+
+
 def _side_lost(scene) -> str | None:
     """The line for a fight the player's side has lost — nobody on it standing — or None
     when it has not (the other side fell, or the player has no side). Who stands over the
@@ -7366,8 +7389,11 @@ def trade_do(request):
         return JsonResponse({"error": "sell or buy"}, status=400)
 
     place, stall, day = _stall_of(c, counter, merchant, str(body.get("stall") or ""))
-    params = {"item": str(body.get("item", "")).strip().lower(),
-              "count": read_int(body, "count", 1, lo=1, hi=999), "stall": stall}
+    item = str(body.get("item", "")).strip().lower()
+    # A bulk lot is counted in pounds (rules/trade.py): the window's 999 was a shelf's.
+    params = {"item": item, "stall": stall,
+              "count": read_int(body, "count", 1, lo=1,
+                                hi=CARGO_COUNT_MAX if item.startswith("cargo:") else 999)}
     # At a market's counter the keeper is named, so the tell says who was paid — never
     # the master, who sells nothing (I2).
     if counter is not None:
