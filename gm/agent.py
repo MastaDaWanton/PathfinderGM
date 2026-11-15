@@ -106,6 +106,10 @@ PRIMARY_TIMEOUT = 600
 _PLAYERS_OWN = ("check", "save", "attack", "move", "manoeuvre", "cast", "use_item",
                 "use_ability")
 FALLBACK_TIMEOUT = 120
+# What one Continue press out of a fight puts on the clock (`_continue_plan`): a minute,
+# ten rounds (CRB p.178). HOUSE: the ruling (2026-09-18) says time passes and names no
+# length; a minute keeps a conversation's answer in the same breath.
+CONTINUE_MINUTES = 1
 
 
 # The opening of a cast tell: "Ted casts Cure Light Wounds (caster level 1; …)".
@@ -1507,9 +1511,19 @@ class GMAgent:
         the NPC loop, which acts with dice; out of a fight the prose call is shown the
         standing action as a fact and the world advances a beat (the engaged NPC goes
         on, `attacked_by` may open a fight from what they do, the watcher ticks)."""
-        intents = self.engine.validate([{
-            "op": "narrate_only",
-            "because": "the player holds their standing action; the scene moves on"}])
+        raw = [{"op": "narrate_only",
+                "because": "the player holds their standing action; the scene moves on"}]
+        scene = self.engine.scene
+        pc = scene.pc()
+        if not scene.in_encounter and pc is not None:
+            # Out of a fight the beat is time on the clock, so what is owed on it comes:
+            # playtest 2026-11-15 #47, ten presses after "somebody will be telling the
+            # watch" left the clock where it was and the watch never came. A minute, the
+            # book's ten rounds; the fight's own beat is its round (the NPC loop).
+            raw.append({"op": "advance_time", "actor": pc.ref,
+                        "params": {"amount": CONTINUE_MINUTES, "unit": "minutes"},
+                        "because": "the scene moves on a beat"})
+        intents = self.engine.validate(raw)
         return TurnPlan(narration="", intents=intents,
                         repairs=["continue: no plan asked of the model — the player's "
                                  "standing action holds and the world moves a beat"])

@@ -762,6 +762,8 @@ _ABOUT_SOMEBODY = frozenset({
     "escape",
     # The carcass a harvest cuts (`Engine._op_harvest`, 2026-11-01).
     "harvest",
+    # Whom the player gives themselves up to (`Engine._op_surrender`, 2026-11-15).
+    "surrender",
 })
 
 

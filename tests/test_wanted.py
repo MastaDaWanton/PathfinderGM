@@ -69,7 +69,9 @@ def _table(seed=3):
 def _run(engine, op, params, actor="pc"):
     intents = engine.validate([{"op": op, "actor": actor, "because": "t", "params": params}],
                               origin="author:test")
-    return engine.run(intents).outcomes[-1]
+    outs = engine.run(intents).outcomes
+    # The op's own outcome: the law's settle may follow it (a gate's watch posted).
+    return next((o for o in reversed(outs) if o.op == op), outs[-1])
 
 
 def _refused(out) -> bool:

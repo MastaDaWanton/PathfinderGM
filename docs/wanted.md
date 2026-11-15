@@ -246,3 +246,46 @@ Tests: `tests/test_trial.py`, one per half of the ruling.
   so its "Clear your name" card can no longer tick once the frame-up has fallen.
 - Fines, the 30-day labour cap and the bribe stand as built. Careless harm short of a death
   stays uncharged (unanswered). Help from outside the cell is not built.
+
+
+## The chain closed (added 2026-11-15)
+
+The playtest of 2026-11-15 (a human outlaw, items 24, 46-48, 51, 55-57, 59, 61, 67, 69, 70 of
+`pgm-work/playtest-2026-11-15.md`) found every link from crime to custody built and none
+of them reached by play: a mugging seen by a passer-by made the character suspected, an
+hour waited beside the victim brought nobody, and the only way into the gaol was to
+attack the sergeant. What was added, link by link:
+
+- **The report lands on the clock** (`trial.deliver`, from `arrest.settle`). A crime seen
+  by somebody who is not the law still makes the character suspected at once ("somebody
+  will be telling the watch"), and the report now carries where it happened, who saw it
+  and when it reaches the watch (`law.json` `report.minutes`, HOUSE ten). Then it is a
+  warrant; if the character still stands where it happened, `report.watch` of the watch
+  come there and the arrest begins in the same breath. A report whose witnesses are all
+  dead carries nothing (Skyrim's rule). Prior art: Skyrim makes the witness the trigger
+  and drops a crime whose last witness dies before the guards are told; Oblivion and the
+  early Ultima Online shards were remembered for guards who knew at once, everywhere
+  (UO:X documents replacing instant guard kills with patrols that fight). I could not
+  fetch UESP itself (403); the Skyrim rules are as quoted by search results.
+- **Time moves** when the player waits or presses Continue. An open wait ("wait to see
+  who comes") is `acts_to_ops.OPEN_WAIT_MINUTES` (ten); Continue out of a fight is a
+  minute (`agent.CONTINUE_MINUTES`), the 2026-09-18 ruling's "time passes". Both are the
+  engine's numbers, never the plan's.
+- **The gate is watched by people** (`arrest.post_the_gate`): a town or city's "the gate"
+  gets `law.json` `gate_watch.count` watchmen the first time the party stands there while
+  the law has a word for them (suspected or wanted: when the tell names guards), once
+  ever, so the travel tell's "the guards at the gate" are actors a warrant can use.
+- **Giving yourself up** is a deed of the reader's (`surrender`), built whole into the
+  engine's `surrender` op (`trial.give_up`): mid-fight it ends the fight, out of one it is
+  the go-quietly door; what the character did in this town is owned up to, and a
+  confession is the proof (`confessed` on the town's record, charged as caught). With
+  none of the watch here, the call goes out and they come on the clock (`trial.send_for`).
+  Skyrim's yield (sheathe: guards stop attacking but still arrest) is the precedent.
+- **The town's watch is its own** (`scope.LAW_WORDS`): "the city watch" never resolves to
+  another city's captain the world wrote up.
+- **A robbery is a theft**: stripping somebody the character struck unprovoked is
+  `deed.theft` even though they fought back, with the haul's lines on the deed
+  (`items`); the charge is priced on the haul (coin at its face) and the things still
+  carried are given back at sentence (`Charge.taken`). Goods marked stolen in the props
+  ledger (`stolen` and `owner`, the theft-and-goods lane's mark) are read as before.
+- **Two fines are said as two** (`trial._fines_said`), one for each count.

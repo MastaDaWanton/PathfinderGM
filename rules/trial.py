@@ -193,6 +193,8 @@ class Charge:
     # Deed keys of lesser charges merged into this one (an assault into the killing it
     # caused), judged with it.
     merged: list = field(default_factory=list)
+    # A robbery's things still on the player (the deed's `items`), given back at sentence.
+    taken: list = field(default_factory=list)
 
     def said(self) -> str:
         row = _charge_rows().get(self.kind) or {}
@@ -301,6 +303,8 @@ def _deed_charges(engine, pc, town: str) -> list[Charge]:
 
     rules = document()["deeds"]
     done = judged(pc, town)
+    # Owned up to the watch's face (`give_up`): the confession is the proof.
+    confessed = set(_record_pay(pc, town).get("confessed") or ())
     people = engine.scene.people
     out = []
     for row in deeds_mod.of(pc):
@@ -314,14 +318,26 @@ def _deed_charges(engine, pc, town: str) -> list[Charge]:
             continue
         seen = [r for r in row.get("witnesses") or ()
                 if r in people and not people[r].has_state(states.TRAVELS_WITH_YOU)]
-        if not seen:
-            # Nobody saw it: the law cannot prove what nobody saw.
+        kind = charge_of(rule, row)
+        # A robbery's haul still on the player (the loot's own lines): what a search finds.
+        # shortcut: matched by name, so a dagger of their own answers for the one taken;
+        # upgrade when loot marks its things in the props ledger (`stolen`, `owner`).
+        held = [i for i in row.get("items") or () if not _coins_of(i)
+                and engine._carried_by(pc, i) is not None] if kind == "theft" else []
+        if not seen and key not in confessed and not held:
+            # Nobody saw it, and nothing of it is on them: the law cannot prove it.
             continue
-        caught = any(_is_law(people.get(r)) for r in seen)
+        caught = any(_is_law(people.get(r)) for r in seen) or key in confessed or bool(held)
         what = str(row.get("what") or "")
         worth = 0.0
-        kind = charge_of(rule, row)
-        if kind == "theft" and what:
+        if kind == "theft" and row.get("items"):
+            # Priced thing by thing, coin at its face; caught with it is the fourfold row
+            # (playtest 2026-11-15 #70: a stripped merchant's gear on her sheet, no theft
+            # charge, no confiscation, no double-value fine).
+            worth = _items_worth(row["items"])
+        elif kind == "theft" and what and what != deeds_mod.EVERYTHING:
+            # A save from before the haul was listed says only "everything they carried",
+            # which no table prices: the charge's own minimum stands.
             try:
                 worth = float(pricing.goods_worth(what) or 0)
             except Exception:       # noqa: BLE001 - an unpriced thing is worth nothing here
@@ -329,8 +345,42 @@ def _deed_charges(engine, pc, town: str) -> list[Charge]:
         out.append(Charge(kind=kind, proof="caught" if caught else "witnessed",
                           what=_what_words(kind, what, row), deed=key,
                           subject=str(row.get("subject") or ""),
-                          subject_name=str(row.get("subject_name") or ""), worth_gp=worth))
+                          subject_name=str(row.get("subject_name") or ""), worth_gp=worth,
+                          taken=held))
     return out
+
+
+def _coins_of(line: str) -> int:
+    """The copper a loot line of coin is ("5 sp" is 50), or 0 for a thing."""
+    from . import goods
+
+    bits = str(line or "").split()
+    rate = dict(goods.DENOMINATIONS)
+    if len(bits) == 2 and bits[0].isdigit() and bits[1] in rate:
+        return int(bits[0]) * rate[bits[1]]
+    return 0
+
+
+def _items_worth(items) -> float:
+    """What a haul is worth in gold: coin at its face, a thing at its open price
+    (`pricing.goods_worth`), "3 × torch" three times over."""
+    import re
+
+    from . import pricing
+
+    gp = 0.0
+    for line in items or ():
+        cp = _coins_of(line)
+        if cp:
+            gp += cp / 100
+            continue
+        m = re.match(r"^(\d+)\s*[×x]\s+(.+)$", str(line))
+        n, name = (int(m.group(1)), m.group(2)) if m else (1, str(line))
+        try:
+            gp += n * float(pricing.goods_worth(name) or 0)
+        except Exception:       # noqa: BLE001 - an unpriced thing is worth nothing here
+            pass
+    return gp
 
 
 def charge_of(rule: dict, row: dict) -> str:
@@ -580,7 +630,7 @@ def take_in(engine, pc, who, town: str, *, how: str = "taken"):
         [a for a in _law_here(engine) if a.has_state(states.GUARD_OFFICER)]
     q = (officers or who or _law_here(engine) or [None])[0]
     lead = f"{_cap(_names(who) or 'The watch')} take{'s' if len(who) == 1 else ''} " \
-           f"{pc.name} {'in' if how == 'taken' else 'up off the ground'} to {where}."
+           f"{pc.name} {'up off the ground' if how == 'beaten' else 'in'} to {where}."
     # An accusation is not proof (the owner's ruling of 2026-11-01, "No proof, released"):
     # a charge with no witnessed deed and no stolen goods behind it — a warrant's word
     # alone, as A Small Favour's frame-up lays one — falls at questioning, and its warrant
@@ -624,6 +674,62 @@ def take_in(engine, pc, who, town: str, *, how: str = "taken"):
                    effects=[{"kind": "custody", "stage": "questioning", "held_at": where,
                              "charges": [c.kind for c in chs], "origin": SOURCE}],
                    tell=tell)
+
+
+def chargeable(engine, pc, town: str) -> list[dict]:
+    """The deeds of this town the law charges and has not dealt with: what a confession
+    owns up to (`give_up`)."""
+    from . import deeds as deeds_mod
+
+    rules = document()["deeds"]
+    done = judged(pc, town)
+    return [r for r in deeds_mod.of(pc) if str(r.get("tag") or "") in rules
+            and not r.get("again") and deed_key(r) not in done
+            and (_town_of_place(str(r.get("place") or "")) or engine.scene.location_id)
+            == town]
+
+
+def give_up(engine, pc, law: list, town: str, *, lead: str = "", mid_batch: bool = True):
+    """The player yields to the law standing here: a fight with the watch stops, what
+    they have done in this town is owned up to (the confession is the proof, `confessed`
+    on the town's record), and they go into custody by the "go quietly" door
+    (`take_in`). With nothing to own up to and no warrant, out of a fight, the watch
+    hears them out and lets it be.
+
+    Playtest 2026-11-15: "I raise my hands ... and surrender to the sergeant of the watch"
+    mid-fight was read `follow` and nothing applied (#59); "I yield and will go quietly",
+    kneeling, was a line of talk, and the sergeant speared her for 7 (#61); a robbery
+    confessed to the sergeant got "nor do I care" (#57). Skyrim's yield is the precedent:
+    sheathe and the guards stop attacking but still arrest (UESP, Skyrim:Crime); Oblivion's
+    yield (block and talk to the guard) brings back the pay-or-jail dialogue (player
+    accounts; UESP refused a fetch)."""
+    scene = engine.scene
+    owned = chargeable(engine, pc, town)
+    _judge_all(pc, town, [deed_key(r) for r in owned], field="confessed")
+    names = _names(law)
+    one = len(law) == 1
+    lead = lead or f"{pc.name} yields to {names or 'the watch'}."
+    if not owned and states.standing_with_the_law(pc, town) != "wanted" \
+            and not scene.in_encounter:
+        from .engine import Outcome
+
+        return Outcome(intent_id="", op="surrender",
+                       effects=[{"kind": "surrender", "taken": False, "origin": SOURCE}],
+                       tell=(f"{lead} {_cap(names or 'the watch')} hear{'s' if one else ''} "
+                             f"{pc.name} out, and know{'s' if one else ''} of nothing to "
+                             f"hold {pc.name} for."))
+    out = take_in(engine, pc, law, town, how="yielded")
+    held = custody(pc)
+    if held is not None and mid_batch:
+        # Posed now, mid-batch: the questioning is the player's NEXT batch to answer, not
+        # this batch's end (`settle`), which would read the yield as silence.
+        _set(pc, held, fresh=True)
+    out.op = "surrender"
+    out.effects.insert(0, {"kind": "surrender", "taken": True,
+                           "confessed": [str(r.get("tag")) for r in owned],
+                           "origin": SOURCE})
+    out.tell = f"{lead} {out.tell}"
+    return out
 
 
 def _release(engine, pc, town: str, held, lead: str, *, grace: bool, effects_kind: str,
@@ -1102,6 +1208,9 @@ def settle(engine) -> list:
         return []
     pay = dict(held.payload or {})
     town = str(pay.get("town") or town_here(engine))
+    if pay.get("fresh"):
+        _set(pc, held, fresh=False)
+        return []
     if pay.get("escaped"):
         return [_escaped(engine, pc, held, town)]
     if pay.get("fought") and not _law_here(engine):
@@ -1155,17 +1264,22 @@ def _after_questioning(engine, pc, held, town: str):
     sent = sentence_for(chs, mercy=False)
     _set(pc, held, stage="plea", answer=None)
     top = gravest(chs)
+    counts = _fines_said(engine, chs)
     what = ("death, hanged at first light tomorrow" if sent["death"]
+            else f"{counts}: a fine of {_coin(engine, sent['fine_cp'])} in all" if counts
             else f"a fine of {_coin(engine, sent['fine_cp'])}")
-    took = (" and the stolen goods given back" if any(c.goods for c in chs) else "")
+    took = (" and the stolen goods given back" if any(c.goods or c.taken for c in chs)
+            else "")
     # The sentence said as still to come, after the last word. Measured on the narration
     # diagnosis bench (2026-11-04, mechanism 9): "The sentence for murder is death, hanged
     # at first light tomorrow. Before it is passed, … may speak once more" came back "He
     # informs you that you are sentenced to death by hanging" — "is death" read as passed.
     tell = (f"{_cap(asker)} finds {pc.name} guilty of "
             f"{'; '.join(c.said() for c in chs)}. {_cap(asker)} will pass sentence after "
-            f"{pc.name}'s last word, and has not passed it yet: for "
-            f"{_charge_rows()[top.kind]['said']} the law's sentence will be {what}{took}. "
+            f"{pc.name}'s last word, and has not passed it yet: "
+            + ("" if counts and not sent["death"]
+               else f"for {_charge_rows()[top.kind]['said']} ")
+            + f"the law's sentence will be {what}{took}. "
             + choices(pc.name, ["speak once more (Diplomacy, Bluff or Intimidate)",
                                 "say nothing"]))
     # The hour a death sentence is set for, on the record (`scheduled`): what the read back
@@ -1175,6 +1289,23 @@ def _after_questioning(engine, pc, held, town: str):
     if sent["death"]:
         fx["scheduled"] = _first_light(engine)
     return Outcome(intent_id="", op="trial", effects=[fx], tell=tell)
+
+
+def _fines_said(engine, chs) -> str:
+    """Each count's fine, said, when there is more than one ("5 gp for assault (the
+    merchant) and 5 gp for assault (the sergeant)"); "" for one or none.
+
+    Playtest 2026-11-15 #69: guilty on two counts of assault, the sentence read "for
+    assault the law's sentence will be a fine of 1 pp" and then "The fine is 1 pp": the
+    two 5 gp fines were summed (`sentence_for`) and said as one, so it read as two
+    convictions and one penalty."""
+    rows = _charge_rows()
+    fined = [c for c in chs if rows[c.kind]["sentence"] == "fine"]
+    if len(fined) < 2:
+        return ""
+    parts = [f"{_coin(engine, fine_cp(c))} for {rows[c.kind]['said']}"
+             + (f" ({c.what})" if c.what else "") for c in fined]
+    return ", ".join(parts[:-1]) + " and " + parts[-1]
 
 
 def _first_light(engine) -> int:
@@ -1243,7 +1374,9 @@ def _sentence(engine, pc, held, town: str):
         paid = min(have, owed)
         if paid:
             pc.purse, _ok = goods.spend(pc.purse or {}, paid)
-        bits.append(f"The fine is {_coin(engine, owed)}"
+        counts = _fines_said(engine, chs)
+        bits.append((f"The fines are {counts}: {_coin(engine, owed)} in all"
+                     if counts and not mercy else f"The fine is {_coin(engine, owed)}")
                     + (f"; {pc.name} pays {_coin(engine, paid)}" if paid else
                        f"; {pc.name} has no coin to pay it")
                     + ".")
@@ -1264,7 +1397,7 @@ def _sentence(engine, pc, held, town: str):
                         + ".")
             effects.append({"kind": "labour", "days": days, "origin": SOURCE})
         effects.append({"kind": "fine", "cp": owed, "paid_cp": paid, "origin": SOURCE})
-    returned = _confiscate(engine, pc)
+    returned = _confiscate(engine, pc, chs)
     if returned:
         bits.append("Taken back to their owners: " + ", ".join(
             f"{r['item']} to {r['owner_name']}" for r in returned) + ".")
@@ -1287,10 +1420,11 @@ def _sentence(engine, pc, held, town: str):
                    tell=" ".join(bits).replace("..", "."))
 
 
-def _confiscate(engine, pc) -> list[dict]:
+def _confiscate(engine, pc, chs=()) -> list[dict]:
     """Stolen things off the player and back to the people they were stolen from: the
     item leaves the player's holdings (the give door, from the player to nobody) and its
-    ledger record is put in the owner's hands, no longer marked stolen."""
+    ledger record is put in the owner's hands, no longer marked stolen. A robbery's haul
+    (`Charge.taken`, the deed's own list) goes back the same way, to the one robbed."""
     import logging
 
     from .engine import Intent
@@ -1298,6 +1432,22 @@ def _confiscate(engine, pc) -> list[dict]:
     log = logging.getLogger(__name__)
     scene = engine.scene
     out = []
+    for c in chs:
+        owner = scene.people.get(c.subject)
+        for name in c.taken:
+            # shortcut: the haul's coin is not handed back, the fine already takes the
+            # purse; things only, and only those still carried.
+            try:
+                gave = engine._op_give(Intent(op="give", actor=pc.ref,
+                                              params={"item": name, "from_": pc.ref},
+                                              because="confiscated by the watch"), {})
+            except Exception:  # noqa: BLE001 - one bad give never costs the sentence
+                log.exception("confiscation: giving up %r failed", name)
+                continue
+            if gave.effects:
+                out.append({"item": name, "owner": c.subject,
+                            "owner_name": owner.name if owner is not None
+                            else (c.subject_name or "their owner")})
     for rec in list(_goods_held(engine, pc)):
         name = str(rec.get("name") or "")
         owner = scene.people.get(str(rec.get("owner") or ""))
@@ -1541,6 +1691,11 @@ def report(engine, found: list[dict], earlier=()):
                             "origin": source, "told": line})
             said.append(line)
         else:
+            # The report is on its way, and lands on the clock (`deliver`).
+            payload.update(town=town, at=str(scene.at or ""),
+                           witnesses=[a.ref for a in seen],
+                           due=int(scene.clock_minutes or 0)
+                           + int(document()["report"]["minutes"]))
             pc.apply_effect(ActiveEffect(
                 name="a name on the watch's lips", kind="situation", key=f"report:{key}",
                 source=source, origin=source, duration="until-dismissed",
@@ -1553,6 +1708,123 @@ def report(engine, found: list[dict], earlier=()):
         return None
     return Outcome(intent_id="", op="report", effects=effects,
                    tell=" ".join(dict.fromkeys(said)))
+
+
+def deliver(engine) -> list:
+    """Reports a witness is carrying to the watch (`report`) that the clock has brought
+    there: each is a warrant now, and if the player still stands where it happened the
+    watch comes, the witness pointing them out — then the arrest's own reader
+    (`arrest.settle`) sees a wanted player in front of the law. A report whose every
+    witness has died on the way carries nothing (Skyrim's rule: content/rules/law.json
+    `report`). Outcomes for what the player can see; the rest is silent.
+
+    Playtest 2026-11-15 #48: "It was seen: somebody will be telling the watch" was said
+    over a beaten merchant, the player waited an hour beside him, and nothing came — the
+    report was a `suspected` tag and nothing read it on the clock."""
+    from .engine import Outcome
+
+    scene = engine.scene
+    pc = scene.pc()
+    if pc is None or scene.in_encounter:
+        return []
+    now = int(scene.clock_minutes or 0)
+    doc = document()["report"]
+    out = []
+    for e in list(pc.effects):
+        if not str(e.source or "").startswith(CRIME_SOURCE):
+            continue
+        pay = dict(e.payload or {})
+        if "due" not in pay:
+            pay = _heal_report(pc, e, pay)
+            if not pay:
+                continue
+        if int(pay["due"]) > now:
+            continue
+        town = str(pay.get("town") or "")
+        if pay.get("sent_for"):
+            # The player called the watch to give themselves up (`send_for`): come, and
+            # take them, if they waited for it.
+            pc.remove_effects(match=lambda x, e=e: x is e)
+            if scene.at == pay.get("at") and custody(pc) is None:
+                come = _law_here(engine) or _come(engine, int(doc["watch"]))
+                if come:
+                    out.append(give_up(engine, pc, come, town, mid_batch=False,
+                                       lead=f"The watch comes at the call: {_names(come)}."))
+            continue
+        alive = [scene.people[r] for r in pay.get("witnesses") or ()
+                 if r in scene.people and not scene.people[r].has_state("state.down.dead")]
+        # Somebody has to be on their feet to carry it: a victim lying senseless tells
+        # the watch when they come to. Measured on the playtest's save: the mugged
+        # merchant was the assault's one witness, unconscious and dying beside her.
+        # shortcut: the report lands the moment a witness is up, not report.minutes after.
+        able = [a for a in alive if not a.is_down]
+        if alive and not able:
+            continue
+        pc.remove_effects(match=lambda x, e=e: x is e)
+        if not town or not alive:
+            continue
+        pay.pop("due", None)
+        pc.apply_effect(ActiveEffect(
+            name="a warrant", kind="situation", key=f"warrant:{e.key}", source=e.source,
+            origin=e.source, duration="until-dismissed", tags=(states.wanted_tag(town),),
+            payload=pay))
+        if scene.at != pay.get("at") or _law_here(engine):
+            # Elsewhere, the warrant waits for the next guard who sees them; with the law
+            # already here, `arrest.settle` takes it from there.
+            continue
+        come = _come(engine, int(doc["watch"]))
+        out.append(Outcome(
+            intent_id="", op="arrest",
+            effects=[{"kind": "watch_came", "by": [a.ref for a in come],
+                      "witness": able[0].ref, "origin": CRIME_SOURCE}],
+            tell=(f"The watch comes: {_names(come)}, brought by {able[0].name}, who "
+                  f"points out {pc.name}.")))
+    return out
+
+
+def _heal_report(pc, e, pay: dict) -> dict:
+    """A report a save made before reports carried their clock (2026-11-15): its place
+    and witnesses read off the deed it is for, due at once. {} for anything that is not
+    a civilian's report (a warrant, the town's record)."""
+    from . import deeds as deeds_mod
+
+    town = next((t[len(states.SUSPECTED) + 1:] for t in e.tags or ()
+                 if t.startswith(states.SUSPECTED + ".")), "")
+    if not town or not pay.get("deed"):
+        return {}
+    row = next((r for r in deeds_mod.of(pc) if deed_key(r) == pay["deed"]), None)
+    if row is None:
+        return {}
+    return dict(pay, town=town, at=str(row.get("place") or ""),
+                witnesses=list(row.get("witnesses") or ()), due=0)
+
+
+def _come(engine, n: int) -> list:
+    """`n` of the watch, arrived where the party stands (the one arrival door)."""
+    born = engine._bring_in("watchman", count=n)
+    return [engine.scene.actors[b["ref"]] for b in born if b["ref"] in engine.scene.actors]
+
+
+def send_for(engine, pc, town: str):
+    """The player calls for the watch with none of it here, to give themselves up: it
+    comes on the clock (`deliver`), as a report does. Playtest 2026-11-15 #55: "I shout
+    for the city watch, telling everyone I beat a merchant senseless" was refused as
+    another city's watch, and nobody came."""
+    from .engine import Outcome
+
+    scene = engine.scene
+    src = f"{CRIME_SOURCE}/sent-for"
+    pc.remove_effects(source=src)
+    pc.apply_effect(ActiveEffect(
+        name="the watch sent for", kind="situation", key="sent-for", source=src,
+        origin=src, duration="until-dismissed",
+        payload={"sent_for": True, "town": town, "at": str(scene.at or ""),
+                 "due": int(scene.clock_minutes or 0)
+                 + int(document()["report"]["minutes"])}))
+    return Outcome(intent_id="", op="surrender",
+                   effects=[{"kind": "sent_for", "town": town, "origin": src}],
+                   tell=(f"None of the watch is here: {pc.name}'s call goes out for them, "
+                         f"and they will come if {pc.name} waits."))
 
 
 def _eyes(scene, pc, victim_ref: str) -> list[str]:

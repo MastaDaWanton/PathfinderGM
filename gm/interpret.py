@@ -41,8 +41,16 @@ ACTS = (
     "go", "journey", "leave", "look", "search", "track", "seek", "talk", "insult", "buy",
     "sell", "give", "take", "drop", "steal", "attack", "cast", "use", "consume", "wait",
     "rest", "rise", "call_on", "break_in", "stealth", "athletics", "exert", "gather",
-    "follow", "request", "claim", "craft", "commission", "escape", "loot", "harvest", "other",
+    "follow", "request", "claim", "craft", "commission", "escape", "loot", "harvest",
+    "surrender", "other",
 )
+# `surrender` since 2026-11-15, from the playtest that day: "I raise my hands ... and
+# surrender to the sergeant of the watch" came back `follow` (the line below once told it
+# "give yourself up to whoever is taking you somewhere"), "tell the sergeant I yield and
+# will go quietly" and "tell the sergeant of the watch that I am the one who robbed the
+# merchant" came back `talk`, and neither owes an op, so the fight with the watch went on
+# and the confession was talk. Giving yourself up is a deed of its own; it owes the
+# engine's `surrender` op, built whole (`acts_to_ops._surrender`).
 # `commission` since 2026-11-01. Owner report that day (Corvin, turns 21-29): "can you put
 # them together and i will give you 10 gold peices" to the smith, about a forged blank for a
 # trident — read as a question with no action, then a `give` of "the money" with no
@@ -254,7 +262,7 @@ ACT_COSTS: dict[str, str] = {
     "loot": "takes_time", "wait": "takes_time", "rest": "takes_time",
     "talk": "addresses", "insult": "addresses", "request": "addresses", "buy": "addresses",
     "sell": "addresses", "commission": "addresses", "call_on": "addresses",
-    "attack": "addresses",
+    "attack": "addresses", "surrender": "addresses",
 }
 # The engine's own facts about time, which overrule the reader in code: these acts' ops
 # happen at once (a hand-over, a bite, a draw), so a reading of `takes_time` on one is
@@ -443,6 +451,8 @@ ACT_SLOTS: dict[str, tuple[str, ...]] = {
     "escape": ("target",),
     # Whose body is searched; what creature is cut up, and which part when one is named.
     "loot": ("target",), "harvest": ("target", "object"),
+    # Who the player gives themselves up to ("the sergeant", "the city watch").
+    "surrender": ("target",),
     "other": ("target", "object", "place"),
 }
 
@@ -506,8 +516,8 @@ athletics climb, swim, jump
 exert     lift, push, pull, heave, drag, hold up or shift something heavy by main
           strength, alone or with somebody; the target is whoever you help with it
 gather   forage, gather, fill waterskins
-follow    follow somebody or a trail; go along with, come quietly with or give yourself
-          up to whoever is taking you somewhere (going quietly is never stealth)
+follow    follow somebody or a trail; go along with or come quietly with whoever is
+          taking you somewhere (going quietly is never stealth)
 claim     assert who or what you are
 craft     make or work something yourself at a trade: forge, smith, hammer out or
           assemble metal work; tan, cure or stitch leather; brew, mix or bottle alchemy;
@@ -522,6 +532,10 @@ commission pay or offer to pay somebody to make, fit, finish, mend or put togeth
 escape    break free of a grapple, a hold, a grip or a pin; wriggle, twist or force your
           way out of somebody's hands. `way` is force (overpower the hold), slip (wriggle
           out, Escape Artist), or either when the words say neither
+surrender give yourself up: yield, lay down your arms, put your hands up to be taken,
+          hand yourself in, or own up to the watch or a guard that you did a crime; the
+          target is who you give yourself up to. Said in words ("I tell the sergeant I
+          yield"), it is still surrender
 other     anything else
 
 Each action also says by what MEANS it is done:
@@ -1096,6 +1110,27 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "try to get loose", "commit": "tried", "way": "either",
           "act": "escape"}]}),
+    # Giving yourself up (playtest 2026-11-15): a yield in a fight, a yield said in words,
+    # a confession to the law, a call for the watch to come and take you.
+    ("I drop my sword, raise my hands and surrender to the guard captain.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "drop my sword", "object": "my sword", "act": "drop"},
+         {"span": "raise my hands and surrender to the guard captain",
+          "target": "the guard captain", "act": "surrender"}]}),
+    ("I kneel and tell the watchman I yield and will come quietly.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "kneel", "act": "other"},
+         {"span": "tell the watchman I yield and will come quietly",
+          "target": "the watchman", "act": "surrender"}]}),
+    ("I tell the guard that I'm the one who broke into the chandler's last night.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "tell the guard that I'm the one who broke into the chandler's last "
+                  "night", "target": "the guard", "act": "surrender"}]}),
+    ("I call for the town guard and wait for them to take me in.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "call for the town guard", "target": "the town guard",
+          "act": "surrender"},
+         {"span": "wait for them to take me in", "act": "wait"}]}),
     ("I walk over to the tannery and look at the drying hides.",
      {"question": False, "claims": [], "actions": [
          {"span": "walk over to the tannery", "place": "the tannery", "act": "go"},
