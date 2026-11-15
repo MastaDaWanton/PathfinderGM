@@ -603,6 +603,73 @@ def strike(raw_intents, judged: list[dict], frame: dict | None, scene) -> list:
     return kept
 
 
+# The ops a plan writes as its guess at the player's own named ability: a thrown
+# "improvised" Blood Spike, a cast of it.
+_POWER_GUESS_OPS = frozenset({"attack", "cast", "use_item"})
+
+
+def held_uses(raw_intents, judged: list[dict], frame: dict | None, scene) -> list:
+    """The plan with each class ability the reading found held (`judge`'s `held`
+    ability) used through its own door: the plan's guesses at it — an attack, cast or
+    item op whose own slot names that ability — struck, and a `use_ability` added when
+    the plan has none, aimed where the reading aimed the deed.
+
+    Playtest 2026-11-15 #31: "I draw blood from my palm and hurl a Blood Spike at the
+    merchant" was judged held (`["ability", "Blood Spike Projectile"]`), the planner
+    wrote `attack weapon=improvised item="Blood Spike" thrown`, and the engine refused it
+    as a weapon not in hand. Code matches the op's slot against the SHEET's names
+    (`held_power`), never the player's English."""
+    # Only an ability the player's own `power` words name on the sheet (`held_power`), not
+    # one the enum question picked for a deed: the playtest's "fly into a Blood Rage" came
+    # back held as Blood Pool Manifestation, and that is no use of it.
+    held = [j for j in judged or () if (j.get("held") or [""])[0] == "ability"
+            and j.get("power")
+            and held_power(scene, j["power"]) == ("ability", j["held"][1])]
+    if not held or not isinstance(raw_intents, list):
+        return raw_intents
+    pc = scene.pc()
+    out = [r for r in raw_intents]
+    for j in held:
+        want = " ".join(_words(j["held"][1]))
+
+        def names_it(r) -> bool:
+            p = r.get("params") or {}
+            for slot in ("ability", "item", "weapon", "spell"):
+                words = str(p.get(slot) or "").replace("-", " ")
+                kind, name = held_power(scene, words) if words else ("", "")
+                if kind == "ability" and " ".join(_words(name)) == want:
+                    return True
+            return False
+
+        mine = [r for r in out if isinstance(r, dict)
+                and str(r.get("actor") or pc.ref) == pc.ref]
+        guesses = [r for r in mine if str(r.get("op", "")).lower() in _POWER_GUESS_OPS
+                   and names_it(r)]
+        have = any(str(r.get("op", "")).lower() == "use_ability" and names_it(r)
+                   for r in mine)
+        out = [r for r in out if not any(r is g for g in guesses)]
+        # A blow the reading itself declared ("I punch him with my armament") is the
+        # attack door's, not a use of the ability: added only when the deed was not an
+        # attack, or when the plan's guess at it was struck.
+        if have or (j.get("act") == "attack" and not guesses):
+            continue
+        aim = str(j.get("aim") or "")
+        to = aim[4:] if aim.startswith("ref:") else ""
+        if not to:
+            from . import acts_to_ops
+
+            to = acts_to_ops.person(scene, j.get("target"))
+        if not to and guesses:
+            to = str(guesses[0].get("target") or "")
+        entry = {"op": "use_ability", "actor": pc.ref,
+                 "because": "the player's words name their own ability",
+                 "params": {"ability": j["held"][1]}}
+        if to and to in scene.actors:
+            entry["target"] = to
+        out.append(entry)
+    return out
+
+
 # --- the page: a power on it that no tell backs -----------------------------------------
 #
 # The other half of the leak. "I erase the apprentice's memory of me" reached the narrator

@@ -596,6 +596,15 @@ def handled(frame, rows, engine, passages: list[str], *, ask_fn=None) -> list[di
         if not interpret.acting(a):
             continue
         thing = acts_to_ops._object(frame, row.index, pc)
+        # The character's own ability, spell or feat is no thing to find in the room.
+        # Playtest 2026-11-15 #32: "I use Blood Spike Projectile on merchant" was asked
+        # whether a blood spike projectile lay here, and refused "There is no blood
+        # spike projectile here" beside the ability's own use.
+        from . import means
+
+        if thing and means.held_power(scene, thing)[0] in ("ability", "spell", "feat",
+                                                           "skill"):
+            continue
         if not thing or thing.lower() in acts_to_ops._IT or not acts_to_ops._a_thing(thing)                 or acts_to_ops._a_person(scene, thing)                 or not engine.unrecorded_thing(thing, pc):
             continue
         if acts_to_ops._mine(thing):

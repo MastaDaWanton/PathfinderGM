@@ -646,29 +646,38 @@ def _use(engine, **params):
 
 def test_an_ability_can_be_used_by_name():
     eng, pc = _table()
-    out = _use(eng, ability="Blood Pool Manifestation")
-    assert "Blood Pool Manifestation" in out.tell
-    assert len(eng.scene.pools) == 1
+    out = _use(eng, ability="Blood Spike Projectile", to="c1")
+    assert out.status == "resolved", out.tell
+    # Its price spills a pool at the bender's feet (Blood Pool Manifestation, a passive
+    # since playtest 2026-11-15).
+    assert len(eng.scene.pools) >= 1
 
 
-def test_the_tell_counts_what_was_resolved_and_what_was_not():
+def test_an_ability_the_engine_can_only_half_run_is_refused_before_its_price():
     """An ability that says it did nine things and silently did two is worse than one
-    that did nothing, so both halves are reported."""
-    eng, _ = _table()
+    that did nothing. It used to be resolved with the parts counted out ("yours to
+    narrate"); playtest 2026-11-15 #32 paid 6 non-lethal for that. Now it is refused,
+    with what it lacks, and nothing is spent."""
+    eng, pc = _table()
+    before = (pc.hp, pc.nonlethal)
     out = _use(eng, ability="Blood Mine", to="c1")
-    assert "The engine resolves:" in out.tell
-    assert "yours to narrate" in out.tell
+    assert out.status == "refused" and "not one the engine can run yet" in out.tell
+    assert (pc.hp, pc.nonlethal) == before
 
 
 def test_lethal_damage_never_falls_back_to_the_person_using_it():
     """Half of these are areas. Defaulting the target to the actor had Hemorrhagic
     Eruption detonating pools on its own caster for 21 and ending them at -1."""
     eng, pc = _table()
-    _use(eng, ability="Blood Pool Manifestation")
+    from rules.engine import BloodPool
+
+    eng.scene.pools.append(BloodPool(owner="pc", at=(2, 2), place=eng.scene.at))
     before = pc.hp
     out = _use(eng, ability="Hemorrhagic Eruption")
     assert pc.hp == before, out.tell
-    assert "pool spent" in out.tell
+    # Nobody named: refused before the pools are spent, never "narrated" after.
+    assert out.status == "refused" and "aim at" in out.tell
+    assert len(eng.scene.pools) == 1
 
 
 def test_the_self_cost_is_still_paid_by_the_user():
@@ -786,7 +795,10 @@ def test_the_state_carries_only_the_abilities_they_can_use():
     _, pc = _table(level=5)
     names = {a["name"] for a in _usable_abilities(pc)}
     assert "Blood Mine" in names and "Heart-Seeker Spike" not in names
-    assert all(a["path"] and a["tier"] for a in _usable_abilities(pc))
+    # A path's entries carry their path and tier; the class's own (Rapid Coagulation, a
+    # class-abilities document) carries the class.
+    assert all(a["path"] and (a["tier"] or a["path"] == "Blood Bending")
+               for a in _usable_abilities(pc))
 
 
 def test_a_character_with_no_paths_gets_no_buttons():
@@ -844,7 +856,7 @@ def test_nothing_from_path_b_is_usable_before_it_opens():
     built, _ = creation.build(bender(paths=["coagulator", "blood spike"]))
     pc = from_dict(built["sheet"])
     pc.level = 5
-    paths = {a["path"] for a in _usable_abilities(pc)}
+    paths = {a["path"] for a in _usable_abilities(pc) if a["tier"] is not None}
     assert paths == {"coagulator"}
     pc.level = 11
     assert "blood spike" in {a["path"] for a in _usable_abilities(pc)}

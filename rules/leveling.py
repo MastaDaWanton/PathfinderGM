@@ -247,6 +247,62 @@ def has_passive(actor, name: str) -> bool:
     return False
 
 
+def needs_of(actor, name: str) -> list[str]:
+    """What the engine still lacks to run this ability (`paths.<path>.needs`, keyed by the
+    resolved name), from the paths this character follows. [] when nothing is missing."""
+    want = " ".join(str(name or "").split()).strip().lower()
+    for path in (getattr(actor, "paths", None) or []):
+        det = path_detail(getattr(actor, "char_class", "") or "", path)
+        resolved = next((str(real) for listed, real in (det.get("resolves") or {}).items()
+                         if str(listed).lower() == want), "")
+        for key, got in (det.get("needs") or {}).items():
+            if str(key).lower() in (want, resolved.lower()) and got:
+                return [str(g) for g in got]
+    return []
+
+
+def path_offering(class_id: str, name: str) -> str:
+    """The path of this class whose tiers list the ability, or "" — for a refusal that
+    says "a Battle Blood ability" to a Blood Spike."""
+    want = " ".join(str(name or "").split()).strip().lower()
+    if not want:
+        return ""
+    for path in paths_for(class_id):
+        for names in (path_detail(class_id, path).get("tiers") or {}).values():
+            if any(str(n).lower() == want for n in names):
+                return str(path)
+    return ""
+
+
+def core_tags(actor) -> list[str]:
+    """`class.<feature>` for each of a followed path's `core` features reached — the
+    level table's own features (uncanny dodge) arriving by path instead of by level, so
+    `has_state` answers them as it answers a rogue's (`rules/classfeatures.py`)."""
+    from . import classfeatures
+
+    out: list[str] = []
+    for path in (getattr(actor, "paths", None) or []):
+        det = path_detail(getattr(actor, "char_class", "") or "", path)
+        for name in det.get("core") or ():
+            if has_passive(actor, str(name)):
+                out.append(f"{classfeatures.FAMILY}.{classfeatures.slug(str(name))}")
+    return out
+
+
+def passive_grants(actor) -> list[dict]:
+    """The documents of the passives this character has reached (`has_passive`), for an
+    executor asking whether one of them answers an event — Blood Pool Manifestation's
+    `pool_on_cost`. Read by field, never by name."""
+    out: list[dict] = []
+    for path in (getattr(actor, "paths", None) or []):
+        det = path_detail(getattr(actor, "char_class", "") or "", path)
+        for name in det.get("passive") or ():
+            doc = (det.get("grants") or {}).get(name)
+            if isinstance(doc, dict) and has_passive(actor, str(name)):
+                out.append(doc)
+    return out
+
+
 def find_ability(actor, wanted: str) -> tuple[str, str, list[dict]]:
     """The ability this character has by that name: its path, its real name, its effects.
 

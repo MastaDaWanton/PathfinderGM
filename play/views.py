@@ -990,7 +990,13 @@ def _usable_abilities(pc) -> list[dict]:
                         if modes:
                             entry["choices"] = modes
                             entry["choice_kind"] = "mode"
-                        entry["aim"] = "self"
+                        # Aimed the way the core classes' entries are: a harm or a
+                        # target takes the panel's target chip (Blood Spike Projectile),
+                        # a use on oneself (Battle Blood Ki Pool) does not.
+                        reaches = doc.get("affects") or "self"
+                        entry["aim"] = str(doc.get("aim") or (
+                            "foe" if doc.get("harmful") or reaches not in ("self", "allies")
+                            else "self"))
                         pid = str((doc.get("cost") or {}).get("pool") or "")
                         pool = pc.pool(pid) if pid else None
                         if pool is not None:

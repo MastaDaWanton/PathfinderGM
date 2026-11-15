@@ -48,7 +48,15 @@ The grammar, one ability:
   or `undead` filters; `count` caps how many.
 - `effect`: the effect on each one it reaches — `modifiers`, `tags`, `condition`,
   `rounds`, `temp_hp`.
-- `attack`: `"ranged touch"` or `"melee touch"`, with `range_ft` — a roll against touch AC.
+- `attack`: `"ranged touch"` or `"melee touch"`, with `range_ft` — a roll against touch AC;
+  `"ranged"` or `"melee"` against full AC (a physical projectile: Blood Spike Projectile).
+- `hp_cost`: a price in hit points, non-lethal unless `lethality` is "lethal" (Blood Bond)
+  — `{"dice": "1d8"}`, `{"column": "blood", "times": 2}`, `{"formula": "floor(hp/5)"}`, or
+  `{"roll": true}`, the use's own roll (Blood Transfer).
+- `roll.column`/`roll.times`: the die off the class table's column ("blood"), multiplied.
+- `stacks`: `{"pool": "blood stack", "amount": 1}` gained by each creature reached.
+- `leaves_pool`: `"target"` — a Blood Pool at each reached creature's feet.
+- `spends_pool`: n of the user's Blood Pools here, drawn back in; refused without them.
 - `roll`: `{"count": <formula>, "die": 6, "bonus": <formula>, "as": "heal"|"damage",
   "type": ..., "lethality": ...}` — rolled ONCE, as a fireball is, and shared.
 - `save`: `{"save": "will", "dc": <formula>, "success": "half"|"negates"}`.
@@ -343,11 +351,23 @@ def hit_dice_of(actor) -> int:
 
 
 def dice(spec: dict, actor) -> str:
-    """A roll's notation for this character — "3d6", "1d6+2"."""
-    count = max(0, amount(spec.get("count", 1), actor, 1))
-    if not count:
-        return ""
-    out = f"{count}d{int(spec.get('die', 6) or 6)}"
+    """A roll's notation for this character — "3d6", "1d6+2".
+
+    `column` reads the die off the class's own level table ("blood": Blood Spike
+    Projectile's "Blood DMG"), `times` over (`leveling.multiply_dice`), so the ladder the
+    table prints is the one rolled and not a copy of it."""
+    if spec.get("column"):
+        from . import leveling
+
+        die = leveling.table_die(actor, str(spec["column"]))
+        if not die:
+            return ""
+        out = leveling.multiply_dice(die, int(spec.get("times", 1) or 1))
+    else:
+        count = max(0, amount(spec.get("count", 1), actor, 1))
+        if not count:
+            return ""
+        out = f"{count}d{int(spec.get('die', 6) or 6)}"
     bonus = amount(spec.get("bonus"), actor, 0)
     if bonus:
         out += f"{bonus:+d}"
@@ -819,9 +839,10 @@ def validate_documents(docs: dict | None = None) -> list[str]:
                         problems.append(f"{at}: {p!r} names both option {named[p]!r} and "
                                         f"{key!r} — give it to one of them.")
                     named.setdefault(p, _norm(key))
-            if doc.get("attack") not in (None, "ranged touch", "melee touch"):
+            if doc.get("attack") not in (None, "ranged touch", "melee touch", "ranged",
+                                         "melee"):
                 problems.append(f"{at}: attack {doc.get('attack')!r} must be 'ranged "
-                                f"touch' or 'melee touch'.")
+                                f"touch', 'melee touch', 'ranged' or 'melee'.")
             problems += _shape_problems(at, doc)
             overlays = [((doc.get("choice") or {}).get("options") or {}).get(k) or {}
                         for k in ((doc.get("choice") or {}).get("options") or {})]

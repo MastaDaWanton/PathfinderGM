@@ -904,6 +904,10 @@ class GMAgent:
                 # "I make the smith forget he saw me" matched no pattern above and was
                 # planned as Diplomacy (2026-10-05).
                 raw = means.strike(raw, self.judged, read_ok, self.engine.scene)
+                # And every deed done by an ability the sheet DOES hold, through that
+                # ability's own door: the plan's thrown "Blood Spike" struck for the
+                # use_ability it was (playtest 2026-11-15 #31).
+                raw = means.held_uses(raw, self.judged, read_ok, self.engine.scene)
                 # And the thing summoned rather than the power claimed. The fiat
                 # phrasings never reach here — `play/player_input.py` hands those back
                 # before any model call — but "I summon a celestial dog" is a real

@@ -27711,10 +27711,25 @@ class Engine:
             # are blood spike") when the list the model needed was the abilities — the
             # same list the brief already computes, now from the one helper both use.
             names = leveling.usable_names(actor) + class_abilities.names(actor)
+            # A path of their class they do not follow says so. Playtest 2026-11-15 #96:
+            # a Blood Spike's "Blood Rage" (Battle Blood's) read only "no ability
+            # called Blood Rage", and the sheet's stray Rage pool made that look wrong.
+            other = leveling.path_offering(actor.char_class or "", wanted)
+            why = (f" {wanted.title()} is a {other.title()} ability, and {actor.name} "
+                   f"follows {_and_list([p.title() for p in actor.paths]) or 'no path'}."
+                   if other else "")
             return self._refuse(
-                intent, f"{actor.name} has no ability called {wanted}. They can use: "
+                intent, f"{actor.name} has no ability called {wanted}.{why} They can use: "
                         f"{', '.join(names) or 'nothing yet'}.")
-        if leveling.is_passive(actor, found):
+        if leveling.is_passive(actor, found) and leveling.tier_needed(actor, found)                 <= leveling.control_blood_for(actor, path):
+            unrun = leveling.needs_of(actor, found)
+            if unrun:
+                # A reactive ability (Sanguine Spray, Blood Sponge) is a passive the
+                # engine does not run yet: said so, never "it does its work".
+                return self._refuse(
+                    intent, f"{found.title()} is never used — it happens on its own — and "
+                            f"the engine does not run it yet (it needs "
+                            f"{_and_list(unrun)}).", code="ability_unsupported")
             # "Using" a passive was worse than a wasted action: Swift Strikes stood in
             # for the attack it exists to modify, and the fight went a round with no
             # to-hit rolled at all.
@@ -27815,8 +27830,37 @@ class Engine:
                         f"it changes nothing on the sheet."
                         + (f" The class describes it: {text}" if text else ""),
                 code="ability_unsupported")
+        # Part of it runnable is not enough: an ability whose effects the engine can only
+        # half do — a save it cannot gate on, a stack it does not lay — is refused BEFORE
+        # its price, with what it is missing. The class file's own contract (its
+        # `_effects_note`): "An ability with effects and no needs is one the engine can
+        # resolve today." Playtest 2026-11-15 #32 paid 6 non-lethal for "1 part(s) of it
+        # are yours to narrate".
+        unrun = leveling.needs_of(actor, found) or sorted({
+            str(s.get("type")) for s in effects if not s.get("inactive")
+            and s.get("type") not in ("damage", "heal", "temp_hp")
+            and s.get("op") not in ("blood_pool", "spend_pools")})
+        if unrun:
+            text = str((leveling.path_detail(actor.char_class or "", path).get(
+                "abilities") or {}).get(found.title(), "") or "").strip()
+            return self._refuse(
+                intent, f"{found.title()} is not one the engine can run yet (it needs "
+                        f"{_and_list(unrun)}), so nothing is spent."
+                        + (f" The class describes it: {text}" if text else ""),
+                code="ability_unsupported")
 
-        target = self.scene.actors.get(intent.params.get("to") or "") or actor
+        # The aim is the intent's target as much as `to`: the plan writes either.
+        to = intent.params.get("to") or next(iter(intent.targets()), None)
+        if to and "to" not in intent.params:
+            intent.params["to"] = to
+        # Harm with nobody named is refused before the price, never "narrated" after it.
+        if not to and any(s.get("type") == "damage" and s.get("lethality") != "nonlethal"
+                          and not s.get("inactive") for s in effects):
+            return self._refuse(
+                intent, f"{found.title()} needs somebody to aim at: name them "
+                        f"(use_ability ability={found.title()!r} to=<ref>). Nothing is "
+                        f"spent.", code="ability_reach")
+        target = self.scene.actors.get(to or "") or actor
         done, narrated, rolls, held_back = [], [], [], []
         # Everyone this ability actually hurt, so the hit-point ladder runs on them at
         # the end. It never did: measured, a level-12 blood bender's Blood Spike
@@ -28156,6 +28200,15 @@ class Engine:
         refused = self._ability_refusal(actor, name, doc)
         if refused:
             return self._refuse(intent, f"Nothing takes hold. {refused}", code="ability_refused")
+        # A Blood Pool of the user's on this floor to draw on (`spends_pool`): Siphon
+        # Pool's "absorb a Blood Pool". Refused before the price, with what makes one.
+        drawn = int(doc.get("spends_pool") or 0)
+        banked = [b for b in self.scene.pools if b.owner == actor.ref and b.here(self.scene)]
+        if drawn and len(banked) < drawn:
+            return self._refuse(
+                intent, f"Nothing takes hold. {name} draws on a Blood Pool of "
+                        f"{actor.name}'s, and there is none here — an ability that "
+                        f"spills blood leaves one.", code="ability_refused")
         # A class's prohibition suspends its supernatural and spell-like abilities (the
         # druid in metal: CRB). The document says which kind it is (`ability_type`); an
         # extraordinary one, or one that says nothing, is not held (`classfeatures`).
@@ -28217,6 +28270,21 @@ class Engine:
             ended, said = self._end_class_stance(actor, swap)
             records.extend(ended)
             tells.extend(said)
+        for pool in banked[:drawn]:
+            self.scene.pools.remove(pool)
+            records.append({"ref": actor.ref, "kind": "blood_pool", "spent": 1,
+                            "spikes": pool.amount - 1, "origin": origin})
+            tells.append(f"{actor.name} draws a Blood Pool back in.")
+        # The price in hit points (`hp_cost`), paid before the ability lands as a pool's
+        # is. Blood Bond: "When taking damage from using your abilities, damage is
+        # received as Non-Lethal" — so non-lethal unless the document says otherwise
+        # (Blood Burst's "lethal damage to self"). Playtest 2026-11-15 #32: the cost was
+        # the only part of Blood Spike Projectile that ran.
+        hp_cost = doc.get("hp_cost") or {}
+        self_paid = False
+        if hp_cost and not hp_cost.get("roll"):
+            self_paid = self._pay_hp_cost(actor, doc, None, shown, origin, rolls,
+                                          records, tells)
 
         # 6. What it does to whoever it reached: a touch attack, one roll shared, a save
         # each, the heal or the harm, and the standing effect it lays on them.
@@ -28242,7 +28310,9 @@ class Engine:
             # modifiers, never as a domain's name, so the channel document names no domain.
             extra_dmg, extra_dc = self._bonus_from(actor, doc)
             total = None
-            if notation or flat:
+            # A stated `flat` of 0 is still a roll of 0 — DMG Purge with nothing to purge
+            # says so rather than saying nothing.
+            if notation or flat or (spec.get("flat") is not None and spec.get("as")):
                 total = flat
                 if notation:
                     r = self.dice.roll(notation, label=shown, visibility="player")
@@ -28252,6 +28322,11 @@ class Engine:
                 for m in extra_dmg:
                     total += m.value
                     tells.append(f"{m.source} adds {m.value:+d} ({total}).")
+            if hp_cost.get("roll") and total:
+                # Blood Transfer: "deal Blood DMG to self and heal a receiver for equal
+                # HP" — the one roll is both the price and the gift.
+                self_paid = self._pay_hp_cost(actor, doc, total, shown, origin, rolls,
+                                              records, tells)
             saving = doc.get("save") or {}
             dc = ca.amount(saving.get("dc"), actor) if saving else 0
             if saving and extra_dc:
@@ -28423,8 +28498,29 @@ class Engine:
                 if mine["said"]:
                     tells.append(mine["said"])
 
+        # 8. What it leaves behind on whoever it reached: blood stacks (`stacks`, a pool
+        # that sits on the creature, as `_op_resource` keeps them) and a Blood Pool on
+        # the ground (`leaves_pool`) — Blood Spike Projectile's "leaves 1 blood stack on
+        # the target, and creates a 5-ft Blood Pool adjacent to the target".
+        reached = [a for a in landed if a is not actor]
+        stacks = doc.get("stacks") or {}
+        if stacks.get("pool"):
+            n = ca.amount(stacks.get("amount", 1), actor, 1)
+            for other in reached:
+                now = other.gain_pool(str(stacks["pool"]), n, source=actor.ref)
+                records.append({"ref": other.ref, "kind": "resource",
+                                "pool": str(stacks["pool"]), "gained": n, "left": now,
+                                "by": actor.ref, "origin": origin})
+                tells.append(f"{other.name} carries {now} {stacks['pool']}"
+                             f"{'s' if now != 1 else ''}.")
+        if doc.get("leaves_pool") == "target" and reached:
+            for other in reached:
+                records.append(self._spill(actor, other.ref, shown, origin))
+            tells.append(f"Blood pools on the ground at {_and_list([a.name for a in reached])}"
+                         f"'s feet.")
+
         crossed = []
-        for ref in dict.fromkeys(hurt):
+        for ref in dict.fromkeys(hurt + ([actor.ref] if self_paid else [])):
             crossed.extend(self._hp_state_effects(self.scene.actors[ref]))
         records.append({"ref": actor.ref, "kind": "use_ability", "ability": name,
                         "class": str(doc.get("class") or ""), "origin": origin,
@@ -28447,6 +28543,71 @@ class Engine:
             effects=records + crossed,
             tell=" ".join(t for t in tells if t) + self._hp_state_tell(crossed),
             because=intent.because)
+
+    def _pay_hp_cost(self, actor: Actor, doc: dict, amount, shown: str, origin: str,
+                     rolls: list, records: list, tells: list) -> bool:
+        """Pay a document's `hp_cost` — `{"dice": "1d8"}`, `{"column": "blood",
+        "times": 1}` (the class table's die), `{"formula": "floor(hp/5)"}`, or the use's
+        own roll (`amount`) — non-lethal unless `lethality` says lethal. Through the
+        existing damage doors: `take_nonlethal` for the price (a cost bypasses damage
+        reduction: Blood Buffer guards what enemies deal, never what the bender pays),
+        `_apply_damage` for a lethal one. Returns whether anything was paid."""
+        from . import class_abilities as ca, leveling
+
+        spec = doc.get("hp_cost") or {}
+        if amount is None:
+            notation = ""
+            if spec.get("dice"):
+                notation = str(spec["dice"])
+            elif spec.get("column"):
+                notation = leveling.multiply_dice(
+                    leveling.table_die(actor, str(spec["column"])),
+                    int(spec.get("times", 1) or 1))
+            if notation:
+                r = self.dice.roll(notation, label=f"{shown}: the cost", visibility="player")
+                rolls.append(r)
+                amount = r.total
+            else:
+                amount = ca.amount(spec.get("formula"), actor, 0)
+        amount = max(0, int(amount or 0))
+        if not amount:
+            return False
+        if str(spec.get("lethality") or "nonlethal") == "lethal":
+            hit = self._apply_damage(actor, amount, "untyped")
+            hit["origin"] = origin
+            records.append(hit)
+            tells.append(f"{actor.name} pays {hit['amount']} hit points.")
+        else:
+            actor.take_nonlethal(amount)
+            records.append({"ref": actor.ref, "kind": "hp_cost", "amount": amount,
+                            "lethality": "nonlethal", "nonlethal": actor.nonlethal,
+                            "hp_after": actor.hp, "hp_max": actor.hp_max,
+                            "origin": origin})
+            tells.append(f"{actor.name} pays {amount} non-lethal ({actor.nonlethal} in "
+                         f"all).")
+        # A passive that spills blood whenever a price is paid (`pool_on_cost`): Blood
+        # Pool Manifestation's "or your square if self-inflicted".
+        if any(g.get("pool_on_cost") for g in leveling.passive_grants(actor)):
+            records.append(self._spill(actor, actor.ref, shown, origin))
+            tells.append(f"The spent blood pools at {actor.name}'s feet.")
+        return True
+
+    def _spill(self, actor: Actor, at_ref: str, source: str, origin: str) -> dict:
+        """A Blood Pool of `actor`'s on `at_ref`'s square. Where one of theirs already
+        lies on that square it gains a spike instead (Blood Pool Manifestation: "If a
+        blood pool would form where one already exists, create a blood spike instead") —
+        on a map only; with no squares to compare, every spill is its own pool."""
+        where = self.scene.positions.get(at_ref)
+        same = next((b for b in self.scene.pools if where is not None and b.at == where
+                     and b.owner == actor.ref and b.here(self.scene)), None)
+        if same is not None:
+            same.amount += 1
+            return {"ref": at_ref, "kind": "blood_pool", "by": actor.ref,
+                    "spikes": same.amount - 1, "origin": origin}
+        self.scene.pools.append(BloodPool(owner=actor.ref, at=where, place=self.scene.at,
+                                          source=source))
+        return {"ref": at_ref, "kind": "blood_pool", "by": actor.ref, "spikes": 0,
+                "origin": origin}
 
     def _class_ability_reach(self, intent: Intent, actor: Actor, doc: dict,
                              name: str) -> tuple[list[Actor], str]:
@@ -28582,7 +28743,13 @@ class Engine:
                         f"document needs fixing, and nothing is spent."), None
         aim = areas.Aim()
         raw = intent.params.get("aim")
-        if raw:
+        # A burst out of the user's own body (`area.centre: "self"`): Blood Burst's
+        # "eject blood". Laid on them and never catching them — nobody chooses to be in
+        # their own harmful burst (the channel's rule, `_class_ability_reach`).
+        own = isinstance(doc.get("area"), dict) and doc["area"].get("centre") == "self"
+        if own:
+            aim = areas.Aim("ref", actor.ref)
+        elif raw:
             try:
                 aim = areas.parse_aim(raw)
             except ValueError:
@@ -28607,7 +28774,11 @@ class Engine:
                                {"shape": shape["shape"], "length_ft": shape["length_ft"]},
                                aim)
         refs = areas.caught(self.scene, area)
-        if shape["shape"] in ("cone", "line"):
+        if own and not area.measured:
+            # No map: the creature named is the one caught, as for any other area.
+            to = intent.params.get("to") or next(iter(intent.targets()), None)
+            refs = [str(to)] if to and str(to) in self.scene.actors else []
+        if shape["shape"] in ("cone", "line") or own:
             # Drawn from the user's own corner outwards: they are never in it.
             refs = [r for r in refs if r != actor.ref]
         fits = self._class_ability_fits(doc)
@@ -28721,17 +28892,25 @@ class Engine:
         roll."""
         from .dice import stack
 
-        ranged = str(doc.get("attack")) == "ranged touch"
+        kind = str(doc.get("attack"))
+        ranged = kind.startswith("ranged")
+        touch = kind.endswith("touch")
         mods = stack(self._touch_mods(actor, target, ranged))
-        ac = target.touch_ac(self._flat_footed(target), attacker=actor,
-                             against="ranged" if ranged else "melee")
-        roll = self.dice.d20(mods, label=f"{shown}: {doc.get('attack')} attack",
-                             visibility="player")
+        against = "ranged" if ranged else "melee"
+        # A plain "ranged"/"melee" is against full AC: a physical projectile, as the
+        # kineticist's physical blast is a ranged attack where an energy blast is a
+        # ranged touch (Occult Adventures, Kinetic Blast). Blood Spike Projectile's
+        # hardened spike is the physical kind.
+        ac = (target.touch_ac(self._flat_footed(target), attacker=actor, against=against)
+              if touch else
+              target.ac(against, self._flat_footed(target), attacker=actor))
+        roll = self.dice.d20(mods, label=f"{shown}: {kind} attack", visibility="player")
         made = d20_succeeds(roll, ac)
         nat = natural_said(roll, ac)
-        said = (f"{actor.name}'s {doc.get('attack')} attack "
+        said = (f"{actor.name}'s {kind} attack "
                 f"{'hits' if made else 'misses'} {target.name} "
-                f"({nat + ', ' if nat else ''}{roll.total} against touch AC {ac}).")
+                f"({nat + ', ' if nat else ''}{roll.total} against "
+                f"{'touch AC' if touch else 'AC'} {ac}).")
         return made, roll, said
 
     def _class_effect_on(self, actor: Actor, other: Actor, doc: dict, origin: str,

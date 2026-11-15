@@ -469,6 +469,22 @@ document.addEventListener("click", async e => {
   // toggle never names anybody, because entering a stance is not something you do to a
   // person. Inside a fight an ordinary ability aims as it always did.
   const fighting = !!(STATE.scene && STATE.scene.in_encounter);
+  // In a fight a chip is the combat bar's own pick, staged into the turn plan and sent
+  // by Commit turn — never a spoken turn of its own. Playtest 2026-11-15 #34: a chip
+  // click queued "I use Blood Spike Projectile on merchant." as a narrated turn, and the
+  // bar's Ability… pressed meanwhile answered "The table is resolving something else":
+  // two doors to one action, fighting each other.
+  if (fighting && typeof COMBAT !== "undefined" && !$("#combatbar").hidden) {
+    if (!COMBAT.target && foe) COMBAT.target = foe.ref;
+    const kind = abilityKind(abilityEntry(name) || {});
+    if (kind === "swift" || kind === "immediate") COMBAT.swift = name;
+    else COMBAT.standard = { label: `Use ${name}`,
+      actions: [{ op: "use_ability", params: { ability: name },
+                  target: abilityTarget(name) }] };
+    renderPlan();
+    $("#err").textContent = `${name} is in this turn's plan; Commit turn sends it.`;
+    return;
+  }
   const aimed = (fighting && btn.dataset.toggle !== "1" && foe) ? ` on ${foe.name}` : "";
   takeTurn({ text: `I use ${name}${aimed}.` }, false);
 });

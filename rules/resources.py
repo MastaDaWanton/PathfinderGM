@@ -88,6 +88,8 @@ def variables(actor) -> Mapping:
         "hp": lambda: actor.hp,
         "hp_max": lambda: actor.hp_max,
         "temp_hp": lambda: actor.temp_hp,
+        # DMG Purge's "regain half of Non-Lethal damage taken" (Blood Bending).
+        "nonlethal": lambda: getattr(actor, "nonlethal", 0),
         "bab": lambda: actor.bab,
     }
 
@@ -164,7 +166,7 @@ def check(formula, extra=()) -> str:
     `extra`: the reader-supplied names this formula may also use (`evaluate`'s `extra`),
     each probed as 1."""
     class _Probe:
-        level = hit_dice = hp = hp_max = temp_hp = bab = 1
+        level = hit_dice = hp = hp_max = temp_hp = nonlethal = bab = 1
 
         def ability_score(self, _):
             return 10
