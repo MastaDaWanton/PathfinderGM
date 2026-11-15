@@ -244,8 +244,8 @@ def test_the_plan_chips_are_numbered_and_carry_reorder_controls():
 
     src = table_source()
     assert 'class="cb-num"' in src
-    assert 'data-steporder="${key}:-1" aria-label="Earlier: ${label}"' in src
-    assert 'data-steporder="${key}:1" aria-label="Later: ${label}"' in src
+    assert 'data-steporder="${esc(key)}:-1" aria-label="Earlier: ${label}"' in src
+    assert 'data-steporder="${esc(key)}:1" aria-label="Later: ${label}"' in src
     assert 'document.addEventListener("pointerdown"' in src
     assert 'document.addEventListener("pointermove"' in src
     assert 'document.addEventListener("pointercancel"' in src

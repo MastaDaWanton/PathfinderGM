@@ -456,7 +456,7 @@
     chips.innerHTML = B.pot.items.map(function (p) {
       var it = B.item(p.key);
       if (!it) return "";
-      return '<li class="bench-chip"><span>' + esc(it.name) + (p.count > 1 ? " ×" + p.count : "") +
+      return '<li class="bench-chip"><span>' + esc(it.name) + (p.count > 1 ? " ×" + esc(p.count) : "") +
         '</span><button type="button" class="bench-chip-x" data-unpot="' + esc(p.key) +
         '" aria-label="Take ' + esc(it.name) + ' off the ' + esc(TOOL[m] || "tool") + '">×</button></li>';
     }).join("");

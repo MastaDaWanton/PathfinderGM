@@ -405,10 +405,10 @@ function renderMap(s) {
     // the whole board red, a notch on each (tried second) was confetti.
     const how = !T.provokes ? "" : provokes[key] ? " risky" : " safe";
     if (how === " safe") safe.add(key);
-    parts.push(cell(c, r, `reach${how}`, `<title>${sqName(c, r)} · ${cost} ft${
+    parts.push(cell(c, r, `reach${how}`, `<title>${sqName(c, r)} · ${esc(cost)} ft${
         lvl ? ` · ${lvl * 5} ft up` : ""}${how === " risky" ? " · provokes" : ""}</title>`)
       .replace(`class="reach${how}"`, `class="reach${how}" data-sq="${c},${r}${
-        lvl ? "," + lvl : ""}"`));
+        lvl ? "," + esc(lvl) : ""}"`));
   }
   const reachEdges = boardEdges(g, (c, r) => reach.has(`${c},${r}`));
   const safeEdges = safe.size && safe.size < reach.size
@@ -485,7 +485,7 @@ function renderMap(s) {
       if (lv in wash) wash[lv] += `M${c * CELL} ${r * CELL}h${CELL}v${CELL}h${-CELL}z`;
     }
     for (const lv in wash) if (wash[lv])
-      parts.push(`<path class="night ${lv}" pointer-events="none" d="${wash[lv]}"/>`);
+      parts.push(`<path class="night ${lv}" pointer-events="none" d="${esc(wash[lv])}"/>`);
   }
 
   // The edge of the move, the edge of its safe steps, and the edge of each hunch: a hunch
@@ -497,8 +497,8 @@ function renderMap(s) {
   for (const h of (T.hunches || [])) {
     const inside = new Set(h.squares.map(p => `${p[0]},${p[1]}`));
     parts.push(`<path class="hunch" d="${pathOf(boardEdges(g, (c, r) => inside.has(`${c},${r}`)))
-      }"><title>you sense ${h.count === 1 ? "a foe" : h.count + " foes"} within ${
-      h.within_ft} ft</title></path>`);
+      }"><title>you sense ${h.count === 1 ? "a foe" : esc(h.count) + " foes"} within ${
+      esc(h.within_ft)} ft</title></path>`);
   }
 
   // Blood before bodies, so a token stands in its own pool rather than under it.
@@ -524,7 +524,7 @@ function renderMap(s) {
     // worked out here from the fight's side NAME, so an hour after the robbers won (the
     // sides gone with the fight) neither was painted a foe while the panel called one of
     // them Hostile; and a side named "party" painted the player's own companions red.
-    const side = a.stance ? ` ${a.stance}` : (s.scene.in_encounter ? " bystander" : "");
+    const side = a.stance ? ` ${esc(a.stance)}` : (s.scene.in_encounter ? " bystander" : "");
     // Somebody on another floor of the same room is faded, not hidden. Hiding them is
     // how a player is surprised by an archer who was on the map the whole time; this is
     // the level selector saying "not who you are looking at" rather than "not there".
@@ -546,8 +546,8 @@ function renderMap(s) {
     if (up) tp.push(`<circle class="turnring" cx="${cx}" cy="${cy}" r="${n * CELL / 2 + .6}"/>`);
     tp.push(`<circle class="token${side}${down ? " down" : ""}${ghost}${unit ? " unit" : ""}${
       up}" cx="${cx}" cy="${cy}" r="${n * CELL / 2 - 1.5}">
-      <title>${esc(a.name)} — ${a.hp}/${a.hp_max}${
-        unit ? ` · ${a.members} of ${a.members_max} still standing` : ""}${
+      <title>${esc(a.name)} — ${esc(a.hp)}/${esc(a.hp_max)}${
+        unit ? ` · ${esc(a.members)} of ${esc(a.members_max)} still standing` : ""}${
         a.at.length > 2 && a.at[2] ? ` · ${a.at[2] * 5} ft up` : ""}</title></circle>`);
     const form = unit ? "" : a.form || "humanoid";
     // The server's plate letters (views._marks): two when an initial clashes here.
@@ -568,7 +568,7 @@ function renderMap(s) {
     tp.push(`<text class="tok${unit ? "" : " ini"}${ghost}" x="${
       form === "beast" ? cx - 1.2 * k : cx}" y="${
       unit ? cy + 3.2 : cy + 2.1 * k}" style="font-size:${unit ? 9 : (mark.length > 1 ? 4.4 : 6) * k
-        }px">${unit ? a.members : esc(mark)}</text>`);
+        }px">${unit ? esc(a.members) : esc(mark)}</text>`);
     // The downed are struck through, so "down" reads without telling faded from far away.
     if (down) {
       const d = (n * CELL / 2 - 3) * .7071;
@@ -652,7 +652,7 @@ function renderMap(s) {
                   aria-label="Turn the board right"><span class="long">Turn </span>right</button></div>` : ""}`;
   const picker = levels.length > 1
     ? `<div class="v2-recess" role="group" aria-label="Looking at"><span class="seglabel">Looking at</span>${
-        levels.map(v => `<button type="button" data-maplevel="${v}" ${pressed(v === MAP_LEVEL)}>${
+        levels.map(v => `<button type="button" data-maplevel="${esc(v)}" ${pressed(v === MAP_LEVEL)}>${
           v ? (v > 0 ? `+${v * 5} ft` : `${v * 5} ft`) : "the floor"}</button>`).join("")}</div>${
         g.ceiling ? `<span class="seglabel">ceiling ${g.ceiling * 5} ft</span>` : ""}`
     : "";
@@ -660,7 +660,7 @@ function renderMap(s) {
   const named = [...new Set(fixtures.map(f => f.name))];
   const legend = `${named.length ? `<p class="sub maplegend">Here: ${
       esc(named.join(", "))}</p>` : ""}${g.speed ? `<p class="sub maplegend">${
-      reach.size} squares within ${g.speed} ft</p>` : ""}${
+      reach.size} squares within ${esc(g.speed)} ft</p>` : ""}${
       pools ? `<p class="sub maplegend">${pools} pool${
         pools === 1 ? "" : "s"} of blood on the ground</p>` : ""}`;
   // The key opens OVER the board, never under it (variant D): a key that pushed the foot
@@ -751,12 +751,12 @@ function renderRolls(log) {
     <div class="who" style="display:block">
       <div style="display:flex;justify-content:space-between">
         <span>${esc(r.label || o.op)}</span>
-        <span style="color:var(--accent)">${r.total}${
+        <span style="color:var(--accent)">${esc(r.total)}${
           // Only a d20 is compared against a DC or an AC. Showing the outcome's target
           // beside a damage roll read as "6 vs 10", which looks like a miss.
-          o.dc && o.dc.value != null && r.die === "1d20" ? " vs " + o.dc.value : ""}</span>
+          o.dc && o.dc.value != null && r.die === "1d20" ? " vs " + esc(o.dc.value) : ""}</span>
       </div>
-      <small>${r.raw}${
+      <small>${esc(r.raw)}${
         r.modifiers.map(m => ` ${sign(m.value)} ${esc(m.source)}`).join("")}</small>
     </div>`).join("") || `<div class="sub">Nothing rolled yet.</div>`;
 }
@@ -821,7 +821,7 @@ async function loadCraftActions() {
                    a.available ? "" : a.why].filter(Boolean).join("\n\n");
       return `<button type="button" ${attr} ${a.available ? "" : "disabled"}
         title="${esc(tip)}">${esc(a.label)}<small>${esc(a.track)}${
-        a.level ? ` ${a.level}` : ""}</small></button>`;
+        a.level ? ` ${esc(a.level)}` : ""}</small></button>`;
     }).join("") || `<div class="cp-busy">No craft actions here.</div>`;
   } catch (err) { $("#err").textContent = err.message; }
 }

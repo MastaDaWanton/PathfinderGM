@@ -351,7 +351,7 @@
   // engine's own options; "Got it" marks the items seen, and an open question stays on the
   // item's card in the working until it is answered. Nothing here is decided by the page.
   E.questionHtml = function (key, q) {
-    var id = "eq-" + String(key).replace(/[^A-Za-z0-9_-]/g, "_") + "-" + q.property;
+    var id = "eq-" + String(key).replace(/[^A-Za-z0-9_-]/g, "_") + "-" + esc(q.property);
     var opts = (q.options || []).map(function (o) {
       var v = typeof o === "object" ? JSON.stringify(o) : String(o);
       return '<option value="' + esc(v) + '">' + esc(v.replace(/-/g, " ")) + '</option>';

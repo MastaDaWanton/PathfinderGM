@@ -666,7 +666,7 @@
     });
     chips.innerHTML = rows.map(function (r) {
       return '<li class="bench-chip"><i class="fr-swatch" style="--sw:' + esc(r.it.color || "") +
-        '" aria-hidden="true"></i><span>' + esc(r.it.name) + (r.n > 1 ? " ×" + r.n : "") +
+        '" aria-hidden="true"></i><span>' + esc(r.it.name) + (r.n > 1 ? " ×" + esc(r.n) : "") +
         '</span><button type="button" class="bench-chip-x" ' + r.x + ' aria-label="Take ' + esc(r.it.name) +
         ' off the ' + esc(String(r.what).toLowerCase()) + '">×</button></li>';
     }).join("");

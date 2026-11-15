@@ -37,7 +37,7 @@
       '<input type="search" id="forge-find" class="v2-well bs-find" autocomplete="off" spellcheck="false">' +
       '<div class="bs-showrow"><label class="bs-label" for="forge-show">Show</label>' +
       '<select id="forge-show" class="v2-well bs-show">' +
-      SHOWS.map(function (s) { return '<option value="' + s[0] + '">' + s[1] + '</option>'; }).join("") +
+      SHOWS.map(function (s) { return '<option value="' + esc(s[0]) + '">' + esc(s[1]) + '</option>'; }).join("") +
       '</select></div>' +
     '</div>' +
     '<div class="bs-list fr-list" id="forge-list" aria-live="off"></div>';
@@ -87,7 +87,7 @@
       '</button>' +
       (ledger ? '<button type="button" class="bt-info' + (unknown ? " is-unknown" : "") + '" data-material="' +
         esc(it.material) + '" data-for="' + esc(it.key) + '" aria-haspopup="dialog" aria-label="About ' +
-        esc(it.name) + (unknown ? ", " + it.unknown + " unknown" : "") + '">?</button>' : "") +
+        esc(it.name) + (unknown ? ", " + esc(it.unknown) + " unknown" : "") + '">?</button>' : "") +
       '</li>';
   }
 

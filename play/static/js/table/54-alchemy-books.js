@@ -167,7 +167,7 @@
     var groups = [["In the bottle", known.filter(inBottle)],
                   ["At the bench", known.filter(function (p) { return !inBottle(p); })]];
     return groups.filter(function (g) { return g[1].length; }).map(function (g) {
-      return '<h4 class="ab-group">' + g[0] + '</h4><ul class="hc-props">' + g[1].map(propRow).join("") + '</ul>';
+      return '<h4 class="ab-group">' + esc(g[0]) + '</h4><ul class="hc-props">' + g[1].map(propRow).join("") + '</ul>';
     }).join("") + (blind.length ? '<ul class="hc-props">' + blind.map(propRow).join("") + '</ul>' : "");
   }
   function dangerHtml(c) {
@@ -966,7 +966,7 @@
       });
     }
     host.innerHTML = '<div class="ab-tools"><button type="button" class="v2-btn is-small" data-ab-cx-sort aria-pressed="' +
-      st.unknownFirst + '">Unknowns first</button></div>' +
+      esc(st.unknownFirst) + '">Unknowns first</button></div>' +
       '<div class="ab-list" role="list" aria-label="Reagents you have met"></div>';
     st.draw = function () {
       var box = host.querySelector(".ab-list");

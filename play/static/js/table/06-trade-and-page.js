@@ -563,11 +563,11 @@ function drawMine() {
     const notes = tradeRarity(x) ? `<span class="tr-rare">${esc(tradeRarity(x))}</span>` : "";
     return `<button type="button" class="traderow${inDeal.has(x.id) ? " on" : ""}"
       data-side="sell" data-id="${esc(x.id)}"
-      aria-label="Sell ${esc(x.name)}${x.count > 1 ? `, you have ${x.count}` : ""}, ${
+      aria-label="Sell ${esc(x.name)}${x.count > 1 ? `, you have ${esc(x.count)}` : ""}, ${
         esc(x.price)}${x.count > 1 ? " each" : ""}">
       ${tradeGlyph(tradeIcon(x))}
       <span class="tr-nm"><b>${esc(x.name)}</b>${
-        x.count > 1 ? ` <span class="tr-n">×${x.count}</span>` : ""}${
+        x.count > 1 ? ` <span class="tr-n">×${esc(x.count)}</span>` : ""}${
         notes ? `<span class="tr-note">${notes}</span>` : ""}</span>
       <span class="gp">${esc(x.price)}${x.count > 1 ? "<small>each</small>" : ""}</span>
     </button>`;
@@ -605,8 +605,8 @@ function drawDeal() {
     // Beside the number it explains: a thing the engine runs nothing from is priced as
     // such (a quarter, when you sell it; `pricing.what_a_shop_pays`).
     const note = x.does_something ? "" : TRADE_INERT;
-    return `<li class="tr-line" tabindex="0" data-side="${l.side}" data-id="${esc(l.id)}"
-      aria-label="${esc(x.name)}, ${l.n}. Plus and minus change how many, Delete removes it.">
+    return `<li class="tr-line" tabindex="0" data-side="${esc(l.side)}" data-id="${esc(l.id)}"
+      aria-label="${esc(x.name)}, ${esc(l.n)}. Plus and minus change how many, Delete removes it.">
       ${tradeGlyph(tradeIcon(x))}
       <span class="tr-nm">${esc(x.name)}${note ? `<span class="tr-note">${note}</span>` : ""}</span>
       <span class="gp">${coinText(got / 100)}${
@@ -615,7 +615,7 @@ function drawDeal() {
         <span class="tr-step" role="group" aria-label="How many ${esc(x.name)}">
           <button type="button" data-act="dec" aria-label="One fewer"${
             l.n <= 1 ? " disabled" : ""}>−</button>
-          <output aria-live="polite">${l.n}</output>
+          <output aria-live="polite">${esc(l.n)}</output>
           <button type="button" data-act="inc" aria-label="One more"${
             l.n >= max ? " disabled" : ""}>+</button>
         </span>
@@ -834,7 +834,7 @@ const said = s => esc(s)
 // the world".
 const tableSaid = s => said(s)
   .replace(/\[([^\]\n]{1,200})\]/g, '<span class="gesture">[$1]</span>');
-const sign = n => (n >= 0 ? "+" : "") + n;
+const sign = n => (n >= 0 ? "+" : "") + esc(n);
 const title = s => s.replace(/\b\w/g, c => c.toUpperCase());
 
 

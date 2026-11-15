@@ -35,7 +35,7 @@ async function openRoster() {
     </button>`).join("");
   $("#deathroster").innerHTML = `<h3>Somebody new</h3>` + (d.choices || []).map(ch => `
     <button class="pick" data-source="${esc(ch.source)}">
-      <b>${esc(ch.name)}</b><small>${esc(ch.line)} · ${ch.hp} hp</small>
+      <b>${esc(ch.name)}</b><small>${esc(ch.line)} · ${esc(ch.hp)} hp</small>
     </button>`).join("")
     + `<button class="pick" id="closeroster"><b>Never mind</b>
        <small>carry on with the game in front of you</small></button>`;

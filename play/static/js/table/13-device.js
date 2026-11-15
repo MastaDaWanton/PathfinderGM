@@ -195,10 +195,10 @@ function deviceShow(shown, target, cap) {
   const gears = svg("dv-gears");
   const under = [...GEARS].sort((a, b) => b.z - a.z);
   gears.innerHTML = `<defs>${GEARS.map(g => brass(`dvbrass${g.i}`, g.x, g.y, G.m * g.z / 2)).join("")}</defs>
-    ${under.map(g => `<g id="dvgear${g.i}"><path d="${gearPath(g.x, g.y, g.z, G.m, g.holes)}"
-      fill="url(#dvbrass${g.i})" fill-rule="evenodd" stroke="#2a1c0a" stroke-width="1.6"
+    ${under.map(g => `<g id="dvgear${esc(g.i)}"><path d="${gearPath(g.x, g.y, g.z, G.m, g.holes)}"
+      fill="url(#dvbrass${esc(g.i)})" fill-rule="evenodd" stroke="#2a1c0a" stroke-width="1.6"
       stroke-linejoin="round"/></g>`).join("")}
-    ${under.map(g => `<circle cx="${g.x}" cy="${g.y}" r="${G.m * g.hub}" fill="#6e5226"
+    ${under.map(g => `<circle cx="${esc(g.x)}" cy="${esc(g.y)}" r="${G.m * g.hub}" fill="#6e5226"
       stroke="#2a1c0a" stroke-width="1.2"/>`).join("")}`;
   el.querySelector(".dv-chamber").after(gears);
   const gearEls = GEARS.map(g => gears.querySelector(`#dvgear${g.i}`));

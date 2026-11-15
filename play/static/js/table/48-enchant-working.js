@@ -175,7 +175,7 @@
       var color = s.color || (it && it.color) || "";
       var choice = "";
       if (s.choice) {
-        var cid = "ew-c-" + s.seat;
+        var cid = "ew-c-" + esc(s.seat);
         choice = '<label class="ew-choice" for="' + cid + '"><span>' + esc(CHOICE[s.choice.of] || words(s.choice.key)) + '</span>' +
           '<select id="' + cid + '" class="v2-well ew-select" data-seat="' + esc(s.seat) + '" data-choice="' + esc(s.choice.key) + '"' +
           (m !== "attune" ? " disabled" : "") + '>' +
@@ -185,7 +185,7 @@
           }).join("") + '</select></label>';
       }
       if (s.bonus) {
-        var bid = "ew-b-" + s.seat;
+        var bid = "ew-b-" + esc(s.seat);
         choice += '<label class="ew-choice" for="' + bid + '"><span>Bonus</span>' +
           '<select id="' + bid + '" class="v2-well ew-select" data-seat="' + esc(s.seat) + '" data-choice="bonus"' +
           (m !== "attune" ? " disabled" : "") + '>' + (s.bonus.options || []).map(function (n) {

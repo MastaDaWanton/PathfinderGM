@@ -1,0 +1,162 @@
+{
+ "_doc": "Unescaped values tools/html_sinks.py may let into markup, each read by a person. Key: 'scope::text' (scope = the innermost named function, or top), 'fn:NAME' (every return of NAME accepted), 'param:FN.NAME'. The value says why no model, world or player text can be in it. A key that matches nothing fails the guard, so this list cannot outlive the code it describes.",
+ "play/templates/play/home.html": {
+  "tabs::t.count()": "a count the tab computes from the loaded lists",
+  "paneRules::v": "LEVEL_RHYTHMS, a constant table in this file",
+  "paneRules::em": "LEVEL_RHYTHMS, a constant table in this file",
+  "narrationPanel::v": "NARRATION_MODES, a constant table in this file",
+  "narrationPanel::em": "NARRATION_MODES, a constant table in this file",
+  "gmPanel::v": "TABLE_TALK_MODES, a constant table in this file",
+  "gmPanel::em": "TABLE_TALK_MODES, a constant table in this file",
+  "phonePanel::LAN.qr": "an SVG pathfindergm/qr.py draws from the LAN url; markup by design",
+  "paneForgeWho::ab": "an element of POOLS, the constant ability lists in this file",
+  "paneForgeWho::ab.toUpperCase()": "an element of POOLS, the constant ability lists in this file",
+  "fn:abfinal": "finalAbility: arithmetic on ability scores",
+  "fn:housePointsPlaced": "a sum of numbers",
+  "fn:ranksBudget": "ranksBudget: arithmetic"
+ },
+ "play/static/js/skillhelp.js": {
+  "fn:slug": "lower-cased and reduced to [a-z0-9-] by its own regex"
+ },
+ "play/static/js/table/16-places-chart.js": {
+  "svg::ax": "chart geometry: arithmetic on the layout's own coordinates, or a constant anchor",
+  "svg::ay": "chart geometry: arithmetic on the layout's own coordinates, or a constant anchor",
+  "svg::bx": "chart geometry: arithmetic on the layout's own coordinates, or a constant anchor",
+  "svg::by2": "chart geometry: arithmetic on the layout's own coordinates, or a constant anchor",
+  "svg::mx + nx": "chart geometry: arithmetic on the layout's own coordinates, or a constant anchor",
+  "svg::my + ny": "chart geometry: arithmetic on the layout's own coordinates, or a constant anchor",
+  "svg::x": "chart geometry: arithmetic on the layout's own coordinates, or a constant anchor",
+  "svg::y": "chart geometry: arithmetic on the layout's own coordinates, or a constant anchor",
+  "svg::lx": "chart geometry: arithmetic on the layout's own coordinates, or a constant anchor",
+  "svg::ly": "chart geometry: arithmetic on the layout's own coordinates, or a constant anchor",
+  "svg::anchor": "chart geometry: arithmetic on the layout's own coordinates, or a constant anchor",
+  "stroke::fx": "chart geometry: arithmetic on the layout's own coordinates, or a constant anchor",
+  "stroke::fy": "chart geometry: arithmetic on the layout's own coordinates, or a constant anchor",
+  "stroke::ex": "chart geometry: arithmetic on the layout's own coordinates, or a constant anchor",
+  "stroke::ey": "chart geometry: arithmetic on the layout's own coordinates, or a constant anchor",
+  "stroke::id": "fog${n}: n is the stub's index"
+ },
+ "play/static/js/table/06-trade-and-page.js": {
+  "paintTradeIcons::svg": "an SVG fetched from the app's own static/icons/items by a name from its own tables",
+  "drawWares::inDeal": "a count of the player's items",
+  "param:tab.id": "callers grep-checked: \"all\" or a key of Object.keys(TRADE_SHELVES)",
+  "param:tab.n": "callers grep-checked: mine.length or counts[k], counts the loop above makes"
+ },
+ "play/static/js/table/11-exits.js": {
+  "renderExits::key": "EXIT_GROUPS, a constant table",
+  "renderExits::label": "EXIT_GROUPS, a constant table"
+ },
+ "play/static/js/table/05-sheet.js": {
+  "drawSheet::entry[2](SHEET)": "TABS: one of the four page builders, each scanned in its own right",
+  "fn:schoolKey": "a SPELL_SCHOOLS key or \"universal\"",
+  "paintSpellIcons::svg": "an SVG fetched from the app's own static icons by a name from its own tables",
+  "detailFacts::k": "a constant label of the facts table just above",
+  "fn:words": "number words, or String(n) of a count",
+  "grimoireIndex::k": "a SPELL_SCHOOLS key and its constant label",
+  "grimoireIndex::SPELL_SCHOOLS[k].label": "a SPELL_SCHOOLS key and its constant label",
+  "eqLoad::band": "a value of the constant load-words table, or esc(L.band)",
+  "param:glyph.cls": "callers grep-checked: absent or the literal \"gi-lg\" (the enchant games' k.glyph is another function)",
+  "param:railBtn.id": "callers grep-checked: \"all\" or a key of Object.keys(TRADE_SHELVES)"
+ },
+ "play/static/js/table/01-core.js": {
+  "top::TABS.find(x => x[0] === SHEET_TAB)[2](SHEET)": "TABS: one of the four page builders, each scanned in its own right"
+ },
+ "play/static/js/table/29-bench-core.js": {
+  "renderFoot::f.buttons": "each bench's footer() returns constant button markup",
+  "fn:sign": "Number(v) || 0 first: a number whatever it was given",
+  "confirm::id": "the bench's layer name, a constant, plus Date.now()",
+  "manuals::id": "the bench's layer name, a constant, plus Date.now()"
+ },
+ "play/templates/play/outfit.html": {
+  "rowsFor::n": "the basket's own count"
+ },
+ "play/static/js/table/02-state.js": {
+  "benchDoor::door[0]": "BENCH_DOORS, a constant table of attribute markup"
+ },
+ "play/static/js/table/40-forge-shell.js": {
+  "renderStage::r.x": "attribute markup built two lines up with esc() on the id"
+ },
+ "play/static/js/table/55-leather-shell.js": {
+  "renderStage::r.x": "attribute markup built a few lines up with esc() on the id"
+ },
+ "play/static/js/scene3d.js": {
+  "stone::c": "a colour from the renderer's own palette (tint() returns rgb() arithmetic)",
+  "fn:tint": "a colour from the renderer's own palette (tint() returns rgb() arithmetic)",
+  "fn:paint": "a colour from the renderer's own palette (tint() returns rgb() arithmetic)",
+  "render::Object.keys(defs).map(function (k) { return defs[k]; }).join(\"\")": "the renderer's own pattern defs, each built by textured() from TILES",
+  "render::body": "the renderer's own pattern defs, each built by textured() from TILES",
+  "render::lay": "the renderer's own pattern defs, each built by textured() from TILES",
+  "fn:textured": "the renderer's own pattern defs, each built by textured() from TILES",
+  "textured::id": "the renderer's own pattern defs, each built by textured() from TILES",
+  "textured::t[0]": "TILES: width, height and pattern markup the renderer builds from a palette colour",
+  "textured::t[1]": "TILES: width, height and pattern markup the renderer builds from a palette colour",
+  "textured::t[2]": "TILES: width, height and pattern markup the renderer builds from a palette colour",
+  "render::f.attrs": "a face record the renderer builds itself; plate is esc(mark), inner is the <title> built with esc()",
+  "render::f.cls": "a face record the renderer builds itself; plate is esc(mark), inner is the <title> built with esc()",
+  "render::f.inner": "a face record the renderer builds itself; plate is esc(mark), inner is the <title> built with esc()",
+  "plate::f.plate": "a face record the renderer builds itself; plate is esc(mark), inner is the <title> built with esc()",
+  "plate::f.inner": "a face record the renderer builds itself; plate is esc(mark), inner is the <title> built with esc()"
+ },
+ "play/static/js/table/44-forge-ledger.js": {
+  "actionsHtml::T.none": "TRACKS, a constant table of the bench's own words",
+  "actionsHtml::T.test": "TRACKS, a constant table of the bench's own words",
+  "actionsHtml::T.testWord": "TRACKS, a constant table of the bench's own words",
+  "actionsHtml::T.askWord": "TRACKS, a constant table of the bench's own words",
+  "rowsHtml::T.empty": "TRACKS, a constant table of the bench's own words",
+  "rowsHtml::T.drawbacksSaid": "TRACKS, a constant table of the bench's own words",
+  "journal::T.list": "TRACKS, a constant table of the bench's own words",
+  "rowsHtml::bodyId": "a constant prefix, a TRACKS key, and esc(e.id)"
+ },
+ "play/static/js/table/13-device.js": {
+  "buildDevice::lpx": "the device's own geometry: constants and arithmetic on them",
+  "buildDevice::lpy": "the device's own geometry: constants and arithmetic on them",
+  "buildDevice::kx": "the device's own geometry: constants and arithmetic on them",
+  "buildDevice::ky": "the device's own geometry: constants and arithmetic on them",
+  "buildDevice::kx + kr * 6.2": "the device's own geometry: constants and arithmetic on them",
+  "buildDevice::tx": "the device's own geometry: constants and arithmetic on them",
+  "buildDevice::ty": "the device's own geometry: constants and arithmetic on them",
+  "buildDevice::tbw": "the device's own geometry: constants and arithmetic on them",
+  "buildDevice::tbh": "the device's own geometry: constants and arithmetic on them",
+  "buildDevice::hy": "the device's own geometry: constants and arithmetic on them",
+  "brass::cx + LIGHT[0] * k": "the device's own geometry: constants and arithmetic on them",
+  "brass::cy + LIGHT[1] * k": "the device's own geometry: constants and arithmetic on them",
+  "buildDevice::tabHref": "DEVICE_IMG_BASE + a constant file name",
+  "param:brass.id": "the one call is brass(`dvbrass${g.i}`, ...): a gear's index from deviceGears()"
+ },
+ "play/static/js/table/03-offers-and-map.js": {
+  "renderMap::sym": "FX_SYMBOL, a constant table",
+  "renderMap::turn": "a rotation in degrees from fxRot, a constant table, or 0/90",
+  "renderMap::lv": "only \"dim\" or \"dark\": the loop draws only wash's own keys",
+  "renderMap::up": "the literal \" up\" or a direction vector used for turn",
+  "renderMap::cx + d": "board geometry: arithmetic on square indices and CELL",
+  "renderMap::cy + d": "board geometry: arithmetic on square indices and CELL",
+  "fn:sqCol": "column letters from String.fromCharCode"
+ },
+ "play/static/js/table/36-bench-perks.js": {
+  "draw::titleId": "TRACKS' constant prefix + \"-perks-t\""
+ },
+ "play/static/js/table/34-bench-tag.js": {},
+ "play/static/js/table/31-bench-satchel.js": {
+  "skeleton::new Array(7).join(one)": "a constant skeleton row, repeated"
+ },
+ "play/static/js/table/41-forge-rack.js": {
+  "skeleton::new Array(7).join(one)": "a constant skeleton row, repeated"
+ },
+ "play/static/js/table/46-enchant-shelf.js": {
+  "skeleton::new Array(7).join(one)": "a constant skeleton row, repeated"
+ },
+ "play/static/js/table/51-alchemy-shelf.js": {
+  "skeleton::new Array(7).join(one)": "a constant skeleton row, repeated"
+ },
+ "play/static/js/table/56-leather-rack.js": {
+  "skeleton::new Array(7).join(one)": "a constant skeleton row, repeated"
+ },
+ "play/static/js/table/23-thats-wrong.js": {
+  "row::said": "a value of the constant outcome table just above"
+ },
+ "play/static/js/table/16-tab-map.js": {
+  "renderPlaces::PlacesChart.svg(pf, { sel: MAPV.sel, k: MAPV.k })": "16-places-chart.js's builders, which the scan reads clean (resolved by name they collide with other svg/key functions)",
+  "renderPlaces::PlacesChart.key(pf)": "16-places-chart.js's builders, which the scan reads clean (resolved by name they collide with other svg/key functions)"
+ },
+ "play/static/js/table/37-works.js": {}
+}

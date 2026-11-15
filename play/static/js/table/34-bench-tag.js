@@ -141,7 +141,7 @@
       '<div class="tb-row"><label class="tb-label" for="bench-batch">Batch</label>' +
       '<div class="tb-step v2-recess">' +
         '<button type="button" class="v2-btn is-small" data-batch="less" aria-label="One dose fewer"' + (n <= 1 ? " disabled" : "") + '>−</button>' +
-        '<input type="number" id="bench-batch" class="v2-well tb-n" min="1" step="1" value="' + n + '" data-batch="n">' +
+        '<input type="number" id="bench-batch" class="v2-well tb-n" min="1" step="1" value="' + esc(n) + '" data-batch="n">' +
         '<button type="button" class="v2-btn is-small" data-batch="more" aria-label="One dose more">+</button>' +
       '</div>' +
       '<button type="button" class="v2-btn is-small is-quiet" data-batch="all">All</button></div>' +

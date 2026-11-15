@@ -1013,7 +1013,7 @@
           cls += " lit";
           // The level a step onto this square actually lands on, straight from the
           // server's own answer. The flat map writes the same attribute.
-          hit = ' data-sq="' + x + "," + y + (reach[k][3] ? "," + reach[k][3] : "") + '"';
+          hit = ' data-sq="' + x + "," + y + (reach[k][3] ? "," + esc(reach[k][3]) : "") + '"';
         }
 
         // A wall is two levels of stone whatever the floor under it does; a raised square
@@ -1226,8 +1226,8 @@
       var cls = "fig " + side + (down ? " down" : "");
       if (az !== level) cls += " offlevel";
       if (opts.caught && opts.caught.has(a.ref)) cls += " caught";
-      var tip = "<title>" + esc(a.name || "") + " — " + a.hp + "/" + a.hp_max +
-                (a.members != null ? " · " + a.members + " of " + a.members_max +
+      var tip = "<title>" + esc(a.name || "") + " — " + esc(a.hp) + "/" + esc(a.hp_max) +
+                (a.members != null ? " · " + esc(a.members) + " of " + esc(a.members_max) +
                  " still standing" : "") +
                 (az ? " · " + az * 5 + " ft up" : "") + "</title>";
       // Whose turn it is: a gold rim on the base (the flat token's ring, in 3D).

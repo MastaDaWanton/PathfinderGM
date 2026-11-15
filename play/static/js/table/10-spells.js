@@ -350,9 +350,9 @@ function spellPickerHtml(sheet) {
     const pips = lvl === 0 ? `<span class="sp-left">at will</span>`
       : slot ? `<span class="sp-pips" aria-hidden="true">${
       Array.from({ length: slot.max }, (_, i) => `<i${i < slot.left ? ` class="on"` : ""}></i>`)
-        .join("")}</span><span class="sp-left">${slot.left} of ${slot.max} left</span>` : "";
-    return `<div class="sp-level" data-level="${lvl}">
-      <div class="sp-levelhead"><span>${lvl === 0 ? "Cantrips" : `Level ${lvl}`}</span>${pips}</div>
+        .join("")}</span><span class="sp-left">${esc(slot.left)} of ${esc(slot.max)} left</span>` : "";
+    return `<div class="sp-level" data-level="${esc(lvl)}">
+      <div class="sp-levelhead"><span>${lvl === 0 ? "Cantrips" : `Level ${esc(lvl)}`}</span>${pips}</div>
       ${rows.filter(r => r.level === lvl).map(r => `<button type="button" class="sp-spell"
           data-spell="${esc(r.id)}" data-name="${esc(r.name)}" data-range="${
           esc(r.range)}"${r.why ? " disabled" : ""}${
