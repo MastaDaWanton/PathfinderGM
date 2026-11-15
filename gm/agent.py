@@ -413,6 +413,16 @@ class GMAgent:
         self.rows = acts_to_ops.table(read_ok, self.engine.scene,
                                       places=self.engine.places(), sentence=player_input,
                                       recent=getattr(self, "recent", ()))
+        # The things a deed handles that nothing records ("light the lamp"), settled
+        # before the plan: ledgered, or the row carries the printed answer
+        # (gm/scenery.py `handled`, `acts_to_ops.things_not_here`). Off with the reader.
+        from . import scenery
+
+        settled = scenery.handled(read_ok, self.rows, self.engine,
+                                  list(getattr(self, "narrated", ()) or ()),
+                                  ask_fn=scenery.ask if interpret.ENABLED else None)
+        if settled and isinstance(self.reading, dict):
+            self.reading.setdefault("scenery", []).extend(settled)
         # A sale to somebody with no counter is asked again on its own before the engine
         # is committed to it (`acts_to_ops.confirm_sales`); off with the reader.
         held_back = acts_to_ops.confirm_sales(
@@ -1045,6 +1055,9 @@ class GMAgent:
                 # (`acts_to_ops.nowhere_to_go`; the owner's 2026-11-05 save, row 69:
                 # "Continue walking toward the quarters" → "You remain in the market").
                 raw = acts_to_ops.nowhere_to_go(raw, self.rows, notes=own_words)
+                # And a deed whose thing is not here or not carried says so on the page
+                # (`acts_to_ops.things_not_here`), whatever else the plan does.
+                raw = acts_to_ops.things_not_here(raw, self.rows, notes=own_words)
                 # Last of all: a say in the player's character's mouth carries the
                 # player's words or none (item 6) — after every injector that can add one.
                 raw = judgement.own_words_only(

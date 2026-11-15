@@ -85,8 +85,6 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
-# Sessions are cookie-backed so there is no database and no session table to migrate.
-SESSION_ENGINE = "django.contrib.sessions.backends.signed_cookies"
 
 # --- Pathfinder GM ---------------------------------------------------------------
 

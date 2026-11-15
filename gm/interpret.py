@@ -479,8 +479,9 @@ attack    hit, punch, stab, shoot, assault, pick a fight with, run amok, finish 
 cast      cast a named spell
 use       draw a weapon, put on, show, use, bandage, light
 consume   eat or drink
-wait      wait, sit, stand, stay, keep watch, pass time
-rest      sleep, lie down, make camp, rest, take a room
+wait      wait, sit, stand, stay, keep watch, pass time; doze, nap or nod off for a
+          while (no night's sleep)
+rest      sleep, go to bed, lie down for the night, make camp, rest, take a room
           (wait and rest: `until` is the time of day it lasts until — tomorrow or the next
           day is morning; first light or sunrise is dawn; dark or nightfall is dusk; a
           clock hour said ("ten at night") is an hour named; a length ("for an hour",
@@ -668,6 +669,13 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "sit on the bench for an hour", "place": "the bench", "time": "for an hour",
           "until": "a while", "act": "wait"}]}),
+    # A doze is time passing, not a night (the live check of 2026-11-07, again on
+    # 2026-11-15): "I stroll to the fire, warm my hands and doze off" was read `rest`, and
+    # the rest door asked the innkeeper for a room — 5 sp — for a nap by the hearth.
+    ("I settle by the fire and doze off for a bit.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "settle by the fire and doze off for a bit", "place": "the fire",
+          "time": "for a bit", "until": "a while", "act": "wait"}]}),
     # Going on, with nowhere named, is a walk all the same (owner report 2026-11-01,
     # Corvin, turn 14: "keep going" came back with no action at all, so the walk a crowd
     # had cut short could not be carried on — `acts_to_ops._carry_on`).
@@ -695,6 +703,14 @@ _DEMOS = [
           "fixture": "hearth", "act": "go"},
          {"span": "set a pot of stew on to simmer for supper", "object": "a pot of stew",
           "cost": "takes_time", "act": "other"}]}),
+    # The fire is the hearth (live 2026-11-15): "I stroll to the fire, warm my hands and
+    # doze off" was read `within_place` with no fixture, nothing moved the player, and
+    # the page said "You remain at your table".
+    ("I wander over to the fire to warm up.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "wander over to the fire", "place": "the fire", "within_place": True,
+          "fixture": "hearth", "act": "go"},
+         {"span": "warm up", "act": "other"}]}),
     # A move inside the place named by a part of the room rather than a thing in it
     # (`within_place`, the live check of 2026-11-07). Not a test line.
     ("I shoulder through the crowd to the far end of the bar.",

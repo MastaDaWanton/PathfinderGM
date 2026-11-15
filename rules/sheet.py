@@ -7233,9 +7233,9 @@ def full_sheet(actor: Actor) -> dict:
             "effect": maneuver_text(m["effect"], "you", "the target", you="actor",
                                     **m.get("sheet", {})),
             "size_limit": m.get("size_limit"),
-            # Straight off the manoeuvre table. `provokes` is the table's word, and the
-            # Sheet says under the table that no attack of opportunity is rolled for a
-            # manoeuvre yet (only movement provokes: rules/reactions.py).
+            # Straight off the manoeuvre table. `provokes` is the table's word; the
+            # attack of opportunity it draws from the target is rolled by
+            # `reactions.provoked_by_maneuver`, which a feat's unprovoking tag stops.
             "key": key,
             "provokes": bool(m.get("provokes")),
             "two_hands": bool(m.get("needs_two_hands")),

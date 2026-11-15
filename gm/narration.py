@@ -1907,7 +1907,13 @@ def ensure_hand_back(text: str) -> tuple[str, bool]:
     # adding another produced ".'. What do you do?".
     # A quoted question is a stop too: the live check of 2026-09-30 shipped `ask him,
     # "How much for a drink?". What do you do?`.
-    if said.rstrip("\"“”'‘’")[-1:] not in (".", "!", "?", "…", ""):
+    bare = said.rstrip("\"“”'‘’")
+    if bare.endswith(",") and len(bare) < len(said):
+        # A quote handed back on its comma is closed on a stop inside the quote: "He
+        # waits by the door. 'Go home,'" shipped as "'Go home,'. What do you do?"
+        # (docs/fix-plan-2026-09-30.md, Lane A).
+        said = bare[:-1] + "." + said[len(bare):]
+    elif bare[-1:] not in (".", "!", "?", "…", ""):
         said += "."
     return f"{said} {HAND_BACK}", True
 
