@@ -1307,18 +1307,23 @@ def _confiscate(engine, pc) -> list[dict]:
             gave = engine._op_give(Intent(op="give", actor=pc.ref,
                                           params={"item": name, "from_": pc.ref},
                                           because="confiscated by the watch"), {})
-            if not gave.effects:
-                log.warning("confiscation: %r did not leave %s's hands (%s); the "
-                            "ledger is put right regardless", name, pc.name, gave.tell)
-        except Exception:       # noqa: BLE001 - the ledger is still put right below
+            moved, why = bool(gave.effects), gave.tell
+        except Exception as exc:  # noqa: BLE001 - one bad give never costs the sentence
             log.exception("confiscation: giving up %r failed", name)
-        # Unconditional ON PURPOSE, and weighed again 2026-11-11 (review finding 10,
-        # which asked for the record to flip only when the give moved the item). Two
-        # reasons it stays: the give only sets the thing down, so this flip is the
-        # second half of the move, not a note about it; and `charges` charges theft
-        # afresh for anything `_goods_held` still finds, so a thing the give can never
-        # move would be charged at every arrest with no way to end it. What was silent
-        # is now logged.
+            moved, why = False, str(exc)
+        # The give only sets the thing down, so this flip is the second half of the
+        # move — made when the thing has left the player's hands, and only then (review
+        # 2026-11-11 finding 10). It flipped regardless, logged: a give the engine
+        # refused (a cursed thing that clings) left the item in the pack while the
+        # ledger had it back with its owner, so the player walked out with stolen goods
+        # no later search could find. A record the pack no longer bears out
+        # (`_carried_by` finds nothing) is still put right — the case the unconditional
+        # flip was kept for, since a thing that is not there would otherwise be charged
+        # at every arrest with no way to end it.
+        if not moved and engine._carried_by(pc, name) is not None:
+            log.warning("confiscation: %r stayed in %s's hands (%s); still stolen",
+                        name, pc.name, why)
+            continue
         rec.pop("at", None)
         rec.pop("square", None)
         rec.pop("stolen", None)
