@@ -243,7 +243,7 @@
         {"text": "Say you search, eavesdrop or listen at a door, and the engine rolls Perception.",
          "file": "gm/judgement.py", "find": "(\"perception\", r\"search"},
         {"text": "On the road, a cutpurse has to beat your Perception, rolled in secret, to lift your coin.",
-         "file": "rules/engine.py", "find": "spot = self.dice.d20(pc.skill_modifiers(\"perception\"),"},
+         "file": "rules/engine.py", "find": "spot = self.dice.d20(pc.skill_modifiers(\"perception\", opposed=True),"},
         {"text": "It is what other people roll against your Stealth. Their number is never shown.",
          "file": "gm/judgement.py", "find": "return {\"ref\": max(pool, key=lambda r: _perception(actors[r])), \"skill\": \"perception\"}"}
       ],

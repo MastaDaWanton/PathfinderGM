@@ -74,6 +74,9 @@ UNSOLD_SECTION = re.compile(r"siege|\(modern\)", re.I)
 AMMO_SECTIONS = ("Ammunition", "Firearm Ammunition / Gear", "Siege Weapon Ammunition",
                  "Siege Engines (Ammunition)")
 _COUNT = re.compile(r"\s*\((\d+)(?:\s+[a-z]+)?\)\s*$")
+# A composite bow's Strength rating as the books print it: "composite longbow (+2 Str)",
+# "+1 composite shortbow (+3 Str)" (compile_block strips the same parenthesis).
+_RATING = re.compile(r"\s*\(\s*\+?\s*(\d+)\s*str(?:ength)?\s*\)\s*", re.I)
 
 
 def _shipped_folder() -> Path:
@@ -231,6 +234,7 @@ def key_for(text: str) -> str:
         return ""
     idx = _index()
     raw = re.sub(r"^(?:a|an|the|my|his|her|their|some)\s+", "", raw)
+    raw = _RATING.sub(" ", raw).strip()
     for cand in (raw, _COUNT.sub("", raw), raw[:-1] if raw.endswith("s") else ""):
         if not cand:
             continue
@@ -267,6 +271,28 @@ def is_ammunition(key: str) -> bool:
     if row.get("not_ammo"):
         return False
     return bool(row.get("ammo_of")) or str(row.get("section") or "") in AMMO_SECTIONS
+
+
+def strength_rating(w: dict, key: str = "") -> int | None:
+    """A composite bow's Strength rating, or None for anything that is not one.
+
+    "All composite bows are made with a particular strength rating ... The default
+    composite longbow requires a Strength modifier of +0 or higher to use with
+    proficiency" (d20pfsrd.com/equipment/weapons/weapon-descriptions/longbow-composite/).
+    The record's own `strength_rating` first, then the "(+N Str)" its name prints, else
+    the default +0."""
+    base = key_for(str(w.get("crafted_base") or key or w.get("name") or ""))
+    if not base.startswith("composite-"):
+        return None
+    rec = w.get("crafted_record") if isinstance(w.get("crafted_record"), dict) else {}
+    for held in (w.get("strength_rating"), rec.get("strength_rating")):
+        if isinstance(held, int) and not isinstance(held, bool) and held >= 0:
+            return held
+    for text in (key, w.get("name"), rec.get("name")):
+        m = _RATING.search(str(text or ""))
+        if m:
+            return int(m.group(1))
+    return 0
 
 
 def ammo_families(key: str) -> list[str]:

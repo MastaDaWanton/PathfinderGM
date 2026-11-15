@@ -591,6 +591,27 @@ CONSTRUCT = "type.construct"
 UNDEAD = "type.undead"
 DESTROYED_AT_ZERO: tuple[str, ...] = (UNDEAD,)
 BROKEN_BELOW_ZERO: tuple[str, ...] = (CONSTRUCT,)
+
+
+def sightless(actor) -> bool:
+    """Whether this creature has no sight for a visual effect to work on: blinded now, or
+    blind by nature. Oozes: "Blind (but have the blindsight universal monster rule),
+    which means they are immune to gaze attacks, visual effects, illusions, and other
+    attack forms that rely on sight" (Bestiary, Creature Types, Ooze; d20pfsrd.com/
+    bestiary/rules-for-monsters/creature-types/#Ooze); and a block printing "blind" among
+    its weaknesses (termite swarm, yrthak).
+
+    Until 2026-11-15 the one asker (color spray's "Sightless creatures are not affected",
+    `spells.spared_by`) read the blinded condition alone, so a gray ooze was stunned by a
+    spray of colour it has no eyes for. Sightless is NOT blinded: an ooze takes none of
+    blinded's -2 AC or lost Dexterity, so this lays nothing; it is only asked."""
+    if actor is None:
+        return False
+    if actor.has_state("state.senses.blinded") or actor.has_state("type.ooze"):
+        return True
+    doc = actor._creature_doc() if hasattr(actor, "_creature_doc") else None
+    weak = [w.strip() for w in str((doc or {}).get("weaknesses") or "").lower().split(",")]
+    return "blind" in weak
 # The bodies with no hands to clutch a wound and no voice to stop mid-word: the death line
 # a narrator falls back on is chosen by this (`gm/agent.py` `_deaths_from`). Measured on the
 # 2026-11-04 follow-ups bench: "The wolf staggers two steps, hands full of it, and sit down

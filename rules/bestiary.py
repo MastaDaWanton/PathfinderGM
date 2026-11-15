@@ -665,7 +665,11 @@ _NOT_ON_THE_SHEET = (
     # All 7,112 stated speeds are integers and the 24 absent ones fall back as before.
     "base_attack", "speed_note", "immune", "resist", "sr", "weaknesses",
     "senses", "languages", "special_attacks", "special_abilities", "spell_like",
-    "environment", "organization", "treasure", "source", "playable", "id", "feats",
+    "environment", "organization", "treasure", "source", "playable", "id",
+    # `feats` came off this list on 2026-11-15: printed Combat Reflexes, Power Attack and
+    # Blind-Fight did nothing on any monster (the feat documents are read live off
+    # `Actor.feats`, `_feat_mods`), and a printed total already holding a feat's
+    # unconditional term skips it under the flat number (`Actor._flat_for`).
     "biomes", "climates", "biomes_any", "biomes_inferred", "biomes_from",
     # What the book prints a creature carries, as printed (tools/ship_rulebook_line.py):
     # read by the compile into `carries`, never by the sheet, whose own `gear` is a dict
@@ -1172,6 +1176,10 @@ def lookup(key: str) -> dict | None:
         if isinstance(raw.get(src), int) and not isinstance(raw.get(src), bool):
             data[dst] = raw[src]
     data["kind"] = "npc"
+    # The printed hit points are the book's total, Toughness inside them: read in the
+    # current convention (`from_dict`'s `hp_channels`), or the feats now on the sheet
+    # would add Toughness a second time (the ogre's printed 30 read 33).
+    data["hp_channels"] = ["feat"]
     # `immune`, `resist`, `weaknesses` and `senses` are stripped by `_NOT_ON_THE_SHEET`
     # above, and `Actor` had no field for any of them — so a frost giant took full damage
     # from cold and 4,673 immunity terms in the content directory were read by nothing.

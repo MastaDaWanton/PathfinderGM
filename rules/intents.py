@@ -298,7 +298,7 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     "check": (("skill",), ("dc", "opposed_by", "circumstance", "aid", "request", "search",
                            "pace", "diversion", "past"),
               "player"),
-    "save": (("save", "dc"), ("on_success", "on_failure"), "player"),
+    "save": (("save", "dc"), ("on_success", "on_failure", "breaks"), "player"),
     # `player`, because the PC rolls their own to-hit and their own damage. Defaulting
     # this to `hidden` meant the engine silently rolled the player's attacks for them,
     # which contradicts the architecture decision outright. NPC attacks still resolve
@@ -787,7 +787,10 @@ PARAM_ALIASES = {
 # printed question; `not_here` is the world's answer for a person the player looked for
 # who is not here, which the engine prints instead of anybody being created (item 29).
 CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending", "request", "job",
-                              "ends_when", "pace", "diversion", "past", "together"})
+                              "ends_when", "pace", "diversion", "past", "together",
+                              # A held player's save (`Engine.held_save_turn`) names the
+                              # hold it ends; honoured only with an engine origin.
+                              "breaks"})
 # Ops only code writes: left out of the plan's op enum (gm/prompts.py) and dropped from a
 # plan that writes one anyway (`acts_to_ops.apply`). A job is offered, taken and turned
 # down by the reader's closed answer about the player's own words, never by the planner:

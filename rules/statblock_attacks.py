@@ -477,6 +477,38 @@ def swings(attack: dict) -> list[int]:
     return [i for _ in range(count) for i in range(n)]
 
 
+# The natural attacks the Bestiary's table makes primary ("Natural Attacks by Size": bite,
+# claw, gore, slam, sting, talons; everything else is secondary), the same list the
+# templates build with (`templates.py`, `primary_kinds`).
+PRIMARY_KINDS = frozenset({"bite", "claw", "gore", "slam", "sting", "talon", "talons",
+                           "rake", "foreclaw"})  # a rake and a foreclaw are claws
+
+
+def strength_share(attack: dict, option: list[dict], hands: int = 1) -> float:
+    """The multiple of Strength a printed attack's damage takes — what its printed flat
+    bonus was built at, read off the print, so a change in Strength since (`Actor.
+    printed_shift`) and Power Attack's rungs move it at the book's multiple.
+
+    Bestiary, Universal Monster Rules, Natural Attacks (d20pfsrd.com/bestiary/rules-for-
+    monsters/universal-monster-rules/#Natural_Attacks): a secondary natural attack adds
+    "1/2 the creature's Strength bonus"; one used beside manufactured weapons is
+    secondary "regardless of the attack's original type"; a sole natural attack adds
+    "1-1/2 times". A printed secondary attack also shows itself by its bonus, five or
+    more below the option's best (the test `templates.py` already uses). A manufactured
+    weapon wielded two-handed (`hands`, from the weapons table) is 1.5."""
+    if not attack.get("natural"):
+        return 1.5 if int(hands or 1) >= 2 and attack.get("category") == "melee" else 1.0
+    if any(not a.get("natural") and not a.get("automatic") for a in option):
+        return 0.5
+    if sum(int(a.get("count") or 1) for a in option if a.get("natural")) == 1:
+        return 1.5
+    first = max((a["bonuses"][0] for a in option if a.get("bonuses")), default=0)
+    if attack.get("kind") not in PRIMARY_KINDS or (
+            attack.get("bonuses") and attack["bonuses"][0] <= first - 5):
+        return 0.5
+    return 1.0
+
+
 # Keyed on the identity of the bestiary's own cache, the arrangement `rules/npcs.py` uses:
 # it rebuilds exactly when the bestiary does (a homebrew creature saved, a test moving
 # CAMPAIGN_DIR) without an entry in conftest's list.

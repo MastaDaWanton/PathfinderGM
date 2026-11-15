@@ -1466,7 +1466,7 @@ def _noticed(engine, seen: list, total: int | None) -> list:
     out = []
     for a in seen:
         try:
-            mods = a.skill_modifiers("perception")
+            mods = a.skill_modifiers("perception", opposed=True)
         except Exception:       # noqa: BLE001
             mods = []
         if engine.dice.d20(mods, label=f"{a.name} Perception", visibility="hidden").total \

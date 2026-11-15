@@ -1192,7 +1192,9 @@ class Scene:
             # Their turn has come round, able or not: a hold that a new save may end
             # (hold person) is tried now, and trying it is the turn (a full-round action).
             self.hazards.extend(self._held_saves(ref))
-            if halt_on is not None and ref == halt_on:
+            # The player's own hold is the player's to roll (`Engine.held_save_turn`): their
+            # slot stops the walk as a downed player's does, and the popup is the turn.
+            if (halt_on is not None and ref == halt_on) or self.held_pc(ref):
                 self.turn = nxt          # their slot, able or not (`advance_turn`)
                 return ref
             # The one caller that wants "can act now" rather than "still in the fight":
@@ -1204,6 +1206,15 @@ class Scene:
                 self.acted.add(ref)
                 return ref
         return None                      # nobody able this pass
+
+    def held_pc(self, ref: str):
+        """The player's hold that a save on their turn may end — the first effect on them
+        with `ends_when.save_each_turn` — or None (a non-player, or nothing so held)."""
+        who = self.people.get(ref)
+        if who is None or not who.is_pc or who.is_dead:
+            return None
+        return next((e for e in who.effects if isinstance(
+            ((e.payload or {}).get("ends_when") or {}).get("save_each_turn"), dict)), None)
 
     def _held_saves(self, ref: str) -> list[dict]:
         """The new saving throw a held creature makes on its turn (hold person, CRB:
@@ -1217,7 +1228,9 @@ class Scene:
         narration (`_ward_tell`, `held_save`). Added 2026-11-08: before it a held creature
         stayed paralyzed for the spell's whole duration."""
         who = self.people.get(ref)
-        if who is None or who.is_dead:
+        if who is None or who.is_dead or who.is_pc:
+            # The player's is rolled on the player's own die, by the popup
+            # (`Engine.held_save_turn`), never here behind the screen.
             return []
         out: list[dict] = []
         for e in list(who.effects):
@@ -5861,6 +5874,28 @@ class Engine:
                     f"the whole round. {end}")
         return ""
 
+    def _beside_weapons(self, actor, weapon: dict) -> bool:
+        """Whether this natural attack follows a manufactured weapon's swing by the same
+        creature this turn — which makes it secondary: creatures that attack with both
+        "treat all of their available natural attacks as secondary attacks during that
+        attack, regardless of the attack's original type" (Bestiary, Universal Monster
+        Rules, Natural Attacks; d20pfsrd.com/bestiary/rules-for-monsters/universal-monster-
+        rules/#Natural_Attacks). A derived body's full attack is one weapon
+        (`Actor.attack_plan`), so the sword and the bite arrive as two blows in one batch;
+        the batch's blows say what swung (`Outcome.blows`). A printed attack carries its
+        own share and never asks."""
+        if not weapon.get("natural") or weapon.get("stat_block"):
+            return False
+        from . import weapons as weapons_mod
+
+        for o in self._acted_in_batch(actor, ("attack",)):
+            for b in o.blows or ():
+                name = str(b.get("weapon") or "")
+                key = weapons_mod.key_for(name)
+                if key and key != "unarmed" and actor.natural_weapon(name) is None:
+                    return True
+        return False
+
     def _acted_in_batch(self, actor, ops=("attack", "cast")):
         """This actor's resolved blows and spells in the batch so far (`_so_far`)."""
         for o in getattr(self, "_so_far", None) or ():
@@ -6015,12 +6050,29 @@ class Engine:
         move the plan declared itself — the order `_reach_refusal` tells the model to
         write — marked nothing. A 5-foot step (one square, 5 ft paid) leaves the full
         attack, the rule's own exception. The closing step is skipped here: its blow was
-        marked when the step was spliced in. A zone move on a scene with no map is not
-        counted — a zone is a distance band, with no feet to weigh."""
+        marked when the step was spliced in.
+
+        A zone move on a scene with no map counts too, weighed at the bands' own distances
+        (`SQUARES_BY_ZONE`: engaged 5 ft, near 15, far 40): near to engaged is 10 ft, more
+        than a 5-foot step, so the full attack after it is one blow. Until 2026-11-15 the
+        zone move was not counted at all ("a zone is a distance band, with no feet to
+        weigh"), and with no map a creature walked in from far and still threw its whole
+        routine. The mover is the walker: the player walking up to somebody sets the zone
+        on the person `who` names (`_op_move`), and it is the player's feet that moved."""
         if not self.scene.in_encounter or outcome.status != "resolved":
             return
         params = intent.params or {}
         mover = str(params.get("who") or intent.actor or "")
+        zoned = next((e for e in outcome.effects or () if e.get("kind") == "zone"
+                      and e.get("from") != e.get("to")), None)
+        walker = self.scene.actors.get(intent.actor or "")
+        if zoned is not None and not self.scene.has_grid and walker is not None                 and (mover == walker.ref or walker.is_pc) and not params.get("closing_on"):
+            feet = abs(SQUARES_BY_ZONE.get(str(zoned["from"]), 3)
+                       - SQUARES_BY_ZONE.get(str(zoned["to"]), 3)) * FEET_PER_SQUARE
+            if feet > FEET_PER_SQUARE:
+                self.scene.move_spent[walker.ref] = self.scene.round
+                self._one_blow_left(walker.ref, queue)
+            return
         if not mover or mover != (intent.actor or "") or params.get("closing_on"):
             return
         went = next((e for e in outcome.effects or () if e.get("kind") == "position"
@@ -6174,6 +6226,32 @@ class Engine:
                     tell=f"The grapple between {held.name} and {other} ends: {why}.",
                     because="")))
         return out
+
+    def held_save_turn(self, ref: str) -> Resolution | None:
+        """The player's turn while a hold that a new save may end holds them (hold person,
+        CRB p.295: "Each round on its turn, the subject may attempt a new saving throw to
+        end the effect. This is a full-round action that does not provoke attacks of
+        opportunity"), rolled on the player's own die — the dice popup — through the one
+        save door, against the DC the cast set. None when nothing so holds them.
+
+        Until 2026-11-15 `Scene._held_saves` rolled the player's save hidden at the top of
+        their skipped turn, like a monster's: the player never saw the die that kept them
+        paralysed. A creature's save is still rolled there (`_held_saves`)."""
+        held = self.scene.held_pc(ref)
+        if held is None:
+            return None
+        spec = held.payload["ends_when"]["save_each_turn"]
+        save, dc = str(spec.get("save") or ""), int(spec.get("dc") or 0)
+        if save not in SAVES or not dc:
+            return None
+        source = str(held.source or held.name or held.key)
+        source = source[4:] if source.startswith("the ") else source
+        return self.run(self.validate([{
+            "op": "save", "actor": ref, "visibility": "player",
+            "params": {"save": save, "dc": dc, "breaks": held.key},
+            "because": f"to break free of the {source}"}],
+            origin=str(held.origin or "rule:held-save"),
+            origin_name=source))
 
     def grapple_turn(self, ref: str) -> Resolution | None:
         """A creature's turn while it holds somebody: the maintaining check, as its
@@ -7540,7 +7618,8 @@ class Engine:
         if ability:
             mods = actor.ability_check_modifiers(ability)
         else:
-            mods, refused = self._skill_mods_or_refusal(intent, actor, skill)
+            mods, refused = self._skill_mods_or_refusal(
+                intent, actor, skill, opposed=bool(intent.params.get("opposed_by")))
             if refused is not None:
                 return refused
         opposed = intent.params.get("opposed_by")
@@ -7668,7 +7747,7 @@ class Engine:
             else:
                 other = self.scene.actors[opposed["ref"]]
                 opposing_roll = self.dice.d20(
-                    other.skill_modifiers(opposed["skill"]),
+                    other.skill_modifiers(opposed["skill"], opposed=True),
                     label=f"{other.name} {opposed['skill'].title()}",
                     visibility="hidden",
                 )
@@ -7829,7 +7908,8 @@ class Engine:
             because=intent.because,
         )
 
-    def _skill_mods_or_refusal(self, intent: Intent, actor, skill: str):
+    def _skill_mods_or_refusal(self, intent: Intent, actor, skill: str,
+                               opposed: bool = False):
         """(the skill's modifiers, None), or ([], the Outcome saying why nothing is rolled)."""
         from .sheet import IllegalSheet
 
@@ -7850,7 +7930,7 @@ class Engine:
         # is right (1e knowledge checks are trained-only); the crash is not. Nothing is
         # rolled, the player is told why, and the turn survives.
         try:
-            return actor.skill_modifiers(skill), None
+            return actor.skill_modifiers(skill, opposed=opposed), None
         except IllegalSheet as exc:
             return [], Outcome(intent_id=intent.id, op="check", effects=[],
                                tell=f"{exc}. Nothing is rolled.", because=intent.because)
@@ -8369,6 +8449,21 @@ class Engine:
                     f"{actor.name} takes {hit['amount']} {hit['type']} damage"
                     + (f" ({hit['note']})." if hit["note"] else ".")
                 )
+
+        # The held player's own save on their turn (`held_save_turn`): made, the hold it
+        # names ends through the applicator. Only from a stamped door — `breaks` is code's.
+        breaks = str(intent.params.get("breaks") or "")
+        if breaks and intent.origin and verdict == "success":
+            gone = actor.remove_effects(match=lambda e: e.key == breaks and isinstance(
+                ((e.payload or {}).get("ends_when") or {}).get("save_each_turn"), dict))
+            if gone:
+                effects.append({"ref": actor.ref, "kind": "held_save", "what": breaks,
+                                "made": True, "origin": intent.origin})
+                tell_bits.append(f"{actor.name} breaks free: no longer {breaks}.")
+        elif breaks and intent.origin:
+            effects.append({"ref": actor.ref, "kind": "held_save", "what": breaks,
+                            "made": False, "origin": intent.origin})
+            tell_bits.append(f"{actor.name} is still {breaks}.")
 
         cond = branch.get("condition")
         if cond:
@@ -9101,7 +9196,9 @@ class Engine:
                 atk_mods = actor.attack_modifiers(weapon_key, iteration, power_attack=power,
                                                   lethality=lethality, defender=defender,
                                                   thrown=thrown_any,
-                                                  range_ft=self._gap_ft(actor, defender))
+                                                  range_ft=self._gap_ft(actor, defender),
+                                                  beside_weapons=self._beside_weapons(
+                                                      actor, weapon))
                 atk_mods = atk_mods + self._situational_attack_mods(
                     actor, defender, weapon, range_pen)
 
@@ -9294,7 +9391,9 @@ class Engine:
                                                         defender=defender,
                                                         thrown=thrown_any,
                                                         range_ft=self._gap_ft(actor,
-                                                                              defender)))
+                                                                              defender),
+                                                        beside_weapons=self._beside_weapons(
+                                                            actor, weapon)))
                 rider_col = "" if dancing else str(weapon.get("rider_column") or "")
                 if rider_col:
                     # Blood DMG + Fist DMG + STR, and BOTH dice are the player's.
@@ -15793,7 +15892,7 @@ class Engine:
                               visibility="hidden").total
         lift = self.dice.d20(thief.skill_modifiers("sleight of hand"),
                              label=f"{thief.name} Sleight of Hand", visibility="hidden")
-        spot = self.dice.d20(pc.skill_modifiers("perception"),
+        spot = self.dice.d20(pc.skill_modifiers("perception", opposed=True),
                              label=f"{pc.name} Perception", visibility="hidden")
         if lift.total < max(ontheway.LIFT_DC, spot.total):
             return (" A hand is on your purse, and you have hold of the wrist it "
@@ -18577,6 +18676,47 @@ class Engine:
                 return None
         return _to_rounds(max(1, int(amount)), unit)
 
+    def _slap_awake(self, intent: Intent, target, key: str) -> "Outcome | None":
+        """Lifting a magical slumber (a condition whose `ends_when` says `wounded`) is
+        somebody else waking the sleeper, at the book's price; None for any other lift.
+
+        Sleep (CRB p.339, aonprd.com/SpellDisplay.aspx?ItemName=Sleep): "Slapping or
+        wounding awakens an affected creature, but normal noise does not. Awakening a
+        creature is a standard action (an application of the aid another action)." Until
+        2026-11-15 `condition ends` lifted it for nothing: the sleeper could plan its own
+        waking, and a companion shook the player awake mid-fight and still swung. Now the
+        sleeper cannot wake itself, the waker must be able to act and stand beside them
+        (aid another is made "in a position to make a melee attack"), and in a fight it
+        is the waker's standard action (`Scene.standard_spent`, the drink's record)."""
+        sleep = [e for e in target.effects if e.kind == "condition" and e.key == key
+                 and ((e.payload or {}).get("ends_when") or {}).get("wounded")]
+        if not sleep:
+            return None
+        waker = self.scene.actors.get(intent.actor or "")
+        if waker is None or waker is target:
+            return self._refuse(intent, f"{target.name} is in a magical sleep and cannot "
+                                        f"wake on their own: somebody must slap them awake "
+                                        f"(a standard action), or a wound will.")
+        if not waker.can_act():
+            return self._refuse(intent, f"{waker.name} is in no state to wake anybody.")
+        gap = self._gap_ft(waker, target)
+        if gap is not None and gap > 5:
+            return self._refuse(intent, f"{waker.name} must be beside {target.name} to slap "
+                                        f"them awake ({gap} ft away).", code="out_of_reach")
+        if self.scene.in_encounter:
+            if self.scene.standard_spent.get(waker.ref) == self.scene.round or any(
+                    self._acted_in_batch(waker)):
+                return self._refuse(intent, f"{waker.name} has already used this turn's "
+                                            f"standard action, and waking {target.name} "
+                                            f"is a standard action.", code="standard_spent")
+            self.scene.standard_spent[waker.ref] = self.scene.round
+        target.remove_effects(match=lambda x: any(x is e for e in sleep))
+        return Outcome(
+            intent_id=intent.id, op="condition",
+            effects=[{"ref": target.ref, "kind": "condition", "condition": key,
+                      "ends": True, "woken_by": waker.ref, "origin": "rule:aid-another"}],
+            tell=f"{waker.name} slaps {target.name} awake.", because=intent.because)
+
     def _op_condition(self, intent: Intent, partial: dict) -> Outcome:
         ref = intent.params.get("to") or intent.actor or (intent.targets() or [None])[0]
         target = self.scene.actors[ref]
@@ -18592,6 +18732,9 @@ class Engine:
         # character never played again — nothing ticked it, no turn could be taken, and
         # there was no route out of it in the whole app.
         if intent.params.get("ends"):
+            woken = self._slap_awake(intent, target, key)
+            if woken is not None:
+                return woken
             gone = target.remove_effects(kind="condition",
                                          match=lambda e: e.key == key)
             named = CONDITIONS.get(key, {}).get("name", key).lower()

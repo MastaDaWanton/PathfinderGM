@@ -1107,10 +1107,11 @@ def spared_by(spell, target, hit_dice: int) -> str:
     (docs: the-world-owns-its-own-races), so their type is never second-guessed here. Only a
     creature typed otherwise (a wolf is `type.animal`) is spared by the type."""
     # "Sightless creatures are not affected" (color spray): read off the spell's own text,
-    # and answered by the vocabulary's blindness — the nearest thing a sheet says to having
-    # no sight to dazzle.
+    # and answered by `states.sightless`: blinded now, or blind by nature (an ooze).
+    from . import states as states_mod
+
     if _SIGHTLESS.search(str(getattr(spell, "description", "") or "")) \
-            and target.has_state("state.senses.blinded"):
+            and states_mod.sightless(target):
         return "cannot see it"
     line = str(getattr(spell, "targets", "") or "").lower()
     if not line:

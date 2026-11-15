@@ -279,7 +279,8 @@ def test_deafened_takes_four_off_initiative():
 def test_blinded_takes_four_off_strength_dexterity_and_perception_only():
     """CRB, Blinded: "-4 penalty on most Strength- and Dexterity-based skill checks and
     on opposed Perception skill checks". The row said -4 on every skill, Knowledge and
-    Spellcraft included."""
+    Spellcraft included. Perception only when opposed (combat rules lane, 2026-11-15):
+    a flat-DC Perception check takes nothing."""
     pc = _strong("longsword")
     pc.ranks.update({"climb": 1, "acrobatics": 1, "perception": 1, "spellcraft": 1,
                      "diplomacy": 1})
@@ -288,7 +289,8 @@ def test_blinded_takes_four_off_strength_dexterity_and_perception_only():
     pc.add_condition("blinded", source="test")
     after = {s: _total(pc.skill_modifiers(s)) for s in names}
     assert {s: after[s] - before[s] for s in names} == {
-        "climb": -4, "acrobatics": -4, "perception": -4, "spellcraft": 0, "diplomacy": 0}
+        "climb": -4, "acrobatics": -4, "perception": 0, "spellcraft": 0, "diplomacy": 0}
+    assert _total(pc.skill_modifiers("perception", opposed=True)) == before["perception"] - 4
 
 
 # --- #32: no attack of opportunity while flat-footed ----------------------------------------
