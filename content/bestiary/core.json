@@ -407,7 +407,7 @@
   },
   {
    "id": "ac-chicken",
-   "name": "Ac Chicken",
+   "name": "Chicken",
    "kind": "npc",
    "cr": "1/6",
    "cr_value": 0.16666666666666666,
