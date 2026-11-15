@@ -105,7 +105,6 @@ Pieces: what the hide can fill (a supple hide is a body, a lacing or a lining; a
 | Electric Eel Skin (always masterwork; only leather, hide armour, studded leather) | smooth | armour: body, fastenings, lining; shield: body; worn: body, lining | book: Armour check penalty 1 lighter; book: +1 maximum Dexterity bonus; book: Resist electricity 2; **-2 hardness** | – | fast_tan | leather, not sold |
 | Frostfallen Bison Hide | fur | armour: body, fastenings, lining; shield: body; worn: body, lining | Resist cold 2; +2 hit points per inch; **-2 armour check penalty** | – | thick, slow_tan | fur, not sold |
 | Giant Frilled Lizard Hide | scale | weapon: haft; armour: body, fastenings, lining; shield: body; worn: body, lining | +2 Intimidate; +2 maximum Dexterity bonus; **-2 hardness** | +2 Attack rolls; +2 CMD; **-2 Damage rolls** | forgiving | leather, not sold |
-| Glowlizard Hide | scale | armour: body, fastenings, lining; shield: body; worn: body, lining | +2 maximum Dexterity bonus; +2 Perception; **-2 Stealth** | – | fast_tan | leather, not sold |
 | Griffon Hide | feather | armour: body, fastenings, lining; shield: body; worn: body, lining | +2 Handle Animal; +2 Perception; **Weighs 20% more** | – | forgiving | fur, not sold |
 | Griffon Mane (only padded, quilted cloth) | feather | armour: body, lining; worn: body, lining | book: +2 Fly; +2 Armour class; **Weighs 20% more** | – | fast_tan | fur, not sold |
 | Grizzly Hide | fur | armour: body, fastenings, lining; shield: body; worn: body, lining | +2 Intimidate; +2 Armour class; **-2 armour check penalty** | – | thick, slow_tan | fur, not sold |
@@ -113,6 +112,7 @@ Pieces: what the hide can fill (a supple hide is a body, a lacing or a lining; a
 | Polar Bear Hide | fur | armour: body, fastenings, lining; shield: body; worn: body, lining | Resist cold 2; +2 Swim; **Weighs 20% more** | – | thick, slow_tan | fur, not sold |
 | Ray Skin | smooth | weapon: haft; armour: body, fastenings, lining; shield: body; worn: body, lining | +2 hardness; +2 Swim; **-2 maximum Dexterity bonus** | +2 CMD; +2 hardness; **-2 Damage rolls** | flawless | leather, 10 gp |
 | Sharkskin | smooth | weapon: haft; armour: body, fastenings, lining; shield: body; worn: body, lining | +2 Swim; +2 CMD; **-2 armour check penalty** | +2 Attack rolls; +2 CMB; **-2 hardness** | forgiving | leather, not sold |
+| Shocker Lizard Hide | scale | armour: body, fastenings, lining; shield: body; worn: body, lining | +2 maximum Dexterity bonus; +2 Perception; **-2 Stealth** | – | fast_tan | leather, not sold |
 | Snow Leopard Pelt | fur | armour: body, fastenings, lining; shield: body; worn: body, lining | +2 Stealth; +2 Climb; **-2 hit points per inch** | – | forgiving | fur, not sold |
 | Winter Wolf Pelt | fur | armour: body, fastenings, lining; shield: body; worn: body, lining | Resist cold 2; +2 Survival; **-2 armour check penalty** | – | forgiving | fur, not sold |
 

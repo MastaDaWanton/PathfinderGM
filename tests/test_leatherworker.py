@@ -200,9 +200,9 @@ def test_every_authored_effect_validates():
 
 # Hides no shipped creature yields, each with why. May only shrink. Option D (2026-10-29)
 # removed the adventure rows; the cave bear hide moved to the Bestiary's dire bear (the
-# Core rules' cave bear), and this one has no rulebook creature: the glowlizard was an
-# adventure's. Waiting on the owner — a world's own glowlizard can still yield it.
-UNREACHABLE_HIDES = {"glowlizard-hide": "adventure creature, none in the rulebooks"}
+# Core rules' cave bear), and the glowlizard hide (an adventure's creature) became the
+# shocker lizard's on 2026-11-15, the owner's call. None is left.
+UNREACHABLE_HIDES: dict[str, str] = {}
 
 
 def test_every_hide_names_a_creature_the_bestiary_has():

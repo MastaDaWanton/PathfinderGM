@@ -242,8 +242,9 @@ hide("polar-bear-hide", surface="fur", color="#e8e2d4", pieces=SUPPLE,
 hide("frostfallen-bison-hide", surface="fur", color="#6e5844", pieces=SUPPLE,
      armour=[res("cold", 2), gm("hp_per_inch", 2), gm("acp", -2)],
      working=wk("thick", "slow_tan"))
-hide("glowlizard-hide", surface="scale", color="#9ad0a0", pieces=SUPPLE,
-     # It glows: the light is not modelled (no light vocabulary on an item), the cost to
+hide("shocker-lizard-hide", surface="scale", color="#9ad0a0", pieces=SUPPLE,
+     # It glimmers with static (the Bestiary's shocker lizard, re-attributed
+     # 2026-11-15 from an adventure's glowlizard): the light is not modelled (no light vocabulary on an item), the cost to
      # hiding is.
      armour=[gm("max_dex", 2), sk("perception", 2), sk("stealth", -2)],
      working=wk("fast_tan"))

@@ -124,11 +124,6 @@ SIZES = ("fine", "diminutive", "tiny", "small", "medium", "large", "huge", "garg
          "colossal")
 
 
-def size_rank(name: str) -> int:
-    name = str(name or "medium").strip().lower()
-    return SIZES.index(name) + 1 if name in SIZES else SIZES.index("medium") + 1
-
-
 # --- what the bench makes (plan §4.2, §13.2, §13.6; owner Q1.4) -------------------------------
 #
 # Picked from this list, never typed (plan §7, Cut: "the pattern is picked from the engine's
@@ -566,7 +561,12 @@ class Hide:
                 if head == "form":
                     h.form = val
                 elif head == "material":
-                    h.material = val
+                    # A renamed material inside a tag is not an exact id, so the save
+                    # migration (`sheet._current_materials`) passes over it: a hide
+                    # skinned as a glowlizard's reads as the shocker lizard's it now is.
+                    from .materials import current_id
+
+                    h.material = current_id(val)
                 elif head == "q":
                     h.quarters = int(val)
                 elif head == "grade":
@@ -2329,10 +2329,6 @@ class Material:
         return wc.tier_rank(self.tier)
 
     @property
-    def is_raw_hide(self) -> bool:
-        return self.kind == "hide" and self.fresh_hours is not None
-
-    @property
     def specs(self) -> list[dict]:
         return [dict(e) for e in self.effects]
 
@@ -2383,7 +2379,7 @@ def load_dir(path: str | Path, claimed_by: str = "") -> dict[str, Material]:
     for file in sorted(p.glob("*.json")):
         try:
             data = json.loads(file.read_text(encoding="utf-8"))
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - reported: files.unreadable names the file
             files.unreadable(file, exc)
             continue
         file_craft = str(data.get("craft") or "").strip().lower() \

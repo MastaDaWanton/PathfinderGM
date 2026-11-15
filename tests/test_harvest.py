@@ -607,3 +607,25 @@ def test_a_humanoid_corpse_is_never_offered(client):
     code, got = _post(client, "/api/harvest/take",
                       {"creature": body.ref, "key": "hide:generic-smooth-hide"})
     assert code == 409
+
+
+def test_the_shocker_lizard_yields_the_hide_the_glowlizard_used_to():
+    """Measured 2026-10-30: `glowlizard-hide` had no body to come off once option D took
+    the adventure's Glowlizard out, and the suite carried it as unreachable. Owner,
+    2026-11-14: "rename it, re-attribute it, whatever". It is the Bestiary's Small scaly
+    shocker lizard's hide now, skinned off a real carcass, and an old save holding the
+    old id reads it as the new one."""
+    from rules import materials
+
+    pc, lizard = _kesst(), Body("shocker-lizard")
+    assert _hides(harvest.parts(lizard, pc, now=0)) == ["shocker-lizard-hide"]
+    got = harvest.take(pc, lizard, "hide:shocker-lizard-hide", 30, now=100)
+    assert got["ok"], got
+    assert materials.get("glowlizard-hide")["id"] == "shocker-lizard-hide"
+    old = json.loads(json.dumps(actor_to_dict(pc)).replace("shocker-lizard-hide",
+                                                          "glowlizard-hide"))
+    assert "glowlizard-hide" in json.dumps(old)
+    back = actor_to_dict(from_dict(old, ref="pc"))
+    (rec,) = back["stock"].values()
+    assert rec["from_materials"] == ["shocker-lizard-hide"]
+    assert lw.Hide.from_tags(rec["properties"]).material == "shocker-lizard-hide"

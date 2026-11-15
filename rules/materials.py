@@ -29,6 +29,7 @@ part of what `validate` judges.
 """
 from __future__ import annotations
 
+import logging
 import builtins
 import copy
 import json
@@ -315,7 +316,7 @@ def _read(path: Path) -> list[dict]:
     "materials", or a homebrew file holding one entry."""
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - reported: files.unreadable names the file
         files.unreadable(path, exc)
         return []
     entries = data.get("materials") if isinstance(data, dict) else None
@@ -620,6 +621,11 @@ RENAMED: dict[str, str] = {
     "siccatite": "searing-skymetal", "siccatite-ore": "searing-skymetal-ore",
     "horacalcum": "time-skymetal", "horacalcum-ore": "time-skymetal-ore",
     "nexavaran-steel": "frontier-steel", "elysian-bronze": "celestial-bronze",
+    # The glowlizard was an adventure's creature, gone with option D (2026-10-29), and its
+    # hide had no body left to come off. Re-attributed 2026-11-15 (owner: "rename it,
+    # re-attribute it, whatever") to the Bestiary's shocker lizard, a Small scaly magical
+    # beast (PRD, Bestiary: Shocker Lizard, CR 2) whose generic scale hide it now is.
+    "glowlizard-hide": "shocker-lizard-hide",
 }
 
 
@@ -670,6 +676,7 @@ def material_of(material_id: str) -> str:
     try:
         docs = _cache()
     except Exception:
+        logging.getLogger(__name__).exception("the material catalogue did not load")
         return mid
     return _root(current_id(mid), docs)
 
@@ -775,6 +782,7 @@ def validate(doc: dict, *, shelf: dict[str, dict] | None = None) -> list[str]:
         try:
             known = _cache()
         except Exception:
+            logging.getLogger(__name__).exception("the material catalogue did not load for validation")
             known = None
 
     def say(msg: str) -> None:
@@ -1090,7 +1098,6 @@ def leather_problems(doc: dict, *, shelf: dict[str, dict] | None = None) -> list
     for gear in EFFECT_GEARS:
         for i, spec in enumerate(lists[gear]):
             out.extend(_leather_effect(spec, f"{mid} {gear} effect {i + 1}"))
-    mark = doc.get("mark")
     out.extend(mark_problems(doc))
     working = list(doc.get("working") or [])
     for i, spec in enumerate(working):
@@ -1326,7 +1333,7 @@ class BadRecipes(ValueError):
 def _families_from(path: Path) -> dict[str, dict]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
-    except Exception:
+    except (OSError, ValueError):
         return {}
     fams = data.get("families") if isinstance(data, dict) else None
     if not isinstance(fams, dict):
@@ -1875,6 +1882,7 @@ def recipe_problems(doc: dict, *, essences: dict[str, dict] | None = None,
 
             spell_ids = set(_spells.all_spells())
         except Exception:
+            logging.getLogger(__name__).exception("the spell catalogue did not load for validation")
             spell_ids = None
     for g in doc.get("spells") or []:
         if not g:
