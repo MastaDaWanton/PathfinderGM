@@ -35,6 +35,38 @@ SAVE_VERSION = 2
 # The saves kept beside each campaign, newest first: `<id>.json.1` is the turn before.
 BACKUPS_KEPT = 3
 
+# The turn log rows kept whole; older ones are slimmed to what play still reads.
+# Measured 2026-11-15 on the owner's 2026-11-05 save: 94 rows for 13 turns, 75 KB, 5.7 KB
+# a turn and 37% of the file, and 45 KB of it diagnostics nothing reads past the last few
+# turns (beat-verify, beat-reading, truth-checks, tells-faith, speech-tags, the prose
+# row's 1.7 KB of `attempts`). Every save rewrites the whole file and fsyncs it under the
+# game lock, so a 1,000-turn game would be rewriting ~6 MB per save, four copies kept.
+# The window is ~40 turns: every backward reader (the GM view, the last turn's tells,
+# `_gone_since_narrated`, the four suggestion turns, the player's 30-row log) looks back
+# one or a few turns. Rows are slimmed, never dropped, so `len(turn_log)` — which the
+# roster and the home page show as turns played — does not move.
+TURN_LOG_WHOLE = 300
+# What an old row keeps: the Journal's history (play/history.py) reads the event rows'
+# intents and outcomes with their clock and place; every other row keeps its kind.
+_EVENT_KEEPS = ("kind", "clock", "at", "level", "intents", "outcomes", "error")
+_OTHER_KEEPS = ("kind", "clock", "at")
+
+
+def _slim_turn_log(log: list) -> list:
+    """`log` with every row older than the last TURN_LOG_WHOLE cut to what is read."""
+    from .history import EVENT_ROWS
+
+    cut = len(log) - TURN_LOG_WHOLE
+    if cut <= 0:
+        return log
+    old = []
+    for row in log[:cut]:
+        if isinstance(row, dict):
+            keeps = _EVENT_KEEPS if row.get("kind") in EVENT_ROWS else _OTHER_KEEPS
+            row = {k: row[k] for k in keeps if k in row}
+        old.append(row)
+    return old + log[cut:]
+
 
 class NewerSave(ValueError):
     """The save was written by a newer build. Not damage: refused, never restored.
@@ -226,6 +258,7 @@ class Campaign:
         # Version-stamped because this file lives in the user data directory and outlives
         # every reinstall — the trap that served a five-day-old stylesheet across four
         # versions of World Bible.
+        self.turn_log = _slim_turn_log(self.turn_log)
         payload = {
             "save_version": SAVE_VERSION,
             "id": self.id,
@@ -391,7 +424,16 @@ class Campaign:
         text = json.dumps(payload, indent=1)
         # The save that was whole becomes `.json.1` (then .2, .3), and the new one lands
         # by rename, never by truncating the only copy — see pathfindergm/files.py.
-        files.keep_backup(p, keep=BACKUPS_KEPT)
+        # Once per player line, not once per save (review 2026-11-11 finding 22): a turn
+        # saves several times (the intents, the prose, each NPC), so rotating on every
+        # save let all three backups fall inside the one turn, and a turn that went
+        # wrong logically took every copy of the turn before with it. Rotated again when
+        # `.1` is missing, so a new campaign's second save already has a backup.
+        mark = sum(1 for b in self.transcript
+                   if isinstance(b, dict) and b.get("who") == "player")
+        if getattr(self, "_backed_up_at", None) != mark or not files.backups(p, keep=1):
+            files.keep_backup(p, keep=BACKUPS_KEPT)
+            self._backed_up_at = mark
         files.write_text(p, text)
 
         # Keep the roster's copy of the sheet level with the game. Nothing called
