@@ -97,9 +97,11 @@ def test_the_refused_join_names_the_hire():
     assert "Or hire them" in out[0].tell
 
 
-def test_the_week_renews_from_the_purse_and_an_unpaid_sword_walks():
+def test_the_week_renews_from_the_purse_and_an_unpaid_sword_walks(monkeypatch):
     """C&C: pay up front; failure to pay, and Trust goes. A week renews while the purse
-    holds; an empty purse and the hireling goes, thinking less of the player."""
+    holds; an empty purse and a negotiation lost (`_negotiates`), the hireling goes,
+    thinking less of the player."""
+    monkeypatch.setattr(hirelings, "_negotiates", lambda *a: (False, "Diplomacy 3 against 20"))
     s, e, pc, sword = _party()
     _company(e, pc, sword, do="hire")
     week = hirelings.wage(sword).payload["per_day_cp"] * 7

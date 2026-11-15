@@ -496,8 +496,10 @@ def aftermath(scene, pc, coins=None, *, here_name: str = "",
         if hauled:
             effects.append({"kind": "cargo", "how": "taken", "ref": robber.ref,
                             "from": pc.ref, "lots": hauled, "why": "robbed while down"})
+            # "Carry", not "drive": live 2026-11-15 a pirate "drives off the party's
+            # cargo: 40 sq yd of silk" — a drove's verb for a bolt of cloth.
             cargo_line = (f"{robber.name}"
-                          + (" and the rest drive" if len(robbers) > 1 else " drives")
+                          + (" and the rest carry" if len(robbers) > 1 else " carries")
                           + " off the party's cargo: "
                           f"{trade_and(hauled)}.")
         effects.append({"kind": "took", "ref": robber.ref, "from": pc.ref,

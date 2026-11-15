@@ -44,8 +44,8 @@ import math
 # of cloth or a pelt, and both of those weights are THIS APP'S: a square yard of linen
 # about half a pound and of silk a quarter (ordinary fabric weights, rounded), leather a
 # pound thin and two thick, a pelt two. Livestock walks: a head weighs nothing on a back
-# or a wagon. shortcut: a drove needs no drover and eats nothing; upgrade when herding is
-# a job (the hired-swords lane's hirelings could drive it).
+# or a wagon, and goes as far as the party has drovers for it (`DROVER_HEAD`); in a hold
+# it weighs its live weight and is fed (`LIVE_LB`, `hold_cp`).
 ROWS: dict[str, tuple[str, int, str, float, str]] = {
     "wheat": ("wheat", 1, "lb", 1.0, "food"),
     "flour": ("flour", 2, "lb", 1.0, "food"),
@@ -182,10 +182,46 @@ QUADRUPED = {"fine": 0.25, "diminutive": 0.5, "tiny": 0.75, "small": 1.0, "mediu
 # with a crew of 20) and a berth in heads. A berth's rate per 200 lb was tried first and
 # priced iron out of the sea altogether: 14.4 cp a pound over 288 miles for a 10 cp good.
 FREIGHT_LB_A_FARE = 2000
+# CRB, Mounts and Related Gear: a pack saddle (5 gp, 15 lb) "holds gear and supplies, but
+# not a rider. It holds as much gear as the mount can carry"; and "a barded animal cannot be
+# used to carry any load other than a rider and normal saddlebags". So a beast carries
+# cargo on a pack saddle, the saddle's own 15 lb inside its load; without one it carries
+# none (saddlebags hold a traveller's kit, and the book gives them no capacity).
+PACK_SADDLE = "pack saddle"
+PACK_SADDLE_LB = 15.0
+# Driving a herd. No Pathfinder book has a drover; history does. Welsh and Scottish droves
+# ran "one man for every 50 or 60 cattle" (en.wikipedia.org/wiki/Droving, and the
+# Herefordshire Through Time essay on droving), so every walker in the party — the PC and
+# anybody travelling with them — drives 50 head; the rest of a herd waits where it was
+# bought. shortcut: one figure for every beast (sheep flocks ran larger per man); upgrade
+# if a world's trade in sheep or poultry makes it matter.
+DROVER_HEAD = 50
+# What a herd eats. CRB, Feed: "Horses, donkeys, mules, and ponies can graze to sustain
+# themselves" — so a drove on the road grazes, as historical droves did along the drove
+# roads, and costs nothing. In a ship's hold there is no grazing: it is fed, the CRB's
+# 5 cp a day for a horse-sized beast, scaled by live weight.
+FEED_CP_A_DAY = 5
+FEED_BEAST_LB = 1000
+# Live weight of a head in a hold, for its freight and its feed. THIS APP'S numbers:
+# rounded ordinary farm weights — no Pathfinder table weighs livestock. On the road a head
+# walks and weighs nothing (`ROWS`); at sea it took no freight at all until 2026-11-15.
+LIVE_LB = {"chicken": 5.0, "goat": 100.0, "sheep": 150.0, "pig": 250.0, "cow": 1000.0,
+           "ox": 1500.0}
 # A road toll's levy on cargo: a fortieth of its book value (THIS APP'S: medieval tolls
 # and customs ran at a fortieth to a tenth ad valorem; the low end, as a toll is the
 # decision, `ontheway.TOLL_DICE`, not the sum).
 TOLL_SHARE = 1 / 40
+# Customs on goods brought into a town to be sold: the levy medieval towns took at their
+# gates (France's octroi, "levied ... on certain categories of goods as they enter the
+# area", collected from the Middle Ages to 1948; England's murage, "taken mainly on goods
+# being imported into the town to be sold" — en.wikipedia.org/wiki/Octroi, /Murage). The
+# rate is England's petty custom of 1303, "3d in the pound" ad valorem on goods
+# (nationalarchives.gov.uk, research guide "Medieval customs accounts"): a eightieth.
+# No Pathfinder book found prices customs (Ultimate Campaign's trade edicts pay a kingdom
+# in build points); no trading game's gate levy could be sourced. The levy is the engine's
+# figure, paid from the purse on arrival; what the purse cannot cover is a lien on the
+# goods (`customs_due`), taken out of what they fetch when they are sold here.
+CUSTOMS_SHARE = 1 / 80
 
 PREFIX = "cargo:"
 
@@ -250,6 +286,25 @@ def row_of_good(good) -> str | None:
                            str(good.get("worth") or "").lower()))
         return k or row_for(str(good.get("name") or ""))
     return row_for(str(good or ""))
+
+
+def names_the_good(item: str, key: str, word: str) -> bool:
+    """Whether a buyer's words name this market's good: the row's own name, or words all
+    drawn from the world's name for it that keep the word it is priced by.
+
+    Live 2026-11-15 (Mirabalos, the world's "Iron ore from nearby mines"): "iron ore" was
+    refused as "no iron ore on the counter" because only "iron" or the whole commodity
+    matched. The deciding word is what keeps "some tools" in a town shipping "iron tools"
+    a tool and not a pound of iron: "tools" drops "iron"."""
+    said = words_of(item)
+    if not said or key not in ROWS:
+        return False
+    if " ".join(said) == " ".join(words_of(ROWS[key][0])):
+        return True
+    world = words_of(word)
+    hits = [w for w in world if w in _RANK]
+    decider = min(hits, key=_RANK.__getitem__) if hits else ""
+    return bool(decider) and decider in said and set(said) <= set(world)
 
 
 def route_row(r: dict, sought: bool = False) -> str | None:
@@ -460,6 +515,23 @@ def lb_of(lot: dict) -> float:
     return round(float(lot.get("units", 0)) * ROWS[lot["key"]][3], 2)
 
 
+def freight_lb(lot: dict) -> float:
+    """What a lot weighs in a ship's hold: its road weight, or a head's live weight."""
+    return round(float(lot.get("units", 0)) * LIVE_LB.get(lot["key"], ROWS[lot["key"]][3]), 2)
+
+
+def heads(lots_: list[dict]) -> int:
+    return sum(int(x.get("units", 0)) for x in lots_ if x["key"] in LIVE_LB)
+
+
+def hold_cp(lots_: list[dict], miles: int, days: int) -> int:
+    """The hold's charge for these lots: freight by weight (`freight_cp`), and feed for
+    every head aboard for the days at sea (`FEED_CP_A_DAY`, scaled by live weight)."""
+    feed = sum(int(x.get("units", 0)) * LIVE_LB[x["key"]] for x in lots_ if x["key"] in LIVE_LB)
+    return freight_cp(sum(freight_lb(x) for x in lots_), miles) + int(
+        math.ceil(feed / FEED_BEAST_LB * FEED_CP_A_DAY * max(0, int(days))))
+
+
 def with_party_lb(scene) -> float:
     return round(sum(lb_of(x) for x in lots(scene) if x.get("stowed") == "party"), 2)
 
@@ -481,20 +553,23 @@ def add_lot(scene, key: str, units: int, owner: str, paid_cp: int, bought_at: st
     return lot
 
 
-def take_units(scene, key: str, units: int) -> tuple[int, int]:
+def take_units(scene, key: str, units: int) -> tuple[int, int, int]:
     """Take `units` of the row out of the party's reachable lots: (taken, what they cost
-    the party, pro rata). Emptied lots are removed."""
-    taken = paid = 0
+    the party, the customs still owed on them), both pro rata. Emptied lots are removed."""
+    taken = paid = due = 0
     for lot in reachable(scene, key):
         if taken >= units:
             break
         n = min(int(lot["units"]), units - taken)
         share = int(round(int(lot.get("paid_cp", 0)) * n / max(1, int(lot["units"]))))
+        owed = int(round(int(lot.get("customs_due", 0)) * n / max(1, int(lot["units"]))))
         lot["units"] -= n
         lot["paid_cp"] = int(lot.get("paid_cp", 0)) - share
-        taken, paid = taken + n, paid + share
+        if owed:
+            lot["customs_due"] = int(lot["customs_due"]) - owed
+        taken, paid, due = taken + n, paid + share, due + owed
     scene.cargo = [x for x in lots(scene) if int(x.get("units", 0)) > 0]
-    return taken, paid
+    return taken, paid, due
 
 
 # --- how much the party can haul -------------------------------------------------------
@@ -511,14 +586,14 @@ def _beast_heavy(a) -> float:
 
 
 def haul_lb(scene) -> dict:
-    """{"lb", "how"}: the pounds of cargo the party can take on the road, and in words how.
+    """{"lb", "how", "head"}: the pounds of cargo the party can take on the road, in words
+    how, and the head of livestock its drovers can drive.
 
     Every walker (the PC, anybody travelling with them who is not a mount) adds their
-    spare light load; a cart or wagon carried in anybody's goods is hitched to the
-    strongest beasts it needs and hauls five times their heavy load less its own weight;
-    every other beast carries its heavy load. shortcut: a pack animal needs no pack
-    saddle here (the CRB's saddle "holds as much gear as the mount can carry"); upgrade
-    if the stables' tack should matter."""
+    spare light load and drives `DROVER_HEAD` head; a cart or wagon carried in anybody's
+    goods is hitched to the strongest beasts it needs and hauls five times their heavy
+    load less its own weight; every other beast carries its heavy load on a pack saddle,
+    one saddle a beast (`PACK_SADDLE`), and nothing without one."""
     from . import defeat, journey, states
 
     beasts = journey.owned_mounts(scene)
@@ -529,33 +604,42 @@ def haul_lb(scene) -> dict:
     lb = sum(defeat.spare_load(a) for a in walkers)
     how = ["on your backs"] if lb else []
     heavy = sorted((_beast_heavy(b) for b in beasts), reverse=True)
-    held = {str(k).lower() for a in walkers for k, n in (a.goods or {}).items()
-            if int(n or 0) > 0}
-    # The stables' tack is delivered to the satchel (`goods.deliver`), under its name.
-    held |= {str(getattr(x, "base", "") or "").lower() for a in walkers
-             for x in (getattr(a, "stock", None) or {}).values()
-             if int(getattr(x, "count", 0) or 0) > 0}
+    held: dict[str, int] = {}
+    for a in walkers:
+        for k, n in (a.goods or {}).items():
+            held[str(k).lower()] = held.get(str(k).lower(), 0) + max(0, int(n or 0))
+        # The stables' tack is delivered to the satchel (`goods.deliver`), under its name.
+        for x in (getattr(a, "stock", None) or {}).values():
+            k = str(getattr(x, "base", "") or "").lower()
+            held[k] = held.get(k, 0) + max(0, int(getattr(x, "count", 0) or 0))
     for vehicle, (weight, team) in VEHICLES.items():
-        if vehicle in held and len(heavy) >= team:
+        if held.get(vehicle, 0) > 0 and len(heavy) >= team:
             pulled = DRAG_TIMES * sum(heavy[:team]) - weight
             if pulled > 0:
                 lb += pulled
                 heavy = heavy[team:]
                 how.append(f"a {vehicle}")
             break
-    if heavy:
-        lb += sum(heavy)
-        how.append(f"{len(heavy)} pack beast{'s' if len(heavy) != 1 else ''}")
-    return {"lb": round(lb, 1), "how": how}
+    packed = heavy[:held.get(PACK_SADDLE, 0)]
+    if packed:
+        lb += sum(max(0.0, h - PACK_SADDLE_LB) for h in packed)
+        how.append(f"{len(packed)} pack beast{'s' if len(packed) != 1 else ''}")
+    if len(heavy) > len(packed):
+        bare = len(heavy) - len(packed)
+        how.append(f"{bare} beast{'s' if bare != 1 else ''} with no pack saddle")
+    return {"lb": round(lb, 1), "how": how, "head": DROVER_HEAD * len(walkers)}
 
 
 def _split(scene, lot: dict, units: int) -> dict:
     """Part `units` off `lot` into a new lot of the same row and owner, its share of the
     cost going with it. Returns the new lot."""
     share = int(round(int(lot.get("paid_cp", 0)) * units / max(1, int(lot["units"]))))
+    owed = int(round(int(lot.get("customs_due", 0)) * units / max(1, int(lot["units"]))))
     n = 1 + max((int(str(x.get("id", "lot-0"))[4:] or 0) for x in lots(scene)
                  if str(x.get("id", "")).startswith("lot-")), default=0)
     new = {**lot, "id": f"lot-{n}", "units": int(units), "paid_cp": share}
+    if owed:
+        new["customs_due"], lot["customs_due"] = owed, int(lot["customs_due"]) - owed
     lot["units"] = int(lot["units"]) - int(units)
     lot["paid_cp"] = int(lot.get("paid_cp", 0)) - share
     scene.cargo.append(new)
@@ -566,17 +650,22 @@ def load_up(scene) -> tuple[list[str], list[str]]:
     """Fill the party's backs, beasts and wagon from its lots here — what it already
     carries first, then what it left here — splitting a lot where only part of it fits,
     and set the rest down here. (what was taken up, what stays here), in words. A row
-    that walks (livestock) always goes."""
+    that walks (livestock) goes as far as the party has drovers for it (`DROVER_HEAD`)."""
     here = str(getattr(scene, "location_id", "") or "")
-    room = haul_lb(scene)["lb"]
+    haul = haul_lb(scene)
+    room, herd = haul["lb"], int(haul.get("head", 0))
     pool = ([x for x in lots(scene) if x.get("stowed") == "party"]
             + [x for x in lots(scene) if x.get("stowed") == "left" and x.get("at") == here])
     was = {id(x): x.get("stowed") for x in pool}
     up, left = [], []
     for lot in pool:
         each = ROWS[lot["key"]][3]
-        fit = int(lot["units"]) if each <= 0 else min(int(lot["units"]),
-                                                       int((room + 1e-9) // each))
+        if lot["key"] in LIVE_LB:
+            fit = min(int(lot["units"]), herd)
+            herd -= fit
+        else:
+            fit = int(lot["units"]) if each <= 0 else min(int(lot["units"]),
+                                                           int((room + 1e-9) // each))
         if 0 < fit < int(lot["units"]):
             rest = _split(scene, lot, int(lot["units"]) - fit)
             rest["stowed"], rest["at"] = "left", here
@@ -591,6 +680,10 @@ def load_up(scene) -> tuple[list[str], list[str]]:
             lot["stowed"], lot["at"] = "left", here
             left.append(said(lot))
     _merge(scene)
+    # Said after the merge: before it, a second buy read "1500 lb of iron and 463 lb of
+    # iron waits here" (live, 2026-11-15) for what is one lot on the quay.
+    if left:
+        left = [said(x) for x in lots(scene) if x.get("stowed") == "left" and x.get("at") == here]
     return up, left
 
 
@@ -629,13 +722,20 @@ def _merge(scene) -> None:
     for lot in lots(scene):
         twin = next((x for x in out if all(x.get(k) == lot.get(k) for k in
                                             ("key", "owner", "stowed", "at", "vessel",
-                                             "held_by"))), None)
+                                             "held_by", "cleared"))), None)
         if twin is None:
             out.append(lot)
         else:
             twin["units"] = int(twin["units"]) + int(lot["units"])
             twin["paid_cp"] = int(twin.get("paid_cp", 0)) + int(lot.get("paid_cp", 0))
+            if lot.get("customs_due"):
+                twin["customs_due"] = int(twin.get("customs_due", 0)) + int(lot["customs_due"])
     scene.cargo = out
+
+
+def shipping_in(scene, vessel_id: str) -> list[dict]:
+    """The party's lots in this ship's hold."""
+    return [x for x in lots(scene) if x.get("stowed") == "hold" and x.get("vessel") == vessel_id]
 
 
 def into_hold(scene, vessel_id: str) -> list[str]:
@@ -676,6 +776,38 @@ def toll_cp(scene) -> int:
     value, in copper; 0 for a party carrying no cargo."""
     owned = [x for x in lots(scene) if x.get("stowed") == "party"]
     return int(math.ceil(book_value_cp(owned) * TOLL_SHARE)) if owned else 0
+
+
+def levies_customs(world, place_id: str) -> bool:
+    """Whether this settlement takes customs on goods coming in: the world's word when it
+    gives one (docs/for-world-bible.md ask 22, `customs`: "levied" or "free"), else
+    whether the town has a customs house among its places (`places.home_set`, the app's
+    own city furniture: 1 of 12 settlements in Pangrella, 2 of 64 in Aurvantis)."""
+    from . import places as places_mod
+
+    for s in _settlements(world):
+        if s.get("id") == place_id and str(s.get("customs") or "").lower() in ("levied", "free"):
+            return str(s["customs"]).lower() == "levied"
+    loc = world.get(place_id) if world is not None and place_id else None
+    if loc is None:
+        return False
+    try:
+        return any(p.name == "the customs house" for p in places_mod.home_set(loc))
+    except Exception:  # noqa: BLE001 - a place set that cannot be built levies nothing
+        return False
+
+
+def entering(scene, place_id: str) -> list[dict]:
+    """The party's lots arriving at `place_id` that have not cleared its customs: with
+    the party, or on its quay, and neither bought here nor already cleared here."""
+    return [x for x in lots(scene) if x.get("stowed") in ("party", "left")
+            and where_now(scene, x) == place_id and x.get("bought_at") != place_id
+            and x.get("cleared") != place_id]
+
+
+def customs_cp(lots_: list[dict]) -> int:
+    """The levy on goods brought in: `CUSTOMS_SHARE` of their book value, in copper."""
+    return int(math.ceil(book_value_cp(lots_) * CUSTOMS_SHARE)) if lots_ else 0
 
 
 def robbed(scene, robber_ref: str) -> list[str]:

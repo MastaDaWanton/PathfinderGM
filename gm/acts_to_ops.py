@@ -709,6 +709,18 @@ def _sell(row: Row, frame, i, scene, pc, sentence: str, recent=(), coming=()) ->
     a = frame["actions"][i]
     thing = _object(frame, i, pc, recent)
     key = _carried(pc, thing, coming) if thing else ""
+    count = 0
+    if thing and not key:
+        # The party's cargo (rules/trade.py) is in no pack: "I sell my iron to the keeper
+        # of the general store" was refused "not carrying my iron" with 2000 lb of it on
+        # the quay (live, 2026-11-15). The row by the world's table, the engine's own
+        # `_op_sell` door; the whole of it within reach, as "my iron" means.
+        from rules import trade
+
+        bulk = trade.row_for(thing)
+        here = trade.reachable(scene, bulk) if bulk else []
+        if here:
+            key, count = trade.PREFIX + bulk, sum(int(x.get("units", 0)) for x in here)
     if not thing and row.commit == "done" and _agreed_work(row, a, scene, pc):
         # A sale of nothing named: a price accepted. Only with no object at all — "I sell
         # him my sword" with no sword is the refusal below, never a job taken.
@@ -742,6 +754,8 @@ def _sell(row: Row, frame, i, scene, pc, sentence: str, recent=(), coming=()) ->
         row.note = "an offer, not a sale: the buyer must agree first"
         return
     params: dict = {"item": key, "to": buyer}
+    if count:
+        params["count"] = count
     share = _SHARE.search(str(sentence or ""))
     if share and key in (pc.goods or {}):
         params["accept"] = round(int(share.group(1)) / 100 * pricing.goods_worth(key), 2)
@@ -3004,6 +3018,13 @@ def _company_who(scene, r) -> str:
 # question is not asked or its call fails: an `other` or a walk needs the question's yes.
 _COMPANY_ACTS = frozenset({"talk", "request", "other", "go", "journey"})
 _COMPANY_SPOKEN = frozenset({"talk", "request"})
+# The acts a hire is made in: words said or asked, and `other` — "I hire the guard." was
+# read as one and planned as a `check` (tools/hire_bench.py, 2026-11-15). Never a walk:
+# going somewhere is not hiring anybody.
+_HIRE_ACTS = frozenset({"talk", "request", "other"})
+# The acts an order about the other ship comes in: a walk at her ("close with the pirate
+# ship" read as `go`), a blow, words to the captain, anything else.
+_SEA_ACTS = frozenset({"go", "attack", "talk", "request", "other", "leave", "journey"})
 # Hiring is having them come along for pay (the demos say "hire the sellsword"); a guard
 # order is its own answer (rules/hirelings.py).
 _COMPANY_DOES = {"join": "has them come along", "hire": "has them come along",
@@ -3084,20 +3105,32 @@ def company_asked(raw, frame: dict | None, scene, *, ask=None, asked: dict | Non
 def orders_spoken(raw, frame: dict | None, scene, *, ask=None, asked: dict | None = None,
                   ask_what=None, notes: list | None = None) -> list:
     """A hire or a guard order the player's words make and the plan left out, added:
-    `company do: hire` for a sword for hire the plan's own `say` speaks to, `company do:
-    guard` for somebody already with the party it speaks to.
+    `company do: hire` for a sword for hire the words are said to, `company do: guard` for
+    somebody already with the party (or hired by the same words) they are said to.
 
     Measured live 2026-11-14 (gemma-4-12B, Scrapden tavern): "I will hire you after all,
     sellsword. Come with me." was planned as a `say` and a `greet`, no `company`; the
     sellsword answered "Fine. Lead the way" and stayed where they stood, unpaid (one plan in
     two wrote the hire). The same day, "Your first job: stand over my wares in the hold and
     let nobody near them." was planned as a `say` alone; the sellsword promised to keep
-    the wares safe and held no guard. Detected in code (a say to the person, no company op
-    for them), then the company question already asked of a plan's own company
-    (`interpret.confirm_company`), once per spoken act; for a guard, ONE more closed
-    question for what is guarded (`interpret.confirm_guarded`, `ask_what`). With no
-    question (`ask` None: the suite, the reader off) nothing is added: coin is never spent
-    and no order given on a guess."""
+    the wares safe and held no guard.
+
+    Measured 2026-11-15 on a fixed set of 22 spoken hires (tools/hire_bench.py, one plan a
+    line, gemma-4-12B): the plans missed 12 (10 of 22 caught); with the three shapes below
+    read, 3 (19 of 22), and 0 of 4 control lines (a question, a refusal) hired anybody
+    either time. The misses had three shapes this door did not look at: a `say` with no `to`
+    ("You're hired. Come with me." to the one guard here), no `say` at all ("I hire the
+    guard." planned as a `check`), and a guard order to a sword not yet hired ("I hire the
+    guard to guard my cargo." planned as `company do: guard` alone, which the engine
+    refuses — they are not with you). So who the words go to is found three ways, in
+    code: the plan's `say` addressee; the reading's own target for a spoken or other act,
+    found among the people here (`person`); and, a target named nobody, the one person
+    the player is dealing with by the engine's state (`addressed`). Then the company
+    question already asked of a plan's own company (`interpret.confirm_company`), once per
+    act; for a guard, ONE more closed question for what is guarded
+    (`interpret.confirm_guarded`, `ask_what`). With no question (`ask` None: the suite,
+    the reader off) nothing is added: coin is never spent and no order given on a
+    guess."""
     from rules import hirelings, states
 
     from . import interpret
@@ -3110,7 +3143,7 @@ def orders_spoken(raw, frame: dict | None, scene, *, ask=None, asked: dict | Non
                 str(((r or {}).get("params") or {}).get("do") or "join").lower())
                for r in raw if _op(r) == "company"}
     spoken = [a for a in frame.get("actions") or [] if interpret.acting(a)
-              and str(a.get("act") or "") in _COMPANY_SPOKEN]
+              and str(a.get("act") or "") in _HIRE_ACTS]
     if not spoken:
         return raw
     memo = asked if asked is not None else {}
@@ -3118,22 +3151,39 @@ def orders_spoken(raw, frame: dict | None, scene, *, ask=None, asked: dict | Non
     # A line said to nobody by name, with one companion along, is said to them: measured
     # live 2026-11-14, the guard order above was read as a `talk` with no target and
     # planned as a `say` with no `to`, the sellsword the only one travelling with the
-    # party. Only a guard order is taken this way; a hire needs its addressee named.
+    # party. Only a guard order is taken this way; a hire needs its addressee found.
     along = [k for k, x in actors.items()
              if not getattr(x, "is_pc", False) and x.has_state(states.TRAVELS_WITH_YOU)]
+    heard: list[tuple[str, bool]] = []
     for r in raw:
         if _op(r) != "say":
             continue
         ref = str(((r or {}).get("params") or {}).get("to") or "")
         unnamed = not ref and len(along) == 1
-        if unnamed:
-            ref = along[0]
+        heard.append((along[0] if unnamed else ref, unnamed))
+    # Said to nobody by name, with nobody the engine has the player dealing with: the one
+    # sword for hire standing here, if there is exactly one ("You're hired. Come with me."
+    # in a market of five, tools/hire_bench.py). The company question still decides.
+    swords = [k for k, x in actors.items() if not getattr(x, "is_pc", False)
+              and not x.is_down and hirelings.wage(x) is None and hirelings.hires_out(scene, x)]
+    for a in spoken:
+        target = str(a.get("target") or "").strip()
+        ref = person(scene, target) if target else addressed(scene)
+        if not ref and not target and len(swords) == 1:
+            ref = swords[0]
+        heard.append((ref, False))
+    seen: set[str] = set()
+    for ref, unnamed in heard:
         who = actors.get(ref)
-        if who is None or getattr(who, "is_pc", False):
+        if who is None or getattr(who, "is_pc", False) or ref in seen:
             continue
+        seen.add(ref)
         hireable = hirelings.wage(who) is None and hirelings.hires_out(scene, who) \
             and (ref, "hire") not in planned and not unnamed
         guardable = who.has_state(states.TRAVELS_WITH_YOU) and (ref, "guard") not in planned
+        # The plan's own guard order to a sword nobody has hired yet ("I hire the guard to
+        # guard my cargo"): the hire the order needs, ahead of it.
+        ordered = (ref, "guard") in planned and not who.has_state(states.TRAVELS_WITH_YOU)
         if not (hireable or guardable):
             continue
         for a in spoken:
@@ -3141,21 +3191,99 @@ def orders_spoken(raw, frame: dict | None, scene, *, ask=None, asked: dict | Non
             key = (span, who.name)
             if key not in memo:
                 memo[key] = ask(span, who.name) or ""
-            if memo[key] == "has them come along" and hireable:
-                out.append({"op": "company", "because": "the player hired them",
-                            "params": {"who": ref, "do": "hire"}})
+            hired_now = hireable and (memo[key] == "has them come along" or (
+                memo[key] == "sets them to guard" and not who.has_state(
+                    states.TRAVELS_WITH_YOU)))
+            if hired_now:
+                hire = {"op": "company", "because": "the player hired them",
+                        "params": {"who": ref, "do": "hire"}}
+                at = next((k for k, r in enumerate(out) if _op(r) == "company"
+                           and _company_who(scene, r) == ref), len(out)) if ordered \
+                    else len(out)
+                out.insert(at, hire)
                 planned.add((ref, "hire"))
                 if notes is not None:
                     notes.append(f"the hire of {who.name} the words made, added")
-                break
-            if memo[key] == "sets them to guard" and guardable:
+            guarded = memo[key] == "sets them to guard" and (guardable or hired_now) \
+                and (ref, "guard") not in planned
+            if guarded:
                 what = (ask_what(span, who.name) if ask_what is not None else "") or "you"
                 out.append({"op": "company", "because": "the player set them to guard",
                             "params": {"who": ref, "do": "guard", "what": what}})
                 planned.add((ref, "guard"))
                 if notes is not None:
                     notes.append(f"the guard order to {who.name} the words gave, added")
+            if hired_now or guarded:
                 break
+    return out
+
+
+def sea_spoken(raw, frame: dict | None, scene, *, ask=None, notes: list | None = None) -> list:
+    """The `sea` op the player's words make about the other ship, when the plan wrote none.
+
+    Measured live 2026-11-15 (fix/merchant-road, pirates a sail away): "I tell the captain
+    to bring us alongside the Cold Hound." was planned as a `say`; "We close with the pirate
+    ship." was read `go, place: the pirate ship` and refused "You don't know of anywhere
+    called the pirate ship"; the pirates stayed on the horizon and no fight on deck could
+    be reached by words at all — no prompt names the op. Detected in code (an engagement on
+    `Scene.sea`, no `sea` in the plan, an act done now), repaired by ONE closed question per
+    act over the engine's own verbs (`interpret.confirm_sea`). A board takes everybody
+    travelling with the party. With no question (`ask` None) nothing is added."""
+    from rules import states
+
+    from . import interpret
+
+    sea = getattr(scene, "sea", None) or {}
+    if ask is None or not isinstance(raw, list) or not frame or frame.get("error")             or not sea.get("theirs") or any(_op(r) == "sea" for r in raw):
+        return raw
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if pc is None:
+        return raw
+    for a in frame.get("actions") or []:
+        if not interpret.acting(a) or str(a.get("act") or "") not in _SEA_ACTS:
+            continue
+        do = ask(str(a.get("span") or ""))
+        if not do:
+            continue
+        params: dict = {"do": do}
+        if do == "board":
+            params["with"] = [k for k, x in (getattr(scene, "actors", {}) or {}).items()
+                              if not x.is_pc and x.has_state(states.TRAVELS_WITH_YOU)]
+        if notes is not None:
+            notes.append(f"the ship's {do} the words gave, added")
+        kept = [r for r in raw if _op(r) != "narrate_only"]
+        return kept + [{"op": "sea", "actor": pc.ref, "because": "the player's orders at sea",
+                        "params": params}]
+    return raw
+
+
+def journey_named(raw, frame: dict | None, *, notes: list | None = None) -> list:
+    """A `journey` with no `to`, given the one place the reading's journey act names.
+
+    Measured live 2026-11-15 (Zhilvarnia, fix/merchant-road): "I head to the docks with my
+    guard and book passage to Mirabalos for us and my silk." was read `journey, place:
+    Mirabalos`; the plan wrote `journey` without `to` five times, every attempt refused
+    "missing required param(s) to", and the turn degraded to narration — nobody moved.
+    Detected in code (the op, the empty param), repaired from the reading's own slot; the
+    engine still judges the place (`Engine._op_journey`). Only with exactly one journey act
+    naming a place: two are a pairing this does not guess."""
+    from . import interpret
+
+    if not isinstance(raw, list) or not frame or frame.get("error"):
+        return raw
+    places = [str(a.get("place") or "").strip() for a in frame.get("actions") or []
+              if a.get("act") == "journey" and interpret.acting(a)
+              and str(a.get("place") or "").strip()]
+    if len(places) != 1:
+        return raw
+    out = []
+    for r in raw:
+        params = (r or {}).get("params") if isinstance(r, dict) else None
+        if _op(r) == "journey" and not str((params or {}).get("to") or "").strip():
+            r = {**r, "params": {**(params or {}), "to": places[0]}}
+            if notes is not None:
+                notes.append(f"the journey's place, {places[0]}, from the words")
+        out.append(r)
     return out
 
 

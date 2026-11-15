@@ -369,8 +369,14 @@ def _does_what_was_declared(intents, player_text: str) -> bool:
     # wagons around the aasimar and on to Kalixiri" planned the same `journey` as the turn
     # before — the road taken up again, which is what a broken road IS — and the guard
     # refused it twice and the turn degraded to narration with the caravan standing still.
+    # And an order about the other ship (`acts_to_ops.sea_spoken`): live 2026-11-15, "We
+    # close with the pirate ship." took her to bowshot, and "Bring us alongside her." — the
+    # same `sea do: close`, which is what closing the last band IS — was refused twice and
+    # the turn degraded to narration with the pirates still a bowshot off.
+    from . import acts_to_ops
+
     need = dict(interpret._OP_NEEDS, give={"give", "take"}, buy={"buy"},
-                attack={"attack"}, journey={"journey", "go"})
+                attack={"attack"}, journey={"journey", "go"}, sea=set(acts_to_ops._SEA_ACTS))
     loud = [i for i in intents if i.op not in QUIET_OPS]
     return bool(loud) and all(need.get(i.op, set()) & acts for i in loud)
 

@@ -1947,6 +1947,8 @@ _COMPANY_DEMOS = [
     ("tell Bren to keep an eye on the crates in the hold", "Bren", "sets them to guard"),
     ("say \"Stand over my wagon and let nobody near it\"", "the sellsword",
      "sets them to guard"),
+    ("tell the guard to stay and hold the shop until I'm back", "the guard",
+     "sets them to guard"),
     ("take the foreman's job guarding the warehouse", "the foreman", "something else"),
     ("agree to the reeve's terms for the week", "the reeve", "something else"),
     ("ask her what the road ahead is like", "the guide", "something else"),
@@ -2001,26 +2003,65 @@ def _closed(messages: list[dict], answers, model: str | None = None) -> str:
 # What a guard order is over (`acts_to_ops.orders_spoken`), asked only once the company
 # question said the words set somebody to guard: the engine's closed `hirelings.GUARDS`.
 # Demonstrations written for this, in no world's words; none is a probed line.
-GUARDED_ANSWERS = {"their goods": "cargo", "the character": "you"}
+GUARDED_ANSWERS = {"their goods": "cargo", "the character": "you", "this place": "here"}
 _GUARDED_DEMOS = [
     ("tell Bren to keep an eye on the crates in the hold", "Bren", "their goods"),
     ("say \"Stand over my wagon and let nobody near it\"", "the sellsword", "their goods"),
     ("tell the guard to watch my back in the market", "the guard", "the character"),
     ("say \"Keep close and keep me alive\"", "the sellsword", "the character"),
+    ("say \"Stay here and hold the warehouse until I get back\"", "the guard",
+     "this place"),
+    ("tell Bren to keep watch over the house while I'm away", "Bren", "this place"),
 ]
 
 
 def confirm_guarded(span: str, who: str, *, model: str | None = None) -> str:
-    """"cargo" or "you" (`hirelings.GUARDS`) for a guard order's words; "" on failure."""
+    """"cargo", "you" or "here" (`hirelings.GUARDS`) for a guard order's words; "" on
+    failure."""
     system = ("In a role-playing game the player's character tells another person to "
               "guard something. Answer from the words alone: is it the character's goods "
-              "(wares, cargo, crates, a wagon, belongings) or the character themselves?")
+              "(wares, cargo, crates, a wagon, belongings), the character themselves, or "
+              "this place, held while the character goes away?")
     messages = [{"role": "system", "content": system}]
     for said, person_, answer in _GUARDED_DEMOS:
         messages.append({"role": "user", "content": f"The person: {person_}\nThe words: {said}"})
         messages.append({"role": "assistant", "content": json.dumps({"answer": answer})})
     messages.append({"role": "user", "content": f"The person: {who}\nThe words: {span}"})
     return GUARDED_ANSWERS.get(_closed(messages, tuple(GUARDED_ANSWERS), model), "")
+
+
+# What the player does about the other ship (`acts_to_ops.sea_spoken`), asked only while
+# a ship-to-ship engagement is on (`Scene.sea`) and the plan wrote no `sea`: the engine's
+# own five verbs (docs/ships.md, "The five verbs"). Demonstrations written for this, in no
+# world's words; none is a probed line.
+SEA_ANSWERS = {"close with her": "close", "sheer off and run": "sheer off", "ram her": "ram",
+               "throw grapnels": "grapple", "board her": "board", "something else": ""}
+_SEA_DEMOS = [
+    ("we close with the pirate ship", "close with her"),
+    ("tell the captain to bring us alongside them", "close with her"),
+    ("run for it, crowd on every sail", "sheer off and run"),
+    ("tell the helmsman to turn away and outrun them", "sheer off and run"),
+    ("drive our bow into her side", "ram her"),
+    ("throw the hooks and lash her to us", "throw grapnels"),
+    ("leap the rail onto their deck, sword out", "board her"),
+    ("draw my sword and wait at the rail", "something else"),
+    ("ask the captain who they are", "something else"),
+]
+
+
+def confirm_sea(span: str, *, model: str | None = None) -> str:
+    """The `sea` op's `do` for the player's words about the other ship, or ""."""
+    system = ("In a role-playing game the character is aboard a ship with another, hostile "
+              "ship in sight. Answer from the words alone: does the character have their "
+              "ship close with the other ship, sheer off and run, ram her, throw grapnels "
+              "to bind the two ships together, board her (cross onto her deck), or "
+              "something else?")
+    messages = [{"role": "system", "content": system}]
+    for said, answer in _SEA_DEMOS:
+        messages.append({"role": "user", "content": f"The words: {said}"})
+        messages.append({"role": "assistant", "content": json.dumps({"answer": answer})})
+    messages.append({"role": "user", "content": f"The words: {span}"})
+    return SEA_ANSWERS.get(_closed(messages, tuple(SEA_ANSWERS), model), "")
 
 
 # --- who a blow lands on, asked ---------------------------------------------------------

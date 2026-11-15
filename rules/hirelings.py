@@ -58,9 +58,36 @@ they guard (`GUARDS`: the party's `cargo`, or `you`), through the applicator und
 source. It is the state the cargo lane (feat/trade-goods) reads: a guard on the party's
 cargo goes where the cargo goes and stands to it. Nothing here builds cargo.
 
-**Not built (said, not hidden):** C&C's Trust score and refusing work whose Risk exceeds it
-(the companion's own turn weighs a dangerous order, the owner's ruling); "double pay for
-unpaid days"; a hireling left behind to guard a place the party walks away from.
+**Trust and Risk** (built 2026-11-15; d20pfsrd "Hirelings, Servants & Services",
+Contingency Services, which carries C&C's text; Ultimate Campaign p.148, Trust, for the
+1-5 scale): a hireling's Trust is set when they are recruited — a successful recruiting
+Diplomacy "finds skeptical or wary hirelings" — and here it is read off their attitude at
+the hire (`TRUST_AT_HIRE`: indifferent is skeptical, 2). Work whose Risk (`jobs.RISK`, 1-5)
+is above it is not refused outright: "Hirelings don't automatically refuse. Each category of
+difference adds 5 to the result of the opposed Diplomacy check" — the player's Diplomacy
+against theirs plus 5 a step (`balk`), asked where the party sets out on a road whose
+ground raises its Risk (`jobs.risk_of("escort", crosses)`). Lost, they will not go: their
+service ends there and the whole days of the advance they will not work are handed back
+(this app's call; the book says only that they refuse).
+
+**Unpaid days** (the same section): "When funds run out, hirelings may stay on duty. Each
+day you must attempt a new negotiation check or the hirelings abandon the task. Hirelings
+who keep working unpaid expect double pay for those days", and "failure to pay immediately
+reduces the hirelings' Trust to 1". So a wage the purse cannot meet drops Trust to 1; each
+day unpaid the same opposed check is made (Risk against Trust 1: +5); a day won is a day
+owed at double (`owed_days`), a day lost and they walk; and the next settle that finds the
+coin pays the debt before the new week (`settle`).
+
+**A post** (`do: guard`, `what: "here"`): a hireling told to hold a place stays there,
+still in pay, when the party walks away — the C&C example of hirelings "watching over ...
+[a] business and defending it if attacked". Their travelling bond is dropped and the post
+held (`bond.guarding`, `at`); being somebody with a standing they stay in the world where
+they stand (`Engine._stays_in_the_world`), and a word has them come along again.
+
+**Not built (said, not hidden):** the wage following the day's most dangerous work (the
+week stays priced at the road's questionable Risk); a balk anywhere but setting out on a
+road — a dangerous order in a fight is still the companion's own turn to weigh, the
+owner's ruling.
 """
 from __future__ import annotations
 
@@ -69,8 +96,17 @@ from . import states
 # CRB, Trained Hirelings: "mercenary warriors"; "Most guards are off-duty soldiers or city
 # watchmen" — the work ids of content/people/occupations.json that hire out a sword.
 HIRES_OUT = frozenset({"caravan-guard", "soldier", "guard"})
-# What a guard order can be on (`do: guard`, `what`).
-GUARDS = ("cargo", "you")
+# What a guard order can be on (`do: guard`, `what`): the party's cargo, the player, or
+# the place they stand in, held while the party goes on without them.
+GUARDS = ("cargo", "you", "here")
+# Ultimate Campaign's Trust (p.148), 1 "wary" to 5 "confidant", set by the hireling's
+# attitude when they sign on. THIS APP'S mapping: a stranger who takes your coin is
+# skeptical ("can be called upon to perform tasks of minimal risk"), one a step warmer
+# reliable, and so on; a confidant is never bought.
+TRUST_AT_HIRE = {"unfriendly": 1, "indifferent": 2, "friendly": 3, "helpful": 4}
+UNPAID_TRUST = 1
+# C&C: "Each category of difference adds 5 to the result of the opposed Diplomacy check."
+RISK_STEP_DC = 5
 
 
 def work_of(scene, actor) -> str:
@@ -109,7 +145,8 @@ def week_cp(scene, actor) -> int:
 
 def take_on(actor, per_day: int, now: int) -> None:
     """The wage, through the one applicator, under the companion's own source: paid a week
-    from `now`."""
+    from `now`, at the Trust their attitude signs on with (`TRUST_AT_HIRE`)."""
+    from . import attitude as attitude_mod
     from . import jobs
     from .activeeffect import ActiveEffect
 
@@ -118,7 +155,98 @@ def take_on(actor, per_day: int, now: int) -> None:
         name="in your pay", kind="bond", key=f"{source}:hired", source=source,
         origin=source, duration="until-dismissed", tags=(states.HIRED,),
         payload={"per_day_cp": int(per_day),
-                 "paid_until": int(now) + jobs.WEEK_DAYS * 24 * 60}))
+                 "paid_until": int(now) + jobs.WEEK_DAYS * 24 * 60,
+                 "trust": TRUST_AT_HIRE.get(attitude_mod.of(actor), 2)}))
+
+
+def trust(actor) -> int:
+    """The hireling's Trust, 1-5 (0 for somebody nobody pays)."""
+    e = wage(actor)
+    return int((e.payload or {}).get("trust", 2)) if e is not None else 0
+
+
+def _negotiates(engine, pc, actor, risk_step: int) -> tuple[bool, str]:
+    """C&C's opposed Diplomacy: the player's against the hireling's, plus `RISK_STEP_DC`
+    for each step the work's Risk is over their Trust. (won, the rolls in words)."""
+    def roll(who, label, plus=0):
+        try:
+            mods = list(who.skill_modifiers("diplomacy"))
+        except Exception:  # noqa: BLE001 - a body with no sheet negotiates on the d20
+            mods = []
+        return engine.dice.d20(mods, label=label, visibility="hidden").total + plus
+
+    over = max(0, risk_step - trust(actor))
+    ours = roll(pc, f"{pc.name} Diplomacy")
+    theirs = roll(actor, f"{actor.name} Diplomacy", RISK_STEP_DC * over)
+    return ours >= theirs, (f"Diplomacy {ours} against {actor.name}'s {theirs}"
+                            + (f", {theirs - RISK_STEP_DC * over} and "
+                               f"{RISK_STEP_DC * over} for the risk over their trust"
+                               if over else ""))
+
+
+def _refund_cp(e, now: int) -> int:
+    """The whole days of an advance not yet worked, in copper."""
+    days = max(0, (int(e.payload.get("paid_until", now)) - int(now)) // (24 * 60))
+    return days * int(e.payload.get("per_day_cp", 0))
+
+
+def balk(engine, risk: str, where: str) -> list:
+    """Hirelings the party sets out with on work riskier than their Trust: each makes C&C's
+    opposed check (`_negotiates`); one the player wins comes, one the player loses stays
+    here, out of the party's pay, with the unworked days of the advance handed back.
+    Outcomes with their tells (law 3)."""
+    from . import goods, jobs
+    from .engine import Outcome
+
+    scene = engine.scene
+    pc = scene.pc()
+    if pc is None or risk not in jobs.RISK:
+        return []
+    step = jobs.RISK.index(risk) + 1
+    now = int(scene.clock_minutes)
+    coins = engine._coins_here()
+    out = []
+    for a in list(scene.actors.values()):
+        e = wage(a)
+        if (e is None or a.is_down or not a.has_state(states.TRAVELS_WITH_YOU)
+                or step <= trust(a)):
+            continue
+        won, rolled = _negotiates(engine, pc, a, step)
+        if won:
+            out.append(Outcome(
+                intent_id="", op="company", because="a hireling weighs the road",
+                effects=[{"ref": a.ref, "kind": "company", "travels": True, "balked": False}],
+                tell=f"{a.name} does not like a {risk} road to {where} and says so, but "
+                     f"{pc.name} talks them into it ({rolled}): they come."))
+            continue
+        back = _refund_cp(e, now)
+        a.remove_effects(source=f"company:{a.ref}")
+        if back:
+            pc.purse = goods.credit(pc.purse, back)
+        out.append(Outcome(
+            intent_id="", op="company", because="a hireling weighs the road",
+            effects=[{"ref": a.ref, "kind": "company", "travels": False, "balked": True}]
+                    + ([{"kind": "give", "ref": a.ref, "item": "coin", "count": back,
+                         "how": "wage returned", "from": a.ref, "to": pc.ref,
+                         "purse": dict(pc.purse)}] if back else []),
+            tell=f"{a.name} will not take a {risk} road to {where} for this pay ({rolled}): "
+                 f"they stay here, out of {pc.name}'s pay"
+                 + (f", and hand back {goods.purse_line(goods.coins_for(back), coins)} for "
+                    f"the days they will not work." if back else ".")))
+    return out
+
+
+def post(actor, where: str) -> None:
+    """Hold `where` while the party goes on: the travelling bond dropped, the wage kept,
+    the post held as `bond.guarding` under the same source."""
+    from .activeeffect import ActiveEffect
+
+    source = f"company:{actor.ref}"
+    actor.remove_effects(match=lambda e: e.key == f"{source}:travels")
+    actor.apply_effect(ActiveEffect(
+        name="holding a post for you", kind="bond", key=f"{source}:guarding", source=source,
+        origin=source, duration="until-dismissed", tags=(states.GUARDING,),
+        payload={"what": "here", "at": str(where)}))
 
 
 def guard(actor, what: str) -> None:
@@ -132,15 +260,18 @@ def guard(actor, what: str) -> None:
 
 
 def guarding(actor) -> str:
-    """What this companion was told to guard ("cargo", "you"), or ""."""
+    """What this companion was told to guard ("cargo", "you", "here"), or ""."""
     e = next((e for e in (getattr(actor, "effects", ()) or ())
               if states.GUARDING in (e.tags or ())), None)
     return str((e.payload or {}).get("what") or "") if e is not None else ""
 
 
 def settle(engine) -> list:
-    """Wages that fell due: a week more from the purse, or the hireling goes. Ashore and
-    out of a fight only (module docstring). Outcomes with their tells (law 3)."""
+    """Wages that fell due: a debt of unpaid days first, at double; then a week more from
+    the purse; and a purse that cannot meet it, C&C's unpaid days — Trust to 1, and each
+    day unpaid a negotiation (`_negotiates`) won to keep them on, owed double, or lost and
+    they walk. Ashore and out of a fight only (module docstring). Outcomes with their
+    tells (law 3)."""
     from . import attitude as attitude_mod
     from . import goods, jobs
     from .engine import Outcome
@@ -150,47 +281,88 @@ def settle(engine) -> list:
     if pc is None or scene.in_encounter or engine.aboard() is not None:
         return []
     now = int(scene.clock_minutes)
-    week = jobs.WEEK_DAYS * 24 * 60
+    day = 24 * 60
+    week = jobs.WEEK_DAYS * day
+    risk_step = jobs.RISK.index(jobs.risk_of("escort")) + 1
     out = []
     for a in list(scene.actors.values()):
         e = wage(a)
-        if e is None or a.is_down or int(e.payload.get("paid_until", now + 1)) > now:
+        if e is None or a.is_down:
             continue
-        per_week = int(e.payload.get("per_day_cp", 0)) * jobs.WEEK_DAYS
+        owed = int(e.payload.get("owed_days", 0) or 0)
+        if int(e.payload.get("paid_until", now + 1)) > now and not owed:
+            continue
+        per_day = int(e.payload.get("per_day_cp", 0))
+        per_week = per_day * jobs.WEEK_DAYS
+        coins = engine._coins_here()
+        spent, said_paid = 0, []
+        if owed:
+            # "Hirelings who keep working unpaid expect double pay for those days."
+            debt = owed * per_day * 2
+            purse, enough = goods.spend(pc.purse, debt)
+            if enough:
+                pc.purse, spent = purse, spent + debt
+                said_paid.append(f"the {owed} unpaid day{'s' if owed != 1 else ''} owed, "
+                                 f"at double: "
+                                 f"{goods.purse_line(goods.coins_for(debt), coins)}")
+                e.payload["owed_days"] = owed = 0
         weeks = 0
-        while int(e.payload["paid_until"]) <= now:
+        while not owed and int(e.payload["paid_until"]) <= now:
             purse, enough = goods.spend(pc.purse, per_week)
             if not enough:
                 break
             pc.purse = purse
             e.payload["paid_until"] = int(e.payload["paid_until"]) + week
             weeks += 1
-        coins = engine._coins_here()
-        paid = goods.purse_line(goods.coins_for(per_week * weeks), coins)
+        if weeks:
+            spent += per_week * weeks
+            said_paid.append(f"another {'week' if weeks == 1 else f'{weeks} weeks'} of "
+                             f"wages in advance: "
+                             f"{goods.purse_line(goods.coins_for(per_week * weeks), coins)}")
+        paid_fx = ([{"kind": "give", "ref": pc.ref, "item": "coin", "count": spent,
+                     "how": "wage", "from": pc.ref, "to": a.ref, "purse": dict(pc.purse)}]
+                   if spent else [])
+        paid_said = f"{pc.name} pays {a.name} " + " and ".join(said_paid) + "."
         if int(e.payload["paid_until"]) > now:
+            out.append(Outcome(intent_id="", op="company", because="a hireling's wage",
+                               effects=paid_fx, tell=paid_said))
+            continue
+        # The purse is short: "failure to pay immediately reduces the hirelings' Trust to
+        # 1", and each day unpaid is negotiated for.
+        e.payload["trust"] = UNPAID_TRUST
+        kept, rolled, walked = 0, "", False
+        while int(e.payload["paid_until"]) <= now:
+            won, rolled = _negotiates(engine, pc, a, risk_step)
+            if not won:
+                walked = True
+                break
+            e.payload["paid_until"] = int(e.payload["paid_until"]) + day
+            e.payload["owed_days"] = int(e.payload.get("owed_days", 0) or 0) + 1
+            kept += 1
+        short = (f"{pc.name} carries {goods.purse_line(pc.purse, coins)} against "
+                 f"{goods.purse_line(goods.coins_for(per_week), coins)} a week")
+        if not walked:
             out.append(Outcome(
                 intent_id="", op="company", because="a hireling's wage",
-                effects=[{"kind": "give", "ref": pc.ref, "item": "coin",
-                          "count": per_week * weeks, "how": "wage", "from": pc.ref,
-                          "to": a.ref, "purse": dict(pc.purse)}],
-                tell=f"{pc.name} pays {a.name} {paid}: another "
-                     f"{'week' if weeks == 1 else f'{weeks} weeks'} of wages in advance."))
+                effects=paid_fx + [{"ref": a.ref, "kind": "company", "travels": True,
+                                    "owed_days": int(e.payload["owed_days"])}],
+                tell=(paid_said + " " if spent else "")
+                     + f"{a.name}'s wages fell due, and {short}: {a.name} stays on unpaid, "
+                       f"for {int(e.payload['owed_days'])} day"
+                       f"{'s' if int(e.payload['owed_days']) != 1 else ''} owed at double "
+                       f"({rolled}), and trusts {pc.name} less for it."))
             continue
         a.remove_effects(source=f"company:{a.ref}")
         before, after = attitude_mod.nudge_regard(a, -jobs.MISSED_REGARD, "wages unpaid")
         said = attitude_mod.regard_said(a.name, before, after)
         out.append(Outcome(
             intent_id="", op="company", because="a hireling's wage",
-            effects=[{"ref": a.ref, "kind": "company", "travels": False,
-                      "regard_from": before, "regard_to": after}]
-                    + ([{"kind": "give", "ref": pc.ref, "item": "coin",
-                         "count": per_week * weeks, "how": "wage", "from": pc.ref,
-                         "to": a.ref, "purse": dict(pc.purse)}] if weeks else []),
-            tell=(f"{a.name}'s wages fell due"
-                  + (f" and {pc.name} paid {paid}, but not enough to bring them up to date"
-                     if weeks else f", and {pc.name} carries "
-                     f"{goods.purse_line(pc.purse, coins)} against "
-                     f"{goods.purse_line(goods.coins_for(per_week), coins)} a week")
-                  + f": unpaid, {a.name} is in nobody's pay and goes their own way."
-                  + (f" {said}" if said else ""))))
+            effects=paid_fx + [{"ref": a.ref, "kind": "company", "travels": False,
+                                "regard_from": before, "regard_to": after}],
+            tell=(paid_said + " " if spent else "")
+                 + f"{a.name}'s wages fell due, and {short}"
+                 + (f"; {a.name} stayed on {kept} day{'s' if kept != 1 else ''} unpaid"
+                    if kept else "")
+                 + f": {a.name} will not work on for nothing ({rolled}), is in nobody's "
+                   f"pay and goes their own way." + (f" {said}" if said else "")))
     return out

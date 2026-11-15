@@ -110,7 +110,7 @@ def _passage_words(engine, leg, scene) -> str:
     shipped = trade.shipping(scene)
     if shipped:
         # The fare carries the party's cargo as freight (`trade.freight_cp`, in the quote).
-        lb = sum(trade.lb_of(x) for x in shipped)
+        lb = sum(trade.freight_lb(x) for x in shipped)
         aboard += f" and freight for {lb:g} lb of cargo"
     if coast is None:
         return aboard

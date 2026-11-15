@@ -186,7 +186,11 @@ def as_sentence(clause: str) -> str:
     # serve the food i made to everyone") came back to the pen as "I i serve the food".
     if re.match(r"^i\b", c):
         c = "I" + c[1:]
-    if not re.match(r"^(?:I\b|I'|\"|“)", c):
+    # "we" is already the player's own subject: "…and we sail for Zhilvarnia" came back to
+    # the pen as "I we sail for Zhilvarnia." (live, 2026-11-15).
+    if re.match(r"^we\b", c, re.I):
+        c = "We" + c[2:]
+    if not re.match(r"^(?:I\b|I'|We\b|\"|“)", c):
         m = _GERUND.match(c)
         if m:
             c = _base(m.group(0)) + c[m.end():]

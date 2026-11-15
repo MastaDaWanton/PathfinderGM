@@ -139,10 +139,43 @@ The hired-swords lane's guards defend a lot by these fields. Nothing here builds
 - **Elite (1984)'s reroll on arrival.** It makes a market a slot machine, and the price no
   longer answers to what the party did.
 
+## Built after the first live game (fix/merchant-road, 2026-11-15)
+
+The loop was played end to end on scratch data (Mirabalos to Zhilvarnia with a hired
+guard and 2000 lb of iron). What it showed and what was built:
+
+- **Named in the world's words.** "iron ore" at a town shipping "Iron ore from nearby
+  mines" was refused as not on the counter. A buyer's words now name the good when they
+  are all the world's and keep the word it is priced by (`trade.names_the_good`), so
+  "some tools" in a town that ships "iron tools" is still a tool.
+- **No 500-unit cap on a lot.** The cap was `give`'s bound against a model-authored count
+  minting coin (review 2026-11-11, finding 5), copied onto `buy` and `sell` and then into
+  the trade window. It clamped 600 lb of iron to 500 without a word. Nothing mints in a
+  bulk trade (the purse, the market's stock and appetite, and the lots held bound it), so
+  a `cargo:` count is bounded only to stay a number (`intents.CARGO_COUNT_MAX`) and the
+  window's input is bounded by what the market has.
+- **Selling by the reading.** "I sell my iron" was refused "not carrying my iron" (the
+  reading's sale looked only in the pack), then sold 1 lb (no count). Cargo within reach
+  is now the reading's to sell, all of it unless a count is said.
+- **Pack saddles.** CRB: a pack saddle "holds as much gear as the mount can carry". A
+  beast carries cargo on one (its 15 lb inside the load) and none without.
+- **Drovers.** One walker drives 50 head (`DROVER_HEAD`, from historical droves' "one man
+  for every 50 or 60 cattle"); the rest of a herd waits where it was bought.
+- **Herds eat.** On the road they graze (CRB Feed: horses and their kind "can graze to
+  sustain themselves"). In a hold they cannot: they pay freight by live weight
+  (`LIVE_LB`, this app's) and are fed 5 cp a horse-weight a day (`trade.hold_cp`). Before,
+  livestock weighed nothing in a hold and sailed free.
+- **Customs.** A town with a customs house (or, with ask 22, one the world says levies)
+  takes an eightieth of the book value of goods brought in (England's petty custom of
+  1303, 3d in the pound), once a lot, at the gate or the quay (`Engine._customs`). What
+  the purse cannot cover is owed on the goods and comes out of their sale.
+
 ## What is not done
 
-- Herding livestock costs nothing and needs no drover.
-- A pack animal needs no pack saddle.
-- Towns charge no customs at their gates.
-- Asks 19–21 in docs/for-world-bible.md would replace the word table with the world's own
-  words. The readers exist (`trade.route_row`, `row_of_good`, `volume`).
+- The customs lien is taken at whichever counter sells the goods, not only the levying
+  town's; carrying them out unpaid is not smuggling.
+- Saddlebags carry no cargo (the book gives them no capacity), and a ridden horse still
+  counts as a pack beast if it has a pack saddle.
+- Asks 19–22 in docs/for-world-bible.md would replace the word table and the customs
+  guess with the world's own words. The readers exist (`trade.route_row`, `row_of_good`,
+  `volume`, `levies_customs`).
