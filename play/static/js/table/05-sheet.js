@@ -252,7 +252,8 @@ function defenceCard(s) {
   const con = (s.abilities || []).find(a => a.key === "con");
   const saves = (d.saves || []).map(sv => stat(esc(sv.name), sign(sv.total), termLine(sv) || "no bonus")).join("");
   const life = [
-    `<div class="t"><span>Hit points</span><b>${esc(hp.current)} of ${esc(hp.max)}</b></div>`,
+    `<div class="t"><span>Hit points</span><b>${esc(hp.current)} of ${esc(hp.max)}${
+      hp.nonlethal ? `, ${esc(hp.nonlethal)} non-lethal` : ""}</b></div>`,
     hp.temp ? `<div class="t"><span>Temporary${hp.temp_source ? `, from ${esc(hp.temp_source)}` : ""}</span><b>${sign(hp.temp)}</b></div>` : "",
     ...(d.dr || []).map(r => `<div class="t"><span>Damage reduction${r.source ? `, from ${esc(r.source)}` : ""}</span><b>${esc(r.label)}</b></div>`),
     ...(d.resistances || []).map(r => `<div class="t"><span>Resists ${esc(r.type)}</span><b>${esc(r.amount)}</b></div>`),

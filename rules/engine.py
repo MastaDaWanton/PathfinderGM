@@ -1666,6 +1666,18 @@ class Scene:
                               "said": [survival.unmended_said(a)]}
                     body.append(record)
                     self._body_said.append(record)
+            # A stable body's hourly check to come round (CRB p.190, `Actor.come_round`).
+            # Not the player's: `play/downed.py` resolves theirs before they take a turn.
+            if hours and not a.is_pc and self._dice is not None \
+                    and a.has_state("state.down.stable"):
+                came = a.come_round(self._dice, hours)
+                if came:
+                    line = {"woke": f"{a.name} comes round.",
+                            "mended": f"{a.name} is past the worst of the wounds, but "
+                                      f"still unconscious from non-lethal damage.",
+                            }.get(came, f"{a.name} dies where they lay, untended.")
+                    ended.append(line[:-1])
+                    told.append({"kind": "said", "ref": a.ref, "said": line})
             # The breath they are holding, for anybody under the surface who does not
             # breathe water. A counter, like hunger above it and for the same reason:
             # the Constitution check that follows it rolls dice and belongs to the
@@ -9584,6 +9596,10 @@ class Engine:
                     # the rider die was the popup before.
                     (f"{weapon['damage_label']} ({weapon['damage']})"
                      if weapon.get("damage_label") else f"Damage ({weapon['name']}")
+                    # The popup says which track the blow lands on: the dice read
+                    # "Damage (unarmed strike)" for a punch that hurt no hit points
+                    # (playtest 2026-11-15 #39).
+                    + (" — non-lethal" if lethality == "nonlethal" else "")
                     + (" — CRITICAL" if mult > 1 else "")
                     + ("" if weapon.get("damage_label") else ")"),
                     None, partial, state, dice_notation,
@@ -24857,7 +24873,11 @@ class Engine:
             return self._stood_toward(intent, actor, toward)
 
         self.scene.zones[ref] = zone
-        tell = f"{actor.name} moves from {was} to {zone}."
+        # A move to the band they already stand in went nowhere, and says so: "Vesna
+        # Kroll moves from near to near" was the tell for dropping to her knees (playtest
+        # 2026-11-15 #62).
+        tell = (f"{actor.name} stays where they are." if was == zone
+                else f"{actor.name} moves from {was} to {zone}.")
         if walker is not None:
             order = {"far": 0, "near": 1, "engaged": 2}
             closer = order.get(zone, 1) - order.get(was, 1)

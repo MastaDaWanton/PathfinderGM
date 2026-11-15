@@ -138,8 +138,11 @@ function renderSides(s) {
   // The phone's glance, in the book's head: life and AC, and the way to the whole sheet.
   const glance = $("#glance");
   if (glance) {
-    glance.textContent = `Life ${pc.hp} of ${pc.hp_max}, AC ${pc.ac}`;
-    glance.setAttribute("aria-label", `Life ${pc.hp} of ${pc.hp_max}, armour class ${pc.ac}. Open the sheet`);
+    // Non-lethal is the Blood Bender's spent resource and its own track (CRB p.191):
+    // the glance read "Life 23 of 26" with 6 on her (playtest 2026-11-15 #33).
+    const nlSaid = pc.nonlethal ? `, ${pc.nonlethal} non-lethal` : "";
+    glance.textContent = `Life ${pc.hp} of ${pc.hp_max}${nlSaid}, AC ${pc.ac}`;
+    glance.setAttribute("aria-label", `Life ${pc.hp} of ${pc.hp_max}${nlSaid}, armour class ${pc.ac}. Open the sheet`);
   }
 }
 

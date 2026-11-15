@@ -10485,6 +10485,8 @@ _A_THING = frozenset({
 
 _CHEAT_XP = re.compile(r"(\d[\d,]*)\s*(?:xp|experience(?: points?)?|exp)\b", re.I)
 _CHEAT_COIN = re.compile(r"(\d[\d,]*)\s*(gold|gp|silver|sp|copper|cp|platinum|pp)\b", re.I)
+_CHEAT_FULL_HEAL = re.compile(
+    r"\b(?:heal\w*|restore\w*)\b.*\bfull\b|\bfull\s+(?:health|hit\s*points|hp)\b", re.I)
 
 
 def cheat_intents(wish: str, scene) -> list[dict]:
@@ -10512,6 +10514,19 @@ def cheat_intents(wish: str, scene) -> list[dict]:
         out.append({"op": "give", "because": "the author's word",
                     "params": {"item": denom, "count": int(m.group(1).replace(",", "")),
                                "to": pc.ref}})
+    # "Heal me to full" is a state, not a number: the model wrote hp_max (26) from 1/26,
+    # and Blood Bond banked the spare point as temporary vitality (playtest 2026-11-15
+    # #88). Full is what is missing, with the non-lethal cleared on its own track, so no
+    # cure point is spare to bank.
+    if _CHEAT_FULL_HEAL.search(wish) and not pc.is_dead:
+        missing = max(0, int(pc.hp_max) - int(pc.hp))
+        left_nl = max(0, int(pc.nonlethal) - missing)
+        if missing:
+            out.append({"op": "heal", "because": "the author's word",
+                        "params": {"amount": missing, "to": pc.ref}})
+        if left_nl:
+            out.append({"op": "heal", "because": "the author's word",
+                        "params": {"amount": left_nl, "to": pc.ref, "nonlethal": True}})
     return out
 
 
