@@ -430,6 +430,13 @@ TAGS: dict[str, tuple[str, ...]] = {
     # (Stealth, CRB p.106). Who was distracted rides in the payload; the next Stealth
     # check spends it (`Engine._diversion`). Not a hiding — nobody is hidden by it.
     "diverting":   ("state.diverting",),
+    # A disguise made (Disguise, CRB p.95): "Your Disguise check result determines how good
+    # the disguise is, and it is opposed by others' Perception check results." Not a
+    # condition the book prints. Granted by `Engine._op_disguise` (source `rule:disguise`,
+    # the secret result in the payload) and read by `disguise.passes` — the watch asks it
+    # before it knows a wanted face. Ends when the clothes it was made in come off, or a
+    # new disguise is made.
+    "disguised":   ("state.disguised",),
     "prone":       ("state.position.prone", "recovery.rest"),
     "flat-footed": ("state.position.flat-footed", "recovery.rest", "state.exposed"),
     "bleed":       ("state.wound.bleeding",),

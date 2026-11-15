@@ -2947,7 +2947,7 @@ async function historyRead() {
 function tabQuests() {
   const q = (STATE && STATE.quests) || { active: [], finished: [] };
   const one = (k, done) => `<li class="matter${done ? " done" : ""}">
-      <h3>${esc(k.title)}${done ? ` <span class="chip">finished</span>` : ""}</h3>
+      <h3>${esc(k.title)}${done ? ` <span class="chip">${esc(k.ended || "finished")}</span>` : ""}</h3>
       ${k.giver ? `<p class="why">for ${esc(k.giver)}</p>` : ""}
       ${k.objectives.length ? `<ul class="objectives">${k.objectives.map(o =>
         `<li class="${o.done ? "done" : ""}">${esc(o.text)}${o.done ? `<span class="vh">, done</span>` : ""}</li>`).join("")}</ul>` : ""}
@@ -2957,7 +2957,7 @@ function tabQuests() {
   return `${q.active.length ? `<ul class="plain matters">${q.active.map(k => one(k, false)).join("")}</ul>`
       : `<p class="why">Nothing taken on yet. When somebody gives you a task and you take it,
           it is kept here.</p>`}
-    ${q.finished.length ? `<h3 class="cardsub">Finished</h3>
+    ${q.finished.length ? `<h3 class="cardsub">Over</h3>
       <ul class="plain matters">${q.finished.map(k => one(k, true)).join("")}</ul>` : ""}`;
 }
 
@@ -2980,7 +2980,9 @@ function journalLines() {
     say to you, and what you say back, is kept here.</p>`;
   let out = "", group = null;
   for (const e of JOURNAL_LOG) {
-    const key = `${e.who}|${e.beat}`;
+    // One heading for a run of lines by one speaker: keyed on the beat too, Lyra's four
+    // lines on four beats read "Lyra Lyraxys" four times over (playtest 2026-11-15 #100).
+    const key = `${e.who}`;
     if (key !== group) {
       if (group !== null) out += `</div>`;
       out += `<div class="jr-turn"><span class="jr-name">${esc(e.who === "you" ? "You" : title(e.name || e.who))}</span>`;

@@ -337,7 +337,13 @@ def jobs_spoken(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list
     # The one person standing here who holds work: who "the clerk" means when the words do
     # not find a name (a world character cast as the clerk carries their own name, measured
     # on Pangrella) and the player is dealing with nobody in particular.
-    hiring = [r for r in (getattr(scene, "actors", {}) or {}) if jobs_mod.held_by(scene, r)]
+    # And a keeper who takes on hands by the week (`jobs.HIRES`): asked like any employer,
+    # the week opened when they are asked for it (`Engine._op_job`, playtest #84).
+    def hires(r: str) -> bool:
+        return bool(jobs_mod.held_by(scene, r)
+                    or jobs_mod.hires_hands((getattr(scene, "actors", {}) or {}).get(r)))
+
+    hiring = [r for r in (getattr(scene, "actors", {}) or {}) if hires(r)]
     for row in rows:
         a = actions[row.index] if row.index < len(actions) else {}
         if row.act not in _JOB_ACTS or not interpret.acting(a):
@@ -352,14 +358,30 @@ def jobs_spoken(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list
             # (first in the room) beside the guild clerk taking names. The room's own
             # finder words it as a tie; the work decides it.
             ref = hiring[0]
-        if not ref or ref in done or not jobs_mod.held_by(scene, ref):
+        if not ref or ref in done or not hires(ref):
             continue
         offered = [c for c in jobs_mod.held_by(scene, ref)
                    if cards_mod.standing(c) == cards_mod.OFFERED and c.job.get("work")]
+        # And the ones the player already took and has not started: what "I've changed my
+        # mind about the caravan" gives up. Playtest 2026-11-15 #9: only the offers were
+        # listed, so the reader named the town week, which was turned down instead, and
+        # the caravan contract she held stayed.
+        taken = [c for c in jobs_mod.held_by(scene, ref)
+                 if cards_mod.standing(c) == cards_mod.OWN and not jobs_mod.quit_refusal(c)]
         who = scene.actors[ref].name
-        got = ask(str(a.get("span") or ""), who, [c.title for c in offered]) or {}
+        got = ask(str(a.get("span") or ""), who, [c.title for c in offered + taken]) or {}
         answer = got.get("answer", "")
         named = next((c for c in offered if c.title == got.get("job")), None)
+        quits = next((c for c in taken if c.title == got.get("job")), None)
+        if quits is None and named is None and not offered and len(taken) == 1:
+            quits = taken[0]      # nothing else on the table to turn down
+        if answer == "turns it down" and quits is not None:
+            row.intents.append({"op": "job", "actor": pc.ref, "target": ref,
+                                "params": {"do": "decline", "job": quits.id},
+                                "because": f"the player, to {who}: gives up the job"})
+            notes.append(f"{who}: gives up {quits.title}")
+            done.add(ref)
+            continue
         built = None
         if answer == "says what work they can do":
             said = got.get("work") if got.get("work") in jobs_mod.SAID else ""
@@ -973,7 +995,10 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                     _to_the_fixture(row, kind, scene, pc)
                 _sneak(row, a, scene, pc)
             if act == "use" and pc is not None and not row.ops:
-                _draw(row, a, pc)
+                if not (_skill_used(row, a, pc) or _put_on(row, a, pc)):
+                    _draw(row, a, pc)
+            if act == "disguise" and pc is not None:
+                _disguise(row, a, pc)
             if act == "commission" and pc is not None:
                 _commission(row, a, scene, pc)
             if act == "escape" and pc is not None:
@@ -1179,6 +1204,66 @@ def _draw(row: Row, a: dict, pc) -> None:
         row.intents.append({"op": "wear", "actor": pc.ref,
                             "params": {"item": str(carried), "actor": pc.ref},
                             "because": f"the player draws the {carried}"})
+
+
+def _disguise(row: Row, a: dict, pc, what: str | None = None) -> None:
+    """A disguise, built whole: the engine's `disguise` op (`Engine._op_disguise`), with the
+    reader's object as who the character passes for. Playtest 2026-11-15 #83: the same
+    words rolled a plan's check one turn and nothing the next."""
+    what = " ".join(str(a.get("object") if what is None else what or "").split())
+    row.intents.append({"op": "disguise", "actor": pc.ref,
+                        "params": {"as": what} if what else {},
+                        "because": "the player makes a disguise"})
+    row.note = "a disguise: one secret Disguise check, held"
+
+
+def _skill_named(words) -> str:
+    """The skill a `use` names ("my Disguise skill", "Perception"), from the engine's own
+    skill table, or "". A closed vocabulary, as an ability's name is matched against the
+    sheet; the words around it ("my", "skill") are the frame, not a reading of intent."""
+    from rules import tables
+
+    low = [w for w in str(words or "").lower().replace("'s", "").split()
+           if w not in ("my", "the", "her", "his", "their", "skill", "skills", "own")]
+    name = " ".join(low)
+    return name if name in tables.SKILLS else ""
+
+
+def _skill_used(row: Row, a: dict, pc) -> bool:
+    """A `use` of the Disguise skill by name is the disguise op. Playtest 2026-11-15 #80: "I
+    use my Disguise skill to make myself look like a dock labourer" was refused "There is
+    no disguise skill here" — the skill's name looked for as an item. Any other skill
+    named is left to its own builder (the Heal skill is `first_aid`'s) and to the plan's
+    check, and is never asked about as a thing (`scenery.handled`)."""
+    skill = _skill_named(a.get("power")) or _skill_named(a.get("object"))
+    if skill != "disguise":
+        return False
+    _disguise(row, a, pc, what="")
+    return True
+
+
+def _put_on(row: Row, a: dict, pc) -> bool:
+    """A `use` that puts on an outfit the player carries: the `wear` op, which changes the
+    body slot (`Engine._change_clothes`). Playtest 2026-11-15 #79: "I change into the new
+    traveler's outfit" was read but no op owed it, and the outfit stayed in the pack."""
+    from rules import goods
+
+    said = " ".join(str(a.get("object") or "").split())
+    key = _carried(pc, said)
+    if not key:
+        # "the new traveler's outfit": the pack's own outfit named whole among other words.
+        # The pack is the closed vocabulary here, matched word for word, never the reverse.
+        words = set(said.lower().split())
+        fits = [k for k in (getattr(pc, "goods", {}) or {})
+                if goods.is_clothes(k) and set(k.lower().split()) <= words]
+        key = fits[0] if len(fits) == 1 else ""
+    if not key or not goods.is_clothes(key):
+        return False
+    row.intents.append({"op": "wear", "actor": pc.ref,
+                        "params": {"item": key, "actor": pc.ref},
+                        "because": f"the player changes into the {key}"})
+    row.note = f"changes into the {key}"
+    return True
 
 
 def _sneak(row: Row, a: dict, scene, pc) -> None:
@@ -2649,6 +2734,13 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     # check, its grapple at the holder or its own escape would roll a second time for the
     # same deed — and the check at a DC the plan chose removed nothing (2026-11-01).
     escaping = any(b.get("op") == "escape" for b in built)
+    # A disguise the table built (`_disguise`) is the turn's one Disguise check: the plan's
+    # own Disguise check would make a second disguise (`Engine._op_check` routes one there).
+    disguising = any(b.get("op") == "disguise" for b in built)
+    # A change of clothes the table built (`_put_on`) is the turn's one `wear` of it: the
+    # plan's own for the same outfit would find it already on and be refused beside it.
+    dressing = {str((b.get("params") or {}).get("item") or "") for b in built
+                if b.get("op") == "wear"} - {""}
     # A loot or a harvest the table built is the turn's word on that body: the plan's own
     # loot, or a skill check it wrote for the cutting, would strip or roll a second time.
     looting = any(b.get("op") == "loot" for b in built)
@@ -2713,6 +2805,18 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
                     "manoeuvre") or "") == "grapple")):
             if notes is not None:
                 notes.append(f"the plan's {op} replaced by the reading's escape")
+            continue
+        if disguising and op in ("check", "disguise") and str(((r or {}).get("params") or {})
+                                                          .get("skill") or "disguise"
+                                                          ).lower() == "disguise":
+            if notes is not None:
+                notes.append(f"the plan's {op} replaced by the reading's disguise")
+            continue
+        if op == "wear" and dressing and str(((r or {}).get("params") or {}).get("item")
+                                              or "").lower().strip() in dressing:
+            continue
+        if op == "disguise":
+            # Code-only (`intents.CODE_ONLY_OPS`): a disguise is the reading's act.
             continue
         if looting and op == "loot":
             if notes is not None:

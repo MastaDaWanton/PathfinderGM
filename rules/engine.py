@@ -7670,6 +7670,12 @@ class Engine:
             # Nobody on the floor makes a check to be helped with.
             return self._refuse(intent, f"{helped.name} is in no state to try anything; "
                                         f"there is no effort of theirs to help with.")
+        if str(skill).lower() == "disguise" and actor.is_pc and helped is None:
+            # A Disguise check IS a disguise (CRB p.95): the same deed whichever way it
+            # came in. Playtest 2026-11-15 #82/#83: the plan's Disguise check rolled "vs
+            # 10" and left nothing on the character, while the same words a turn later
+            # rolled nothing at all.
+            return self._op_disguise(intent, partial)
         if ability:
             mods = actor.ability_check_modifiers(ability)
         else:
@@ -7946,8 +7952,16 @@ class Engine:
             # and was paid 300 XP — a fifth of a level for a check she could not fail.
             beaten = (10 + opposing_roll.modifier_total if opposing_roll
                       else resolved_dc.final)
+            # Only an obstacle the engine holds pays (`reward_check`): the one who opposed
+            # or was swayed, the trap, the dying patient, the law's hearing. A DC the
+            # plan chose for a deed at nobody is no challenge on the record.
+            obstacle = (str(opposed.get("ref") or "") if isinstance(opposed, dict)
+                        else getattr(swayed, "ref", "") if swayed is not None
+                        else f"trap:{disarming['id']}" if disarming is not None
+                        else getattr(patient, "ref", "") if patient is not None
+                        else f"hearing:{self.scene.at}" if heard is not None else "")
             tell += self.reward_check(actor, skill, beaten,
-                                      modifier=roll.modifier_total)
+                                      modifier=roll.modifier_total, obstacle=obstacle)
 
         effects: list[dict] = list(slip_fx)
         if slip_said:
@@ -8078,9 +8092,8 @@ class Engine:
                   f"{helped.name} misses the {what} check by {-task_margin}: the attempt "
                   f"fails.")
         tell = f"{helping} {result}"
-        if made:
-            # The player beat the book's 10, a challenge overcome like any check.
-            tell += self.reward_check(actor, skill, AID_ANOTHER_DC)
+        # No XP for the aid itself: helping is no obstacle overcome (`reward_check`); the
+        # book's 10 paid nothing at any level anyway (`xp.challenge_award`).
         return Outcome(
             intent_id=intent.id, op="check", rolls=[roll, theirs],
             dc=dc_mod.ResolvedDC(value=AID_ANOTHER_DC, band=None,
@@ -8152,7 +8165,8 @@ class Engine:
         paid = 0
         if granted:
             tell = (f"{asks} {actor.name} makes the diplomacy check{dc_mod.by(margin)}."
-                    + self.reward_check(actor, "diplomacy", resolved_dc.final))
+                    + self.reward_check(actor, "diplomacy", resolved_dc.final,
+                                        obstacle=target.ref))
             if kind == requests_mod.PAYMENT:
                 line, effects, paid = self._pay_for_work(actor, target)
                 tell = f"{tell} {line}"
@@ -8201,7 +8215,8 @@ class Engine:
             card = cards_mod.find(self.scene, card.id)
             pay = jobs_mod.pay_of(card)
             tell = (f"{asks} {actor.name} makes the diplomacy check{dc_mod.by(margin)}."
-                    + self.reward_check(actor, "diplomacy", resolved_dc.final)
+                    + self.reward_check(actor, "diplomacy", resolved_dc.final,
+                                        obstacle=target.ref)
                     + (f" {_sentence(target.name)} raises it to "
                        f"{jobs_mod.coin_words(self, pay['per_day_cp'])} a day, "
                        f"{jobs_mod.coin_words(self, jobs_mod.total_cp(card))} in all"
@@ -12826,6 +12841,10 @@ class Engine:
                  if intent.params.get("job") else None)
         if employer is None and named is not None:
             employer = self.scene.actors.get(named.giver)
+        if employer is not None and do == "offer":
+            # A keeper who takes on hands by the week (the docks, the warehouses) has
+            # work whenever they are asked for it (`jobs.HIRES`, playtest 2026-11-15 #84).
+            jobs_mod.hire_on_demand(self, employer)
         if employer is None or not jobs_mod.held_by(self.scene, employer.ref):
             return self._refuse(intent, "Nobody here has work to put to the player.")
         who = employer.name
@@ -12882,9 +12901,21 @@ class Engine:
             return self._refuse(intent, f"{_sentence(who)} has put no work to {pc.name} "
                                         f"to {'take on' if do == 'accept' else 'turn down'}.")
         if do == "decline":
+            title = card.title.lower()[:1] + card.title[1:]
+            if cards_mod.standing(card) == cards_mod.OWN:
+                # Giving up a job taken (playtest 2026-11-15 #9), not an offer turned down.
+                why = jobs_mod.quit_refusal(card)
+                if why:
+                    return self._refuse(intent, why)
+                jobs_mod.decline(self, card)
+                return Outcome(intent_id=intent.id, op="job", because=intent.because,
+                               tell=f"{pc.name} gives up the job ({title}): it is off, and "
+                                    f"nothing is owed either way.",
+                               effects=[{"kind": "job", "id": card.id, "state": "declined",
+                                         "quit": True, "origin": f"job:{card.id}"}])
             jobs_mod.decline(self, card)
             return Outcome(intent_id=intent.id, op="job", because=intent.because,
-                           tell=f"{pc.name} turns down {card.title.lower()[:1] + card.title[1:]}.",
+                           tell=f"{pc.name} turns down {title}.",
                            effects=[{"kind": "job", "id": card.id, "state": "declined",
                                      "origin": f"job:{card.id}"}])
         if cards_mod.standing(card) == cards_mod.UNHEARD:
@@ -25375,8 +25406,17 @@ class Engine:
         return line
 
     def reward_check(self, actor, skill: str, dc: int | None,
-                     modifier: int | None = None) -> str:
-        """Pay for a check beaten, once per DC per place per day, or "".
+                     modifier: int | None = None, *, obstacle: str = "") -> str:
+        """Pay for an obstacle overcome by a check, once per obstacle, or "".
+
+        `obstacle` is what the engine holds that was beaten: the person who opposed or was
+        swayed (their ref), the trap or door (its id). CRB "Awarding Experience" pays for
+        "the monsters, traps, obstacles, and roleplaying encounters the PCs overcome" —
+        never for a roll. Playtest 2026-11-15 #11/#53: a Stealth "vs 12" for a bracelet
+        that did not exist and an Intimidate "vs 12" at a guard who was not there paid
+        100 XP each, because the DC was the plan's band against nobody; with no obstacle
+        named nothing is paid. And once per obstacle and skill, not once a day: the same
+        guard cowed again is not a new challenge.
 
         `modifier` is what the check was rolled with: a DC that the lowest face (1 + it —
         a skill check has no automatic failure, CRB p.86) already reaches was no challenge
@@ -25384,7 +25424,7 @@ class Engine:
         "the character could not fail" and could only ask their level."""
         from . import xp as xp_mod
 
-        if actor is None or not actor.is_pc or dc is None:
+        if actor is None or not actor.is_pc or dc is None or not obstacle:
             return ""
         if modifier is not None and int(modifier) + 1 >= int(dc):
             return ""
@@ -25392,8 +25432,8 @@ class Engine:
         if not award:
             return ""
         day = self.scene.clock_minutes // (24 * 60)
-        key = f"{skill}|{int(dc)}|{self.scene.at or ''}"
-        if self.scene.rewarded.get(key) == day:
+        key = f"{skill}|{obstacle}"
+        if key in self.scene.rewarded:
             return ""
         self.scene.rewarded[key] = day
         return self.award_xp(actor, award, f"the {skill} check (DC {int(dc)})")
@@ -29184,6 +29224,92 @@ class Engine:
             because=intent.because,
         )
 
+    # Changing clothes, out of a fight. Ours: the CRB gives armour its donning times and
+    # an outfit none; a few minutes is a change behind a screen.
+    CHANGE_MINUTES = 5
+
+    def _change_clothes(self, intent: Intent, actor, key: str, no) -> Outcome:
+        """Into an outfit carried: it goes on the body slot, and what was there goes in
+        the pack. Playtest 2026-11-15 #79: "I change into the new traveler's outfit" was
+        read as nothing and the outfit stayed in the pack; an outfit was "not something
+        that can be worn" because only weapons, armour and crafted slot items were.
+        A disguise made in the old clothes comes off with them (`rules/disguise.py`)."""
+        from . import disguise as disguise_mod
+
+        if self.scene.in_encounter:
+            return no(f"Changing clothes takes minutes, and there is a fight on.")
+        body = actor.slot_list("body")
+        was = body[0] if body else None
+        if actor.goods.get(key, 0) <= 1:
+            actor.goods.pop(key, None)
+        else:
+            actor.goods[key] -= 1
+        if was:
+            actor.goods[was] = actor.goods.get(was, 0) + 1
+        if body:
+            body[0] = key
+        else:
+            actor.slots["body"] = [key]
+        self.scene.advance(minutes=self.CHANGE_MINUTES)
+        off = disguise_mod.take_off(actor)
+        return Outcome(
+            intent_id=intent.id, op="wear",
+            effects=[{"ref": actor.ref, "kind": "wear", "item": key, "slot": "body",
+                      "minutes": self.CHANGE_MINUTES, **({"was": was} if was else {}),
+                      **({"disguise_off": True} if off else {})}],
+            tell=(f"{actor.name} changes into the {key}"
+                  + ((", the old one packed away" if was == key else
+                      f", the {was} packed away") if was else "") + "."
+                  + (" The disguise goes with the old clothes." if off else "")),
+            because=intent.because)
+
+    def _op_disguise(self, intent: Intent, partial: dict) -> Outcome:
+        """Making yourself look like somebody else (Disguise, CRB p.95; `rules/disguise.py`).
+
+        One Disguise check, rolled by the engine in secret ("you can't be sure how good
+        the result is"), with a disguise kit's +2 when one is carried; the result IS the
+        disguise, held through the one applicator as `state.disguised` for every
+        suspicious viewer to take 10 against (`disguise.passes`); 1d3 x 10 minutes of
+        work. Playtest 2026-11-15 #82: a plain check "vs 10" that left nothing on the
+        character. Nothing is said of the number: the tell says it is made, not how well."""
+        from . import disguise as disguise_mod
+
+        actor = self.scene.actors.get(intent.actor or "") or self.scene.pc()
+        if actor is None:
+            return self._refuse(intent, "There is nobody here to disguise.")
+        if self.scene.in_encounter:
+            return self._refuse(intent, "A disguise takes ten minutes or more of work, and "
+                                        "there is a fight on.")
+        mods, refused = self._skill_mods_or_refusal(intent, actor, "disguise")
+        if refused is not None:
+            return refused
+        if holding.key_in(actor.goods or {}, disguise_mod.KIT):
+            mods = [*mods, Modifier(disguise_mod.KIT_BONUS, "disguise kit")]
+        # shortcut: the kit's ten uses are not counted down; count them when kits are sold
+        # with a use pool.
+        roll = self.dice.d20(mods, label="Disguise check", visibility="hidden")
+        minutes = 10 * self.dice.roll("1d3", [], label="time to make the disguise",
+                                      visibility="hidden").total
+        self.scene.advance(minutes=minutes)
+        had = disguise_mod.take_off(actor)
+        what = " ".join(str(intent.params.get("as") or "").split())
+        actor.apply_effect(ActiveEffect(
+            name="Disguised" + (f" as {what}" if what else ""), kind="condition",
+            key=disguise_mod.KEY, source=disguise_mod.ORIGIN, origin=disguise_mod.ORIGIN,
+            duration="until-dismissed", tags=disguise_mod.tags(),
+            payload={"result": int(roll.total), "modifier": int(roll.modifier_total),
+                     "as": what, "made": int(self.scene.clock_minutes)}))
+        return Outcome(
+            intent_id=intent.id, op="disguise", rolls=[roll],
+            effects=[{"kind": "condition", "ref": actor.ref, "condition": "disguised",
+                      "minutes": minutes, "origin": disguise_mod.ORIGIN}],
+            tell=(f"{actor.name} spends {minutes} minutes on a disguise"
+                  + (f" as {what}" if what else "")
+                  + (", in place of the old one" if had else "")
+                  + f". It is made, and it stays on {actor.name} until the clothes change; "
+                    f"how good it is, nobody can be sure until a suspicious eye falls on it."),
+            because=intent.because)
+
     def _op_wear(self, intent: Intent, partial: dict) -> Outcome:
         """Put on something you are carrying, and let it reach the numbers.
 
@@ -29254,6 +29380,9 @@ class Engine:
                 tell=f"{actor.name} puts on the {label}." + (f" {seen}" if seen else ""),
                 because=intent.because)
 
+        clothes = holding.key_in(actor.goods or {}, item)
+        if clothes and goods.is_clothes(clothes):
+            return self._change_clothes(intent, actor, clothes, no)
         # The one key, by the two resolvers (E1). Compared key to key, so "leather
         # armour", "Chain Shirt" and "bo staff" find what the sheet holds as "leather",
         # "chain shirt" and "bo-staff" — and what is put on is stored by its key.

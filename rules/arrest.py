@@ -92,7 +92,7 @@ def stood_down(actor, town: str) -> bool:
 def guards_who_see(engine, pc) -> list:
     """The law standing here who can see the player: `role.guard`, on their feet, not
     travelling with them, and seeing them (a hidden or invisible player is not seen)."""
-    from . import awareness
+    from . import awareness, disguise
 
     out = []
     for a in engine.scene.actors.values():
@@ -101,6 +101,10 @@ def guards_who_see(engine, pc) -> list:
         if a.has_state(states.TRAVELS_WITH_YOU):
             continue
         if not awareness.sees(engine.scene, a, pc):
+            continue
+        # Seen, but not known: a disguise that beats a guard's Perception (taking 10, a
+        # suspicious eye — Disguise, CRB p.95) is not a wanted face (`disguise.passes`).
+        if pc.has_state(disguise.TAG) and disguise.passes(a, pc):
             continue
         out.append(a)
     return out

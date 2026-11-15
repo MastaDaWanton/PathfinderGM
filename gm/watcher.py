@@ -942,48 +942,6 @@ def _schemes_own(card) -> bool:
     return str(getattr(card, "origin", "") or "").startswith("scheme:")
 
 
-# The undercurrent's story award, as a ledger on the scene (`Scene.rewarded`, saved with
-# it): which thread of the note this is — counted up each time the watcher says the old
-# one resolved and writes a `new` — and, per thread, whether its advance and its ending
-# have been paid. The note itself is a sentence a model rewrites; nothing in the engine
-# holds what it is about, so what CAN be held is that one thread is moved once and ended
-# once. Measured on the owner's 0.2.25 save (Corvin): one private note, rewritten in place
-# with the same stallholder's grip on the same sleeve, was paid seven "advance" awards —
-# 1,700 XP — and with the unchecked quest steps the character went from level 1 to level 3
-# in about two game days.
-#
-# What was weighed and refused: a similarity test between the old sentence and the new
-# (reading English to price a number, which the owner's direction rules out), and a cap per
-# game day (a rate, not a fact: a real thread moved twice in a day would pay once, a
-# recycled one every day). A thread must have been moved before its ending pays, so a model
-# that answers `new` at every look ends nothing it never moved.
-_THREAD_KEY = "story:undercurrent"
-
-
-def _undercurrent_award(c, action: str) -> str:
-    """The story award for the undercurrent moving, or "" when this thread has already
-    been paid for this step. The line names no thread: the note is the GM's own, and the
-    award line used to print it on the page whole ("You gain 200 XP for moving a matter
-    along: The stallholder's grip on your sleeve tightens…")."""
-    paid = c.scene.rewarded
-    thread = int(paid.get(_THREAD_KEY, 0) or 0)
-    moved = f"{_THREAD_KEY}:{thread}:advance"
-    if action == "advance":
-        key = moved
-    elif action == "new":
-        key = f"{_THREAD_KEY}:{thread}:new"
-        # The new sentence is a new thread, paid or not.
-        paid[_THREAD_KEY] = thread + 1
-        if moved not in paid:
-            return ""
-    else:
-        return ""
-    if key in paid:
-        return ""
-    paid[key] = int(getattr(c.scene, "clock_minutes", 0) or 0)
-    return c.engine().award_story(action, "").strip()
-
-
 def _apply_undercurrent(c, p: dict) -> bool:
     from play import opening
 
@@ -1000,20 +958,10 @@ def _apply_undercurrent(c, p: dict) -> bool:
                           "content": opening.private_note(p["sentence"])})
     c.turn_log.append({"kind": "watcher", "did": "undercurrent",
                        "note": p["sentence"]})
-    # Resolving a situation pays. The CRB's story award — double a CR-equal-to-level
-    # fight for a storyline concluded, and half of one here for a storyline moved —
-    # lands as its own line on the page, since the watcher writes between turns and
-    # has no beat to ride on. "i should be receiving EXP for ... resolving situations".
-    # Once per thread and step (`_undercurrent_award`), never once per rewrite.
-    line = _undercurrent_award(c, str(p.get("action", "")))
-    if line:
-        # An engine line, not narration: "consequence", like every other award and tell
-        # `play/views.py` appends. Measured 2026-09-17 on the first sixty-turn audit
-        # after the narrator guards: filed as "setup", the award — "You gain 200 XP for
-        # moving a matter along: …" — was handed to the next prose call as "what you
-        # narrated just before this", opened four of the last nineteen beats in that
-        # register, and was the single largest phrase repeating across the run (seven
-        # beats). The narrator's own prose, measured apart from it, had improved.
-        c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
-        c.turn_log.append({"kind": "watcher", "did": "story_award", "line": line})
+    # No XP for the note moving or ending. Playtest 2026-11-15 #40: "You gain 200 XP for
+    # moving a matter along" mid-mugging, after one punch — the note is the GM's private
+    # sentence, rewritten by a model between turns, and the CRB's story award is for
+    # concluding "a major storyline or an important accomplishment", never for a GM's
+    # thread being moved. Before this a ledger held one advance and one ending per thread
+    # (the owner's 0.2.25 save had been paid 1,700 XP for one note rewritten seven times).
     return True

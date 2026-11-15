@@ -41,8 +41,17 @@ ACTS = (
     "go", "journey", "leave", "look", "search", "track", "seek", "talk", "insult", "buy",
     "sell", "give", "take", "drop", "steal", "attack", "cast", "use", "consume", "wait",
     "rest", "rise", "call_on", "break_in", "stealth", "athletics", "exert", "gather",
-    "follow", "request", "claim", "craft", "commission", "escape", "loot", "harvest", "other",
+    "follow", "request", "claim", "craft", "commission", "escape", "loot", "harvest",
+    "disguise", "other",
 )
+# `disguise` since 2026-11-15 (playtest items 80, 82, 83): "I disguise myself as a dock
+# labourer" was read `other` one turn and rolled a plan's Disguise "vs 10" the next — the
+# same words, two readings — and "I use my Disguise skill to look like a dock labourer"
+# was read `use` of a thing called "Disguise skill" and refused as not here. Making
+# yourself look like somebody else is its own deed in the book (Disguise, CRB p.95: the
+# check's result IS the disguise, opposed by each viewer's Perception), and it lasts, so
+# it owes the engine's `disguise` op, built whole (`acts_to_ops._disguise`); the object is
+# who or what the character means to pass for.
 # `commission` since 2026-11-01. Owner report that day (Corvin, turns 21-29): "can you put
 # them together and i will give you 10 gold peices" to the smith, about a forged blank for a
 # trident — read as a question with no action, then a `give` of "the money" with no
@@ -248,6 +257,7 @@ ACT_COSTS: dict[str, str] = {
     "look": "quick", "take": "quick", "give": "quick", "drop": "quick", "consume": "quick",
     "use": "quick", "steal": "quick", "cast": "quick", "break_in": "quick",
     "athletics": "quick", "exert": "quick", "escape": "quick", "rise": "quick",
+    "disguise": "takes_time",
     "other": "quick",
     "journey": "takes_time", "search": "takes_time", "track": "takes_time",
     "gather": "takes_time", "craft": "takes_time", "harvest": "takes_time",
@@ -443,6 +453,8 @@ ACT_SLOTS: dict[str, tuple[str, ...]] = {
     "escape": ("target",),
     # Whose body is searched; what creature is cut up, and which part when one is named.
     "loot": ("target",), "harvest": ("target", "object"),
+    # Who or what the character means to pass for ("a dock labourer", "one of the guards").
+    "disguise": ("object",),
     "other": ("target", "object", "place"),
 }
 
@@ -487,7 +499,8 @@ attack    hit, punch, stab, shoot, assault, pick a fight with, run amok, finish 
           helpless — finish off, slit a throat, put out of its misery, the killing stroke
           — else ordinary
 cast      cast a named spell
-use       draw a weapon, put on, show, use, bandage, light
+use       draw a weapon, put on or change into clothes, armour or jewellery, show,
+          use, bandage, light
 consume   eat or drink
 wait      wait, sit, stand, stay, keep watch, pass time; doze, nap or nod off for a
           while (no night's sleep)
@@ -522,6 +535,9 @@ commission pay or offer to pay somebody to make, fit, finish, mend or put togeth
 escape    break free of a grapple, a hold, a grip or a pin; wriggle, twist or force your
           way out of somebody's hands. `way` is force (overpower the hold), slip (wriggle
           out, Escape Artist), or either when the words say neither
+disguise  make yourself look like somebody else or like nobody anyone would know: a
+          disguise, a false look, passing yourself off as another, using the Disguise
+          skill; the object is who or what you mean to pass for
 other     anything else
 
 Each action also says by what MEANS it is done:
@@ -1082,6 +1098,21 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "fit a haft to this axe head for me", "object": "this axe head",
           "act": "commission"}]}),
+    # A disguise and a change of clothes (2026-11-15, playtest items 79-83). Written for
+    # this, in no world's words; the playtest's own lines are not among them.
+    ("I smear ash on my face and pass myself off as a charcoal burner.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "smear ash on my face and pass myself off as a charcoal burner",
+          "object": "a charcoal burner", "act": "disguise"}]}),
+    ("I use my Disguise skill to look like one of the temple's novices.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "use my Disguise skill to look like one of the temple's novices",
+          "object": "one of the temple's novices", "act": "disguise"}]}),
+    ("I change into the clean shirt I bought and comb my beard.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "change into the clean shirt I bought", "object": "the clean shirt I bought",
+          "act": "use"},
+         {"span": "comb my beard", "object": "my beard", "act": "other"}]}),
     # Breaking a hold (2026-11-01): the way, closed. None is a probe or a labelled line.
     ("I twist out of the bandit's grip and step back.",
      {"question": False, "claims": [], "actions": [
@@ -1892,6 +1923,17 @@ _JOB_DEMOS = [
      "turns it down", NOT_SAID, "Drive cattle to the ford"),
     ("ask the foreman where the privy is", "the foreman", ["A week mending fences"],
      "something else", NOT_SAID, NOT_SAID),
+    # Playtest 2026-11-15 #8: "While Lyra writes my name" — the hirer's own doing, setting
+    # the moment for a theft — signed the character onto a caravan. What the HIRER does is
+    # never the character agreeing; and giving up a job already taken is turning it down
+    # (#9: "I've changed my mind about the caravan"). Written for this, in no world's words.
+    ("while the drover counts out the wages", "the drover", ["Drive cattle to the ford"],
+     "something else", NOT_SAID, NOT_SAID),
+    ("as the foreman writes my name in his ledger", "the foreman",
+     ["A week mending fences"], "something else", NOT_SAID, NOT_SAID),
+    ("tell the drover I've thought better of the cattle drive", "the drover",
+     ["A week mending fences", "Drive cattle to the ford"], "turns it down", NOT_SAID,
+     "Drive cattle to the ford"),
 ]
 
 
@@ -1900,7 +1942,9 @@ def job_messages(span: str, employer: str, jobs) -> list[dict]:
               "to them. Answer from the words alone: what the words do about the work — say "
               "what work the character can do (and which: carry, count, or fight — guarding "
               "and swordwork are fight), ask about it, agree to a job (and which of the jobs "
-              "put to them), turn it down, ask for more pay, or something else.")
+              "put to them), turn it down (or give up one already taken), ask for more "
+              "pay, or something else. Only the character's own words or deed agree to "
+              "a job; what the hirer is doing is something else.")
     out = [{"role": "system", "content": system}]
     for said, who, titles, answer, work, job in _JOB_DEMOS:
         out.append({"role": "user", "content": f"Who is hiring: {who}\nJobs put to the "
@@ -2636,7 +2680,7 @@ _OP_NEEDS = {
                 "follow"},
     "check": {"stealth", "steal", "take", "break_in", "use", "athletics", "exert", "go",
               "escape", "talk", "request", "insult", "claim", "search", "look", "track",
-              "follow", "other"},
+              "follow", "disguise", "other"},
 }
 
 # The declarers that read a CLOSED vocabulary, not English: an ability's name against

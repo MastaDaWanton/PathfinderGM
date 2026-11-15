@@ -1532,6 +1532,42 @@ def describing_sentences(text: str, phrase: str) -> list[str]:
             if names_person(s, phrase) and _describes(s)]
 
 
+def _respell_known(text: str, found: list[str], known) -> tuple[str, list[str]]:
+    """A flagged name that is a known name misspelt is that person, written right: (text,
+    the names still unknown).
+
+    Playtest 2026-11-15 #73: the matter slot wrote "Word reaches you from Lyra Lyraxs",
+    one letter short of Lyra Lyraxys, and the un-namer made her "the stranger". A word
+    counts as a known one at a close spelling (difflib ratio 0.85, five letters or more:
+    "lyraxs" against "lyraxys" is 0.92), and only when it is the only close one, so two
+    people with near names are never guessed between."""
+    import difflib
+
+    words = {}
+    for name in known or ():
+        for w in re.findall(r"[A-Za-z][A-Za-z'’-]+", str(name)):
+            if len(w) >= 5 and w[:1].isupper():
+                words.setdefault(w.lower(), w)
+    keep: list[str] = []
+    for n in found:
+        fixed = []
+        for w in n.split():
+            low = w.lower()
+            if low in words:
+                fixed.append(words[low])
+                continue
+            near = difflib.get_close_matches(low, list(words), n=2, cutoff=0.85)
+            if len(w) < 5 or len(near) != 1:
+                fixed = []
+                break
+            fixed.append(words[near[0]])
+        if fixed and " ".join(fixed) != n:
+            text = re.sub(rf"\b{re.escape(n)}\b", " ".join(fixed), text)
+        else:
+            keep.append(n)
+    return text, keep
+
+
 def unname_strangers(text: str, known: set[str]) -> tuple[str, list[str]]:
     """Replace first-appearance invented people with an unnamed descriptor.
 
@@ -1555,6 +1591,7 @@ def unname_strangers(text: str, known: set[str]) -> tuple[str, list[str]]:
     # ABOUT somebody else ("Stay back, Kaida!") is still the narrator's invention.
     given = {w for _, name in introductions(text) for w in name.split()}
     found = [n for n in found if not (set(n.split()) & given)]
+    text, found = _respell_known(text, found, known)
     if not found:
         return text, []
     known_words = {w.lower() for name in known for w in _WORD.findall(name.lower())}
