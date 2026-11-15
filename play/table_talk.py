@@ -43,6 +43,7 @@ scene's `table:log` (`_log`), so a bench can count what the checks threw away.
 from __future__ import annotations
 
 import json
+import random
 import re
 import time
 from pathlib import Path
@@ -641,7 +642,8 @@ def introduction(c, agent=None) -> None:
         tips = "\n".join(f"- {t}" for t in TABLE_TIPS)
         system = INTRO_SYSTEM.format(name=v["name"] + " GM", manner=v["manner"],
                                      never=v["never"],
-                                     gestures=_gesture_rule(True).replace(
+                                     gestures=_gesture_rule(
+                                         True, random.choice(WELCOME_GESTURES)).replace(
                                          "- You may open", "You may open"))
         msgs = [{"role": "system", "content": system},
                 {"role": "user", "content": f"THE TABLE:\n{table}\n\nTHE TIPS:\n{tips}"}]
@@ -731,10 +733,23 @@ no name and no fact from the record.
 {gestures}"""
 
 
-def _gesture_rule(on: bool) -> str:
+# The welcome's example gesture, drawn fresh each campaign. Measured live: on 2026-11-07
+# and again on 2026-11-15, two of three welcomes opened on the one fixed example ("[I look
+# at your character sheet.]", "[I glance at your sheet.]"); with no example at all, two of
+# three opened "[Nods slowly.]". A welcome is said once a campaign, so whatever the model
+# copies is the same line in every campaign the player starts: the example varies instead.
+WELCOME_GESTURES = (
+    "[I pull my chair in.]", "[I set my dice down.]", "[I shuffle my notes.]",
+    "[I push a mug across the table to you.]", "[I clear a space on the table.]",
+    "[I roll a die between my fingers.]", "[I tap the map.]", "[I lean back.]",
+)
+
+
+def _gesture_rule(on: bool, example: str = "[I glance at your sheet.]") -> str:
+    if not on:
+        return "- Do not describe your own actions."
     return ("- You may open with one short action of your own in square brackets, like "
-            "[I glance at your sheet.]" if on else
-            "- Do not describe your own actions.")
+            + example)
 
 
 def voiced_record(c, question: str, record: str) -> dict:

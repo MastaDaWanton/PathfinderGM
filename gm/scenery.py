@@ -565,6 +565,57 @@ def _quoted_on(quote: str, passages: list[str]) -> bool:
     return any(bv.place_quote(quote, bv._sentences(text)) for text in passages)
 
 
+# The acts whose object is a thing handled where the player stands: "light the lamp", "use
+# the rope". Only `use` — `other` and `look` carry a door, a fire, the sky and "my hands",
+# where a wrong refusal costs more than an unrecorded lamp (the coordinator, 2026-10-17).
+HANDLED_ACTS = frozenset({"use"})
+
+
+def handled(frame, rows, engine, passages: list[str], *, ask_fn=None) -> list[dict]:
+    """The things a deed of the reading handles that nothing records, settled before the
+    plan: the player's own ("my rope") by the pack, anything else by the one closed
+    question `ground` asks — shown or commonplace, it is ledgered; not here, the row's
+    `unheld` is the engine's printed answer (`acts_to_ops.things_not_here`).
+
+    Measured live 2026-11-15 (the table-checks lane): "I light the lamp, read the note and
+    burn it" was planned a bare `narrate_only` — no op owes a thing — and the page struck
+    a light on a lamp no passage showed. A plan with no op never reaches `reached_for`, so
+    the reading's own object is asked instead. One row per thing asked, for the turn log."""
+    from . import acts_to_ops, interpret
+
+    scene = engine.scene
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if pc is None or not frame or frame.get("error"):
+        return []
+    acts = frame.get("actions") or []
+    out: list[dict] = []
+    for row in rows:
+        if row.act not in HANDLED_ACTS or row.intents or row.ops or row.unheld:
+            continue
+        a = acts[row.index] if row.index < len(acts) else {}
+        if not interpret.acting(a):
+            continue
+        thing = acts_to_ops._object(frame, row.index, pc)
+        if not thing or thing.lower() in acts_to_ops._IT or not acts_to_ops._a_thing(thing)                 or acts_to_ops._a_person(scene, thing)                 or not engine.unrecorded_thing(thing, pc):
+            continue
+        if acts_to_ops._mine(thing):
+            row.unheld = f"{pc.name} has no {acts_to_ops._plain(thing)}"
+            out.append({"kind": "scenery", "thing": thing, "answer": "not carried"})
+            continue
+        if ask_fn is None or len(out) >= MOST:
+            continue
+        rows_asked = ground([{"op": "give", "actor": pc.ref,
+                              "params": {"item": thing, "to": pc.ref}}],
+                            engine, passages, ask_fn=ask_fn)
+        got = next((r for r in rows_asked if r.get("thing") == thing), None)
+        if got is None:
+            continue
+        if got.get("answer") in REFUSALS:
+            row.unheld = f"there is no {acts_to_ops._plain(thing)} here"
+        out.append(got)
+    return out
+
+
 def ground(raw, engine, passages: list[str], *, ask_fn=None, skip=()) -> list[dict]:
     """Ledger what the plan reaches for that the narration showed or the place plainly
     holds; one row per thing asked, for the turn log. Nothing is asked with no `ask_fn`

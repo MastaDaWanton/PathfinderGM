@@ -562,6 +562,7 @@ def brief(scene, recent: list[str] | None, *, turn: int = 0, secret: bool = Fals
         return ""
     actors = getattr(scene, "actors", {}) or {}
     people = getattr(scene, "people", None) or actors
+    here = str(getattr(scene, "at", "") or "")
     lines = ["SITUATIONS (kept by the engine; facts, not suggestions — keep them true, "
              "and let the player move them):"]
     for c in shown:
@@ -585,6 +586,15 @@ def brief(scene, recent: list[str] | None, *, turn: int = 0, secret: bool = Fals
             head += f", {c.clock}/{c.clock_max} of the way to changing"
         if who:
             head += f"; with {who}"
+        if c.place and here and c.place != here:
+            # A card kept on the brief away from its place (the opening's errand is on
+            # every brief, `always_on`) states that place's facts as if they were here:
+            # live 2026-11-15, 2 of 2 walks out of Fizspark's inn ended "You emerge into
+            # the lane … The lingering silence of the dining room … remains", and the
+            # half-eaten bowl followed the player across the room. Said where they are.
+            at = c.place.rsplit(":", 1)[-1].replace("-", " ") if ":" in c.place else ""
+            head += (f" [set at {at}, " if at else " [set elsewhere, ") + (
+                "where the party is not now: its facts describe that place, not here]")
         if c.secret:
             head += " [the GM's alone; the player does not know this]"
         if c.kind in TASKS:

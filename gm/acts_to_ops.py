@@ -86,6 +86,9 @@ class Row:
     # A give of no thing at all ("give him a nod"): the deed is still the player's to show,
     # though nothing changes hands (`narration.moved_nothing`).
     gesture: bool = False
+    # A thing the deed handles that is not here or not carried, as the engine's printed
+    # answer (`things_not_here`): "Kesst Vayr is not carrying pelts."
+    unheld: str = ""
 
     def record(self) -> dict:
         out = {"act": self.act, "ops": list(self.ops)}
@@ -104,6 +107,8 @@ class Row:
             out["nowhere"] = self.nowhere
         if self.gesture:
             out["gesture"] = True
+        if self.unheld:
+            out["unheld"] = self.unheld
         return out
 
 
@@ -719,6 +724,12 @@ def _sell(row: Row, frame, i, scene, pc, sentence: str, recent=(), coming=()) ->
         # offer of "to help him with the crate", and "not carrying to help him…" would
         # have reached the brief as a fact.
         row.note = f"an offer of {thing or 'nothing named'}, nothing carried to sell"
+        # Except a thing the player calls their own: the live check of 2026-11-15, "I
+        # offer the smith my pelts, then leave" with no pelts in the pack, was planned a
+        # bare narrate_only and the page wrote "You reach into your pack and pull out the
+        # bundle of pelts". The pack answers, printed (`things_not_here`).
+        if _mine(thing) and _a_thing(thing):
+            row.missing = row.unheld = f"{pc.name} has no {_plain(thing)}"
         return
     if not key:
         row.missing = (f"{pc.name} is not carrying {thing}" if thing
@@ -1613,6 +1624,41 @@ def _nowhere(row: Row, a: dict, scene, places) -> None:
                               or any(w.endswith(("'s", "s'")) for w in words[:-1])):
         return
     row.nowhere = "You don't know of anywhere called \"" + place + "\" here."
+
+
+def _mine(words) -> bool:
+    """Whether an object slot is the player's own by its determiner: "my pelts"."""
+    return str(words or "").lower().split()[:1] in (["my"], ["our"])
+
+
+def things_not_here(raw, rows: list[Row], *, notes: list | None = None) -> list:
+    """The plan, with the engine's answer to a deed whose thing is not here or not carried
+    (`Row.unheld`), stamped on `narrate_only`'s `not_here` — which the engine prints as a
+    refusal (`Engine._op_narrate_only`) — whatever else the plan does.
+
+    Measured live 2026-11-15 (the table-checks lane, Fizspark's inn, gemma-4-12B): "I
+    light the lamp, read the note and burn it" and "I offer the smith my pelts" were
+    planned as bare `narrate_only`, and the page lit a lamp nothing recorded and pulled
+    pelts out of a pack that held none. Unlike `nowhere_to_go`, a plan that also does
+    something else still owes the sentence: the walk out after the offer is no answer to
+    the pelts."""
+    said = [r.unheld for r in rows if getattr(r, "unheld", "")]
+    if not said or not isinstance(raw, list):
+        return raw
+    line = " ".join(s[0].upper() + s[1:].rstrip(".") + "." for s in dict.fromkeys(said))
+    out = [dict(r) if isinstance(r, dict) else r for r in raw]
+    if notes is not None:
+        notes.append(f"things the deeds handle that are not here: {line}")
+    for r in out:
+        if _op(r) == "narrate_only":
+            had = " ".join(str((r.get("params") or {}).get("not_here") or "").split())
+            if line in had:
+                return out
+            r["params"] = dict(r.get("params") or {},
+                               not_here=(had + " " + line).strip())
+            return out
+    return out + [{"op": "narrate_only", "because": "the deed's thing is not here",
+                   "params": {"not_here": line}}]
 
 
 def nowhere_to_go(raw, rows: list[Row], *, notes: list | None = None) -> list:
@@ -3229,6 +3275,8 @@ def address_the_named(raw, frame: dict | None, scene, *,
              and str(a.get("target") or "").strip()]
     says = [k for k, r in enumerate(raw) if _op(r) == "say"
             and str(r.get("actor") or "pc").lower() in ("pc", pc.ref.lower(), "none", "")]
+    if not named and len(says) == 1:
+        return _said_to_nobody(raw, frame, scene, says[0], notes)
     if len(named) != 1 or len(says) != 1:
         return raw
     want = person(scene, named[0])
@@ -3253,6 +3301,41 @@ def address_the_named(raw, frame: dict | None, scene, *,
         out.insert(intro, out.pop(k))
     if notes is not None:
         notes.append(f"the say to {was} goes to {want}: the one the player's words name")
+    return out
+
+
+def _said_to_nobody(raw, frame, scene, k: int, notes) -> list:
+    """A line the reading says nobody would answer goes to nobody the plan picked.
+
+    Measured live 2026-11-15 (the table-checks lane; first seen 2026-11-07): 'I mutter
+    "fool" and walk out' was read `talk`, no target, cost `free` — "words said to nobody
+    who would answer" — and the plan wrote the say `to` the potboy, one of two people in
+    the inn; the engine opened a conversation with him and the page had Kesst call him a
+    fool. The reader's own cost is the evidence, no English read. The one the player is
+    plainly dealing with (`addressed`: engaged, in conversation, or the only other person
+    here) still hears it, as `Engine._op_say` would decide with no `to`."""
+    from . import interpret
+
+    talks = [a for a in frame.get("actions") or []
+             if a.get("act") == "talk" and interpret.acting(a)]
+    if not talks or any(str(a.get("cost") or "") != "free" for a in talks):
+        return raw
+    say = raw[k]
+    params = dict(say.get("params") or {})
+    was = str(params.get("to") or say.get("target") or "")
+    keep = addressed(scene)
+    if not was or was == keep:
+        return raw
+    params.pop("to", None)
+    if keep:
+        params["to"] = keep
+    out = list(raw)
+    out[k] = {key: v for key, v in dict(say, params=params).items() if key != "target"}
+    if keep:
+        out[k]["target"] = keep
+    if notes is not None:
+        notes.append(f"the say to {was} goes to {keep or 'nobody'}: the words were said "
+                     f"to nobody who would answer")
     return out
 
 
@@ -3315,6 +3398,19 @@ def timed_waits(raw, frame: dict | None, scene, *, notes: list | None = None) ->
         return raw
     wait = next((a for a in frame.get("actions") or []
                  if a.get("act") == "wait" and interpret.acting(a)), None)
+    resting = any(a.get("act") == "rest" and interpret.acting(a)
+                  for a in frame.get("actions") or [])
+    if wait is not None and not resting and any(_op(r) == "rest" for r in raw):
+        # A wait is never a night: the plan's `rest` beside a wait and no rest act of the
+        # reading is struck, whatever time the words give. Measured live 2026-11-15 (the
+        # table-checks lane): "I stroll to the fire, warm my hands and doze off" was read
+        # `wait` (a doze, `interpret.ACTS`), the plan wrote `rest`, and the rest door asked
+        # 5 sp for a room at the inn. With nothing left, the turn is narrated, as a wait
+        # with no time is (`interpret.ops_for` owes it no op).
+        raw = [r for r in raw if _op(r) != "rest"] or [
+            {"op": "narrate_only", "because": "the player dozed: a wait, not a night"}]
+        if notes is not None:
+            notes.append("the plan's rest dropped: the words wait, not sleep the night")
     clock = int(getattr(scene, "clock_minutes", 0) or 0)
     minutes = interpret.until_minutes(wait, clock) if wait is not None else None
     if minutes is None:
@@ -3329,8 +3425,6 @@ def timed_waits(raw, frame: dict | None, scene, *, notes: list | None = None) ->
     # narrator, told only "696 minutes pass", wrote the afternoon sun. And in the cell
     # ("I sit in the cell and wait for dawn") the same rest was refused — "still in
     # conversation" — a refusal of a sleep nobody asked for, told on the page.
-    resting = any(a.get("act") == "rest" and interpret.acting(a)
-                  for a in frame.get("actions") or [])
     if not resting and any(_op(r) == "advance_time" for r in raw):
         kept = [r for r in raw if _op(r) != "rest"]
         if len(kept) != len(raw) and notes is not None:
