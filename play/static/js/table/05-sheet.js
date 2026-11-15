@@ -239,8 +239,9 @@ function combatCard(s) {
         <th scope="col">Provokes</th><th scope="col">On success</th><th scope="col">Limits</th></tr></thead>
       <tbody>${man}${feint}</tbody>
     </table></div>
-    <p class="why">Provokes is read from the rules' manoeuvre table. No attack of opportunity
-      is rolled for a manoeuvre yet: only moving provokes one.</p>`);
+    <p class="why">Provokes is read from the rules' manoeuvre table: a manoeuvre that
+      provokes draws an attack of opportunity from its target, unless a feat says
+      otherwise.</p>`);
 }
 
 // AC, touch and flat-footed, the saves with their terms, life's edges, and conditions.

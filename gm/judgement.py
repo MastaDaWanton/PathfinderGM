@@ -8664,9 +8664,21 @@ def _sought_match(player_text: str):
     for pattern, text in ((_ASKS_AROUND, speech.blanked(player_text or "")),
                           (_LOOKS_FOR, redact_speech(player_text or ""))):
         for m in pattern.finditer(text):
-            if not _a_place_word(m.group(1)):
+            if not _a_place_word(m.group(1)) and not _a_trail_word(m.group(1)):
                 return m
     return None
+
+
+# What a tracker looks for is no person: "I search for tracks" declared an `introduce` of
+# somebody called "tracks" whenever the reading was missing (docs/fix-plan-2026-09-30.md,
+# Lane B; still so on 0.3.4, `person_sought("I search for tracks")` -> "tracks").
+_TRAIL_WORDS = frozenset({"track", "tracks", "trail", "trails", "sign", "signs", "print",
+                          "prints", "footprint", "footprints", "spoor"})
+
+
+def _a_trail_word(phrase: str) -> bool:
+    words = re.sub(r"^(?:the|a|an|any|some)\s+", "", " ".join(str(phrase or "").lower().split()))
+    return (words.split() or [""])[0] in _TRAIL_WORDS
 
 
 def _a_place_word(phrase: str) -> bool:

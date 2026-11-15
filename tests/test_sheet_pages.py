@@ -230,7 +230,7 @@ def test_all_ten_manoeuvres_and_feint_are_rows_with_bonus_provokes_effect_and_li
     feint = rows[-1]
     assert cell(feint, "Bonus").startswith(f"+{bluff}" if bluff >= 0 else str(bluff))
     assert "not known" in cell(feint, "Provokes")
-    assert "No attack of opportunity" in out["html"]
+    assert "draws an attack of opportunity from its target" in out["html"]
     none = _tree(out["none"])
     frow = [e for e in none if e["tag"] == "tr"][-1]
     assert "not known" in _text(next(c for c in none if frow in c["ancestors"]

@@ -3911,8 +3911,9 @@ class Engine:
                     f"on. Name what does it: cast spell=<id> for a spell, use_ability "
                     f"ability=<name> for a power on the sheet, use_item item=<id> for "
                     f"an item. To move somebody by ordinary means, talk to them and "
-                    f"roll it: check skill=diplomacy, check skill=intimidate, "
-                    f"check skill=bluff.", "legality", index, code="mind_ungated")
+                    f"roll it: check skill=diplomacy, check skill=intimidate, or "
+                    f"check skill=bluff for a lie about who you are, the only lie that "
+                    f"moves a listener.", "legality", index, code="mind_ungated")
         if intent.op == "travel" and intent.params.get("place"):
             # A destination the scene does not hold is refused HERE, where the plan's
             # repair loop reads the message and names a real one — not in `run`,
