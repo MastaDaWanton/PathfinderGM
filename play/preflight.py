@@ -384,6 +384,13 @@ INSTALLER_URL = "https://ollama.com/download/OllamaSetup.exe"
 # captive-portal login page or a truncated download before we bother verifying a 2 KB
 # "file". Measured 2026-09-15: 1,501 MB.
 SMALLEST_PLAUSIBLE = 200_000_000
+
+# The signer's simple display name (its certificate's CN), compared whole. Read off the real
+# OllamaSetup.exe and ollama.exe on 2026-11-15: "CN=Ollama Inc., O=Ollama Inc., L=Toronto".
+# It was a substring test for "ollama", which any publisher can register a name to pass
+# ("Ollama Tools Ltd", "Not Ollama"). If Ollama ever re-signs under a new legal name this
+# refuses, and the player is sent to the download page — the safe way to be wrong.
+OLLAMA_SIGNER = "Ollama Inc."
 LARGEST_PLAUSIBLE = 4_000_000_000
 
 
@@ -412,13 +419,33 @@ def installer_path() -> Path:
 def _signer_name(path: Path) -> str:
     """Whose certificate signed it, as the name the file's properties would show.
 
-    Empty when it cannot be read, which the caller treats as unsigned. The store holds one
-    certificate for a singly-signed installer, which is the case this exists for.
+    Empty when it cannot be read, which the caller treats as unsigned.
+
+    The SIGNER's certificate, found the way Microsoft's own sample does it (KB 323809:
+    CMSG_SIGNER_CERT_INFO_PARAM, then CertFindCertificateInStore by subject). The first
+    cut took the first certificate in the store, which holds the whole chain and any
+    extra certificate a signer cares to embed — so a file signed by anyone could carry
+    Ollama's public certificate first and be named "Ollama Inc.". Every handle is typed
+    as a pointer: measured 2026-11-15, the untyped CertEnumCertificatesInStore returned a
+    32-bit truncated pointer on 64-bit Python and CertGetNameStringW died with an access
+    violation on Ollama's real OllamaSetup.exe — the button could never have run it.
     """
     import ctypes
     from ctypes import wintypes
 
     crypt32 = ctypes.WinDLL("crypt32")
+    crypt32.CryptMsgGetParam.argtypes = [wintypes.HANDLE, wintypes.DWORD, wintypes.DWORD,
+                                         ctypes.c_void_p, ctypes.POINTER(wintypes.DWORD)]
+    crypt32.CertFindCertificateInStore.restype = ctypes.c_void_p
+    crypt32.CertFindCertificateInStore.argtypes = [wintypes.HANDLE, wintypes.DWORD,
+                                                   wintypes.DWORD, wintypes.DWORD,
+                                                   ctypes.c_void_p, ctypes.c_void_p]
+    crypt32.CertGetNameStringW.restype = wintypes.DWORD
+    crypt32.CertGetNameStringW.argtypes = [ctypes.c_void_p, wintypes.DWORD, wintypes.DWORD,
+                                           ctypes.c_void_p, ctypes.c_wchar_p, wintypes.DWORD]
+    crypt32.CertFreeCertificateContext.argtypes = [ctypes.c_void_p]
+    crypt32.CertCloseStore.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+    crypt32.CryptMsgClose.argtypes = [wintypes.HANDLE]
     encoding, content, format_ = wintypes.DWORD(), wintypes.DWORD(), wintypes.DWORD()
     store, msg = wintypes.HANDLE(), wintypes.HANDLE()
     ok = crypt32.CryptQueryObject(
@@ -430,11 +457,20 @@ def _signer_name(path: Path) -> str:
         ctypes.byref(store), ctypes.byref(msg), None)
     if not ok:
         return ""
+    cert = None
     try:
-        cert = crypt32.CertEnumCertificatesInStore(store, None)
+        size = wintypes.DWORD()
+        if not crypt32.CryptMsgGetParam(msg, 7, 0, None, ctypes.byref(size)):  # SIGNER_CERT_INFO
+            return ""
+        info = ctypes.create_string_buffer(size.value)
+        if not crypt32.CryptMsgGetParam(msg, 7, 0, info, ctypes.byref(size)):
+            return ""
+        cert = crypt32.CertFindCertificateInStore(
+            store, 0x10001,   # X509_ASN_ENCODING | PKCS_7_ASN_ENCODING
+            0, 0xB0000,       # CERT_FIND_SUBJECT_CERT: the issuer and serial in `info`
+            info, None)
         if not cert:
             return ""
-        crypt32.CertGetNameStringW.restype = wintypes.DWORD
         need = crypt32.CertGetNameStringW(cert, 4, 0, None, None, 0)   # SIMPLE_DISPLAY_TYPE
         if need <= 1:
             return ""
@@ -443,8 +479,11 @@ def _signer_name(path: Path) -> str:
         return name.value or ""
     finally:
         try:
+            if cert:
+                crypt32.CertFreeCertificateContext(cert)
             crypt32.CertCloseStore(store, 0)
-        except Exception:
+            crypt32.CryptMsgClose(msg)
+        except OSError:
             pass
 
 
@@ -581,7 +620,7 @@ def fetch_and_run_installer(timeout: int = 60, wait_seconds: int = 600):
 
     yield {"status": "checking who signed it"}
     trusted, signer = signature_of(target)
-    if not trusted or "ollama" not in (signer or "").lower():
+    if not trusted or signer != OLLAMA_SIGNER:
         target.unlink(missing_ok=True)
         said = f" It claims to be signed by {signer}." if signer else ""
         yield {"error": "Windows would not vouch for that download, so it was deleted "
