@@ -357,11 +357,70 @@ def coast_road(world, here: str, sea_leg: Leg, speed_ft: int = 30) -> Leg | None
     stopped road resumes (`Engine.road_to_the_coast` has the measurements)."""
     if sea_leg.from_port or sea_leg.by == "river":
         return None
+    return harbour_road(world, here, speed_ft) or Leg(to_id=sea_leg.to_id,
+                                                      to_name="the coast", days_apart=1)
+
+
+# --- a ship lying off a town with no docks (owner ruling 2026-11-14) ---------------------
+#
+# "If a ship is lying off a coastal town that has no docks, the player can reach it two
+# ways: swim out ... or take a smaller boat out to it." What says a ship comes here is
+# the world's own route: a stated `by: "sea"` travel row from a settlement on the water
+# with nowhere to tie up is a ship's call, and she anchors off the shore. How often she
+# calls is this app's number, not the world's (ask 22 asks for it): once a week on each
+# such route, on a day fixed by the route itself, so a player who waits for her knows
+# when she comes. A route the tree infers (two continents) is no call: nobody wrote it.
+CALLS_EVERY_DAYS = 7
+
+
+def _call_day(here: str, there: str) -> int:
+    import zlib
+
+    return zlib.crc32(f"{here}|{there}".encode()) % CALLS_EVERY_DAYS
+
+
+def calls_off(world, here: str) -> tuple[str, ...]:
+    """Every settlement a ship calling off `here` is bound for: the stated sea routes from
+    a settlement on the water (`geography.land_around`'s coast or water) that has no docks
+    of its own. () for a port, inland, or a world that states no such route."""
+    from . import geography
+
+    if world is None or not here or here in ports(world):
+        return ()
+    found = world.get(here)
+    land = geography.land_around(world, found) if found is not None else None
+    if land is None or not (land.coast or land.water):
+        return ()
+    out = []
+    for row in (getattr(world, "play", None) or {}).get("travel") or []:
+        ends = (str(row.get("from_id") or ""), str(row.get("to_id") or ""))
+        if here in ends and str(row.get("by") or "").strip().lower() == "sea":
+            other = ends[1] if ends[0] == here else ends[0]
+            if other and other != here and other not in out:
+                out.append(other)
+    return tuple(out)
+
+
+def lying_off(world, here: str, day: int) -> tuple[str, ...]:
+    """Where the ships lying off `here` on clock day `day` are bound (`calls_off`, on the
+    day each route's ship calls)."""
+    return tuple(t for t in calls_off(world, here)
+                 if _call_day(here, t) == int(day) % CALLS_EVERY_DAYS)
+
+
+def days_to_call(here: str, there: str, day: int) -> int:
+    """Days until the ship on this route next lies off `here` (0 = today)."""
+    return (_call_day(here, there) - int(day)) % CALLS_EVERY_DAYS
+
+
+def harbour_road(world, inland: str, speed_ft: int = 30) -> Leg | None:
+    """The quickest of the world's own roads from `inland` to a port, or None when it
+    writes none. Both ends of a crossing ask it: the road down to the ship
+    (`coast_road`) and the road up from her (`Engine._book_passage`'s `lands_at`), since a
+    travel row is read from either end."""
     harbours = set(ports(world))
-    roads = [l for l in legs_from(world, here) if not l.by_sea and l.to_id in harbours]
-    if roads:
-        return min(roads, key=lambda l: hours_for(l, speed_ft)[0])
-    return Leg(to_id=sea_leg.to_id, to_name="the coast", days_apart=1)
+    roads = [l for l in legs_from(world, inland) if not l.by_sea and l.to_id in harbours]
+    return min(roads, key=lambda l: hours_for(l, speed_ft)[0]) if roads else None
 
 
 def _sea_days(world) -> int:

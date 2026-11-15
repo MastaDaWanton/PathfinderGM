@@ -951,7 +951,9 @@ async function takeTurn(body, clearInput) {
     // the crossroads, and the chip and the words were cleared as though it had gone. A
     // way that is still a way on from here was not taken, unless a die is owed first.
     const place = (body.attachments || []).find(a => a.kind === "place");
-    if (place && !rest && !s.awaiting
+    // `moved`: the server saw the party go somewhere. A road stopped short still offers
+    // the same town's row, and that was a move that happened.
+    if (place && !rest && !s.awaiting && !s.moved
         && ((s.scene && s.scene.exits) || []).some(e => e.id === place.id)) {
       rest = { text: $("#input").value, keep_chip: true,
                line: "The move did not happen; it is still attached." };

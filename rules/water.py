@@ -191,17 +191,69 @@ def roughness(world, place_id: str, storm: bool = False) -> str:
     water (Swim DC 20)"; a placid river, a lake and the sea are calm unless something
     says. Wind is not here: no wind or storm table in the book sets a Swim DC (read
     2026-11-14). `world` may be None (a test, a Scene alone): then only the storm answers.
-    """
-    from . import places as places_mod
 
+    A current (ask 23) sets the floor by the same paragraph: a fast one at least rough,
+    rapids stormy. A flood (ask 23) is one category harder (`HARDER`).
+    """
     if storm:
         return "stormy"
+    row = _place_row(world, place_id)
+    said = str(row.get("water") or "").strip().lower()
+    rough = said if said in SWIM_DC else DEFAULT_WATER
+    flow = current(world, place_id)
+    floor = {"fast": "rough", "rapids": "stormy"}.get(flow, DEFAULT_WATER)
+    if SWIM_DC[floor] > SWIM_DC[rough]:
+        rough = floor
+    return HARDER[rough] if row.get("flooded") is True else rough
+
+
+def _place_row(world, place_id: str) -> dict:
+    from . import places as places_mod
+
     entity = world.get(places_mod.location_of(place_id)) if world is not None else None
-    for row in getattr(entity, "places", None) or ():
-        if isinstance(row, dict) and row.get("id") == place_id:
-            said = str(row.get("water") or "").strip().lower()
-            return said if said in SWIM_DC else DEFAULT_WATER
-    return DEFAULT_WATER
+    return next((r for r in getattr(entity, "places", None) or ()
+                 if isinstance(r, dict) and r.get("id") == place_id), {})
+
+
+# A flood makes the water one category harder (CRB Environment, Floods: Swim checks
+# become one step harder, calm to rough and rough to stormy) and its current half again
+# as fast. Read off the place's own row (`"flooded": true`, World Bible ask 23): nothing
+# in this app floods a river by itself.
+HARDER = {"calm": "rough", "rough": "stormy", "stormy": "stormy"}
+
+# Moving water (CRB Aquatic Terrain and Water Dangers, read 2026-11-15, aonprd.com Rules
+# ID 336): "Characters must make a successful DC 15 Swim check or a DC 15 Strength check
+# to avoid going under. On a failed check, the character takes 1d3 points of nonlethal
+# damage per round (1d6 points of lethal damage if flowing over rocks and cascades)."
+# Currents carry a swimmer 10 to 40 feet a round, the fastest rapids 60 to 90; nothing
+# here moves them downstream, because the board has no "downstream" to move them along
+# (the tell says so instead). The place's row names it (`"current": "fast"` or
+# `"rapids"`, ask 23); rapids are the rocks and cascades.
+CURRENTS = ("fast", "rapids")
+CURRENT_DC = 15
+CURRENT_HURT = {"fast": ("1d3", "nonlethal"), "rapids": ("1d6", "lethal")}
+
+# The Swim skill's hourly check (CRB Swim): "Each hour that you swim, you must make a DC
+# 20 Swim check or take 1d6 points of nonlethal damage from fatigue." A Swim check, not
+# a Constitution check, in the book's own words.
+HOURLY_DC = 20
+HOURLY_NONLETHAL = "1d6"
+ROUNDS_AN_HOUR = 600
+
+
+def current(world, place_id: str) -> str:
+    """"fast", "rapids" or "" for still water, off the place's own row (ask 23)."""
+    said = str(_place_row(world, place_id).get("current") or "").strip().lower()
+    return said if said in CURRENTS else ""
+
+
+def armour_is_why(mods, margin: int) -> bool:
+    """Whether the armour check penalty is what failed this Swim check: it failed, and
+    without the penalty it would have made it. The tell names the armour then, so a
+    character in plate going under in a calm lake is told why (CRB Water Dangers:
+    "armor or heavy gear makes any attempt at swimming much more difficult")."""
+    acp = sum(int(m.value) for m in mods if str(m.source) == "armour check")
+    return margin < 0 <= margin - acp
 
 
 def swim_dc(water: str = DEFAULT_WATER) -> int:

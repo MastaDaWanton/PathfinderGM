@@ -618,6 +618,11 @@ class Actor:
     # a counter that is right beats a counter that is wrong.
     held_breath_rounds: int = 0
     drown_failures: int = 0
+    # Rounds swum since the last hourly fatigue check (CRB Swim: "Each hour that you
+    # swim, you must make a DC 20 Swim check or take 1d6 points of nonlethal damage from
+    # fatigue"). A counter beside the breath's, moved by `Scene.advance`; the check is
+    # `Engine.swim`'s.
+    swum_rounds: int = 0
     # World Bible provenance. The rules race and the world's people are different things:
     # Zhilakai is not a PF1e race, so the sheet carries both and neither pretends to be
     # the other.
@@ -8158,6 +8163,8 @@ def to_dict(actor: Actor) -> dict:
         # fresh lungful for reloading, which is the cheapest cheat in the game.
         "held_breath_rounds": actor.held_breath_rounds,
         "drown_failures": actor.drown_failures,
+        # Only when there is any: a save from before it round-trips byte for byte.
+        **({"swum_rounds": int(actor.swum_rounds)} if actor.swum_rounds else {}),
         "swim_check_made": actor.swim_check_made,
         "awake_minutes": actor.awake_minutes, "fed_minutes": actor.fed_minutes,
         "watered_minutes": actor.watered_minutes,
@@ -8797,6 +8804,7 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
         speed=int(data.get("speed", 30) or 30),
         held_breath_rounds=int(data.get("held_breath_rounds", 0) or 0),
         drown_failures=int(data.get("drown_failures", 0) or 0),
+        swum_rounds=int(data.get("swum_rounds", 0) or 0),
         swim_check_made=data.get("swim_check_made"),
         awake_minutes=int(data.get("awake_minutes", 0) or 0),
         fed_minutes=int(data.get("fed_minutes", 0) or 0),

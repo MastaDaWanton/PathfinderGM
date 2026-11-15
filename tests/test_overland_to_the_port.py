@@ -33,6 +33,9 @@ SCRAPDEN, LEDGERWARREN, MOLDWARREN = (_id("Scrapden"), _id("Ledgerwarren"),
 
 def _at_vormoor(gp: int = 500):
     scene = Scene(location_id=VORMOOR)
+    # A day no ship lies off Vormoor's shore (`journey.lying_off`, 2026-11-15): on day 0
+    # the Ledgerwarren ship calls, and the berth is reached by boat, not by this road.
+    scene.clock_minutes = 24 * 60
     pc = load_pc("fixtures/pc-kesst.json")
     scene.add(pc)
     engine = Engine(scene, Dice(seed=4), world=AURVANTIS)

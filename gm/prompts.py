@@ -3748,6 +3748,10 @@ def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...],
         from rules.journey import PACES
 
         props["pace"] = {"type": "string", "enum": list(PACES)}
+    if op == "journey" and "out" in props:
+        from rules.intents import JOURNEY_OUT
+
+        props["out"] = {"type": "string", "enum": list(JOURNEY_OUT)}
     if op == "gather" and "key" in props:
         # The gathering door's key is a closed list (content/rules/gathering.json), the
         # same way a pace is: a free string here is a refusal waiting to be sampled.

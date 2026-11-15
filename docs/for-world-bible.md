@@ -1298,3 +1298,84 @@ this app's factors (`trade.SUPPLY_FACTOR`, `DEMAND_FACTOR`).
 
 An export carries `goods` on its settlements, and a settlement that sells two goods is
 measured offering both at its market.
+
+
+## 22. `anchors` on a settlement — where ships lie off a town with no docks
+
+*Asked 2026-11-15 (fix/shore-and-sea). The consumer reads it the day it appears
+(`rules/journey.calls_off`). Optional: without it this app works it out as described
+below, which is how every world plays today.*
+
+The owner's ruling of 2026-11-14: a ship lying off a coastal town that has no docks can be
+reached by swimming out or by a rowboat, and then boarded and sailed exactly as from a
+quay. Something has to say that a ship is there. Today this app reads the world's own
+routes: a stated `by: "sea"` travel row from a settlement on the water (its `coast`, or a
+water phrase in its land facts) that has no docks is a ship's call, and she calls **once a
+week** on a day fixed by the route. Measured on Aurvantis: 6 of its 41 dockless
+settlements qualify (Pilfnook, Kraghold, Vormoor, Halhollow, Faeanor, Tidecrest), with 9
+calls between them; on Pangrella, Kalixiri's one. The weekly call and the distance she
+lies off (a cable, about 600 feet) are this app's numbers. Three of the six read as being
+"on the water" only because their land facts name a canal, which says nothing about the
+sea.
+
+**Shape.** One optional object on a `play.settlements[]` row:
+
+| Field | Meaning |
+|---|---|
+| `coastal` | `true` when the town is on the sea (ask 8a's `coastal`, read here too) |
+| `anchorage` | `true` when ships lie off it to take on passengers; `false` when none ever do |
+| `calls` | `"daily"`, `"weekly"`, `"monthly"` or `"seasonal"`: how often a ship on each of its sea routes lies off |
+
+```json
+{"id": "bde94b038cba", "name": "Vormoor", "coastal": true, "anchorage": true,
+ "calls": "weekly"}
+```
+
+**Rule 1 still holds.** Words, never days or distances: which day a ship calls, how far
+off she lies and what the boat out costs (Ultimate Equipment's rowboat, 2 cp a mile) are
+this app's.
+
+### Done when
+
+An export carries `anchorage` on its coastal towns without docks, a town marked `false` is
+measured offering no ship off its shore, and a `"daily"` one offers her every day.
+
+
+## 23. `current` and `flooded` on a wet place — moving water and floods
+
+*Asked 2026-11-15 (fix/shore-and-sea). The consumer reads it the day it appears
+(`rules/water.current`, `rules/water.roughness`). Optional: without it every water is
+still water, and nothing floods.*
+
+The Core Rulebook has rules for moving water and for floods that this app now runs, and
+cannot place without the world. Fast-moving water asks "a DC 15 Swim check or a DC 15
+Strength check to avoid going under", and a failed check costs 1d3 nonlethal damage a
+round, or 1d6 lethal over rocks and cascades. A flood makes every Swim check "one step
+harder", calm to rough and rough to stormy. Ask 17's `water` word says how rough a water
+is; it cannot say whether it moves, or whether it is in flood.
+
+**Shape.** Two optional fields on any `play.places[]` row whose ground is wet, beside
+ask 17's `water`:
+
+| Field | Values | What it is in the world |
+|---|---|---|
+| `current` | `"fast"` or `"rapids"` | a fast river or tide race; whitewater over rocks |
+| `flooded` | `true` | the water is in flood now |
+
+```json
+{"id": "5bbd0c40345f~water:the-ford", "name": "the ford", "water": "calm",
+ "current": "fast", "flooded": true}
+```
+
+A fast current makes the water at least rough and rapids make it stormy, by the same CRB
+paragraph. A flood is a fact of a season, so a world that does not track seasons should
+leave it out rather than set it once for ever.
+
+**Rule 1 still holds.** Words only. The DCs and damage dice are the book's, in
+`rules/water.py`.
+
+### Done when
+
+An export carries `current` on at least one river place, `tools/check_places.py` accepts
+the two words and `true`, and a swimmer there is measured taking the current's damage on
+a failed check.
