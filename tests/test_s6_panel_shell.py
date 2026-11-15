@@ -217,8 +217,12 @@ def test_the_drawer_is_decided_before_first_paint_without_template_variables():
     (the PATHFINDER_BOOT lesson, table.html)."""
     src = TABLE.read_text(encoding="utf-8")
     after = src[src.index(">", src.index("<body")) + 1:].lstrip()
-    assert after.startswith("<script>"), "the pre-paint script is not first in <body>"
-    block = after[:after.index("</script>")]
+    # The one template variable allowed is the tag's CSP nonce (pathfindergm/csp.py): it
+    # sits in the attribute, not the code, and a missing one fails closed (the script is
+    # refused), never as a `x = ;` that silently kills what follows.
+    nonced = '<script nonce="{{ request.csp_nonce }}">'
+    assert after.startswith(nonced), "the pre-paint script is not first in <body>"
+    block = after[len(nonced):after.index("</script>")]
     assert "{{" not in block and "{%" not in block
     assert 'classList.add("sheet-hidden")' in block and "max-width: 760px" in block
     assert '"pgm.table.panels.v1"' in block

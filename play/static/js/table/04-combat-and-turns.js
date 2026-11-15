@@ -194,13 +194,13 @@ function renderPlan() {
     const s = stepOf(key);
     const label = esc(s.label);
     const arrows = n > 1 ? `<span class="cb-ord">
-      <button type="button" data-steporder="${key}:-1" aria-label="Earlier: ${label}"
+      <button type="button" data-steporder="${esc(key)}:-1" aria-label="Earlier: ${label}"
         title="Earlier"${i === 0 ? " disabled" : ""}>&lsaquo;</button>
-      <button type="button" data-steporder="${key}:1" aria-label="Later: ${label}"
+      <button type="button" data-steporder="${esc(key)}:1" aria-label="Later: ${label}"
         title="Later"${i === n - 1 ? " disabled" : ""}>&rsaquo;</button></span>` : "";
-    return `<span class="cb-step" data-step="${key}" role="group"
+    return `<span class="cb-step" data-step="${esc(key)}" role="group"
       aria-label="Step ${i + 1} of ${n}: ${label}"><b class="cb-num" aria-hidden="true">${
-      i + 1}</b><button type="button" class="cb-what" data-unplan="${key}"
+      i + 1}</b><button type="button" class="cb-what" data-unplan="${esc(key)}"
       title="Remove" aria-label="Remove ${label}">${label}</button>${arrows}</span>`;
   });
   const far = strikeOutOfReach();
@@ -658,7 +658,7 @@ document.addEventListener("click", async e => {
     const list = flasksCarried();
     if (!list.length) { combatMenu(`<span class="cb-note">You carry nothing to throw.</span>`); return; }
     combatMenu(list.map((f, i) => `<button type="button" data-throwflask="${i}"
-      title="${esc(f.line || "")}">${esc(f.name)}${f.count > 1 ? ` (${f.count})` : ""}</button>`).join("")
+      title="${esc(f.line || "")}">${esc(f.name)}${f.count > 1 ? ` (${esc(f.count)})` : ""}</button>`).join("")
       + `<span class="cb-note">A standard action: a ranged touch attack, ${
         esc(String(list[0].range_ft || 10))} ft range increments.</span>`);
     return;
@@ -768,9 +768,9 @@ document.addEventListener("click", async e => {
       !a.toggle && !["swift", "free", "immediate"].includes(abilityKind(a)));
     const arms = (STATE.attacks || {}).weapons || [];
     const options = (i) => `<option value="">weapon (${seq[i] >= 0 ? "+" : ""}${
-      seq[i]})</option>` + (arms.length > 1 ? arms.slice(1).map(w =>
+      esc(seq[i])})</option>` + (arms.length > 1 ? arms.slice(1).map(w =>
       `<option value="w:${esc(w)}">${esc(w)} (${seq[i] >= 0 ? "+" : ""}${
-      seq[i]})</option>`).join("") : "") + ((STATE.attacks || {}).replaceable ? abil.map(a =>
+      esc(seq[i])})</option>`).join("") : "") + ((STATE.attacks || {}).replaceable ? abil.map(a =>
       `<option value="${esc(a.name)}">${esc(a.name)}</option>`).join("") : "");
     combatMenu(seq.map((p, i) =>
       `<div class="cb-slot"><label>attack ${i + 1}</label>
@@ -800,7 +800,7 @@ document.addEventListener("click", async e => {
     // stays out of the standard one.
     const list = (STATE.abilities || []).filter(a => kinds.includes(abilityKind(a)));
     if (!list.length) { combatMenu(`<span class="cb-note">Nothing ${
-      kinds[0]} to use.</span>`); return; }
+      esc(kinds[0])} to use.</span>`); return; }
     // An ability with a choice offers each one as its own button — "Channel Energy
     // (harm)", "Wild Shape (wolf)" — except a stance already held, whose one button ends
     // it. One spent to nothing is shown and greyed rather than hidden: "why is Smite gone"

@@ -77,7 +77,7 @@
     }
     const bits = [];
     if (o.by === "remake") {
-      bits.push(`<span class="fixtag">Remake ${o.remakes} of ${maxRemakes(s)}${
+      bits.push(`<span class="fixtag">Remake ${esc(o.remakes)} of ${esc(maxRemakes(s))}${
         o.kept ? ", kept" : ""}</span>`);
     } else if (o.by === "player") {
       bits.push(`<span class="fixtag">Your version</span>`);
@@ -94,7 +94,7 @@
   function pickHint(o) {
     const n = FIX.picked.length;
     return (n ? `${n} sentence${n === 1 ? "" : "s"} marked.` : "Nothing marked: the whole beat.")
-      + (o.remake ? ` ${o.remakes_left} remake${o.remakes_left === 1 ? "" : "s"} left.` : "");
+      + (o.remake ? ` ${esc(o.remakes_left)} remake${o.remakes_left === 1 ? "" : "s"} left.` : "");
   }
 
   function slip(s, i) {
@@ -120,7 +120,7 @@
       lead = "Later beats are built on this one, so it stays as it is. Marking it wrong " +
              "saves it for training the narrator.";
     } else if (cut) {
-      lead = `It has been remade ${o.remakes} times. Write it yourself, put the first ` +
+      lead = `It has been remade ${esc(o.remakes)} times. Write it yourself, put the first ` +
              "one back, or leave it as it is.";
     } else if (!o.remake) {
       lead = "The narrator’s notes for this beat were not kept, so it cannot be " +

@@ -226,7 +226,7 @@
       html += '<div class="tag-batch fo-batch"><div class="tb-row"><label class="tb-label" for="leather-batch">Batch</label>' +
         '<div class="tb-step v2-recess">' +
           '<button type="button" class="v2-btn is-small" data-batch="less" aria-label="One fewer"' + (n <= 1 ? " disabled" : "") + '>−</button>' +
-          '<input type="number" id="leather-batch" class="v2-well tb-n" min="1" step="1" value="' + n + '" data-batch="n">' +
+          '<input type="number" id="leather-batch" class="v2-well tb-n" min="1" step="1" value="' + esc(n) + '" data-batch="n">' +
           '<button type="button" class="v2-btn is-small" data-batch="more" aria-label="One more"' + (most != null && n >= most ? " disabled" : "") + '>+</button>' +
         '</div>' +
         (most > 1 ? '<button type="button" class="v2-btn is-small is-quiet" data-batch="all">All ' + esc(most) + '</button>' : "") + '</div>' +

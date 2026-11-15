@@ -147,7 +147,7 @@
       wrap.innerHTML = '<div class="bench-scrim"></div><div class="bench-dialog bench-perks v2-framed v2-card-leather">' +
         '<i class="v2-rim" aria-hidden="true"></i>' +
         '<h3 id="' + titleId + '">' + (need === 1 ? "Pick a perk" : "Pick two perks") + '</h3>' +
-        '<p>' + row.title + ' ' + esc(t.level) + '. The same perk twice is allowed.</p>' +
+        '<p>' + esc(row.title) + ' ' + esc(t.level) + '. The same perk twice is allowed.</p>' +
         '<div class="pk-grid">' + PERKS.map(function (p, i) {
           var mine = picks.filter(function (x) { return x === p.id; }).length;
           var taken = (t.perks && t.perks[p.id]) || 0;
@@ -155,11 +155,11 @@
           // An odd last choice spans the row (the alchemist's five); the four-perk tracks'
           // markup is unchanged, byte for byte.
           var span = PERKS.length % 2 && i === PERKS.length - 1 ? ' style="grid-column: 1 / -1"' : "";
-          return '<button type="button" class="pk' + (mine ? " is-on" : "") + '" data-perk="' + p.id + '"' + span + ' aria-pressed="' + (mine > 0) + '">' +
+          return '<button type="button" class="pk' + (mine ? " is-on" : "") + '" data-perk="' + esc(p.id) + '"' + span + ' aria-pressed="' + (mine > 0) + '">' +
             (window.BenchIcons ? BenchIcons.html(ICON[p.id], { size: 34, label: p.name }) : "") +
             '<span class="pk-main"><b>' + esc(p.name) + (mine ? ' <span class="pk-x">×' + mine + '</span>' : "") + '</b>' +
             '<span class="pk-next">' + esc(next) + '</span>' +
-            '<span class="pk-taken">' + (taken ? "Taken " + taken + (taken === 1 ? " time" : " times") : "Not taken yet") + '</span></span></button>';
+            '<span class="pk-taken">' + (taken ? "Taken " + esc(taken) + (taken === 1 ? " time" : " times") : "Not taken yet") + '</span></span></button>';
         }).join("") + '</div>' +
         '<p class="pk-left" role="status">' + (picks.length < need ? (need - picks.length) + " to pick" : "Ready to confirm") + '</p>' +
         (err ? '<p class="bench-warnline">' + esc(err) + '</p>' : "") +

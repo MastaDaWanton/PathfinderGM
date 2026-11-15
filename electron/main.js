@@ -186,10 +186,21 @@ function createWindow() {
     autoHideMenuBar: true,
     webPreferences: {
       // The page is our own Django app, but it renders model-generated text;
-      // there is no reason for it to reach Node.
+      // there is no reason for it to reach Node. No preload either: a script that got
+      // into the page reaches the backend's /api/ (as the page does) and nothing more.
       nodeIntegration: false,
       contextIsolation: true,
+      // Electron's default since 20, said here so an upgrade or a copied config cannot
+      // quietly turn it off (electronjs.org/docs/latest/tutorial/security, item 4).
+      sandbox: true,
     },
+  });
+
+  // The game asks for no camera, microphone, location or notification; Electron grants
+  // every such request unless told otherwise (security checklist, item 5), so a script
+  // that got into the page could have listened through the microphone.
+  mainWindow.webContents.session.setPermissionRequestHandler((wc, permission, callback) => {
+    callback(false);
   });
 
   // Shown on first paint, and failing that, shown anyway. Measured 2026-09-04: the
@@ -223,7 +234,7 @@ function createWindow() {
     return { action: 'deny' };
   });
   mainWindow.webContents.on('will-navigate', (event, target) => {
-    if (!target.startsWith(backendUrl)) {
+    if (!isBackend(target)) {
       event.preventDefault();
       openOutside(target);
     }
@@ -326,6 +337,18 @@ function makeReportFromShell(note) {
       done({ error: `the report stopped (exit ${code})` });
     });
   });
+}
+
+/** Whether a navigation stays in the game: the backend's own origin, compared as an
+ * origin. It was `target.startsWith(backendUrl)`, which `http://127.0.0.1:8917@evil.example/`
+ * passes (the part before `@` is a user name) and so does `http://127.0.0.1:89170/`: the
+ * window would have loaded somebody else's page in the game's frame. */
+function isBackend(target) {
+  try {
+    return !!backendUrl && new URL(target).origin === new URL(backendUrl).origin;
+  } catch (err) {
+    return false;
+  }
 }
 
 /** The one door from the page to the Windows shell: web and mail links only.

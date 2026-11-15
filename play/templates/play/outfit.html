@@ -150,7 +150,7 @@
   <small>The GM is writing your first moments in the world. This can take a minute on a local model.</small>
 </div>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 const STATE = {{ state_json|safe }};
 const CAT = STATE.catalogue;
 const $ = s => document.querySelector(s);

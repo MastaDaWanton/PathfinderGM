@@ -963,9 +963,9 @@
 <script src="{% asset 'js/prefs.js' %}"></script>
 <script src="{% asset 'js/sound.js' %}"></script>
 <script src="{% asset 'js/music.js' %}"></script>
-<script>window.Music && Music.start("ambient");</script>
+<script nonce="{{ request.csp_nonce }}">window.Music && Music.start("ambient");</script>
 <script src="{% asset 'js/skillhelp.js' %}"></script>
-<script>
+<script nonce="{{ request.csp_nonce }}">
 const STATE = {{ state_json|safe }};
 // Who was just forged, if the forge sent us back here. Opens on the roster rather than
 // the shelf, so the character that was made is the thing on screen.
@@ -1097,7 +1097,7 @@ const TABS = [
 
 function tabs() {
   $("#tabs").innerHTML = TABS.map(t =>
-    `<button class="tab ${t.id === TAB ? "on" : ""}" data-tab="${t.id}">
+    `<button class="tab ${t.id === TAB ? "on" : ""}" data-tab="${esc(t.id)}">
        ${esc(t.name)}<b>${t.count()}</b></button>`).join("");
 }
 
@@ -1127,7 +1127,7 @@ function continueBlock() {
       <b>${esc(c.character)}</b>
       <span>${esc(c.world)}${c.location ? ` · ${esc(c.location)}` : ""}${
         c.biome ? ` · ${esc(c.biome)}` : ""} — ${esc(c.hp)} hp,
-        ${c.turns} turn${c.turns === 1 ? "" : "s"} played</span>
+        ${esc(c.turns)} turn${c.turns === 1 ? "" : "s"} played</span>
     </div>
     ${c.ended ? `<span class="pill dead">this game has ended</span>`
               : `<a class="go" href="/play/">Continue</a>`}
@@ -1161,7 +1161,7 @@ function paneWorlds() {
         <h3>${esc(w.name)}</h3>
         <em>${esc(w.premise || "no premise recorded")}</em>
         ${w.playable ? `<div class="stat">
-            <b>${w.entities}</b> entities · <b>${w.events}</b> events</div>
+            <b>${esc(w.entities)}</b> entities · <b>${esc(w.events)}</b> events</div>
           <div style="margin-top:8px">${w.settlements.slice(0, 4).map(s =>
             `<span class="pill">${esc(s)}</span>`).join("")}</div>`
           : `<div class="bad-note">${esc(w.problem)}</div>`}
@@ -1174,7 +1174,7 @@ function paneOneWorld() {
   const w = WORLD, d = DETAIL || { campaigns: [], characters: [], pregens: [] };
   return `<button class="quiet" data-back="1">← all worlds</button>
     <h2 class="sect">${esc(w.name)}</h2>
-    <p class="note">${esc(w.premise || "")} — ${w.entities} entities, ${w.events} events.
+    <p class="note">${esc(w.premise || "")} — ${esc(w.entities)} entities, ${esc(w.events)} events.
       ${w.peoples.length ? "Peoples: " + w.peoples.map(esc).join(", ") + "." : ""}</p>
 
     <h2 class="sect">Games</h2>
@@ -1182,7 +1182,7 @@ function paneOneWorld() {
       <div class="card">
         <h3>${esc(c.character)}</h3>
         <em>${esc(c.kind)}${c.ended ? " · ended" : ""}</em>
-        <div class="stat"><b>${c.turns}</b> turns · <b>${c.lines}</b> lines ·
+        <div class="stat"><b>${esc(c.turns)}</b> turns · <b>${esc(c.lines)}</b> lines ·
           ${esc(c.hp)} hp</div>
         <div style="margin-top:9px">
           ${c.active ? `<span class="pill now">in play</span>` : ""}
@@ -1201,7 +1201,7 @@ function paneOneWorld() {
       <button class="card pick ${PICKED === p.source ? "on" : ""}"
               data-pregen="${esc(p.source)}">
         <h3>${esc(p.name)}</h3>
-        <em>${esc(p.line)} · ${p.hp} hp</em>
+        <em>${esc(p.line)} · ${esc(p.hp)} hp</em>
         ${p.notes ? `<div class="stat">${esc(p.notes)}</div>` : ""}
       </button>`).join("")}
       <button class="card pick" data-forge style="border-style:dashed">
@@ -1247,7 +1247,7 @@ function optionsFor(f) {
 
 function fieldHtml(f, spec, path) {
   const v = spec[f.id];
-  const at = `data-fx="${path}" data-field="${esc(f.id)}"`;
+  const at = `data-fx="${esc(path)}" data-field="${esc(f.id)}"`;
   const lbl = `<label>${esc(f.label)}${f.required ? "" : " <em>(optional)</em>"}</label>`;
 
   if (f.kind === "choice") {
@@ -1270,7 +1270,7 @@ function fieldHtml(f, spec, path) {
     const list = v || [];
     return `${lbl}
       ${list.map((child, i) => effectHtml(child, `${path}.${f.id}.${i}`, true)).join("")}
-      <button class="addfx" data-add="${path}.${f.id}" style="padding:7px;margin-bottom:11px">
+      <button class="addfx" data-add="${esc(path)}.${esc(f.id)}" style="padding:7px;margin-bottom:11px">
         + ${esc(f.label)}</button>`;
   }
   const ph = f.hint ? ` placeholder="${esc(f.hint)}"` : "";
@@ -1284,15 +1284,15 @@ function effectHtml(spec, path, nested) {
     <header>
       <span class="line ${info && info.problems.length ? "bad" : ""}">${
         info ? esc(info.problems.length ? info.problems[0] : info.line) : "…"}</span>
-      <button class="drop" data-remove="${path}" title="Remove">×</button>
+      <button class="drop" data-remove="${esc(path)}" title="Remove">×</button>
     </header>
     <div class="row2">
       <div><label>Kind</label>
-        <select data-cat="${path}">${CAT.categories.map(c =>
+        <select data-cat="${esc(path)}">${CAT.categories.map(c =>
           `<option value="${esc(c.id)}" ${cat && c.id === cat.id ? "selected" : ""}>${
             esc(c.name)}</option>`).join("")}</select></div>
       <div><label>Type</label>
-        <select data-type="${path}">${(cat ? cat.types : []).map(t =>
+        <select data-type="${esc(path)}">${(cat ? cat.types : []).map(t =>
           `<option value="${esc(t.id)}" ${t.id === spec.type ? "selected" : ""}>${
             esc(t.name)}</option>`).join("")}</select></div>
     </div>
@@ -1425,7 +1425,7 @@ let SPELLS = null;
 function dropdown(id, label, counts, chosen) {
   const opts = Object.entries(counts || {})
     .map(([k, n]) => `<option value="${esc(k)}" ${k === chosen ? "selected" : ""}>${
-      esc(k)} (${n})</option>`).join("");
+      esc(k)} (${esc(n)})</option>`).join("");
   return `<div><label>${esc(label)}</label>
     <select data-sp="${id}"><option value="">any</option>${opts}</select></div>`;
 }
@@ -1446,7 +1446,7 @@ function paneSpells() {
       ${dropdown("class", "On the list of", v.classes, SP.class)}
       <div><label>At level</label>
         <select data-sp="level"><option value="">any</option>${levels.map(l =>
-          `<option value="${l}" ${String(l) === SP.level ? "selected" : ""}>${l}</option>`
+          `<option value="${esc(l)}" ${String(l) === SP.level ? "selected" : ""}>${esc(l)}</option>`
         ).join("")}</select></div>
       <div><label>&nbsp;</label>
         <button class="quiet" id="sp-clear" style="width:100%">Clear filters</button></div>
@@ -1455,7 +1455,7 @@ function paneSpells() {
       ? `<p class="warn">${esc(SP.tag)} — ${esc(v.tag_notes[SP.tag])} A tag is ours, not
          Pathfinder's; no rule reads it.</p>` : ""}
     <p class="note" style="margin-bottom:0">${
-      SPELLS ? `<b style="color:var(--ink)">${SPELLS.count}</b> shown` : "…"}</p>
+      SPELLS ? `<b style="color:var(--ink)">${esc(SPELLS.count)}</b> shown` : "…"}</p>
   </div>
   ${SPELLS ? `<div class="rows spellrows">
     <table>${SPELLS.spells.map(sp => `
@@ -1465,7 +1465,7 @@ function paneSpells() {
         <td style="text-align:left;color:var(--dim)">${esc(sp.line)}</td>
       </tr>
       ${OPEN_SPELL === sp.id ? `<tr><td colspan="3" class="spellbody">
-        <p>${esc(sp.description).slice(0, 1400)}</p>
+        <p>${esc(String(sp.description || "").slice(0, 1400))}</p>
         <div class="terms">
           ${["casting_time","range","area","effect","targets","duration",
              "saving_throw","spell_resistance"].map(k => sp[k]
@@ -1498,8 +1498,8 @@ function paneHomebrew() {
       <h2 class="sect">${esc(b.name)}</h2>
       <p class="note">${esc(b.blurb)}</p>
       ${b.waiting ? `<div class="waiting" style="margin-bottom:14px">${esc(b.waiting)}</div>` : ""}
-      <p class="note"><b style="color:var(--ink)">${b.yours || "nothing"}</b> authored by
-        you${b.shipped ? `, <b style="color:var(--ink)">${b.shipped}</b> ${esc(b.shipped_label)}`
+      <p class="note"><b style="color:var(--ink)">${esc(b.yours || "nothing")}</b> authored by
+        you${b.shipped ? `, <b style="color:var(--ink)">${esc(b.shipped)}</b> ${esc(b.shipped_label)}`
         : ""}. Yours go in <code>${esc(b.path)}</code>.</p>
       ${b.builder === "page" ? `<p class="note"><a style="display:inline-block;
         padding:8px 14px;border:1px solid var(--gold-dim);border-radius:2px;
@@ -1544,8 +1544,8 @@ function paneHomebrew() {
         <em>${esc(b.blurb)}</em>
         ${b.ready
           ? `<span class="pill ${b.yours ? "now" : ""}">${
-               b.yours ? `${b.yours} yours` : "nothing authored yet"}</span>
-             ${b.shipped ? `<span class="pill">${b.shipped} ${esc(b.shipped_label)}</span>` : ""}`
+               b.yours ? `${esc(b.yours)} yours` : "nothing authored yet"}</span>
+             ${b.shipped ? `<span class="pill">${esc(b.shipped)} ${esc(b.shipped_label)}</span>` : ""}`
           : `<span class="pill soon">not built yet</span>`}
         ${b.waiting ? `<div class="waiting">${esc(b.waiting)}</div>` : ""}
       </button>`).join("")}</div>`;
@@ -1572,8 +1572,8 @@ function paneRules() {
       four are the Core Rulebook's own table; past 25 is this table's homebrew.</p>
     <div class="cards tight">${RULES.tiers.map(t => `
       <button class="card pick ${r.point_buy === t.points ? "on" : ""}"
-              data-hbtier="${t.points}">
-        <h3>${t.points ? `${t.points} points` : "Unlimited points"}</h3>
+              data-hbtier="${esc(t.points)}">
+        <h3>${t.points ? `${esc(t.points)} points` : "Unlimited points"}</h3>
         <em>${esc(t.name)}${t.book ? "" : " · homebrew"}</em>
       </button>`).join("")}</div>
 
@@ -1585,8 +1585,8 @@ function paneRules() {
       unless that is set to Unlimited too.</p>
     <div class="cards tight">${(RULES.caps || []).map(c => `
       <button class="card pick ${r.ability_cap === c.cap ? "on" : ""}"
-              data-hbcap="${c.cap}">
-        <h3>${c.cap ? c.cap : "∞"}</h3>
+              data-hbcap="${esc(c.cap)}">
+        <h3>${c.cap ? esc(c.cap) : "∞"}</h3>
         <em>${esc(c.name)}${c.book ? "" : " · homebrew"}</em>
       </button>`).join("")}</div>
 
@@ -1595,8 +1595,8 @@ function paneRules() {
       race points — the Core seven are all inside the standard tier — and whether those
       seven are offered beside a world's own peoples at all.</p>
     <div class="cards tight">${(RULES.race_tiers || []).map(t => `
-      <button class="card pick ${r.race_rp === t.rp ? "on" : ""}" data-hbracerp="${t.rp}">
-        <h3>${t.rp ? `${t.rp} RP` : "Unlimited RP"}</h3>
+      <button class="card pick ${r.race_rp === t.rp ? "on" : ""}" data-hbracerp="${esc(t.rp)}">
+        <h3>${t.rp ? `${esc(t.rp)} RP` : "Unlimited RP"}</h3>
         <em>${esc(t.name)} · ${esc(t.note || "")}</em>
       </button>`).join("")}</div>
     <button class="card pick ${r.core_races === false ? "" : "on"}" data-hbcore="1"
@@ -2409,7 +2409,7 @@ async function paintFixLine() {
   const n = d.episodes || 0;
   line.hidden = false;
   line.innerHTML = (n
-    ? `You have marked ${n} beat${n === 1 ? "" : "s"} wrong at the table. Each is kept,
+    ? `You have marked ${esc(n)} beat${n === 1 ? "" : "s"} wrong at the table. Each is kept,
        with what replaced it, to train the narrator. `
     : `Beats you mark wrong at the table are kept here, to train the narrator. None yet. `)
     + (IN_DESKTOP_APP || location.hostname === "127.0.0.1" || location.hostname === "localhost"
@@ -2606,7 +2606,7 @@ function paneCharacters() {
         <h3>${esc(c.name)}</h3>
         <em class="${c.unreadable ? "line bad" : ""}">${esc(c.line)}${
           c.world && !c.unreadable ? ` · ${esc(c.world)}` : ""}</em>
-        <div class="stat">${esc(c.hp)} hp · <b>${c.turns_played}</b> turns played</div>
+        <div class="stat">${esc(c.hp)} hp · <b>${esc(c.turns_played)}</b> turns played</div>
         <div style="margin-top:9px">
           ${c.active ? `<span class="pill now">in play</span>` : ""}
           ${c.status === "dead" ? `<span class="pill dead">died${
@@ -2660,7 +2660,7 @@ function showRaceCard(id) {
     || (r.choose || []).map(c => `${c.amount > 0 ? "+" : ""}${c.amount} ${c.from}`).join(", ") || "no adjustments";
   box.innerHTML = `<div class="sheet">
     <h3>${esc(r.name)}${r.of ? ` <span class="pill now">of ${esc(r.of)}</span>` : ""}</h3>
-    <div class="why">${esc(r.type || "humanoid")} · ${esc(r.size)} · ${r.speed} ft · ${esc(mods)} · ${r.rp} RP (${esc(r.power || "")})</div>
+    <div class="why">${esc(r.type || "humanoid")} · ${esc(r.size)} · ${esc(r.speed)} ft · ${esc(mods)} · ${esc(r.rp)} RP (${esc(r.power || "")})</div>
     ${r.description ? `<p>${esc(r.description)}</p>` : ""}
     <p><b>Traits.</b> ${(r.trait_lines || r.traits || []).map(esc).join(" · ") || "none"}</p>
     ${(r.languages || []).length ? `<p><b>Languages.</b> ${r.languages.map(esc).join(", ")}</p>` : ""}
@@ -2722,7 +2722,7 @@ function chips(counts, active, kind, total) {
   const all = total;
   const one = (key, label, n) => `<button class="chip ${
     (active || "") === key ? "on" : ""}" data-crchip="${kind}:${esc(key)}"
-    >${esc(label)} <b>${n}</b></button>`;
+    >${esc(label)} <b>${esc(n)}</b></button>`;
   return `<div class="chips">${one("", "everything", all)}${
     Object.entries(counts).sort((a, b) => b[1] - a[1])
       .map(([k, n]) => one(k, k, n)).join("")}</div>`;
@@ -2842,7 +2842,7 @@ function spellPicker() {
   const got = FORGE.choices && FORGE.choices.spells;
   if (!got || !got.ready) return "";
   const slotLine = Object.entries(got.slots || {}).sort()
-    .map(([lvl, n]) => `<b>${n}</b> at level ${lvl}`).join(", ");
+    .map(([lvl, n]) => `<b>${esc(n)}</b> at level ${esc(lvl)}`).join(", ");
   // A cleric chooses nothing here and still has slots. Saying so is half of what was
   // asked for, and staying silent made the page look broken for every prepared caster.
   if (!got.casts) {
@@ -2888,7 +2888,7 @@ function spellPicker() {
       const what = lvl === "0" ? `${esc(f.class)} cantrips`
                                : `level ${esc(lvl)} ${esc(f.class)} spells`;
       return `<div class="budget ${n > cap ? "over" : ""}${n < cap ? " short" : ""}">
-        <span>${what} to choose</span><b>${n} / ${cap}</b></div>`;
+        <span>${what} to choose</span><b>${esc(n)} / ${esc(cap)}</b></div>`;
     }).join("")}
     <div style="margin:6px 0 10px">${chosen.map(id => {
       const s = (got.choose || []).find(x => x.id === id);
@@ -2950,7 +2950,7 @@ function spellMatches() {
     <button class="featrow${full[String(s.level)] ? " shut" : ""}"
             data-craddspell="${esc(s.id)}" title="${esc(s.text || "")}">
       <b>${esc(s.name)}</b><span>${esc(s.school || "")}${
-        s.level === 0 ? " · cantrip" : ` · level ${s.level}`}${
+        s.level === 0 ? " · cantrip" : ` · level ${esc(s.level)}`}${
         full[String(s.level)] ? " · allowance full" : ""}</span></button>`).join("")}</div>${
     pager(hits.length, page, "spell")}`;
 }
@@ -2965,8 +2965,8 @@ function paneForgeChoices() {
       ${(opts.domains || []).length && takesAllDomains(f) ? `
         <h2 class="sect">Domains</h2>
         <div class="budget ${(f.domains || []).length !== (opts.domains_wanted || 2) ? "over" : ""}">
-          <span>a cleric takes ${opts.domains_wanted || 2}</span>
-          <b>${(f.domains || []).length} / ${opts.domains_wanted || 2}</b></div>
+          <span>a cleric takes ${esc(opts.domains_wanted || 2)}</span>
+          <b>${(f.domains || []).length} / ${esc(opts.domains_wanted || 2)}</b></div>
         <div style="margin:6px 0 10px">${(f.domains || []).map(d => `
           <button class="quiet" data-crundomain="${esc(d)}" title="remove">
             ${esc(d)} ✕</button>`).join(" ")
@@ -3041,7 +3041,7 @@ function catalogueChoice(ch, f) {
   }).join("");
   return `<h2 class="sect">${esc(ch.name)}</h2>
     ${ch.text ? `<p class="note">${esc(ch.text)}</p>` : ""}
-    <p class="note">${picks.length} of ${n} chosen${picks.length < n
+    <p class="note">${picks.length} of ${esc(n)} chosen${picks.length < n
       ? " — or leave it, and it waits on the sheet's Class tab." : "."}</p>
     <div class="cards tight">${cards}</div>${variants}`;
 }
@@ -3061,7 +3061,7 @@ function classChoiceSection(cls, f) {
         <button class="card pick ${(f.domains || []).includes(d.name) ? "on" : ""}"
                 data-crbonddomain="${esc(d.name)}" data-crchoice="${esc(ch.id)}">
           <h3>${esc(d.name)}</h3>
-          <div class="stat">${d.spells} spell${d.spells === 1 ? "" : "s"}${
+          <div class="stat">${esc(d.spells)} spell${d.spells === 1 ? "" : "s"}${
             d.first ? ` · ${esc(d.first)} at 1st` : ""}</div>
           <div class="traits">${(d.powers || []).map(esc).join(" · ")
             || "Its spells and slot; its powers are not written down yet."}</div>
@@ -3106,7 +3106,7 @@ function domainMatches() {
   if (!hits.length) return `<p class="note">No domain matches “${esc(FORGE.domainq || "")}”.</p>`;
   return `<div class="featlist">${hits.map(d => `
     <button class="featrow" data-cradddomain="${esc(d.name)}"><b>${esc(d.name)}</b>
-      <span>${d.spells} spell${d.spells === 1 ? "" : "s"}${
+      <span>${esc(d.spells)} spell${d.spells === 1 ? "" : "s"}${
         d.first ? ` · ${esc(d.first)} at 1st` : ""}</span></button>`).join("")}</div>`;
 }
 
@@ -3245,9 +3245,9 @@ function paneForgeWho() {
       on in the house rules and it appears here.</p>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
       ${(opts.genders || ["woman", "man"]).map(g => `
-        <button class="quiet" data-crgender="${g}" style="${
+        <button class="quiet" data-crgender="${esc(g)}" style="${
           f.gender === g ? "border-color:var(--accent);color:#f0dcae" : ""
-        }">${g}</button>`).join("")}
+        }">${esc(g)}</button>`).join("")}
       <span class="note">${f.gender
         ? esc(PRONOUNS_FOR[f.gender] || f.gender) : "&nbsp;"}</span>
     </div>
@@ -3266,15 +3266,15 @@ function paneForgeWho() {
       priced from the Race Builder — then the Core Rulebook's own${opts.races.some(r => !r.of)
         ? "" : ", which this table has turned off on the Rulesets bench"}.</p>` : ""}
     <div class="cards tight races">${opts.races.map(r => `
-      <button class="card pick ${f.race === r.id ? "on" : ""}" data-crrace="${r.id}"
-              ${opts.race_rp && r.rp > opts.race_rp ? `disabled title="${r.rp} RP: above this table's ${opts.race_rp} RP tier"` : ""}
+      <button class="card pick ${f.race === r.id ? "on" : ""}" data-crrace="${esc(r.id)}"
+              ${opts.race_rp && r.rp > opts.race_rp ? `disabled title="${esc(r.rp)} RP: above this table's ${esc(opts.race_rp)} RP tier"` : ""}
               style="${opts.race_rp && r.rp > opts.race_rp ? "opacity:.45" : ""}">
         <h3>${esc(r.name)}${r.of ? ` <span class="pill now">of ${esc(r.of)}</span>` : ""}${
           r.converted ? ` <span class="unread">unreviewed</span>` : ""}</h3>
-        <div class="stat">${esc(r.size)} · ${r.speed} ft · ${
-          Object.entries(r.mods || {}).map(([a, v]) => `${a.toUpperCase()} ${v > 0 ? "+" : ""}${v}`).join(", ")
+        <div class="stat">${esc(r.size)} · ${esc(r.speed)} ft · ${
+          esc(Object.entries(r.mods || {}).map(([a, v]) => `${a.toUpperCase()} ${v > 0 ? "+" : ""}${v}`).join(", "))
           || (r.choose || []).map(c => `${c.amount > 0 ? "+" : ""}${esc(c.amount)} ${esc(c.from)}`).join(", ")
-          || "no adjustments"} · ${r.rp} RP</div>
+          || "no adjustments"} · ${esc(r.rp)} RP</div>
         <div class="traits clip">${(r.trait_lines || r.traits || []).map(esc).join(" · ")}</div>
         <span class="quiet cardinfo" data-crinfo="${esc(r.id)}" title="the whole card">details</span>
       </button>`).join("")}</div>
@@ -3282,7 +3282,7 @@ function paneForgeWho() {
       <p class="note" style="margin-top:44px">A ${esc(race.name.toLowerCase())} places ${race.choose.length === 1
         ? "+2 where they choose" : "the Race Builder's standard adjustments — each on a different ability"}:</p>
       ${race.choose.map((c, i) => `<div style="margin:4px 0">
-        <span class="note" style="display:inline-block;width:110px">${c.amount > 0 ? "+" : ""}${c.amount} ${esc(c.from)}</span>
+        <span class="note" style="display:inline-block;width:110px">${c.amount > 0 ? "+" : ""}${esc(c.amount)} ${esc(c.from)}</span>
         ${POOLS[c.from].map(ab => `
         <button class="quiet" data-crbonus="${ab}" data-crslot="${i}" style="${
           f.choices[i] === ab ? "border-color:var(--accent);color:#f0dcae" : ""
@@ -3330,12 +3330,12 @@ function paneForgeWho() {
 
     <h2 class="sect">Class</h2>
     <div class="cards">${opts.classes.map(c => `
-      <button class="card pick ${f.class === c.id ? "on" : ""}" data-crclass="${c.id}">
+      <button class="card pick ${f.class === c.id ? "on" : ""}" data-crclass="${esc(c.id)}">
         <h3>${esc(c.name)}</h3>
         <em>${esc(c.summary || "")}</em>
         <div class="stat">${esc(c.die_label || `d${c.hit_die}`)} ·
           ${esc(String(c.bab).replace("_", " "))} BAB ·
-          ${c.skill_ranks}+Int skills${c.caster ? " · caster" : ""}</div>
+          ${esc(c.skill_ranks)}+Int skills${c.caster ? " · caster" : ""}</div>
         <div class="traits">${(c.features || []).map(esc).join(" · ")}</div>
       </button>`).join("")}</div>
 
@@ -3345,7 +3345,7 @@ function paneForgeWho() {
         choice. The <b>first</b> you pick is <b>Path A</b> — you begin with it and
         take its Control Blood 1 abilities at 1st level. The <b>second</b> is
         <b>Path B</b>, and it stays shut until the table opens its track at
-        <b>${cls.unlocks_b || 11}th level</b>. Pick one now if you would rather
+        <b>${esc(cls.unlocks_b || 11)}th level</b>. Pick one now if you would rather
         decide the other later.</p>
       <div class="slotrow">
         <div class="pathslot ${f.paths[0] ? "filled" : ""}">
@@ -3356,7 +3356,7 @@ function paneForgeWho() {
         <div class="pathslot ${f.paths[1] ? "filled" : ""}">
           <span class="slotname">Path B</span>
           <b>${f.paths[1] ? esc(f.paths[1]) : "not chosen"}</b>
-          <em>from ${cls.unlocks_b || 11}th level</em>
+          <em>from ${esc(cls.unlocks_b || 11)}th level</em>
         </div>
       </div>
       <div class="cards tight">${cls.paths.map(x => {
@@ -3366,7 +3366,7 @@ function paneForgeWho() {
                 ${at < 0 && f.paths.length >= 2 ? "disabled style=opacity:.4" : ""}>
           <h3>${esc(x)}</h3>
           <div class="traits">${at === 0 ? "Path A — from 1st level"
-            : at === 1 ? `Path B — from ${cls.unlocks_b || 11}th`
+            : at === 1 ? `Path B — from ${esc(cls.unlocks_b || 11)}th`
             : f.paths.length >= 2 ? "both slots taken" : "click to take"}</div>
         </button>`;
       }).join("")}</div>` : ""}
@@ -3374,17 +3374,17 @@ function paneForgeWho() {
     ${classChoiceSection(cls, f)}
 
     <h2 class="sect">Abilities</h2>
-    <p class="note">Point buy, ${opts.point_budget ? `${opts.point_budget} points — the Rulesets bench under Homebrew sets the tier, Unlimited included` : "unlimited"}. The race lands after.
+    <p class="note">Point buy, ${opts.point_budget ? `${esc(opts.point_budget)} points — the Rulesets bench under Homebrew sets the tier, Unlimited included` : "unlimited"}. The race lands after.
       ${opts.ability_cap
-        ? `No score above ${opts.ability_cap} before race.`
+        ? `No score above ${esc(opts.ability_cap)} before race.`
         : `No ceiling on a single score — the budget is the only wall.`}</p>
     <div class="budget ${opts.point_budget && spent > opts.point_budget ? "over" : ""}">
-      <span>spent</span><b>${spent} / ${opts.point_budget || "∞"}</b></div>
+      <span>spent</span><b>${esc(spent)} / ${esc(opts.point_budget || "∞")}</b></div>
     ${["str","dex","con","int","wis","cha"].map(ab => `
       <div class="abrow"><b>${ab.toUpperCase()}</b>
         <button data-abdn="${ab}" ${
           f.abilities[ab] <= (opts.ability_floor ?? 7) ? "disabled" : ""}>−</button>
-        <span class="val">${f.abilities[ab]}</span>
+        <span class="val">${esc(f.abilities[ab])}</span>
         <!-- The ceiling is a house rule, not a constant. With none set the button
              stops where the point table the server sent stops, which is the highest
              score this budget could actually pay for. -->
@@ -3394,17 +3394,17 @@ function paneForgeWho() {
         <span class="fin">${race ? `becomes ${abfinal(ab)}` : ""}</span>
       </div>`).join("")}
     ${(opts.level_one || {}).points ? `
-      <h3 class="sect" style="font-size:1em">House rule: ${opts.level_one.points} ability points</h3>
-      <p class="note">The table's homebrew grants ${opts.level_one.points} ability points at
+      <h3 class="sect" style="font-size:1em">House rule: ${esc(opts.level_one.points)} ability points</h3>
+      <p class="note">The table's homebrew grants ${esc(opts.level_one.points)} ability points at
         1st level (Rulesets bench). They land after the race, cost no point buy, and may
         be spread however you like — both on one score if you want. Any left unplaced
         wait on the sheet's Class tab.</p>
       <div class="budget ${housePointsPlaced(f) > opts.level_one.points ? "over" : ""}">
-        <span>placed</span><b>${housePointsPlaced(f)} / ${opts.level_one.points}</b></div>
+        <span>placed</span><b>${housePointsPlaced(f)} / ${esc(opts.level_one.points)}</b></div>
       ${["str","dex","con","int","wis","cha"].map(ab => `
         <div class="abrow"><b>${ab.toUpperCase()}</b>
           <button data-hpdn="${ab}" ${(f.house_points || {})[ab] ? "" : "disabled"}>−</button>
-          <span class="val">+${(f.house_points || {})[ab] || 0}</span>
+          <span class="val">+${esc((f.house_points || {})[ab] || 0)}</span>
           <button data-hpup="${ab}" ${
             housePointsPlaced(f) >= opts.level_one.points ? "disabled" : ""}>+</button>
         </div>`).join("")}` : ""}
@@ -3421,13 +3421,13 @@ function paneForgeWho() {
 
     <h2 class="sect">Skills</h2>
     <div class="budget ${f.skills.length > rb ? "over" : ""}">
-      <span>ranks${cls ? ` (${cls.skill_ranks} class${(() => {
+      <span>ranks${cls ? ` (${esc(cls.skill_ranks)} class${esc((() => {
         // Asked of the race document, as `ranksBudget` is — `f.race === "human"` named
         // one race and a world's own skilled people never showed their rank here.
         const r = opts.races.find(x => x.id === f.race);
         const n = (r && r.budget && r.budget.ranks) || 0;
-        return n ? ` +${n} ${esc((r.name || "race").toLowerCase())}` : "";
-      })()} + Int)` : ""}. More arrive with every level, on the Class tab.</span>
+        return n ? ` +${n} ${(r.name || "race").toLowerCase()}` : "";
+      })())} + Int)` : ""}. More arrive with every level, on the Class tab.</span>
       <b>${f.skills.length} / ${rb}</b></div>
     <p class="note">Hover over or press a skill's ? to see what it does in this game.</p>
     <div class="skillgrid">${opts.skills.map(s => SkillHelp.row(s, `

@@ -273,7 +273,7 @@
   <span id="err"></span>
 </footer>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 // The flame, same two channels as home: --cx/--cy from the pointer, --flick from
 // summed irrational sines plus a bounded walk. See home.html for the reasoning.
 {
@@ -309,8 +309,8 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c =>
 function tabs() {
   $("#tabs").innerHTML = STATE.disciplines.map(d => {
     const t = STATE.tracks[d.id] || {};
-    const sub = t.available ? `${esc(t.name)} ${t.level}` : "not yet";
-    return `<button class="tab ${d.id === CRAFT ? "on" : ""}" data-craft="${d.id}">
+    const sub = t.available ? `${esc(t.name)} ${esc(t.level)}` : "not yet";
+    return `<button class="tab ${d.id === CRAFT ? "on" : ""}" data-craft="${esc(d.id)}">
       ${esc(d.name)}<small>${sub}</small></button>`;
   }).join("");
 }
@@ -430,7 +430,7 @@ selectCraft(CRAFT);
 <!-- The soundtrack carries on here from the table (music.js resumes the same song). -->
 <script src="{% asset 'js/prefs.js' %}"></script>
 <script src="{% asset 'js/music.js' %}"></script>
-<script>window.Music && Music.start("ambient");</script>
+<script nonce="{{ request.csp_nonce }}">window.Music && Music.start("ambient");</script>
 <script src="{% static 'js/keepalive.js' %}"></script>
 </body>
 </html>

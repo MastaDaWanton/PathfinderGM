@@ -322,7 +322,7 @@
   </section>
 </main>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 const CAT = {{ state_json|safe }};
 const SECTIONS = CAT.schema;
 // Which section a validation message belongs to, worked out from the dotted path the
@@ -363,8 +363,8 @@ function drawNav() {
     if (id) counts[id] = (counts[id] || 0) + 1;
   });
   const tab = (id, title) => `<button class="tab ${id === current ? "on" : ""}"
-      data-sec="${id}"><span class="grow">${esc(title)}</span>${
-      counts[id] ? `<span class="badge">${counts[id]}</span>` : ""}</button>`;
+      data-sec="${esc(id)}"><span class="grow">${esc(title)}</span>${
+      counts[id] ? `<span class="badge">${esc(counts[id])}</span>` : ""}</button>`;
   let plain = "", adv = "";
   SECTIONS.forEach(s => {
     const html = tab(s.id, s.title);

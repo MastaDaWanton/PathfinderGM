@@ -88,10 +88,10 @@ function renderSides(s) {
   $("#life").innerHTML = `
     <div class="lifebar" aria-hidden="true"><i style="width:${pct}%"></i>${
       temp ? `<i class="temp" style="width:${tpct}%"></i>` : ""}</div>
-    <p class="lifesay"><b>${pc.hp}</b> of ${pc.hp_max} hit points${
-      temp ? ` <small>and ${temp} temporary</small>` : ""}</p>
+    <p class="lifesay"><b>${esc(pc.hp)}</b> of ${esc(pc.hp_max)} hit points${
+      temp ? ` <small>and ${esc(temp)} temporary</small>` : ""}</p>
     ${nl ? `<div class="row${nl >= nlLimit ? " danger" : ""}"><span>Non-lethal</span>
-      <span>${nl} <small>of ${nlLimit}</small></span></div>` : ""}
+      <span>${esc(nl)} <small>of ${esc(nlLimit)}</small></span></div>` : ""}
     ${(pc.needs || []).length ? `<h4>The body</h4>${pc.needs.map(n => `
       <div class="row${n.danger ? " danger" : ""}" title="${esc(n.detail)}">
         <span>${esc(n.label)}</span><span>${esc(n.state)}</span></div>`).join("")}` : ""}`;
@@ -101,23 +101,23 @@ function renderSides(s) {
   const hurt = pc.ability_damage || {};
   $("#medals").innerHTML = Object.entries(pc.abilities || {}).map(([k, v]) => {
     const mod = Math.floor((v - 10) / 2), down = hurt[k] || 0;
-    return `<li class="v2-coin${down ? " hurt" : ""}"><span class="vh">${sidesUp(k)} ${v}, modifier ${
-        sign(mod)}${down ? `, ${down} lost` : ""}</span>
-      <div aria-hidden="true"><span class="ab">${esc(sidesUp(k))}</span><span class="sc">${v}</span></div>
-      <span class="md${down ? " hurt" : ""}" aria-hidden="true">${sign(mod)}${down ? ` (-${down})` : ""}</span></li>`;
+    return `<li class="v2-coin${down ? " hurt" : ""}"><span class="vh">${esc(sidesUp(k))} ${esc(v)}, modifier ${
+        sign(mod)}${down ? `, ${esc(down)} lost` : ""}</span>
+      <div aria-hidden="true"><span class="ab">${esc(sidesUp(k))}</span><span class="sc">${esc(v)}</span></div>
+      <span class="md${down ? " hurt" : ""}" aria-hidden="true">${sign(mod)}${down ? ` (-${esc(down)})` : ""}</span></li>`;
   }).join("");
 
   const plaque = (dt, dd, small = "") => `<div class="v2-plaque"><dt>${dt}</dt><dd>${dd}${
     small ? `<small>${small}</small>` : ""}</dd></div>`;
   const d = sheet && sheet.defense;
-  $("#defence").innerHTML = plaque("AC", pc.ac, d
-      ? `touch ${d.ac_touch.total}, flat ${d.ac_flat_footed.total}` : "")
-    + (pc.speed ? plaque("Speed", `${pc.speed} ft`) : "");
+  $("#defence").innerHTML = plaque("AC", esc(pc.ac), d
+      ? `touch ${esc(d.ac_touch.total)}, flat ${esc(d.ac_flat_footed.total)}` : "")
+    + (pc.speed ? plaque("Speed", `${esc(pc.speed)} ft`) : "");
   $("#defence-more").innerHTML = `${(pc.dr && pc.dr.length)
       ? `<div class="row"><span>Damage reduction</span><span>${pc.dr.map(esc).join(", ")}</span></div>` : ""}${
     (pc.pools || []).map(p => `<div class="row"><span>${esc(title(p.id))}</span>
-      <span>${p.current} <small>of ${p.max}</small>${
-        p.ready ? "" : ` <small>${p.cooldown_left}r</small>`}</span></div>`).join("")}${
+      <span>${esc(p.current)} <small>of ${esc(p.max)}</small>${
+        p.ready ? "" : ` <small>${esc(p.cooldown_left)}r</small>`}</span></div>`).join("")}${
     d ? "" : `<p class="note">Touch and flat-footed are on the Sheet's Defense page.</p>`}`;
   const saves = pc.saves || {};
   $("#saves").innerHTML = plaque("Fort", sign(saves.fort || 0)) + plaque("Ref", sign(saves.ref || 0))
@@ -129,10 +129,10 @@ function renderSides(s) {
       xp.next.toLocaleString()} for the next level</small></p>${
       xp.ready ? `<p class="ready">Ready to level: sleep to take it.</p>` : ""}` : ""}${
     (pc.world_classes && pc.world_classes.length) ? `<h4>World classes</h4>${
-      pc.world_classes.map(w => `<div class="row"><span>${esc(w.name)} ${w.level}</span><span>${
+      pc.world_classes.map(w => `<div class="row"><span>${esc(w.name)} ${esc(w.level)}</span><span>${
         w.missing ? "<small>unknown track</small>"
-        : w.to_next ? `<small>${w.to_next.need} to next</small>` : "<small>mastered</small>"}</span></div>
-        ${w.missing ? "" : `<p class="note">${esc(w.max_tier)}, ${w.known} recipe${
+        : w.to_next ? `<small>${esc(w.to_next.need)} to next</small>` : "<small>mastered</small>"}</span></div>
+        ${w.missing ? "" : `<p class="note">${esc(w.max_tier)}, ${esc(w.known)} recipe${
           w.known === 1 ? "" : "s"}</p>`}`).join("")}` : ""}`;
 
   // The phone's glance, in the book's head: life and AC, and the way to the whole sheet.

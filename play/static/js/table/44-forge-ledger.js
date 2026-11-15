@@ -793,7 +793,7 @@
     st.error = "";
     st.cards = {};
     host.innerHTML = '<div class="fl-tools"><button type="button" class="v2-btn is-small" data-fl-sort aria-pressed="' +
-      st.unknownFirst + '">Unknowns first</button></div>' +
+      esc(st.unknownFirst) + '">Unknowns first</button></div>' +
       '<div class="fl-list" role="list" aria-label="' + T.list + '"></div>';
     function drawList() {
       var box = host.querySelector(".fl-list");

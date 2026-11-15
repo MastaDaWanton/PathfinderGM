@@ -127,7 +127,7 @@
   </div>
 </main>
 
-<script>
+<script nonce="{{ request.csp_nonce }}">
 const STATE = {{ state_json|safe }};
 const $ = s => document.querySelector(s);
 const esc = s => String(s == null ? "" : s).replace(/[&<>"]/g,

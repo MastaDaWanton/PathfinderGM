@@ -727,7 +727,7 @@
     st.recipes = null;
     st.error = "";
     host.innerHTML = '<div class="el-tools"><button type="button" class="v2-btn is-small" data-el-sort aria-pressed="' +
-      st.unknownFirst + '">Unknowns first</button></div>' +
+      esc(st.unknownFirst) + '">Unknowns first</button></div>' +
       '<div class="el-list" role="list" aria-label="Essences you have met"></div>' +
       '<h3 class="el-sub">Recipes</h3><div class="el-rc"></div>';
     st.draw = function () {

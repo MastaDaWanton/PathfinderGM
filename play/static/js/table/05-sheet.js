@@ -72,14 +72,14 @@ function pageSheet(s) {
 // its "?" only, by click, tap or keyboard, never from hovering a row (the skill-help
 // lesson of 2026-10-08: a card that opened on hover covered the rows under it).
 let DEEDS_HELP = false;
-const deedSign = v => (v > 0 ? `+${v}` : v < 0 ? `−${-v}` : "0");
+const deedSign = v => (v > 0 ? `+${esc(v)}` : v < 0 ? `−${-v}` : "0");
 function deedChip(r) {
   if (r.again) return `<span class="chip dd-v nil">0, again that day</span>`;
   if (!r.value) return `<span class="chip dd-v nil">0, ${r.how === "accident" ? "an accident" : "not counted"}</span>`;
   return `<span class="chip dd-v${r.value < 0 ? " warn" : ""}">${deedSign(r.value)}</span>`;
 }
 function deedRow(r) {
-  return `<li class="dd-row" data-n="${r.n}">
+  return `<li class="dd-row" data-n="${esc(r.n)}">
     <span class="dd-when">Day ${esc(String(r.day))}${r.phase ? `, ${esc(r.phase)}` : ""}${
       r.where ? `<span class="dd-where">${esc(r.where)}</span>` : ""}</span>
     <span class="dd-said">${esc(r.said)}</span>${deedChip(r)}</li>`;
@@ -178,11 +178,11 @@ function combatCard(s) {
       <td class="lead"><b>${esc(a.name)}</b>${a.equipped ? `<span class="chip">in hand</span>` : ""}${
         a.proficient ? "" : `<span class="chip warn">not proficient</span>`}</td>
       <td class="n" data-label="To hit">${swings.join(" / ")}<span class="why">${
-        esc(termLine(a.attack)) || "no bonus"}</span></td>
+        esc(termLine(a.attack) || "no bonus")}</span></td>
       <td class="n" data-label="Damage">${esc(a.damage_dice)}${a.damage.total ? sign(a.damage.total) : ""}<span
         class="why">${esc(a.type_text || a.type)}</span></td>
       <td class="n" data-label="Critical">${esc(a.crit)}</td>
-      <td data-label="Range">${a.range_ft ? `${a.range_ft} ft${thrown ? ", thrown" : ""}`
+      <td data-label="Range">${a.range_ft ? `${esc(a.range_ft)} ft${thrown ? ", thrown" : ""}`
         : a.category === "melee" ? `<span class="why">melee</span>`
         : a.launcher ? NOT_KNOWN : `<span class="why">not printed</span>`}${
         thrown ? (a.thrown_attack
@@ -220,9 +220,9 @@ function combatCard(s) {
       ${stat("Initiative", sign(o.initiative.total), termLine(o.initiative))}
       ${stat("Base attack", sign(o.bab))}
       ${stat("CMB", sign(o.cmb.total), termLine(o.cmb))}
-      ${stat("CMD", d.cmd.total, termLine(d.cmd), `flat-footed ${d.cmd_flat_footed.total}`)}
-      ${stat("Speed", speed.current != null ? `${speed.current} ft` : NOT_KNOWN,
-             speed.base != null && speed.base !== speed.current ? `base ${speed.base} ft` : "")}
+      ${stat("CMD", esc(d.cmd.total), termLine(d.cmd), `flat-footed ${esc(d.cmd_flat_footed.total)}`)}
+      ${stat("Speed", speed.current != null ? `${esc(speed.current)} ft` : NOT_KNOWN,
+             speed.base != null && speed.base !== speed.current ? `base ${esc(speed.base)} ft` : "")}
     </dl>
     <div class="gridwrap"><table class="grid">
       <caption class="vh">Attacks</caption>
@@ -250,34 +250,34 @@ function defenceCard(s) {
   const d = s.defense;
   const hp = d.hp || {};
   const con = (s.abilities || []).find(a => a.key === "con");
-  const saves = (d.saves || []).map(sv => stat(sv.name, sign(sv.total), termLine(sv) || "no bonus")).join("");
+  const saves = (d.saves || []).map(sv => stat(esc(sv.name), sign(sv.total), termLine(sv) || "no bonus")).join("");
   const life = [
-    `<div class="t"><span>Hit points</span><b>${hp.current} of ${hp.max}</b></div>`,
+    `<div class="t"><span>Hit points</span><b>${esc(hp.current)} of ${esc(hp.max)}</b></div>`,
     hp.temp ? `<div class="t"><span>Temporary${hp.temp_source ? `, from ${esc(hp.temp_source)}` : ""}</span><b>${sign(hp.temp)}</b></div>` : "",
     ...(d.dr || []).map(r => `<div class="t"><span>Damage reduction${r.source ? `, from ${esc(r.source)}` : ""}</span><b>${esc(r.label)}</b></div>`),
-    ...(d.resistances || []).map(r => `<div class="t"><span>Resists ${esc(r.type)}</span><b>${r.amount}</b></div>`),
+    ...(d.resistances || []).map(r => `<div class="t"><span>Resists ${esc(r.type)}</span><b>${esc(r.amount)}</b></div>`),
     `<div class="t"><span>Unconscious at</span><b>0</b></div>`,
-    con ? `<div class="t"><span>Dead at</span><b>-${con.score}</b></div>` : "",
-    `<div class="t"><span>Non-lethal taken</span><b>${hp.nonlethal || 0}</b></div>`,
-    `<div class="t"><span>Knocked out by non-lethal at</span><b>${hp.nonlethal_threshold}</b></div>`,
+    con ? `<div class="t"><span>Dead at</span><b>-${esc(con.score)}</b></div>` : "",
+    `<div class="t"><span>Non-lethal taken</span><b>${esc(hp.nonlethal || 0)}</b></div>`,
+    `<div class="t"><span>Knocked out by non-lethal at</span><b>${esc(hp.nonlethal_threshold)}</b></div>`,
   ].join("");
   const gear = (d.gear || []).length ? `<h3 class="cardsub">Damaged gear</h3>
     <div class="terms">${d.gear.map(g => `<div class="t"><span>${esc(g.name)} <small>${
-      esc(g.material)}, hardness ${g.hardness}</small></span><b>${
-      g.state === "destroyed" ? "destroyed" : `${g.hp} of ${g.hp_max}${
+      esc(g.material)}, hardness ${esc(g.hardness)}</small></span><b>${
+      g.state === "destroyed" ? "destroyed" : `${esc(g.hp)} of ${esc(g.hp_max)}${
         g.state === "broken" ? ", broken" : ""}`}</b></div>`).join("")}</div>` : "";
   return sheetCard("sc-defence", "Defence", `
     <dl class="statrow">
-      ${stat("AC", d.ac.total, termLine(d.ac))}
-      ${stat("Touch", d.ac_touch.total, termLine(d.ac_touch))}
-      ${stat("Flat-footed", d.ac_flat_footed.total, termLine(d.ac_flat_footed))}
+      ${stat("AC", esc(d.ac.total), termLine(d.ac))}
+      ${stat("Touch", esc(d.ac_touch.total), termLine(d.ac_touch))}
+      ${stat("Flat-footed", esc(d.ac_flat_footed.total), termLine(d.ac_flat_footed))}
       ${saves}
     </dl>
     <div class="twocol">
       <div><h3 class="cardsub">Life</h3><div class="terms">${life}</div>${gear}</div>
       <div><h3 class="cardsub">Conditions</h3>
         ${(d.conditions || []).length ? `<ul class="plain conds">${d.conditions.map(c => `<li>
-          <b>${esc(c.name)}</b>${c.rounds_left ? ` <span class="chip">${c.rounds_left} rounds</span>` : ""}
+          <b>${esc(c.name)}</b>${c.rounds_left ? ` <span class="chip">${esc(c.rounds_left)} rounds</span>` : ""}
           ${c.note ? `<span class="why">${esc(c.note)}</span>` : ""}
           ${c.source ? `<span class="why">from ${esc(c.source)}</span>` : ""}</li>`).join("")}</ul>`
           : `<p>None.</p>`}
@@ -301,7 +301,7 @@ function skillsCard(s) {
           k.trained_only ? ` <small>trained only</small>` : ""}</dt>
         <dd>${k.usable ? sign(k.total) : `<span title="Cannot be attempted untrained">untrained</span>`}</dd>
         <span class="why terms-line">${esc(k.ability.toUpperCase())}${
-          k.armour_check ? ", armour check applies" : ""}${k.rank ? `, ${k.rank} ranks` : ""}${
+          k.armour_check ? ", armour check applies" : ""}${k.rank ? `, ${esc(k.rank)} ranks` : ""}${
           k.usable && k.terms.length ? `: ${esc(k.terms.map(m => `${sign(m.value)} ${m.source}`).join(", "))}` : ""}</span>
       </div>`).join("")}</dl>`);
 }
@@ -331,8 +331,8 @@ async function fillWorkOffer() {
   }
   const p = o.pay || {};
   box.innerHTML = o.skill
-    ? `<span class="why">In ${esc(o.town)}, a ${esc(o.scale)}: task level ${o.task}, your
-        ${esc(title(o.skill))} (${o.ranks} ranks, ${esc(o.proficiency)}) against DC ${o.dc}.
+    ? `<span class="why">In ${esc(o.town)}, a ${esc(o.scale)}: task level ${esc(o.task)}, your
+        ${esc(title(o.skill))} (${esc(o.ranks)} ranks, ${esc(o.proficiency)}) against DC ${esc(o.dc)}.
         A day pays ${esc(p.success)}; beat it by 10 for ${esc(p["critical success"])};
         miss it and ${esc(p.failure)}; miss by 10 and nothing.</span>`
     : `<span class="why">In ${esc(o.town)}, with no ranks in Craft or Profession: untrained
@@ -393,7 +393,7 @@ function tabFeats(s) {
         <div><dt>Moves</dt><dd>${esc(moves.map(([k, v]) => `${k} ${v} ft`).join(", "))}</dd></div>
         ${(body.senses || []).length ? `<div><dt>Senses</dt><dd>${esc(body.senses.join(", "))}</dd></div>` : ""}
         ${(body.natural_weapons || []).map(w => `<div><dt>${esc(w.name)}</dt><dd>${
-          w.count > 1 ? `${w.count} of them, ` : ""}${esc(w.damage)} ${esc(w.type)}${
+          w.count > 1 ? `${esc(w.count)} of them, ` : ""}${esc(w.damage)} ${esc(w.type)}${
           w.secondary ? ", secondary" : ""}</dd></div>`).join("")}
         ${(body.not_yet || []).map(n => `<div><dt>Not yet</dt><dd>${esc(n)}</dd></div>`).join("")}
       </dl>` : ""}
@@ -424,11 +424,11 @@ function featResults() {
       : f.qualifies ? ["ok", "can take"]
       : f.unmet.length ? ["no", "needs " + f.unmet.join(", ")]
       : ["maybe", "ask your GM: " + f.unknown.join("; ")];
-    return `<div class="featrow ${state[0]}">
+    return `<div class="featrow ${esc(state[0])}">
       <div><b>${esc(f.name)}</b>
         <small>${esc([f.types.join(", "), f.source].filter(Boolean).join(", "))}</small></div>
       <div class="why">${esc(f.benefit || f.description)}</div>
-      <div class="verdict ${state[0]}">${esc(state[1])}</div>
+      <div class="verdict ${esc(state[0])}">${esc(state[1])}</div>
     </div>`;
   }).join("");
 }
@@ -552,10 +552,10 @@ function lvChoicePicker(n) {
           <option value="">choose</option>
           ${e.variants.map(v => `<option value="${esc(v)}" ${LVCH.variants[e.id] === v ? "selected" : ""}>${esc(title(v))}</option>`).join("")}
         </select></label>` : "";
-      return `<div class="featrow ${verdict[0]}">
-        <div><b>${esc(e.name)}</b>${e.min_level > 1 ? ` <small>from level ${e.min_level}</small>` : ""}</div>
+      return `<div class="featrow ${esc(verdict[0])}">
+        <div><b>${esc(e.name)}</b>${e.min_level > 1 ? ` <small>from level ${esc(e.min_level)}</small>` : ""}</div>
         <div class="why">${esc(e.text || "")}</div>
-        <div class="verdict ${verdict[0]}">${esc(verdict[1])}
+        <div class="verdict ${esc(verdict[0])}">${esc(verdict[1])}
           ${e.open ? `<button type="button" class="spbtn${on ? "" : " quiet"}"
             data-lventry="${esc(e.id)}" aria-pressed="${on}">${on ? "Chosen" : "Choose"}</button>` : ""}
           ${variant}</div>
@@ -590,8 +590,8 @@ function lvSkillsBlock(due) {
   const why = `${due.class_ranks} class ${due.int_mod >= 0 ? "+" : "−"} ${Math.abs(due.int_mod)} Int${
     due.race_ranks ? ` + ${due.race_ranks} race` : ""} = ${due.per_level} a level, × ${due.max_rank}`;
   return `<div class="lvskills">
-    <p><b>Skill ranks: ${due.owed} to place</b> <small class="why">${esc(why)}; ${due.spent} placed of ${due.total}</small></p>
-    <p class="why">No skill holds more ranks than your level (${due.max_rank}). A class skill
+    <p><b>Skill ranks: ${esc(due.owed)} to place</b> <small class="why">${esc(why)}; ${esc(due.spent)} placed of ${esc(due.total)}</small></p>
+    <p class="why">No skill holds more ranks than your level (${esc(due.max_rank)}). A class skill
       with a rank adds +3.</p>
     <dl class="skills">${due.skills.map(k => {
       const add = LVSK.spread[k.name] || 0;
@@ -601,7 +601,7 @@ function lvSkillsBlock(due) {
       const desc = help ? ` aria-describedby="${help}"` : "";
       return `<div${help ? ` data-skillhelp="${esc(k.name)}"` : ""}><dt>${esc(title(k.name))}${
         k.class_skill ? ` <small class="cls">class</small>` : ""}${help ? SkillHelp.info(k.name) : ""}</dt>
-        <dd>${k.rank}${add ? ` → ${k.rank + add}` : ""}
+        <dd>${esc(k.rank)}${add ? ` → ${esc(k.rank + add)}` : ""}
           <button type="button" class="spbtn quiet" data-lvskdn="${esc(k.name)}"${desc}
             aria-label="One rank fewer in ${esc(k.name)}" ${add ? "" : "disabled"}>−</button>
           <button type="button" class="spbtn quiet" data-lvskup="${esc(k.name)}"${desc}
@@ -609,13 +609,13 @@ function lvSkillsBlock(due) {
               placed < due.owed && k.rank + add < due.max_rank ? "" : "disabled"}>+</button></dd></div>`;
     }).join("")}</dl>
     <button type="button" class="v2-btn is-go" id="lvskplace"${
-      placed && !LVSK.busy ? "" : " disabled"}>Place ${placed || ""} rank${placed === 1 ? "" : "s"}</button>
+      placed && !LVSK.busy ? "" : " disabled"}>Place ${esc(placed || "")} rank${placed === 1 ? "" : "s"}</button>
   </div>`;
 }
 
 function lvPathBlock(p) {
   return `<div class="lvpath">
-    <p><b>Path B is open</b> <small class="why">from level ${p.at}</small></p>
+    <p><b>Path B is open</b> <small class="why">from level ${esc(p.at)}</small></p>
     <p class="why">You may follow a second path now; its abilities run on the b-track.
       It is never owed — one path is a whole character.</p>
     <div class="terms">${p.offered.map(x => `<button type="button" class="v2-btn"
@@ -739,10 +739,10 @@ function lvFeatBlock(pool, due, title, rule) {
   const open = LVFEAT.pool === pool && LVFEAT.list;
   const fors = due.picks.map(owedFor).join(", ");
   return `<div class="lvfeat" data-lvpool="${pool}">
-    <p><b>${esc(title)}: ${due.owed} to choose</b> <small class="why">for ${esc(fors)}</small></p>
+    <p><b>${esc(title)}: ${esc(due.owed)} to choose</b> <small class="why">for ${esc(fors)}</small></p>
     <p class="why">${esc(rule)}</p>
     ${open ? lvFeatPicker(due) : `<button type="button" class="v2-btn is-go"
-        data-lvopen="${pool}">Choose ${due.owed} ${pool === "bonus" ? "bonus " : ""}feat${
+        data-lvopen="${pool}">Choose ${esc(due.owed)} ${pool === "bonus" ? "bonus " : ""}feat${
         due.owed === 1 ? "" : "s"}</button>`}
   </div>`;
 }
@@ -753,7 +753,7 @@ function lvFeatPicker(due) {
     || { name: id }).name;
   const needsTarget = id =>
     !!(LVFEAT.list.open.concat(LVFEAT.list.shut).find(f => f.id === id) || {}).target;
-  return `<p class="why" id="lvcount">${LVFEAT.picked.length} of ${n} chosen${
+  return `<p class="why" id="lvcount">${LVFEAT.picked.length} of ${esc(n)} chosen${
       LVFEAT.picked.length ? ": " + LVFEAT.picked.map(id => esc(name(id))).join(", ") : ""}</p>
     ${LVFEAT.picked.filter(needsTarget).map(id => `<label class="why" style="display:block">
       ${esc(name(id))} needs a weapon:
@@ -789,10 +789,10 @@ function lvFeatList() {
     const verdict = shut ? ["no", "needs " + f.unmet.join(", ")]
       : (f.unknown && f.unknown.length)
         ? ["maybe", "make sure you qualify: " + f.unknown.join("; ")] : ["ok", "can take"];
-    return `<div class="featrow ${verdict[0]}">
+    return `<div class="featrow ${esc(verdict[0])}">
       <div><b>${esc(f.name)}</b> <small>${esc((f.types || []).join(", "))}</small></div>
       <div class="why">${esc(f.text || "")}</div>
-      <div class="verdict ${verdict[0]}">${esc(verdict[1])}
+      <div class="verdict ${esc(verdict[0])}">${esc(verdict[1])}
         ${shut ? "" : `<button type="button" class="spbtn${on ? "" : " quiet"}"
           data-lvfeat="${esc(f.id)}" aria-pressed="${on}">${on ? "Chosen" : "Choose"}</button>`}</div>
     </div>`;
@@ -805,7 +805,7 @@ function lvPointsBlock(s, due) {
   const scores = Object.fromEntries((s.abilities || []).map(a => [a.key, a.score]));
   const fors = due.picks.map(p => `${p.points} for ${owedFor(p)}`).join(", ");
   return `<div class="lvpoints">
-    <p><b>Ability points: ${due.owed} to place</b> <small class="why">${esc(fors)}</small></p>
+    <p><b>Ability points: ${esc(due.owed)} to place</b> <small class="why">${esc(fors)}</small></p>
     <p class="why">Each point raises a score by 1, permanently. The book's come one at a
       time, at every fourth level.${hasHouse ? ` The <b>house rule's</b> two are yours to
       spread however you like: both may go on one score.` : ""} A Constitution point
@@ -814,15 +814,15 @@ function lvPointsBlock(s, due) {
       const now = scores[ab];
       const add = LVPTS.spread[ab] || 0;
       return `<div class="t"><span>${ab.toUpperCase()}${typeof now === "number"
-          ? ` ${now}${add ? ` → ${now + add}` : ""}` : ""}</span>
+          ? ` ${esc(now)}${add ? ` → ${esc(now + add)}` : ""}` : ""}</span>
         <b><button type="button" class="spbtn quiet" data-lvdn="${ab}"
             aria-label="One point fewer on ${ab}" ${add ? "" : "disabled"}>−</button>
-          ${add}
+          ${esc(add)}
           <button type="button" class="spbtn quiet" data-lvup="${ab}"
             aria-label="One point more on ${ab}" ${placed < due.owed ? "" : "disabled"}>+</button></b></div>`;
     }).join("")}</div>
     <button type="button" class="v2-btn is-go" id="lvplace"${
-      placed && !LVPTS.busy ? "" : " disabled"}>Place ${placed || ""} point${
+      placed && !LVPTS.busy ? "" : " disabled"}>Place ${esc(placed || "")} point${
       placed === 1 ? "" : "s"}</button>
   </div>`;
 }
@@ -962,7 +962,7 @@ function learnOwedLine(s) {
   const due = s.spells && s.spells.to_learn;
   if (!due || !due.owed) return "";
   return `<h3 class="cardsub">Spellbook</h3>
-    <p class="why">${due.owed} new spell${due.owed === 1 ? "" : "s"} to choose. ${
+    <p class="why">${esc(due.owed)} new spell${due.owed === 1 ? "" : "s"} to choose. ${
       esc(learnRule(due))}</p>
     <button type="button" class="v2-btn" id="learn-goto">Choose on the Spells tab</button>`;
 }
@@ -990,21 +990,21 @@ function tabClass(s) {
         <div class="t"><span>Hit die</span><b>${esc(String(p.hit_die))}</b></div>
         <div class="t"><span>Base attack</span><b>${esc(String(p.bab).replace(/_/g, " "))}</b></div>
         <div class="t"><span>Good saves</span><b>${esc((p.good_saves || []).join(", ") || "none")}</b></div>
-        <div class="t"><span>Skill ranks</span><b>${p.skill_ranks} plus Int</b></div>
+        <div class="t"><span>Skill ranks</span><b>${esc(p.skill_ranks)} plus Int</b></div>
       </div>
       ${(p.paths_offered || []).length ? `
         <h3 class="cardsub">Paths</h3>
         <p class="why">This class follows two paths, in order. Path A runs from 1st level;
-          Path B stays shut until its track opens at ${p.unlocks_b || 11}th.
+          Path B stays shut until its track opens at ${esc(p.unlocks_b || 11)}th.
           ${p.paths_taken.length ? `You follow <b>${esc(p.paths_taken[0])}</b> as Path A${
             p.paths_taken[1] ? ` and <b>${esc(p.paths_taken[1])}</b> as Path B` : ""}.`
             : "This character has none recorded."}</p>
         <div class="terms">
           <div class="t"><span>Path A: ${esc(p.paths_taken[0] || "not chosen")}</span>
-            <b>Control Blood ${(p.control_blood || {}).a || 0}</b></div>
+            <b>Control Blood ${esc((p.control_blood || {}).a || 0)}</b></div>
           <div class="t"><span>Path B: ${esc(p.paths_taken[1] || "not chosen")}</span>
-            <b>${(p.control_blood || {}).b ? "Control Blood " + p.control_blood.b
-              : `opens at ${p.unlocks_b || 11}th`}</b></div>
+            <b>${(p.control_blood || {}).b ? "Control Blood " + esc(p.control_blood.b)
+              : `opens at ${esc(p.unlocks_b || 11)}th`}</b></div>
         </div>
         ${p.paths_offered.map(x => {
           const det = (p.path_detail || {})[x] || {};
@@ -1040,21 +1040,21 @@ function tabClass(s) {
       ${p.next ? `
         <h3 class="cardsub">Next level</h3>
         <div class="terms">
-          <div class="t"><span>Level</span><b>${p.next.level}</b></div>
-          ${p.next.bab ? `<div class="t"><span>Base attack</span><b>+${p.next.bab}</b></div>` : ""}
+          <div class="t"><span>Level</span><b>${esc(p.next.level)}</b></div>
+          ${p.next.bab ? `<div class="t"><span>Base attack</span><b>+${esc(p.next.bab)}</b></div>` : ""}
           ${Object.entries(p.next.saves || {}).map(([k, v]) =>
-            `<div class="t"><span>${esc(k)} save</span><b>+${v}</b></div>`).join("")}
+            `<div class="t"><span>${esc(k)} save</span><b>+${esc(v)}</b></div>`).join("")}
           ${(p.next.said || p.next.grants || []).length ? `<div class="t"><span>Gains</span><b>${
             (p.next.said || p.next.grants).map(glossify).join(", ")}</b></div>` : ""}
         </div>
         <fieldset class="lv-favoured" id="lvfavoured">
-          <legend>Favoured class bonus for level ${p.next.level}</legend>
+          <legend>Favoured class bonus for level ${esc(p.next.level)}</legend>
           <label><input type="radio" name="lvfavoured" value="hp" checked> +1 hit point</label>
           <label><input type="radio" name="lvfavoured" value="skill"> +1 skill rank</label>
           <span class="why">CRB p.31: every level in your favoured class gives one or the
             other.</span>
         </fieldset>
-        <button type="button" class="v2-btn is-go" id="levelup">Take level ${p.next.level}</button>
+        <button type="button" class="v2-btn is-go" id="levelup">Take level ${esc(p.next.level)}</button>
         <div id="levelerr" class="why" role="status"></div>`
         : `<p class="why">Twentieth level. There is no more table.</p>`}
     </div>
@@ -1065,7 +1065,7 @@ function tabClass(s) {
         <thead><tr><th scope="col">Level</th>${cols.map(c => `<th scope="col">${esc(c)}</th>`).join("")}
           <th scope="col">What it grants</th></tr></thead>
         <tbody>${p.rows.map(r => `<tr class="${r.reached ? "" : "dim"}${r.level === p.level ? " inhand" : ""}">
-          <td class="lead" data-label="Level"><b>${r.level}</b>${r.level === p.level
+          <td class="lead" data-label="Level"><b>${esc(r.level)}</b>${r.level === p.level
             ? `<span class="chip">here</span>` : ""}</td>
           ${cols.map(c => `<td class="n" data-label="${esc(c)}">${esc((r.columns || {})[c] ?? "")}</td>`).join("")}
           <td class="wide" data-label="Grants"><span class="why">${
@@ -1320,7 +1320,7 @@ function schoolLine(sp) {
   return `${label}${sub ? ` (${sub[1]})` : ""}${desc ? `, ${desc[1]}` : ""}`;
 }
 const ABILITY_NAMES = { int: "Intelligence", wis: "Wisdom", cha: "Charisma" };
-const levelName = n => (n === 0 ? "Cantrips" : `Level ${n}`);
+const levelName = n => (n === 0 ? "Cantrips" : `Level ${esc(n)}`);
 
 // --- the tab ------------------------------------------------------------------------------
 function tabSpells(s) {
@@ -1375,13 +1375,13 @@ function learnCard(sp) {
       aria-labelledby="sx-learn-h">
     <i class="v2-rim" aria-hidden="true"></i>
     <h3 id="sx-learn-h">${book ? "New spells for the book" : "New spells known"}
-      <small class="chip">${n} to choose</small></h3>
+      <small class="chip">${esc(n)} to choose</small></h3>
     <p class="sx-hint">${esc(learnRule(due))} ${book
       ? "Spells you could cast at that level, from your class list. They are free: "
         + "copying from a scroll is another matter."
       : "From your class list, at levels you can cast."}</p>
     ${LEARN.list ? learnPicker(due) : `
-      <button type="button" class="v2-btn is-go" id="learn-open">Choose ${n} spell${
+      <button type="button" class="v2-btn is-go" id="learn-open">Choose ${esc(n)} spell${
         n === 1 ? "" : "s"}</button>`}
     <p class="sx-say" id="learnsay" role="status" aria-live="polite"></p>
   </section>`;
@@ -1394,7 +1394,7 @@ function learnPicker(due) {
         <input id="learnfind" class="findbox" type="search" value="${esc(LEARN.find)}"
                autocomplete="off" placeholder="Spell name"></label>
     </div>
-    <p class="gx-count" id="learncount">${LEARN.picked.length} of ${n} chosen${
+    <p class="gx-count" id="learncount">${LEARN.picked.length} of ${esc(n)} chosen${
       LEARN.picked.length ? ": " + LEARN.picked.map(id =>
         esc((LEARN.list.find(s => s.id === id) || { name: id }).name)).join(", ") : ""}</p>
     <div id="learn-list">${learnList()}</div>
@@ -1419,7 +1419,7 @@ function learnList() {
         <small>${esc([SPELL_SCHOOLS[school].label, rangePhrase(s.range),
                       plainMeasure(s.duration)].filter(Boolean).join(", "))}</small>
         ${detailsButton(s, "sx-more")}</span>
-      <span class="gx-lvl" title="Spell level ${s.level}"><span class="sr">Level </span>${s.level}</span>
+      <span class="gx-lvl" title="Spell level ${esc(s.level)}"><span class="sr">Level </span>${esc(s.level)}</span>
       <button type="button" class="spbtn${on ? "" : " quiet"}" data-learn="${esc(s.id)}"
               aria-pressed="${on}" aria-label="Choose ${esc(s.name)}">${
         on ? "Chosen" : "Choose"}</button>
@@ -1503,22 +1503,22 @@ function casterStats(sp) {
   const sockets = (sp.slots || []).map(sl => sl.level === 0 ? `
     <li class="sock-level">
       <div class="sock-head"><span>${levelName(0)}</span>
-        <span class="sock-dc">DC ${sl.dc}</span></div>
+        <span class="sock-dc">DC ${esc(sl.dc)}</span></div>
       ${sp.kind === "prepared" ? `<div class="sock-gems" role="img"
-           aria-label="${Math.min(heldCantrips, sl.max)} of ${sl.max} cantrips prepared">${
+           aria-label="${Math.min(heldCantrips, sl.max)} of ${esc(sl.max)} cantrips prepared">${
         Array.from({ length: sl.max }, (_, i) =>
           `<i class="gem${i < heldCantrips ? " lit" : ""}"></i>`).join("")}</div>
-      <div class="sock-count">${Math.min(heldCantrips, sl.max)} of ${sl.max} prepared, at will</div>`
+      <div class="sock-count">${Math.min(heldCantrips, sl.max)} of ${esc(sl.max)} prepared, at will</div>`
       : `<div class="sock-count">At will</div>`}
     </li>` : slotSockets(sp, sl)).join("");
   return `<section class="v2-framed v2-card-leather sx-card sx-stats" aria-labelledby="sx-stats-h">
     <i class="v2-rim" aria-hidden="true"></i>
     <h3 id="sx-stats-h">Caster stats</h3>
     <div class="terms">
-      <div class="t"><span>Caster level</span><b>${sp.caster_level}</b></div>
+      <div class="t"><span>Caster level</span><b>${esc(sp.caster_level)}</b></div>
       <div class="t"><span>Casting ability</span><b>${esc(ABILITY_NAMES[sp.ability]
         || String(sp.ability || "").toUpperCase())}</b></div>
-      <div class="t"><span>Highest spell level</span><b>${sp.highest}</b></div>
+      <div class="t"><span>Highest spell level</span><b>${esc(sp.highest)}</b></div>
     </div>
     <h4 class="sx-sub">Spell slots</h4>
     ${sockets ? `<ul class="sockets">${sockets}</ul>` : tabEmpty("No slots at this level.")}
@@ -1559,13 +1559,13 @@ function specialSlotsBlock(sp) {
             <button type="button" class="spbtn quiet" data-sslot="${esc(kind)}"
               data-sspell="${esc(held.id)}" data-saction="unprepare">Unprepare</button>`
           : spent ? `<b>spent today</b>`
-          : (r.choices || []).length ? `<select class="sx-sselect" aria-label="${esc(titled[kind] || kind)}, level ${r.level}"
-              data-sslotsel="${esc(kind)}-${r.level}">${r.choices.map(c =>
+          : (r.choices || []).length ? `<select class="sx-sselect" aria-label="${esc(titled[kind] || kind)}, level ${esc(r.level)}"
+              data-sslotsel="${esc(kind)}-${esc(r.level)}">${r.choices.map(c =>
                 `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join("")}</select>
-            <button type="button" class="spbtn" data-sslot="${esc(kind)}" data-slevel="${r.level}"
+            <button type="button" class="spbtn" data-sslot="${esc(kind)}" data-slevel="${esc(r.level)}"
               data-saction="prepare"${r.blocked ? ` disabled title="${esc(r.blocked)}"` : ""}>Prepare</button>`
           : `<b>no spell for it</b>`;
-        return `<div class="t sx-sslot"><span>Level ${r.level}</span>${pick}</div>`;
+        return `<div class="t sx-sslot"><span>Level ${esc(r.level)}</span>${pick}</div>`;
       }).join("")}</div>
       <p class="note">${kind === "domain" ? "One a level, and only a domain spell goes in it."
         : `One a level, and only ${/^[aeiou]/i.test(school.specialist || "") ? "an" : "a"}
@@ -1577,19 +1577,19 @@ function specialSlotsBlock(sp) {
   }
   if (granted.length) {
     html += `<h4 class="sx-sub">Bloodline spells</h4>
-      <div class="terms">${granted.map(g => `<div class="t"><span>Level ${g.level}</span>
+      <div class="terms">${granted.map(g => `<div class="t"><span>Level ${esc(g.level)}</span>
         <b>${esc(g.name)}</b></div>`).join("")}</div>
       <p class="note">Known through your bloodline, on top of your spells known; never exchanged.</p>`;
   }
   if ((swaps.open || []).length) {
     html += `<h4 class="sx-sub">Exchange a spell</h4>
-      <p class="note">Earned at level ${swaps.open.join(", ")}: one known spell may be
+      <p class="note">Earned at level ${esc(swaps.open.join(", "))}: one known spell may be
         traded for another of the same level${swaps.below_highest
-          ? `, if it is at least ${swaps.below_highest} below the highest you cast` : ""}.</p>
+          ? `, if it is at least ${esc(swaps.below_highest)} below the highest you cast` : ""}.</p>
       <div class="terms"><div class="t">
         <select id="sx-swap-old" aria-label="Spell to give up">${(sp.choose_from || [])
           .flatMap(g => (g.spells || []).filter(s => !(granted.some(x => x.id === s.id)))
-            .map(s => `<option value="${esc(s.id)}" data-level="${g.level}">${esc(s.name)} (${g.level})</option>`)).join("")}</select>
+            .map(s => `<option value="${esc(s.id)}" data-level="${esc(g.level)}">${esc(s.name)} (${esc(g.level)})</option>`)).join("")}</select>
         <input id="sx-swap-new" list="sx-swap-list" aria-label="Spell to learn instead"
           placeholder="the spell to learn instead">
         <datalist id="sx-swap-list"></datalist>
@@ -1632,7 +1632,7 @@ document.addEventListener("focusin", async e => {
   try {
     const d = await readJSON(await fetch("/api/spells/swap"));
     list.innerHTML = (d.new || []).map(s =>
-      `<option value="${esc(s.name)}">level ${s.level}</option>`).join("");
+      `<option value="${esc(s.name)}">level ${esc(s.level)}</option>`).join("");
   } catch (_) { /* the field still takes a typed name */ }
 });
 
@@ -1654,7 +1654,7 @@ function slotSockets(sp, sl) {
   const prepared = sp.kind === "prepared";
   const ready = prepared ? Math.min(sl.held || 0, sl.left) : sl.left;
   const open = prepared ? Math.max(0, sl.left - ready) : 0;
-  const name = `Level ${sl.level} slot`;
+  const name = `Level ${esc(sl.level)} slot`;
   const gems = [
     ...Array.from({ length: ready }, () =>
       `<i class="gem lit" role="img" aria-label="${name}: ${prepared ? "prepared, ready" : "ready"}"></i>`),
@@ -1663,13 +1663,13 @@ function slotSockets(sp, sl) {
     ...Array.from({ length: spent }, () =>
       `<i class="gem spent" role="img" aria-label="${name}: spent today"></i>`),
   ].join("");
-  const words = prepared ? `${ready} ready, ${spent} spent, ${open} open`
-                         : `${sl.left} left, ${spent} spent`;
+  const words = prepared ? `${esc(ready)} ready, ${spent} spent, ${open} open`
+                         : `${esc(sl.left)} left, ${spent} spent`;
   return `
     <li class="sock-level">
       <div class="sock-head"><span>${levelName(sl.level)}</span>
-        <span class="sock-dc">DC ${sl.dc}</span></div>
-      <div class="sock-gems" role="group" aria-label="Level ${sl.level} slots">${gems}</div>
+        <span class="sock-dc">DC ${esc(sl.dc)}</span></div>
+      <div class="sock-gems" role="group" aria-label="Level ${esc(sl.level)} slots">${gems}</div>
       <div class="sock-count${sl.left ? "" : " spent"}">${words}</div>
     </li>`;
 }
@@ -1684,7 +1684,7 @@ const prepBlocked = (sp, level) => {
 // The owner's words for a spent level (2026-09-29).
 const prepShort = sl => (sl.level > 0 && !sl.left
   ? "Spent for today; it comes back after a long rest." : "No open slot; unprepare one first.");
-const prepNoteId = level => `sx-full-${level}`;
+const prepNoteId = level => `sx-full-${esc(level)}`;
 
 // The cantrips this caster may cast right now: a prepared caster's prepared ones (a
 // wizard "can prepare a number of cantrips… each day", and a cleric's orisons read the
@@ -1721,7 +1721,7 @@ function preparedToday(sp) {
     const off = prepared ? prepBlocked(sp, lvl) : null;
     return `
     <h4 class="sx-sub sx-levelhead">${levelName(lvl)}${
-      sl ? ` <small>DC ${sl.dc}, ${sl.left} of ${sl.max} slots left</small>` : ""}</h4>
+      sl ? ` <small>DC ${esc(sl.dc)}, ${esc(sl.left)} of ${esc(sl.max)} slots left</small>` : ""}</h4>
     ${off ? `<p class="sx-full" id="${prepNoteId(lvl)}">${esc(off.blocked)}</p>` : ""}
     <div class="spcards">${today.filter(k => k.level === lvl)
       .map(k => spellCard(k, off, prepared)).join("")}</div>`;
@@ -1744,9 +1744,9 @@ function preparedToday(sp) {
       : "Nothing known yet. Choose from the list beside this."}</div>`}
     ${cantripRows.length || (prepared && cantripRoom) ? `
       <h4 class="sx-sub sx-levelhead">Cantrips${
-        slots.get(0) ? ` <small>DC ${slots.get(0).dc}</small>` : ""}</h4>
+        slots.get(0) ? ` <small>DC ${esc(slots.get(0).dc)}</small>` : ""}</h4>
       <p class="sx-hint">At will: casting one spends nothing.${prepared
-        ? ` ${cantripRows.length} of ${cantripRoom} prepared today; prepare the others from the grimoire.`
+        ? ` ${cantripRows.length} of ${esc(cantripRoom)} prepared today; prepare the others from the grimoire.`
         : ""}</p>
       ${cantripRows.length ? `<ul class="sx-cantrips">${cantripRows.map(c => `
         <li class="sx-cantrip" style="--school: var(--sc-${schoolKey(c.school)})">
@@ -1792,11 +1792,11 @@ function spellCard(k, off, prepared) {
     </header>
     <dl class="spcard-strip">
       <div><dt>Range</dt><dd title="${esc(k.range || "")}">${esc(rangeShort(k.range))}</dd></div>
-      <div><dt title="${middle[2]}">${middle[0]}</dt><dd>${esc(middle[1])}</dd></div>
+      <div><dt title="${esc(middle[2])}">${esc(middle[0])}</dt><dd>${esc(middle[1])}</dd></div>
       <div><dt>Save</dt><dd title="${esc(k.save || "")}">${esc(save)}</dd></div>
     </dl>
     <p class="spcard-line">Duration: ${esc(spellCap(plainMeasure(k.duration)) || "not stated")}</p>
-    ${prepared ? `<p class="spcard-count"><b>${k.prepared}</b> prepared</p>` : ""}
+    ${prepared ? `<p class="spcard-count"><b>${esc(k.prepared)}</b> prepared</p>` : ""}
     <div class="spcard-act">
       <button type="button" class="prepbtn castbtn" data-spell="${esc(k.id)}"
               data-name="${esc(k.name)}" data-range="${esc(k.range || "")}"
@@ -1904,11 +1904,11 @@ function grimoireList(sp) {
       <span class="gx-text"><b>${esc(s.name)}</b>
         <small>${esc([SPELL_SCHOOLS[school].label, rangePhrase(s.range),
                       plainMeasure(s.duration)].filter(Boolean).join(", "))}</small>
-        ${s.prepared ? `<small class="gx-have">${s.prepared} prepared</small>` : ""}
+        ${s.prepared ? `<small class="gx-have">${esc(s.prepared)} prepared</small>` : ""}
         ${off ? `<small class="gx-why" id="${whyId}" title="${esc(off.blocked)}">${
           prepShort(off)}</small>` : ""}
         ${detailsButton(s, "sx-more")}</span>
-      <span class="gx-lvl" title="Spell level ${s.level}"><span class="sr">Level </span>${s.level}</span>
+      <span class="gx-lvl" title="Spell level ${esc(s.level)}"><span class="sr">Level </span>${esc(s.level)}</span>
       ${act}
     </li>`;
   };
@@ -1917,7 +1917,7 @@ function grimoireList(sp) {
   const unsent = (sp.choose_from || []).reduce((n, g) => n + Math.max(0, g.total - g.spells.length), 0);
   return `${rows.length ? `<ul class="gx-rows">${rows.map(row).join("")}</ul>`
       : `<div class="sx-empty">No spell matches.</div>`}
-    ${unsent ? `<p class="sx-note">${unsent} more on this list are not shown here.</p>` : ""}
+    ${unsent ? `<p class="sx-note">${esc(unsent)} more on this list are not shown here.</p>` : ""}
     <span hidden data-gx-shown="${rows.length}" data-gx-total="${total}"></span>`;
 }
 
@@ -2195,12 +2195,12 @@ function eqLoad(s) {
   const L = (s.equipment || {}).load;
   const first = esc(String(s.identity.name || "").split(" ")[0]);
   if (!L) return `<p class="eqload"><b>Weight.</b> Load is <span class="unknown">not tracked</span>.</p>`;
-  const str = L.str_bonus ? `Strength ${L.str} counts as ${L.str + L.str_bonus} for this, from the ${esc(L.str_bonus_from)}`
-    : `Strength ${L.str}`;
+  const str = L.str_bonus ? `Strength ${esc(L.str)} counts as ${esc(L.str + L.str_bonus)} for this, from the ${esc(L.str_bonus_from)}`
+    : `Strength ${esc(L.str)}`;
   const band = { light: "a light load", medium: "a medium load", heavy: "a heavy load",
-                 over: "more than can be carried" }[L.band] || L.band;
+                 over: "more than can be carried" }[L.band] || esc(L.band);
   return `<p class="eqload"><b>Weight.</b> ${esc(String(L.lb))} lb carried: ${band}. Light up to
-      ${L.light} lb, medium to ${L.medium}, heavy to ${L.heavy} (${str}).${L.unknown.length
+      ${esc(L.light)} lb, medium to ${esc(L.medium)}, heavy to ${esc(L.heavy)} (${str}).${L.unknown.length
       ? ` Not weighed, the rules have no weight for: ${esc(L.unknown.join(", "))}.` : ""}
       A heavier load does <span class="unknown">not yet slow</span> ${first} down.</p>`;
 }
@@ -2219,8 +2219,8 @@ function pageEquipment(s) {
     const on = !EQ_FIT && EQ_SHELF === id;
     return `<button type="button" role="tab" class="v2-btn" data-eqshelf="${id}"
       aria-selected="${on}" tabindex="${on || (EQ_FIT && id === "all") ? 0 : -1}"
-      aria-controls="eq-list" aria-label="${esc(label)}, ${n}">${tradeGlyph(icon)}<span>${
-      esc(label)}</span><small>${n}</small></button>`;
+      aria-controls="eq-list" aria-label="${esc(label)}, ${esc(n)}">${tradeGlyph(icon)}<span>${
+      esc(label)}</span><small>${esc(n)}</small></button>`;
   };
   const fitWord = EQ_FIT ? eqSlotLabel(s, EQ_FIT) : "";
   const rail = railBtn("all", "Everything", "lorc-knapsack", rows.length)
@@ -2269,7 +2269,7 @@ function pageEquipment(s) {
   // says so rather than being an empty place to click.
   const held = rows.find(r => r.kind === "weapon" && r.state === "in hand");
   const slotBtn = (key, label, item, icon) => `<button type="button" class="v2-btn slotbtn${
-      item ? "" : " empty"}" data-eqslot="${key}" aria-pressed="${EQ_FIT === key}">
+      item ? "" : " empty"}" data-eqslot="${esc(key)}" aria-pressed="${EQ_FIT === key}">
       <span class="tile${item ? " inuse" : ""}">${icon ? tradeGlyph(icon) : ""}</span>
       <span><span class="sl">${esc(label)}</span><span class="it">${esc(item || "empty")}</span></span></button>`;
   const col = side => `<div class="slotcol">${(((s.equipment || {}).slots || {})[side] || []).map(sl => {
@@ -2314,23 +2314,23 @@ function pageEquipment(s) {
 // armour and shield lines are the armour worn, and say so rather than being typed in.
 function slotEditor(sl) {
   const canAdd = sl.items.length < sl.max;
-  return `<div class="slotedit" data-slot="${sl.key}">
+  return `<div class="slotedit" data-slot="${esc(sl.key)}">
     <h3>${esc(sl.label)} <small>${esc(sl.holds)}${
-      sl.max > sl.rules_limit ? `; ${sl.rules_limit} work${sl.rules_limit === 1 ? "s" : ""} at once` : ""}</small></h3>
+      sl.max > sl.rules_limit ? `; ${esc(sl.rules_limit)} work${sl.rules_limit === 1 ? "s" : ""} at once` : ""}</small></h3>
     ${sl.items.map(it => `<div class="slotrow${it.empty ? " isempty" : ""}${it.beyond_rules ? " beyond" : ""}">
-      <label class="vh" for="slotin-${sl.key}-${it.index}">${esc(sl.label)}, line ${it.index + 1}</label>
-      <input class="slotinput v2-well" id="slotin-${sl.key}-${it.index}" data-slot="${sl.key}"
-             data-index="${it.index}" value="${esc(it.item || "")}" placeholder="empty"
+      <label class="vh" for="slotin-${esc(sl.key)}-${esc(it.index)}">${esc(sl.label)}, line ${it.index + 1}</label>
+      <input class="slotinput v2-well" id="slotin-${esc(sl.key)}-${esc(it.index)}" data-slot="${esc(sl.key)}"
+             data-index="${esc(it.index)}" value="${esc(it.item || "")}" placeholder="empty"
              ${sl.derived ? "disabled" : ""}>
       ${!sl.derived && !it.empty ? `<button type="button" class="v2-btn is-quiet is-small emptyslot"
-        data-slot="${sl.key}" data-index="${it.index}"
+        data-slot="${esc(sl.key)}" data-index="${esc(it.index)}"
         aria-label="Empty ${esc(sl.label)} line ${it.index + 1}">Empty</button>` : ""}
       ${sl.items.length > 1 && !sl.derived ? `<button type="button" class="v2-btn is-quiet is-small delslot"
-        data-slot="${sl.key}" data-index="${it.index}"
+        data-slot="${esc(sl.key)}" data-index="${esc(it.index)}"
         aria-label="Remove ${esc(sl.label)} line ${it.index + 1}">Remove line</button>` : ""}
     </div>`).join("")}
     ${canAdd && !sl.derived ? `<button type="button" class="v2-btn is-quiet is-small addslot"
-      data-slot="${sl.key}">Another ${esc(sl.label.toLowerCase())} line</button>` : ""}
+      data-slot="${esc(sl.key)}">Another ${esc(sl.label.toLowerCase())} line</button>` : ""}
     ${sl.derived ? `<p class="why">What is worn here is the ${sl.key === "armor" ? "armour" : "shield"}
       put on from the list.</p>` : ""}
   </div>`;
@@ -2348,7 +2348,7 @@ function drawEqNums() {
   box.innerHTML = Object.entries(now).map(([k, v]) => `<div class="v2-plaque"><dt>${esc(
     k === "Fortitude" ? "Fort" : k === "Reflex" ? "Ref" : k)}</dt><dd class="${
     EQ_BEFORE && EQ_BEFORE[k] !== undefined && EQ_BEFORE[k] !== v ? "moved" : ""}">${
-    signed.has(k) ? sign(v) : v}</dd></div>`).join("");
+    signed.has(k) ? sign(v) : esc(v)}</dd></div>`).join("");
 }
 const eqNumbers = () => {
   if (!SHEET || !SHEET.defense) return null;
@@ -2741,16 +2741,16 @@ function companionsBlock(s) {
   const c = s.companions || {};
   const animals = c.animals || [];
   const powers = s.domain_powers || [];
-  const sign = n => (n >= 0 ? `+${n}` : `${n}`);
+  const sign = n => (n >= 0 ? `+${esc(n)}` : esc(n));
   let html = animals.map(a => `
     <div class="terms" data-page="companions">
       <div class="t"><span>${esc(a.name)}</span><b>${esc(a.animal)}${a.dead ? " (dead)" : ""}</b></div>
-      <div class="t"><span>Bond</span><b>druid level ${a.edl} · ${a.hd} HD · ${esc(a.size)}</b></div>
-      <div class="t"><span>Hit points</span><b>${a.hp} / ${a.hp_max}</b></div>
-      <div class="t"><span>AC · BAB</span><b>${a.ac} · ${sign(a.bab)}</b></div>
+      <div class="t"><span>Bond</span><b>druid level ${esc(a.edl)} · ${esc(a.hd)} HD · ${esc(a.size)}</b></div>
+      <div class="t"><span>Hit points</span><b>${esc(a.hp)} / ${esc(a.hp_max)}</b></div>
+      <div class="t"><span>AC · BAB</span><b>${esc(a.ac)} · ${sign(a.bab)}</b></div>
       <div class="t"><span>Saves</span><b>Fort ${sign(a.saves.fort)} · Ref ${sign(a.saves.ref)} · Will ${sign(a.saves.will)}</b></div>
       <div class="t"><span>Scores</span><b>${["str","dex","con","int","wis","cha"].map(k =>
-        `${k.toUpperCase()} ${a.abilities[k]}`).join(" · ")}</b></div>
+        `${k.toUpperCase()} ${esc(a.abilities[k])}`).join(" · ")}</b></div>
       <div class="t"><span>Attacks</span><b>${esc((a.attacks || []).join(", ") || "none")}</b></div>
       <div class="t"><span>Tricks</span><b>${esc((a.tricks || []).join(", ") || "none yet")}</b></div>
       ${(a.specials || []).length ? `<div class="t"><span>Bond gives</span><b>${esc(a.specials.join(", "))}</b></div>` : ""}
@@ -2766,7 +2766,7 @@ function companionsBlock(s) {
   if (powers.length) {
     html += `<div class="terms">${powers.map(p => `
       <div class="t"><span>${esc(p.source || `${p.domain} domain`)}</span><b>${esc(p.name)}${
-        p.kind ? ` (${esc(p.kind)})` : ""}${p.max != null ? ` · ${p.uses} / ${p.max} today` : ""}</b></div>`).join("")}</div>
+        p.kind ? ` (${esc(p.kind)})` : ""}${p.max != null ? ` · ${esc(p.uses)} / ${esc(p.max)} today` : ""}</b></div>`).join("")}</div>
       ${powers.map(p => `<p class="why"><b>${esc(p.name)}.</b> ${esc(p.line)}${
         (p.not_yet || []).length ? ` <i>Not yet: ${esc(p.not_yet.join(" "))}</i>` : ""}</p>`).join("")}`;
   }

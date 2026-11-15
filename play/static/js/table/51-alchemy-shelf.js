@@ -38,7 +38,7 @@
       '<input type="search" id="alchemy-find" class="v2-well bs-find" autocomplete="off" spellcheck="false">' +
       '<div class="bs-showrow"><label class="bs-label" for="alchemy-show">Show</label>' +
       '<select id="alchemy-show" class="v2-well bs-show">' +
-      SHOWS.map(function (s) { return '<option value="' + s[0] + '">' + s[1] + '</option>'; }).join("") +
+      SHOWS.map(function (s) { return '<option value="' + esc(s[0]) + '">' + esc(s[1]) + '</option>'; }).join("") +
       '</select></div>' +
     '</div>' +
     '<div class="bs-list as-list" id="alchemy-list" aria-live="off"></div>';
@@ -114,7 +114,7 @@
       '</button>' +
       (books ? '<button type="button" class="bt-info' + (unknown ? " is-unknown" : "") + '" data-material="' +
         esc(it.material) + '" data-for="' + esc(it.key) + '" aria-haspopup="dialog" aria-label="About ' +
-        esc(it.name) + (unknown ? ", " + it.unknown + " unknown" : "") + '">?</button>' : "") +
+        esc(it.name) + (unknown ? ", " + esc(it.unknown) + " unknown" : "") + '">?</button>' : "") +
       '</li>';
   }
   function badge(b) {

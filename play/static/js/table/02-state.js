@@ -16,14 +16,14 @@ function showDeath(d) {
   $("#deathchoices").innerHTML = raise_ + (d.choices || []).map(ch => `
     <button class="pick" data-source="${esc(ch.source)}">
       <b>${esc(ch.name)}</b>
-      <small>${esc(ch.line)} · ${ch.hp} hp</small>
+      <small>${esc(ch.line)} · ${esc(ch.hp)} hp</small>
       ${ch.notes ? `<em>${esc(ch.notes)}</em>` : ""}
     </button>`).join("");
   const played = (d.roster || []);
   $("#deathroster").innerHTML = played.length ? `<h3>Played before</h3>` + played.map(e => `
     <div class="grave ${e.status === "dead" ? "dead" : ""}">
       <span><b>${esc(e.name)}</b> — ${esc(e.line)}</span>
-      <small>${e.status === "dead" ? "died" : e.status}</small>
+      <small>${e.status === "dead" ? "died" : esc(e.status)}</small>
     </div>`).join("") : "";
   // The last option: back to the shelf, the save untouched (table.html says why it is a link).
   $("#deathhome").hidden = false;
@@ -277,7 +277,7 @@ function render(s, hold) {
   const record = b => b.record ? `<details class="gmrecord"${b.open ? " open" : ""}>
       <summary>The record</summary><pre>${esc(b.record)}</pre></details>` : "";
   $("#story").innerHTML = s.transcript.map((b, i) =>
-    `<p class="beat ${b.who === "player" ? "player" : (b.kind || "")}${
+    `<p class="beat ${b.who === "player" ? "player" : (esc(b.kind || ""))}${
       atTable(b) ? " attable" : ""}${
       i >= seen ? " fresh" : ""}">${tableTag(b)}${chips(b)}${
       atTable(b) ? tableSaid(b.text) : said(b.text)}${benchDoor(b)}</p>${record(b)}${
@@ -302,11 +302,11 @@ function render(s, hold) {
   // it is or who is still standing, which makes combat unplayable however correct the
   // maths underneath is.
   $("#order").innerHTML = s.scene.in_encounter ? `
-    <h2>Round ${s.scene.round}</h2>
+    <h2>Round ${esc(s.scene.round)}</h2>
     ${s.scene.initiative.map(i => `
       <div class="who${i.up ? " up" : ""}${i.out ? " out" : ""}">
         <span>${i.up ? "▸ " : ""}${esc(i.name)}</span>
-        <small>${i.out ? "down" : i.score}</small>
+        <small>${i.out ? "down" : esc(i.score)}</small>
       </div>`).join("")}` : "";
 
   renderMap(s);
@@ -315,7 +315,7 @@ function render(s, hold) {
 
   $("#board").innerHTML = s.scene.actors.map(a =>
     `<div class="who"><span>${esc(a.name)} <small>${esc(a.ref)}</small></span>
-     <small>${a.hp}/${a.hp_max}${a.conditions.length ? " · " + a.conditions.map(esc).join(", ") : ""}</small></div>`
+     <small>${esc(a.hp)}/${esc(a.hp_max)}${a.conditions.length ? " · " + a.conditions.map(esc).join(", ") : ""}</small></div>`
   ).join("") + `<div class="sub" style="margin-top:8px">${esc(s.scene.location)}</div>`;
   renderTalk(s);
 
@@ -378,7 +378,7 @@ function renderTalk(s) {
         how.length ? ` <small>${esc(how.join(", "))}</small>` : ""}</p>
       <button type="button" class="v2-btn is-quiet is-small talkignore" data-ignore="${esc(t.ref)}"
               title="Do not answer them">Ignore</button>${has ? `
-      <div class="regard" role="img" aria-label="Regard ${t.regard} of ${max}"><i style="width:${
+      <div class="regard" role="img" aria-label="Regard ${esc(t.regard)} of ${esc(max)}"><i style="width:${
         pct}%"></i></div>` : ""}
     </div>`;
   }).join("") + `<button type="button" class="v2-btn is-quiet" id="takeleave"
@@ -424,11 +424,11 @@ function renderAbilities(s) {
       data-ability="${esc(a.name)}"
       data-toggle="${a.toggle ? "1" : "0"}"
       data-free="${(a.toggle || actionKind(a.text) === "free") ? "1" : "0"}"
-      title="${esc(a.path)}${a.tier != null ? ` · Control Blood ${a.tier}` : ""}${
+      title="${esc(a.path)}${a.tier != null ? ` · Control Blood ${esc(a.tier)}` : ""}${
         a.toggle ? (a.active ? " · ACTIVE — click to dismiss" : " · off — click to form") : ""}${
         a.choices ? " · name one: " + esc(a.choices.join(", ")) : ""}${
         a.text ? " — " + esc(a.text) : ""}">${esc(a.name)}${
-        a.uses != null ? ` (${a.uses}/${a.max})` : ""}${
+        a.uses != null ? ` (${esc(a.uses)}/${esc(a.max)})` : ""}${
         a.toggle ? (a.active ? " ●" : " ○") : ""}</button>`).join("");
 }
 

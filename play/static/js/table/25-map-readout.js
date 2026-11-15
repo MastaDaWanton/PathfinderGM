@@ -33,7 +33,7 @@ function mapReadout(s, T) {
 }
 
 const mapActor = ref => ((MAPREAD.s && MAPREAD.s.scene.actors) || []).find(a => a.ref === ref && a.at);
-const mapSigned = n => (n < 0 ? "−" + Math.abs(n) : "+" + n);
+const mapSigned = n => (n < 0 ? "−" + Math.abs(n) : "+" + esc(n));
 const mapCap = t => String(t).charAt(0).toUpperCase() + String(t).slice(1);
 // In running text a name stops at its first comma ("Ünsal the Twice-Drowned, Reeve of the
 // Saltmarsh Ossuaries" made a five-name list four lines long); two of one name are told
@@ -65,8 +65,8 @@ function mapIdle() {
       ? `caught ${esc(mapList(names))}.` : "caught nobody you can see."}`);
   }
   for (const h of (T.hunches || []))
-    lines.push(`<span class="mr-hunch">You sense ${h.count === 1 ? "a foe" : h.count + " foes"} within ${
-      h.within_ft} ft</span>, but not where.`);
+    lines.push(`<span class="mr-hunch">You sense ${h.count === 1 ? "a foe" : esc(h.count) + " foes"} within ${
+      esc(h.within_ft)} ft</span>, but not where.`);
   const hint = sc.in_encounter ? "Tap or point at a foe for your attack, or a lit square for the move."
     : "Tap or point at somebody, or a square.";
   return `<p class="mr-h mr-one"><span>${esc(who)}</span>${light
@@ -84,7 +84,7 @@ function mapForActor(a) {
   // One line: the name gives way (ellipsis, whole on the token's own label), the numbers
   // never do. A two-line name on a phone pushed the attack bonus below the box's fold.
   const out = [`<p class="mr-h mr-one mr-who"><span class="mr-name" title="${esc(a.name)}">${esc(a.name)}</span><span class="mr-dim">${
-    a.hp}/${a.hp_max}${where}${a.hp <= 0 ? ", down" : ""}${cv}</span>${caught ? `<span class="mr-spell">caught</span>` : ""}</p>`];
+    esc(a.hp)}/${esc(a.hp_max)}${where}${a.hp <= 0 ? ", down" : ""}${cv}</span>${caught ? `<span class="mr-spell">caught</span>` : ""}</p>`];
   const rows = (T.attack || {})[a.ref] || [];
   // Weapons that come to the same bonus by the same terms are one line ("Rapier or dagger
   // +5"): the box has two lines on a phone, and a repeat spends one.
@@ -111,7 +111,7 @@ function mapForSquare(sq) {
   const g = MAPREAD.s.scene.grid, T = MAPREAD.T, k = `${sq[0]},${sq[1]}`;
   const e = (g.reachable || []).find(p => p[0] === sq[0] && p[1] === sq[1]);
   const name = typeof sqName === "function" ? sqName(sq[0], sq[1]) + ": " : "";
-  const out = [`<p class="mr-h">${name}${e ? `${e[2]} ft to here` : "out of your move"}${
+  const out = [`<p class="mr-h">${name}${e ? `${esc(e[2])} ft to here` : "out of your move"}${
     e && e[3] ? `<span class="mr-dim">${e[3] * 5} ft up</span>` : ""}</p>`];
   const bits = [];
   if ((T.unseen || []).some(p => p[0] === sq[0] && p[1] === sq[1])) bits.push(`<span class="mr-dim">You cannot see this square.</span>`);

@@ -722,7 +722,7 @@
           '<span class="bf-mp">' + (need ? esc(have) + " / " + esc(need) : esc(t.mp) + " mastery") + '</span>';
       }
       var picks = f.picks ? '<button type="button" class="bf-btn bf-perks" data-bench-perks>' +
-        (f.picks === 1 ? "1 perk to pick" : f.picks + " perks to pick") + '</button>' : "";
+        (f.picks === 1 ? "1 perk to pick" : esc(f.picks) + " perks to pick") + '</button>' : "";
       var steady = C.steady();
       foot.innerHTML =
         '<span class="bf-clock" id="' + esc(o.clockId || o.layer + "-clock") + '">' + esc(f.clock || "") + '</span>' +
