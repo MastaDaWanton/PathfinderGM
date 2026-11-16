@@ -1256,12 +1256,14 @@ def _sentence(engine, pc, held, town: str):
             # What the days ended is told behind the batch by `Engine._ended_settles`, as a
             # sentence, not the fragment "Ended: ..." this once added here.
             scene.advance(days * DAY, charge_body=False)
+            mended = _gaol_nights(engine, pc, days)
             worked = days * wage
             bits.append(f"The rest is worked off at the gaol, a labourer's wage a day: "
                         f"{days} day{'s' if days != 1 else ''}"
                         + (" — the most the watch will hold anybody for a fine, and what "
                            "is still owed is written off" if worked < left else "")
                         + ".")
+            bits.extend(mended)
             effects.append({"kind": "labour", "days": days, "origin": SOURCE})
         effects.append({"kind": "fine", "cp": owed, "paid_cp": paid, "origin": SOURCE})
     returned = _confiscate(engine, pc)
@@ -1329,6 +1331,35 @@ def _confiscate(engine, pc) -> list[dict]:
         out.append({"item": name, "owner": str(rec.get("owner") or ""),
                     "owner_name": owner.name if owner is not None else "their owner"})
     return out
+
+
+def _gaol_nights(engine, pc, days: int) -> list[str]:
+    """The nights of a gaol term, each slept through the night's one door
+    (`survival.night`): fed and watered by the gaol, then natural healing, 1 hit point per
+    level a night (CRB p.191, Natural Healing), the non-lethal, the pools and the slots.
+
+    The term moved the clock with `charge_body=False` and nothing else, so thirty days of
+    gaol healed nothing: playtest 2026-11-15 #72 went in on 1 of 26 hit points on day 1 and
+    came out on 1 of 26 on day 31. The voyage's days are the worked example
+    (`Engine._op_voyage` eats, drinks and sleeps each day aboard). Said once, as a total:
+    thirty "recovers 1 hit point" lines would bury the sentence."""
+    from . import survival
+
+    before, said = int(pc.hp), []
+    for _ in range(max(0, int(days))):
+        survival.eat(pc)
+        survival.drink(pc)
+        # `survival.night` is this pair; the night's own hit-point line is left out
+        # here and the term's total said instead, and each other thing once.
+        slept = pc.sleep_through("night", engine.dice)
+        for line in survival.rested_said(pc, dict(slept, healed=0)):
+            if line not in said:
+                said.append(line)
+    healed = int(pc.hp) - before
+    if healed:
+        said.insert(0, survival.heal_said(pc, healed).replace(
+            "a night's rest heals", f"{days} nights' rest, each healing"))
+    return said
 
 
 def _dawn(engine, pc, held, town: str):

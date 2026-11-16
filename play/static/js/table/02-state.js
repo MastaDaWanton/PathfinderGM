@@ -315,7 +315,7 @@ function render(s, hold) {
 
   $("#board").innerHTML = s.scene.actors.map(a =>
     `<div class="who"><span>${esc(a.name)} <small>${esc(a.ref)}</small></span>
-     <small>${esc(a.hp)}/${esc(a.hp_max)}${a.conditions.length ? " · " + a.conditions.map(esc).join(", ") : ""}</small></div>`
+     <small>${esc(a.hp)}/${esc(a.hp_max)}${a.nonlethal ? `, ${esc(a.nonlethal)} non-lethal` : ""}${a.conditions.length ? " · " + a.conditions.map(esc).join(", ") : ""}</small></div>`
   ).join("") + `<div class="sub" style="margin-top:8px">${esc(s.scene.location)}</div>`;
   renderTalk(s);
 

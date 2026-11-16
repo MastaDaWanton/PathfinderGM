@@ -1068,6 +1068,8 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 _commission(row, a, scene, pc)
             if act == "escape" and pc is not None:
                 _escape(row, a, scene, pc)
+            if act in ("prone", "rise") and pc is not None:
+                _posture(row, act, pc)
         rows.append(row)
     # One commission a keeper a turn: "agree to his price and pay" is read as two deeds
     # (`sell`, `give`), and each agrees the same job (`_agreed_work`). The first stands.
@@ -1112,6 +1114,28 @@ def _take_is_the_harvest(rows: list[Row]) -> None:
             row.intents = [t for t in row.intents if t not in folded]
             row.note = (f"{folded[0]['params'].get('item')} comes off the carcass with the "
                         f"harvest: one deed, not a second take")
+
+
+def _posture(row: Row, act: str, pc) -> None:
+    """Down on the ground, or up off it: the `prone` condition on the player, laid or
+    lifted through the engine's `condition` op (`Engine._op_condition`). "Drop Prone ...
+    is a free action" (CRB p.188); prone is -4 AC against melee and +4 against ranged
+    (CRB Appendix 2, `tables.CONDITIONS["prone"]`). Whether they are prone to stand up is
+    the sheet's state, asked by tag, never the words.
+
+    Playtest 2026-11-15 #62/#64: "drop to my knees" was read `go`, told "moves from near
+    to near", laid nothing, and the sergeant's spear swung six times at standing AC."""
+    prone = pc.has_state("state.position.prone")
+    if act == "prone" and not prone:
+        row.intents.append({"op": "condition", "actor": pc.ref,
+                            "params": {"condition": "prone", "to": pc.ref},
+                            "because": "the player drops prone"})
+        row.note = "down on the ground: prone"
+    elif act == "rise" and prone:
+        row.intents.append({"op": "condition", "actor": pc.ref,
+                            "params": {"condition": "prone", "to": pc.ref, "ends": True},
+                            "because": "the player stands up"})
+        row.note = "up off the ground"
 
 
 # How the reader's closed `way` (`interpret.ESCAPE_WAYS`) reaches the engine's `how`.
@@ -2742,6 +2766,8 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     # A loot or a harvest the table built is the turn's word on that body: the plan's own
     # loot, or a skill check it wrote for the cutting, would strip or roll a second time.
     looting = any(b.get("op") == "loot" for b in built)
+    posturing = any(b.get("op") == "condition" and (b.get("params") or {}).get(
+        "condition") == "prone" for b in built)
     harvesting = any(b.get("op") == "harvest" for b in built)
     # A go the reading owes a journey for (`interpret.ops_for`: a town the roads reach) is
     # that journey, and the plan's own walk beside it is not: measured on the 0.2.22
@@ -2803,6 +2829,16 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
                     "manoeuvre") or "") == "grapple")):
             if notes is not None:
                 notes.append(f"the plan's {op} replaced by the reading's escape")
+            continue
+        # Dropping prone or standing (`_posture`) is the turn's word on the player's
+        # posture: the plan's own `move` beside it walked nowhere and told "moves from near
+        # to near" (playtest 2026-11-15 #62), and its own prone would lay it twice.
+        if posturing and str((r or {}).get("actor") or pc.ref) in (pc.ref, "pc") and (
+                (op == "move" and not (acts & interpret._MOVING_ACTS))
+                or (op == "condition" and str(((r or {}).get("params") or {}).get(
+                    "condition") or "").lower() == "prone")):
+            if notes is not None:
+                notes.append(f"the plan's {op} replaced by the reading's posture")
             continue
         if looting and op == "loot":
             if notes is not None:

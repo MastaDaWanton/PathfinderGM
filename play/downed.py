@@ -202,12 +202,24 @@ def resolve(campaign) -> Outcome:
     # An hour used to pass with nothing ticking at all — not conditions, not buffs,
     # not pools, not compulsions.
     scene.advance(HOURS_UNTIL_CONSCIOUS * 60)
-    told = [s for r in scene.take_body_said() for s in r.get("said") or []]
     pc.hp = max(pc.hp, 1)
     pc.clear_states("recovery.hit-points")
+    # The non-lethal still past the floored hit points keeps them out until it heals
+    # back to them, 1 an hour per level (CRB p.191). Woken over it, the player stood on
+    # 1 hit point carrying 3 non-lethal with no condition at all (playtest 2026-11-15
+    # #65's snapshot), which by the book is unconscious.
+    hours = HOURS_UNTIL_CONSCIOUS
+    over = pc.nonlethal - pc.nonlethal_threshold
+    if over > 0:
+        extra = -(-over // max(1, int(getattr(pc, "level", 1) or 1)))
+        scene.advance(extra * 60)
+        hours += extra
+    pc.apply_hp_state()
+    told = [s for r in scene.take_body_said() for s in r.get("said") or []]
     lines.append(
-        f"You come round about an hour later, face down where you fell, on "
-        f"{pc.hp} hit point{'s' if pc.hp != 1 else ''}."
+        f"You come round {'about an hour' if hours == 1 else f'{hours} hours'} later, "
+        f"face down where you fell, on {pc.hp} hit point{'s' if pc.hp != 1 else ''}"
+        + (f" and {pc.nonlethal} non-lethal" if pc.nonlethal else "") + "."
     )
     lines.extend(told)
     lines.extend(after)

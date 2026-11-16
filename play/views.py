@@ -1093,6 +1093,9 @@ def _state(c) -> dict:
             "clock_minutes": c.scene.clock_minutes,
             "actors": [
                 {"ref": r, "name": a.name, "hp": a.hp, "hp_max": a.hp_max,
+                 # Its own track beside the hit points (CRB p.191): the merchant read
+                 # "5/5" after a 4-point punch (playtest 2026-11-15 #39).
+                 "nonlethal": int(a.nonlethal or 0),
                  "zone": c.scene.zones.get(r, "near"), "is_pc": a.is_pc,
                  # Which side of the fight, or "" for a bystander the fight has not
                  # touched — the map paints foes red and bystanders white.

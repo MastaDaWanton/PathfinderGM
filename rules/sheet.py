@@ -6692,6 +6692,41 @@ class Actor:
             return {"ref": self.ref, "outcome": "dead", "hp": self.hp, **said}
         return {"ref": self.ref, "outcome": "dying", "hp": self.hp, **said}
 
+    def come_round(self, dice, hours: int) -> str:
+        """A stable body's hours unconscious: "every hour to regain consciousness", a DC
+        10 Constitution check with the negative hit points as a penalty, a natural 20
+        succeeding; left without help, "every failed Constitution check to regain
+        consciousness results in the loss of 1 hit point" (CRB p.190, Stable Characters
+        and Recovery). Returns "woke", "mended" (off the hit-point track but still out on
+        non-lethal), "dead" or "".
+
+        Waking lands on 1 hit point, the floor `play/downed.py` already gives the player:
+        the engine has no rung for "stable and conscious at negative hit points" (stable
+        carries `state.unable`), and the player's own wake-up is the house's answer to
+        that. Before this nothing woke a stable creature but the player: playtest
+        2026-11-15 #50, a merchant stable at -2 was still out cold an hour later, and
+        would have lain there for the rest of the campaign.
+        """
+        for _ in range(max(0, int(hours))):
+            if not self.has_state("state.down.stable") or self.is_dead or self.hp >= 0:
+                return ""
+            dc = 10 + abs(self.hp)
+            roll = dice.d20(self.ability_check_modifiers("con"),
+                            label=f"{self.name} regain consciousness", visibility="hidden")
+            if roll.natural == 20 or roll.total >= dc:
+                self.hp = 1
+                self.clear_states("recovery.hit-points")
+                self.apply_hp_state()
+                # Past the wounds, but non-lethal over 1 hit point still keeps them out
+                # (CRB p.191) until the hours heal it: live, the merchant was told
+                # "comes round" on 1 hp under 4 non-lethal, and the prose stood him up.
+                return "mended" if self.has_state("state.down") else "woke"
+            self.hp -= 1
+            if self.hp <= self.death_floor():
+                self.apply_hp_state()
+                return "dead"
+        return ""
+
     def taking_continuous_damage(self) -> bool:
         """Whether something is still hurting this body every round — the CRB's
         "continuous damage, such as from an acid arrow or a bleed effect", which fails

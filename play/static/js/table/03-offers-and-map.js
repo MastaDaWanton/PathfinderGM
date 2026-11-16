@@ -547,6 +547,7 @@ function renderMap(s) {
     tp.push(`<circle class="token${side}${down ? " down" : ""}${ghost}${unit ? " unit" : ""}${
       up}" cx="${cx}" cy="${cy}" r="${n * CELL / 2 - 1.5}">
       <title>${esc(a.name)} — ${esc(a.hp)}/${esc(a.hp_max)}${
+        a.nonlethal ? `, ${esc(a.nonlethal)} non-lethal` : ""}${
         unit ? ` · ${esc(a.members)} of ${esc(a.members_max)} still standing` : ""}${
         a.at.length > 2 && a.at[2] ? ` · ${a.at[2] * 5} ft up` : ""}</title></circle>`);
     const form = unit ? "" : a.form || "humanoid";
