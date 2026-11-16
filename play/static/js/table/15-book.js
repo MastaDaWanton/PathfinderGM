@@ -105,7 +105,18 @@ const STORY = { count: 0, beat: -1, landedAt: null, holding: false, watch: null,
 
 function storyKeep() {
   const scroller = storyScroller();
-  STORY.was = scroller ? scroller.scrollTop : null;
+  STORY.was = scroller && storyShown(scroller) ? scroller.scrollTop : null;
+}
+
+// Whether the story is laid out at all. Map, Sheet, Trade and the rest hide the book
+// (`body:not(.mode-table) .book { display: none }`), and a hidden scroller reads
+// scrollTop 0 and every beat's offset 0. Read as a position, that 0 was "scrolled back
+// to the first beat": the landing took the player for a rereader and held the page, so
+// every turn played from the Map left the book where the Table last saw it. Playtest
+// 2026-11-15 #66, #87, #91: an hour of turns later the book still opened on beat 41 of
+// 178, the merchant fight, and the newest beats were below it, unseen.
+function storyShown(el) {
+  return !!el && el.getClientRects().length > 0;
 }
 
 function storyAfterHooks(fn) {
@@ -135,7 +146,7 @@ function storyTopOf(i) {
 
 function storySettle() {
   const scroller = storyScroller(), top = storyTopOf(STORY.beat);
-  if (!scroller || top === null) return;
+  if (!scroller || top === null || !storyShown(scroller)) return;
   scroller.scrollTop = top;
   STORY.landedAt = scroller.scrollTop;          // what the browser allowed (the foot clamps)
 }
@@ -148,6 +159,18 @@ function storyLand(s, prev) {
   const was = STORY.was !== null ? STORY.was : (scroller ? scroller.scrollTop : 0);
   STORY.was = null;
   if (!scroller || !n) { STORY.count = n; return; }
+  // Hidden: nothing can be measured or read. Mark the newest beat to land on and hold it;
+  // the watch below lands it the moment the book is shown again (its size changes from
+  // nothing).
+  if (!storyShown(scroller)) {
+    if (!prev || n > STORY.count) {
+      STORY.beat = prev ? Math.min(STORY.count, n - 1) : n - 1;
+      STORY.holding = true;
+    }
+    STORY.count = n;
+    storyWatch();
+    return;
+  }
   // Put back where they were once every hook has drawn: the rebuild's clamp has moved it.
   const stay = () => storyAfterHooks(() => {
     if (STORY.holding) storySettle(); else scroller.scrollTop = was;
@@ -196,6 +219,12 @@ function storyWatch() {
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(() => { if (STORY.holding) storySettle(); });
   }
+}
+// And when the Table tab is opened again, at once: the watch only reports at the next
+// paint, which a backgrounded window may not have, and the turns played from the Map
+// meanwhile are exactly what the reader has come back to read.
+if (typeof Shell === "object" && Shell) {
+  Shell.tab("table", { enter() { if (STORY.holding) storySettle(); } });
 }
 // The story's content changes height without its box changing (a beat's text reflowing
 // as the drop cap's face loads): the beats themselves are watched too, the fresh set on

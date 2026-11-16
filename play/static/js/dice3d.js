@@ -774,12 +774,31 @@
     osc.start(at); osc.stop(at + 0.12);
   }
 
+  /* The turn's next roll, waiting on this mat (`next`). Playtest 2026-11-15 #38: the
+     attack's mat said "Success" and "Close", the damage roll was held until it closed,
+     and nothing said so: nine minutes went by. Foundry's Dice So Nice clears its dice on
+     a timer ("Automatically Hide", "Millisecs Before Hiding") and shows the result
+     without waiting on anyone; here the next die is the player's own throw, so the turn
+     needs them anyway, and the mat says so instead of closing itself. */
+  var nextUp = "";
+  function showNext() {
+    var go = mat && mat.querySelector("#d3d-go");
+    if (!nextUp || !go || go.disabled || !mat.classList.contains("on")) return;
+    go.textContent = "Next roll";
+    mat.querySelector("#d3d-note").textContent = nextUp;
+  }
+  function next(label) {
+    nextUp = label ? label + " is next. The turn goes on when this closes." : "";
+    showNext();
+  }
+
   function reducedMotion() {
     try { return window.matchMedia("(prefers-reduced-motion: reduce)").matches; }
     catch (e) { return false; }
   }
 
   function resetMat(opts, dieLabel) {
+    nextUp = "";
     mat.querySelector("#d3d-title").textContent = opts.title || "Roll";
     // A middle dot, one per line, not a long dash: the bench's copy rule (UI plan §8), and
     // the mat is the one line every roll in the app shares ("Comfrey powder · 1d20").
@@ -820,6 +839,7 @@
     if (opts.note) mat.querySelector("#d3d-note").textContent = opts.note;
     mat.querySelector("#d3d-go").textContent = "Close";
     mat.querySelector("#d3d-go").disabled = false;
+    showNext();
     return new Promise(function (done) {
       mat.querySelector("#d3d-go").onclick = function () {
         mat.classList.remove("on");
@@ -1018,8 +1038,10 @@
     var landing = labelFaces(els, sides, lo, hi, opts.result);
     var thrown = tumble(die, faceToFront(sides, landing), false, sh1);
     settling = thrown;
+    var mine = throwSeq;
     return (async function () {
       await thrown;
+      if (mine !== throwSeq) return opts.result;  // the mat moved on: see `ask`
       els[landing].classList.add("land");
       if (reqSides === 20 && opts.result === 20) els[landing].classList.add("crit");
       if (reqSides === 20 && opts.result === 1) els[landing].classList.add("fumble");
@@ -1056,8 +1078,10 @@
       tumble(die2, faceToFront(10, landB), true, sh2),
     ]);
     settling = thrown;
+    var mine = throwSeq;
     return (async function () {
       await thrown;
+      if (mine !== throwSeq) return result;
       elsA[landA].classList.add("land");
       elsB[landB].classList.add("land");
       mat.querySelector("#d3d-terms").innerHTML =
@@ -1079,6 +1103,12 @@
      meaning "the table rolls it" — the default, and what the 3D die is for. */
   function ask(opts) {
     build();
+    // A new throw for `land`'s finish to see. A throw still in the air when the next roll
+    // was asked for finished INTO the new mat: its terms appended under the new roll's,
+    // and its Close put over the new Roll, so the roll was dismissed and never sent.
+    // Playtest 2026-11-15 #19 (Intimidate listed Stealth's Dex +2 and beat 12) and #27
+    // (that unsent roll came back after a reload).
+    throwSeq += 1;
     var reqSides = opts.sides || 20;
     var lo = opts.lo != null ? opts.lo : 1;
     var hi = opts.hi != null ? opts.hi : reqSides;
@@ -1182,6 +1212,7 @@
     land: land,
     ask: ask,
     close: closeMat,
+    next: next,
     settled: settled,
     mark: mark,
     // Exposed for probes: the d20's numbering and geometry, plus every shape by sides.

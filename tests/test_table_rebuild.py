@@ -594,9 +594,11 @@ const esc = s => String(s);
 function beats(tops) { return tops.map(t => ({ offsetTop: t })); }
 const story = { id: "story", scrollTop: 0, scrollHeight: 6000, clientHeight: 255, offsetTop: 64,
                 _beats: [], querySelectorAll: () => story._beats, addEventListener() {},
+                getClientRects: () => [{}],   // laid out (15-book.js `storyShown`)
                 style: { overflowY: "auto", paddingTop: "22px" } };
 const leaf = { id: "bookin", scrollTop: 0, scrollHeight: 6100, clientHeight: 700,
-               addEventListener() {}, style: { overflowY: "auto", paddingTop: "0px" } };
+               addEventListener() {}, getClientRects: () => [{}],
+               style: { overflowY: "auto", paddingTop: "0px" } };
 const document = {
   getElementById: id => ({ story, bookin: leaf })[id] || null,
   querySelector: () => null, querySelectorAll: () => story._beats,

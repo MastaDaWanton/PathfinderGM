@@ -39,14 +39,19 @@ _STUB = r"""
 function onRender() {}
 const PAD = 22, FOOT = 26, SLOT = 29;
 const parts = [];                               // {kind: "beat"|"slot", h, filled}
-const story = { id: "story", clientHeight: 587, _top: 0, addEventListener() {},
+// `hidden`: the book under another tab (`display: none` on an ancestor), as a browser has
+// it: no boxes, scrollTop reads 0 and ignores writes, every offset 0, and the position it
+// had comes back when it is shown again.
+const story = { id: "story", clientHeight: 587, _top: 0, hidden: false, addEventListener() {},
   style: { overflowY: "auto", paddingTop: PAD + "px" },
+  getClientRects() { return this.hidden ? [] : [{}]; },
   get scrollHeight() { return PAD + parts.reduce((n, p) => n + height(p), 0) + FOOT; },
-  get scrollTop() { return Math.max(0, Math.min(this._top, this.scrollHeight - this.clientHeight)); },
-  set scrollTop(v) { this._top = Math.max(0, Math.min(v, this.scrollHeight - this.clientHeight)); },
+  get scrollTop() { return this.hidden ? 0 : Math.max(0, Math.min(this._top, this.scrollHeight - this.clientHeight)); },
+  set scrollTop(v) { if (!this.hidden) this._top = Math.max(0, Math.min(v, this.scrollHeight - this.clientHeight)); },
   querySelectorAll: sel => sel === ".beat" ? beatEls() : parts };
+const Shell = { tabs: {}, tab(name, hooks) { this.tabs[name] = hooks; } };
 function height(p) { return p.kind === "slot" ? (p.filled ? SLOT : 0) : p.h; }
-function offsetOf(p) { let y = PAD; for (const q of parts) { if (q === p) return y; y += height(q); } }
+function offsetOf(p) { if (story.hidden) return 0; let y = PAD; for (const q of parts) { if (q === p) return y; y += height(q); } }
 function beatEls() { return parts.filter(p => p.kind === "beat").map(p => ({ get offsetTop() { return offsetOf(p); } })); }
 const leaf = { id: "bookin", scrollTop: 0, addEventListener() {}, style: { overflowY: "auto" } };
 const document = {
@@ -132,6 +137,25 @@ def test_a_rereader_and_a_redraw_with_nothing_new_keep_their_place(tmp_path):
     out.turnReader = at() - was;
     console.log(JSON.stringify(out));""")
     assert got == {"resync": 0, "resyncReader": 0, "turnReader": 0}, got
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not on this machine")
+def test_turns_played_from_another_tab_are_landed_on_when_the_book_comes_back(tmp_path):
+    """Playtest 2026-11-15 #66, #87, #91: an hour of turns played with the Map open, and
+    the Table opened on beat 41 of 178, the merchant fight, every newer beat below it. A
+    hidden book reads scrollTop 0, and the landing took that 0 for a reader scrolled back
+    to the first beat, so it held the page where the Table last saw it. Shown again, the
+    book now opens on the newest turn's first line."""
+    got = _run(tmp_path, r"""
+    for (let i = 0; i < 24; i++) addTurn(200);
+    draw(null); await settle();
+    story.hidden = true;                                      // the Map tab
+    let k = 0;
+    for (let i = 0; i < 3; i++) { const prev = T(); k = n; draw(prev, () => addTurn(900)); await settle(); }
+    story.hidden = false;                                     // back to the Table
+    if (Shell.tabs.table) Shell.tabs.table.enter();
+    console.log(JSON.stringify({ firstNew: firstNewFromTop(k), holding: STORY.holding }));""")
+    assert got == {"firstNew": 0, "holding": True}, got
 
 
 def test_render_tells_the_book_where_the_reader_was_before_it_rebuilds():

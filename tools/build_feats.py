@@ -83,6 +83,12 @@ RE_ALIGNMENT = re.compile(
     r"^(?:any\s+)?(non-?)?(lawful|chaotic|good|evil|neutral)(\s+alignment)?\s*$", re.I)
 
 
+# Names the source spreadsheet glued together (playtest 2026-11-15 #2: "Death Frombelow"
+# beside "Death from Above"). The id keeps the glued slug, so saved characters still load.
+NAME_FIXES = {"Death Frombelow": "Death from Below", "Seeds Ofdoubt": "Seeds of Doubt",
+              "Wall Offlesh": "Wall of Flesh"}
+
+
 def slug(name: str) -> str:
     """`Weapon Focus (rapier)` -> `weapon-focus-rapier`."""
     s = re.sub(r"[^a-z0-9]+", "-", str(name).strip().lower())
@@ -280,7 +286,7 @@ def build(src: Path) -> dict:
         types = [t.strip().lower() for t in clean(d.get("type")).split(",") if t.strip()]
         feats.append({
             "id": feat_id(d),
-            "name": name,
+            "name": NAME_FIXES.get(name, name),
             "types": types,
             "description": clean(d.get("description")),
             "benefit": clean(d.get("benefit")),

@@ -1141,7 +1141,7 @@ function paneWorlds() {
   return continueBlock() + `
     <div style="margin:-14px 0 26px">
       <button class="go" data-forge>Create a character</button>
-      <span class="note" style="margin-left:12px">Point buy, all eleven classes,
+      <span class="note" style="margin-left:12px">Point buy, all ${esc(STATE.class_count)} classes,
         the world's own races and the Core seven — validated by the rules as you go.</span>
     </div>
     <h2 class="sect">Worlds on the shelf</h2>
@@ -1207,7 +1207,7 @@ function paneOneWorld() {
       <button class="card pick" data-forge style="border-style:dashed">
         <h3>Someone new</h3>
         <em>Build a character from nothing — point buy, class, skills, feats.</em>
-        <div class="stat">All eleven classes · the world's races and the Core seven</div>
+        <div class="stat">All ${esc(STATE.class_count)} classes · the world's races and the Core seven</div>
       </button></div>
     <!-- Where the game starts. "Surprise me" draws the town and the start from the
          character (rules/openings.py). Choosing is the path the owner asked to be built

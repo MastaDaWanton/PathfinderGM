@@ -17,7 +17,7 @@ from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST
 
-from rules import biomes, effectspec, registry, spells
+from rules import biomes, classes as classes_mod, effectspec, registry, spells
 from world.loader import UnsupportedSchema
 
 from . import campaign as campaign_mod
@@ -88,6 +88,9 @@ def home(request):
             # ordinary load, so the banner costs nothing to carry.
             "unreadable": unreadable,
             "pregens": roster.pregens(),
+            # Counted, not written: the page said "all eleven classes" beside a forge
+            # listing twelve once Blood Bending shipped (playtest 2026-11-15 #1).
+            "class_count": len(classes_mod.all_classes()),
         }),
     })
 

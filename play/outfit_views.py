@@ -54,7 +54,11 @@ def catalogue() -> dict:
         if weapons_mod.UNSOLD_SECTION.search(str(w.get("section") or "")):
             continue
         arms.append({"key": key, "name": w.get("name", key), "cost_gp": round(float(cost), 2),
-                     "damage": w.get("damage", ""), "type": w.get("type", ""),
+                     # Every type the weapon deals, not the first: the kunai is "B or P"
+                     # (Ranged Tactics Toolbox p. 18) and read "1d4 bludgeoning" (playtest
+                     # 2026-11-15 #5).
+                     "damage": w.get("damage", ""),
+                     "type": " or ".join(w.get("types") or [w.get("type", "")]),
                      "prof": w.get("prof", "simple"), "hands": w.get("hands", 1),
                      "category": w.get("category", "melee")})
     armour = [{"key": k, "name": v["name"], "cost_gp": float(v["cost_gp"]), "ac": v["ac"],
@@ -66,6 +70,11 @@ def catalogue() -> dict:
     gear = [{"key": k, "name": v["name"], "cost_gp": float(v["cost_gp"]),
              "unit": v.get("unit", ""), "per": v.get("per", 1)}
             for k, v in GEAR_SORTED()]
+    # One case on the page: the hand-written rows in rules/tables.py are lower case for
+    # prose ("swings his dagger") and the 445 imported ones are not, so the list read
+    # "club" beside "Baston fighting stick" (playtest 2026-11-15 #4). Display only.
+    for row in (*arms, *armour, *shields, *gear):
+        row["name"] = row["name"][:1].upper() + row["name"][1:]
     return {"weapons": arms, "armour": armour, "shields": shields, "gear": gear}
 
 

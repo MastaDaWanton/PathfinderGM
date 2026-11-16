@@ -889,8 +889,16 @@ async function sendRoll(face, shown) {
   let state = null;
   const logBefore = (STATE && STATE.log) || [];
   try { state = await post("/api/roll", { face: landed }); }
-  catch (e) { $("#err").textContent = e.message; }
+  catch (e) { $("#err").className = ""; $("#err").textContent = e.message; }
   finally { busy(false); }
+  // The turn this die finished is over, so the "Not yet done: …" its first reply put up
+  // (10-spells.js `showUnfinished`) is not news any more: the resumed turn had done the
+  // snatch and the walk it listed, and the line still stood under the mat (playtest
+  // 2026-11-15 #12). The words it handed back stay in the pen.
+  if (state && $("#err").classList.contains("hint")) {
+    $("#err").textContent = "";
+    $("#err").className = "";
+  }
   // An attack this die finished, heard once the die is down (never awaited).
   if (state) attackSounds(logBefore, state.log, rest);
 
@@ -926,6 +934,8 @@ async function sendRoll(face, shown) {
   // and that one part waits for them to close it.
   if (state && closing && state.awaiting) {
     render(state, true);
+    // Said on the mat, or the turn waits on a Close nobody knows is holding it (#38).
+    if (typeof Dice3D.next === "function") Dice3D.next(state.awaiting.label || "Another roll");
     await closing;
     showPopup(state.awaiting);
   } else if (state) {
