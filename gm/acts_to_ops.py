@@ -994,6 +994,15 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 row.note = "the same work agreed once already this turn"
             seen.add(who)
     _take_is_the_harvest(rows)
+    # One surrender a turn: live 2026-11-15, "shout for the city watch, telling everyone I
+    # beat a merchant" was read as two surrenders and the call went out twice.
+    given = False
+    for row in rows:
+        for b in [b for b in row.intents if b.get("op") == "surrender"]:
+            if given:
+                row.intents.remove(b)
+                row.note = "giving themselves up once this turn already"
+            given = True
     return rows
 
 

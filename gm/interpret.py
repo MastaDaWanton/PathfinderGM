@@ -1126,6 +1126,13 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "tell the guard that I'm the one who broke into the chandler's last "
                   "night", "target": "the guard", "act": "surrender"}]}),
+    # Live 2026-11-15: "I shout ... for the city watch, telling everyone I beat a merchant
+    # senseless" came back two `talk`s; owning up aloud with the watch called is a
+    # surrender, said or not.
+    ("I yell for the guards and tell the whole street I'm the one who knifed the tailor.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "yell for the guards and tell the whole street I'm the one who knifed "
+                  "the tailor", "target": "the guards", "act": "surrender"}]}),
     ("I call for the town guard and wait for them to take me in.",
      {"question": False, "claims": [], "actions": [
          {"span": "call for the town guard", "target": "the town guard",

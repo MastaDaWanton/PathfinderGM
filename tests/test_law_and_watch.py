@@ -288,3 +288,25 @@ def test_47_continue_out_of_a_fight_moves_the_clock():
     me.engine = e
     ops = [i.op for i in me._continue_plan().intents]
     assert ops == ["narrate_only", "advance_time"]
+
+
+def test_55_a_surrender_at_the_gate_finds_its_watch_first_and_is_said_once():
+    """Live 2026-11-15 at the gate, suspected: "I shout ... for the city watch, telling
+    everyone I beat a merchant" was read as two surrenders, both said "None of the watch is
+    here", and only then was the gate's watch posted."""
+    from gm import acts_to_ops
+
+    s, e, pc = _table()
+    v = _seller(s)
+    deeds.record(pc, "deed.violence.unprovoked", scene=s, subject=v.ref,
+                 subject_name=v.name, witnesses=[])
+    _want(pc, how="suspected")
+    e.place_party(f"{TOWN}~urban:the-gate")        # stood there, no batch run yet
+    assert not _watch(s)
+    frame = {"actions": [{"act": "surrender", "target": "the city watch", "span": "a"},
+                         {"act": "surrender", "target": "everyone", "span": "b"}]}
+    rows = acts_to_ops.table(frame, s, places=e.places(), sentence="a b")
+    assert sum(1 for r in rows for b in r.intents if b.get("op") == "surrender") == 1
+    res = _run(e, {"op": "surrender", "actor": "pc", "because": "t"})
+    assert trial.custody(pc) is not None, _tells(res)
+    assert "The gate is watched" in _tells(res) and "None of the watch" not in _tells(res)

@@ -6446,6 +6446,11 @@ class Engine:
         if trial.custody(pc) is not None:
             return self._refuse(intent, f"{pc.name} is in the watch's hands already.")
         town = trial.town_here(self)
+        from . import arrest as arrest_mod
+
+        # The gate's watch stands there before anybody looks for the law (live
+        # 2026-11-15: the call "went out" at the gate, then its watch was posted).
+        posted = [] if self.scene.in_encounter else arrest_mod.post_the_gate(self)
         law = trial._law_here(self)
         if law:
             # The one the words named first, if they are the law.
@@ -6460,6 +6465,9 @@ class Engine:
                         f"themselves up to. Yielding to anybody else is said to them.")
         out.intent_id = intent.id
         out.because = intent.because
+        if posted:
+            out.tell = f"{posted[0].tell} {out.tell}"
+            out.effects[:0] = posted[0].effects
         return out
 
     def _op_escape(self, intent: Intent, partial: dict) -> Outcome:
