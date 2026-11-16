@@ -1095,6 +1095,9 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                     _draw(row, a, pc)
             if act == "disguise" and pc is not None:
                 _disguise(row, a, pc)
+            # Taking 10 or 20 is always on the ground at hand: nobody takes 20 on a tavern.
+            if act == "search" and (a.get("where") == "here" or a.get("take"))                     and pc is not None:
+                _search(row, a, pc)
             if act == "commission" and pc is not None:
                 _commission(row, a, scene, pc)
             if act == "escape" and pc is not None:
@@ -1117,6 +1120,20 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 row.note = "the same work agreed once already this turn"
             seen.add(who)
     _take_is_the_harvest(rows)
+    # One search a turn: "I take my time and go over every brick …, taking twenty on the
+    # search" was read as two searches (playtest 2026-11-16, beat 256). The first stands,
+    # taking whatever the words took on either.
+    first = None
+    for row in rows:
+        for b in [b for b in row.intents
+                  if b.get("op") == "check" and (b.get("params") or {}).get("search")]:
+            if first is None:
+                first = b
+                continue
+            if b["params"].get("take", 0) > first["params"].get("take", 0):
+                first["params"]["take"] = b["params"]["take"]
+            row.intents.remove(b)
+            row.note = "the same search once already this turn"
     # One surrender a turn: live 2026-11-15, "shout for the city watch, telling everyone I
     # beat a merchant" was read as two surrenders and the call went out twice.
     given = False
@@ -1440,6 +1457,25 @@ def _sneak(row: Row, a: dict, scene, pc) -> None:
                         "because": "the player hides"})
     row.note = ("a Bluff to divert, then " if a.get("diversion") == "bluff" else "") + (
         "Stealth at full speed (-5)" if params.get("pace") else "Stealth at half speed")
+
+
+def _search(row: Row, a: dict, pc) -> None:
+    """A search of where the player is (`interpret.SEARCH_WHERE` here), built whole: the
+    engine's Perception search, one roll against everything hidden here at its own DC
+    (`Engine._player_search`) — never a DC of the plan's. Taking 10 or 20 is the reader's
+    closed `take` (CRB p.86); whether it may be taken is the engine's.
+
+    Playtest 2026-11-16: the search act owed no op, and of five searches for a hidden way
+    down the plan rolled Survival twice ("finding tracks", "inspecting the masonry"),
+    Perception at its own "average (DC 10)" three times, and a forage once for a ship's
+    hold; the dungeon's own search at DC 20 ran on none of them."""
+    params: dict = {"skill": "perception", "search": True}
+    take = {"ten": 10, "twenty": 20}.get(str(a.get("take") or ""))
+    if take:
+        params["take"] = take
+    row.intents.append({"op": "check", "actor": pc.ref, "params": params,
+                        "because": "the player searches"})
+    row.note = f"a Perception search, taking {take}" if take else "a Perception search"
 
 
 def _craft(row: Row, a: dict, pc) -> None:
@@ -2827,6 +2863,17 @@ def _op(r) -> str:
     return str((r or {}).get("op", "")).lower() if isinstance(r, dict) else ""
 
 
+def _skill(r) -> str:
+    """The 1e skill a check names, as validation will read it: the plan's "search" or
+    "investigation" is Perception (`intents.SKILL_ALIASES`). Live 2026-11-16: the plan's
+    own search check beside the table's survived the built-check rule under its alias and
+    rolled a second Perception at its "average" DC."""
+    from rules import intents as intents_mod
+
+    said = str(((r or {}).get("params") or {}).get("skill") or "")
+    return intents_mod.normalise_skill(said) or said.strip().lower()
+
+
 def _coin_amount(params: dict) -> bool:
     """Whether a coin op's params say how much: a count, or a number in the item's words
     ("gold-piece-10", "10 gp", "ten gold")."""
@@ -2891,8 +2938,7 @@ def _searches_the_ground(r) -> bool:
     of the ground or a look around is made of."""
     op = _op(r)
     return op in ("forage", "prospect", "gather") or (
-        op == "check" and str(((r or {}).get("params") or {}).get("skill") or "").lower()
-        in ("perception", "survival"))
+        op == "check" and _skill(r) in ("perception", "survival"))
 
 
 def loot_is_the_search(raw, frame: dict | None, scene=None, *,
@@ -2949,6 +2995,10 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     checks = {str((b.get("params") or {}).get("skill") or "").lower()
               for b in built if b.get("op") == "check"}
     tracking = any(b.get("op") == "track" for b in built)
+    # A search the table built (`_search`) is the turn's one look for what is hidden here:
+    # the plan's Survival for it, its track or its forage would search for something else.
+    searching = any(b.get("op") == "check" and (b.get("params") or {}).get("search")
+                    for b in built)
     # A trail followed walks where the engine says it leads (`Engine._op_track`), so the
     # plan's own walk for the same follow is not the walk: on the owner's 0.2.21 save
     # (row 136) it was "the fields", toward nothing the engine held.
@@ -3147,14 +3197,20 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
             if notes is not None:
                 notes.append(f"the plan's {op} replaced by the reading's look for tracks")
             continue
+        if searching and str((r or {}).get("actor") or pc.ref) in (pc.ref, "pc") and (
+                (op == "track" and "track" not in acts)
+                or (op == "check" and _skill(r) == "survival" and "track" not in acts)
+                or (op == "forage" and "gather" not in acts)):
+            if notes is not None:
+                notes.append(f"the plan's {op} replaced by the reading's search")
+            continue
         if exerted and _effort_check(r, pc):
             if notes is not None:
                 notes.append(f"the plan's {((r.get('params') or {}).get('skill'))} check "
                              f"replaced by the reading's feat of strength (band "
                              f"{exerted[0]['params']['dc']['band']})")
             continue
-        if op == "check" and checks and str(
-                ((r or {}).get("params") or {}).get("skill") or "").lower() in checks:
+        if op == "check" and checks and _skill(r) in checks:
             # The table built this check whole (`first_aid`, `_request`): the plan's own
             # copy of it, usually without the patient, would roll a second Heal against
             # nobody — or a second Diplomacy, an Influence Attitude beside the request.

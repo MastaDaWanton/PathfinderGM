@@ -5221,6 +5221,60 @@ class Engine:
                        verdict="success" if found else "failure", effects=effects,
                        tell=" ".join(said), because=intent.because)
 
+    # One Perception search is a move action (CRB p.102); taking 20 takes twenty times
+    # as long (CRB p.86): twenty rounds, two minutes.
+    TAKE_20_ROUNDS = 20
+
+    def _player_search(self, intent: Intent, pc, mods, partial: dict) -> Outcome:
+        """The player searches where they are: one Perception result, their own die or a
+        10 or 20 taken (CRB p.86), set against everything hidden here at its own DC
+        (`_player_finds`: hidden creatures, the way down, a dungeon's traps), and the
+        tell says what was found or that nothing was. No DC of the plan's and no
+        circumstance of its own: the difficulty is what is hidden.
+
+        Playtest 2026-11-16 #29/#35: the search was set at the ground's "average (DC 10)"
+        when the way down hides at the CRB's secret-door DC 20, so any roll "succeeded";
+        #28: the plan's +2 for torchlight from a torch the same turn refused; #30: "makes
+        the perception check by 10" and nothing more, found or not; #49/#52: "taking
+        twenty" rolled a live d20.
+
+        Taking 10 or 20 needs no threat or distraction (CRB p.86, "Distractions or
+        threats (such as combat) make it impossible"), so not in a fight; a search has no
+        penalty for failure, so 20 may be taken, and it costs twenty searches' time.
+        A miss says nothing of what was there: "nothing hidden" is all the searcher can
+        see, whether nothing is there or it hid too well (CRB p.564's rule for a missed
+        check, as `_player_finds` follows it)."""
+        intent.params.pop("dc", None)
+        intent.params.pop("circumstance", None)
+        try:
+            take = int(intent.params.get("take") or 0)
+        except (TypeError, ValueError):
+            take = 0
+        if take and self.scene.in_encounter:
+            return self._refuse(intent, f"{pc.name} cannot take {take} in the middle of a "
+                                        f"fight: threats and distractions rule it out "
+                                        f"(CRB p.86). A search here is a single roll.",
+                                code="threatened")
+        label = f"Perception — searching, taking {take}" if take else "Perception — searching"
+        if take:
+            roll = self.dice.given(take, mods, label=label)
+            if take == 20:
+                self.scene.advance(self.TAKE_20_ROUNDS // 10, rounds=self.TAKE_20_ROUNDS)
+        else:
+            # The number to beat is whatever hides here, unknown to the searcher.
+            roll = self._roll_or_suspend(intent, pc, mods, label=label, dc=0,
+                                         partial=partial, dc_shown=False)
+        fx, found = self._player_finds(pc, roll.total, True)
+        here = self.here()
+        took = (" over two minutes" if take == 20 else "")
+        if found:
+            tell = " ".join([f"{pc.name} searches {here.name}{took}.", *found])
+        else:
+            tell = f"{pc.name} searches {here.name}{took} and finds nothing."
+        return Outcome(intent_id=intent.id, op="check", rolls=[roll],
+                       verdict="success" if found else "failure", effects=fx,
+                       tell=tell, because=intent.because)
+
     def _player_finds(self, pc, total: int, searching: bool) -> tuple[list[dict], list[str]]:
         """The player's own Perception result set against each creature hidden from them,
         at that creature's DC (`awareness.notice_dcs`: its Stealth result, its 10 when it
@@ -7822,13 +7876,8 @@ class Engine:
         if searching:
             if not actor.is_pc:
                 return self._search(intent, actor)
-            # The player's own search is the ordinary Perception check, against the
-            # ground's average DC, and — since 2026-10-30 — the same roll is set against
-            # every creature hidden from them, at its own DC (`_player_finds`, below),
-            # as a creature's search is. Before, a hidden NPC could not be found at all.
-            # `search` stays on the intent: the player's die suspends the check, and the
-            # resume comes back through here still a search.
-            intent.params["dc"] = {"band": "average"}
+            if helped is None:
+                return self._player_search(intent, actor, mods, partial)
         # Stealth while watched (CRB p.106): "If people are observing you using any of
         # their senses (but typically sight), you can't use Stealth. Against most
         # creatures, finding cover or concealment allows you to use Stealth." Refused

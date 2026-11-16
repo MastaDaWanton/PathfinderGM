@@ -82,27 +82,41 @@ ORIGIN = "dungeon"
 
 # The owner's own examples, one row per kind; `spot` is the venture spot it lies in (the
 # last one minted when that one was not). `open` is None for a way that needs only finding.
+# `sign` is what anybody standing at the spot sees while the way is still hidden, told on
+# every arrival (`arrived`): playtest 2026-11-16 #48, the culvert lay in the main channel
+# (that venture had no sump) and arriving there told nothing, so nothing said where to
+# search. The secret door stays at its DC; the sign only says a search here is worth it.
+# An owner call: the CRB gives no clue rule, and the common GM advice to give a hidden door
+# a visible clue could not be traced to a primary source (searched 2026-11-16).
 FEATURES: dict[str, list[dict]] = {
     "cave": [{"name": "the split boulder", "spot": "the deep chamber", "find": 20, "open": None,
-              "about": "a boulder split by the frost, a gap behind it, and a passage going down"}],
+              "about": "a boulder split by the frost, a gap behind it, and a passage going down",
+              "sign": "a cold draught comes from somewhere among the rocks"}],
     "mine": [{"name": "the broken cart line", "spot": "the gallery", "find": 0, "open": None,
               "about": "a mine-cart line broken off over a pit, and a ladder going down the side of it"},
              {"name": "the boarded winze", "spot": "the gallery", "find": 20,
               "open": {"force": 13},
-              "about": "a shaft going down, boarded over with rotten timbers"}],
+              "about": "a shaft going down, boarded over with rotten timbers",
+              "sign": "the floor of the gallery sounds hollow underfoot in one place"}],
     "ruins": [{"name": "the trapdoor", "spot": "the undercroft", "find": 20, "open": {"force": 16},
-               "about": "a trapdoor under the rubble, its ring rusted, and steps beneath it"}],
+               "about": "a trapdoor under the rubble, its ring rusted, and steps beneath it",
+               "sign": "the rubble lies oddly here, as if it were heaped over something"}],
     "crypt": [{"name": "the trapdoor", "spot": "the deep chamber", "find": 20, "open": {"force": 16},
-               "about": "a trapdoor under the dust of the floor, and steps beneath it"},
+               "about": "a trapdoor under the dust of the floor, and steps beneath it",
+              "sign": "the dust of the floor lies thinner along one line, as if air moves under it"},
               {"name": "the hollow tomb", "spot": "the niches", "find": 20, "open": {"force": 16},
-               "about": "a tomb with no floor to it, and steps going down inside"}],
+               "about": "a tomb with no floor to it, and steps going down inside",
+              "sign": "one of the tombs is colder to the touch than the rest"}],
     "sewers": [{"name": "the bricked-up culvert", "spot": "the sump", "find": 20, "open": None,
-                "about": "an old culvert bricked up long ago, the mortar gone to mush"}],
+                "about": "an old culvert bricked up long ago, the mortar gone to mush",
+                "sign": "one stretch of the wall is newer brick than the rest"}],
     "cellar": [{"name": "the sealed stair", "spot": "the vaults", "find": 20, "open": {"force": 16},
-                "about": "a flagstone with an iron ring in it, and a stair under it"}],
+                "about": "a flagstone with an iron ring in it, and a stair under it",
+              "sign": "one flagstone of the floor sits a little proud of the others"}],
     "tower": [{"name": "the locked trapdoor", "spot": "the foot", "find": 20,
                "open": {"force": 18, "pick": 25},
-               "about": "a trapdoor in the floor, iron-bound and locked"}],
+               "about": "a trapdoor in the floor, iron-bound and locked",
+               "sign": "the floorboards here are newer than the rest"}],
 }
 
 # Rooms by the ground's family, (name, about); the last is the climax's. A closed list: no
@@ -203,6 +217,17 @@ def on_entering(world, scene, head: dict, kind: str, spot_ids: list[str]) -> dic
         head["deeper"] = {"kind": kind, "feature": feat, "spot": spot,
                           "found": False, "noticed": False}
     return got
+
+
+def sign_of(deeper: dict) -> str:
+    """The way down's sign: from its row in `FEATURES`, so a way recorded before the rows
+    had signs still shows one."""
+    feat = deeper.get("feature") or {}
+    if int(feat.get("find") or 0) <= 0:
+        return ""
+    row = next((r for r in FEATURES.get(deeper.get("kind", ""), ())
+                if r["name"] == feat.get("name")), feat)
+    return str(row.get("sign") or "")
 
 
 def deeper_at(scene, place_id: str) -> tuple[dict, dict] | None:
@@ -398,6 +423,9 @@ def arrived(engine, place) -> tuple[list[dict], list[str]]:
                 rec, said = _found(engine, head, deeper)
                 fx.append(rec)
                 bits.append(said)
+        sign = sign_of(deeper)
+        if not deeper["found"] and sign:
+            bits.append(f"{_cap(sign)}.")
     d = room(engine.scene, place.id)
     if d is None:
         return fx, bits

@@ -307,7 +307,7 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # answer about the player's words (`acts_to_ops._threaten`); read by Intimidate's two
     # uses, Influence Attitude and Demoralize (`Engine._cowed`, `Engine._demoralize`).
     "check": (("skill",), ("dc", "opposed_by", "circumstance", "aid", "request", "search",
-                           "pace", "diversion", "past", "demand"),
+                           "pace", "diversion", "past", "demand", "take"),
               "player"),
     "save": (("save", "dc"), ("on_success", "on_failure", "breaks"), "player"),
     # `player`, because the PC rolls their own to-hit and their own damage. Defaulting
@@ -1390,6 +1390,12 @@ def _check_params(intent: Intent, index: int) -> None:
         if search and (p.get("dc") or p.get("opposed_by")):
             raise IntentError("check: a search is rolled against what is hidden, at its "
                               "own DC. Drop the dc and opposed_by and keep search.",
+                              "schema", index)
+        # Taking 10 or 20 (CRB p.86), the reader's closed answer on a search
+        # (`acts_to_ops._search`); whether it may be taken here is the engine's.
+        if p.get("take") not in (None, "", 10, 20, "10", "20") or (
+                p.get("take") not in (None, "") and not search):
+            raise IntentError("check: take is 10 or 20, and only on a search.",
                               "schema", index)
         if p.get("pace") not in (None, "", "half", "full") or (
                 p.get("pace") and p.get("skill") != "stealth"):
