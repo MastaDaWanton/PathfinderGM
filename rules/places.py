@@ -2186,24 +2186,113 @@ def venture_set(parent: Place, kind: str) -> list[Place]:
     return out
 
 
+def generated_names() -> frozenset[str]:
+    """The names, without "the", of the places this module makes itself rather than
+    reads from the world: a city's great square and crossings, every venture and its
+    spots. A closed vocabulary, as `KINDS` is."""
+    names = {"the great square", *_QUARTERS}
+    for spec in VENTURES.values():
+        names.add(spec["label"])
+        # Two-word spots only: "the top" and "the mouth" end too many ways of naming a
+        # person ("the man at the top") to be read as places.
+        names.update(label for label, _about in spec["spots"] if len(label.split()) > 2)
+    return frozenset(n.removeprefix("the ") for n in names)
+
+
+def venture_head(places, place) -> Place | None:
+    """The head of the venture `place` is in (the sewers, for their main channel), or
+    None when it is in none."""
+    by_id = {p.id: p for p in places or ()}
+    head = None
+    while place is not None and place.origin == "venture":
+        head = place
+        place = by_id.get(place.parent)
+    return head
+
+
+def venture_kind(head) -> str:
+    """Which `VENTURES` kind a venture's head is, by its label, or ""."""
+    name = str(getattr(head, "name", "") or "")
+    return next((k for k, spec in VENTURES.items() if spec["label"] == name), "")
+
+
+def stock_spot_elsewhere(places, here, going_to, said: str) -> str:
+    """A refusal when a walk from inside one venture names a stock spot of its kind that
+    only ANOTHER venture holds, else "".
+
+    Playtest 2026-11-16 #40: in the gardens' sewers, which were seeded without a sump,
+    "I make my way along the main channel to the sump" climbed out, crossed three
+    districts and went down into the great square's sewers to theirs, half an hour. Every
+    sewer has the same spot names, so "the sump" said underground means this sewer's;
+    the other one is reached by name of where it is, not by a word every sewer shares.
+    Said by id, a place is meant exactly and passes."""
+    if here is None or going_to is None or said.strip().lower() == going_to.id.lower():
+        return ""
+    mine, theirs = venture_head(places, here), venture_head(places, going_to)
+    if mine is None or theirs is None or mine.id == theirs.id or going_to.id == theirs.id:
+        return ""
+    stock = {label for label, _about in VENTURES.get(venture_kind(mine), {}).get("spots", ())}
+    if going_to.name not in stock:
+        return ""
+    ways = [p.name for p in places if p.parent == mine.id]
+    up = next((p for p in places if p.id == theirs.parent), None)
+    return (f"There is no {going_to.name.removeprefix('the ')} in {mine.name} you are in: "
+            f"{', '.join(ways) or 'nothing more'} {'is' if len(ways) == 1 else 'are'} all "
+            f"there is. The {going_to.name.removeprefix('the ')} you know is in "
+            f"{theirs.name}" + (f" off {up.name}" if up is not None else "")
+            + ", which is reached from up there.")
+
+
 def spots_for(location, terrain: str = "") -> tuple[Place, ...]:
     """The location's own places. Kept as the name stage 8a shipped under; `home_set`
     is the same function and the docstring lives there."""
     return home_set(location, terrain)
 
 
-def find(places, wanted: str) -> Place | None:
+def distance(a_id: str, b_id: str) -> int:
+    """How many steps up and down the place tree lie between two place ids: 0 for the
+    same place, 1 for a venture and the place it hangs off, 2 for two spots of one
+    venture. Another settlement is farther than anything in this one."""
+    if location_of(a_id) != location_of(b_id):
+        return 1000
+    a, b = _spot_path(a_id), _spot_path(b_id)
+    common = 0
+    for x, y in zip(a, b):
+        if x != y:
+            break
+        common += 1
+    return len(a) + len(b) - 2 * common
+
+
+def _nearest(found: list, near: str):
+    """The first of `found`, or the one nearest `near` when there is a choice (`find`)."""
+    if near and len(found) > 1:
+        return min(found, key=lambda p: distance(near, p.id))
+    return found[0]
+
+
+def find(places, wanted: str, near: str = "") -> Place | None:
     """The place the GM means, by id or by name, or None.
 
     Matched leniently on the way in and refused hard on the way out: "market", "the
     market" and the raw id all mean the same place, and anything else means none of them.
+
+    `near` is where the party stands. Every venture of a kind has the same stock spots,
+    so two sewers both hold "the main channel"; the one nearest `near` in the place tree
+    wins. Playtest 2026-11-16 #40/#42: "the sump" and "the sewers", said in and over the
+    gardens' sewers, went to the great square's (first in the list), half an hour away.
+    The traditions agree on nearest first: CircleMUD's `get_obj_vis` scans what is
+    carried, then the room, then the whole object list (src/handler.c); Inform 7's
+    parser scores a thing in the player's location above one elsewhere before any "does
+    the player mean" rule runs (intfiction.org, "does the player mean" threads).
     """
     want = " ".join(str(wanted or "").split()).lower()
     if not want:
         return None
-    for p in places or ():
-        if want in (p.id.lower(), p.name.lower(), p.name.lower().removeprefix("the ")):
-            return p
+    named = [p for p in places or ()
+             if want in (p.id.lower(), p.name.lower(), p.name.lower().removeprefix("the "))]
+    if named:
+        return _nearest(named, near)
     # The GM's own dressing of a real place: "the merchant's gate" for "the gate", "the
     # old market" for "the market". Measured at the table, 2026-09-06: the plan wrote
     # `travel` to "the merchant's gate", the exact match failed, and the turn was a 502.
@@ -2215,6 +2304,10 @@ def find(places, wanted: str) -> Place | None:
                   if (p.name.lower().split() or [""])[-1].rstrip("s") == head]
         if len(ending) == 1:
             return ending[0]
+        # Two of one stock name ("the city's sewers" with two sewers known) is no coin
+        # toss when the party stands nearer one of them.
+        if near and ending and len({p.name.lower() for p in ending}) == 1:
+            return _nearest(ending, near)
     return None
 
 

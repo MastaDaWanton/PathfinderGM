@@ -15391,7 +15391,7 @@ class Engine:
         if biome is not None and place:
             from . import places as places_mod
 
-            named = places_mod.find(self.places(), place)
+            named = places_mod.find(self.places(), place, near=self.scene.at or "")
             if named is not None and named.terrain != biome:
                 place = ""
         if want and biome is None:
@@ -15412,7 +15412,10 @@ class Engine:
         known = self.places()
         here = self.here()
         if place:
-            going_to = places_mod.find(known, place)
+            going_to = places_mod.find(known, place, near=here.id)
+            elsewhere = places_mod.stock_spot_elsewhere(known, here, going_to, place)
+            if elsewhere:
+                return self._refuse(intent, elsewhere)
             if going_to is None:
                 # "the town", "the city", the settlement's own name: its way in from
                 # outside, its middle from inside (`places.the_settlement`).
@@ -15843,6 +15846,12 @@ class Engine:
                     # place and is then dropped IS left behind, and is said.
                     if keepers.place_of(getattr(a, "world_entity_id", "") or "") == a.at:
                         continue
+                    # Nor what lives down there (`_inhabit`): playtest 2026-11-16 #39,
+                    # "Left behind: the mite" of a creature only ever "further in",
+                    # never met. It is where it lives, as the keeper is; a fight walked
+                    # out of is said by "The fight is left behind".
+                    if any(e.origin == "budget:venture" for e in a.effects):
+                        continue
                     left.append(a.name)
             # The places walked through join the record before the place walked to, so
             # the chart lifts the fog off the way the tell has just said was taken
@@ -16030,7 +16039,20 @@ class Engine:
         elif moved and direction == "in":
             town_name = str(getattr(found_loc, "name", "") or "the settlement")
             bits.append(f"You come back into {town_name}.")
-        if going_to.terrain != was_ground:
+        town_side = ("in", "under")
+        if moved and was_setting in town_side and setting in town_side \
+                and places_mod.location_of(was_place) == places_mod.location_of(going_to.id):
+            # Down under the town or back up into it is the town's own underground, not a
+            # change of country: playtest 2026-11-16 #26/#33, the crypt under the city's
+            # graveyard told "The ground changes: barrows, battlefields and cursed ground"
+            # going down and "streets, yards and rooftops" coming up, and the prose
+            # copied both as a journey.
+            town_name = str(getattr(found_loc, "name", "") or "the settlement")
+            if was_setting == "in" and setting == "under":
+                bits.append(f"You go down under {town_name}.")
+            elif was_setting == "under" and setting == "in":
+                bits.append(f"You come back up into {town_name}.")
+        elif going_to.terrain != was_ground:
             bits.append(f"The ground changes: {biomes.describe(going_to.terrain).lower()}.")
         if went_by:
             # The places the walk actually crossed, said as fact. The narrator is asked
@@ -17238,7 +17260,7 @@ class Engine:
         known = self.places()
         if not str(wanted or "").strip():
             return self.here(), known
-        return places_mod.find(known, str(wanted)), known
+        return places_mod.find(known, str(wanted), near=self.scene.at or ""), known
 
     # --- quests: a task taken up (rules/cards.py, kind "quest") ------------------------------
 
@@ -19280,13 +19302,39 @@ class Engine:
         # and the party went from the green to under the gate without passing through
         # either. Movement is walked (item 48); this was the one door left that was not.
         here_now = self.here()
-        if parent.id != here_now.id:
-            return self._refuse(
-                intent, f"You are at {here_now.name}, not {parent.name}: the way down is "
-                        f"there, not here. Travel to {parent.name} first — that is this "
-                        f"turn's journey — and go in from it.")
         made = places_mod.venture_set(parent, kind)
         head = made[0]
+        # Already down there: the plan's travel to "the sewers" took the party in, and
+        # the venture beside it is the same move. Playtest 2026-11-16 #42 refused it as
+        # "You are at the sewers, not the gardens", standing in the gardens' own sewers.
+        if here_now.id == head.id or here_now.id.startswith(head.id + "/"):
+            return Outcome(intent_id=intent.id, op="venture", effects=[],
+                           tell=f"{actor.name} is in {head.name} off {parent.name} already.",
+                           because=intent.because)
+        walked = None
+        if parent.id != here_now.id:
+            if self._journeyed:
+                return self._refuse(
+                    intent, f"You are at {here_now.name}, not {parent.name}: the way down "
+                            f"is there, not here. Travel to {parent.name} first — that is "
+                            f"this turn's journey — and go in from it.")
+            # Walked there first, as the turn's one journey, then in: playtest 2026-11-16
+            # #31, "I climb back out of the crypt and go down into the city's sewers" was
+            # refused for standing in the crypt. Walked through `travel`, the way any walk
+            # is, never a step across town: the 2026-09-22 bug below this was a venture
+            # that moved the party to the parent without walking at all.
+            walked = self._op_travel(Intent(
+                op="travel", actor=actor.ref, because=intent.because,
+                params={"place": parent.id, "with": list(intent.params.get("with") or [])},
+                visibility="hidden", id=intent.id, origin=intent.origin,
+                origin_name=intent.origin_name), {})
+            if walked.status == "refused":
+                return walked
+            here_now = self.here()
+            if here_now.id != parent.id:
+                return self._refuse(
+                    intent, f"You are at {here_now.name}, not {parent.name}: the way down "
+                            f"is there, not here.")
         # The same place the second time: the id is seeded off the parent, so a return
         # finds the venture already minted and simply goes there.
         existing = places_mod.find(known, head.id)
@@ -19327,13 +19375,25 @@ class Engine:
                         visibility="hidden", id=intent.id, origin=intent.origin,
                         origin_name=intent.origin_name)
         self._hours_underway[head.id] = hours
+        # Down a grate from where the party stands is a step, not a second journey:
+        # playtest 2026-11-16 #41, "go back to the sewers under the gardens" walked to the
+        # gardens and the drop was then refused as "One journey a turn" — and logged
+        # resolved. Ground hours away (a cave, a mine) is a journey of its own and still
+        # waits for the next turn.
+        if not hours:
+            self._journeyed = ""
         try:
             moved = self._op_travel(travel, {})
         finally:
             self._hours_underway.pop(head.id, None)
-        effects = [{"kind": "place", "id": head.id, "name": head.name, "parent": parent.id,
-                    "fresh": fresh, "spots": [m.name for m in made[1:]]}] + list(moved.effects)
-        tell = (f"{head.name}, {'found for the first time' if fresh else 'as before'}, off "
+        if moved.status == "refused":
+            # Not resolved: the venture did not happen (#41's second half).
+            return self._refuse(intent, moved.tell)
+        effects = ([{"kind": "place", "id": head.id, "name": head.name, "parent": parent.id,
+                     "fresh": fresh, "spots": [m.name for m in made[1:]]}]
+                   + list(walked.effects if walked is not None else ()) + list(moved.effects))
+        tell = ((walked.tell + " " if walked is not None and walked.tell else "")
+                + f"{head.name}, {'found for the first time' if fresh else 'as before'}, off "
                 f"{parent.name}" + (f" — {hours} hour{'s' if hours != 1 else ''} away" if hours else "")
                 + ". " + moved.tell + toll_note)
         # Something may live here. Half the time where nothing rates the ground; a

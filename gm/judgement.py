@@ -8830,7 +8830,11 @@ def _a_place_word(phrase: str) -> bool:
 
     words = " ".join(str(phrase or "").lower().split())
     words = re.sub(r"^(?:the|a|an)\s+", "", words)
-    return any(words == k or words.endswith(" " + k) for k in places_mod.KINDS)
+    # And the places the engine makes itself, a city's middle and crossings and the
+    # ventures and their spots: playtest 2026-11-16 #45, the clicked "I go to the great
+    # square." logged a population miss for a person called "great square".
+    return any(words == k or words.endswith(" " + k)
+               for k in (*places_mod.KINDS, *places_mod.generated_names()))
 
 
 def sought_indefinitely(player_text: str) -> bool:
