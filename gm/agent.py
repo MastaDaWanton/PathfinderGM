@@ -902,6 +902,12 @@ class GMAgent:
                     raw, read_ok, self.engine.scene,
                     ask=interpret.confirm_sea if interpret.ENABLED else None,
                     notes=own_words)
+                # And aboard a ship the PC holds, her cruise the words gave
+                # (`acts_to_ops.cruise_spoken`), one closed question per deed.
+                raw = acts_to_ops.cruise_spoken(
+                    raw, read_ok, self.engine.scene,
+                    ask=interpret.confirm_cruise if interpret.ENABLED else None,
+                    notes=own_words)
                 # A journey the plan wrote with nowhere to go, given the place the reading's
                 # journey names (`acts_to_ops.journey_named`).
                 raw = acts_to_ops.journey_named(raw, read_ok, notes=own_words)
@@ -1102,8 +1108,12 @@ class GMAgent:
                 # And the world's answer when the player looked for somebody who is not
                 # here, stated whether or not the plan reached for them (item 29). Last,
                 # because it reads the player's own sentence and competes with nothing.
-                raw = judgement.answer_the_absent(raw, player_input, self.engine.scene,
-                                                  self.world)
+                # Not on a cruise: what she seeks is ships, which the cruise meets
+                # (playtest 2026-11-16 #9, "a merchant ship" looked up as a person).
+                if not any(isinstance(r, dict) and r.get("op") == "sea"
+                           and (r.get("params") or {}).get("do") == "cruise" for r in raw):
+                    raw = judgement.answer_the_absent(raw, player_input,
+                                                      self.engine.scene, self.world)
                 # And a walk to a place the engine cannot find, on a plan that moves
                 # nobody, is the engine's printed answer — never a narrated nothing
                 # (`acts_to_ops.nowhere_to_go`; the owner's 2026-11-05 save, row 69:
@@ -1152,6 +1162,10 @@ class GMAgent:
                 raw = judgement.settle_placeholders(
                     raw, player_input, self.engine.scene, read_ok, notes=own_words,
                     hold_players=n == 0)
+                # A walk the settle left with nowhere to go, given the place the reading's
+                # walk names (`acts_to_ops.travel_named`).
+                raw = acts_to_ops.travel_named(raw, read_ok, self.engine.places(),
+                                               notes=own_words)
                 # A thing the plan reaches for that nothing records is asked about once,
                 # of the passages the player read here (gm/scenery.py): shown, or loose in
                 # any place of this kind, it is ledgered before the engine looks for it;

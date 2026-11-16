@@ -202,21 +202,26 @@ def ways_from(engine, world, place_ids) -> dict[str, list[dict]]:
     # port's: the page keeps a chip whose id is still a way on as "the move did not
     # happen", and live the booking row and this one shared the port's id.
     ship = engine.aboard()
-    if ship is not None and ship.bound_for:
+    if ship is not None and (ship.bound_for or ship.held_by):
         from rules import ships
 
-        dest = world.get(ship.bound_for) if world is not None else None
-        days = ship.days_left
-        row = {"id": ship.id, "name": str(getattr(dest, "name", "") or "port"),
-               "group": "road", "blocked": "", "journey": True, "minutes": 0,
-               "time_words": _days_aboard(days, ship.river) + (
-                   f" to {engine._settlement_name(ship.lands_at)}, then the road inland"
-                   if ship.lands_at else "")}
+        rows_here = []
+        if ship.bound_for:
+            dest = world.get(ship.bound_for) if world is not None else None
+            days = ship.days_left
+            rows_here.append({
+                "id": ship.id, "name": str(getattr(dest, "name", "") or "port"),
+                "group": "road", "blocked": "", "journey": True, "minutes": 0,
+                "time_words": _days_aboard(days, ship.river) + (
+                    f" to {engine._settlement_name(ship.lands_at)}, then the road inland"
+                    if ship.lands_at else "")})
         more = []
         if ship.held_by:
             # Hers to sail anywhere her waters reach (`Engine._come_about`, 2026-11-15):
-            # a row per port, its id the port's, which the journey op re-aims her for.
-            for leg in journey_mod.legs_from(world, ship.came_from or ship.at):
+            # a row per port, its id the port's, which the journey op re-aims her for —
+            # from the quay she lies at too (playtest 2026-11-16 #20: tied up at
+            # Mirabalos, nothing offered to sail her).
+            for leg in engine._her_waters(ship):
                 if (leg.by_sea or leg.by in ("sea", "river")) and leg.to_id != ship.bound_for:
                     days = ships.days_for(leg.miles if leg.source == "exact" else None,
                                           ship.kind, leg.days_apart)
@@ -225,8 +230,7 @@ def ways_from(engine, world, place_ids) -> dict[str, list[dict]]:
                                  "time_words": _days_aboard(days, leg.by == "river")})
         for place_id, rows in out.items():
             if ships.vessel_of(place_id) == ship.id:
-                rows.append(dict(row))
-                rows.extend(dict(m) for m in more)
+                rows.extend(dict(m) for m in rows_here + more)
     return out
 
 

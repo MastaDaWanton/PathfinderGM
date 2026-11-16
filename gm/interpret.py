@@ -410,6 +410,14 @@ def within_place(action: dict, places=(), here: str = "") -> bool:
             said in (p.name.lower(), p.name.lower().removeprefix("the ")) and p.id != here
             for p in places):
         return False
+    # And a ship's room by her name ("the hold of the Red Gull", `places.find`): live
+    # 2026-11-16 it was read `within_place` with fixture `floor` and the walk dropped.
+    if said and places:
+        from rules import ships
+
+        room = places_mod.find(places, said)
+        if room is not None and room.id != here and ships.vessel_of(room.id):
+            return False
     if action.get("within_place") is True or action.get("fixture"):
         return True
     words = " ".join(str(action.get("place") or "").lower().replace("’", "'").split())
@@ -2305,6 +2313,43 @@ _SEA_DEMOS = [
 ]
 
 
+# Whether the player's words put a ship they hold out to cruise (`acts_to_ops.cruise_spoken`),
+# asked only aboard a ship the PC holds with no other ship in sight: the engine's `sea`
+# `cruise`, or nothing. Playtest 2026-11-16 #8/#9: "take the Red Gull out along the trade
+# route, hunting for a merchant ship to rob" was read `journey: the trade route` (refused,
+# no such port) and `seek: a merchant ship` (looked up as a person). Demonstrations
+# written for this, in no world's words; none is a probed line.
+CRUISE_ANSWERS = {"cruise the waters, hunting or waiting for other ships": "cruise",
+                  "sail to a port": "", "something else": ""}
+_CRUISE_DEMOS = [
+    ("take her out along the trade route, hunting for a merchant ship to rob",
+     "cruise the waters, hunting or waiting for other ships"),
+    ("we lie in wait off the headland for a fat merchantman",
+     "cruise the waters, hunting or waiting for other ships"),
+    ("look for a ship to take", "cruise the waters, hunting or waiting for other ships"),
+    ("tell the crew to patrol the sea lanes", "cruise the waters, hunting or waiting for other ships"),
+    ("set a course for Port Velk", "sail to a port"),
+    ("raise sail and take us home", "sail to a port"),
+    ("ask the deckhand what cargo she carries", "something else"),
+    ("go below and sleep", "something else"),
+]
+
+
+def confirm_cruise(span: str, *, model: str | None = None) -> str:
+    """"cruise" when the words put the character's own ship out to cruise or lie in wait
+    for other ships, else ""."""
+    system = ("In a role-playing game the character is aboard a ship they command. Answer "
+              "from the words alone: does the character take the ship out to cruise the "
+              "waters, hunting for or lying in wait for other ships; sail her to a port; "
+              "or do something else?")
+    messages = [{"role": "system", "content": system}]
+    for said, answer in _CRUISE_DEMOS:
+        messages.append({"role": "user", "content": f"The words: {said}"})
+        messages.append({"role": "assistant", "content": json.dumps({"answer": answer})})
+    messages.append({"role": "user", "content": f"The words: {span}"})
+    return CRUISE_ANSWERS.get(_closed(messages, tuple(CRUISE_ANSWERS), model), "")
+
+
 def confirm_sea(span: str, *, model: str | None = None) -> str:
     """The `sea` op's `do` for the player's words about the other ship, or ""."""
     system = ("In a role-playing game the character is aboard a ship with another, hostile "
@@ -2478,6 +2523,14 @@ def _road_to(phrase, scene) -> bool:
     if scene is None or world is None or not str(phrase or "").strip():
         return False
     legs = journey.legs_from(world, str(getattr(scene, "location_id", "") or ""))
+    # Aboard a ship the player holds, the ports her waters reach too ("bring her back into
+    # Mirabalos" from a cruise was read as a walk, 2026-11-16).
+    from rules import ships
+
+    ship = ships.aboard(scene)
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if ship is not None and pc is not None and ship.held_by == pc.ref:
+        legs = list(legs) + ships.her_waters(world, ship)
     want = " ".join(str(phrase).split()).lower().removeprefix("the ")
     return any(leg.to_name.lower() == want or leg.to_id == phrase for leg in legs)
 
@@ -2570,7 +2623,14 @@ def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
             # (docs/playtest-2026-09-28.md, 16.1). Leaving is a move.
             add("travel")
         elif act == "journey":
-            add("journey")
+            # "Board my ship, the Red Gull": a ship lying at this quay is one of this
+            # town's places (`Engine.moored_here`), and going aboard her is a walk.
+            # Live 2026-11-16 the plan wrote that journey and a placeless travel beside it.
+            from rules import ships
+
+            p = places_mod.find(places, a["place"]) if places and a.get("place") else None
+            add("travel" if p is not None and p.id != here and ships.vessel_of(p.id)
+                and ships.vessel_of(p.id) != ships.vessel_of(here) else "journey")
         elif act in ("call_on", "break_in", "rest"):
             add(act)
         elif act == "wait" and (a.get("time") or a.get("until") in DAY_PARTS):

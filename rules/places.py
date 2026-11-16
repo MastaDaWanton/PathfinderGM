@@ -1555,7 +1555,7 @@ def region_set(location_id: str, terrain: str) -> tuple[Place, ...]:
 
 
 def for_scene(location, at: str, terrain_hint: str = "",
-              founded=(), ring=()) -> tuple[Place, ...]:
+              founded=(), ring=(), moored=()) -> tuple[Place, ...]:
     """Every place the party can name from where they stand: home, plus the ground
     they are on if it is not home, plus what play has minted here (`founded`).
 
@@ -1582,6 +1582,22 @@ def for_scene(location, at: str, terrain_hint: str = "",
     from . import ships
 
     aboard = ships.rooms_at(at)
+    if not aboard and moored:
+        # A ship the party may step aboard, lying at this quay (`Engine.places`, playtest
+        # 2026-11-16 #19/#22: her new owner stepped ashore and "board my ship" found no
+        # such place). Her rooms join the town a gangplank from the docks, named by the
+        # ship from the shore ("the Red Gull", "the hold of the Red Gull"); aboard, the
+        # same ids read as her rooms again.
+        town = for_scene(location, at, terrain_hint, founded, ring)
+        for vid in moored:
+            rooms = ships.rooms_at(f"{vid}~{ships.DECK}:x")
+            if not rooms:
+                continue
+            ship = ships.name_for(vid)
+            rooms = (_replace(rooms[0], name=ship),) + tuple(
+                _replace(r, name=f"{r.name} of {ship}") for r in rooms[1:])
+            town = _gangplank(town, rooms)
+        return town
     if aboard:
         # Aboard a ship (2026-11-13): her rooms, from the id alone. At sea the location IS
         # the ship (`Engine._sail`), so her rooms are all there is; at the quay the town is
@@ -1589,15 +1605,8 @@ def for_scene(location, at: str, terrain_hint: str = "",
         loc_id = str(getattr(location, "id", location) or "")
         if ships.vessel_of(loc_id):
             return with_founded(aboard, founded, at)
-        town = for_scene(location, "", terrain_hint, founded, ring)
-        quay = next((p for p in town
-                     if " ".join(str(p.name).split()).lower() in ships.PORT_PLACES), None)
-        if quay is None:
-            return town + aboard
-        deck = aboard[0]
-        town = tuple(_replace(p, exits=tuple(p.exits) + (deck.id,)) if p.id == quay.id
-                     else p for p in town)
-        return town + (_replace(deck, exits=tuple(deck.exits) + (quay.id,)),) + aboard[1:]
+        others = tuple(m for m in moored if m != ships.vessel_of(at))
+        return _gangplank(for_scene(location, "", terrain_hint, founded, ring, others), aboard)
     home = home_set(location, terrain_hint)
     ground = terrain_of(at)
     ring = tuple(ring or ())
@@ -1626,6 +1635,21 @@ def for_scene(location, at: str, terrain_hint: str = "",
                          if p.id == outskirts.id else p for p in base)
         base = base + region
     return with_founded(with_storeys(base), founded, at)
+
+
+def _gangplank(town: tuple[Place, ...], rooms: tuple[Place, ...]) -> tuple[Place, ...]:
+    """A ship's rooms beside a town, her deck (the first) and the docks a step apart both
+    ways; with no docks, her rooms beside the town and no way between."""
+    from . import ships
+
+    quay = next((p for p in town
+                 if " ".join(str(p.name).split()).lower() in ships.PORT_PLACES), None)
+    if quay is None:
+        return town + rooms
+    deck = rooms[0]
+    town = tuple(_replace(p, exits=tuple(p.exits) + (deck.id,)) if p.id == quay.id
+                 else p for p in town)
+    return town + (_replace(deck, exits=tuple(deck.exits) + (quay.id,)),) + rooms[1:]
 
 
 def _with_ring(home: tuple[Place, ...], ring: tuple[Place, ...]) -> tuple[Place, ...]:
@@ -2293,6 +2317,21 @@ def find(places, wanted: str, near: str = "") -> Place | None:
              if want in (p.id.lower(), p.name.lower(), p.name.lower().removeprefix("the "))]
     if named:
         return _nearest(named, near)
+    # A ship's room by her name, from aboard her too: "the hold of the Red Gull" is "the
+    # hold" on her deck (live 2026-11-16, read as no place and answered with a Perception
+    # check), and "the deck of the Red Gull" her deck from the shore, where it is named
+    # "the Red Gull" (`for_scene`'s `moored`).
+    from . import ships
+
+    for p in places or ():
+        vid = ships.vessel_of(p.id)
+        if not vid:
+            continue
+        ship = ships.name_for(vid).lower()
+        room = p.id.rsplit(":", 1)[-1].replace("-", " ")
+        if want in (f"{room} of {ship}", f"{room} of {ship.removeprefix('the ')}",
+                    f"{ship}'s {room.removeprefix('the ')}"):
+            return p
     # The GM's own dressing of a real place: "the merchant's gate" for "the gate", "the
     # old market" for "the market". Measured at the table, 2026-09-06: the plan wrote
     # `travel` to "the merchant's gate", the exact match failed, and the turn was a 502.

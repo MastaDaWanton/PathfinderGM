@@ -3750,6 +3750,82 @@ def sea_spoken(raw, frame: dict | None, scene, *, ask=None, notes: list | None =
     return raw
 
 
+# The acts a cruise comes in: a journey to no port ("out along the trade route"), a seek
+# of a ship, a wait for one, an order to the crew, anything else.
+_CRUISE_ACTS = frozenset({"journey", "seek", "wait", "talk", "request", "other"})
+
+
+def cruise_spoken(raw, frame: dict | None, scene, *, ask=None,
+                  notes: list | None = None) -> list:
+    """The `sea` op's `cruise` the player's words make, aboard a ship the PC holds with no
+    other ship in sight (playtest 2026-11-16 #8/#9: "take the Red Gull out along the trade
+    route, hunting for a merchant ship to rob" was planned as a journey to "the trade
+    route", refused for no such port, and a seek of "a merchant ship" was answered "The
+    merchant, is not here"). Detected in code (the ship is the PC's, no engagement, no
+    `sea` in the plan, an act done now), repaired by ONE closed question per act
+    (`interpret.confirm_cruise`). A cruise stands in for the plan's every way of going
+    somewhere and its `narrate_only`: the engine's cruise is where she goes, and what she
+    meets is told. Live 2026-11-16 the plan wrote `travel` and `found` to "the trade
+    route" five times and the turn degraded to narration with the question answered.
+    With no question (`ask` None) nothing is changed."""
+    from rules import ships
+
+    from . import interpret
+
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if ask is None or pc is None or not isinstance(raw, list) or not frame \
+            or frame.get("error") or getattr(scene, "sea", None) \
+            or any(_op(r) == "sea" for r in raw):
+        return raw
+    ship = ships.aboard(scene)
+    if ship is None or ship.held_by != pc.ref:
+        return raw
+    for a in frame.get("actions") or []:
+        if not interpret.acting(a) or str(a.get("act") or "") not in _CRUISE_ACTS:
+            continue
+        if ask(str(a.get("span") or "")) != "cruise":
+            continue
+        if notes is not None:
+            notes.append("the ship's cruise the words gave, added")
+        kept = [r for r in raw
+                if _op(r) not in ("narrate_only", "journey", "travel", "found")]
+        return kept + [{"op": "sea", "actor": pc.ref, "because": "the player puts her out "
+                        "to cruise", "params": {"do": "cruise"}}]
+    return raw
+
+
+def travel_named(raw, frame: dict | None, places=(), *, notes: list | None = None) -> list:
+    """A `travel` with no `place`, given the one place here the reading's walk names.
+
+    Measured live 2026-11-16 (playtest #14 replayed): "I go back aboard the Red Gull" was
+    read `go, place: the Red Gull`, her deck one of this town's places; the plan wrote
+    `travel` with a placeholder target and no place, the placeholder was taken out
+    (`judgement.settle_placeholders`), and the engine refused "Nobody moves: where to?".
+    Detected in code (the op, the empty param), repaired from the reading's own slot when
+    exactly one walk names a place `places.find` knows; the engine still judges the walk."""
+    from rules import places as places_mod
+
+    from . import interpret
+
+    if not isinstance(raw, list) or not frame or frame.get("error") or not places:
+        return raw
+    found = [places_mod.find(places, str(a.get("place") or ""))
+             for a in frame.get("actions") or []
+             if a.get("act") == "go" and interpret.acting(a)
+             and str(a.get("place") or "").strip()]
+    if len(found) != 1 or found[0] is None:
+        return raw
+    out = []
+    for r in raw:
+        params = (r or {}).get("params") if isinstance(r, dict) else None
+        if _op(r) == "travel" and not str((params or {}).get("place") or "").strip():
+            r = {**r, "params": {**(params or {}), "place": found[0].id}}
+            if notes is not None:
+                notes.append(f"the walk's place, {found[0].name}, from the words")
+        out.append(r)
+    return out
+
+
 def journey_named(raw, frame: dict | None, *, notes: list | None = None) -> list:
     """A `journey` with no `to`, given the one place the reading's journey act names.
 
