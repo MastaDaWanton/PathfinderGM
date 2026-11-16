@@ -5258,6 +5258,7 @@ class Engine:
         label = f"Perception — searching, taking {take}" if take else "Perception — searching"
         if take:
             roll = self.dice.given(take, mods, label=label)
+            roll.taken = True
             if take == 20:
                 self.scene.advance(self.TAKE_20_ROUNDS // 10, rounds=self.TAKE_20_ROUNDS)
         else:

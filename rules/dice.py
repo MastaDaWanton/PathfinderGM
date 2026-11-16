@@ -130,6 +130,9 @@ class Roll:
     modifiers: list[Modifier] = field(default_factory=list)
     label: str = ""
     visibility: str = "hidden"
+    # Taking 10 or 20 (CRB p.86): a face counted, never rolled, so it is no natural 20 —
+    # the table talk called a taken 20 "that natural twenty" (playtest 2026-11-16).
+    taken: bool = False
 
     @property
     def raw(self) -> int:
@@ -138,7 +141,9 @@ class Roll:
     @property
     def natural(self) -> int | None:
         """The single d20 face, when there is exactly one — crits and natural 1s are
-        defined on the face, not the total."""
+        defined on the face, not the total. None for a taken 10 or 20."""
+        if self.taken:
+            return None
         return self.faces[0] if self.die.endswith("d20") and len(self.faces) == 1 else None
 
     @property

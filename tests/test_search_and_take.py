@@ -71,7 +71,7 @@ def test_taking_20_finds_the_way_down_at_its_dc_and_costs_two_minutes(always):
     before = s.clock_minutes
     out = _run(engine, "check", {"skill": "perception", "search": True, "take": 20},
                visibility="player")
-    assert out.rolls[0].natural == 20 and out.verdict == "success"
+    assert out.rolls[0].faces == [20] and out.rolls[0].taken and out.verdict == "success"
     assert deeper["found"] and "bricked-up culvert" in out.tell, out.tell
     assert s.clock_minutes - before == 2
 
@@ -192,3 +192,12 @@ def test_the_plans_own_search_under_an_alias_is_replaced_too():
         raw = acts_to_ops.apply(plan, rows, frame, s)
         assert [r["params"] for r in raw if r.get("op") == "check"] == [
             {"skill": "perception", "search": True, "take": 20}], alias
+
+
+def test_a_taken_twenty_is_no_natural_twenty():
+    """Playtest 2026-11-16, merge: the table talk called a taken 20 "that natural twenty".
+    A face counted under CRB p.86 was never rolled, so `natural` must not report it."""
+    from rules.dice import Roll
+
+    assert Roll(die="1d20", faces=[20]).natural == 20
+    assert Roll(die="1d20", faces=[20], taken=True).natural is None
