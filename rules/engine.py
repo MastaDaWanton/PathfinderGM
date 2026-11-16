@@ -4616,6 +4616,11 @@ class Engine:
         from . import jobs as jobs_mod
 
         resolution.outcomes.extend(self._articled(o) for o in jobs_mod.settle(self))
+        # A found way down's quest opened, and finished once the dungeon is cleared
+        # (rules/dungeons.py `settle`), the same once-a-batch shape.
+        from . import dungeons as dungeons_mod
+
+        resolution.outcomes.extend(self._articled(o) for o in dungeons_mod.settle(self))
         # A hireling's week fallen due: paid from the purse, or they go (rules/hirelings.py).
         from . import hirelings as hirelings_mod
 

@@ -65,6 +65,10 @@ on the props ledger, which `give` already empties.
 Every room is a founded place (`origin` "dungeon"), saved in `Scene.founded` with its state
 under `dungeon`, walked by `travel`, and on the place chart one exit beyond where the party
 has been (play/places_found.py). Nothing here is minted before the way down is found.
+
+**The quest** (owner, 2026-11-16): finding the way down opens the player's own quest to
+clear it, finished by the boss or by every trial, with the CRB's story award — see the
+quest section below `disarm_lands`.
 """
 from __future__ import annotations
 
@@ -395,9 +399,12 @@ def _found(engine, head: dict, deeper: dict) -> tuple[dict, str]:
     door = (first.get("dungeon") or {}).get("door")
     tail = (f" {shut_line(engine.scene, deeper['spot'], first['id'])}" if door else
             f" The way down is open, to {first.get('name', 'somewhere below')}.")
+    # The owner, 2026-11-16: finding the way down gives the quest (see `open_quest`).
+    q_fx, q_said = open_quest(engine, head)
     return ({"kind": "way_down_found", "feature": feat["name"], "at": deeper["spot"],
-             "leads_to": first.get("id", "")},
-            f"Here: {feat['about']} — {feat['name']}.{tail}")
+             "leads_to": first.get("id", ""),
+             **({"quest": q_fx[0]["id"]} if q_fx else {})},
+            f"Here: {feat['about']} — {feat['name']}.{tail}" + (f" {q_said}" if q_said else ""))
 
 
 def arrived(engine, place) -> tuple[list[dict], list[str]]:
@@ -443,6 +450,8 @@ def arrived(engine, place) -> tuple[list[dict], list[str]]:
         d["stocked"] = True
         if d["stock"] == "monster":
             got, said = engine._inhabit(place, guarding=d["role"] == "climax")
+            # Who was stocked here, so the quest can ask whether they are dealt with.
+            d["foes"] = [e["ref"] for e in got if e.get("ref")]
             fx.extend(got)
             if said:
                 bits.append(said)
@@ -579,6 +588,191 @@ def disarm_lands(engine, actor, trap: dict, margin: int) -> tuple[list[dict], li
         _rolls, fx, said = spring(engine, trap, [actor])
         return fx, [f"{actor.name} sets {row['name']} off.", *said]
     return [], [f"{row['name'][:1].upper() + row['name'][1:]} is still set."]
+
+
+# --- the quest: the way down found, the dungeon to clear -----------------------------------
+#
+# The owner, 2026-11-16: "i would like finding the way down to give you a quest to complete
+# it and mark the location for returning. and completing it should be defeating the Boss at
+# the end or completing all trials."
+#
+# What the traditions do, and what was taken:
+# - Skyrim: a location is "Cleared" when every actor with the Boss LocationRefType is dead
+#   (Creation Kit wiki, ck.uesp.net/wiki/IsCleared_-_Location), not when every enemy is;
+#   UESP's Delver page notes a cleared dungeon can still hold living enemies. Taken as (a):
+#   the climax room's creatures dealt with.
+# - Diablo II's Den of Evil finishes when every monster in the cave is dead (diablowiki,
+#   "Den of Evil"). Taken as (b): every room seen through. A trap counts too here, because
+#   the B/X stocking makes a trap room a room's whole challenge.
+# - Daggerfall: a quest's dungeon is revealed on the travel map when the quest names it
+#   (UESP "Daggerfall:Locations"), but its automap reset on leaving ("all map information is
+#   lost"). Refused, as NetHack refused map amnesia (play/places_found.py): the rooms are
+#   founded places and `Scene.been` only grows, so the way back stays on the chart.
+# The quest is the player's own from the first moment (BG3's journal starts a quest on the
+# personal, the find itself), so finishing it is their part (`cards.took_part`), and the
+# CRB's story award pays: "Feel free to award Story Awards when players conclude a major
+# storyline ... worth double the amount of experience points for a CR equal to the APL"
+# (CRB p.397, "Awarding Experience"; `xp.STORY["new"]`). Once: the head's `cleared` and the
+# card's closing both say so. No model writes any of it: the words are place names in code.
+
+QUEST_ORIGIN = "rule:dungeon"
+QUEST_OBJECTIVE = ("Defeat whatever holds the deepest room, or see every room below through: "
+                   "every room entered, every creature dealt with, every trap disarmed or sprung")
+
+
+def quest_origin(head_id: str) -> str:
+    return f"{QUEST_ORIGIN}/{head_id}"
+
+
+def is_quest(card) -> bool:
+    """A dungeon's quest, whose one objective only the engine ticks (`settle`)."""
+    return str(getattr(card, "origin", "") or "").startswith(QUEST_ORIGIN + "/")
+
+
+def _name(engine, place_id: str) -> str:
+    p = places_mod.find(engine.places(), place_id) if place_id else None
+    return str(getattr(p, "name", "") or "")
+
+
+def _where(engine, head: dict) -> str:
+    """"the sewers off the gardens": the venture and the place it was ventured from."""
+    town = _name(engine, head.get("parent", ""))
+    return str(head.get("name") or "the way down") + (f" off {town}" if town else "")
+
+
+def quest_words(engine, head: dict) -> tuple[str, str]:
+    """(title, journal entry) of a dungeon's quest: the one place its words are made, so a
+    generator that knows a dungeon's origin can name it here."""
+    deeper = head.get("deeper") or {}
+    spot = _name(engine, deeper.get("spot", ""))
+    title = _cap(f"Clear what lies below {_where(engine, head)}")[:80]
+    fact = (f"The way down is {(deeper.get('feature') or {}).get('name', 'a way down')}"
+            + (f" in {spot}" if spot else "") + f", in {_where(engine, head)}.")
+    return title, fact
+
+
+def _rooms(scene, head_id: str) -> list[dict]:
+    return [p for p in scene.founded if (p.get("dungeon") or {}).get("of") == head_id]
+
+
+def _dealt_with(engine, ref: str, room_id: str) -> bool:
+    """Dead, fled, yielded or out of the fight: gone from the campaign, down, yielded, or
+    no longer in the room and on no side of a fight (run off, not chasing the party)."""
+    from . import morale
+
+    a = engine.scene.people.get(ref)
+    if a is None or a.is_down or morale.yielded(a):
+        return True
+    fighting = any(ref in refs for refs in (engine.scene.sides or {}).values())
+    return str(getattr(a, "at", "") or "") != room_id and not fighting
+
+
+def _foes(engine, rec: dict) -> list[str]:
+    """Who was stocked in a room; for a room stocked before that was recorded, whoever not
+    of the party stands in it now."""
+    from . import states
+
+    d = rec["dungeon"]
+    if "foes" in d:
+        return list(d["foes"])
+    return [r for r, a in engine.scene.people.items()
+            if str(getattr(a, "at", "") or "") == rec["id"] and not a.is_pc
+            and not a.has_state(states.TRAVELS_WITH_YOU)]
+
+
+def _seen_through(engine, rec: dict) -> bool:
+    d = rec["dungeon"]
+    return bool(d.get("stocked")) and all(_dealt_with(engine, r, rec["id"])
+                                          for r in _foes(engine, rec))
+
+
+def completion(engine, head_id: str) -> str:
+    """"boss" when the climax room held creatures and they are dealt with, "trials" when
+    every room is entered, its creatures dealt with and its trap disarmed or sprung; else "".
+
+    A climax the bestiary stocked with nobody has no boss to defeat, so only the trials
+    finish that dungeon (an owner call): entering an empty last room is not a victory."""
+    rooms = _rooms(engine.scene, head_id)
+    if not rooms:
+        return ""
+    climax = next((r for r in rooms if r["dungeon"].get("role") == "climax"), None)
+    if climax is not None and _foes(engine, climax) and _seen_through(engine, climax):
+        return "boss"
+    if all(_seen_through(engine, r) and not (r["dungeon"].get("trap") or {}).get("armed")
+           for r in rooms):
+        return "trials"
+    return ""
+
+
+def quest_of(scene, head_id: str):
+    from . import cards as cards_mod
+
+    origin = quest_origin(head_id)
+    return next((c for c in cards_mod.quests(scene) if c.origin == origin), None)
+
+
+def open_quest(engine, head: dict) -> tuple[list[dict], str]:
+    """The player's own quest for this way down, through the one quest store, and its
+    tell. (effects, tell); nothing when it is open already."""
+    from . import cards as cards_mod
+
+    if quest_of(engine.scene, head["id"]) is not None:
+        return [], ""
+    pc = engine.scene.pc()
+    origin = quest_origin(head["id"])
+    title, fact = quest_words(engine, head)
+    card = cards_mod.open_quest(engine.scene, title=title, objectives=[QUEST_OBJECTIVE],
+                                facts=[fact], place=str(head["deeper"].get("spot") or ""),
+                                origin=origin, known="taken")
+    return ([{"kind": "quest", "id": card.id, "title": card.title,
+              "objectives": [QUEST_OBJECTIVE], "origin": origin}],
+            f"{pc.name if pc else 'The party'} takes it on: {card.title}. "
+            f"(1) {QUEST_OBJECTIVE}. {fact} The way down is marked on the chart, to come "
+            f"back to.")
+
+
+def settle(engine) -> list:
+    """Once a batch: every found way down has its quest (opened the batch it is found, or
+    the first batch after an older save loads), and an open one is finished the moment the
+    dungeon is cleared — the quest closed, the story award paid once, a tell each."""
+    from . import cards as cards_mod
+    from .engine import Outcome
+
+    scene = engine.scene
+    pc = scene.pc()
+    if pc is None:
+        return []
+    out = []
+    for head in list(scene.founded):
+        deeper = head.get("deeper")
+        if not deeper or not deeper.get("found"):
+            continue
+        origin = quest_origin(head["id"])
+        card = quest_of(scene, head["id"])
+        if card is None:
+            # A save from before the quest existed: the way found, no quest on it.
+            fx, said = open_quest(engine, head)
+            card = quest_of(scene, head["id"])
+            out.append(Outcome(intent_id="", op="quest", effects=fx, tell=said,
+                               because="the way down was found"))
+        if not card.live or deeper.get("cleared"):
+            continue
+        how = completion(engine, head["id"])
+        if not how:
+            continue
+        deeper["cleared"] = how
+        said = ("What held the deepest room is dealt with." if how == "boss"
+                else "Every room below has been seen through.")
+        cards_mod.objective_done(scene, card.id, 0, note=said)
+        line = engine.award_story("new", card.title).strip()
+        out.append(Outcome(
+            intent_id="", op="quest_step",
+            effects=[{"kind": "quest_step", "id": card.id, "objective": 1, "finished": True,
+                      "cleared": how, "origin": origin}],
+            tell=f"{said} {card.title} is finished." + (f" {line}" if line else "")
+                 + " The way down stays on the chart.",
+            because="the dungeon is cleared"))
+    return out
 
 
 def break_door(engine, intent, pc, how: str, partial: dict, *, strict: bool = False):
