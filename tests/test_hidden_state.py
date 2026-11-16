@@ -499,4 +499,5 @@ def test_an_opposed_check_pays_by_the_opposers_take_ten_not_their_die():
     s, e = _board(fight=False)
     pc = s.actors["pc"]
     assert e.reward_check(pc, "stealth", 11, modifier=29) == ""
-    assert e.reward_check(pc, "climb", 15, modifier=3)
+    assert e.reward_check(pc, "stealth", 15, modifier=3, obstacle="c1")
+    assert e.reward_check(pc, "climb", 15, modifier=3) == "", "no obstacle held"

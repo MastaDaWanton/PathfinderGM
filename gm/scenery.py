@@ -605,6 +605,10 @@ def handled(frame, rows, engine, passages: list[str], *, ask_fn=None) -> list[di
         if thing and means.held_power(scene, thing)[0] in ("ability", "spell", "feat",
                                                            "skill"):
             continue
+        if acts_to_ops._skill_named(thing) or acts_to_ops._skill_named(a.get("power")):
+            # A skill used by name is no thing to find (playtest 2026-11-15 #80: "There is
+            # no disguise skill here").
+            continue
         if not thing or thing.lower() in acts_to_ops._IT or not acts_to_ops._a_thing(thing)                 or acts_to_ops._a_person(scene, thing)                 or not engine.unrecorded_thing(thing, pc):
             continue
         if acts_to_ops._mine(thing):

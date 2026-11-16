@@ -603,7 +603,9 @@ def test_the_watchers_award_is_an_engine_line():
 
     src = inspect.getsource(watcher)
     assert '"kind": "setup"' not in src, "an award filed as narration is a template taught"
-    assert src.count('"kind": "consequence"') >= 2
+    # One writer left: the undercurrent's own award went (playtest 2026-11-15 #40); the
+    # card award still files its line as a consequence.
+    assert src.count('"kind": "consequence"') >= 1
 
 
 # --- the model that is not there ----------------------------------------------------------

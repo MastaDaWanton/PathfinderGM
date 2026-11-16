@@ -424,6 +424,20 @@ def resolve(scene, card_id: str, how: str = "resolved", turn: int = 0) -> Card |
     return card
 
 
+def _clip(tell: str, most: int = 200) -> str:
+    """A tell short enough to be a card's fact, cut at a sentence's end, or else at a word
+    with an ellipsis. Playtest 2026-11-15 #100: `tell[:200]` cut mid-word ("Lyra Lyraxys
+    c"), and the Journal ran the stump into the next fact ("…Lyra Lyraxys c Vesna Kroll
+    speaks to the harbourmaster")."""
+    if len(tell) <= most:
+        return tell
+    head = tell[:most]
+    end = max(head.rfind(". "), head.rfind("! "), head.rfind("? "))
+    if end >= most // 3:
+        return head[:end + 1]
+    return head[:head.rfind(" ")].rstrip(" ,;:") + "…" if " " in head else head
+
+
 def touch_from_outcomes(scene, outcomes, turn: int = 0) -> list[str]:
     """The engine's own tells land on the cards they concern, mechanically.
 
@@ -474,8 +488,18 @@ def touch_from_outcomes(scene, outcomes, turn: int = 0) -> list[str]:
         if str(getattr(o, "status", "") or "") == "refused":
             continue
         low = tell.lower()
+        # The jobs this outcome is about, by id (`{"kind": "job", "id": ...}`).
+        about = {str(e.get("id")) for e in (getattr(o, "effects", None) or [])
+                 if isinstance(e, dict) and e.get("kind") == "job"}
         for card in cards:
             if not card.live:
+                continue
+            if card.kind == "job" and card.id not in about:
+                # A job's facts are what was done about THAT job. Playtest 2026-11-15
+                # #100: every tell naming its employer or hitting "work"/"paid" landed on
+                # it — the harbourmaster asked for dock work filed under Lyra's week, the
+                # gate's "your name is on the watch's lips" under her caravan, and the
+                # caravan's own lapse under the week.
                 continue
             named = False
             for ref in card.people:
@@ -485,7 +509,7 @@ def touch_from_outcomes(scene, outcomes, turn: int = 0) -> list[str]:
                     named = True
                     break
             if named or _hits(card, keyed) >= 2:
-                touch(scene, card.id, tell[:200], turn=turn, tick=named)
+                touch(scene, card.id, _clip(tell), turn=turn, tick=named)
                 touched.append(card.id)
     return touched
 
@@ -735,6 +759,10 @@ def objective_done(scene, card_id: str, index: int, note: str = "", turn: int = 
     return card
 
 
+# A job's closing state as the Journal says it (rules/jobs.py `STATES`).
+_ENDED = {"paid": "finished", "lapsed": "missed", "declined": "turned down", "gone": "missed"}
+
+
 def quest_log(scene) -> dict:
     """What the table page shows: the quests underway, then the ones finished."""
     # The whole store, not `actors` (who is here): a giver left behind in the back streets
@@ -750,6 +778,12 @@ def quest_log(scene) -> dict:
                 "reward": c.reward, "objectives": [dict(o) for o in c.objectives],
                 "facts": list(c.facts), "done": sum(1 for o in c.objectives if o.get("done")),
                 "of": len(c.objectives), "standing": standing(c),
+                # How a closed matter ended, for its chip: playtest 2026-11-15 #99, the
+                # caravan job she missed sat under "Finished" as if seen through.
+                "ended": (_ENDED.get(str((c.job or {}).get("state") or ""), "")
+                          if c.kind == "job" and not c.live else ""
+                          ) or ("dropped" if c.stage == "dropped" else
+                                "finished" if not c.live else ""),
                 **({"kind": "job"} if c.kind == "job" else {})}
 
     # A quest the player has never heard of is not in their Journal (the owner's report,

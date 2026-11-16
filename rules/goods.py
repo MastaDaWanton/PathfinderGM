@@ -313,6 +313,14 @@ def known_item(name: str) -> dict | None:
     return None
 
 
+def is_clothes(key: str) -> bool:
+    """Whether this pack key is an outfit, worn on the body slot (`creation.OUTFITS`): the
+    CRB's outfits and vestments ("traveler's outfit", "cleric's vestments"), by the
+    item's own name, never the player's words."""
+    low = " ".join(str(key or "").lower().split())
+    return low.endswith((" outfit", " vestments", " clothes", " robes"))
+
+
 def canonical(name: str) -> str:
     """The one key a weapon, a round, a suit or a shield is stored under, else the name
     itself, lowered. What `wear`, `deliver` and the loot write, so a save never again holds

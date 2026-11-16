@@ -172,6 +172,14 @@ def ready_to_level(actor) -> bool:
 # of that CR's fight award, because a check is one roll and a fight is a dozen. DC 15
 # is 100 XP, DC 20 is 300, DC 25 is 600; a first-level character needs 2,000 to advance,
 # so twenty moderate checks or seven hard ones is a level, against five CR 1 fights.
+#
+# Paid only for an OBSTACLE the engine holds (`Engine.reward_check`'s `obstacle`): the
+# person opposed or swayed, the trap, the door, the dying patient — once per obstacle,
+# never per roll. Playtest 2026-11-15 #11/#53: a Stealth and an Intimidate "vs 12" at
+# nothing (a bracelet that did not exist, a guard who was not there) paid 100 XP each,
+# because the DC was the plan's band. And the GM's private note moving pays nothing
+# (#40, `gm/watcher._apply_undercurrent`); a situation card resolved still pays the
+# "advance" share below, and a quest concluded the CRB's double.
 
 CHECK_SHARE = 4          # a check is a quarter of the fight its DC would be
 STORY = {"new": 2.0, "advance": 0.5}   # of a CR = level award; "new" is the CRB's double

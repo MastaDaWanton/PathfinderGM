@@ -47,27 +47,25 @@ def test_a_dc_reads_as_a_cr_and_a_check_pays_a_quarter_of_the_fight():
     assert xp.challenge_award(10, 14) == 0 and xp.challenge_award(1, 14) > 0
 
 
-def test_a_check_beaten_pays_once_per_dc_per_place_per_day():
+def test_a_check_at_the_plans_dc_with_no_obstacle_pays_nothing():
+    """Was: a climb at DC 15 paid 150 XP once a day. Playtest 2026-11-15 #11/#53 measured
+    what that rule paid for — 100 XP each for a Stealth and an Intimidate "vs 12" at
+    nothing — so a check pays only for an obstacle the engine holds (`reward_check`'s
+    `obstacle`), once per obstacle; a wall the plan gave a DC is not one."""
     s, engine = _room()
     pc = s.pc()
     before = pc.xp
-    def climb(face):
-        intents = engine.validate([{"op": "check", "actor": "pc", "because": "t",
-                                    "params": {"skill": "climb", "dc": 15}}],
-                                  origin="author:test")
-        res = engine.run(intents)
-        assert res.awaiting, "the player rolls their own check"
-        return engine.resume(face).outcomes[-1]
-
-    first = climb(20)
-    assert first.verdict == "success" and "You gain 150 XP" in first.tell, first.tell
-    assert pc.xp - before == 150
-    # The same wall, the same day: no second payment for the grind.
-    again = climb(20)
-    assert again.verdict == "success" and "You gain" not in again.tell
-    assert pc.xp - before == 150
-    # A miss pays nothing.
-    assert "You gain" not in climb(1).tell
+    intents = engine.validate([{"op": "check", "actor": "pc", "because": "t",
+                                "params": {"skill": "climb", "dc": 15}}],
+                              origin="author:test")
+    res = engine.run(intents)
+    assert res.awaiting, "the player rolls their own check"
+    first = engine.resume(20).outcomes[-1]
+    assert first.verdict == "success" and "You gain" not in first.tell, first.tell
+    assert pc.xp == before
+    # An obstacle held pays, once.
+    assert "You gain 150 XP" in engine.reward_check(pc, "climb", 15, obstacle="door:x")
+    assert engine.reward_check(pc, "climb", 15, obstacle="door:x") == ""
 
 
 def test_a_storyline_concluded_pays_the_crb_double_and_one_advanced_pays_half():

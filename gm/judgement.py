@@ -3213,7 +3213,10 @@ def inject_checks(raw_intents, player_text: str, scene) -> list:
     present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
     # `track` rolls Survival itself (2026-10-09, `Engine._op_track`): "I track the boar"
     # matched the survival verbs below and would have rolled it twice.
-    if present & {"check", "attack", "manoeuvre", "save", "track"}:
+    # `disguise` rolls Disguise itself (`Engine._op_disguise`): live 2026-11-15, "I disguise
+    # myself as a dock labourer" built the disguise AND matched the disguise verbs below,
+    # and the second check replaced the first disguise with a worse one.
+    if present & {"check", "attack", "manoeuvre", "save", "track", "disguise"}:
         return raw_intents
     pc = scene.pc()
     if pc is None:
@@ -9813,6 +9816,13 @@ def embody_seen(scene, *, turn: int, world=None, beat: str = "", engine=None) ->
             rows.append({"kind": "seen-people", "made": "", "record": rec["id"],
                          "why": "in a fight the prose brings nobody in"})
             continue
+        if _the_disguise(scene, said_as):
+            # Who the player is disguised as is the player, never a newcomer: live
+            # 2026-11-15, "the weary air of a dock laborer" made a dock labourer stand in
+            # the market beside the woman disguised as one.
+            rows.append({"kind": "seen-people", "made": "", "record": rec["id"],
+                         "why": "the player's own disguise"})
+            continue
         known = _householder(scene, rec, said_as, beat) or _held_elsewhere(scene, said_as)
         if known is not None:
             # Through the engine's door, never `Scene.move` from here (the one-spatial-
@@ -9857,6 +9867,27 @@ def embody_seen(scene, *, turn: int, world=None, beat: str = "", engine=None) ->
                      "square": list(scene.positions.get(actor.ref) or [])
                      if getattr(scene, "positions", None) else []})
     return rows
+
+
+def _the_disguise(scene, phrase: str) -> bool:
+    """Whether a phrase the prose used for somebody is who the player is disguised as
+    (`rules/disguise.py`, the disguise's own `as`): a close spelling counts, "dock laborer"
+    for "dock labourer"."""
+    import difflib
+
+    from rules import disguise
+
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    held = disguise.worn(pc) if pc is not None else None
+    if held is None:
+        return False
+
+    def bare(words: str) -> str:
+        return re.sub(r"^(?:an?|the|one of the|some)\s+", "", " ".join(
+            str(words or "").lower().split()))
+
+    want, said = bare((held.payload or {}).get("as")), bare(phrase)
+    return bool(want and said) and difflib.SequenceMatcher(None, want, said).ratio() >= 0.85
 
 
 def _held_elsewhere(scene, phrase: str):

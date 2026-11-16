@@ -419,6 +419,12 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # "escape artist"; left out, the better of the two. The holder is the engine's (the
     # condition's own `by`), aimed by `target` only to choose among two holders.
     "escape": ((), ("actor", "how"), "player"),
+    # Making yourself look like somebody else (Disguise, CRB p.95): one Disguise check,
+    # made secretly — the result IS the disguise, held as `state.disguised` and opposed by
+    # each suspicious viewer's Perception (`rules/disguise.py`). `as` is the player's words
+    # for who they pass for. Written only by the act->op table from the reader's
+    # `disguise` act, and by the engine for a plan's Disguise check (CODE_ONLY_OPS).
+    "disguise": ((), ("actor", "as"), "hidden"),
     "temp_hp": (("amount",), ("to", "source", "duration"), "hidden"),
     # Poison, disease, a spell that withers: damage to a score rather than to hit points.
     # `drain` for the permanent kind, which no amount of resting brings back.
@@ -810,7 +816,8 @@ CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending", "request", "
 # `craft` act, built whole into `make`; the chain bench (play/craft_views.py) still writes
 # `craft` itself, from code.
 # `harvest` since 2026-11-01: the reader's `harvest` act, built whole (`acts_to_ops._harvest`).
-CODE_ONLY_OPS = frozenset({"job", "make", "craft", "greet", "commission", "harvest"})
+CODE_ONLY_OPS = frozenset({"job", "make", "craft", "greet", "commission", "harvest",
+                           "disguise"})
 # Ops only the author's own hand writes (`/cheat`, origin `author:`): left out of the
 # turn's op enum like the code-only ops, but offered to the cheat (`prompts.CHEAT_OPS`),
 # and refused by the engine from any other origin. `xp` since 2026-11-07 (audit #22): a

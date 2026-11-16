@@ -693,19 +693,89 @@ def accept(engine, card):
     return card
 
 
+# The keepers of these places take on hands by the week, without a start document to put
+# work on their table (playtest 2026-11-15 #84: asked for paid dock work, the harbourmaster
+# said "there is always labor to be found… hauling crates", and no job existed — the
+# narrator had invented work the engine did not hold, and a player with 1 gp and a
+# 28.8 gp fare had no honest way to passage). By the places' own table
+# (`places.STAFFED`): the ones whose trade is hauling, loading and tallying. Ours: no
+# source lists which keepers hire; the wage is the CRB's untrained hireling for
+# labour and carrying, the trained one for counting (`per_day_cp`).
+HIRES: dict[str, tuple[str, ...]] = {
+    "the docks": ("carry", "labour"), "the warehouses": ("carry", "count"),
+    "the workshops": ("labour", "carry"), "the tannery": ("labour",),
+    "the brewery": ("labour", "carry"), "the mill": ("labour", "carry"),
+    "the carters yard": ("carry", "labour"),
+}
+
+
+def hires_hands(actor) -> tuple[str, ...]:
+    """The work this person takes hands on for, when they keep a place in `HIRES`."""
+    from . import keepers
+
+    wid = str(getattr(actor, "world_entity_id", "") or "")
+    if not keepers.is_keeper(wid) or keepers.counter_of(wid):
+        return ()
+    return HIRES.get(keepers.label_of(keepers.place_of(wid)), ())
+
+
+def hire_on_demand(engine, actor):
+    """A week's work opened at a keeper in `HIRES` who holds none live, when the player
+    asks them for work; the card, or None. Opened `heard`, as an opening's is, so it is
+    put to the player by the offer that follows (`Engine._op_job`)."""
+    choices = hires_hands(actor)
+    if not choices or held_by(engine.scene, actor.ref):
+        return None
+    card = open_week(engine, {"choices": choices}, actor.ref,
+                     origin=f"hires:{getattr(actor, 'world_entity_id', '')}")
+    # The place's own work, priced at once: a dock hires haulers whatever the player says
+    # they can do, so "is there paid work?" is answered with a wage, not a question back.
+    return choose_work(engine, card, choices[0]) if card is not None else None
+
+
+def quit_refusal(card) -> str:
+    """Why a job the player took cannot be given up now, or "". Before the road it can
+    (playtest 2026-11-15 #9: "I've changed my mind about the caravan" had no way to the
+    contract she held); once the wagons are rolling the job ends at the far town."""
+    j = card.job or {}
+    if j.get("set_out"):
+        return (f"The wagons are already on the road to "
+                f"{(j.get('route') or {}).get('to_name')}: the job ends when they are in.")
+    if j.get("state") not in ("open", "met"):
+        return "That job is already over."
+    return ""
+
+
 def decline(engine, card):
+    """Turn down a job put to the player, or give up one they took and have not started.
+
+    A taken escort given up is `declined` like one turned down: the wagons go without the
+    player, and the sum put in the master's purse for the guard goes back out of it. No
+    regard is lost for saying so before the hour (the owner's answer 4 docks regard for a
+    no-show, which this is not)."""
     from . import cards as cards_mod
+    from . import goods
 
     card = cards_mod.find(engine.scene, card.id)
     if card.job.get("work") == "escort":
+        if card.job.get("funded"):
+            master = engine.scene.people.get(
+                (card.job.get("counterpart") or {}).get("master", ""))
+            if master is not None:
+                master.purse, _ok = goods.spend(master.purse, int(card.job["funded"]))
+            card.job["funded"] = 0
         card.job["state"] = "declined"
         cards_mod._store(engine.scene, card)
         return cards_mod.resolve(engine.scene, card.id, how="dropped")
     # The week's posting stays on the table: turning down one kind of work is not turning
-    # the table down.
+    # the table down. But it is no longer put to the player: back to a call they have
+    # heard, out of the Journal, until the employer puts it again. Playtest 2026-11-15
+    # #99: the town week turned down on day 1 still sat under "Matters in play" a month
+    # on, and (#73) the matter slot sent word "asking them to come by" about it.
     card.job["work"] = ""
     card.job.pop("pay", None)
     card.reward = ""
+    card.known = "heard"
     card.facts = [facts_line(engine, card)]
     cards_mod._store(engine.scene, card)
     return card

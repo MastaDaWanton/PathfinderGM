@@ -238,35 +238,19 @@ def _rewrite(c, sentence, action="advance"):
                                            "action": action, "thread": "the old note"})
 
 
-def test_one_recycled_note_pays_once_not_seven_times(campaign):
-    """The 1,700 XP: seven rewrites of one private note, each paid as an advance."""
+def test_the_undercurrent_moving_or_ending_pays_nothing(campaign):
+    """Playtest 2026-11-15 #40: "You gain 200 XP for moving a matter along" in the middle
+    of a mugging, after one punch. The note is the GM's private sentence; the CRB's story
+    award is for a storyline concluded, never a GM's thread moved. (Before: the 1,700 XP
+    of seven rewrites, then one advance and one ending per thread.)"""
     c = campaign
     pc = c.scene.pc()
     xp = pc.xp
-    for i in range(7):
+    for i in range(3):
         assert _rewrite(c, f"The stallholder's grip on your sleeve tightens again, take {i}.")
-    from rules import xp as xp_mod
-
-    assert pc.xp - xp == xp_mod.story_award(pc.level, "advance")
-    lines = [t for t in c.transcript if "XP" in str(t.get("text", ""))]
-    assert len(lines) == 1
-    assert "stallholder" not in lines[0]["text"], "the GM's private note printed on the page"
-
-
-def test_a_thread_ends_once_and_only_after_it_moved(campaign):
-    c = campaign
-    pc = c.scene.pc()
-    xp = pc.xp
-    _rewrite(c, "A new thread nobody has moved yet begins here.", action="new")
-    assert pc.xp == xp, "an ending paid for a thread that never moved"
-    _rewrite(c, "The second thread moves a step along now.")
-    moved = pc.xp
-    assert moved > xp
-    _rewrite(c, "The second thread is over and a third begins.", action="new")
-    ended = pc.xp
-    assert ended > moved
-    _rewrite(c, "The third thread is called over before it moved.", action="new")
-    assert pc.xp == ended
+    assert _rewrite(c, "That thread is over and a new one begins.", action="new")
+    assert pc.xp == xp
+    assert not [t for t in c.transcript if "XP" in str(t.get("text", ""))]
 
 
 def test_the_watcher_cannot_close_or_fill_a_schemes_card(campaign):

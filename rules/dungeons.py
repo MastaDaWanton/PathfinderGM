@@ -610,7 +610,8 @@ def break_door(engine, intent, pc, how: str, partial: dict, *, strict: bool = Fa
         bits.append(f"{_cap(door['name'])} gives: the way to "
                     f"{getattr(dest, 'name', 'beyond')} is open.")
         bits.append(engine.reward_check(pc, "strength" if how == "force" else "disable device",
-                                        dc, modifier=roll.modifier_total).strip())
+                                        dc, modifier=roll.modifier_total,
+                                        obstacle=f"door:{far}").strip())
     else:
         bits.append(f"{_cap(door['name'])} holds.")
     fx.append({"kind": "dungeon_door", "to": far, "how": how, "opened": opened})
