@@ -101,18 +101,60 @@ def shown(text: str, key: str) -> bool:
     return any(family.search(n) and _about_the_player(n) for _w, n in page_sentences(text))
 
 
-def missing(ctx, text: str | None = None) -> list:
-    """The strains the engine holds (`survival.strains`) that the page does not show."""
+# How long a strain, once told, goes before the page owes it again, in game minutes: the
+# hour CircleMUD's `point_update` takes to say "You are hungry." again (limits.c). Playtest
+# 2026-11-16 #25: owed on every beat, the wound was written into every beat from day 32 on
+# — most of them put there by this check's own rewrite ("You trudge" -> "You limp … your
+# body aching"), and twice in one short paragraph (beat 205). A line that is always there
+# is a formula (docs/narrator-guards.md); a new or changed strain is owed at once.
+RETELL_MINUTES = 60
+_TOLD = "body:told"
+
+
+def owed(scene) -> list:
+    """The strains the engine holds that this beat owes the page: new since last told,
+    told in other words (worse, or better), or told `RETELL_MINUTES` ago or more. The
+    brief (`prompts.body_now`) and this check read the same list."""
     from rules import survival
 
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if pc is None:
+        return []
+    told = (getattr(scene, "said", None) or {}).get(_TOLD) or {}
+    clock = int(getattr(scene, "clock_minutes", 0) or 0)
+    out = []
+    for s in survival.strains(pc):
+        was = told.get(s.key)
+        if not (isinstance(was, list) and len(was) == 2 and was[1] == s.words
+                and 0 <= clock - int(was[0]) < RETELL_MINUTES):
+            out.append(s)
+    return out
+
+
+def note_told(scene, text: str) -> None:
+    """After the beat ships: each owed strain the page shows is told now. A strain shown
+    while not owed leaves the clock where it was, so the model's own unprompted ache does
+    not keep pushing the next telling away."""
+    said = getattr(scene, "said", None)
+    if not isinstance(said, dict):
+        return
+    told = dict(said.get(_TOLD) or {})
+    clock = int(getattr(scene, "clock_minutes", 0) or 0)
+    for s in owed(scene):
+        if shown(text, s.key):
+            told[s.key] = [clock, s.words]
+    said[_TOLD] = told
+
+
+def missing(ctx, text: str | None = None) -> list:
+    """The strains this beat owes (`owed`) that the page does not show."""
     scene = ctx.scene
     if getattr(scene, "in_encounter", False):
         return []
-    pc = scene.pc() if hasattr(scene, "pc") else None
     text = ctx.text if text is None else text
-    if pc is None or not str(text or "").strip():
+    if not str(text or "").strip():
         return []
-    return [s for s in survival.strains(pc) if not shown(text, s.key)]
+    return [s for s in owed(scene) if not shown(text, s.key)]
 
 
 def anchor(text: str) -> str:

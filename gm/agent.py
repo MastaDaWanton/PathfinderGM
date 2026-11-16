@@ -2911,6 +2911,9 @@ class GMAgent:
         # Sentences a rewrite was refused for breaking a tell (`gate`): no backstop cuts
         # them below.
         protected: set[str] = set()
+        # Each rewrite kept, new words -> the sentence they replaced, so `keep_act_slots`
+        # knows a slot's sentence rewritten in place from one cut.
+        rewrites: dict[str, str] = {}
         order = sorted(range(len(findings)), key=lambda i: (-int(findings[i].weight or 0), i))
         members = []
         for i in order:
@@ -2995,6 +2998,7 @@ class GMAgent:
                     protected.add(" ".join(sentence.split()))
                     continue
                 text = candidate
+                rewrites[fixed] = sentence
                 notes.append(f"{f.kind}: {sentence[:80]!r} -> {fixed[:80]!r}")
         # The backstops, over the beat as it now stands: only a member that still finds
         # something is asked, so a rewrite that held costs nothing here.
@@ -3036,7 +3040,8 @@ class GMAgent:
                 if any(s in text for s in f.sentences):
                     notes.append(f"{f.kind}: no backstop; left as written")
         if getattr(ctx, "planned", False):
-            text, kept = keep_act_slots(original, text, getattr(ctx, "slots", ()))
+            text, kept = keep_act_slots(original, text, getattr(ctx, "slots", ()),
+                                        rewrites=rewrites)
             notes += kept
         return re.sub(r"[ \t]{2,}", " ", text or "").strip(), notes, attempts
 
@@ -4573,6 +4578,10 @@ class GMAgent:
                                         *power_unbacked.authored_in(text),
                                         *light_shown.authored_in(text))
                             if s not in self.last_added]
+        # What of the body this page told, so the next beat does not owe it again within
+        # the hour (`body_shown.owed`, playtest 2026-11-16 #25).
+        if not self.engine.scene.in_encounter:
+            body_shown.note_told(self.engine.scene, text)
         # And the deeds backstop's opening built from the player's own line
         # (`_show_declared`): ours too.
         self.last_added += [s for s in self.deed_lines
@@ -5382,7 +5391,8 @@ def said_by_its_slot(unshown: list[dict], outcomes, slots, pc
     return kept, [str(d.get("span") or d.get("act")) for d in unshown if d not in kept]
 
 
-def keep_act_slots(before: str, after: str, slots) -> tuple[str, list[str]]:
+def keep_act_slots(before: str, after: str, slots, *, rewrites=None
+                   ) -> tuple[str, list[str]]:
     """No repair leaves a planned act slot's tells untold: a slot that had a sentence on
     the page before the narrator checks' repairs and has none after gets the engine's own
     line for its tells where its sentences stood (`planned.engine_line`, the tells check's
@@ -5400,8 +5410,17 @@ def keep_act_slots(before: str, after: str, slots) -> tuple[str, list[str]]:
         return after, []
     was = {planned.slot_of(x, acts) for x in narration_mod._sentences(before)}
     notes: list[str] = []
+    # A sentence a repair rewrote in place is still its slot's: judged by what it replaced.
+    # Playtest 2026-11-16 #38: the body repair turned "You emerge into the gardens, leaving
+    # the mite behind" into "You limp into the gardens, your body aching with every step as
+    # you leave the mite behind", the rewrite shared too few words with the slot, the slot
+    # was taken for cut, and the travel tell went onto the page raw beside it: "The ground
+    # changes: streets, yards and rooftops. … It takes half an hour. Left behind: the mite."
+    def _was(x: str) -> str:
+        return next((old for new, old in (rewrites or {}).items() if x and x in new), x)
+
     for n, s in enumerate(acts):
-        now = [(x, planned.slot_of(x, acts)) for x in narration_mod._sentences(after)]
+        now = [(x, planned.slot_of(_was(x), acts)) for x in narration_mod._sentences(after)]
         if n not in was or any(o == n for _x, o in now):
             continue
         line = planned.engine_line(s["tells"])

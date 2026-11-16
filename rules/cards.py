@@ -38,6 +38,7 @@ import copy
 import re
 from dataclasses import dataclass, field
 
+from . import places as places_mod
 from . import states
 from .activeeffect import ActiveEffect
 
@@ -985,6 +986,16 @@ def salience(scene, *, recent, player_text: str = "", tells=(),
         # A quest is the player's own only once taken (`standing`); every quest card also
         # carries TAG_PLAY, so the tag alone made a scheme's unheard quest "own".
         own = (is_own(c) or (c.kind not in TASKS and c.is_(TAG_PLAY)) or present)
+        if standing(c) == SITUATION and c.place and not present \
+                and places_mod.location_of(c.place) != places_mod.location_of(here):
+            # A matter of the world THERE is not seen or heard here. Playtest 2026-11-16
+            # #10: at sea on the Red Gull's deck the matter slot was handed Kalimnar's
+            # strain ("Economic competition between Khy'vyr clans and Nirkor merchants")
+            # and wrote it rippling "through the port … the north crossing and … the great
+            # square"; in Mirabalos's sewers it wrote Xylorvotha's and Kalimnar's. The
+            # word "merchant" in the tells was enough to make it "spoken". A matter of the
+            # player's own still goes where they go.
+            continue
         if own:
             qualifies = bool(set(why) - {"quiet", "urgent"})
         else:

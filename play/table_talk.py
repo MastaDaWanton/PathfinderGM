@@ -146,7 +146,13 @@ def moments(c, resolution) -> tuple[list[str], list[str]]:
             # "his status makes that direct challenge a lot harder to pull off" over an
             # Intimidate that had just succeeded (playtest 2026-11-15 #54).
             verdict = str(getattr(o, "verdict", "") or "")
-            came = (" It worked all the same." if verdict == "success"
+            # A search made over nothing is no find to praise: playtest 2026-11-16 #53,
+            # "you caught that seam perfectly" over a search that found nothing.
+            from gm.beat_verify import found_nothing
+
+            empty = hasattr(o, "as_dict") and found_nothing(o.as_dict())
+            came = (" The search was made well, and it turned up nothing." if empty
+                    else " It worked all the same." if verdict == "success"
                     else " It failed." if verdict == "failure" else "")
             facts.append(f"You gave a {word} for how it was done: "
                          f"{str(dc['circumstance_why']).rstrip('. ')}.{came}")
@@ -154,7 +160,13 @@ def moments(c, resolution) -> tuple[list[str], list[str]]:
             if getattr(r, "visibility", "") != "player":
                 continue
             face = getattr(r, "natural", None)
-            if face in (1, 20):
+            # A taken 10 or 20 (CRB p.86) is no die rolled: the search lane builds it as a
+            # given 1d20 face labelled "…taking 20", and the table said "That natural twenty
+            # is a gift" (2026-11-16). shortcut: read off our own label; upgrade when the
+            # Roll carries a taken mark of its own.
+            taken = "taking 10" in str(getattr(r, "label", "")) or \
+                "taking 20" in str(getattr(r, "label", ""))
+            if face in (1, 20) and not taken:
                 kinds.append("natural")
                 label = str(getattr(r, "label", "") or "roll").strip()
                 facts.append(f"The die showed a natural {'twenty' if face == 20 else 'one'}"
