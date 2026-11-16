@@ -485,6 +485,24 @@ def _a_person(scene, words) -> bool:
     return said in _PRONOUNS or said in ("me", "myself", "you") or bool(person(scene, said))
 
 
+def _counter_keeper(scene) -> str:
+    """The keeper whose counter a take names when its holder is no person here — "his
+    open till", "the stall": the one person here who keeps a counter, else the one of
+    them the player is dealing with; "" when that is not one person. Structure, not
+    English: the slot named a holder the people here could not answer, and a counter is
+    the one holder a keeper stands behind (playtest 2026-11-15 #7: "pocket a handful of
+    coins from his open till" built a give from nobody, refused "nobody here is holding
+    any coin")."""
+    from rules import keepers
+
+    keeping = [r for r, a in (getattr(scene, "actors", {}) or {}).items()
+               if not a.is_pc and keepers.keeps_a_counter(a)]
+    if len(keeping) == 1:
+        return keeping[0]
+    dealt = addressed(scene)
+    return dealt if dealt in keeping else ""
+
+
 def _take(row: Row, frame, i, scene, pc, recent=()) -> None:
     from rules import holding
 
@@ -529,10 +547,15 @@ def _take(row: Row, frame, i, scene, pc, recent=()) -> None:
             row.note = f"a steal from {actor.name}: {thing}"
             return
     params: dict = {"item": _plain(thing) or thing, "to": pc.ref}
+    amount = coin_amount(thing) if coin and not holding.is_container(source) else None
+    if amount:
+        # "ten gold" from a person or a till: a denomination and a count, as a give's is
+        # (a pouch's coin keeps its own door, which empties it).
+        params.update(item=amount[0], count=amount[1])
     if source and holding.is_container(source):
         params["from_"] = _plain(source)
     elif source:
-        who = person(scene, source)
+        who = person(scene, source) or _counter_keeper(scene)
         if who:
             params["from_"] = who
     if not coin and "from_" not in params and holding.key_in(pc.goods, thing):
@@ -715,6 +738,11 @@ def _sell(row: Row, frame, i, scene, pc, sentence: str, recent=(), coming=()) ->
     thing = _object(frame, i, pc, recent)
     key = _carried(pc, thing, coming) if thing else ""
     count = 0
+    many = _carried_among(pc, thing) if thing and not key else []
+    if len(many) > 1:
+        # "the dagger, rope, bedroll and backpack": several things the pack holds, each
+        # named whole inside the one slot — sold one by one, as the panel sells them.
+        key = many[0]
     if thing and not key:
         # The party's cargo (rules/trade.py) is in no pack: "I sell my iron to the keeper
         # of the general store" was refused "not carrying my iron" with 2000 lb of it on
@@ -749,7 +777,13 @@ def _sell(row: Row, frame, i, scene, pc, sentence: str, recent=(), coming=()) ->
         return
     buyer_words = " ".join(str(a.get("target") or "").split())
     buyer = person(scene, buyer_words) if buyer_words else addressed(scene)
-    if not buyer:
+    if not buyer and _walks_first(frame, i):
+        # "I go to the market and sell … to the general store": the buyer stands where
+        # the walk ends, not here, and the engine finds whoever keeps the counter there
+        # when the sale resolves (`Engine._stall_here`). Playtest 2026-11-15 #74 refused it
+        # "there is nobody here who is the general store" at plan time.
+        buyer = ""
+    elif not buyer:
         row.missing = (f"there is nobody here who is {buyer_words}" if buyer_words
                        else f"nobody here to sell {thing} to")
         return
@@ -764,14 +798,70 @@ def _sell(row: Row, frame, i, scene, pc, sentence: str, recent=(), coming=()) ->
         # round 1: "I try to sell the crate to the smith for coin" was read `sell` and sold.
         row.note = "an offer, not a sale: the buyer must agree first"
         return
-    params: dict = {"item": key, "to": buyer}
-    if count:
-        params["count"] = count
-    share = _SHARE.search(str(sentence or ""))
-    if share and key in (pc.goods or {}):
-        params["accept"] = round(int(share.group(1)) / 100 * pricing.goods_worth(key), 2)
-    row.intents.append({"op": "sell", "actor": pc.ref, "params": params,
-                        "because": "the player sold it"})
+    from rules import goods
+
+    for key in (many if len(many) > 1 else [key]):
+        params: dict = {"item": key}
+        if buyer:
+            params["to"] = buyer
+        held = (getattr(pc, "stock", {}) or {}).get(key)
+        if count:
+            params["count"] = count
+        elif held is not None and goods.unit_for(getattr(held, "base", "") or held.name):
+            # "the rope" is the whole length carried, never one foot of it (#76).
+            params["count"] = int(held.count)
+        share = _SHARE.search(str(sentence or ""))
+        if share and key in (pc.goods or {}):
+            params["accept"] = round(int(share.group(1)) / 100 * pricing.goods_worth(key),
+                                     2)
+        row.intents.append({"op": "sell", "actor": pc.ref, "params": params,
+                            "because": "the player sold it"})
+
+
+def _carried_among(pc, words) -> list[str]:
+    """Every thing in the pack or on the shelf named whole inside `words`, in the words'
+    order — the pack as a closed vocabulary, matched whole-word as `_object` matches it
+    against a beat; nothing outside it is read. Playtest 2026-11-15 #74: "sell the
+    merchant's dagger, rope, bedroll and backpack to the general store" was one slot,
+    "not carrying the merchant's dagger, rope, bedroll and backpack", and nothing sold."""
+    from rules import holding
+
+    said = holding.plain(words)
+    names: dict[str, str] = {}
+    for k in (getattr(pc, "goods", {}) or {}):
+        names.setdefault(holding.plain(k), k)
+    for sid, st in (getattr(pc, "stock", {}) or {}).items():
+        for n in (getattr(st, "name", ""), getattr(st, "base", "")):
+            if n:
+                names.setdefault(holding.plain(n), sid)
+    # And each thing's head noun when only one thing carried has it: "rope" is the hemp
+    # rope (measured on the #74 replay: the rope was left unsold).
+    heads: dict[str, set] = {}
+    for name, key in names.items():
+        heads.setdefault(holding.head_of(name), set()).add(key)
+    for head, keys in heads.items():
+        if head and len(keys) == 1:
+            names.setdefault(head, next(iter(keys)))
+    found: list[tuple[int, str]] = []
+    taken: list[range] = []
+    for name in sorted(names, key=len, reverse=True):
+        if len(name) < 3:
+            continue
+        m = re.search(rf"\b{re.escape(name)}s?\b", said)
+        if m is None or any(m.start() in r for r in taken) \
+                or names[name] in {k for _, k in found}:
+            continue
+        taken.append(range(m.start(), m.end()))
+        found.append((m.start(), names[name]))
+    return [k for _, k in sorted(found)]
+
+
+def _walks_first(frame, i: int) -> bool:
+    """Whether an earlier deed of the sentence, done or tried, walks somewhere."""
+    from . import interpret
+
+    return any(str(p.get("act") or "") in ("go", "journey", "seek") and interpret.acting(p)
+               for p in (frame.get("actions") or [])[:i])
 
 
 def table(frame: dict | None, scene, *, places=(), sentence: str = "",

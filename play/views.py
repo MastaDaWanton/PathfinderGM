@@ -7305,9 +7305,12 @@ def trade(request):
         # "suspected" costs at a counter that does not refuse them.
         # And moved by a haggle won at this counter today (`Engine._op_haggle`, the
         # owner's option B, 2026-10-07): the numbers the engine will charge and pay.
+        # A measured thing carries its unit, so fifty feet of rope reads "50 ft, 1 cp a
+        # ft" and not "hemp rope ×50, 1 cp each" — fifty ropes (playtest 2026-11-15 #76).
         "mine": sorted(
-            (_row(s, tradecraft.sell_price(
-                pricing.what_a_shop_pays(s, seller=pc, town=place), percent), s.count)
+            ({**_row(s, tradecraft.sell_price(
+                pricing.what_a_shop_pays(s, seller=pc, town=place), percent), s.count),
+              "unit": goods.unit_for(getattr(s, "base", "") or s.name)}
              for s in pc.stock.values()),
             key=lambda r: -r["gp"]),
         "theirs": sorted((_row(m, tradecraft.buy_price(

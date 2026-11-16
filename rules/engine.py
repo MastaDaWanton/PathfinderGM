@@ -4377,9 +4377,82 @@ class Engine:
             # wrote "the grueling struggle leaves you drained and exhausted" after sleep.
             before_batch = [o.as_dict() for o in self._body_settles() + self._works_settles()]
             resolution = self._tick_schemes(self._their_first_blow(
-                self._drive([i.as_dict() for i in intents], before_batch, {})))
+                self._drive(self._takes_weighed_first([i.as_dict() for i in intents]),
+                            before_batch, {})))
         resolution.clock_before = before
         return resolution
+
+    # The skills a take is done under: lifting it unseen, and being unseen doing it.
+    # shortcut: a plan's check carries no link to the deed it serves, so a covert check
+    # is tied to the batch's takes by its skill; give checks an `for` link if a second
+    # case needs it.
+    _TAKEN_UNDER = frozenset({"sleight of hand", "stealth"})
+
+    def _takes_weighed_first(self, raws: list[dict]) -> list[dict]:
+        """The batch, with the player's covert checks for a take answered by the take.
+
+        Measured in the 2026-11-15 playtest:
+        - #10: "Snatch a silver bracelet" rolled Stealth 20 vs 12, hid the player and
+          paid 100 XP, and only then was the take refused ("the shopkeeper has no silver
+          bracelet to take"). A take that cannot happen is refused before anything is
+          rolled or paid: when every take of the player's in the batch would be refused,
+          the Sleight of Hand and Stealth checks written before them are not made.
+        - #15: an open grab was written as Sleight of Hand, which the player had no
+          ranks in ("cannot attempt sleight of hand untrained. Nothing is rolled"). The
+          skill is trained only (CRB p.104), and picking an unattended thing up is a
+          move action with no check (CRB Table 8-2): an untrained player's grab is made
+          in plain sight, so the check is dropped and the take stands — seen by everyone
+          present (`trial._noticed` with no Sleight of Hand made).
+
+        Whether a take would be refused is asked of the take itself, on a copy of the
+        scene and the dice (`_op_give` is the one definition of a take), so the two can
+        never disagree. Every take, not only a theft: a pick-up of a thing that is not
+        here is the same refusal."""
+        pc = self.scene.pc()
+        if pc is None or self.scene.in_encounter:
+            return raws
+
+        def mine(r) -> bool:
+            return str(r.get("actor") or "") == pc.ref and not r.get("origin")
+
+        takes = [r for r in raws if r.get("op") == "give" and mine(r)
+                 and str((r.get("params") or {}).get("to") or pc.ref) == pc.ref
+                 and str((r.get("params") or {}).get("from_") or "") != pc.ref]
+        if not takes:
+            return raws
+        last = max(raws.index(t) for t in takes)
+        from .intents import normalise_skill
+        from .sheet import IllegalSheet
+
+        covert = [r for r in raws[:last] if r.get("op") == "check" and mine(r)
+                  and normalise_skill(str((r.get("params") or {}).get("skill") or ""))
+                  in self._TAKEN_UNDER]
+        if not covert:
+            return raws
+        if all(self._would_refuse(t) for t in takes):
+            return [r for r in raws if not any(r is c for c in covert)]
+        untrained = []
+        for r in covert:
+            if normalise_skill(str(r["params"]["skill"])) != "sleight of hand":
+                continue
+            try:
+                pc.skill_modifiers("sleight of hand")
+            except IllegalSheet:
+                untrained.append(r)
+        return [r for r in raws if not any(r is u for u in untrained)]
+
+    def _would_refuse(self, raw: dict) -> bool:
+        """Whether this give would be refused, asked of `_op_give` on copies of the scene
+        and the dice, which are put back untouched."""
+        scene, dice = self.scene, self.dice
+        try:
+            self.scene, self.dice = copy.deepcopy(scene), copy.deepcopy(dice)
+            return self._op_give(_intent_from_dict(dict(raw)), {}).status == "refused"
+        except Exception:  # noqa: BLE001 - a take that cannot be weighed is run as written
+            logging.getLogger(__name__).exception("a take could not be weighed first")
+            return False
+        finally:
+            self.scene, self.dice = scene, dice
 
     def _their_first_blow(self, resolution: "Resolution") -> "Resolution":
         """Somebody else opened the fight: their blow is rolled now, in this batch.
@@ -21698,7 +21771,10 @@ class Engine:
                     f"{actor.name} {verb} {item}"
                     + ("" if target == intent.actor else f" for {who}") + ".")
         elif how == "light":
-            tell = f"{actor.name} strikes {item}."
+            # A sunrod or a tindertwig is struck; a torch is lit (`goods.LIGHT_SOURCES`).
+            tell = (f"{actor.name} lights {self._the(item)}."
+                    if str(item).strip().lower() in goods.LIGHT_SOURCES
+                    else f"{actor.name} strikes {item}.")
         else:
             verb = "drinks" if how == "drink" else "throws"
             at = "" if target == intent.actor else f" at {who}"
@@ -21809,6 +21885,8 @@ class Engine:
         # The keeper's own terms and a counter talked round today move what they pay, the
         # opposite way to what they charge (`tradecraft.counter_terms`).
         keeper = self._counter_keeper(buyer, stall)
+        if not buyer and keeper is not None:
+            who = keeper.name               # a typed sale names nobody: whoever keeps it
         if self._will_not_deal(keeper):
             return self._refuse(intent, self._will_not_deal(keeper))
         percent, why = tradecraft.counter_terms(self.scene, actor, keeper, place, stall, day)
@@ -21847,7 +21925,10 @@ class Engine:
         short = paid < asking
         # Who bought it, said: "hands over 1x Yarow Elixir" named the thing and not the
         # stallholder, and the ledger then remembered the sale as made to the player.
-        tell = (f"{actor.name} hands {sold}x {held.name} to {who} and takes "
+        unit = goods.unit_for(getattr(held, "base", "") or held.name)
+        tell = (f"{actor.name} hands "
+                + (f"{goods.measure(sold, unit)} of {held.name}" if unit
+                   else f"{sold}x {held.name}") + f" to {who} and takes "
                 f"{goods.purse_line(goods.coins_for(cp), coins)}")
         if short:
             # Said out loud, because a silent shortfall reads as a bad price rather than
@@ -21895,6 +21976,8 @@ class Engine:
         asking = round(pricing.what_a_shop_pays_for_goods(key, seller=actor, town=place)
                        * count, 2)
         keeper = self._counter_keeper(buyer_ref, stall)
+        if not buyer_ref and keeper is not None:
+            who = keeper.name               # a typed sale names nobody: whoever keeps it
         if self._will_not_deal(keeper):
             return self._refuse(intent, self._will_not_deal(keeper))
         percent, why = tradecraft.counter_terms(self.scene, actor, keeper, place, stall, day)
@@ -26769,6 +26852,170 @@ class Engine:
             return key
         return holding.label_carries(holder.name, item) or None
 
+    # --- a keeper's counter and till, taken from (playtest 2026-11-15 #7, #14) ---------------
+    #
+    # Shoplifting was impossible: a keeper's wares live on the Trade panel's shelf
+    # (`market.on_sale`) and their coin in its till (`market.purse`), neither of which a
+    # take from the keeper looked at — "the keeper of the general store has no hooded
+    # lantern to take" beside a panel listing it at 7 gp, and "nobody here is holding any
+    # coin" beside 212 gp in the till. Taken here off the same shelf and till the panel
+    # and `buy`/`sell` read, so a stolen lantern is one fewer on the shelf and a grabbed
+    # handful is less in the till. Whether it was SEEN is not decided here: the give is
+    # filed `took_from` the keeper, the deeds reader books the theft with its witnesses,
+    # and `trial.report` rolls each witness's Perception against a Sleight of Hand made
+    # before it (CRB p.104: "The opponent makes a Perception check to detect the attempt,
+    # opposed by the Sleight of Hand check result"); with none made, the grab was in plain
+    # sight and everybody present saw it. Picking up an unattended item is a move action
+    # and needs no check at all (CRB Table 8-2), so an open grab is anybody's to make.
+
+    # shortcut: no rule sizes "a handful" of coin; 2d10+10 coins (the street lift's own
+    # dice, `ontheway.LIFT_DICE`) in silver, the commoner's coin (CRB p.140: "the most
+    # prevalent coin among commoners is the silver piece"). Upgrade if the owner rules one.
+    TILL_HANDFUL = "2d10+10"
+
+    def _till(self, intent: Intent, keeper) -> tuple[str, str, int, int] | None:
+        """(place, stall, day, copper left) of the till `keeper` stands behind, or None
+        when they keep no counter here."""
+        from . import keepers as keepers_mod
+        from . import market as market_mod
+
+        if keeper is None or keeper.is_pc or not keepers_mod.keeps_a_counter(keeper):
+            return None
+        place = str(self.scene.location_id or "nowhere")
+        stall = self._stall_here(intent, keeper.ref)
+        day = market_mod.day_of(self.scene.clock_minutes)
+        left = (market_mod.purse(place, stall, day)
+                - market_mod.spent_today(self.scene.market_taken, place, stall, day))
+        return place, stall, day, max(0, int(round(left * 100)))
+
+    def _counter_rows(self, intent: Intent, keeper) -> list | None:
+        """What is on `keeper`'s counter today — the shelf `buy` and the Trade panel
+        read — or None when they keep no counter here."""
+        from . import market as market_mod
+
+        till = self._till(intent, keeper)
+        if till is None:
+            return None
+        place, stall, day, _left = till
+        return market_mod.on_sale(
+            place, stall, day, self.scene.market_taken,
+            counter_kind=market_mod.counter_kind_here(self.scene, stall),
+            scale=market_mod.scale_here(self.world, self.scene.location_id))
+
+    def _counter_ware(self, intent: Intent, keeper, item: str):
+        """(the shelf row, place, stall, day) for the thing on `keeper`'s counter that
+        `item` names — by id, else the shelf's own matcher (`goods.match_want`, which
+        guesses nothing) — or None. A mount is not lifted off a counter."""
+        counter = self._counter_rows(intent, keeper)
+        if counter is None:
+            return None
+        place, stall, day, _left = self._till(intent, keeper)
+        want = holding.plain(item) or str(item)
+        found = next((m for m in counter
+                      if str(getattr(m, "id", "")).lower() == want.lower()), None) \
+            or goods.match_want(want, counter)[0]
+        if found is None or str(getattr(found, "kind", "") or "") == "mount":
+            return None
+        return found, place, stall, day
+
+    def _lift_off_the_counter(self, intent: Intent, taker, keeper, found, place: str,
+                              stall: str, day: int) -> Outcome:
+        """One of the thing off the keeper's shelf and into the taker's hands, unpaid:
+        filed where a purchase of it would be (`goods.deliver`), sold out of today's draw
+        as a purchase is (`market.mark_sold`), and on the props ledger as the keeper's,
+        stolen — the record `trial` finds on the thief and gives back."""
+        from . import market as market_mod
+
+        arrived, _said = goods.deliver(self.scene, taker, found, 1)
+        if not getattr(found, "staple", False):
+            market_mod.mark_sold(self.scene.market_taken, str(found.id), place, stall, day)
+        name = str(found.name)
+        rec = self.scene.hold_prop(name, taker.ref, owner=keeper.ref,
+                                   turn=int(self.scene.clock_minutes))
+        rec["owner"], rec["stolen"] = keeper.ref, True
+        what = (goods.measure(int(getattr(found, "per", 1) or 1), found.unit) + f" of {name}"
+                if getattr(found, "unit", "") else name)
+        return Outcome(
+            intent_id=intent.id, op="give", because=intent.because,
+            tell=(f"{taker.name} takes {self._the(what)} off {keeper.name}'s counter "
+                  f"without paying. {taker.name} has it now; it still belongs to "
+                  f"{keeper.name}."),
+            effects=[{"ref": taker.ref, "kind": "give", "item": name, "count": 1,
+                      "how": "took_from", "from": keeper.ref, "to": taker.ref,
+                      "counter": True, "purse": dict(taker.purse),
+                      "goods": dict(taker.goods)}] + arrived)
+
+    def _from_the_till(self, intent: Intent, taker, keeper, cp: int | None) -> Outcome:
+        """Coin out of `keeper`'s till: `cp` copper when an amount was named, else a
+        handful (`TILL_HANDFUL`), never more than the till holds today; spent from it as
+        a sale's payment is (`market.mark_spent`), so the panel's till shows the loss."""
+        from . import market as market_mod
+
+        place, stall, day, left = self._till(intent, keeper)
+        if cp is None:
+            cp = 10 * self.dice.roll(self.TILL_HANDFUL, label="a handful from the till",
+                                     visibility="hidden").total
+        cp = min(int(cp), left)
+        coins = self._coins_here()
+        if cp <= 0:
+            return self._refuse(intent, f"{_sentence(keeper.name)}'s till is empty today: "
+                                        f"nothing changes hands.")
+        taker.purse = goods.credit(taker.purse, cp)
+        market_mod.mark_spent(self.scene.market_taken, cp / 100, place, stall, day)
+        return Outcome(
+            intent_id=intent.id, op="give", because=intent.because,
+            tell=(f"{taker.name} takes {goods.purse_line(goods.coins_for(cp), coins)} out "
+                  f"of {keeper.name}'s till without leave. It was {keeper.name}'s."),
+            effects=[{"ref": taker.ref, "kind": "give", "item": "coin", "count": cp,
+                      "how": "took_from", "from": keeper.ref, "to": taker.ref,
+                      "till": True, "purse": dict(taker.purse),
+                      "goods": dict(taker.goods)}])
+
+    def _one_helpless_here(self, taker):
+        """The one body here that cannot keep its own pockets — helpless (CRB p.197:
+        unconscious, paralysed, held) or dead — that is not the taker's own company; None
+        when there is not exactly one."""
+        lying = [a for r, a in self.scene.actors.items()
+                 if r != getattr(taker, "ref", "") and not a.is_pc
+                 and not a.has_state(states.TRAVELS_WITH_YOU)
+                 and (a.is_dead or a.is_helpless)]
+        return lying[0] if len(lying) == 1 else None
+
+    def _take_purse(self, intent: Intent, taker, body, item: str) -> Outcome | None:
+        """`body`'s purse searched out and taken: the coin they carry, into the taker's
+        purse. None when they carry a thing of that name (the ordinary take moves it).
+
+        Playtest 2026-11-15 #43: "take the merchant's purse" with him unconscious at her
+        feet looked only on the ground ("Nothing loose lies here"), while "search his
+        body" stripped 5 sp off him. A helpless person's pockets are anyone's to go
+        through — no roll, as a helpless foe gives up a held item to a manoeuvre without
+        one (CRB p.199) — so the plain words search him for it. Taken from the living it
+        is theft, filed `took_from` and still his; from the dead, a body's, as the loot
+        files it."""
+        from .bestiary import collapse_kit
+
+        collapse_kit(body)
+        if self._carried_by(body, item) is not None:
+            return None
+        cp = goods.in_copper(body.purse)
+        coins = self._coins_here()
+        if cp <= 0:
+            return self._refuse(intent, f"{_sentence(body.name)} has no coin on them: "
+                                        f"nothing changes hands.")
+        got = dict(body.purse)
+        body.purse = {}
+        taker.purse = goods.credit(taker.purse, cp)
+        dead = body.is_dead
+        tell = (f"{taker.name} searches {body.name} and takes the purse: "
+                f"{goods.purse_line(got, coins)}."
+                + ("" if dead else f" It was {body.name}'s."))
+        return Outcome(
+            intent_id=intent.id, op="give", because=intent.because, tell=tell,
+            effects=[{"ref": taker.ref, "kind": "give", "item": "coin", "count": cp,
+                      "how": "took" if dead else "took_from", "from": body.ref,
+                      "to": taker.ref, "purse": dict(taker.purse),
+                      "goods": dict(taker.goods)}])
+
     def _coin_lying_here(self) -> dict | None:
         """A record lying here with coin in it — a pile somebody set down, a dropped
         purse — or None."""
@@ -26949,6 +27196,14 @@ class Engine:
                 intent, f"How much? {who.name} carries "
                         f"{goods.purse_line(who.purse, coins)}; name the coin and the "
                         f"amount, and it changes hands.")
+        acting = str(intent.actor or getattr(self.scene.pc(), "ref", "") or "")
+        if (giver is not None and not giver.is_pc and source is None
+                and taker.ref == acting and giver.ref != acting
+                and self._till(intent, giver) is not None):
+            # A hand in a keeper's till: the coin is the till's, which the Trade panel
+            # shows (playtest 2026-11-15 #7: "pocket a handful of coins from his open
+            # till" found none, with 212 gp in it).
+            return self._from_the_till(intent, taker, giver, None)
         box = source if (source is not None and holding.coin_in(source) > 0) else None
         if box is None and source is None:
             box = next((r for r in self.scene.props
@@ -27079,6 +27334,9 @@ class Engine:
         if self.scene.prop_on_the_ground(name) is not None:
             return False
         if self._holder_of(name, taker) is not None:
+            return False
+        # A purse on the one helpless body here is that body's (`_take_purse`, #43).
+        if holding.is_container(name) and self._one_helpless_here(taker) is not None:
             return False
         return not any(holding.same(r.get("name"), name) for r in self.scene.props)
 
@@ -27286,6 +27544,24 @@ class Engine:
                   and taker is not None and taker is not giver and taker.ref == acting
                   and giver.ref != acting and source is None and not denom
                   and not giver.has_state(states.TRAVELS_WITH_YOU))
+        if (denom and giver is not None and not inferred and not giver.is_pc
+                and taker is not None and taker.ref == acting and giver.ref != acting
+                and source is None and not int(giver.purse.get(denom, 0) or 0)
+                and self._till(intent, giver) is not None):
+            # "Ten gold out of his till": a keeper's coin is the till's (#7).
+            return self._from_the_till(intent, taker, giver,
+                                       goods.in_copper({denom: count}))
+        if (taker is not None and taker.ref == acting and source is None and not denom
+                and holding.is_container(item) and self.scene.prop_named(item) is None):
+            # "Take the merchant's purse" with the merchant out cold at her feet: a purse
+            # nobody ledgered is the coin on a body that cannot keep it (#43).
+            lying = (giver if giver is not None and not giver.is_pc
+                     and giver.ref != acting else
+                     self._one_helpless_here(taker) if giver is None else None)
+            if lying is not None and (lying.is_dead or lying.is_helpless):
+                took = self._take_purse(intent, taker, lying, item)
+                if took is not None:
+                    return took
         if taking:
             # What they actually carry, and nothing else: a take from a person never comes
             # out of the air. "another apple" from a seller with an "apple" line is that
@@ -27297,10 +27573,24 @@ class Engine:
             collapse_kit(giver)
             held = self._carried_by(giver, item)
             if held is None:
+                # A keeper's wares are on the counter, not in their pockets: the Trade
+                # panel's own shelf (playtest 2026-11-15 #14).
+                ware = self._counter_ware(intent, giver, item)
+                if ware is not None:
+                    return self._lift_off_the_counter(intent, taker, giver, *ware)
+                shelf = self._counter_rows(intent, giver)
+                on_it = (f" On the counter: {', '.join(sorted(str(m.name) for m in shelf)[:12])}."
+                         if shelf else "")
                 return self._refuse(
                     intent, f"{giver.name} has no {holding.plain(item) or item} to take. "
-                            f"Nothing changes hands.")
+                            f"Nothing changes hands.{on_it}")
             item = held
+            taken_from = giver
+        elif (denom and giver is not None and not inferred and not giver.is_pc
+                and taker is not None and taker.ref == acting and giver.ref != acting
+                and source is None and not giver.has_state(states.TRAVELS_WITH_YOU)):
+            # Coin out of somebody's purse, unasked, is taken and not handed over: the
+            # take row names "ten gold" as a count now, and this read it as a gift.
             taken_from = giver
         if giver is None and taker is not None and source is None and not denom:
             source = self._box_holding(item, taker)
@@ -27406,7 +27696,7 @@ class Engine:
                                          owner=(taker.ref if rec.get("owner")
                                                 in ("", giver.ref) else ""),
                                          turn=int(self.scene.clock_minutes))
-            if moved and taken_from is not None and taker is not None:
+            if moved and taken_from is not None and taker is not None and not denom:
                 rec = self.scene.hold_prop(item, taker.ref, owner=taken_from.ref,
                                            turn=int(self.scene.clock_minutes))
                 rec["owner"] = taken_from.ref
