@@ -308,10 +308,10 @@ def elsewhere_by_name(scene, said: list[str], location_id: str | None, world) ->
     in_town = (bool(at) and places_mod.location_of(at) == (location_id or "")
                and places_mod.terrain_of(at) == places_mod.URBAN)
     if in_town and town_name:
-        line = (f"{a.name}, is in {town_name} but not in this room. Nobody of that "
+        line = (f"{a.name} is in {town_name} but not in this room. Nobody of that "
                 f"description is standing here.")
     else:
-        line = f"{a.name}, is not here."
+        line = f"{a.name} is not here."
     return {"scope": ELSEWHERE, "who": str(a.name), "ref": ref,
             "where": town_name if in_town else "", "line": line}
 
@@ -435,14 +435,16 @@ def look_for(world, phrase: str, scene=None, location_id: str | None = None, *,
             # where Vormoor's healer is, tests/test_introduce.py).
             return {**out, "scope": "", "line": ""}
         role = _role_of(who)
-        named = f"{who.name}" + (f", {role}" if role else "")
+        # The comma only around a role: "The merchant, is not here" was printed
+        # (playtest 2026-11-16 #9).
+        named = f"{who.name}" + (f", {role}," if role else "")
         if where and where == town_name:
-            line = (f"{named}, is in {where} but not in this room. Nobody of that "
+            line = (f"{named} is in {where} but not in this room. Nobody of that "
                     f"description is standing here.")
         elif where:
-            line = f"{named}, is in {where}, not here."
+            line = f"{named} is in {where}, not here."
         else:
-            line = f"{named}, is not here."
+            line = f"{named} is not here."
         return {**out, "scope": ELSEWHERE, "who": str(who.name), "where": where,
                 "line": line}
 

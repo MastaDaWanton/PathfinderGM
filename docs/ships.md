@@ -363,6 +363,41 @@ be taken without killing her crew. Now:
 
 The same rules hold ashore, where a broken person runs home instead (`Engine._flee`).
 
+## A ship the party holds, ashore and at sea (2026-11-16)
+
+Playtest 2026-11-16 (#8, #9, #12-#14, #18-#20, #22): the Red Gull, taken by threat at sea,
+was lost the moment her new owner stepped ashore at Mirabalos. Built:
+
+- **Her gangplank.** A ship the PC holds, or has a berth on, lying at this quay
+  (`Engine.moored_here`) joins the town's places a step from the docks (`places.for_scene`,
+  `moored`), her deck named by the ship from the shore ("the Red Gull", "the hold of the
+  Red Gull"). A walk or a journey to her name boards her; a deck has no street meetings.
+- **Sailing her from the quay.** A held ship arrives with her master still on deck; a
+  journey from her deck re-aims her from the quay she lies at (`_her_waters`), and the
+  exits row lists each port her waters reach. No berth is bought on another ship.
+- **Her people when nobody holds them** (`_ships_left_settle`). By the CRB's Intimidate,
+  a threat holds while made good and the one it held "may report you to local
+  authorities" (p.99): her yielded master, left aboard at a quay with nobody of the party
+  on her, goes to the watch, and the seizure is sworn as a warrant (a theft of the ship;
+  law.json has no piracy row). Her hands stay aboard, cowed, and work her. Once per ship
+  (`Vessel.sworn`). Somebody travelling with the party left on her deck holds them.
+- **The cruise** (`sea` op, `do: cruise`; `Engine._cruise`). A held ship stands out and
+  cruises her waters for a day a turn, and from there sails back into her port in a day
+  or on to any port her waters reach (`ships.her_waters`). The sea's check (`ontheway.sea`) is made each
+  six-hour watch, four a day, which is the land's rate (Ultimate Wilderness p.127); a
+  voyage holding her course checks once a day. A merchant a held ship meets is a real
+  vessel at `distant`, not hostile (`_met_at_sea`): close, board, and her people at the
+  rail answer a threat; all yielded, she is a prize (`_ship_taken` ends the engagement)
+  and the ship the party left keeps company with her into the next port. The reader asks
+  one closed question aboard a held ship (`interpret.confirm_cruise`,
+  `acts_to_ops.cruise_spoken`).
+
+Researched for the cruise: Sid Meier's Pirates! (2004) shows the sails and lets the player
+choose and chase a target; the Skull & Shackles plunder rules price a cargo (a mixed
+trader about 4 plunder) but print no rate for meeting one, and no 1e book I could read
+does. Not built: the merchant running from a closing hunter, her cargo as plunder, a
+naval patrol that challenges a pirate, keeping prisoners in irons.
+
 ## Still open
 
 - **The derived coast.** An inland town with no road to any port walks a derived day to

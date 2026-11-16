@@ -4573,6 +4573,9 @@ class Engine:
         # `role.guard.officer`) is healed before the law looks for who is the law.
         if schemes_mod.ENABLED:
             schemes_mod._heal_cast_grants(self.scene, schemes_mod.all_schemes())
+        # A seized ship's yielded master, left aboard at a quay with nobody of the party's
+        # holding him, goes to the law (`_ships_left_settle`) — before the law looks.
+        resolution.outcomes.extend(self._articled(o) for o in self._ships_left_settle())
         resolution.outcomes.extend(self._articled(o) for o in arrest_mod.settle(self))
         # What the hours this batch spent did to the player's body (`Scene.advance`
         # rolls the checks; this tells them). Each op's toll is told right behind it in
@@ -11832,6 +11835,82 @@ class Engine:
         self._mark_priced(coming[:room], "joined")
         return coming[:room], held
 
+    def _ships_left_settle(self) -> list[Outcome]:
+        """What a seized ship's people do when nobody holds them (playtest 2026-11-16 #12,
+        #13: the Red Gull sailed into Mirabalos with the captain she was taken from aboard,
+        her new owner went ashore, and nothing happened).
+
+        By the book's nearest rule: a threat's hold on somebody lasts only while it is
+        made good, and "after the Intimidate expires, the target treats you as unfriendly
+        and may report you to local authorities" (CRB p.99, Intimidate). So a ship the PC
+        holds (`Vessel.held_by`), lying at a quay, with her yielded master aboard and no
+        one of the party on her (the PC, or anybody travelling with them): he goes ashore
+        to the town's law, and the seizure is sworn as a warrant (`state.wanted.<town>`,
+        a theft of the ship — law.json has no piracy row). Her other people stay aboard,
+        cowed, and work her for whoever holds her (`Vessel.crew` is that abstract crew);
+        they are hands, and the master is the one who answers for her (`ships.master_of`).
+        Told only when the PC can see her quay; the warrant stands either way.
+
+        shortcut: the master goes the moment he is unheld, not after the threat's 1d6x10
+        minutes; a hold on prisoners (irons, a locked hold) is the upgrade when one is
+        asked for."""
+        from . import morale, places as places_mod, ships as ships_mod
+        from .activeeffect import ActiveEffect
+
+        pc = self.scene.pc()
+        town = str(self.scene.location_id or "")
+        if pc is None or not town:
+            return []
+        out = []
+        for raw in list(self.scene.vessels):
+            ship = ships_mod.Vessel.from_dict(raw)
+            if ship is None or ship.held_by != pc.ref or ship.at != town \
+                    or ship.sailed_at is not None or ship.sworn:
+                continue
+            rooms = {p.id for p in ships_mod.places_of(ship)}
+            if self.scene.at in rooms or any(
+                    a.at in rooms and not a.is_down and a.has_state(states.TRAVELS_WITH_YOU)
+                    for a in self.scene.people.values()):
+                continue
+            crew = self.crew_of(ship)
+            master = ships_mod.master_of(crew)
+            if master is None or master.is_down or not morale.yielded(master):
+                continue
+            self.scene.depart(master.ref)
+            ship.sworn = town
+            self._keep_vessel(ship)
+            effects: list[dict] = [{"kind": "departs", "ref": master.ref,
+                                    "origin": "rule:intimidate-lapses"}]
+            name = f"{ship.name[:1].upper()}{ship.name[1:]}"
+            if states.standing_with_the_law(pc, town) != "wanted":
+                pc.apply_effect(ActiveEffect(
+                    name="a warrant", kind="situation", key=states.wanted_tag(town),
+                    source=f"rule:ship-seized/{ship.id}", origin=f"rule:ship-seized/{ship.id}",
+                    duration="until-dismissed", tags=(states.wanted_tag(town),),
+                    payload={"crime": "theft", "what": ship.name}))
+                effects.append({"kind": "wanted", "town": town})
+            hands = [a for a in crew if a is not master and not a.is_down]
+            quay = next((p for p in self.places() if " ".join(str(p.name).split()).lower()
+                         in ships_mod.PORT_PLACES), None)
+            # Seen from her quay, or from the deck of another ship lying at it.
+            on_deck = self.vessel(ships_mod.vessel_of(self.scene.at))
+            seen = (quay is not None and places_mod.base_of(self.scene.at) == quay.id) or (
+                on_deck is not None and on_deck.at == town)
+            stay = (f" {_sentence(_and_list([a.name for a in hands]))} "
+                    f"{'stays' if len(hands) == 1 else 'stay'} aboard, cowed, and "
+                    f"{'works' if len(hands) == 1 else 'work'} her for you." if hands else "")
+            if seen:
+                tell = (f"With nobody of yours aboard {ship.name}, {master.name} comes down "
+                        f"her gangplank and goes into {self._settlement_name(town)} to the "
+                        f"watch: the taking of her will be sworn against {pc.name}." + stay)
+            else:
+                tell = (f"Nobody of yours holds {ship.name} at the quay, and {master.name}, "
+                        f"who yielded her to {pc.name}, is free to go to the watch: the "
+                        f"taking of her will be sworn against {pc.name}." + stay)
+            out.append(Outcome(intent_id="", op="ship_left", effects=effects, tell=tell,
+                               because="a threat holds only while it is made good"))
+        return out
+
     def _law_held_settle(self) -> list[Outcome]:
         """The people `_law_room` kept out of a fight, said: standing in the scene, off
         the initiative — the watch raising the alarm, anyone else watching. Their own
@@ -14412,7 +14491,24 @@ class Engine:
         return places_mod.for_scene(found or self.scene.location_id, self.scene.at,
                                     terrain_hint=self._terrain_hint(found),
                                     founded=self.scene.founded,
-                                    ring=self._ring(found, self.scene.at))
+                                    ring=self._ring(found, self.scene.at),
+                                    moored=self.moored_here())
+
+    def moored_here(self) -> tuple[str, ...]:
+        """The ships lying at this town's quay that the party may simply walk aboard: one
+        the PC holds (`_ship_taken`) or has a berth on, not yet sailed. Any other ship at
+        the quay is boarded by booking a passage (`_book_passage`)."""
+        from . import ships as ships_mod
+
+        pc = self.scene.pc()
+        if pc is None:
+            return ()
+        out = []
+        for raw in self.scene.vessels:
+            v = ships_mod.Vessel.from_dict(raw)
+            if v is not None and v.at and v.at == self.scene.location_id                     and v.sailed_at is None and v.afloat                     and (v.held_by == pc.ref or pc.ref in v.passengers):
+                out.append(v.id)
+        return tuple(out)
 
     def water_at_hand(self) -> str:
         """The name of the free water — a well, a cistern (`places.water_in`) — of the
@@ -14750,8 +14846,21 @@ class Engine:
         # Aboard a ship with a passage booked, the journey is the voyage: "set sail", the
         # exits row's sail-on, and "on to X" all mean the ship makes way (`_sail`).
         ship = self.aboard()
-        if ship is not None and ship.bound_for:
+        # A ship the party holds sails where they say, from the quay or the open sea
+        # (`_come_about`): never a berth bought on another (playtest 2026-11-16 #19).
+        if ship is not None and (ship.bound_for or ship.held_by == getattr(pc, "ref", "")):
             return self._sail(intent, ship, want)
+        # "Board my ship, the Red Gull": a ship lying at this quay is a walk up her
+        # gangplank (`moored_here`), read as a journey because a ship goes places
+        # (playtest 2026-11-16 #19, refused "There is no road from here to the Red Gull").
+        from . import ships as ships_mod
+
+        board = places_mod.find(self.places(), want) if want else None
+        if board is not None and ships_mod.vessel_of(board.id) \
+                and ships_mod.vessel_of(board.id) != ships_mod.vessel_of(self.scene.at):
+            return self._op_travel(Intent(op="travel", actor=intent.actor, id=intent.id,
+                                          because=intent.because,
+                                          params={"place": board.id}), partial)
         legs = journey_mod.legs_from(self.world, self.scene.location_id)
         if not legs:
             return self._refuse(
@@ -15750,7 +15859,12 @@ class Engine:
                     # nothing (`journey.HUSTLE_FREE_HOURS`).
                     step = max(1, -(-step // journey_mod.PACES[pace]))
                     ridden_minutes += step
-                if places_mod.setting_of(hop.id) == "in":
+                if hop.terrain == "deck":           # `ships.DECK`
+                    # Up the gangplank or down a hatch: a deck is no street. Live
+                    # 2026-11-16 (#19), boarding the Red Gull met "two of them going at
+                    # each other in the middle of the road at the Red Gull".
+                    met = None
+                elif places_mod.setting_of(hop.id) == "in":
                     met = ontheway.street(self.dice, level,
                                           apl=encounter_budget.party_apl(self.scene),
                                           danger=volatility.scale(
@@ -18080,8 +18194,7 @@ class Engine:
         words, or None when no leg leaves her waters at all."""
         from . import journey as journey_mod, ships as ships_mod
 
-        legs = [x for x in journey_mod.legs_from(self.world, ship.came_from or ship.at)
-                if x.by_sea or x.by in ("sea", "river")]
+        legs = self._her_waters(ship)
         leg = journey_mod.find(legs, want) if legs else None
         if leg is None:
             if not legs:
@@ -18089,6 +18202,10 @@ class Engine:
             return (f"{_sentence(ship.name)} is yours, but no sea road the world knows runs "
                     f"from her waters to {want}. She can make "
                     f"{_and_list([x.to_name for x in legs])}.")
+        if ship.at:
+            # Lying at a quay: that port is where she puts out from (2026-11-16: she was
+            # re-aimed from the port she had sailed from the voyage before).
+            ship.came_from = ship.at
         ship.bound_for, ship.lands_at = leg.to_id, ""
         # shortcut: the whole leg from her home port, whatever she has already sailed of
         # another (a day out to Mirabalos, then two to Elyrielle); a position at sea is the
@@ -18098,6 +18215,12 @@ class Engine:
         ship.river = leg.by == "river"
         self._keep_vessel(ship)
         return ship
+
+    def _her_waters(self, ship) -> list:
+        """The sea and river legs from the quay she lies at, else from where she put out."""
+        from . import ships as ships_mod
+
+        return ships_mod.her_waters(self.world, ship)
 
     def _waters_climates(self, ship) -> tuple[str, ...]:
         """The climate of the waters between the ports she sails from and to, as
@@ -18130,13 +18253,20 @@ class Engine:
         caps how many are sailed this turn."""
         from . import ships as ships_mod, volatility
 
+        if not ship.bound_for and not want:
+            legs = self._her_waters(ship)
+            return self._refuse(
+                intent, f"Where to? {_sentence(ship.name)} is yours"
+                        + (f", and she can make {_and_list([x.to_name for x in legs])}"
+                           if legs else "")
+                        + ", or cruise her waters for other ships.")
         dest = ship.bound_for
-        dest_name = self._settlement_name(dest)
+        dest_name = self._settlement_name(dest) if dest else ""
         # The exits row names the ship by id, which `intents.normalise_ref` cuts to its hex.
         port_name = self._settlement_name(ship.lands_at) if ship.lands_at else ""
-        if want and want not in (dest, ship.id, ship.lands_at or dest) \
-                and not ship.id.endswith("-" + want) \
-                and want.lower() not in dest_name.lower() \
+        if want and (not dest or want not in (dest, ship.id, ship.lands_at or dest)) \
+                and not (dest and ship.id.endswith("-" + want)) \
+                and not (dest_name and want.lower() in dest_name.lower()) \
                 and not (port_name and want.lower() in port_name.lower()) \
                 and want.lower() != ship.name.lower():
             turned = self._come_about(ship, want) if ship.held_by else None
@@ -18203,20 +18333,7 @@ class Engine:
                 f"{'casts off and ' if cast_off else ''}makes way: {days_said} "
                 f"{'on the river' if ship.river else 'at sea'}."]
         if weather == "storm":
-            for a in aboard:
-                a.apply_effect(ActiveEffect(
-                    name="a storm at sea", kind="situation", key="storm-at-sea",
-                    source="rule:storm-at-sea", origin="rule:storm-at-sea",
-                    tags=states.tags_for("storm-at-sea"),
-                    duration="rounds", rounds_left=ships_mod.STORM_ROUNDS,
-                    modifiers=[{"kind": "skill_mod", "target": "perception",
-                                "amount": ships_mod.STORM_PERCEPTION,
-                                "note": "a storm at sea"}]))
-                effects.append({"kind": "condition", "ref": a.ref,
-                                "condition": "storm-at-sea", "origin": "rule:storm-at-sea"})
-            bits.append("A storm comes down on her: wind and black water over the rail, "
-                        "nothing to see past the bow (-8 Perception), no bow or throw that "
-                        "the wind does not take, and she rides it out.")
+            bits.append(self._storm_on_deck(aboard, effects))
         if settled:
             bits.insert(0, settled)
         if met is not None:
@@ -18237,17 +18354,37 @@ class Engine:
         port_name = self._settlement_name(port)
         ship.at, ship.bound_for, ship.sailed_at, ship.lands_at = port, "", None, ""
         self._keep_vessel(ship)
+        company: list[str] = []
+        for raw in list(self.scene.vessels):
+            other = ships_mod.Vessel.from_dict(raw)
+            if other is not None and other.id != ship.id and ship.held_by \
+                    and other.held_by == ship.held_by and not other.at \
+                    and not other.bound_for and other.afloat:
+                # In company (a prize, or the ship the party left for her): she makes the
+                # same port. shortcut: no separate voyage or weather for her.
+                other.at, other.sailed_at, other.came_from = port, None, port
+                self._keep_vessel(other)
+                company.append(f"{_sentence(other.name)} comes in with her and ties up.")
         self.scene.location_id = port
-        quay = next((p for p in self.places() if " ".join(str(p.name).split()).lower()
-                     in ships_mod.PORT_PLACES), None)
-        self.place_party(quay.id if quay is not None else "")
-        for a in aboard:
-            if not a.is_pc:
-                self.scene.move(a.ref, self.scene.at)
+        held = bool(ship.held_by)
+        if held:
+            # Her master stays on her deck at the quay (playtest 2026-11-16 #12/#13/#19):
+            # going ashore is the player's own step, and what her people do when nobody
+            # holds them is `_ships_left_settle`'s.
+            bits.append(f"She makes {port_name} and ties up at the quay; "
+                        f"{pc.name if pc else 'the party'} is still on her deck.")
+        else:
+            quay = next((p for p in self.places() if " ".join(str(p.name).split()).lower()
+                         in ships_mod.PORT_PLACES), None)
+            self.place_party(quay.id if quay is not None else "")
+            for a in aboard:
+                if not a.is_pc:
+                    self.scene.move(a.ref, self.scene.at)
+            bits.append(f"She makes {port_name} and ties up; "
+                        f"{pc.name if pc else 'the party'} goes ashore at {self.here().name}.")
         effects.append({"kind": "journey", "to": port, "to_name": port_name,
                         "arrived": True, "how": "sea", "place": self.scene.at})
-        bits.append(f"She makes {port_name} and ties up; {pc.name if pc else 'the party'} "
-                    f"goes ashore at {self.here().name}.")
+        bits.extend(company)
         landed = trade_mod.unload(self.scene, ship.id, port)
         if landed:
             bits.append(f"{_sentence(_and_list(landed))} {'is' if len(landed) == 1 else 'are'}"
@@ -18273,6 +18410,110 @@ class Engine:
             done.tell = f"{done.tell} {inland.tell}".strip()
         return done
 
+    def _storm_on_deck(self, aboard, effects: list) -> str:
+        """A day's storm laid on everybody aboard (`ships.STORM_PERCEPTION`, the CRB's
+        Storm entry), its records added to `effects`; the tell."""
+        from . import ships as ships_mod
+
+        for a in aboard:
+            a.apply_effect(ActiveEffect(
+                name="a storm at sea", kind="situation", key="storm-at-sea",
+                source="rule:storm-at-sea", origin="rule:storm-at-sea",
+                tags=states.tags_for("storm-at-sea"),
+                duration="rounds", rounds_left=ships_mod.STORM_ROUNDS,
+                modifiers=[{"kind": "skill_mod", "target": "perception",
+                            "amount": ships_mod.STORM_PERCEPTION,
+                            "note": "a storm at sea"}]))
+            effects.append({"kind": "condition", "ref": a.ref,
+                            "condition": "storm-at-sea", "origin": "rule:storm-at-sea"})
+        return ("A storm comes down on her: wind and black water over the rail, "
+                "nothing to see past the bow (-8 Perception), no bow or throw that "
+                "the wind does not take, and she rides it out.")
+
+    def _cruise(self, intent: Intent, ship) -> Outcome:
+        """A ship the PC holds stands out and cruises her waters, hunting or lying in wait
+        for other sails (playtest 2026-11-16 #8: "take the Red Gull out along the trade
+        route, hunting for a merchant ship to rob" had no path; a held ship sailed only
+        port to port and met nobody she went looking for).
+
+        Researched 2026-11-16. Sid Meier's Pirates! (2004) puts the sails on the map and
+        lets the player pick a target and give chase; the Skull & Shackles plunder rules
+        price a taken cargo (a mixed-goods trader is about 4 plunder) but print no rate
+        for meeting one, and neither does any 1e book I could read. So the sea's own check
+        (`ontheway.sea`, 20% a check, half its hits a passing sail) is made each watch of
+        a cruise instead of once a day: four watches a day is the land's own rate
+        (Ultimate Wilderness p.127, four checks a day), because a ship looking for sails
+        sees what a ship holding her course sails past. One day's cruise a turn
+        (`ships.CRUISE_WATCHES`), the day's weather rolled first; it stops at the first
+        sail or creature. A merchant met by a held ship can be closed with and boarded
+        (`_met_at_sea`); everything else is what any voyage meets."""
+        from . import ships as ships_mod, volatility
+
+        pc = self.scene.pc()
+        if ship is None or pc is None or ship.held_by != pc.ref:
+            return self._refuse(intent, "Only a ship you hold cruises where you say. A "
+                                        "berth goes where her master is bound.")
+        if self.scene.initiative:
+            return self._refuse(intent, "Not while there is fighting on deck.")
+        settled = self._sea_settled()
+        if self.scene.sea:
+            return self._refuse(intent, "Another ship is on the water with you: close "
+                                        "with her or sheer off first.")
+        if not ships_mod.crewed(ship):
+            return self._refuse(intent, f"{_sentence(ship.name)} has too few hands to "
+                                        f"work her.")
+        cast_off = bool(ship.at)
+        if cast_off:
+            ship.came_from, ship.at = ship.at, ""
+        if ship.sailed_at is None:
+            ship.sailed_at = int(self.scene.clock_minutes)
+        # Off any course she held: where she goes next is the player's (`_come_about`).
+        ship.bound_for, ship.days_left, ship.lands_at = "", 0, ""
+        self.scene.location_id = ship.id
+        level = volatility.of(self.world, ship.came_from)
+        aboard = [a for a in self.scene.people.values()
+                  if a.at in {p.id for p in ships_mod.places_of(ship)}
+                  and (a.is_pc or a.has_state(states.TRAVELS_WITH_YOU))]
+        weather = ships_mod.day_at_sea(self.dice, level)
+        if weather == "wreck":
+            ship.passengers = list(dict.fromkeys([*ship.passengers, *(a.ref for a in aboard)]))
+            return self._wreck(intent, ship, 0)
+        effects: list[dict] = []
+        met, watches = None, 0
+        while watches < ships_mod.CRUISE_WATCHES and met is None:
+            self.scene.advance(ships_mod.WATCH_MINUTES, charge_body=False)
+            watches += 1
+            met = ontheway.sea(self.dice, int(getattr(pc, "level", 1) or 1),
+                               apl=encounter_budget.party_apl(self.scene),
+                               danger=volatility.factor(level),
+                               climates=self._waters_climates(ship))
+        told: list[str] = []
+        if watches == ships_mod.CRUISE_WATCHES:
+            # A whole day: the ship feeds, waters and beds her people, as `_sail` does.
+            for a in aboard:
+                survival.eat(a)
+                survival.drink(a)
+                if a.is_pc:
+                    told.extend(survival.night(a, self.dice))
+        self._keep_vessel(ship)
+        self._journeyed = ship.name
+        hours = watches * ships_mod.WATCH_MINUTES // 60
+        effects.insert(0, {"kind": "cruise", "vessel": ship.id, "watches": watches,
+                           "weather": weather, "volatility": volatility.word(level)})
+        bits = [settled] if settled else []
+        bits.append(f"{_sentence(ship.name)} {'casts off and ' if cast_off else ''}cruises "
+                    f"her waters off {self._settlement_name(ship.came_from)}: "
+                    f"{watches} watch{'es' if watches != 1 else ''}, {hours} hours"
+                    + ("." if met is not None else ", and nothing on the water."))
+        if weather == "storm":
+            bits.append(self._storm_on_deck(aboard, effects))
+        if met is not None:
+            said, fx = self._met_at_sea(ship, met)
+            bits.append(said)
+            effects.extend(fx)
+        return Outcome(intent_id=intent.id, op="sea", effects=effects,
+                       tell=" ".join(bits + told), because=intent.because)
+
     def _met_at_sea(self, ship, met) -> tuple[str, list[dict]]:
         """What the day's sea check found (`ontheway.sea`), put on the water: the tell and
         its records. A passing sail is told and gone; pirates are the ship-to-ship bands
@@ -18281,6 +18522,22 @@ class Engine:
         from . import ships as ships_mod
 
         fx = {"kind": "sea_encounter", "met": met.kind, "origin": "rule:sea-encounter"}
+        if met.kind == "merchant" and ship.held_by:
+            # A ship the PC holds can go after her (playtest 2026-11-16 #8): a real vessel
+            # on the water, at `distant`, and no threat to anybody until boarded — her
+            # people meet the boarders at the rail (`_defenders`) and yield or fight.
+            vid = ships_mod.vessel_id(f"merchant|{ship.id}", "sailing ship",
+                                      int(self.scene.clock_minutes))
+            row = ships_mod.VESSELS["sailing ship"]
+            theirs = ships_mod.Vessel(id=vid, name=ships_mod.name_for(vid),
+                                      kind="sailing ship", hp=int(row["hp"]),
+                                      crew=int(row["crew"][0]), came_from=ship.came_from)
+            self._keep_vessel(theirs)
+            self.scene.sea = {"ours": ship.id, "theirs": theirs.id, "range": "distant",
+                              "grappled": False, "hostile": False, "foes": []}
+            fx.update(vessel=theirs.id, range="distant")
+            return (f"A sail on the horizon: {theirs.name}, a merchantman on her own "
+                    f"course and deep in the water. Close with her, or let her go.", [fx])
         if met.kind == "merchant":
             return ("A sail on the horizon: a merchantman on her own course, who dips her "
                     "flag and holds on.", [fx])
@@ -18499,6 +18756,8 @@ class Engine:
 
         do = str(intent.params.get("do") or "").strip().lower()
         sea = dict(self.scene.sea or {})
+        if do == "cruise":
+            return self._cruise(intent, self.aboard())
         if not sea:
             return self._refuse(intent, "There is no other ship in sight.")
         ours, theirs = self.vessel(sea.get("ours", "")), self.vessel(sea.get("theirs", ""))
@@ -18642,14 +18901,14 @@ class Engine:
                 effects=[{"kind": "sea", "boarded": theirs.id, "place": deck,
                           "who": going, "met": [a.ref for a in met]}],
                 tell=f"{said} {verb} over the rail onto {theirs.name}'s deck."
-                     + (f" {_and_list([a.name for a in met])} "
+                     + (f" {_sentence(_and_list([a.name for a in met]))} "
                         f"{'is' if len(met) == 1 else 'are'} waiting at the rail."
                         if met else " Nobody is on it.") + fought,
                 because=intent.because)
 
         return self._refuse(
             intent, f"{do or 'that'} is not something to do to a ship. There is close, "
-                    f"sheer off, ram, grapple and board.")
+                    f"sheer off, ram, grapple, board and cruise.")
 
     def _helm(self, people) -> tuple[str, list]:
         """(who, the modifiers) of the best hand at a helm among `people`: Profession
@@ -26418,6 +26677,10 @@ class Engine:
         if any(not (morale.yielded(a) or a.is_down) for a in crew):
             return [], []
         ship.held_by = self.scene.pc().ref
+        if (self.scene.sea or {}).get("theirs") == ship.id:
+            # A prize taken on the water: the engagement is over, and the ship the party
+            # came in keeps company with her to the next port (`_sail`).
+            self.scene.sea = {}
         self._keep_vessel(ship)
         name = f"{ship.name[:1].upper()}{ship.name[1:]}"
         return ([{"kind": "ship_taken", "vessel": ship.id, "by": ship.held_by,

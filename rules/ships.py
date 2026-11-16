@@ -116,6 +116,12 @@ PORT_PLACES = ("the docks", "the harbour", "the quay", "the wharf")
 # which is most of why the sea is faster than the road even at the same speed.
 HOURS_AT_SEA = 24
 
+# A cruise (`Engine._cruise`): the sea's check is made each watch, four watches a day —
+# the land's rate (Ultimate Wilderness p.127: four checks a day), not a voyage's one — and a
+# turn's cruise is at most one day of them.
+WATCH_MINUTES = 6 * 60
+CRUISE_WATCHES = 4
+
 # 0 hit points is not sunk: it is SINKING, which is ten rounds of people getting off.
 SINKS_AFTER = 10
 # "Damage to sinking ships reduces remaining time by 1 round per 25 damage."
@@ -158,6 +164,9 @@ class Vessel:
     # the PC whose threat or blade made her people yield (`Engine._ship_taken`). "" for a
     # ship that is her owners' still; `_sail` takes a held ship wherever the holder says.
     held_by: str = ""
+    # The town her seizure was sworn in, by the master who yielded her (2026-11-16,
+    # `Engine._ships_left_settle`): sworn once, whoever answers for her after him.
+    sworn: str = ""
 
     def as_dict(self) -> dict:
         return {"id": self.id, "name": self.name, "kind": self.kind, "hp": self.hp,
@@ -167,7 +176,8 @@ class Vessel:
                 "sailed_at": self.sailed_at, "passengers": list(self.passengers),
                 "river": self.river,
                 **({"lands_at": self.lands_at} if self.lands_at else {}),
-                **({"held_by": self.held_by} if self.held_by else {})}
+                **({"held_by": self.held_by} if self.held_by else {}),
+                **({"sworn": self.sworn} if self.sworn else {})}
 
     @classmethod
     def from_dict(cls, d: dict) -> "Vessel | None":
@@ -188,7 +198,7 @@ class Vessel:
                               else None),
                    passengers=[str(r) for r in (d.get("passengers") or [])],
                    river=bool(d.get("river")), lands_at=str(d.get("lands_at") or ""),
-                   held_by=str(d.get("held_by") or ""))
+                   held_by=str(d.get("held_by") or ""), sworn=str(d.get("sworn") or ""))
 
     @property
     def row(self) -> dict:
@@ -471,6 +481,25 @@ def master_of(crew: list):
     from . import attitude
 
     return min(crew, key=lambda a: (-attitude._hit_dice(a), a.ref)) if crew else None
+
+
+def her_waters(world, vessel: Vessel) -> list:
+    """The sea and river legs a ship can sail from where she is: from the quay she lies at,
+    else from the port she put out from — and, out on a cruise, the way back into that port
+    (live 2026-11-16: "bring her back into Mirabalos" had no leg, because the legs from a
+    port never lead to itself). The way back is a day: a cruise is a day's sail at most
+    from her port (`CRUISE_WATCHES`)."""
+    from . import journey as journey_mod
+
+    home = vessel.at or vessel.came_from
+    legs = [x for x in journey_mod.legs_from(world, home)
+            if x.by_sea or x.by in ("sea", "river")] if home else []
+    if not vessel.at and vessel.came_from and not vessel.bound_for:
+        town = world.get(vessel.came_from) if world is not None else None
+        legs.append(journey_mod.Leg(to_id=vessel.came_from,
+                                    to_name=str(getattr(town, "name", "") or "port"),
+                                    days_apart=1, by="sea", by_sea=True, to_port=True))
+    return legs
 
 
 def crewed(vessel: Vessel) -> bool:
