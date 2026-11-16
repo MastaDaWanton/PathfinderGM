@@ -197,9 +197,10 @@ def test_the_players_search_finds_a_hidden_npc_at_its_dc():
 
 
 def test_a_failed_search_says_nothing_of_anyone_hidden():
-    """A creature's failed search is told "finds nothing"; the player's is not, or the
-    page would learn somebody is hidden (CRB p.564: "tell him that the character has
-    missed, regardless of the result")."""
+    """A failed search names nobody hidden, or the page would learn somebody is (CRB
+    p.564: "tell him that the character has missed, regardless of the result"). Since
+    2026-11-16 the player's search says "finds nothing" — the same words whether nobody
+    is there or they hid too well (`Engine._player_search`)."""
     s, e = _board(fight=False, thug_at=(9, 5))
     thug = s.actors["c1"]
     _hide(thug)

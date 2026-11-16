@@ -152,6 +152,20 @@ WORKS = ("plain", "finer")
 #     the Bluff and the Stealth check (`acts_to_ops._sneak`).
 PACES = ("careful", "hurried")
 DIVERSIONS = ("none", "bluff")
+# The two closed answers a `search` action carries since 2026-11-16 (playtest that day,
+# #24, #29, #35, #49, #52): the search act owed no op, so the plan rolled whatever it
+# liked — Survival "finding tracks" for a way down, Perception at its own "average (DC
+# 10)", a forage for a ship's hold — and the engine's own search (the hidden creatures'
+# DCs, the way down's DC 20 in rules/dungeons.py) never ran.
+#   `where`: here, a search of where the searcher is or of a part of it (the walls, the
+#     floor, a ship's hold, the loft, the ground) for anything hidden or lost — the
+#     Perception search (CRB p.102), built whole (`acts_to_ops._search`); or elsewhere,
+#     looking for somewhere to go or something out in the world (water, somewhere dry,
+#     a tavern), which the travel and found doors answer as before.
+#   `take`: twenty when the words take 20 or search for as long as it takes, ten when
+#     they take 10, else roll (Taking 10 and Taking 20, CRB p.86).
+SEARCH_WHERE = ("elsewhere", "here")
+TAKES = ("roll", "ten", "twenty")
 # `until` since 2026-11-01, on `wait` and `rest`: the time of day the words wait or sleep
 # until, as a closed choice the sampler holds. The owner's report that day (Corvin): "wait
 # till tomarrow" was read `wait, time: till tomarrow`, nothing in code could turn the words
@@ -509,7 +523,11 @@ journey   take the road or a ship to another town; book or take passage, board a
 leave     walk out of where you are — a building, or the settlement itself — with
           nowhere else named
 look      look, watch, listen, read, examine
-search    look for a THING or a PLACE (water, a way in, somewhere to sleep)
+search    look for a THING or a PLACE (water, a way in, somewhere to sleep). `where` is
+          here for going over where you are or a part of it (a room, its walls or
+          floor, a ship's hold, the ground here) for anything hidden or lost, else
+          elsewhere; `take` is twenty when the words take 20 or keep searching as long
+          as it takes, ten when they take 10, else roll
 track     look for tracks, a trail or footprints; read the ground for who passed
 seek      look for, ask around for, wave down, head for or turn to a PERSON
 talk      speak to, ask, tell, greet, thank, persuade, order, haggle with somebody;
@@ -816,7 +834,14 @@ _DEMOS = [
     ("I turn the whole loft over looking for the missing ledger.",
      {"question": False, "claims": [], "actions": [
          {"span": "turn the whole loft over looking for the missing ledger",
-          "object": "the missing ledger", "place": "the whole loft", "act": "search"}]}),
+          "object": "the missing ledger", "place": "the whole loft", "where": "here",
+          "act": "search"}]}),
+    # Taking 20 (CRB p.86), the closed `take` (2026-11-16). Not a test line.
+    ("I go over the chapel floor slab by slab, as long as it takes, for a hidden hatch.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "go over the chapel floor slab by slab, as long as it takes, for a "
+                  "hidden hatch", "object": "a hidden hatch", "place": "the chapel floor",
+          "where": "here", "take": "twenty", "act": "search"}]}),
     ("I darn the hole in my stocking by the fire.",
      {"question": False, "claims": [], "actions": [
          {"span": "darn the hole in my stocking by the fire",
@@ -1317,6 +1342,11 @@ def per_act_schema() -> dict:
                  **({"pace": {"type": "string", "enum": list(PACES)},
                      "diversion": {"type": "string", "enum": list(DIVERSIONS)}}
                     if act == "stealth" else {}),
+                 # Where a search is, and whether it takes 10 or 20 (`SEARCH_WHERE`,
+                 # `TAKES`), after the words, as `pace`.
+                 **({"where": {"type": "string", "enum": list(SEARCH_WHERE)},
+                     "take": {"type": "string", "enum": list(TAKES)}}
+                    if act == "search" else {}),
                  # Until what time of day (`UNTILS`), after the time slot's own words.
                  **({"until": {"type": "string", "enum": list(UNTILS)}}
                     if act in UNTIL_ACTS else {}),
@@ -1384,6 +1414,9 @@ def _demo_reply(frame: dict) -> str:
                      **({"pace": a.get("pace") or PACES[0],
                          "diversion": a.get("diversion") or DIVERSIONS[0]}
                         if a["act"] == "stealth" else {}),
+                     **({"where": a.get("where") or SEARCH_WHERE[0],
+                         "take": a.get("take") or TAKES[0]}
+                        if a["act"] == "search" else {}),
                      **({"until": a.get("until") or UNTILS[0]}
                         if a["act"] in UNTIL_ACTS else {}),
                      **({"way": a.get("way") or ESCAPE_WAYS[0]}
@@ -1514,6 +1547,15 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
             div = str(a.get("diversion") or "").strip().lower()
             if div in DIVERSIONS and div != DIVERSIONS[0]:
                 kept["diversion"] = div
+        if kept["act"] == "search":
+            # The enums' or the default (elsewhere, rolled): the reading the turn always
+            # acted on. Kept only when they say something, as `pace` is.
+            where = str(a.get("where") or "").strip().lower()
+            if where in SEARCH_WHERE and where != SEARCH_WHERE[0]:
+                kept["where"] = where
+            take = str(a.get("take") or "").strip().lower()
+            if take in TAKES and take != TAKES[0]:
+                kept["take"] = take
         if kept["act"] in UNTIL_ACTS:
             # The enum's or nothing, kept only when it names something (`UNTILS`). Outside
             # it (a hosted provider, a remembered frame) the time slot's words are read
