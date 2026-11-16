@@ -786,12 +786,14 @@ class GMAgent:
                 # The ops the player's words committed the turn to, which the schema asks
                 # for as required keys because Ollama does not enforce `contains`
                 # (`prompts.turn_schema`): merged in where the list left them out.
-                # Only the ops this turn asked for: a `declared` key the schema did not
-                # require is the model's own, and merged as the player's it is an old
-                # intent renewed (#37, the way down planned on a walk out of the sewers).
+                # Never an op the reading overruled this turn: merged as the player's it
+                # is an old intent renewed (#37, the way down planned on a walk out of
+                # the sewers). Not every unrequested key: a recorded reply's `declared`
+                # (tests/replay/plans) answers the schema of its own day.
                 got = data.get("declared")
+                refused = set((read_ok or {}).get("overruled") or ()) - set(declared)
                 raw = self._merge_declared(
-                    raw, ({op: body for op, body in got.items() if op in declared}
+                    raw, ({op: body for op, body in got.items() if op not in refused}
                           if isinstance(got, dict) else got),
                     actor=getattr(self.engine.scene.pc(), "ref", ""))
                 # A give to the player that the reading never asked for is conjuring.
