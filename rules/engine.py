@@ -28491,9 +28491,11 @@ class Engine:
             # 502 where a sentence would have done.
             return Outcome(
                 intent_id=intent.id, op="use_ability", effects=[],
+                # Nothing else is told: "{name} attacks, and it does its work on the
+                # attack" claimed a blow nobody struck, and the page opened "As you
+                # strike" on a threat (playtest 2026-11-16 #1).
                 tell=(f"{found.title()} is always active — it is never used, it "
-                      f"simply happens. {actor.name} attacks, and it does its work "
-                      f"on the attack."),
+                      f"simply happens."),
                 because=intent.because)
 
         # A toggle is a standing state, not a spent action. Using it again turns it
@@ -33144,10 +33146,27 @@ def reported_speech(who: str, at: str, words: str, heard: str = "") -> str:
     elif not k and "that" in (t.lower() for t in rest[:8]):
         # Somebody named some other way ("him", "the man"): up to the first "that".
         k = [t.lower() for t in rest].index("that") + 1
+    elif k and k + 1 < len(rest) and rest[k].lower() == "to" or (
+            not k and len(rest) > 2 and rest[0].lower() in _SUBJECT_OF
+            and rest[1].lower() == "to"):
+        # "tell him to yield the ship": an order, told as what the one spoken to is to do
+        # — "that he yield the ship". Playtest 2026-11-16 #2 kept the frame: "to the
+        # effect that tell him to yield the Red Gull to me or die". Only straight after
+        # the one spoken to (their name, or a pronoun): "tell the guard I go to the
+        # market" is no order.
+        j = k or 1
+        named = " ".join(rest[:j]) if k else rest[0]
+        subject = _SUBJECT_OF.get(named.lower(), named)
+        return f"{who} speaks{at}, to the effect that {subject} {' '.join(rest[j + 1:])}"
     content = " ".join(rest[k:])
     if not k or not content:
         return plain
     return f"{who} speaks{at}, to the effect that {content}"
+
+
+# The one spoken to, as the subject of what they are told to do.
+_SUBJECT_OF = {"him": "he", "her": "she", "them": "they", "us": "we", "me": "I",
+               "it": "it", "you": "you"}
 
 
 def _instrument(weapon: dict, weapon_key: str) -> str:

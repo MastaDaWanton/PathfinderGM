@@ -583,6 +583,7 @@ class GMAgent:
         # `inject_sale`, `declare_drop`, `declare_emptying`) are gone: the table builds
         # those ops whole (`acts_to_ops.apply`, below).
         attached = getattr(self, "attachments", ())
+        check_skill = ""
         if read_ok is not None:
             detectors = judgement.declared_ops(player_input, self.engine.scene, self.world,
                                                attached=attached)
@@ -628,6 +629,11 @@ class GMAgent:
                                       "id", None) == self.engine.scene.at]
             if here_named and "travel" not in by_reading:
                 declared = [op for op in declared if op != "travel"]
+            # And no way down is owed where every move names a place already known.
+            if "venture" in declared and "venture" not in by_reading and not \
+                    interpret.ventures_somewhere_new(self.reading, self.engine.places()):
+                declared = [op for op in declared if op != "venture"]
+                self.reading.setdefault("overruled", []).append("venture")
 
         from play import modelcfg
 
@@ -723,7 +729,8 @@ class GMAgent:
                                     # caster, the features and props, and for a cone or
                                     # a line the map's axes.
                                     aims=self._cast_aims(player_input)
-                                    if "cast" in declared else ()))
+                                    if "cast" in declared else (),
+                                    skill=check_skill if "check" in declared else ""))
             except client.ModelUnavailable as exc:
                 down.add(model)
                 # A wedged Ollama is wedged for every model it serves: the backup on the
@@ -779,8 +786,13 @@ class GMAgent:
                 # The ops the player's words committed the turn to, which the schema asks
                 # for as required keys because Ollama does not enforce `contains`
                 # (`prompts.turn_schema`): merged in where the list left them out.
+                # Only the ops this turn asked for: a `declared` key the schema did not
+                # require is the model's own, and merged as the player's it is an old
+                # intent renewed (#37, the way down planned on a walk out of the sewers).
+                got = data.get("declared")
                 raw = self._merge_declared(
-                    raw, data.get("declared"),
+                    raw, ({op: body for op, body in got.items() if op in declared}
+                          if isinstance(got, dict) else got),
                     actor=getattr(self.engine.scene.pc(), "ref", ""))
                 # A give to the player that the reading never asked for is conjuring.
                 raw, conjured = interpret.drop_unread_gifts(
@@ -948,7 +960,21 @@ class GMAgent:
                     raw, player_input, self.engine.scene,
                     self.reading if isinstance(self.reading, dict) else None)
                 raw = judgement.the_players_spell_dice(raw, player_input, self.engine.scene)
-                raw = judgement.inject_checks(raw, player_input, self.engine.scene)
+                # Not where the reading overruled the check detector (`interpret.supported`):
+                # the injector reads the same words, and put the check straight back.
+                # Live replay of #32, 2026-11-16: "I climb back out of the crypt" was read
+                # `go`, the declared check overruled, and a Climb rolled anyway.
+                if "check" not in ((read_ok or {}).get("overruled") or ()):
+                    raw = judgement.inject_checks(raw, player_input, self.engine.scene)
+                # A sneak, a palm or a disguise is the player's to choose, this turn, in
+                # this turn's words (`interpret.drop_unchosen_checks`, #37).
+                raw, unchosen = interpret.drop_unchosen_checks(
+                    raw, read_ok, getattr(self.engine.scene.pc(), "ref", "pc"))
+                if unchosen:
+                    own_words.append("dropped the plan's " + ", ".join(unchosen)
+                                     + " check: this turn's words do not do it")
+                # And a passive the plan "used" that the words never named (#1).
+                raw = judgement.drop_unasked_passives(raw, declared, self.engine.scene)
                 # A body searched is the loot, and only the loot: the check the words'
                 # "search" just added, or the plan's own, goes (2026-11-04).
                 raw = acts_to_ops.loot_is_the_search(
@@ -1006,7 +1032,12 @@ class GMAgent:
                     known=tuple(self.engine.places()) + tuple(self.engine.open_ground()),
                     reading=read_ok)
                 raw = judgement.inject_found(raw, player_input, self.engine.scene, self.world)
-                raw = judgement.inject_venture(raw, player_input, self.engine.scene)
+                # As the check injector: not where the reading overruled the venture
+                # detector. Live replay of #37, 2026-11-16: in the sewers, "I climb out of
+                # the sewers and walk to the great square" had the venture overruled, and
+                # this put it back — and dropped the walk as "the same intent".
+                if "venture" not in ((read_ok or {}).get("overruled") or ()):
+                    raw = judgement.inject_venture(raw, player_input, self.engine.scene)
                 raw = judgement.inject_wait(raw, player_input, self.engine.scene)
                 # The waking time of a sleep is the reading's `time` slot, or none
                 # (`acts_to_ops.timed_rests`): after every door that can add a rest.
@@ -4889,9 +4920,29 @@ class GMAgent:
             return raw
         have = {str(r.get("op", "")).lower() for r in raw if isinstance(r, dict)}
         for op, body in declared.items():
-            if op in have or not isinstance(body, dict):
+            if not isinstance(body, dict):
                 continue
             params = dict(body.get("params") or {})
+            skill = str(params.get("skill") or "").lower() if op == "check" else ""
+            if op in have and not (skill and not any(
+                    isinstance(r, dict) and str(r.get("op", "")).lower() == "check"
+                    and str((r.get("params") or {}).get("skill") or "").lower() == skill
+                    for r in raw)):
+                # A plan's check of another skill is not the declared one (playtest
+                # 2026-11-16 #37: the plan's own Stealth stood in for a declared Climb).
+                if op == "travel" and params.get("place"):
+                    # Except where the plan's own walk names nowhere: the declared body's
+                    # place is the schema's enum of real places. Live replay of #37
+                    # (snapshot 228): "climb out of the sewers and walk to the great
+                    # square" planned a bare travel, refused "Nobody moves: where to?".
+                    bare = next((r for r in raw if isinstance(r, dict)
+                                 and str(r.get("op", "")).lower() == "travel"
+                                 and not (r.get("params") or {}).get("place")
+                                 and not (r.get("params") or {}).get("biome")), None)
+                    if bare is not None:
+                        bare["params"] = dict(bare.get("params") or {},
+                                              place=params["place"])
+                continue
             if op == "say":
                 # The words of a declared say are the MODEL's, written into the schema's
                 # required key; the player's words are what commit the turn to it.

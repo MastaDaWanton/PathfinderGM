@@ -4403,6 +4403,32 @@ def _psychic_called(text: str) -> str:
     return "psychic powers"
 
 
+def drop_unasked_passives(raw_intents, declared, scene) -> list:
+    """The plan's `use_ability` of the player's always-active passive, when the player's
+    words declared no use (`declared` is the turn's declared ops): a passive is never
+    used, it simply happens (`leveling.is_passive`), so "using" it is the plan reaching
+    for the sheet. Playtest 2026-11-16 #1: a threat with a levelled dagger planned Blood
+    Pool Manifestation, its tell said the character "attacks", and the page opened "As
+    you strike". The player who names one ("I use Swift Strikes") still hears the
+    engine's own answer, since that use is declared."""
+    if not isinstance(raw_intents, list) or scene is None or "use_ability" in (declared or ()):
+        return raw_intents
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if pc is None:
+        return raw_intents
+    from rules import leveling
+
+    def passive(r) -> bool:
+        if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "use_ability"
+                and r.get("actor") in (None, "", "pc", pc.ref)):
+            return False
+        _path, found, _fx = leveling.find_ability(
+            pc, str((r.get("params") or {}).get("ability") or ""))
+        return bool(found) and leveling.is_passive(pc, found)
+
+    return [r for r in raw_intents if not passive(r)]
+
+
 def refuse_unnamed_power(raw_intents, player_text: str, scene) -> list:
     """Reaching into somebody's mind is an ability or it is nothing.
 
