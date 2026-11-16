@@ -331,15 +331,33 @@ class TestTheDoorThatWasNotWalked:
     """
 
     def test_you_go_in_from_where_you_are_standing(self):
+        """Since playtest 2026-11-16 #31 the walk to the parent is made first, through
+        `travel`, as the turn's one journey ("I climb out of the crypt and go down into
+        the sewers"): walked and its minutes charged, never a step across town. With the
+        turn's journey already spent, it is still refused."""
         s, e, pc = _party()
         here = e.here()
         elsewhere = next(p for p in e.places()
-                         if p.id != here.id and not p.described_only)
+                         if p.id != here.id and not p.described_only
+                         and places_mod.setting_of(p.id) == "in")
+        clock = s.clock_minutes
         raw = {"op": "venture", "actor": pc.ref, "because": "t",
                "params": {"kind": "sewers", "parent": elsewhere.name}}
         res = e.run(e.validate([raw], origin="author:test"))
         tell = " ".join(o.tell for o in res.outcomes)
-        assert s.at == here.id, "the party went underground somewhere it was not standing"
+        slug = elsewhere.id.split(":", 1)[1]
+        assert s.at.endswith(f"{slug}/the-sewers"), (s.at, tell)
+        assert f"You are at {elsewhere.name} now" in tell, tell
+        assert s.clock_minutes > clock, "the walk to the parent took no time"
+
+        s, e, pc = _party()
+        third = next(p for p in e.places() if p.id not in (here.id, elsewhere.id)
+                     and not p.described_only and places_mod.setting_of(p.id) == "in")
+        res = e.run(e.validate([
+            {"op": "travel", "actor": pc.ref, "because": "t", "params": {"place": third.id}},
+            raw], origin="author:test"))
+        tell = " ".join(o.tell for o in res.outcomes)
+        assert s.at == third.id, "the party went underground somewhere it was not standing"
         assert elsewhere.name in tell and "first" in tell, tell
 
     def test_the_way_down_where_you_stand_still_opens(self):

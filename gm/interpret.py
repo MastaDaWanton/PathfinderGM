@@ -520,8 +520,9 @@ go        walk somewhere within reach (a place in town, the crossroads, the fiel
           floor for back down to the ground), or none
 journey   take the road or a ship to another town; book or take passage, board a ship
           bound somewhere, set sail, sail on, or order a ship's crew to sail somewhere
-leave     walk out of where you are — a building, or the settlement itself — with
-          nowhere else named
+leave     walk or climb out of where you are — a building, ground gone down into (a
+          cellar, a crypt, the sewers, a cave), or the settlement itself — with nowhere
+          else named
 look      look, watch, listen, read, examine
 search    look for a THING or a PLACE (water, a way in, somewhere to sleep). `where` is
           here for going over where you are or a part of it (a room, its walls or
@@ -826,6 +827,18 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "head back down to the ground", "place": "the ground",
           "within_place": True, "fixture": "floor", "act": "go"}]}),
+    # Two moves in one line are two acts, and climbing OUT of somewhere is leaving it
+    # (playtest 2026-11-16 #31 and #34): "I climb back out of the crypt and go down into
+    # the city's sewers" was read as a walk inside the crypt, and "I find a sewer grate
+    # and go down into the sewers" as one search, the going down dropped. Not test lines.
+    ("I clamber up out of the cellar and go down to the docks.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "clamber up out of the cellar", "place": "the cellar", "act": "leave"},
+         {"span": "go down to the docks", "place": "the docks", "act": "go"}]}),
+    ("I find the trapdoor and drop down into the cellars.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "find the trapdoor", "object": "the trapdoor", "act": "search"},
+         {"span": "drop down into the cellars", "place": "the cellars", "act": "go"}]}),
     ("I pick up the lantern, light it and peer down the stairwell.",
      {"question": False, "claims": [], "actions": [
          {"span": "pick up the lantern", "object": "the lantern", "act": "take"},
@@ -2519,7 +2532,7 @@ def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
             # already at the road to Kalixiri").
             add("journey")
         elif act == "go" and a.get("place"):
-            p = places_mod.find(places, a["place"]) if places else None
+            p = places_mod.find(places, a["place"], near=here) if places else None
             if p is None and scene is not None:
                 # A person standing here, named where a place goes: "I go back to the
                 # guild clerk" is read `go: the guild clerk`, which no place is called.
@@ -2699,6 +2712,18 @@ def travel_choices(frame: dict | None, scene, places, location) -> tuple[str, ..
                        if x in by_id and not places_mod.is_indoors(
                            x, by_id[x].terrain, by_id[x].shape))
         return street or everything
+    if going == "venture":
+        from rules import places as places_mod
+
+        by_id = {p.id: p for p in places}
+        head = places_mod.venture_head(places, by_id.get(here))
+        up = by_id.get(head.parent) if head is not None else None
+        # Out, to the place it hangs off — unless the line goes on somewhere ("…and walk
+        # to the market"), which that walk's own place answers.
+        onward = any(a.get("act") in ("go", "journey") and a.get("place")
+                     for a in (frame or {}).get("actions") or [] if acting(a))
+        if up is not None and not onward:
+            return (up.name,)
     nearby = _sought_nearby(frame, here, places)
     if nearby:
         return nearby
@@ -2760,18 +2785,25 @@ def _has_outside(places) -> bool:
 
 
 def _leaving(action: dict, scene, places, location=None) -> str:
-    """"settlement", "building" or "" for one `leave` action of the reading."""
+    """"settlement", "building", "venture" or "" for one `leave` action of the reading."""
     from rules import places as places_mod
 
     here_id = str(getattr(scene, "at", "") or "")
-    if places_mod.setting_of(here_id) == "outside":
-        return ""                      # already out: "leave" names nowhere to go
     slot = str(action.get("place") or "").strip().lower()
-    words = set(_WORDS_RE.findall(slot))
-    name = str(getattr(location, "name", "") or "").lower()
     by_id = {p.id: p for p in places or ()}
     cur = by_id.get(here_id)
-    named = places_mod.find(places, slot) if slot else None
+    named = places_mod.find(places, slot, near=here_id) if slot else None
+    # Out of the ground gone into, up to the place it hangs off: playtest 2026-11-16 #31,
+    # "I climb back out of the crypt and go down into the city's sewers" owed no op for
+    # its first half. Inform's EXIT takes you out of the container you are in; the
+    # venture is that container, so the way out is its head's parent.
+    head = places_mod.venture_head(places, cur) if cur is not None else None
+    if head is not None and (named is None or places_mod.venture_head(places, named) == head):
+        return "venture"
+    if places_mod.setting_of(here_id) == "outside":
+        return ""                      # already out: "leave" names nowhere to go
+    words = set(_WORDS_RE.findall(slot))
+    name = str(getattr(location, "name", "") or "").lower()
     indoors = cur is not None and places_mod.is_indoors(cur.id, cur.terrain, cur.shape)
     # Asked of the place's own id when the list does not carry it (the floorplan answers
     # either way, `places.is_indoors`).
