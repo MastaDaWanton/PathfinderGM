@@ -1710,7 +1710,7 @@ def inject_fight(raw_intents, player_text: str, scene, *, rows=(), frame=None,
     blows = [r for r in rows or () if r.act in acts_to_ops.VIOLENT_ACTS
              and r.index < len(actions) and interpret.acting(actions[r.index])]
     if not blows:
-        return raw_intents
+        return _threat_at_the_found(list(raw_intents), rows, actions, scene, notes)
     # No early return on finishing words any more (2026-11-04): it was `is_finishing_blow`,
     # a regex, standing the reading down — so "I finish him off" in a fight kept whatever
     # blow the plan wrote, and "I slit his throat", which the regex never knew, was an
@@ -1817,6 +1817,7 @@ def inject_fight(raw_intents, player_text: str, scene, *, rows=(), frame=None,
                         **({"params": {"manoeuvre": man}} if man else {})})
         if notes is not None:
             notes.append(f"the blow after the finding is at {met[0]}, whom the plan found")
+    out = _threat_at_the_found(out, rows, actions, scene, notes)
 
     if getattr(scene, "in_encounter", False):
         standing = [a for a in actors.values() if not getattr(a, "is_pc", False)
@@ -1829,6 +1830,46 @@ def inject_fight(raw_intents, player_text: str, scene, *, rows=(), frame=None,
                 for r in out if isinstance(r, dict)):
             out.append({"op": "end_encounter",
                         "because": "there is nobody left standing to fight"})
+    return out
+
+
+def _threat_at_the_found(out: list, rows, actions, scene, notes) -> list:
+    """A threat the table left for after somebody is found (`acts_to_ops.DEFERRED` on a
+    `threaten` row) is the Intimidate check at the plan's one newcomer, after the
+    introduce and any blow at them, unless the plan already threatens somebody. Live
+    replay of playtest #18/#21, 2026-11-15: "... shove him against the wall and demand his
+    purse" printed "there is nobody here who is him"."""
+    from rules.intents import INTRODUCED_REFS
+
+    from . import acts_to_ops
+
+    pc = scene.pc() if scene is not None and hasattr(scene, "pc") else None
+    later = [r for r in rows or () if r.act == "threaten" and not r.intents
+             and r.note == acts_to_ops.DEFERRED and r.index < len(actions)]
+    intros = [k for k, r in enumerate(out) if isinstance(r, dict)
+              and str(r.get("op", "")).lower() == "introduce"]
+    if not later or pc is None or len(intros) != 1 \
+            or int((out[intros[0]].get("params") or {}).get("count") or 1) != 1:
+        return out
+    new = INTRODUCED_REFS[0]
+    demand = str(actions[later[0].index].get("demand") or "obey")
+    # The plan's own threat is this one, carrying the reading's demand: the live replay's
+    # plan wrote `check intimidate` at new1 with no demand, and the purse never moved.
+    for k, r in enumerate(out):
+        if isinstance(r, dict) and str(r.get("op", "")).lower() == "check" \
+                and str((r.get("params") or {}).get("skill", "")).lower() == "intimidate":
+            out[k] = dict(r, target=r.get("target") or new,
+                          params={**(r.get("params") or {}), "demand": demand})
+            return out
+    at = intros[0] + 1
+    while at < len(out) and isinstance(out[at], dict) \
+            and str(out[at].get("op", "")).lower() == "attack" and out[at].get("target") == new:
+        at += 1
+    out.insert(at, {"op": "check", "actor": pc.ref, "target": new,
+                    "params": {"skill": "intimidate", "demand": demand},
+                    "because": "the player threatens the one they found"})
+    if notes is not None:
+        notes.append(f"the threat after the finding is at {new}, whom the plan found")
     return out
 
 
@@ -8778,7 +8819,22 @@ def sought_indefinitely(player_text: str) -> bool:
     crossing when you saw them, and is not here" — a particular girl from earlier, for a
     request that wanted any child. The user's ruling on reuse is the same line: a kind
     that is not tied to a place or a title should not always grab somebody already made.
+
+    The turn's reading first, as `person_sought` reads it: its target keeps the article
+    `target_of` strips. Live 2026-11-15 (playtest #22, replayed): "I pick out a
+    well-dressed merchant passing through the warrens…" was read `seek: a well-dressed
+    merchant`, the regex below matched nothing, and the finder was asked for a definite
+    "well-dressed merchant" — Lyraea, a guild leader in another town.
     """
+    from . import interpret as _interpret
+
+    reading = _interpret.reading_of(player_text)
+    if reading and not reading.get("error"):
+        for a in reading.get("actions") or ():
+            if a.get("act") in ("seek", "call_on", "talk") and a.get("target"):
+                first = str(a["target"]).split()[0].lower()
+                return first in ("a", "an", "some", "any", "another", "someone",
+                                 "somebody", "anyone", "anybody", "whoever")
     m = _sought_match(player_text)
     if not m:
         return False

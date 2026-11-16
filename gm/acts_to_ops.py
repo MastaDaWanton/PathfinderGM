@@ -959,7 +959,7 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
             if act == "request" and pc is not None:
                 _request(row, a, scene, pc)
             if act == "threaten" and pc is not None:
-                _threaten(row, a, scene, pc)
+                _threaten(row, a, scene, pc, frame, i)
             if act == "craft" and pc is not None:
                 _craft(row, a, pc)
             if act == "loot" and pc is not None:
@@ -1862,7 +1862,7 @@ def _request(row: Row, a: dict, scene, pc) -> None:
     row.note = f"a request of {name}: {kind}"
 
 
-def _threaten(row: Row, a: dict, scene, pc) -> None:
+def _threaten(row: Row, a: dict, scene, pc, frame=None, i: int = 0) -> None:
     """A threat, built whole: the player's Intimidate check at the person threatened,
     carrying what is demanded (`interpret.DEMANDS`). The engine makes it Influence Attitude
     out of a fight and Demoralize in one (CRB p.99, `Engine._cowed`, `Engine._demoralize`),
@@ -1873,7 +1873,7 @@ def _threaten(row: Row, a: dict, scene, pc) -> None:
     engine's finder on the words; a crowd ("the crew") or no words at all is the one the
     player is dealing with, else — in a fight — the nearest foe, else — aboard a ship —
     her master (`Engine._crew_master`). Nobody here to threaten is said, never invented."""
-    from . import judgement
+    from . import interpret, judgement
 
     words = " ".join(str(a.get("target") or "").split())
     actors = getattr(scene, "actors", {}) or {}
@@ -1887,6 +1887,14 @@ def _threaten(row: Row, a: dict, scene, pc) -> None:
         crew = _crew_here(scene)
         who = crew.ref if crew is not None else ""
     actor = actors.get(who) if who else None
+    if actor is None and (not words or words.lower() in _PRONOUNS) and any(
+            interpret.acting(b) and b.get("act") in _FINDS_SOMEBODY_FIRST
+            for b in ((frame or {}).get("actions") or [])[:i]):
+        # "pick out a merchant ..., and demand his purse": the threat is at the one the
+        # plan finds, as a blow there is (`DEFERRED`, `judgement.inject_fight`). Live replay
+        # of playtest #18/#21, 2026-11-15: "there is nobody here who is him" was printed.
+        row.note = DEFERRED
+        return
     if actor is None or actor.is_pc:
         row.missing = (f"there is nobody here who is {words}" if words
                        else "there is nobody here to threaten")

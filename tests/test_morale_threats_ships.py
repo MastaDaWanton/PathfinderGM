@@ -289,22 +289,34 @@ def test_a_shove_is_a_bull_rush_and_a_named_blow_in_a_fight_is_never_dropped():
 
 
 def test_a_blow_after_a_seek_lands_on_the_one_the_plan_found():
-    """#18: "I pick out a merchant ..., shove him against the wall" — the plan introduced
-    the merchant and the shove was never struck."""
+    """#18 / #21: "I pick out a merchant ..., shove him against the wall and demand his
+    purse" — the plan introduced the merchant, the shove was never struck, and the live
+    replay printed "there is nobody here who is him" for the demand."""
     from gm import acts_to_ops, judgement
 
-    scene, engine, who = _table()
+    scene, engine, who = _table(name="Grix")
     frame = {"actions": [{"act": "seek", "target": "a merchant", "span": "a"},
-                         {"act": "attack", "target": "him", "blow": "shove", "span": "b"}]}
+                         {"act": "attack", "target": "him", "blow": "shove", "span": "b"},
+                         {"act": "threaten", "target": "him", "demand": "hand_over",
+                          "span": "c"}]}
     rows = acts_to_ops.table(frame, scene)
     acts_to_ops.victims(rows, frame, scene)
+    assert not any(r.missing for r in rows), [r.missing for r in rows]
     plan = [{"op": "introduce", "params": {"who": "merchant", "how": "already_here",
                                            "template": "merchant-level-1"}},
             {"op": "say", "actor": "pc", "target": "new1", "params": {"words": "purse"}}]
     out = judgement.inject_fight(plan, "", scene, rows=rows, frame=frame)
     assert out[1]["op"] == "attack" and out[1]["target"] == "new1", out
     assert out[1]["params"] == {"manoeuvre": "bull rush"}
+    assert out[2]["op"] == "check" and out[2]["target"] == "new1", out
+    assert out[2]["params"] == {"skill": "intimidate", "demand": "hand_over"}
     engine.validate(out, origin="author:test")
+    # The live replay's plan wrote its own threat with no demand: it carries the reading's.
+    own = plan + [{"op": "check", "actor": "pc", "target": "new1",
+                   "params": {"skill": "intimidate"}}]
+    out = judgement.inject_fight(own, "", scene, rows=rows, frame=frame)
+    checks = [r for r in out if r["op"] == "check"]
+    assert len(checks) == 1 and checks[0]["params"]["demand"] == "hand_over", out
 
 
 def test_a_step_back_in_a_fight_is_one_square():
