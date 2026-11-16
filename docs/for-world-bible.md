@@ -1504,3 +1504,53 @@ phrase, never a sentence cut at a length.
 ### Done when
 
 No `play.cards[]` title is a strict prefix of one of that card's own facts.
+
+## 28. `ruins` on a place — who built the old works, when, and what ended them
+
+*Asked 2026-11-16 (feat/dungeon-story). Optional: without it a dungeon's history is drawn
+from the app's own authored rows (`content/dungeons/builders.json`), grounded where it can
+be in the world's PEOPLE, NATION and faction names and its oldest dated chronology events
+(`rules/dungeons.py` `_world_sources`), which is how every world plays today.*
+
+The owner: "A proper dungeon cannot just be random rooms and it must hold a cohesive
+story/pattern." Every way down now carries a concept chosen before any room: who built it
+and for what, how old it is, how it was ruined, who used it after, who holds it now, why it
+is still unlooted, and what the town says of it. The app can only guess the first four
+from names: a tomb "of the Korvu" because the Korvu are the continent's people, "in the days
+of the Founding of Pangrella" because that is one of the world's oldest events. It cannot
+know that the Korvu buried their dead in the sinkholes their Founding Story names, or that
+the Shattering of the Citadel is what emptied the old works under Vyrakon. A world that
+knows its own ruins should be able to say so, and the app should then tell that history in
+the rooms instead of a guessed one.
+
+**Shape.** An optional list on any settlement entity or `play.places[]` row, beside ask 25's
+`dungeons` (the two may be one row: a `dungeons` entry may carry these fields too):
+
+```json
+{"id": "5bbd0c40345f", "name": "Pangrella",
+ "ruins": [{"under": "crypt", "built_by": "fd4449bc9a64", "built_for": "tomb",
+            "when": "event:Founding of Pangrella", "ended_by": "flood",
+            "after": ["e1a2b3c4d5e6"],
+            "about": "The first Korvu dead were laid under the sinkholes, until the water came up."}]}
+```
+
+| field | what it is |
+|---|---|
+| `under` | the venture kind it lies under: `cave`, `mine`, `ruins`, `crypt`, `sewers`, `cellar` or `tower` |
+| `built_by` | the id of the PEOPLE, NATION or faction that built it (never a free-text name) |
+| `built_for` | one word: `tomb`, `temple`, `smuggling`, `garrison`, `mine`, `retreat`, `drains`, `treasury`, `prison`, `natural`, `monastery` |
+| `when` | `event:<chronology event name>`, or one word: `recent`, `old`, `ancient` |
+| `ended_by` | one word: `flood`, `fire`, `plague`, `collapse`, `war`, `sealed`, `quarrel`, `abandoned` |
+| `after` | ids of PEOPLE, NATION or factions that used it later, oldest first; may be empty |
+| `about` | one sentence, the world's own prose |
+
+**Rule 1 still holds.** Ids and words, never numbers: what lives there now, its creatures,
+traps, doors and treasure stay the app's (the ruin tag, the bestiary through the encounter
+budget, the CRB's traps and treasure). Ask 14 still holds too: no Pathfinder setting names
+in `about`.
+
+### Done when
+
+An export carries `ruins` on at least one settlement, `tools/check_places.py` accepts the
+fields above and nothing else, and a way down found under that settlement names those
+builders, that age and that ending in its rooms' traces, every time.

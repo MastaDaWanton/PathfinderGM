@@ -1,0 +1,246 @@
+{
+  "_about": "Who built a dungeon and what for, how it fell, who used it after, why it is still unlooted and what the town makes of it: the history half of a dungeon's concept (rules/dungeons.py, `concept_for`). The owner, 2026-11-16: 'A proper dungeon cannot just be random rooms and it must hold a cohesive story/pattern.' Shaped on Hal Johnson's origin / history / ecology (haljohnsonbooks.substack.com, 'Anatomy of a dungeon', 2024), Sly Flourish's three layers - what it was built for, what it became, what it is now (slyflourish.com/making_awesome_dungeons.html) - and the ruin questions of Kevin Crawford's Worlds Without Number (type, age, how ruined, why unplundered, previous users, what the locals think, one ruin tag). Authored game data: no model writes a word of it. Slots a sentence may carry, filled in code from the world's own names or the generic `who` below: {builders} {users} {town} {where} {age} {leader} {lair} {ally}. A builder's `ground` says which of the world's records may name it: `people` (a PEOPLE entity of the continent), `nation` (a NATION), `faction` (a faction whose own description carries one of `words`); with none of those it is its generic `who`. `rooms` are by family (built: ruins, crypt, sewers, cellar, tower; natural: cave; dug: mine), ordered from the way in to the innermost. `traps` are content/rules/traps.json ids that fit the builders. `traces` are what the builders left that can still be seen, one per room, shown and never explained. `ruin`, where a row has it, limits how the place can have fallen to the causes that make sense for it (nobody walls up a cave its builders never dug).",
+  "builders": {
+    "tomb": {
+      "kinds": ["crypt", "ruins", "cave", "cellar"],
+      "who": "a family long dead",
+      "ground": {"from": "people", "as": "the {name}"},
+      "purpose": "a tomb, to keep their honoured dead",
+      "rooms": {
+        "built": [["the antechamber", "a low room with a stone bench along each wall, for the mourners"],
+                  ["the hall of offerings", "shelves cut into the walls, and the dust of what was left on them"],
+                  ["the embalmers' room", "a stone table with a channel cut round its edge"]],
+        "natural": [["the barrow mouth", "a cave mouth walled up with dressed stones, half of them pulled down"],
+                    ["the bone shelf", "a ledge of rock where the bones were laid out to dry"],
+                    ["the cairn chamber", "a cave chamber with a cairn of river stones heaped in the middle"]]
+      },
+      "traps": ["pit-trap", "camouflaged-pit-trap", "falling-portcullis"],
+      "cache": "a funeral casket",
+      "traces": ["Names are cut over every niche, worn almost smooth, all of them names of {builders}.",
+                 "A carved lintel shows a procession carrying a bier down into the dark, and the faces are the faces of {builders}.",
+                 "Grave-goods are still set out in rows: cups, combs, a child's clay horse, nothing anybody thought worth stealing."]
+    },
+    "temple": {
+      "kinds": ["crypt", "ruins", "cave", "tower"],
+      "who": "a forgotten priesthood",
+      "ground": {"from": "people", "as": "priests of the {name}"},
+      "purpose": "a shrine below the ground, for rites kept out of the daylight",
+      "rooms": {
+        "built": [["the narthex", "a vestibule with a dry basin by the door for washing the hands"],
+                  ["the hall of pillars", "a long hall, its pillars carved as figures holding up the roof"],
+                  ["the vestry", "rotted chests where the vestments were kept, the cloth gone to threads"]],
+        "natural": [["the washing pool", "a pool in the rock, its edge cut into steps"],
+                    ["the painted gallery", "a cave wall covered from floor to roof in faded paint"],
+                    ["the echo chamber", "a round cave where every sound comes back three times"]]
+      },
+      "traps": ["swinging-axe-trap", "pit-trap", "falling-portcullis"],
+      "cache": "an offering chest",
+      "traces": ["The painted figures on the walls are {builders} at their rites, kneeling to something the paint has flaked away from.",
+                 "Prayers are scratched into the floor stones by the hundred, in the hand of {builders}.",
+                 "An altar stone stands at the end, cracked clean across, and the crack has been filled with lead."]
+    },
+    "smugglers-run": {
+      "kinds": ["sewers", "cellar", "cave"],
+      "who": "smugglers",
+      "ground": {"from": "faction", "words": ["smuggl", "contraband", "black market", "untaxed", "tariff", "toll"], "as": "{name}"},
+      "purpose": "a run for goods that never paid the town's tolls",
+      "rooms": {
+        "built": [["the landing", "a ledge with iron rings set in the wall, where boats were tied"],
+                  ["the tally room", "a room with a long plank table and a rack for lamps"],
+                  ["the bonded store", "a store with racks on every wall, built for bales"]],
+        "natural": [["the boat cave", "a cave with water in it, a rotten jetty along one side"],
+                    ["the dry ledge", "a ledge above the waterline, scraped flat for stacking"],
+                    ["the lookout crevice", "a crack in the rock with a view back down the way in"]]
+      },
+      "traps": ["arrow-trap", "pit-trap", "collapsing-floor"],
+      "cache": "a bale wrapped in oilcloth",
+      "traces": ["Tally marks are cut in the wall in long rows of five, hundreds of them: {builders} counted cargo here.",
+                 "A rusted lantern hangs with its shutter on one side only, the kind that shows a light to one direction and no other.",
+                 "Somebody has scratched a crude map of the town's streets into the plaster, with the watch-houses crossed out."]
+    },
+    "garrison": {
+      "kinds": ["ruins", "tower", "cellar"],
+      "who": "soldiers of a lord nobody remembers",
+      "ground": {"from": "nation", "as": "soldiers of {name}"},
+      "purpose": "a strongpoint under the ground, to hold the place in a siege",
+      "rooms": {
+        "built": [["the gatehouse", "two arrow-slits looking down the stair, and a bar-socket either side of the door"],
+                  ["the guardroom", "benches and a weapon rack, long empty"],
+                  ["the armoury", "pegs for spears in rows, and a whetstone worn into a saddle"]]
+      },
+      "traps": ["arrow-trap", "javelin-trap", "swinging-axe-trap", "falling-portcullis"],
+      "cache": "a paymaster's strongbox",
+      "traces": ["A duty roster is painted on the wall: names of {builders}, a watch each, and the last watch never filled in.",
+                 "Spent arrowheads lie thick against one wall, all pointing the same way, inwards.",
+                 "Soldiers' scratchings by the door: a game board, a name, a count of days that stops at forty-one."]
+    },
+    "mine-works": {
+      "kinds": ["mine", "cave"],
+      "who": "miners",
+      "ground": {"from": "people", "as": "miners of the {name}"},
+      "purpose": "a working, dug after a seam that ran deeper than anyone expected",
+      "rooms": {
+        "dug": [["the cage landing", "the bottom of a shaft, where the winding cage came down"],
+                ["the lower drift", "a level dug below the old one, its props still sound"],
+                ["the ore chute", "a steep chute the ore came down, polished by it"]],
+        "natural": [["the miners' entry", "a natural cave the miners widened, pick-marks on the walls"],
+                    ["the sorting floor", "a flat floor of rock, heaps of spoil along its edges"],
+                    ["the cut seam", "a cave where a seam was followed into the rock and given up"]]
+      },
+      "traps": ["pit-trap", "collapsing-floor", "camouflaged-pit-trap"],
+      "cache": "a pay chest",
+      "traces": ["Tally boards hang by the shaft with pegs still in them: so many loads a shift, the work of {builders}.",
+                 "The pick-marks change halfway along: the same seam, cut later by different hands and different tools.",
+                 "A lamp-niche holds a little clay figure, put there for luck by somebody who dug here."]
+    },
+    "wizards-retreat": {
+      "kinds": ["tower", "cellar", "ruins"],
+      "who": "a mage who wanted no neighbours",
+      "ground": null,
+      "purpose": "a retreat for work the town would not have stood for",
+      "rooms": {
+        "built": [["the warded stair", "a stair whose every step is cut with a sign, the signs gone dull"],
+                  ["the library", "shelves to the ceiling, most of the books gone to pulp"],
+                  ["the laboratory", "a long bench burnt black in rings, and glass ground underfoot"]]
+      },
+      "traps": ["arrow-trap", "javelin-trap", "swinging-axe-trap"],
+      "cache": "a locked reliquary",
+      "traces": ["Notes in a cramped hand are pinned to the shelves, every one of them about the same experiment.",
+                 "Chalk circles are drawn and redrawn on the floor, each one a little larger than the last.",
+                 "A mirror hangs face to the wall, and somebody has nailed it there."]
+    },
+    "old-drains": {
+      "kinds": ["sewers", "cellar"],
+      "who": "the town's first builders",
+      "ground": {"from": "nation", "as": "builders of {name}"},
+      "purpose": "the first drains, laid before the town above them was half its size",
+      "rooms": {
+        "built": [["the outfall gate", "a gate of iron bars across the old channel, rusted open"],
+                  ["the settling tank", "a deep square tank, the silt in it gone hard as clay"],
+                  ["the sluice room", "a room of wheels and rotten gates that once let the water through"]]
+      },
+      "traps": ["pit-trap", "collapsing-floor"],
+      "cache": "a sealed lead box",
+      "traces": ["Every brick is stamped with the same mark, the mark of {builders}, and the newer drains above have no mark at all.",
+                 "A tide line runs along the walls well above head height, from a flood nobody up top remembers.",
+                 "A builders' plaque is set in the wall, its words worn away, a date that is only the shape of numbers."]
+    },
+    "treasury": {
+      "kinds": ["cellar", "tower", "ruins"],
+      "who": "a family that grew rich and frightened",
+      "ground": {"from": "faction", "words": ["merchant", "trade", "guild", "wealth", "coin", "bank"], "as": "{name}"},
+      "purpose": "a strong-room, dug to keep what the house above was worth",
+      "rooms": {
+        "built": [["the strong-room stair", "a narrow stair with a door at the top and another at the bottom"],
+                  ["the steward's room", "a writing desk and racks of tally sticks, split and mouldy"],
+                  ["the wine vaults", "barrel racks, and barrels stove in long ago"]]
+      },
+      "traps": ["arrow-trap", "camouflaged-pit-trap", "javelin-trap", "falling-portcullis"],
+      "cache": "an iron-bound coffer",
+      "traces": ["The steward's ledgers are bound in leather stamped with the sign of {builders}, page after page of what came in.",
+                 "Every lock in the place has been changed at least once: new iron over the marks of old.",
+                 "A bell on a wire runs along the ceiling from the stair to the inner door, its clapper tied with a rag."]
+    },
+    "prison": {
+      "kinds": ["cellar", "tower", "ruins", "sewers"],
+      "who": "the law of an older day",
+      "ground": {"from": "nation", "as": "the gaolers of {name}"},
+      "purpose": "a prison below the ground, for those who were not to be seen again",
+      "rooms": {
+        "built": [["the turnkey's room", "a stool, a rack for keys, a slot in the door to look through"],
+                  ["the cells", "a row of cells, their doors hanging, chains still in the walls"],
+                  ["the oubliette", "a round room with a grate in the floor over a shaft"]]
+      },
+      "traps": ["pit-trap", "falling-portcullis", "arrow-trap"],
+      "cache": "a gaoler's box",
+      "traces": ["Prisoners' marks cover the cell walls: names, days, and one long prayer cut letter by letter beside the seal of {builders} on the door.",
+                 "The chains are short, and set low, so whoever wore them could never stand.",
+                 "A sentence is painted over the door, the charges blacked out and the name left plain."]
+    },
+    "cavern": {
+      "kinds": ["cave"],
+      "who": "nobody: the water, over a long age",
+      "ground": null,
+      "purpose": "nothing; the water made it, and others found it afterwards",
+      "ruin": ["flood", "collapse", "plague", "war"],
+      "rooms": {
+        "natural": [["the dripping gallery", "water running down the walls into a hundred small pools"],
+                    ["the flooded grotto", "standing water, knee deep and very cold"],
+                    ["the narrow cleft", "a crack in the rock just wide enough to pass sideways"]]
+      },
+      "traps": ["collapsing-floor", "pit-trap"],
+      "cache": "a rotted pack",
+      "traces": ["The rock is carved by water into ribs and folds, older than any town; nothing made by hands stands here.",
+                 "Old soot on the roof marks where somebody once kept a fire, a long time before anyone now.",
+                 "Hand-prints in red ochre run along the wall at shoulder height, small ones and large ones together."]
+    },
+    "monastery": {
+      "kinds": ["cave", "ruins", "tower"],
+      "who": "an order of hermits",
+      "ground": {"from": "people", "as": "hermits of the {name}"},
+      "purpose": "cells for an order that went below the ground to be away from the world",
+      "rooms": {
+        "built": [["the gate cell", "a cell by the door, with a bench for whoever kept the gate"],
+                  ["the refectory", "a long table cut from the rock itself, and stone bowls on it"],
+                  ["the scriptorium", "desks along the walls, ink pots dried to a crust"]],
+        "natural": [["the gate cave", "a cave mouth with a wall and a narrow door built across it"],
+                    ["the cells", "small caves along a passage, each with a sleeping ledge"],
+                    ["the cistern cave", "a cave with a cistern cut in its floor, fed by a drip from above"]]
+      },
+      "traps": ["swinging-axe-trap", "pit-trap"],
+      "cache": "an alms box",
+      "traces": ["The rule of the order is cut into the wall by the door, line under line, in the hand of {builders}.",
+                 "Each sleeping ledge has a name above it, and the last few names are in a different, hurried hand.",
+                 "The bowls on the table are set for a meal, and the meal was never eaten."]
+    }
+  },
+  "ages": [
+    {"id": "lifetime", "said": "a lifetime ago"},
+    {"id": "lifetimes", "said": "three or four lifetimes ago"},
+    {"id": "walls", "said": "before the town above it had walls"},
+    {"id": "nobody", "said": "so long ago that nobody living can say"}
+  ],
+  "_ages": "With the world's chronology exported, an age is also 'in the days of <event>', the event's own name, drawn from the oldest half of the world's dated events.",
+  "ruin": [
+    {"id": "flood", "said": "a flood that filled it to the roof", "trace": "Silt lies a hand deep on every floor and a tide line runs along the walls high up: the water came all the way in, once."},
+    {"id": "fire", "said": "a fire that ran through it", "trace": "The beams are charcoal, the plaster scorched black up one side of every room: the fire came from the way in."},
+    {"id": "plague", "said": "a sickness that took the ones who kept it", "trace": "A heap of bedding was burned in the middle of the floor, and a sign is daubed on the door in something that was once lime."},
+    {"id": "collapse", "said": "a fall of the roof that cut it off", "trace": "Half of one wall is fallen rock, and old tools lie under it where somebody was digging through and stopped."},
+    {"id": "war", "said": "the war that took the land above it", "trace": "Spearheads and a split shield lie by the door: the place was held, and then it was not."},
+    {"id": "sealed", "said": "its own makers, who walled it up and left", "trace": "The doorway was walled up from this side with mortar and stones; the wall has been broken through since, from the other side."},
+    {"id": "quarrel", "said": "a quarrel among the ones who kept it", "trace": "Two sets of marks are cut into the same wall, each one scratched out by the other."},
+    {"id": "money", "said": "the money running out, and the work stopped half done", "trace": "Tools are laid down mid-task along the far wall, a half-finished arch above them, as if the workers went up for wages and never came down."}
+  ],
+  "users": [
+    {"id": "outlaws", "who": "outlaws", "ground": {"from": "faction", "words": ["outlaw", "bandit", "thief", "thieves", "criminal", "underworld", "black market"], "as": "{name}"},
+     "trace": "{users} slept here after: a fire-pit, bones of meals, and a knife-scored tally of shares."},
+    {"id": "plague-dead", "who": "the dead of a hard year", "ground": null,
+     "trace": "Later bodies were laid here in haste, wrapped in sacking, by people who did not stop to cut names: {users}."},
+    {"id": "cult", "who": "a secret cult", "ground": {"from": "faction", "words": ["cult", "forbidden", "heresy", "heretic", "occult", "dark rites"], "as": "{name}"},
+     "trace": "Over the old paint someone has drawn their own signs in soot, and candles have burned down to the floor in a ring where {users} gathered."},
+    {"id": "beggars", "who": "beggars who wintered below", "ground": null,
+     "trace": "Rags and straw are piled in the corners, where beggars slept out the cold years after."},
+    {"id": "watch", "who": "the town's watch, as a lockup", "ground": null,
+     "trace": "A newer door was hung here with a bar on the outside, from the years the town's watch used the place as a lockup."},
+    {"id": "seekers", "who": "treasure-seekers, who went no further", "ground": null,
+     "trace": "A rope, a broken lantern and a scratched warning lie where treasure-seekers turned back, or did not."},
+    {"id": "refugees", "who": "people hiding from a war", "ground": {"from": "people", "as": "the {name}"},
+     "trace": "Families hid here once: little shoes, a cooking pot, a child's scratched drawing of the sky, left by {users}."}
+  ],
+  "unlooted": [
+    {"id": "lost", "said": "the way in was lost, and nobody has found it since"},
+    {"id": "cursed", "said": "it is said to be cursed, and nobody in {town} will go down"},
+    {"id": "deadly", "said": "the few who went down did not come back up"},
+    {"id": "forbidden", "said": "{town} forbids it, and has for longer than anyone remembers"},
+    {"id": "unknown", "said": "nobody knows it is there"},
+    {"id": "held", "said": "what lives there now keeps it"}
+  ],
+  "attitudes": [
+    {"id": "feared", "said": "Folk in {town} will not talk of {where} after dark"},
+    {"id": "dared", "said": "The children of {town} dare each other to go down into {where}, and none of them ever has"},
+    {"id": "forgotten", "said": "Only the old in {town} remember there was ever anything deeper than {where}"},
+    {"id": "coveted", "said": "Every drinker in {town} has a story about treasure deep in {where}, and no two stories agree"},
+    {"id": "mourned", "said": "In {town} they still leave a light for somebody who went down into {where} and never came back"},
+    {"id": "blamed", "said": "In {town} they blame whatever is down in {where} for every bad season"}
+  ]
+}

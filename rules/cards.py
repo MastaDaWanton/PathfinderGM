@@ -60,6 +60,10 @@ TAG_STRAIN = "situation.strain"      # what is wrong with this place, from the e
 TAG_HOOK = "situation.hook"          # the world's own unwritten hooks — the GM's
 TAG_WORLD = "situation.world"        # authored by World Bible, shipped with the world
 TAG_PLAY = "situation.play"          # arose in play
+# What a settlement says of a place nearby (rules/dungeons.py `spread_rumours`): ambient,
+# the world's matter and never the player's, pulled in passing until the prose has
+# carried it once (`salience`'s "talk").
+TAG_RUMOUR = "situation.rumour"
 # A quest: a situation the player has taken up as a task, with a giver, objectives to
 # tick and something promised at the end. Baldur's Gate 3's journal keeps the same
 # two things apart — *objectives* say what to do next, *steps* (our facts) say what just
@@ -1014,6 +1018,14 @@ def salience(scene, *, recent, player_text: str = "", tells=(),
             why.append("quiet")
         if since >= URGENT_TURNS:
             why.append("urgent")
+        # Talk in town about a place nearby: heard in passing, once, wherever the party is
+        # in that settlement — the hook that gives a dungeon a reason to be gone to (the
+        # Worlds Without Number review's complaint, and the Alexandrian's rumours "in the
+        # general conversation"). Carried once, it is ambient like any other.
+        talk = (c.is_(TAG_RUMOUR) and not c.mentioned and bool(c.place)
+                and places_mod.location_of(c.place) == places_mod.location_of(here))
+        if talk:
+            why.append("talk")
         # A quest is the player's own only once taken (`standing`); every quest card also
         # carries TAG_PLAY, so the tag alone made a scheme's unheard quest "own".
         own = (is_own(c) or (c.kind not in TASKS and c.is_(TAG_PLAY)) or present)
@@ -1030,7 +1042,7 @@ def salience(scene, *, recent, player_text: str = "", tells=(),
         if own:
             qualifies = bool(set(why) - {"quiet", "urgent"})
         else:
-            qualifies = "spoken" in why or "recent" in why
+            qualifies = "spoken" in why or "recent" in why or "talk" in why
         if qualifies:
             out.append((len(why), why, c))
     out.sort(key=lambda t: (-t[0], -t[2].touched, t[2].id))

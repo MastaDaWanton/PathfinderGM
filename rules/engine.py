@@ -19744,33 +19744,54 @@ class Engine:
         return Outcome(intent_id=intent.id, op="venture", effects=effects, tell=tell,
                        because=intent.because)
 
-    def _inhabit(self, place, *, guarding: bool = False, by=None) -> tuple[list[dict], str]:
+    def _inhabit(self, place, *, guarding: bool = False, by=None, row: dict | None = None,
+                 count: int = 1, name: str | None = None,
+                 hostile: bool | None = None) -> tuple[list[dict], str]:
         """Something that lives here, by the ground, from the bestiary through the party's
         encounter budget (`gathering.creature_for`): brought in, kept far, and the fight
         opened when it is a kind that attacks on sight. A venture's inhabitant and a dungeon
         room's both come in by this door. (effects, tell), both empty when the book has
-        nothing for this ground at the party's budget."""
+        nothing for this ground at the party's budget.
+
+        A dungeon built from a concept (rules/dungeons.py `stock_room`) has already drawn
+        its `row` and `count` from its tag through the same budget, names its leader, and
+        says whether they attack on sight (`hostile`); it comes in by this door too, so
+        there is one way a room's inhabitants arrive."""
         from . import gathering
 
         pc = self.scene.pc()
-        level = getattr(pc, "level", 1) if pc is not None else 1
-        row = gathering.creature_for(place.terrain, max(1, int(level)), self.dice,
-                                     guarding=guarding,
-                                     apl=encounter_budget.party_apl(self.scene))
+        if row is None:
+            level = getattr(pc, "level", 1) if pc is not None else 1
+            row = gathering.creature_for(place.terrain, max(1, int(level)), self.dice,
+                                         guarding=guarding,
+                                         apl=encounter_budget.party_apl(self.scene))
         if row is None:
             return [], ""
-        born = self._bring_in(row["id"], count=1, name=row["name"])
-        ref = born[0]["ref"]
-        self._mark_priced([ref], "venture")
-        self.scene.zones[ref] = "far"
-        self.scene.positions.pop(ref, None)
-        aggressive = row.get("creature_type") in gathering.AGGRESSIVE
+        born = self._bring_in(row["id"], count=max(1, int(count)), name=name or row["name"])
+        refs = [b["ref"] for b in born]
+        ref = refs[0]
+        self._mark_priced(refs, "venture")
+        for r in refs:
+            self.scene.zones[r] = "far"
+            self.scene.positions.pop(r, None)
+        aggressive = (row.get("creature_type") in gathering.AGGRESSIVE if hostile is None
+                      else bool(hostile))
         tell = (f"Something lives here: {gathering._an(row['name'])}"
                 + (", and it has seen you." if aggressive else ", further in."))
         if aggressive and pc is not None and (by is None or by.ref == pc.ref):
             self._ensure_encounter(pc.ref, target=ref)
-        return ([{"kind": "gathering", "encounter": "creature", "creature": row["name"],
-                  "aggressive": aggressive, "ref": ref}], tell)
+            # The rest of a group fight beside the one the fight was opened on.
+            if self.scene.in_encounter:
+                for r in refs[1:]:
+                    if r in self.scene.actors and not any(
+                            r in side for side in self.scene.sides.values()):
+                        a = self.scene.actors[r]
+                        init = self.dice.d20(a.initiative_modifiers(),
+                                             label=f"{a.name} initiative", visibility="hidden")
+                        self.scene.enrol(r, init.total)
+                        self.scene.sides.setdefault("them", []).append(r)
+        return ([{"kind": "gathering", "encounter": "creature", "creature": name or row["name"],
+                  "aggressive": aggressive, "ref": ref, "refs": refs}], tell)
 
     def _duration_rounds(self, duration, default_unit: str = "round") -> int | None:
         """A `{amount, unit}` duration in rounds, rolling the amount when it is dice, or
