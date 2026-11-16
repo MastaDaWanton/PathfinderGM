@@ -3578,8 +3578,9 @@ def _within_the_budget(c, text: str, claim: str, beat: dict):
         # The clauses as cut: a cut inside a clause made two of one.
         parts = now + later
         run_text = sequence.joined(now)
-        # This beat is the words done now; the rest get their own line when they run.
-        beat["text"] = run_text
+        # The beat keeps the words as typed (playtest 2026-11-16 #11: "...to Mirabalos,
+        # and keep a lookout posted..." was shown as "...to Mirabalos."); the cut is the
+        # planner's, never the page's.
 
         def done_now(a) -> bool:
             where = sequence.clauses_of(a.get("span"), parts)
@@ -4417,9 +4418,8 @@ def _toward(c, chip: dict, text: str, typed: bool, acting: tuple, claim: str,
     else:
         now, later, moves = parts[:at + 1], parts[at + 1:], True
     now_text = sequence.joined(now) or text
-    if later:
-        # This beat is the words done now; the rest get their own line when they run.
-        beat["text"] = now_text
+    # The beat keeps the words as typed, whatever is done now: cutting it to the first
+    # clause dropped the rest from the story (playtest 2026-11-16 #11, #21).
 
     before = _where(c)
     if not moves:
@@ -4458,7 +4458,10 @@ def _toward(c, chip: dict, text: str, typed: bool, acting: tuple, claim: str,
         return _unfinished(c, resp, later, keep_chip=False, arrived=moved)
 
     later_text = sequence.joined(later)
-    c.transcript.append({"who": "player", "text": later_text})
+    # Its own player line, so the turn after the move is a turn of its own to everything
+    # that counts them; "continued" because the typed line above already says it, and
+    # the page does not draw it twice (02-state.js).
+    c.transcript.append({"who": "player", "text": later_text, "kind": "continued"})
     resp2 = _plan_and_run(c, later_text, (), "")
     if resp2.status_code == 200:
         return resp2

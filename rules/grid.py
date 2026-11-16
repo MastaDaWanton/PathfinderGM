@@ -434,9 +434,11 @@ class Grid:
             # `_crosses_opaque` has it: a line along a barrel's edge grazes past. Measured
             # 2026-11-12: beside a bar, every square of the room gave +4 cover, an ogre
             # adjacent included, because each line to a corner on the bar's seam "crossed" it.
-            here = [s for s in _squares_at(x, y) if s not in ignore]
-            tops = [self.parapet.get(s, self.low.get(s)) for s in here]
-            if here and all(top is not None and at <= top for top in tops):
+            # The two combatants' own squares are open ground, never "absent": dropping
+            # them left a rail beside your own square as the only square on the seam.
+            tops = [None if s in ignore else self.parapet.get(s, self.low.get(s))
+                    for s in _squares_at(x, y)]
+            if all(top is not None and at <= top for top in tops):
                 return True
         return False
 
@@ -455,8 +457,13 @@ class Grid:
         for i in range(steps + 1):
             t = i / steps
             x, y = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
-            here = [s for s in _squares_at(x, y) if s not in ignore]
-            if here and all(self.opaque(s, solid_only) for s in here):
+            # The combatants' own squares count as OPEN on a seam, not as missing.
+            # Measured 2026-11-16 (playtest #6): on a ship's deck with the hull along x=0,
+            # the line from the attacker's corner down the hull's face touched only the
+            # hull once the attacker's own square was dropped, so it read as "through the
+            # wall" and two adjacent fighters on open deck both had +4 cover.
+            if all(s not in ignore and self.opaque(s, solid_only)
+                   for s in _squares_at(x, y)):
                 return True
         return False
 

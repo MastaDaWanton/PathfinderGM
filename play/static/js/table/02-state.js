@@ -276,10 +276,13 @@ function render(s, hold) {
         b.who === "table" ? "" : ", out of character"}</span>` : "";
   const record = b => b.record ? `<details class="gmrecord"${b.open ? " open" : ""}>
       <summary>The record</summary><pre>${esc(b.record)}</pre></details>` : "";
+  // The words after a move, run as their own turn (play/views.py `_toward`): the typed
+  // line above already shows them. Still a `.beat`, so beat i stays the i-th.
+  const hiddenBeat = b => b.who === "player" && b.kind === "continued" ? " hidden" : "";
   $("#story").innerHTML = s.transcript.map((b, i) =>
     `<p class="beat ${b.who === "player" ? "player" : (esc(b.kind || ""))}${
       atTable(b) ? " attable" : ""}${
-      i >= seen ? " fresh" : ""}">${tableTag(b)}${chips(b)}${
+      i >= seen ? " fresh" : ""}"${hiddenBeat(b)}>${tableTag(b)}${chips(b)}${
       atTable(b) ? tableSaid(b.text) : said(b.text)}${benchDoor(b)}</p>${record(b)}${
       b.who === "gm" && b.kind === "setup" ? `<div class="beatfix" data-beat="${i}"></div>` : ""}`
   ).join("");

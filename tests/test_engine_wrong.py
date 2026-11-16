@@ -157,6 +157,26 @@ def test_each_beat_is_shown_its_own_turn(table):
     assert [ln["text"] for ln in ec.lines(c, b)] == ["Kesst walks to the door."]
 
 
+def test_a_turn_resumed_after_the_dice_shows_each_outcome_once(table):
+    """Playtest 2026-11-16 #7: a turn that stopped for the player's dice logged its two
+    outcomes (r677.o0/o1), and the resolution after the dice logged the whole list again
+    with two new checks; the page showed the first two twice."""
+    from play import engine_corrections as ec
+    from play import history
+
+    c = table["c"]
+    first = [{"intent_id": "i1", "op": "say", "status": "resolved", "rolls": [],
+              "tell": "Kesst speaks."},
+             {"intent_id": "i2", "op": "say", "status": "resolved", "rolls": [],
+              "tell": "Kesst speaks again."}]
+    i = table["turn"]("I talk, then threaten.", first)
+    c.turn_log.append(history.stamp(c, {"kind": "resolution", "outcomes": first + [
+        {"intent_id": "i3", "op": "check", "status": "resolved", "rolls": [],
+         "tell": "The guard is shaken."}]}))
+    assert [ln["text"] for ln in ec.lines(c, i)] == [
+        "Kesst speaks.", "Kesst speaks again.", "The guard is shaken."]
+
+
 def test_the_record_stands_alone_is_appended_and_carries_the_start_of_turn(table):
     """Two marks in one turn, a missing thing, and a second record: two lines in the file,
     neither rewritten; the snapshot is the save from before the player's line (`.1`)."""

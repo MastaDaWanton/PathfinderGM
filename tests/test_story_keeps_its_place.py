@@ -166,3 +166,28 @@ def test_render_tells_the_book_where_the_reader_was_before_it_rebuilds():
     assert keep < src.index('$("#story").innerHTML = s.transcript.map(')
     book = BOOK.read_text(encoding="utf-8")
     assert "queueMicrotask" in book and ".beatfix" in book
+
+
+@pytest.mark.skipif(shutil.which("node") is None, reason="node is not on this machine")
+def test_a_pane_that_grows_under_a_landed_page_is_not_a_reread(tmp_path):
+    """Playtest 2026-11-16 #44: the book visible, and the story sat on beat 179 for nine
+    turns. Reproduced live on that save: landed at the foot (scrollTop 36324, a 260px
+    pane), the player's click let go, the pane grew to 379px and the browser pulled the
+    page up to 36213 with nobody scrolling. 36213 < 36324 - 24 read as a reread, and the
+    landing, never updated on a reread, held every turn after it. A page at its foot is
+    reading the newest beat, never rereading."""
+    got = _run(tmp_path, r"""
+    for (let i = 0; i < 24; i++) addTurn(200);
+    draw(null); await settle();
+    let prev = T();
+    draw(prev, () => addTurn(180)); await settle();           // lands at the foot
+    STORY.holding = false;                                    // the player's click let go
+    story.clientHeight = 800;                                 // the pane grows
+    const out = [];
+    for (let i = 0; i < 3; i++) {
+      prev = T(); const k = n;
+      draw(prev, () => addTurn(900)); await settle();
+      out.push(firstNewFromTop(k));
+    }
+    console.log(JSON.stringify(out));""")
+    assert got == [0, 0, 0], f"the new turns were not landed on: {got}"

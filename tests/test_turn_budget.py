@@ -108,8 +108,9 @@ def test_the_owners_dinner_keeps_serving_the_food_for_the_pen(room):
     """The owner's own example. The run is free, the cooking takes time and ends the turn,
     and "serve the food" comes back to the pen with "Not yet done: ...". Before: all three
     deeds in one turn. The planner is asked for the run and the cooking only, and handed
-    the reading of those two deeds — no second reader call — and the player's beat is the
-    words done now. The lower-case "i" comes back as "I", never "I i serve"."""
+    the reading of those two deeds — no second reader call. The player's beat is the line
+    as typed (playtest 2026-11-16 #11: it was cut to the words done now, and the rest
+    vanished from the story). The lower-case "i" comes back as "I", never "I i serve"."""
     _read(DINNER,
           _act("run to the other side of the room", "go",
                place="the other side of the room"),
@@ -125,7 +126,7 @@ def test_the_owners_dinner_keeps_serving_the_food_for_the_pen(room):
     assert left["text"] == "I serve the food i made to everyone."
     assert left["line"] == "Not yet done: serve the food i made to everyone."
     assert left["keep_chip"] is False and "takes time" in left["why"]
-    assert _players(room["c"])[-1] == plan["text"]
+    assert _players(room["c"])[-1] == DINNER
 
 
 def test_two_quick_deeds_fill_the_turn(room):

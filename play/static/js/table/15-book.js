@@ -101,11 +101,23 @@ onRender(function bookHead(s, prev) {
 // before the rebuild) keeps the position the reader really had, the reread test reads
 // that, and every landing, or a rereader's own place, is put back once the hooks have
 // drawn (a microtask: after render's last hook, before the browser paints).
-const STORY = { count: 0, beat: -1, landedAt: null, holding: false, watch: null, was: null };
+const STORY = { count: 0, beat: -1, landedAt: null, holding: false, watch: null, was: null,
+                atFoot: false };
+
+// A page at its foot is never a reread, wherever it sits against `landedAt`. Playtest
+// 2026-11-16 #44: a landing at the foot is clamped there (landedAt 36324 of 36584, a 260px
+// pane), and when the pane later grew (the window resized to 379px) the browser pulled the
+// page up to 36213 with nobody touching it. Below `landedAt - 24`, every turn after that
+// read as a reader scrolled back, and the book sat on one beat for nine turns.
+function storyAtFoot(el) {
+  return !!el && el.scrollTop + el.clientHeight >= el.scrollHeight - 24;
+}
 
 function storyKeep() {
   const scroller = storyScroller();
-  STORY.was = scroller && storyShown(scroller) ? scroller.scrollTop : null;
+  const shown = scroller && storyShown(scroller);
+  STORY.was = shown ? scroller.scrollTop : null;
+  STORY.atFoot = shown ? storyAtFoot(scroller) : false;
 }
 
 // Whether the story is laid out at all. Map, Sheet, Trade and the rest hide the book
@@ -156,7 +168,9 @@ function storyLand(s, prev) {
   const scroller = storyScroller();
   // Where the reader was before this draw's rebuild (`storyKeep`), or, when nothing
   // called it, where the page is now.
-  const was = STORY.was !== null ? STORY.was : (scroller ? scroller.scrollTop : 0);
+  const kept = STORY.was !== null;
+  const was = kept ? STORY.was : (scroller ? scroller.scrollTop : 0);
+  const atFoot = kept ? STORY.atFoot : storyAtFoot(scroller);
   STORY.was = null;
   if (!scroller || !n) { STORY.count = n; return; }
   // Hidden: nothing can be measured or read. Mark the newest beat to land on and hold it;
@@ -177,7 +191,7 @@ function storyLand(s, prev) {
   });
   if (prev && n <= STORY.count) { STORY.count = n; stay(); return; }   // nothing new
   // Scrolled back above where the last beat landed: they are rereading. Nothing moves.
-  const rereading = prev && STORY.landedAt !== null && was < STORY.landedAt - 24;
+  const rereading = prev && STORY.landedAt !== null && was < STORY.landedAt - 24 && !atFoot;
   // The first new beat (the player's own line leads the answer), or on a fresh page, the
   // newest beat of all.
   STORY.beat = prev ? Math.min(STORY.count, n - 1) : n - 1;

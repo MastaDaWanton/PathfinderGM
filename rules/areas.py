@@ -460,8 +460,8 @@ def _clear(scene, a, b, ignore) -> bool:
     for i in range(steps + 1):
         t = i / steps
         x, y = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
-        here = [s for s in _squares_at(x, y) if s not in ignore]
-        if here and all(s in blocked for s in here):
+        # The target's own square is open on a seam, not absent (grid.py, playtest #6).
+        if all(s not in ignore and s in blocked for s in _squares_at(x, y)):
             return False
     return True
 

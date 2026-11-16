@@ -332,3 +332,21 @@ def test_a_reaching_creature_is_engaged_from_further_out():
 def test_adjacency_is_the_short_way_of_saying_five_feet():
     assert g.is_adjacent((5, 5), "medium", (6, 6), "medium")
     assert not g.is_adjacent((5, 5), "medium", (7, 5), "medium")
+
+
+def test_adjacent_fighters_along_a_hull_have_no_cover():
+    """Playtest 2026-11-16 #6: on the Red Gull's open deck (hull blocked along x=0, a
+    fixture at (2,11)) the captain at (1,11) and the penguin at (1,9) both swung at Vesna
+    on (1,10) against "AC 18 (14, +4 cover)". Lines running down the hull's face read as
+    passing through it once the fighters' own squares were dropped from the seam. CRB
+    (Combat, Cover): melee against an adjacent target has cover only when a line goes
+    THROUGH a wall; grazing its face is a clear line."""
+    hull = {(0, y) for y in range(17)}
+    grid = Grid(width=6, height=17, blocked=hull | {(2, 11), (3, 10), (3, 11), (4, 9)})
+    me = (1, 10)
+    for foe in ((1, 11), (1, 9)):
+        assert grid.cover_between(me, "medium", foe, "medium", solid_only=True) == "none"
+        assert grid.cover_between(foe, "medium", me, "medium", solid_only=True) == "none"
+    # A wall really between them still counts.
+    walled = Grid(width=6, height=6, blocked={(2, 1), (2, 2), (2, 3)})
+    assert walled.cover_between((1, 2), "medium", (3, 2), "medium") == "total"

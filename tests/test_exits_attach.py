@@ -453,8 +453,12 @@ def test_go_then_ask_is_planned_again_at_the_destination(worlds, desk):
     plans = desk["calls"]["plans"]
     assert [(p["text"], p["at"], p["chips"]) for p in plans] == \
         [("I ask after the smith.", way["id"], ())]
-    texts = [b["text"] for b in _players(c)[-2:]]
-    assert texts == [f"I walk to {way['name']}.", "I ask after the smith."]
+    # The page keeps the line as typed (playtest 2026-11-16 #11); the second turn's
+    # line is there for whatever counts turns, and not drawn twice.
+    beats = _players(c)[-2:]
+    assert [b["text"] for b in beats] == [f"I walk to {way['name']} and ask after the smith",
+                                          "I ask after the smith."]
+    assert [b.get("kind") for b in beats] == [None, "continued"]
     assert "unfinished" not in r.json()
 
 
@@ -474,7 +478,7 @@ def test_a_refused_remainder_stops_the_chain_and_comes_back_to_the_pen(worlds, d
     assert left["line"] == f"You are at {c.engine().here().name}. Not yet done: " \
                            f"ask after the smith."
     assert left["why"] == "Nobody here answers to that."
-    assert _players(c)[-1]["text"] == f"I walk to {way['name']}."
+    assert _players(c)[-1]["text"] == f"I walk to {way['name']}, then ask after the smith"
 
 
 def test_words_before_the_move_are_done_here_and_the_move_goes_last(worlds, desk):
