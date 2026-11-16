@@ -207,6 +207,10 @@ def lines(c, i: int) -> list[dict]:
     hidden = _hidden(scene)
     shown_names = {str(a.name or "") for r, a in (scene.actors or {}).items() if r not in hidden}
     out: list[dict] = []
+    # A turn that stopped for the player's dice writes its outcomes so far, and the
+    # resolution after the dice writes the WHOLE list again, those included (other
+    # readers want it whole). Playtest 2026-11-16 #7: r677.o0/o1 shown again as r684.o0/o1.
+    shown: list[dict] = []
     for n, row in rows_for(c, i):
         reading = row.get("reading") if isinstance(row.get("reading"), dict) else None
         if reading:
@@ -238,6 +242,10 @@ def lines(c, i: int) -> list[dict]:
         for k, o in enumerate(row.get("outcomes") or []):
             if not isinstance(o, dict):
                 continue
+            if row.get("kind") in ("turn", "resolution"):
+                if o in shown:
+                    continue
+                shown.append(o)
             if _behind_screen(o, intents.get(str(o.get("intent_id"))), hidden, shown_names):
                 continue
             refused = o.get("status") == "refused"
