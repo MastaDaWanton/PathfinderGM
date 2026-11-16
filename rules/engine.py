@@ -13640,8 +13640,14 @@ class Engine:
             age = self.scene.fallen.get(ref, 0) + 1
             self.scene.fallen[ref] = age
             if age > grace:
+                # Told only where the player is. Playtest 2026-11-16 #17: a man killed at
+                # the tavern, heard of only as harbour gossip, was printed on the docks as
+                # "Eren Vynsar is gone; what Eren Vynsar carried lies where the body fell:
+                # rapier, chain shirt". The world still moves (the gear is still left, the
+                # dying still resolve); the player is told what they could perceive.
+                said = tells if ref in self.scene.actors else []
                 if a.has_condition("dying"):
-                    tells.extend(self._resolve_dying(a))
+                    said.extend(self._resolve_dying(a))
                 # Only a corpse leaves. Measured 2026-09-25: unconscious and stable carry
                 # `state.down.fallen` beside dead, so an NPC knocked out with non-lethal
                 # damage — at full hit points — departed the campaign after three calls
@@ -13667,7 +13673,7 @@ class Engine:
                     except Exception:      # noqa: BLE001 - a body with no block simply goes
                         harvest_left = False
                     if not harvest_left:
-                        tells.extend(self._leave_the_gear(a))
+                        said.extend(self._leave_the_gear(a))
                         self.scene.depart(ref)
                 self.scene.fallen.pop(ref, None)
         return tells

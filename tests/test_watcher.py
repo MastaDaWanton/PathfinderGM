@@ -413,9 +413,17 @@ def test_a_talking_turn_moves_a_card_through_the_watcher(campaign, monkeypatch):
 
 
 def test_resolving_a_card_settles_it_and_pays_the_story_share(campaign, monkeypatch):
+    """Pays for a card the player's own deed landed on (`cards.took_part`); one they
+    never touched pays nothing (playtest 2026-11-16 #16,
+    tests/test_playtest_2026_11_16_xp_watcher.py)."""
     from rules import cards
+    from rules.engine import Outcome
     c = campaign
-    _cards_ready(c)
+    woman = _cards_ready(c)
+    pc = c.scene.pc()
+    cards.touch_from_outcomes(c.scene, [Outcome(
+        intent_id="i1", op="give", actor=pc.ref,
+        tell=f"{pc.name} gives {woman.name} the sealed jar.")], turn=2)
     before = c.scene.pc().xp
     _answer(monkeypatch, {"changes": [{"id": "jar", "action": "resolve", "fact": ""}],
                           "new": None})

@@ -1478,3 +1478,29 @@ the Bestiary's Environment line (`biomes.parse_environment`).
 
 An export carries `climate` on its sea routes, and a crossing marked `warm` never meets a
 creature whose Environment line says cold oceans.
+
+## 27. `title` on a faction's card — the faction's name, not its description cut short
+
+*Asked 2026-11-16 (fix/xp-and-watcher). Optional: without it the app re-titles a card whose
+title is a cut-off prefix of its own first fact with the faction's name, found by the card's
+id (`cards._world_title`), which is how every world plays today.*
+
+Playtest 2026-11-16 #27: a story award read "for moving a matter along: A fraternal
+organization of skilled salt harvesters and refiners, bound by". The faction's public card in
+`play.cards[]` is titled with the first seventy characters of its description, cut in the
+middle of the sentence, and its secret card the same way with its aim ("The Guild aims to
+monopolize the Pangrellan salt trade by establishing a"). A settlement's strain card has the
+same cut when its tension runs long ("…over control").
+
+**Shape.** No new field: `title` on every `play.cards[]` row is a whole name or a whole
+phrase, never a sentence cut at a length.
+
+| card | `title` |
+|---|---|
+| a faction's public card | the faction's `name`: "The Guild of Saltmakers' Sons" |
+| a faction's secret card | a short phrase of its own: "What the Guild of Saltmakers' Sons wants" |
+| a settlement's strain | the tension as one whole phrase, shortened by wording, not by length |
+
+### Done when
+
+No `play.cards[]` title is a strict prefix of one of that card's own facts.

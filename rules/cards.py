@@ -159,6 +159,10 @@ class Card:
     # A job's own record (rules/jobs.py): employer, work, meets, route, counterpart, pay,
     # terms and state. Written only when there is one, like `recover`.
     job: dict = field(default_factory=dict)
+    # The transcript turn the player's own deed last landed on this card: an outcome of
+    # theirs whose tell named one of its people (`touch_from_outcomes`). Zero until it ever
+    # has. What `took_part` asks before a story award pays. Written only when set.
+    worked: int = 0
 
     def as_dict(self) -> dict:
         out = {
@@ -181,6 +185,8 @@ class Card:
             out["known"] = self.known
         if self.job:
             out["job"] = copy.deepcopy(self.job)
+        if self.worked:
+            out["worked"] = self.worked
         return out
 
     @classmethod
@@ -212,6 +218,7 @@ class Card:
                      if isinstance(d.get("recover"), dict) else {}),
             known=(str(d.get("known")) if str(d.get("known") or "") in KNOWN else ""),
             job=(copy.deepcopy(d["job"]) if isinstance(d.get("job"), dict) else {}),
+            worked=int(d.get("worked", 0) or 0),
         )
 
     def is_(self, query: str) -> bool:
@@ -279,6 +286,22 @@ def standing(card: Card) -> str:
 
 def is_own(card: Card) -> bool:
     return standing(card) == OWN
+
+
+def took_part(card: Card) -> bool:
+    """Whether the player had a hand in this matter, so that settling it is theirs to be
+    paid for.
+
+    CRB "Awarding Experience" (p.397; legacy.aonprd.com/coreRulebook/gamemastering.html):
+    XP goes "to each PC that participated", for "the monsters, traps, obstacles, and
+    roleplaying encounters the PCs overcome", and a story award is for when "players
+    conclude a major storyline or make an important accomplishment". Playtest 2026-11-16
+    #16/#27/#47: 600 XP in four turns for cards the player never touched — a dock-work
+    card that lapsed, a fight card already paid as a fight, a faction's world card, a
+    card the watcher opened for a walk already done — because the watcher's "resolve"
+    paid whatever it closed. Their own matter (an errand, a job or quest taken), or one
+    their own deed landed on (`worked`); never the watcher's word alone."""
+    return is_own(card) or card.worked > 0
 
 
 # --- keys ----------------------------------------------------------------------------------
@@ -373,7 +396,8 @@ def _ungrant(scene, card: Card) -> None:
         who.remove_effects(source=f"card:{card.id}")
 
 
-def touch(scene, card_id: str, fact: str, turn: int = 0, tick: bool = True) -> Card | None:
+def touch(scene, card_id: str, fact: str, turn: int = 0, tick: bool = True,
+          worked: bool = False) -> Card | None:
     """A fact lands on a card: dedupe, cap, move the stage and the clock. A full
     clock resolves the card. Returns the card, or None if there is no such card."""
     cards = load(scene)
@@ -385,6 +409,8 @@ def touch(scene, card_id: str, fact: str, turn: int = 0, tick: bool = True) -> C
         card.facts.append(fact)
         card.facts = card.facts[-FACT_CAP:]
     card.touched = int(turn)
+    if worked:
+        card.worked = max(1, int(turn))
     if card.stage == "open":
         card.stage = "moving"
     # A quest's clock is its objectives and `objective_done` is its only ticker.
@@ -452,6 +478,7 @@ def touch_from_outcomes(scene, outcomes, turn: int = 0) -> list[str]:
     if not cards:
         return []
     actors = getattr(scene, "actors", {}) or {}
+    pc = scene.pc() if hasattr(scene, "pc") else None
     touched: list[str] = []
     # A job settled this batch (`jobs.close`, an effect `{"kind": "job", "state": "paid" |
     # "lapsed"}`) is stamped with THIS turn, so it lingers in the brief as every resolved
@@ -509,7 +536,11 @@ def touch_from_outcomes(scene, outcomes, turn: int = 0) -> list[str]:
                     named = True
                     break
             if named or _hits(card, keyed) >= 2:
-                touch(scene, card.id, _clip(tell), turn=turn, tick=named)
+                # The player's own deed with one of the card's people is their part in it
+                # (`took_part`); a key hit is only talk about it, and somebody else's deed
+                # is not theirs.
+                mine = named and pc is not None and str(getattr(o, "actor", "")) == pc.ref
+                touch(scene, card.id, _clip(tell), turn=turn, tick=named, worked=mine)
                 touched.append(card.id)
     return touched
 
@@ -1211,7 +1242,8 @@ def from_world(world, place_id: str = "") -> list[Card]:
         if not any(states.matches(t, "situation") for t in tags):
             tags = (TAG_WORLD,) + tags
         out.append(Card(
-            id=cid, title=str(raw["title"]).strip()[:80], facts=facts[:FACT_CAP],
+            id=cid, title=_world_title(world, cid, str(raw["title"]), facts),
+            facts=facts[:FACT_CAP],
             keys=[str(k).lower() for k in raw.get("keys") or []] or keys_from(raw["title"], *facts),
             tags=tags, people=[str(p) for p in raw.get("people") or []],
             place=str(raw.get("place") or ""), stage="open",
@@ -1248,6 +1280,29 @@ def from_world(world, place_id: str = "") -> list[Card]:
             origin=f"world:{u.get('id') or name}", secret=True,
         ))
     return out
+
+
+def _world_title(world, cid: str, title: str, facts) -> str:
+    """A world card's title, never a sentence cut off in the middle.
+
+    Playtest 2026-11-16 #27: the award read "…for moving a matter along: A fraternal
+    organization of skilled salt harvesters and refiners, bound by" — World Bible's
+    faction card is titled with its description's first seventy characters, cut mid-
+    sentence, the whole sentence being the card's first fact. A title that is a cut
+    prefix of one of its own facts is replaced by the faction's name when the card is a
+    faction's (its id is the name's slug, `-secret` for the second card), else ended with
+    an ellipsis. World Bible ask 27 asks for the name as the title."""
+    title = " ".join(title.split())
+    whole = [" ".join(f.split()).rstrip(".!?") for f in facts or ()]
+    cut = any(len(f) > len(title) and f.startswith(title) for f in whole)         and not title.endswith((".", "!", "?"))
+    if not cut:
+        return title[:80]
+    base = re.sub(r"-secret$", "", cid)
+    for f in getattr(world, "factions", None) or []:
+        name = str((f.get("name") if isinstance(f, dict) else getattr(f, "name", "")) or "")
+        if name and re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") == base:
+            return name if base == cid else f"What {name} wants"
+    return title[:80].rstrip(" ,;:") + "…"
 
 
 def _entity_for(world, place_id: str):

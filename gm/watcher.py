@@ -174,7 +174,12 @@ def _jobs_for(c) -> list[dict]:
     # invent a person: a fact may name only names that appear here.
     from rules import cards as cards_mod
 
-    live = [k for k in cards_mod.load(c.scene) if k.live]
+    # Not a card the player has never heard of: a scheme's secret card moves by the
+    # scheme's own steps, and an unheard quest is somebody else's. Playtest 2026-11-16 #23:
+    # "The news of the death at the tavern begins to circulate among the local
+    # authorities" was laid on the favour scheme's secret plan card, out of harbour gossip.
+    live = [k for k in cards_mod.load(c.scene)
+            if k.live and not k.secret and cards_mod.standing(k) != cards_mod.UNHEARD]
     since = _LAST_CARD_LOOK.get(c.id, _LAST_LOOK[c.id])
     if live and turns - since >= CARD_TURNS_BETWEEN_LOOKS:
         _LAST_CARD_LOOK[c.id] = turns
@@ -199,11 +204,50 @@ def _jobs_for(c) -> list[dict]:
                       for k in live],
             "refs": {r: c.scene.actors[r].name for r in refs
                      if not c.scene.actors[r].is_pc},
-            "recent": [f"{b.get('who', '?')}: {str(b.get('text', ''))[:400]}"
-                       for b in c.transcript[-8:]],
+            "recent": _what_happened(c),
             "known": frozenset(known),
         })
     return jobs
+
+
+# How many of the player's turns back a look at the cards reads (it read eight beats of the
+# transcript: four turns, the player's line and the GM's each).
+CARD_TURNS_READ = 4
+
+
+def _what_happened(c, turns: int = CARD_TURNS_READ) -> list[str]:
+    """The engine's own tells for the last few turns, oldest first: what a look at the
+    cards is shown as "what has happened".
+
+    Never the narration. Playtest 2026-11-16 #51: the narrator wrote "Your methodical
+    search reveals a hidden passage concealed within the masonry" over a find the engine
+    never made (the culvert stayed `found: false`); the watcher read that prose, advanced
+    the Burrowers' card with "The hidden passage within the masonry of the main channel
+    suggests a secret route" and opened "The Hidden Passage". Invented prose became world
+    memory, to be fed back to the narrator as fact. The severed-tells law
+    (docs/states-effects-tells.md): mechanics reach the prose as tells, and nothing the
+    prose says comes back as a fact. The turn log's outcome rows are the record: the
+    player's turns and the others' after them, refusals left out as nothing happening
+    (`cards.touch_from_outcomes` says the same). A talking turn still says something here:
+    the talk op's own tell ("X speaks to Y, to the effect that ...")."""
+    rows: list[dict] = []
+    seen_turns = 0
+    for row in reversed(list(getattr(c, "turn_log", None) or [])):
+        kind = row.get("kind")
+        if kind not in ("turn", "resolution", "npc-turn"):
+            continue
+        rows.append(row)
+        if kind in ("turn", "resolution"):
+            seen_turns += 1
+            if seen_turns >= turns:
+                break
+    tells: list[str] = []
+    for row in reversed(rows):
+        for o in row.get("outcomes") or []:
+            tell = " ".join(str(o.get("tell") or "").split())
+            if tell and o.get("status") != "refused" and tell not in tells:
+                tells.append(tell[:400])
+    return tells
 
 
 def _down(a) -> bool:
@@ -653,8 +697,8 @@ def _propose_cards(job: dict, cfg: dict) -> dict | None:
          {"role": "user", "content":
              "The situation cards on the table (facts the engine keeps):\n" + deck
              + "\nThe people on the board, by ref:\n" + (people or "- nobody\n")
-             + "\nWhat has happened at the table recently:\n"
-             + "".join(f"{line}\n" for line in job.get("recent", []))
+             + "\nWhat the engine says has happened recently:\n"
+             + ("".join(f"- {line}\n" for line in job.get("recent", [])) or "- nothing\n")
              + "\nFor each card decide:\n"
                '- "keep": nothing on it moved. This is the usual answer.\n'
                '- "advance": play touched it; give ONE new fact, one sentence, what is '
@@ -925,6 +969,13 @@ def _apply_cards(c, p: dict) -> bool:
             # share, on its own line — "i should be receiving EXP for ... resolving
             # situations". Whether the model said resolve or an advance filled the
             # clock.
+            # Only for a matter the player had a hand in (`cards.took_part`, the CRB's
+            # "each PC that participated"): playtest 2026-11-16 #16/#27/#47 was 800 XP
+            # for four cards she never touched, closed on the watcher's word.
+            if not cards_mod.took_part(after):
+                c.turn_log.append({"kind": "watcher", "did": "no_award", "card": card.id,
+                                   "why": "the player had no part in it"})
+                continue
             engine = engine or c.engine()
             line = engine.award_story("new" if after.kind == "quest" else "advance",
                                       card.title).strip()
@@ -933,9 +984,18 @@ def _apply_cards(c, p: dict) -> bool:
     new = p.get("new")
     if isinstance(new, dict) and new.get("title"):
         existing = {k.title.lower() for k in cards_mod.load(c.scene)}
-        if new["title"].lower() not in existing:
+        people = [r for r in new.get("people") or [] if r in c.scene.actors]
+        if not people:
+            # A situation is somebody's. Playtest 2026-11-16 #47 and #51: "The Path to the
+            # Main Channel" for a walk already walked and "The Hidden Passage" for a find
+            # nobody made, both with nobody on them. A card's clock ticks only on a tell
+            # naming one of its people (`cards.touch_from_outcomes`), so a card with none
+            # could only ever be moved, closed and paid on the watcher's own word.
+            c.turn_log.append({"kind": "watcher", "did": "card", "action": "refused",
+                               "title": new["title"],
+                               "why": "a new card names nobody present"})
+        elif new["title"].lower() not in existing:
             n = sum(1 for k in cards_mod.load(c.scene) if k.id.startswith("play-")) + 1
-            people = [r for r in new.get("people") or [] if r in c.scene.actors]
             cards_mod.open_card(c.scene, cards_mod.Card(
                 id=f"play-{n}", title=new["title"], facts=list(new["facts"]),
                 tags=(cards_mod.TAG_PLAY,), people=people, place=str(c.scene.at or ""),
