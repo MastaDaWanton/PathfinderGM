@@ -58,7 +58,10 @@ def judge(engine, card, index: int, events=()) -> Judgement:
 
     scene = engine.scene
     pc = scene.pc()
-    if card.kind == "job" or card.recover:
+    from . import dungeons
+
+    # A dungeon's quest is ticked only by `dungeons.settle`, on the rooms' own state.
+    if card.kind == "job" or card.recover or dungeons.is_quest(card):
         return Judgement(ENGINE)
     if cards_mod.standing(card) != cards_mod.OWN:
         return Judgement(REFUSE, f"{card.title} is not {pc.name if pc else 'the player'}'s "
