@@ -3718,7 +3718,7 @@ _NUMERIC_PARAMS = {"amount": "number", "count": "integer", "hours": "integer"}
 
 
 def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...],
-                 aims: tuple[str, ...] = ()) -> dict:
+                 aims: tuple[str, ...] = (), skill: str = "") -> dict:
     """One required op's shape in the reply's `declared` object: its target and params,
     the params the op requires marked required — and a travel's place held to the names
     of the places this town really has (generation under a list of valid names; GENRE,
@@ -3777,9 +3777,24 @@ def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...],
         # check (`acts_to_ops._exert`, 2026-10-16). Its difficulty is a band word from the
         # rules' own table — the engine resolves the number (rules/dc.py) — where a free
         # string invited "DC 15" and a model's number.
-        props["skill"] = {"type": "string", "enum": [*SKILLS, *ABILITY_CHECKS]}
+        # The skill the words declared (`judgement.declared_check_skill`), when one
+        # did: playtest 2026-11-16 #32, "I climb back out of the crypt" declared a
+        # check and the model filled it with Stealth — a sneak nobody asked for.
+        props["skill"] = {"type": "string",
+                          "enum": [skill] if skill in (*SKILLS, *ABILITY_CHECKS)
+                          else [*SKILLS, *ABILITY_CHECKS]}
         if "dc" in props:
             props["dc"] = {"type": "string", "enum": list(DC_BANDS)}
+        if "circumstance" in props:
+            # A circumstance names what helps or hinders (`intents._bare_why`): typed a
+            # bare string it could only ever come back as the band word, never a reason.
+            from rules.tables import CIRCUMSTANCE
+
+            props["circumstance"] = {
+                "type": "object",
+                "properties": {"value": {"type": "string", "enum": sorted(CIRCUMSTANCE)},
+                               "why": {"type": "string", "minLength": 8}},
+                "required": ["value", "why"]}
     if op == "cast" and "aim" in props:
         from rules import areas
 
@@ -3799,8 +3814,11 @@ def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...],
 def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
                 min_chars: int = 0, must_contain: tuple[str, ...] = (),
                 ops: tuple[str, ...] = (), places: tuple[str, ...] = (),
-                aims: tuple[str, ...] = ()) -> dict:
+                aims: tuple[str, ...] = (), skill: str = "") -> dict:
     """The JSON schema this turn's reply must satisfy.
+
+    `skill` is the check skill the player's words declared, if any: a declared check is
+    held to it (`_declared_op`).
 
     `aims` is the scene's legal aims for a declared cast (`areas.legal_aims`), handed to
     `_declared_op` so the `aim` enum holds the features and props here as well as the
@@ -3890,7 +3908,8 @@ def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
         # `allOf` above stays for providers that do enforce it.
         schema["properties"]["declared"] = {
             "type": "object",
-            "properties": {op: _declared_op(op, refs, places, aims) for op in wanted},
+            "properties": {op: _declared_op(op, refs, places, aims, skill)
+                           for op in wanted},
             "required": list(wanted)}
         schema["required"] = ["narration", "declared", "intents"]
     return schema

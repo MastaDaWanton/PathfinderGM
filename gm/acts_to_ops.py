@@ -1071,7 +1071,7 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
             if act == "request" and pc is not None:
                 _request(row, a, scene, pc)
             if act == "threaten" and pc is not None:
-                _threaten(row, a, scene, pc, frame, i)
+                _threaten(row, a, scene, pc, frame, i, rows)
             if act == "craft" and pc is not None:
                 _craft(row, a, pc)
             if act == "loot" and pc is not None:
@@ -2122,7 +2122,7 @@ def _request(row: Row, a: dict, scene, pc) -> None:
     row.note = f"a request of {name}: {kind}"
 
 
-def _threaten(row: Row, a: dict, scene, pc, frame=None, i: int = 0) -> None:
+def _threaten(row: Row, a: dict, scene, pc, frame=None, i: int = 0, rows=()) -> None:
     """A threat, built whole: the player's Intimidate check at the person threatened,
     carrying what is demanded (`interpret.DEMANDS`). The engine makes it Influence Attitude
     out of a fight and Demoralize in one (CRB p.99, `Engine._cowed`, `Engine._demoralize`),
@@ -2138,6 +2138,31 @@ def _threaten(row: Row, a: dict, scene, pc, frame=None, i: int = 0) -> None:
     words = " ".join(str(a.get("target") or "").split())
     actors = getattr(scene, "actors", {}) or {}
     who = person(scene, words) if words else ""
+    # Whose intents the sentence has already aimed, latest first: "him" is the one the
+    # same line just levelled a dagger at or grabbed, before anybody else in the room.
+    # Playtest 2026-11-16 #3: "I level my dagger at the bleeding captain and tell him to
+    # yield…" read as two threats, and "him" went to the deckhand (`addressed`).
+    aimed = [t["target"] for r in reversed(list(rows)) for t in r.intents
+             if isinstance(t.get("target"), str) and t["target"] in actors
+             and t["target"] != pc.ref]
+    if words.lower() in _PRONOUNS and aimed:
+        # Before the finder's own guess: `person` answers a pronoun with whoever it
+        # fits in the room (the live replay of #3 gave the deckhand).
+        who = aimed[0]
+    if who:
+        earlier = next((t for r in rows for t in r.intents
+                        if t.get("op") == "check" and t.get("target") == who
+                        and (t.get("params") or {}).get("skill") == "intimidate"), None)
+        if earlier is not None:
+            # One threat, one check (CRB p.99: Intimidate is one check at the one
+            # threatened): the gesture and the words of it are not two. The demand is
+            # the first one the sentence made plainly; "obey" only stands in for none.
+            # #4: the second reading's hand_over answered "has no coin on them to hand
+            # over" to a demand to yield the ship.
+            if earlier["params"].get("demand") == "obey" and a.get("demand"):
+                earlier["params"]["demand"] = str(a["demand"])
+            row.note = f"the same threat at {actors[who].name}"
+            return
     if not who:
         who = addressed(scene) if not words or words.lower() in _PRONOUNS else ""
     if not who and getattr(scene, "in_encounter", False):

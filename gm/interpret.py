@@ -1168,6 +1168,15 @@ _DEMOS = [
          {"span": "level my spear at the wounded bandit and tell him to throw down his "
                   "sword", "target": "the wounded bandit",
           "says": "throw down his sword", "demand": "yield", "act": "threaten"}]}),
+    # One threat is one act, the blade and the words together, and giving up a ship is
+    # `yield` (playtest 2026-11-16 #3, #4: a levelled dagger and "tell him to yield the Red
+    # Gull to me or die" came back as two threats, the second `hand_over`). Not the
+    # playtest line.
+    ("I hold my cutlass to the mate's throat and tell her to give up the Saltwren or die.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "hold my cutlass to the mate's throat and tell her to give up the "
+                  "Saltwren or die", "target": "the mate",
+          "says": "give up the Saltwren or die", "demand": "yield", "act": "threaten"}]}),
     ("I shove the drunk out of the doorway.",
      {"question": False, "claims": [], "actions": [
          {"span": "shove the drunk out of the doorway", "target": "the drunk",
@@ -2894,6 +2903,29 @@ UNJUDGED = frozenset({"use_ability"})
 # audit's limit on #7, "a talk-backed check can still fire from 'I'll never pick the lock'".
 SPEECH_ACTS = frozenset({"talk", "request", "insult", "threaten"})
 SPOKEN_SKILLS = frozenset({"bluff", "diplomacy", "intimidate", "sense motive"})
+# And a deed's skill is backed by THAT deed, not by any deed: playtest 2026-11-16 #32, "I
+# climb back out of the crypt" was read `go` (a walk up out of it), the check detector read
+# "climb", and the walk backed the check (`go` is in the check row) — which the plan then
+# filled with Stealth. The reading's act vocabulary is the closed list each skill answers
+# to (the act lines of `ACTS`'s help text: athletics "climb, swim, jump", stealth "sneak,
+# hide, slip past", steal "pick a pocket").
+DEED_SKILL_ACTS = {
+    "stealth": frozenset({"stealth"}),
+    "sleight of hand": frozenset({"steal", "take"}),
+    "disable device": frozenset({"break_in", "use"}),
+    "climb": frozenset({"athletics", "exert"}),
+    "swim": frozenset({"athletics", "exert"}),
+    "acrobatics": frozenset({"athletics", "exert"}),
+    "escape artist": frozenset({"escape"}),
+    "disguise": frozenset({"disguise"}),
+    "perception": frozenset({"search", "look"}),
+    "survival": frozenset({"track", "follow"}),
+}
+# The skills only the player chooses to use. A GM calls for a Climb on a sheer wall or a
+# Perception to notice; nobody is made to sneak, palm or pass as somebody else — Stealth is
+# used "to hide" by the one hiding (CRB p.106, "You can't use Stealth while being observed"
+# is a rule about the choice, not a check the world imposes).
+CHOSEN_SKILLS = frozenset({"stealth", "sleight of hand", "disguise"})
 
 
 def supported(ops: list[str], frame: dict | None,
@@ -2930,11 +2962,61 @@ def supported(ops: list[str], frame: dict | None,
         need = _OP_NEEDS.get(op)
         have = elsewhere if op == "travel" else acts
         if op == "check" and check_skill and check_skill.lower() not in SPOKEN_SKILLS:
-            # A deed's skill: words alone (`SPEECH_ACTS`) do not stand behind it.
+            # A deed's skill: words alone (`SPEECH_ACTS`) do not stand behind it, and of
+            # the deeds only its own (`DEED_SKILL_ACTS`).
             have = have - SPEECH_ACTS
+            need = DEED_SKILL_ACTS.get(check_skill.lower(), need)
         backed = op in UNJUDGED if need is None else bool(have & need)
         (kept if backed else dropped).append(op)
     return kept, dropped
+
+
+def drop_unchosen_checks(raw, frame: dict | None, pc_ref: str = "pc") -> tuple[list, list]:
+    """(the plan's intents, the skills dropped). The player's own check of a skill only
+    the player chooses (`CHOSEN_SKILLS`) stands only where an act of this turn's reading
+    is that deed (`DEED_SKILL_ACTS`). Playtest 2026-11-16 #37: "I climb out of the sewers
+    and walk to the gardens" was read athletics + go, and the plan still carried the
+    sneaking of earlier turns — a Stealth refused "the gardener is watching", and the
+    refusal reached the page. An intent from an earlier turn is not renewed unless this
+    turn's words name it. Only with a reading to judge by."""
+    if not isinstance(raw, list) or not frame or frame.get("error"):
+        return (raw if isinstance(raw, list) else []), []
+    acts = {a.get("act") for a in frame.get("actions") or [] if acting(a)}
+    kept, dropped = [], []
+    for r in raw:
+        p = (r.get("params") or {}) if isinstance(r, dict) else {}
+        skill = str(p.get("skill") or "").strip().lower()
+        if (isinstance(r, dict) and str(r.get("op", "")).lower() == "check"
+                and skill in CHOSEN_SKILLS and r.get("actor") in (None, "", "pc", pc_ref)
+                and not acts & DEED_SKILL_ACTS[skill]):
+            dropped.append(skill)
+            continue
+        kept.append(r)
+    return kept, dropped
+
+
+def ventures_somewhere_new(frame: dict | None, places) -> bool:
+    """Whether an act of the reading that could enter new ground (`_OP_NEEDS["venture"]`)
+    names no place the town already knows: a `venture` makes the place, so a walk to a
+    place that exists (a travel) or out of the one stood in is none. Playtest 2026-11-16
+    #37: "I climb out of the sewers and walk to the gardens", in the sewers, had the
+    venture detector read "sewers" and plan a way down, refused "not at the great square"
+    onto the page. Place ids against the engine's own finder; no English read. True with
+    no reading to judge by."""
+    from rules import places as places_mod
+
+    if not frame or frame.get("error"):
+        return True
+    for a in frame.get("actions") or []:
+        if not acting(a) or a.get("act") not in _OP_NEEDS["venture"]:
+            continue
+        # A search's place is where the looking is done ("search the great square for a
+        # way down", rules/dungeons.py), never a destination.
+        if a.get("act") == "search" or not a.get("place"):
+            return True
+        if places_mod.find(places, a["place"]) is None:
+            return True
+    return False
 
 
 # The acts under which the player can come away holding something. One set for both

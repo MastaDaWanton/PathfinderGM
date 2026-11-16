@@ -1955,8 +1955,26 @@ def _check_params(intent: Intent, index: int) -> None:
                 f"{val!r}. Leave it out entirely when nothing helps or hinders.",
                 "schema", index,
             )
+        elif _bare_why(circ.get("why")):
+            # A +2/-2 is for a condition that helps or hinders — the right tool, a hand
+            # from somebody (CRB "Using Skills"; the 3.5 SRD's "favorable and unfavorable
+            # conditions") — so it names that condition or it does not apply. Playtest
+            # 2026-11-16 #32: a walk's DC was "lowered by 2 to 8 for a favourable
+            # circumstance: favorable", the reason the band word itself. Dropped, never
+            # refused (a required op's refusal regenerates the whole plan), and recorded.
+            p.pop("circumstance", None)
+            intent.ignored_params.append("circumstance")
         else:
             circ["value"] = val
+
+
+def _bare_why(why) -> bool:
+    """Whether a circumstance's reason names nothing: missing, or only the band's own
+    words ("favorable", "an unfavourable circumstance"). Closed words, not meaning."""
+    words = set(re.findall(r"[a-z]+", str(why or "").lower()))
+    return not (words - {"a", "an", "the", "favorable", "favourable", "unfavorable",
+                         "unfavourable", "circumstance", "circumstances", "condition",
+                         "conditions", *NO_CIRCUMSTANCE})
 
 
 # The ops whose `amount` lands on a sheet. Every one of them needs an origin the engine
