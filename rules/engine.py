@@ -4286,7 +4286,12 @@ class Engine:
                         f"Drop `lethality`, or strike with a melee weapon or the fists.",
                         "legality", index, code="cannot_pull_blow")
             man = intent.params.get("manoeuvre")
-            if man:
+            from .intents import INTRODUCED_REFS
+
+            # At somebody an earlier introduce in this list brings in (a shove at the
+            # merchant just picked out, playtest 2026-11-15 #18): nobody to measure yet,
+            # and the blow is deferred by the battle gate it opens, as any first blow is.
+            if man and not set(intent.targets()) & set(INTRODUCED_REFS):
                 m = MANEUVERS[man]
                 targets = intent.targets()
                 defender = self.scene.get(targets[0]) if targets else None
@@ -8075,7 +8080,8 @@ class Engine:
             tell = " ".join([tell, *done_said])
         if swayed is not None:
             moved_tell, effects = self._sway(actor, swayed, skill, margin,
-                                             intent.because)
+                                             intent.because,
+                                             demand=str(intent.params.get("demand") or ""))
             # The margin has already been said; what the player is told about the person
             # is how they now feel, which is the only part of this a character could
             # see. No step count, no DC — the third law.
@@ -8414,7 +8420,8 @@ class Engine:
                   f"hear it again. Come back tomorrow, or find another way."),
             because=intent.because)
 
-    def _sway(self, actor, target, skill: str, margin: int, because: str):
+    def _sway(self, actor, target, skill: str, margin: int, because: str,
+              demand: str = ""):
         """Move the target along the track, and say how they now feel.
 
         The book, and nothing but: Diplomacy shifts one step plus one per 5 over, two at
@@ -8436,12 +8443,12 @@ class Engine:
                                    "from": before, "to": after})
 
         if skill == "intimidate":
+            if self.scene.in_encounter and any(
+                    target.ref in refs for refs in (self.scene.sides or {}).values()):
+                return self._demoralize(actor, target, margin, demand)
             if margin < 0:
                 return f"{target.name} does not scare.", []
-            minutes = self.dice.roll(attitude_mod.INTIMIDATE_DICE,
-                                     label="cowed for", visibility="hidden").total * 10
-            now, rounds = attitude_mod.COMES_ALONG, _to_rounds(minutes, "minute")
-            _remember(-attitude_mod.REGARD_RESENTMENT)
+            return self._cowed(actor, target, demand, because, _remember, regard_effects)
         else:
             # The attempt is spent whether or not it worked: the limit is on trying.
             self.scene.swayed[target.ref] = int(self.scene.clock_minutes)
@@ -8460,6 +8467,99 @@ class Engine:
         return (attitude_mod.said(target.name, was, now),
                 [{"ref": target.ref, "kind": "condition", "condition": now,
                   "rounds_left": cond.rounds_left}] + regard_effects)
+
+    def _cowed(self, actor, target, demand: str, because: str, remember, regard_effects):
+        """Intimidate's Influence Attitude made (CRB p.99): the target "gives you the
+        information you desire, takes actions that do not endanger it, or otherwise offers
+        limited assistance", acting friendly for 1d6x10 minutes; after that it "treats you
+        as unfriendly and may report you to local authorities".
+
+        Playtest 2026-11-15 #21: Intimidate 23 against DC 10 to rob a merchant told the
+        player "The merchant warms: is well disposed towards you" and handed nothing over.
+        Now the step is held as cowed (`payload.cowed`, which harm breaks as it breaks a
+        charm, `attitude.harmed`), the standing regard drops into unfriendly so that the
+        step's lapse leaves them there (the book's "treats you as unfriendly", with no
+        trigger the engine lacks), and what was demanded is done when doing it endangers
+        nothing: a purse handed over, a fight given up, a way cleared."""
+        from . import attitude as attitude_mod, morale
+
+        minutes = self.dice.roll(attitude_mod.INTIMIDATE_DICE,
+                                 label="cowed for", visibility="hidden").total * 10
+        remember(-attitude_mod.REGARD_RESENTMENT)
+        top = attitude_mod.floor_of(attitude_mod.DEFAULT) - 1
+        if attitude_mod.regard_of(target) > top:
+            before = attitude_mod.regard_of(target)
+            attitude_mod.set_regard(target, top, "intimidated")
+            regard_effects.append({"kind": "regard", "ref": target.ref, "from": before,
+                                   "to": top})
+        cond = self._set_attitude(target, attitude_mod.COMES_ALONG,
+                                  _to_rounds(minutes, "minute"), because or "intimidate",
+                                  payload={"cowed": True})
+        effects = [{"ref": target.ref, "kind": "condition",
+                    "condition": attitude_mod.COMES_ALONG, "cowed": True,
+                    "rounds_left": cond.rounds_left}] + regard_effects
+        said = [f"{_sentence(target.name)} is cowed: will do as told for now, and will not "
+                f"forget it."]
+        if demand == "hand_over":
+            fx, line = self._hand_over_purse(target, actor)
+            effects += fx
+            said.append(line)
+        elif demand == "yield" and morale.can_yield(target):
+            fx, lines = self.yield_to_the_party(target, "rule:intimidate")
+            effects += fx
+            said += lines
+        return " ".join(x for x in said if x), effects
+
+    def _hand_over_purse(self, giver, to) -> tuple[list[dict], str]:
+        """A cowed person hands over the coin they carry. Coin only: what else a threat
+        could take is the loot op's, from somebody who can no longer stop it."""
+        cp = goods.in_copper(getattr(giver, "purse", None) or {})
+        if cp <= 0:
+            return [], f"{_sentence(giver.name)} has no coin on them to hand over."
+        to.purse = goods.credit(to.purse, cp)
+        giver.purse = {}
+        coins = self._coins_here()
+        return ([{"kind": "give", "ref": giver.ref, "item": "coin", "count": cp,
+                  "how": "handed over", "from": giver.ref, "to": to.ref,
+                  "purse": dict(to.purse), "goods": dict(getattr(to, "goods", {}) or {})}],
+                f"{_sentence(giver.name)} hands over "
+                f"{goods.purse_line(goods.coins_for(cp), coins)}.")
+
+    def _demoralize(self, actor, target, margin: int, demand: str):
+        """Intimidate in a fight is Demoralize (CRB p.99): shaken for 1 round, and 1 more
+        for every 5 by which the check beat the DC; a second success only lengthens it. A
+        demand to yield is the threat made good on somebody whose nerve is going: made
+        against one already shaken, at half their hit points or worse (the morale line
+        `rules/morale.py` checks at), held fast, or no fighter at all (`martial`), they
+        give up the fight — a person yields, a beast runs — and a demand for their purse
+        is paid before they yield. Playtest 2026-11-15 #97: "yield the Red Gull to me or die" to a captain at
+        1 of 11 was booked as talk, and he fought on."""
+        from . import morale
+
+        if margin < 0:
+            return f"{_sentence(target.name)} is not cowed.", []
+        was_afraid = target.has_state("state.fear")
+        rounds = 1 + margin // 5
+        cond = target.add_condition(morale.SHAKEN_KEY, rounds, source="rule:demoralize",
+                                    origin="rule:intimidate")
+        effects = [{"ref": target.ref, "kind": "condition", "condition": morale.SHAKEN_KEY,
+                    "rounds_left": cond.rounds_left, "origin": "rule:intimidate"}]
+        said = [f"{_sentence(target.name)} is shaken."]
+        gives_in = morale.checks_morale(target) and (
+            was_afraid or morale.bloodied(target) or target.has_state("state.held")
+            or (morale.can_yield(target) and not self.martial(target)))
+        if demand == "hand_over" and gives_in and morale.can_yield(target):
+            # A civilian, or anybody past the end of their nerve, pays to be let go: the
+            # coin handed over, and they are out of the fight (a mugging's whole shape).
+            fx, line = self._hand_over_purse(target, actor)
+            more_fx, lines = self.yield_to_the_party(target, "rule:intimidate")
+            effects += fx + more_fx
+            said += [line, *lines]
+        elif demand == "yield" and gives_in:
+            fx, lines = self._break(target, "rule:intimidate", "threatened")
+            effects += fx
+            said += lines
+        return " ".join(x for x in said if x), effects
 
     def _lie_lands(self, liar, listener, kind: str, believed: bool, margin: int):
         """What a lie about who the player is does to how the listener feels. Owner ruling
@@ -17933,6 +18033,53 @@ class Engine:
             said.append(f"{a.name}'s armour drags at them in the water.")
         return made, rounds, said + list(dict.fromkeys(ladder))
 
+    def _come_about(self, ship, want: str):
+        """A ship the party holds (`_ship_taken`) sails where they say: any port the world
+        has a sea or river leg to from where she put out, the days by her own speed
+        (`ships.days_for`, as a booking reckons them). Returns the re-aimed ship, a refusal's
+        words, or None when no leg leaves her waters at all."""
+        from . import journey as journey_mod, ships as ships_mod
+
+        legs = [x for x in journey_mod.legs_from(self.world, ship.came_from or ship.at)
+                if x.by_sea or x.by in ("sea", "river")]
+        leg = journey_mod.find(legs, want) if legs else None
+        if leg is None:
+            if not legs:
+                return None
+            return (f"{_sentence(ship.name)} is yours, but no sea road the world knows runs "
+                    f"from her waters to {want}. She can make "
+                    f"{_and_list([x.to_name for x in legs])}.")
+        ship.bound_for, ship.lands_at = leg.to_id, ""
+        # shortcut: the whole leg from her home port, whatever she has already sailed of
+        # another (a day out to Mirabalos, then two to Elyrielle); a position at sea is the
+        # upgrade when a voyage is ever measured as too long.
+        ship.days_left = ship.days_total = ships_mod.days_for(
+            leg.miles if leg.source == "exact" else None, ship.kind, leg.days_apart)
+        ship.river = leg.by == "river"
+        self._keep_vessel(ship)
+        return ship
+
+    def _waters_climates(self, ship) -> tuple[str, ...]:
+        """The climate of the waters between the ports she sails from and to, as
+        `biomes.CLIMATES` words: each port's own Climate fact (`geography.land_around`), read
+        only when it names ONE climate — Zhilvarnia's "temperate near the equator, polar at
+        the edges" is a continent's whole span and says nothing about this crossing. Empty
+        when neither port says (every sea creature then stays in), which is why
+        for-world-bible ask 26 asks for the waters' own climate."""
+        from . import biomes, geography
+
+        out: set[str] = set()
+        for pid in (ship.came_from, ship.bound_for):
+            town = self.world.get(pid) if self.world is not None and pid else None
+            if town is None:
+                continue
+            said = str(geography.land_around(self.world, town).climate or "").lower()
+            named = {c for w, c in biomes._CLIMATE_WORDS.items()
+                     if re.search(rf"\b{w}\b", said)}
+            if len(named) == 1:
+                out |= named
+        return tuple(sorted(out))
+
     def _sail(self, intent: Intent, ship, want: str = "") -> Outcome:
         """The ship makes way, a day at a time, until she makes port or the weather turns.
 
@@ -17952,6 +18099,11 @@ class Engine:
                 and want.lower() not in dest_name.lower() \
                 and not (port_name and want.lower() in port_name.lower()) \
                 and want.lower() != ship.name.lower():
+            turned = self._come_about(ship, want) if ship.held_by else None
+            if isinstance(turned, str):
+                return self._refuse(intent, turned)
+            if turned is not None:
+                return self._sail(intent, turned)
             return self._refuse(
                 intent, f"{ship.name} is bound for {dest_name}, nowhere else. Sail on with "
                         f"her, or go ashore when she makes port.")
@@ -17996,7 +18148,8 @@ class Engine:
             if not ship.river and ship.days_left > 0:
                 met = ontheway.sea(self.dice, int(getattr(pc, "level", 1) or 1),
                                    apl=encounter_budget.party_apl(self.scene),
-                                   danger=volatility.factor(level))
+                                   danger=volatility.factor(level),
+                                   climates=self._waters_climates(ship))
                 if met is not None:
                     break
         self._journeyed = ship.name
@@ -18122,6 +18275,14 @@ class Engine:
         self._ensure_encounter(pc.ref, target=made[0]["ref"])
         for m in made[1:]:
             self.join_fight(m["ref"])
+        # Her people defend their deck (playtest 2026-11-15 #92: the captain and the hand
+        # stood idle five rounds while a creature bit at their passenger). RimWorld's
+        # caravan guards "defend" when a member is harmed; here every hand aboard does,
+        # because a deck at sea has nowhere for a non-combatant to run to.
+        mine = next((s for s, refs in self.scene.sides.items() if pc.ref in refs), "party")
+        for a in self.crew_of(ship):
+            if not a.is_down and self.join_fight(a.ref, mine):
+                fx.setdefault("crew", []).append(a.ref)
         # A swimmer stays in the water alongside, to strike from it or climb aboard; one
         # with no swim speed has come over the rail onto the planks.
         afloat = self._into_the_water([m["ref"] for m in made])
@@ -25945,6 +26106,23 @@ class Engine:
         Read off its data, never its name (the owner's ruling above)."""
         if actor is None or actor.is_pc:
             return False
+        if self.martial(actor):
+            return True
+        if states.attitude_of(actor) == "hostile":
+            held = str(getattr(actor, "equipped", "") or "").strip().lower()
+            printed = actor.stat_block_attacks() if hasattr(actor, "stat_block_attacks") \
+                else {}
+            if (held and held not in ("unarmed", "none")) or any(printed.values()):
+                return True
+        return False
+
+    def martial(self, actor) -> bool:
+        """Whether a creature is a fighter by what it IS — the law's tag, a fighting
+        template, a martial class or martial Hit Dice — whatever it feels today. The half of
+        `fights_back` that a grudge cannot give: a merchant made hostile by a punch, with a
+        dagger on his belt, is still no fighter (`morale_turn`, playtest 2026-11-15 #30)."""
+        if actor is None or actor.is_pc:
+            return False
         if actor.has_state(states.GUARD):
             return True
         if str(getattr(actor, "from_template", "") or "") in self.FIGHTING_KINDS:
@@ -25959,12 +26137,6 @@ class Engine:
                 str(getattr(actor, "from_template", "") or "").strip().lower()) or {}
             dice = [int(d) for d in self._MARTIAL_DIE.findall(str(row.get("hit_dice") or ""))]
             if dice and all(d >= 10 for d in dice):
-                return True
-        if states.attitude_of(actor) == "hostile":
-            held = str(getattr(actor, "equipped", "") or "").strip().lower()
-            printed = actor.stat_block_attacks() if hasattr(actor, "stat_block_attacks") \
-                else {}
-            if (held and held not in ("unarmed", "none")) or any(printed.values()):
                 return True
         return False
 
@@ -26036,6 +26208,182 @@ class Engine:
                 or places_mod.location_of(self.scene.at) or str(self.scene.at or ""))
         self.scene.move(b.ref, residency.offstage(town, f"home-{b.ref}"))
         return {"ref": b.ref, "kind": "flees", "why": "splashed", "origin": origin}
+
+    # --- morale: when somebody stops fighting (rules/morale.py) ----------------------------
+
+    def _off_the_fight(self, ref: str) -> None:
+        """Out of every side and the order, through the order's own door (see `_rout`)."""
+        for refs in (self.scene.sides or {}).values():
+            if ref in refs:
+                refs.remove(ref)
+        if self.scene.initiative:
+            self.scene.leave_order(ref)
+
+    def _cornered(self, actor) -> bool:
+        """Nowhere to run: held fast, or on a ship's deck at sea with no swim speed (the
+        sea is not a way off for anybody who would drown in it)."""
+        from . import ships as ships_mod, water as water_mod
+
+        if actor.has_state("state.held"):
+            return True
+        ship = self.vessel(ships_mod.vessel_of(str(getattr(actor, "at", "") or "")))
+        at_sea = ship is not None and not ship.at
+        return at_sea and water_mod.swim_speed(actor) <= 0
+
+    def yield_to_the_party(self, actor, origin: str) -> tuple[list[dict], list[str]]:
+        """`actor` gives up the fight: tagged yielded (until dismissed), out of the order
+        and off every side, standing where it is. A ship's people yield with their master,
+        and a deck whose people have all given up is the party's (`_ship_taken`).
+        (effects, tells)."""
+        from . import morale
+
+        if morale.yielded(actor):
+            return [], []
+        self._off_the_fight(actor.ref)
+        actor.add_condition(morale.YIELDED_KEY, None, source=origin, origin=origin)
+        held = str(getattr(actor, "equipped", "") or "").strip().lower()
+        fx = [{"ref": actor.ref, "kind": "yields", "origin": origin}]
+        said = [morale.yield_said(actor.name, bool(held) and held not in ("unarmed", "none"))]
+        more_fx, more_said = self._crew_follow(actor, origin)
+        taken_fx, taken_said = self._ship_taken()
+        return fx + more_fx + taken_fx, said + more_said + taken_said
+
+    def _break(self, actor, origin: str, why: str = "") -> tuple[list[dict], list[str]]:
+        """A creature whose nerve went: it runs if it can, else it yields, and an animal,
+        which has no terms to offer, runs or fights on (CRB, frightened: "If unable to
+        flee, it may fight"). (effects, tells)."""
+        from . import morale, water as water_mod
+
+        if not self._cornered(actor):
+            into_the_sea = water_mod.swim_speed(actor) > 0 and self.aboard() is not None
+            self._off_the_fight(actor.ref)
+            if actor.from_template and not morale.can_yield(actor) or into_the_sea:
+                # A beast leaves the scene: it has no home here for `residency` to keep.
+                self.scene.positions.pop(actor.ref, None)
+                self.scene.remove(actor.ref)
+                rec = {"ref": actor.ref, "kind": "flees", "why": why or "morale",
+                       "origin": origin}
+            else:
+                rec = self._flee(actor, origin)
+                rec["why"] = why or "morale"
+            return [rec], [morale.flee_said(actor.name, into_the_sea)]
+        if morale.can_yield(actor):
+            return self.yield_to_the_party(actor, origin)
+        return [], []
+
+    def morale_turn(self, ref: str) -> list[Outcome]:
+        """The top of a creature's turn in a fight: whether it fights on. [] when it does,
+        and the turn is planned as any other; else the outcome of its running or yielding,
+        which is its turn. Nobody on the player's side checks (companions obey in
+        character, the owner's ruling of 2026-10-01), nor the mindless, nor a crowd
+        (`troops`' own check), and a person checks at half hit points once.
+
+        A civilian ashore, hurt, does not wait for half: it runs (`martial`, the owner's
+        ruling of 2026-10-06). Measured live 2026-11-15 (#30): a merchant punched in round 2
+        "remains unmoving in your space"."""
+        from . import morale
+
+        actor = self.scene.actors.get(ref)
+        pc = self.scene.pc()
+        if actor is None or actor.is_pc or pc is None or not self.scene.in_encounter:
+            return []
+        if actor.is_down or actor.is_helpless or getattr(actor, "troop", None) is not None:
+            return []
+        mine = next((refs for refs in self.scene.sides.values() if pc.ref in refs), [])
+        if ref in mine or actor.has_state(states.TRAVELS_WITH_YOU) \
+                or not any(ref in refs for refs in self.scene.sides.values()):
+            return []
+        if morale.yielded(actor):
+            # Struck after yielding and back on a side: the yield is over, and the next
+            # half-blood check is not made again (5e DMG p.273: a surrendered group that
+            # is attacked makes no further attempt to surrender).
+            actor.remove_condition(morale.YIELDED_KEY)
+            actor.add_condition(morale.TESTED_KEY, None, source="rule:morale",
+                                origin="rule:morale")
+            return []
+        if not morale.checks_morale(actor):
+            return []
+        rolls: list[Roll] = []
+        person = morale.can_yield(actor)
+        if person and not self.martial(actor) and morale.hurt(actor) \
+                and not self._cornered(actor):
+            why = "hurt, and no fighter"
+        elif morale.bloodied(actor) and not actor.has_state(morale.TESTED):
+            actor.add_condition(morale.TESTED_KEY, None, source="rule:morale",
+                                origin="rule:morale")
+            roll = self.dice.roll(morale.DICE, label=f"{actor.name} morale",
+                                  visibility="hidden")
+            rolls.append(roll)
+            if morale.holds(roll.total):
+                return []
+            why = "half their blood gone"
+        else:
+            return []
+        fx, said = self._break(actor, "rule:morale", why)
+        if not said:
+            return []
+        return [Outcome(intent_id="", op="morale", rolls=rolls, effects=fx,
+                        tell=" ".join(said), because=why)]
+
+    def crew_of(self, ship) -> list:
+        """Her people (`ships.crew_of`)."""
+        from . import ships as ships_mod
+
+        return ships_mod.crew_of(self.scene, ship)
+
+    def _crew_master(self, crew: list):
+        from . import ships as ships_mod
+
+        return ships_mod.master_of(crew)
+
+    def _crew_follow(self, actor, origin: str) -> tuple[list[dict], list[str]]:
+        """Her master has yielded: the rest of her people give up with him (5e's group
+        trigger, AD&D's "leader slain"). Those already fighting check morale at once; those
+        who never came into it simply stand down."""
+        from . import morale, ships as ships_mod
+
+        ship = self.vessel(ships_mod.vessel_of(str(getattr(actor, "at", "") or "")))
+        crew = self.crew_of(ship)
+        if actor not in crew or self._crew_master(crew) is not actor:
+            return [], []
+        fx: list[dict] = []
+        said: list[str] = []
+        for a in crew:
+            if a is actor or a.is_down or morale.yielded(a):
+                continue
+            if any(a.ref in refs for refs in self.scene.sides.values()):
+                roll = self.dice.roll(morale.DICE, label=f"{a.name} morale (master yielded)",
+                                      visibility="hidden")
+                if morale.holds(roll.total):
+                    continue
+            self._off_the_fight(a.ref)
+            a.add_condition(morale.YIELDED_KEY, None, source=origin, origin=origin)
+            fx.append({"ref": a.ref, "kind": "yields", "origin": origin, "with": actor.ref})
+            said.append(f"{_sentence(a.name)} stands down with {actor.name}.")
+        return fx, said
+
+    def _ship_taken(self) -> tuple[list[dict], list[str]]:
+        """The deck the party stands on is theirs once every one of her people has yielded
+        or is down, and somebody yielded (a ship of the dead is a wreck to loot, not a
+        command). Her abstract crew (`Vessel.crew`) works her under the party from then on:
+        `_sail` takes her wherever the player says (`held_by`). (effects, tells)."""
+        from . import morale
+
+        ship = self.aboard()
+        if ship is None or ship.held_by:
+            return [], []
+        crew = self.crew_of(ship)
+        if not crew or not any(morale.yielded(a) for a in crew):
+            return [], []
+        if any(not (morale.yielded(a) or a.is_down) for a in crew):
+            return [], []
+        ship.held_by = self.scene.pc().ref
+        self._keep_vessel(ship)
+        name = f"{ship.name[:1].upper()}{ship.name[1:]}"
+        return ([{"kind": "ship_taken", "vessel": ship.id, "by": ship.held_by,
+                  "origin": "rule:morale"}],
+                [f"{name} is yours: her people have given up, and will work her where "
+                 f"you say."])
 
     def _scatter(self, actor, aim: tuple[int, int], feet, inc: int,
                  rolls: list) -> tuple[tuple[int, int] | None, str]:

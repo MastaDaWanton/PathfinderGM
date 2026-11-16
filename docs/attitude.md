@@ -117,11 +117,17 @@ something different about them.
 
 ## Still open
 
-- **Intimidate's aftermath.** The book has an intimidated creature treat you as unfriendly
-  once the friendliness lapses, and possibly report you. Not implemented: there is no
-  "when this effect ends" trigger in the engine — wards fire each round or when struck —
-  and inventing a third trigger for one rule is how a mechanism ossifies around a special
-  case. The friendliness runs out and they are whatever they were.
+- **Intimidate's aftermath — built 2026-11-15** (`Engine._cowed`, playtest #21). The
+  friendliness a threat forces is held as a cowed step (`payload.cowed`), and the standing
+  regard is put into unfriendly at the same moment, so when the step lapses they fall back
+  to unfriendly with no "when this effect ends" trigger: the book's "treats you as
+  unfriendly". Harm breaks the cowed step as it breaks a charm (`attitude.harmed`, #26).
+  What was demanded (`demand`, the reader's `threaten` act) is done when it endangers
+  nothing: a purse handed over, a fight given up. In a fight the same check is Demoralize
+  (`Engine._demoralize`): shaken for 1 + 1 per 5 rounds, and a demand to yield made good on
+  somebody already shaken or at half their hit points (`rules/morale.py`). Still open:
+  "may report you to local authorities", and the failure by 5 or more that has the target
+  "deceive you or otherwise hinder your activities".
 - **Requests — built 2026-10-16 for payment and favours** (`rules/requests.py`,
   `Engine._make_request`). The reader's `request` act (`asks_for`: payment | favour)
   becomes the player's Diplomacy check at the attitude's DC + Cha + the "simple aid" row

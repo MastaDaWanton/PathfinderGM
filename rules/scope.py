@@ -316,6 +316,9 @@ def elsewhere_by_name(scene, said: list[str], location_id: str | None, world) ->
             "where": town_name if in_town else "", "line": line}
 
 
+_INDEFINITE = frozenset({"a", "an", "some", "any", "another"})
+
+
 def look_for(world, phrase: str, scene=None, location_id: str | None = None, *,
              indefinite: bool = False) -> dict:
     """The three answers of scope for a person the player named.
@@ -328,6 +331,9 @@ def look_for(world, phrase: str, scene=None, location_id: str | None = None, *,
     out = {"scope": NOWHERE, "who": "", "where": "", "line": "", "phrase": phrase}
     if not phrase:
         return out
+    # The phrase's own article says it too ("a well-dressed merchant"): every caller, the
+    # brief's sought section among them, which asked without the flag (playtest #22).
+    indefinite = indefinite or phrase.split()[0].lower() in _INDEFINITE
     ref = in_the_room(scene, phrase)
     if ref:
         who = scene.actors[ref]
@@ -409,6 +415,14 @@ def look_for(world, phrase: str, scene=None, location_id: str | None = None, *,
             where = str(getattr(parent, "name", "") or "")
         except (AttributeError, TypeError):
             where = ""
+        if indefinite and not (where and where == town_name):
+            # "A merchant" wants any merchant, never a figure of the world's in another
+            # town: playtest 2026-11-15 #22, "I pick out a well-dressed merchant passing
+            # through the warrens" in Zhilvarnia was answered "Lyraea, Leader of Valtorian
+            # Merchant Guild, is in Pangrella, not here" while the plan introduced the
+            # merchant it asked for. The town's own one is still the answer ("a healer" is
+            # where Vormoor's healer is, tests/test_introduce.py).
+            return {**out, "scope": "", "line": ""}
         role = _role_of(who)
         named = f"{who.name}" + (f", {role}" if role else "")
         if where and where == town_name:

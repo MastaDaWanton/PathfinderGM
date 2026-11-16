@@ -172,6 +172,15 @@ def coins_here(world=None, scene=None) -> list[Coin]:
     """
     place = None
     location_id = str(getattr(scene, "location_id", "") or "")
+    # At sea the location is the ship (`Engine._sail`), which is no world entity, and the
+    # purse was named after the world's first faction: playtest 2026-11-15 #90, "12 Eldrida
+    # gold pieces" became "12 Saltmakers' gold pieces" one day out. The coin carried is the
+    # port's she sailed from (the owner's ruling of 2026-10-17: the town's nation names it).
+    if location_id.startswith("ship-"):
+        location_id = next((str(v.get("came_from") or v.get("at") or "")
+                            for v in (getattr(scene, "vessels", None) or ())
+                            if isinstance(v, dict) and str(v.get("id")) == location_id),
+                           location_id)
     if world is not None and location_id and hasattr(world, "get"):
         place = world.get(location_id)
     return coinage(world, place)

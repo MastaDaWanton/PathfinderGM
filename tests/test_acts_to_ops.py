@@ -507,7 +507,10 @@ def test_the_per_act_schema_offers_each_act_only_its_own_slots():
                                           *(["within_place"] if act == "go" else []),
                                           # And `fixture` on a go (2026-11-11,
                                           # tests/test_map_fixtures.py).
-                                          *(["fixture"] if act == "go" else [])}
+                                          *(["fixture"] if act == "go" else []),
+                                          # And `demand` on a threat (2026-11-15,
+                                          # tests/test_morale_threats_ships.py).
+                                          *(["demand"] if act == "threaten" else [])}
         assert alt["required"] == list(alt["properties"])
         assert alt["additionalProperties"] is False
 

@@ -303,8 +303,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # `past` (2026-11-01): the check is a push past the people who cut the player's walk
     # short (`states.MAKING_FOR`); made, the walk goes on to where it was for
     # (`Engine._drive`). Written only by the act→op table (`acts_to_ops._exert`).
+    # `demand` (2026-11-15): what a threat demands (`morale.DEMANDS`), the reader's closed
+    # answer about the player's words (`acts_to_ops._threaten`); read by Intimidate's two
+    # uses, Influence Attitude and Demoralize (`Engine._cowed`, `Engine._demoralize`).
     "check": (("skill",), ("dc", "opposed_by", "circumstance", "aid", "request", "search",
-                           "pace", "diversion", "past"),
+                           "pace", "diversion", "past", "demand"),
               "player"),
     "save": (("save", "dc"), ("on_success", "on_failure", "breaks"), "player"),
     # `player`, because the PC rolls their own to-hit and their own damage. Defaulting
@@ -801,6 +804,7 @@ PARAM_ALIASES = {
 # printed question; `not_here` is the world's answer for a person the player looked for
 # who is not here, which the engine prints instead of anybody being created (item 29).
 CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending", "request", "job",
+                              "demand",
                               "ends_when", "pace", "diversion", "past", "together",
                               # A held player's save (`Engine.held_save_turn`) names the
                               # hold it ends; honoured only with an engine origin.
@@ -1367,6 +1371,12 @@ def _check_params(intent: Intent, index: int) -> None:
                 f"check: the DC for {p['skill']} on a named person is the engine's — "
                 f"the book sets it from their attitude and their own scores. Drop the "
                 f"dc and keep the target.", "legality", index)
+        from .morale import DEMANDS
+
+        if p.get("demand") not in (None, "", *DEMANDS) or (
+                p.get("demand") and p.get("skill") != "intimidate"):
+            raise IntentError(f"check: demand is one of {', '.join(DEMANDS)}, and only on "
+                              f"an intimidate check.", "schema", index)
         # A search: Perception against whatever is hidden here, at the hiding's own DC —
         # the engine's (`Engine._search`, rules/awareness.py), so a band is refused.
         search = p.get("search")

@@ -1020,6 +1020,10 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 # whole, through the engine's own move (stair, reach and provoking rules).
                 if pc is not None:
                     _to_the_fixture(row, str(a["fixture"]), scene, pc)
+            if act == "go" and pc is not None and not row.intents and not row.ops \
+                    and not a.get("place") and not a.get("fixture") \
+                    and getattr(scene, "in_encounter", False):
+                _a_step(row, scene, pc)
             if act == "call_on" and pc is not None:
                 # The reader's own call on a person who is standing here is the same walk
                 # home together; their door would refuse them ("is here, with you").
@@ -1066,6 +1070,8 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 _exert(row, frame, i, scene, pc)
             if act == "request" and pc is not None:
                 _request(row, a, scene, pc)
+            if act == "threaten" and pc is not None:
+                _threaten(row, a, scene, pc, frame, i)
             if act == "craft" and pc is not None:
                 _craft(row, a, pc)
             if act == "loot" and pc is not None:
@@ -1794,6 +1800,43 @@ def _to_the_fixture(row: Row, kind: str, scene, pc) -> None:
         row.nowhere = why
 
 
+def _a_step(row: Row, scene, pc) -> None:
+    """A walk that names nowhere, in a fight, is a step: one square, back from whoever
+    stands nearest (the 5-foot step, CRB p.189). Playtest 2026-11-15 #60: "I raise my
+    hands, step back and surrender" was read `go` with no place, the plan chose square
+    (0, 0) itself, and she ran 30 ft out into open ground. A square the player never named
+    is the plan's to invent no longer.
+    shortcut: always back, away from the nearest person; "step forward" with nobody named
+    reads the same, and wants a direction slot on `go` if it is ever measured."""
+    grid = getattr(scene, "grid", None)
+    here = (getattr(scene, "positions", {}) or {}).get(pc.ref)
+    if grid is None or here is None:
+        return
+    others = [tuple(p)[:2] for r, p in (scene.positions or {}).items()
+              if r != pc.ref and r in (getattr(scene, "actors", {}) or {})
+              and not scene.actors[r].is_down]
+    if not others:
+        return
+    x, y = tuple(here)[:2]
+    near = min(others, key=lambda p: max(abs(p[0] - x), abs(p[1] - y)))
+    taken = {tuple(p)[:2] for r, p in scene.positions.items() if r != pc.ref}
+
+    def apart(p):
+        return max(abs(p[0] - near[0]), abs(p[1] - near[1]))
+
+    steps = [(x + dx, y + dy) for dx in (-1, 0, 1) for dy in (-1, 0, 1)
+             if (dx or dy) and (x + dx, y + dy) not in taken
+             and grid.passable((x + dx, y + dy))]
+    steps = [p for p in steps if apart(p) > apart((x, y))]
+    if not steps:
+        return
+    to = min(steps, key=lambda p: (-apart(p), abs(p[0] - x) + abs(p[1] - y), p))
+    row.intents.append({"op": "move", "actor": pc.ref,
+                        "params": {"who": pc.ref, "square": list(to)},
+                        "because": "the player takes a step back"})
+    row.note = "a step back: one square"
+
+
 def _nowhere(row: Row, a: dict, scene, places) -> None:
     """A walk to a place the engine cannot find, with nothing built for it, records the
     printable answer (`nowhere_to_go` prints it when the plan moves nobody either).
@@ -2018,6 +2061,58 @@ def _request(row: Row, a: dict, scene, pc) -> None:
     row.note = f"a request of {name}: {kind}"
 
 
+def _threaten(row: Row, a: dict, scene, pc, frame=None, i: int = 0) -> None:
+    """A threat, built whole: the player's Intimidate check at the person threatened,
+    carrying what is demanded (`interpret.DEMANDS`). The engine makes it Influence Attitude
+    out of a fight and Demoralize in one (CRB p.99, `Engine._cowed`, `Engine._demoralize`),
+    the DC its own (10 + Hit Dice + Wisdom), and what the demand does is the engine's.
+
+    Playtest 2026-11-15: "yield the Red Gull to me or die" (#97) and "tell the crew the Red
+    Gull is mine now" (#94) were each a `say` and nothing more. Who is threatened is the
+    engine's finder on the words; a crowd ("the crew") or no words at all is the one the
+    player is dealing with, else — in a fight — the nearest foe, else — aboard a ship —
+    her master (`Engine._crew_master`). Nobody here to threaten is said, never invented."""
+    from . import interpret, judgement
+
+    words = " ".join(str(a.get("target") or "").split())
+    actors = getattr(scene, "actors", {}) or {}
+    who = person(scene, words) if words else ""
+    if not who:
+        who = addressed(scene) if not words or words.lower() in _PRONOUNS else ""
+    if not who and getattr(scene, "in_encounter", False):
+        who = nearest(scene, [x.ref for x in _standing_here(scene)
+                              if judgement._can_be_fought(x)])
+    if not who and words:
+        crew = _crew_here(scene)
+        who = crew.ref if crew is not None else ""
+    actor = actors.get(who) if who else None
+    if actor is None and (not words or words.lower() in _PRONOUNS) and any(
+            interpret.acting(b) and b.get("act") in _FINDS_SOMEBODY_FIRST
+            for b in ((frame or {}).get("actions") or [])[:i]):
+        # "pick out a merchant ..., and demand his purse": the threat is at the one the
+        # plan finds, as a blow there is (`DEFERRED`, `judgement.inject_fight`). Live replay
+        # of playtest #18/#21, 2026-11-15: "there is nobody here who is him" was printed.
+        row.note = DEFERRED
+        return
+    if actor is None or actor.is_pc:
+        row.missing = (f"there is nobody here who is {words}" if words
+                       else "there is nobody here to threaten")
+        return
+    demand = str(a.get("demand") or "obey")
+    row.intents.append({"op": "check", "actor": pc.ref, "target": who,
+                        "params": {"skill": "intimidate", "demand": demand},
+                        "because": f"the player threatens {actor.name}"})
+    row.note = f"a threat at {actor.name}: {demand}"
+
+
+def _crew_here(scene):
+    """The master of the ship the player stands on, when there is one: who answers when
+    the words address her people ("I tell the crew the ship is mine")."""
+    from rules import ships
+
+    return ships.master_of(ships.crew_of(scene, ships.aboard(scene)))
+
+
 def _carry(row: Row, frame, i, scene, pc, recent=()) -> None:
     """What a walk carries along is picked up first when the player is not holding it:
     "I take the crate to the man in the counting house" carries the docks man's crate
@@ -2202,6 +2297,10 @@ def first_aid(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list[s
 
 # The acts whose deed is a blow at somebody (`interpret.ACTS`).
 VIOLENT_ACTS = frozenset({"attack"})
+# The reader's closed `blow` (`interpret.BLOWS`) that is a combat manoeuvre, and which
+# (CRB pp.198-201; the engine's MANEUVERS keys). Playtest 2026-11-15 #18, #52.
+MANOEUVRE_OF_BLOW = {"shove": "bull rush", "grab": "grapple", "trip": "trip",
+                     "disarm": "disarm"}
 # Acts that, done before a blow in the same sentence, put somebody in front of the player
 # whom the engine cannot see yet: a walk into another room, the person sought or followed.
 # "I walk into the tavern and punch the first man I see" is about people in the tavern,
@@ -2213,6 +2312,9 @@ _FINDS_SOMEBODY_FIRST = frozenset({"go", "journey", "leave", "call_on", "break_i
 _ZONE_FEET = {"engaged": 5, "near": 15, "far": 40}
 
 NOBODY_TO_ATTACK = "there is nobody here to attack"
+# The note on a blow left for after a walk or a seek finds somebody (`victims`); the fight
+# injector aims it at the one the plan found (`judgement.inject_fight`).
+DEFERRED = "the blow comes after somebody is found or a place is reached"
 
 
 def _standing_here(scene) -> list:
@@ -2331,9 +2433,15 @@ def victims(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list[str
         a = actions[row.index] if row.index < len(actions) else {}
         if row.act not in VIOLENT_ACTS or row.intents or not interpret.acting(a):
             continue
-        if any(interpret.acting(b) and b.get("act") in _FINDS_SOMEBODY_FIRST
-               for b in actions[:row.index]):
-            row.note = "the blow comes after somebody is found or a place is reached"
+        named_here = fighting and bool(person(scene, a.get("target"))) \
+            and str(a.get("target") or "").lower() not in _PRONOUNS
+        if not named_here and any(interpret.acting(b) and b.get("act") in _FINDS_SOMEBODY_FIRST
+                                  for b in actions[:row.index]):
+            # In a fight nobody new is found: a blow at somebody named and standing here
+            # is at them, whatever walk the line began with. Playtest 2026-11-15 #93:
+            # "I leave the penguin, draw my dagger, put it to the captain's throat" was
+            # read `leave` first, and the blow at the captain was dropped.
+            row.note = DEFERRED
             continue
         here = _standing_here(scene)
         words = " ".join(str(a.get("target") or "").split())
@@ -2420,9 +2528,12 @@ def victims(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list[str
                 "a coup de grâce" if coup else "a blow at helpless AC")
             notes.append(row.note)
             continue
+        man = MANOEUVRE_OF_BLOW.get(str(a.get("blow") or ""))
         row.intents.append({"op": "attack", "actor": pc.ref, "target": victim.ref,
-                            "because": f"the player attacks {victim.name}"})
-        row.note = f"the blow lands on {victim.name} ({victim.ref}): {how}"
+                            "because": f"the player attacks {victim.name}",
+                            **({"params": {"manoeuvre": man}} if man else {})})
+        row.note = f"the blow lands on {victim.name} ({victim.ref}): {how}" + (
+            f", a {man}" if man else "")
         notes.append(row.note)
     return notes
 

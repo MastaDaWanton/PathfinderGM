@@ -486,6 +486,13 @@ TAGS: dict[str, tuple[str, ...]] = {
     # making, so it lives outside BLOCKS and the gate that reads it says why in words.
     # No `recovery.*`: a night's sleep does not move a creature off its ground.
     "holding ground": ("state.holding-ground",),
+    # A creature that has given up the fight to the party (`rules/morale.py`, playtest
+    # 2026-11-15 #97): out of the order and off every side, standing where it was, until
+    # dismissed. Like holding ground it is a choice, not an incapacity, so not under
+    # `state.unable`. And the mark a morale check leaves, so it is made once (5e's "for
+    # the first time"); not a state, nothing reads it but the check.
+    "yielded":       ("state.yielded",),
+    "morale tested": ("morale.tested",),
     # 1e's attitude track, in the book's own order. `rules/effectspec.py` has offered
     # an `attitude` effect type since the spell import — thirty-three spells set one,
     # charm person among them — and it shipped `engine=False` with the note "no check

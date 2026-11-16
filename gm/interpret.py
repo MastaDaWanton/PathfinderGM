@@ -42,7 +42,7 @@ ACTS = (
     "sell", "give", "take", "drop", "steal", "attack", "cast", "use", "consume", "wait",
     "rest", "rise", "call_on", "break_in", "stealth", "athletics", "exert", "gather",
     "follow", "request", "claim", "craft", "commission", "escape", "loot", "harvest", "prone",
-    "disguise", "other",
+    "disguise", "threaten", "other",
 )
 # `prone` since 2026-11-15, from the playtest that day (#62, #64): "I drop to my knees, put
 # my hands behind my head" was read `go`, the engine told "Vesna Kroll moves from near to
@@ -61,6 +61,17 @@ ACTS = (
 # check's result IS the disguise, opposed by each viewer's Perception), and it lasts, so
 # it owes the engine's `disguise` op, built whole (`acts_to_ops._disguise`); the object is
 # who or what the character means to pass for.
+# `threaten` since 2026-11-15, from the playtest of that day (a human outlaw taking a
+# ship): "yield the Red Gull to me or die" to a captain at 1 of 11 came back `talk`, a
+# `say`, and nothing was rolled (#97); "put it to the captain's throat" came back
+# `attack` and was dropped (#93); "Intimidate 23 vs 10 to rob him" made the merchant warm
+# and handed nothing over (#21). Making somebody do something by fear is Intimidate (CRB
+# p.99): Influence Attitude out of a fight, Demoralize in one. `threaten` owes that check,
+# built whole (`acts_to_ops._threaten`). What is demanded is a closed choice (`DEMANDS`,
+# `rules/morale.DEMANDS` is the engine's copy), never read out of the words in code:
+# yield (give up the fight, surrender, give up the ship), hand_over (a purse, the goods,
+# the keys), back_off (stand aside, leave), obey (anything else).
+DEMANDS = ("yield", "hand_over", "back_off", "obey")
 # `commission` since 2026-11-01. Owner report that day (Corvin, turns 21-29): "can you put
 # them together and i will give you 10 gold peices" to the smith, about a forged blank for a
 # trident — read as a question with no action, then a `give` of "the money" with no
@@ -87,7 +98,12 @@ ESCAPE_WAYS = ("either", "force", "slip")
 # AC, whatever the words, because nothing told the two apart but a regex in the free
 # narrator's door (`judgement.is_finishing_blow`). The reader reads the words; whether the
 # one struck IS helpless is the engine's state, never the reader's (`acts_to_ops.victims`).
-BLOWS = ("ordinary", "finishing")
+BLOWS = ("ordinary", "finishing", "shove", "grab", "trip", "disarm")
+# `shove`, `grab`, `trip` and `disarm` since 2026-11-15 (playtest #18, #52): "shove him
+# against the wall" was read `attack` and no rule was applied, and "shove him out of my
+# way" a plain Strength check against nobody. A shove is a bull rush, a grab a grapple, a
+# trip and a disarm themselves (CRB pp.198-201): combat manoeuvres against the target's
+# CMD, the engine's `attack` with its `manoeuvre` (`acts_to_ops.MANOEUVRE_OF_BLOW`).
 # `loot` and `harvest` since 2026-11-01, both from the owner's 0.2.25 report (Corvin's game):
 #
 # * "loot the body" was read `take, object: the body`, a take of a THING, and the give
@@ -271,6 +287,7 @@ ACT_COSTS: dict[str, str] = {
     "gather": "takes_time", "craft": "takes_time", "harvest": "takes_time",
     "loot": "takes_time", "wait": "takes_time", "rest": "takes_time",
     "talk": "addresses", "insult": "addresses", "request": "addresses", "buy": "addresses",
+    "threaten": "addresses",
     "sell": "addresses", "commission": "addresses", "call_on": "addresses",
     "attack": "addresses",
 }
@@ -281,7 +298,7 @@ ACT_COSTS: dict[str, str] = {
 INSTANT_ACTS = frozenset({"take", "give", "drop", "consume", "use", "steal"})
 TIMED_ACTS = frozenset({"craft", "rest", "journey"})
 # Words said to nobody who could answer are free, not a deed ("I mutter a curse").
-_SPOKEN_ACTS = frozenset({"talk", "insult"})
+_SPOKEN_ACTS = frozenset({"talk", "insult", "threaten"})
 
 
 def cost_of(action: dict, scene=None) -> str:
@@ -429,6 +446,9 @@ ACT_SLOTS: dict[str, tuple[str, ...]] = {
     "track": ("target", "object", "place"), "rise": (),
     "seek": ("target", "place", "object"), "talk": ("target", "says"),
     "insult": ("target", "says"),
+    # Who is threatened and the words of it; what is demanded is the closed `demand`
+    # (`DEMANDS`), written after them (`per_act_schema`).
+    "threaten": ("target", "says"),
     # Who is asked, and the words for what is asked of them; `asks_for` (`REQUESTS`) is
     # the closed choice the engine reads, written after them (`per_act_schema`).
     "request": ("target", "object"),
@@ -476,7 +496,7 @@ go        walk somewhere within reach (a place in town, the crossroads, the fiel
           barrel…; gallery for a wall-walk, landing, loft or balcony above the floor;
           floor for back down to the ground), or none
 journey   take the road or a ship to another town; book or take passage, board a ship
-          bound somewhere, set sail, sail on
+          bound somewhere, set sail, sail on, or order a ship's crew to sail somewhere
 leave     walk out of where you are — a building, or the settlement itself — with
           nowhere else named
 look      look, watch, listen, read, examine
@@ -503,10 +523,17 @@ loot      loot, strip, search or go through the body or belongings of somebody o
           creature that is down or dead; the target is whose body
 harvest   skin, butcher, gut, or cut a hide, horns, teeth, venom or other parts off a dead
           creature; the target is the creature, the object the part
-attack    hit, punch, stab, shoot, assault, pick a fight with, run amok, finish somebody.
-          `blow` is finishing when the words kill somebody who is down, dying, bound or
-          helpless — finish off, slit a throat, put out of its misery, the killing stroke
-          — else ordinary
+attack    hit, punch, stab, shoot, assault, pick a fight with, run amok, finish somebody;
+          shove, push, grab, seize, trip or disarm a person. `blow` is finishing when the
+          words kill somebody who is down, dying, bound or helpless — finish off, slit a
+          throat, put out of its misery, the killing stroke; shove for shoving or pushing
+          a person (against a wall, out of the way, over); grab for seizing or holding a
+          person; trip for tripping them; disarm for knocking a weapon from their hand;
+          else ordinary
+threaten  threaten somebody to make them do something: "your purse or your life", "yield
+          or die", a blade held to a throat, menacing or scaring somebody into it.
+          `demand` is yield (give up the fight, surrender, give up a ship), hand_over
+          (a purse, goods, keys), back_off (stand aside, leave) or obey (anything else)
 cast      cast a named spell
 use       draw a weapon, put on or change into clothes, armour or jewellery, show,
           use, bandage, light
@@ -526,7 +553,8 @@ stealth   sneak, hide, slip past. `pace` is careful, or hurried when the words h
           first distract the onlookers by a trick, a shout or a lie, else none
 athletics climb, swim, jump
 exert     lift, push, pull, heave, drag, hold up or shift something heavy by main
-          strength, alone or with somebody; the target is whoever you help with it
+          strength, alone or with somebody; the target is whoever you help with it.
+          Never a person pushed or shoved: that is attack
 gather   forage, gather, fill waterskins
 follow    follow somebody or a trail; go along with, come quietly with or give yourself
           up to whoever is taking you somewhere (going quietly is never stealth)
@@ -1069,6 +1097,30 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "swing my axe to kill the charging boar", "target": "the charging boar",
           "object": "my axe", "blow": "ordinary", "act": "attack"}]}),
+    # Ordering a ship's people to sail is the voyage, not talk (2026-11-15, the live check
+    # after a ship was taken: "I tell the crew to put about and sail the Red Gull to
+    # Elyrielle" was read `talk`). Not a playtest line.
+    ("I order the hands to make sail for Port Vane.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "order the hands to make sail for Port Vane", "place": "Port Vane",
+          "act": "journey"}]}),
+    # A threat (2026-11-15, `threaten`) and a shove (`blow`): none is a playtest line.
+    ("I grab the clerk by the collar and tell him to hand over the strongbox key or bleed.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "grab the clerk by the collar", "target": "the clerk", "blow": "grab",
+          "cost": "quick", "act": "attack"},
+         {"span": "tell him to hand over the strongbox key or bleed", "target": "him",
+          "says": "hand over the strongbox key or bleed", "demand": "hand_over",
+          "act": "threaten"}]}),
+    ("I level my spear at the wounded bandit and tell him to throw down his sword.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "level my spear at the wounded bandit and tell him to throw down his "
+                  "sword", "target": "the wounded bandit",
+          "says": "throw down his sword", "demand": "yield", "act": "threaten"}]}),
+    ("I shove the drunk out of the doorway.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "shove the drunk out of the doorway", "target": "the drunk",
+          "place": "the doorway", "blow": "shove", "cost": "quick", "act": "attack"}]}),
     ("I strip the drowned sailor's corpse.",
      {"question": False, "claims": [], "actions": [
          {"span": "strip the drowned sailor's corpse",
@@ -1233,6 +1285,9 @@ def per_act_schema() -> dict:
                  # Whether a blow is the killing stroke (`BLOWS`), after the words.
                  **({"blow": {"type": "string", "enum": list(BLOWS)}}
                     if act == "attack" else {}),
+                 # What a threat demands (`DEMANDS`), after the words, as `blow`.
+                 **({"demand": {"type": "string", "enum": list(DEMANDS)}}
+                    if act == "threaten" else {}),
                  # Whether a walk stays inside the place (`within_place`), after the
                  # place's own words, as `until` follows the time's: a closed answer the
                  # walk-to-nowhere refusal reads (`acts_to_ops._nowhere`), never English.
@@ -1294,6 +1349,8 @@ def _demo_reply(frame: dict) -> str:
                         if a["act"] == "escape" else {}),
                      **({"blow": a.get("blow") or BLOWS[0]}
                         if a["act"] == "attack" else {}),
+                     **({"demand": a.get("demand") or DEMANDS[-1]}
+                        if a["act"] == "threaten" else {}),
                      **({"within_place": bool(a.get("within_place")),
                          "fixture": a.get("fixture") or "none"}
                         if a["act"] == "go" else {}), **cost, **means})
@@ -1435,6 +1492,10 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
             blow = str(a.get("blow") or "").strip().lower()
             if blow in BLOWS and blow != BLOWS[0]:
                 kept["blow"] = blow
+        if kept["act"] == "threaten":
+            # The demand is the enum's, or obey: a threat outside it still frightens.
+            demand = str(a.get("demand") or "").strip().lower()
+            kept["demand"] = demand if demand in DEMANDS else DEMANDS[-1]
         if kept["act"] == "go" and a.get("within_place") is True:
             # A walk inside the place (`within_place`): kept only when it says so, as
             # `blow` is. Only the boolean itself: a hosted provider's "yes" is not it.
@@ -2685,7 +2746,7 @@ def _going(frame, scene, places, location) -> str:
 _OP_NEEDS = {
     "travel": {"go", "leave", "journey", "search", "seek", "call_on"},
     "journey": {"journey"}, "introduce": {"seek", "talk", "call_on", "request"},
-    "say": {"talk", "insult", "request"}, "provoke": {"insult"},
+    "say": {"talk", "insult", "request", "threaten"}, "provoke": {"insult"},
     "give": {"give", "take", "drop"},
     "sell": {"sell"},
     "rest": {"rest"}, "advance_time": {"wait", "rest"}, "call_on": {"call_on"},
@@ -2700,7 +2761,7 @@ _OP_NEEDS = {
                 "follow"},
     "check": {"stealth", "steal", "take", "break_in", "use", "athletics", "exert", "go",
               "escape", "talk", "request", "insult", "claim", "search", "look", "track",
-              "follow", "disguise", "other"},
+              "follow", "disguise", "threaten", "other"},
 }
 
 # The declarers that read a CLOSED vocabulary, not English: an ability's name against
@@ -2716,7 +2777,7 @@ UNJUDGED = frozenset({"use_ability"})
 # lock" still matched inside the boast, and `talk` backed the check (the row is wide so a
 # persuasion stands) — a Disable Device rolled for a sentence that did nothing. The
 # audit's limit on #7, "a talk-backed check can still fire from 'I'll never pick the lock'".
-SPEECH_ACTS = frozenset({"talk", "request", "insult"})
+SPEECH_ACTS = frozenset({"talk", "request", "insult", "threaten"})
 SPOKEN_SKILLS = frozenset({"bluff", "diplomacy", "intimidate", "sense motive"})
 
 
@@ -2811,7 +2872,7 @@ def drop_unread_gifts(raw, frame: dict | None) -> tuple[list, list]:
     return kept, dropped
 
 
-_SPEECH_ACTS = frozenset({"talk", "insult", "request"})
+_SPEECH_ACTS = frozenset({"talk", "insult", "request", "threaten"})
 
 
 def words_said(frame: dict | None, sentence: str) -> str:

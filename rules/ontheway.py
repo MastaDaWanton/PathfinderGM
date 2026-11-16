@@ -395,11 +395,39 @@ def open_water(row: dict) -> bool:
     return bool(_SALT.search(env)) and not _FRESH_ONLY.search(env)
 
 
+# Sizes a creature may be and still come at a Medium traveller on its own deck: the same
+# size or bigger. Playtest 2026-11-15 #89: a Small penguin (bite 1d3-1, CR 1/3) came up
+# at the rail and bit at a human aboard a sailing ship. A swarm is many and keeps its bite.
+# shortcut: Medium is assumed for the party; a Small party would want its own size here.
+_COMES_AT_YOU = ("medium", "large", "huge", "gargantuan", "colossal")
+
+
+def comes_at_you(row: dict) -> bool:
+    """Whether a creature met on the water comes at the party (the road's aggressive
+    types, `AGGRESSIVE`), or only surfaces and looks. A beast smaller than the people it
+    meets does not pick a fight with them: the app's temperament rule, read off the stat
+    block's own size and subtype, never its name."""
+    if row.get("creature_type") not in AGGRESSIVE:
+        return False
+    return (str(row.get("size") or "medium").lower() in _COMES_AT_YOU
+            or "swarm" in str(row.get("subtype") or "").lower())
+
+
+def in_climate(row: dict, climates) -> bool:
+    """Whether a creature lives in waters of this climate: its stat block's `climates`
+    (parsed from its Environment line, `biomes.parse_environment`) meet the waters', or
+    either is unrestricted (empty). #89: a penguin ("cold oceans") was met on a crossing."""
+    own = set(row.get("climates") or ())
+    return not own or not climates or bool(own & set(climates))
+
+
 def sea(dice, level: int = 1, *, apl: int | None = None,
-        danger: float = 1.0) -> Meeting | None:
+        danger: float = 1.0, climates=()) -> Meeting | None:
     """One day on open water: None most days, else who or what is out there.
 
-    `danger` is the waters' (`volatility.factor` of the worse port, as the storm's is)."""
+    `danger` is the waters' (`volatility.factor` of the worse port, as the storm's is);
+    `climates` the waters' (`Engine._waters_climates`), empty when the world said nothing
+    one climate could be read from."""
     table, top = _weighed(SEA, danger, SEA_DANGER)
     if dice.roll("1d100", label="the sea", visibility="hidden").total \
             > SEA_PERCENT * top / 100:
@@ -408,12 +436,13 @@ def sea(dice, level: int = 1, *, apl: int | None = None,
     kind = _weighed_band(table, top, r)
     level = max(1, int(level or 1))
     if kind == "creature":
-        got = _the_land(dice, "water", level, apl, keep=open_water)
+        got = _the_land(dice, "water", level, apl,
+                        keep=lambda x: open_water(x) and in_climate(x, climates))
         if got is not None:
             row = got.row
             return Meeting(kind="creature", roll=r, creature=row,
                            template=str(row.get("id") or ""), count=got.count,
-                           aggressive=row.get("creature_type") in AGGRESSIVE)
+                           aggressive=comes_at_you(row))
         kind = "merchant"           # a sea the book stocks nothing for still has ships
     if kind == "pirates":
         got = npcs.choose(["pirate", "sailor"], level) or {}

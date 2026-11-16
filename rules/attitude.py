@@ -37,12 +37,11 @@ lie the engine already rolls: `Engine._lie_lands`, with the direction read from
 content/rules/claims.json and the size from `steps_for` below. Said here so the old
 paragraph is not read as still true.
 
-**The simplification, named.** After an intimidated creature's friendliness lapses, the
-book has them treat you as unfriendly and possibly report you. That is not implemented:
-there is no "when this effect ends" trigger in the engine — wards fire each round or when
-struck — and inventing a third trigger for one rule is how a mechanism ossifies around a
-special case. The friendliness runs out and they are whatever they were. docs/attitude.md
-carries this as an open gap rather than a quiet one.
+**The aftermath, without a trigger** (2026-11-15, `Engine._cowed`). After an intimidated
+creature's friendliness lapses the book has them treat you as unfriendly. There is still no
+"when this effect ends" trigger in the engine, and none was added: the standing regard is
+put into unfriendly when the threat lands, so the lapse falls back to it. Reporting you is
+still not built; docs/attitude.md carries that as an open gap rather than a quiet one.
 """
 from __future__ import annotations
 
@@ -639,7 +638,10 @@ def harmed(engine, victim, by, source: str, *, seen: bool | None = None,
     # that threatens the charmed person breaks the spell"): the charm's friendly step goes,
     # through the applicator, and the harm then meets the victim's own standing — not the
     # friendship the spell lent. A gated harm (another charm, a sleep) is not that act.
-    charm = [] if gated else [e for e in victim.effects if (e.payload or {}).get("charm")]
+    # So does the friendliness a threat forced (`Engine._cowed`): playtest 2026-11-15 #26,
+    # a merchant cowed by Intimidate still read "Friendly" while she fought him.
+    charm = [] if gated else [e for e in victim.effects
+                              if (e.payload or {}).get("charm") or (e.payload or {}).get("cowed")]
     if charm:
         victim.remove_effects(match=lambda e: any(e is c for c in charm))
     was = of(victim)
