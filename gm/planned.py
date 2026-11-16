@@ -495,16 +495,23 @@ _LEFT = {
     # Never "slowing": slowed is a condition (CRB p.567) the engine did not apply, and the
     # 2026-11-05 rerun's wolf bite came back "leaving you reeling and slowed".
     "bloodied": ("bloodied", "blood running from it", "badly marked"),
-    "badly hurt": ("badly hurt, barely holding on", "staggering under it",
+    # No wording names a condition the band is not (2026-11-15 playtest #63: "you
+    # stumble, left unsteady on your feet" after a plain hit). Staggered and shaken are
+    # conditions (CRB pp.567-568); only the "staggering" band is the book's staggered
+    # (non-lethal equal to hit points, CRB p.191), so only it may say so.
+    "badly hurt": ("badly hurt, barely holding on", "hurt badly, the wound telling",
                    "close to falling"),
-    "shaken": ("shaken by it", "rattled", "blinking it away"),
-    "reeling": ("reeling", "unsteady on their feet", "swaying, close to dropping"),
+    "shaken": ("hurting from it", "rattled", "blinking it away"),
+    "reeling": ("reeling", "the beating telling on them", "close to dropping"),
     "staggering": ("staggering, all but out", "barely upright", "one more and they drop"),
     "down": ("down",),
     "dead": ("dead",),
 }
 _MISS = {
-    "wild": ("badly wide, a clumsy miss", "nowhere near, thrown off balance",
+    # A natural 1 is a miss and nothing more (CRB p.178): "thrown off balance" was a
+    # condition the engine never applied, and it reached the page as "You are thrown off
+    # balance" on the swinger's miss (playtest 2026-11-15 #63).
+    "wild": ("badly wide, a clumsy miss", "nowhere near the mark",
              "a wild swing that finds only air"),
     "cover": ("the cover between them takes it", "it strikes the cover instead",
               "it is turned by what stands between them"),
@@ -553,6 +560,15 @@ def blow_facts(outcomes, engine, said=None) -> list[str]:
             return ""
         return "you" if who.is_pc else narration_mod.definite(str(who.name))
 
+    from rules.engine import spoken_weapon
+
+    def weapon(b) -> str:
+        # Said as a sentence says it ("masterwork", never the block's "mwk"), and a made
+        # weapon kept in the hand said to be so: "weapon: dagger" alone came back "the
+        # captain's dagger flies through the air" for a stab (playtest 2026-11-15 #95).
+        name = spoken_weapon(b.get("weapon"))
+        return f"{name}, in hand" if name and b.get("in_hand") else name
+
     for o in outcomes or []:
         attacker = called(getattr(o, "actor", "") or "")
         for b in getattr(o, "blows", None) or []:
@@ -565,7 +581,7 @@ def blow_facts(outcomes, engine, said=None) -> list[str]:
             if b.get("result") == "hit":
                 name = target or "you"
                 severity = str(b.get("severity") or "solid")
-                bits = [f"weapon: {b.get('weapon') or 'a blow'}"
+                bits = [f"weapon: {weapon(b) or 'a blow'}"
                         + (f" ({b['type']})" if b.get("type") else ""),
                         _pick(said, f"blow:{severity}",
                               _SEVERITY.get(severity, _SEVERITY["solid"]))]
@@ -591,7 +607,7 @@ def blow_facts(outcomes, engine, said=None) -> list[str]:
                 # took the wind-up's invented crossbow and wrote "the heavy bolt whistles
                 # past" for a swung sap (the 2026-10-16 planned fight bench).
                 out.append("MISS — " + head
-                           + (f"weapon: {b['weapon']}; " if b.get("weapon") else "")
+                           + (f"weapon: {weapon(b)}; " if b.get("weapon") else "")
                            + _pick(said, f"blow:miss:{how}", _MISS.get(how, _MISS["plain"])))
     return out
 
@@ -2085,8 +2101,11 @@ def _tells_kept(out: Planned, who, faith, tells, lift=None, refused=(),
                 # choice is the table's, not the story's, and the un-namer took "(Escape
                 # Artist)" for a person — "slip it (the stranger)" on 2 of 6 gallows runs
                 # of the first-read-alone bench (2026-11-03).
-                s["wrote"] = engine_line(s.get("tells") or [c.tell for c in clashes])
-                how = "the engine's own line put in its place"
+                line = engine_line(s.get("tells") or [c.tell for c in clashes])
+                retold = _retold(s, line, who, lift, faith, tells, out)
+                s["wrote"] = retold or line
+                how = ("the engine's line retold in its place" if retold
+                       else "the engine's own line put in its place")
             else:
                 s.update(wrote="", dropped=True)
                 how = "dropped"
@@ -2094,6 +2113,45 @@ def _tells_kept(out: Planned, who, faith, tells, lift=None, refused=(),
             out.notes.append(f'the tells check: the "{s["key"]}" slot broke a tell twice '
                              f'({clashes[0].words[:60]!r}) — {how}')
         out.remade.append(record)
+
+
+RETELL_ASK = ("Write this as one or two sentences of story prose, second person for the "
+              "player's character, present tense. Tell exactly this and nothing more, in "
+              "the words of a story, not of the rules: no check, roll, rank or skill "
+              "named.\n\n{line}")
+
+
+def _retold(s: dict, line: str, who, lift, faith, tells, out: Planned) -> str:
+    """The engine's line, asked for once more as prose — the narrow request, with the
+    player's own words and the beat around it left out — and kept only when it is whole
+    and the tells check finds nothing in it; else "" and the engine's line stands.
+
+    Playtest 2026-11-15 #16: a slot broke a tell twice ("you grab the hooded lantern"
+    beside "there is no lantern to take"), and its stand-in put the engine's own sentences
+    on the page: "You cannot attempt sleight of hand untrained. Nothing is rolled." and, on
+    the replay, "You make the stealth check. You are hidden, moving at half speed, until
+    they attack or somebody finds them." Both remakes had failed on the player's line,
+    which this ask does not carry."""
+    if not line or not (s.get("messages") or []):
+        return ""
+    msgs = [dict(s["messages"][0]),
+            {"role": "user", "content": RETELL_ASK.format(line=line)}]
+    started = time.monotonic()
+    try:
+        reply, data = call_slot(s, msgs, who)
+        text = realise(s, data, lift)
+    except Exception as exc:  # noqa: BLE001 — unretold: the engine's line stands
+        if isinstance(exc, client.ModelStalled):
+            raise
+        return ""
+    out.calls.append({"key": s["key"], "messages": msgs, "raw": reply.text,
+                      "seconds": round(time.monotonic() - started, 1),
+                      "model": reply.model or who[0], "note": "tells: the engine's line retold"})
+    if not text or page_fault(text) or text.count("(") != text.count(")"):
+        return ""
+    read = faith(text, tells)
+    out.faith.append({"pass": f"retold {s['key']}", **read.as_log()})
+    return "" if read.error or read.clashes else text
 
 
 def engine_line(tells) -> str:

@@ -2275,6 +2275,14 @@ class GMAgent:
         if tagged:
             notes.append(f"the brief's refs on the page: stripped {tagged}")
         text = narration_mod.destutter(text)
+        undoubled = narration_mod.undouble(text)
+        if undoubled != text:
+            notes.append("a doubled word said once")
+            text = undoubled
+        opened = narration_mod.mend_orphan_close(text)
+        if opened != text:
+            notes.append("a line with no opening mark given one")
+            text = opened
         text, gone = narration_mod.trim_unfinished(text)
         if gone:
             notes.append(f"cut off mid-sentence: trimmed {gone[:60]!r}")

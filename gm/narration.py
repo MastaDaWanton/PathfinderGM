@@ -579,6 +579,67 @@ def destutter(text: str) -> str:
     return _STUTTER.sub(_fix, text or "")
 
 
+# One word said twice across "and"/"or"/a comma: "a clumsy and clumsy strike" (playtest
+# 2026-11-15 #35). A prose-quality pattern, the kind mechanical detection is for; the
+# repair keeps the word once. The idioms that double on purpose are spared: "again and
+# again", "on and on", "round and round", and any comparative ("closer and closer").
+_DOUBLED = re.compile(r"\b([A-Za-z]+)(?: and | or |, )\1\b", re.I)
+_DOUBLES_ON_PURPOSE = frozenset({
+    "again", "more", "over", "round", "around", "on", "through", "out", "back", "up",
+    "down", "ever", "less", "little", "by", "in", "off", "far", "so", "now", "then",
+    "time", "step", "bit", "side", "inch", "drop", "here", "there", "no", "yes", "very",
+    "slowly", "long", "many", "years", "days", "hours"})
+
+
+def undouble(text: str) -> str:
+    """The doubled word said once, outside speech (a speaker may stammer)."""
+    text = text or ""
+    quoted = speech.spans(text)
+
+    def _fix(m: re.Match) -> str:
+        word = m.group(1).lower()
+        if (word in _DOUBLES_ON_PURPOSE or word.endswith("er")
+                or any(a <= m.start() < b for a, b in quoted)):
+            return m.group(0)
+        return m.group(1)
+
+    return _DOUBLED.sub(_fix, text)
+
+
+def mend_orphan_close(text: str) -> str:
+    """A line's closing single quote with no opening mark, given one at the start of its
+    sentence. Playtest 2026-11-15 #71: "…Then the silence is your only defense. If you
+    cannot find the words…,' the sergeant of the watch says" — the opening mark gone with a
+    sentence before it. An orphan is read off the marks alone (`speech.spans`): a single
+    close after a line's own punctuation, inside no quotation; an apostrophe ("guards'")
+    follows a letter, so it is never one.
+
+    shortcut: the line is opened at its own sentence, not wherever the lost opening was;
+    an earlier sentence of the same speech then reads as narration. Upgrade to a targeted
+    read of where the speech begins if that is measured to matter."""
+    text = text or ""
+    for _ in range(4):
+        quoted = speech.spans(text)
+        orphan = next((i for i, ch in enumerate(text)
+                       if ch in "'’" and i and text[i - 1] in ",.!?…"
+                       and (i + 1 == len(text) or text[i + 1].isspace())
+                       and not any(a <= i < b for a, b in quoted)), None)
+        if orphan is None:
+            return text
+        start = 0
+        for m in re.finditer(r"[.!?…]['’\"”]?\s+|\n\n", text[:orphan]):
+            start = m.end()
+        # The close after a full stop is the line's own end: its sentence is the one
+        # before that stop.
+        if text[orphan - 1] in ".!?…":
+            head = text[:orphan - 1]
+            start = max([0] + [m.end() for m in re.finditer(r"[.!?…]['’\"”]?\s+|\n\n",
+                                                            head)])
+        mark = "‘" if text[orphan] == "’" else "'"
+        text = text[:start] + mark + text[start:]
+    return text
+
+
 # --- the model looping -------------------------------------------------------------------
 
 
@@ -5702,8 +5763,14 @@ def a_face_for(name: str, appearance: str) -> str:
         # noun phrase a name fits in; "of the Korvu people" can only be a people. Not
         # the fix on its own — `judgement.apply_introductions` refuses a people's name
         # in code — but this backstop was the source the model copied.
-        return f"{name} is of the {people} people: {body}"
-    return f"{name}: {said}"
+        return f"{name} is of the {people} people: {body}" + (
+            "" if body.endswith((".", "!", "?")) else ".")
+    # The resident's own words, as something the player sees and as a whole sentence.
+    # Playtest 2026-11-15 #75: "Miorintha: Short stature, dark hair, Kelvaxian tattoos
+    # Each breath pulls at your wounds" — the label form read as a sheet pasted into the
+    # prose, with no full stop before the next sentence. The words stay the world's.
+    said = said[:1].lower() + said[1:] if said[1:2].islower() else said
+    return f"You see {name}: {said}" + ("" if said.endswith((".", "!", "?")) else ".")
 
 
 def _someone_elses(sentence: str, ref: str, attribution=None) -> bool:
