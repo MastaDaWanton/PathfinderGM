@@ -6520,6 +6520,46 @@ class Engine:
                        tell=f"{actor.name} breaks free of {holder.name}'s grapple ({said}); "
                             f"the grapple ends for both.", because=intent.because)
 
+    def _op_surrender(self, intent: Intent, partial: dict) -> Outcome:
+        """`surrender`: the player gives themselves up to the law — yields mid-fight,
+        hands themselves in, owns up to a crime (`trial.give_up`: the fight stops and
+        custody begins by the go-quietly door). With none of the watch here, in town,
+        the call goes out and they come on the clock (`trial.send_for`). Written only by
+        the act->op table from the reader's `surrender` act (CODE_ONLY_OPS); yielding to
+        anybody who is not the law is refused with what would answer it."""
+        from . import places as places_mod
+        from . import trial
+
+        pc = self.scene.pc()
+        if pc is None:
+            raise IntentError("surrender: there is no player here to give up", "refs")
+        if trial.custody(pc) is not None:
+            return self._refuse(intent, f"{pc.name} is in the watch's hands already.")
+        town = trial.town_here(self)
+        from . import arrest as arrest_mod
+
+        # The gate's watch stands there before anybody looks for the law (live
+        # 2026-11-15: the call "went out" at the gate, then its watch was posted).
+        posted = [] if self.scene.in_encounter else arrest_mod.post_the_gate(self)
+        law = trial._law_here(self)
+        if law:
+            # The one the words named first, if they are the law.
+            law.sort(key=lambda a: a.ref != intent.target)
+            out = trial.give_up(self, pc, law, town)
+        elif places_mod.terrain_of(self.scene.at or "") == places_mod.URBAN \
+                and not self.scene.in_encounter:
+            out = trial.send_for(self, pc, town)
+        else:
+            return self._refuse(
+                intent, f"There is nobody of the law here for {pc.name} to give "
+                        f"themselves up to. Yielding to anybody else is said to them.")
+        out.intent_id = intent.id
+        out.because = intent.because
+        if posted:
+            out.tell = f"{posted[0].tell} {out.tell}"
+            out.effects[:0] = posted[0].effects
+        return out
+
     def _op_escape(self, intent: Intent, partial: dict) -> Outcome:
         """`escape`: the held creature breaks the grapple holding it (`_escape_from`)."""
         actor = self.scene.actors.get(intent.actor or "") or self.scene.pc()

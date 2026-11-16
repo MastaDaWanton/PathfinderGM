@@ -60,6 +60,15 @@
   },
   "_deeds_note": "What a row of the deeds record (rules/deeds.py) is charged as. A row is evidence only when somebody saw it (its witnesses); the moral total is never read. `report: false` is a crime whose own door already tells the watch (a break-in, `Engine._witnessed_break_in`). `after` is the charge when the death came after the player's harm rather than by their own act (the row's `manner`): bled out, or fell to somebody else. The owner's rulings of 2026-11-01: a beaten foe killed after the fight (deed.kill.captive) is murder; 'letting someone bleedout or killing someone who attacked you durring combat are not murder and instead manslaughter or assault' - so an unprovoked victim who bleeds out is manslaughter, and an attacker killed in the fight, which the deeds record does not hold (fighting back is no deed), is charged by the watch's own eyes as `self_defence` (rules/trial.py `watch`). Careless or accidental harm short of a death stays uncharged (not answered).",
   "self_defence": {"charge": "manslaughter", "report": true},
+  "report": {
+    "minutes": 10,
+    "watch": 2,
+    "note": "A crime seen by somebody who is not the law is carried to the watch on the clock (rules/trial.py `deliver`): after `minutes` the report reaches them and is a warrant, and if the character is still where it happened the watch comes there, `watch` of them. A witness dead before then carries nothing (Skyrim: a crime is dropped when its last witness dies before the guards are told; Creation Kit wiki, Crime, as quoted by search results - the page itself refused a fetch). HOUSE: ten minutes is a walk to the nearest post and back; two is a patrol, not sourced. Before this a civilian witness made the character suspected and nothing ever came of it: an hour waited over a beaten merchant, and no watch (playtest 2026-11-15 #48)."
+  },
+  "gate_watch": {
+    "count": 2,
+    "note": "A town or a city's gate is watched (docs/wanted.md, Reader one): the first time the party stands at a place called the gate while suspected or wanted there (when the travel tell names its guards), `count` of the watch are posted there as people of the scene (`role.guard`), so a warrant can be enforced by somebody who can see it. Before this the gate's guards were a sentence of the travel tell and never actors, and a wanted woman could not be arrested at the gate (playtest 2026-11-15 #51; the seen-people ruling of 2026-10-01). HOUSE: two, the same patrol as `report.watch`."
+  },
   "proof": {
     "accused": {
       "said": "named in the warrant",

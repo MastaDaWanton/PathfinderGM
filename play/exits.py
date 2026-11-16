@@ -142,7 +142,14 @@ def exits(engine, world) -> list[dict]:
         return []
     here = engine.here()
     rows = ways_from(engine, world, (here.id,)).get(here.id, [])
-    return [{k: v for k, v in row.items() if k != "minutes"} for row in rows]
+    # Nobody walks anywhere unconscious: playtest 2026-11-15 #67, the row offered "the
+    # bathhouse · withdraw" to a character lying dying on the street. Shut, with the
+    # reason, as every way the rules refuse is shown (never hidden).
+    pc = scene.pc()
+    down = (f"{pc.name} cannot get up and go anywhere."
+            if pc is not None and not pc.can_act() else "")
+    return [{k: v for k, v in dict(row, **({"blocked": down} if down else {})).items()
+             if k != "minutes"} for row in rows]
 
 
 def ways_from(engine, world, place_ids) -> dict[str, list[dict]]:

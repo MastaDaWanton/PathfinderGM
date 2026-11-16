@@ -317,6 +317,9 @@ def elsewhere_by_name(scene, said: list[str], location_id: str | None, world) ->
 
 
 _INDEFINITE = frozenset({"a", "an", "some", "any", "another"})
+# The words for the town's own law in a phrase that looks for somebody (`look_for`).
+LAW_WORDS = frozenset({"watch", "guard", "guards", "guardsman", "guardsmen", "watchman",
+                       "watchmen", "constable", "constables"})
 
 
 def look_for(world, phrase: str, scene=None, location_id: str | None = None, *,
@@ -402,6 +405,14 @@ def look_for(world, phrase: str, scene=None, location_id: str | None = None, *,
     # says watchman, and answered that one was elsewhere.
     found = [e for e in getattr(world, "entities", {}).values()
              if getattr(e, "kind", "") == "CHARACTER" and matches(e, whom)]
+    if set(said) & LAW_WORDS:
+        # Every town keeps its own watch: "the city watch" called for here is this town's,
+        # never a captain of another city's watch the world happened to write up.
+        # Playtest 2026-11-15 #55: "I shout for the city watch" in Zhilvarnia was refused
+        # "Xandroslyn, Torvathys' City Watch, is in Torvathys, not here".
+        found = [e for e in found if getattr(e, "parent_id", "") == (location_id or "")]
+        if not found:
+            return {**out, "scope": "", "line": ""}
     if found:
         # A whole name said beats a word of one, as in the room (`in_the_room`); then the
         # one here in town, because "not in this room" is a shorter walk than "in another

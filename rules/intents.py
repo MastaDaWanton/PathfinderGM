@@ -428,6 +428,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # for who they pass for. Written only by the act->op table from the reader's
     # `disguise` act, and by the engine for a plan's Disguise check (CODE_ONLY_OPS).
     "disguise": ((), ("actor", "as"), "hidden"),
+    # Giving oneself up to the law (rules/trial.py `give_up`): yielding mid-fight, handing
+    # oneself in, owning up to a crime. Aimed by `target` at the one yielded to; the law
+    # present is the engine's. Written only by the act->op table (CODE_ONLY_OPS).
+    "surrender": ((), ("actor",), "player"),
     "temp_hp": (("amount",), ("to", "source", "duration"), "hidden"),
     # Poison, disease, a spell that withers: damage to a score rather than to hit points.
     # `drain` for the permanent kind, which no amount of resting brings back.
@@ -821,7 +825,7 @@ CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending", "request", "
 # `craft` itself, from code.
 # `harvest` since 2026-11-01: the reader's `harvest` act, built whole (`acts_to_ops._harvest`).
 CODE_ONLY_OPS = frozenset({"job", "make", "craft", "greet", "commission", "harvest",
-                           "disguise"})
+                           "disguise", "surrender"})
 # Ops only the author's own hand writes (`/cheat`, origin `author:`): left out of the
 # turn's op enum like the code-only ops, but offered to the cheat (`prompts.CHEAT_OPS`),
 # and refused by the engine from any other origin. `xp` since 2026-11-07 (audit #22): a

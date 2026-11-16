@@ -62,6 +62,8 @@ HOWS = ("meant", "careless", "accident")
 PAGE = 20
 # The words for "how" a harm or a death was done, in the tags: a meant harm of somebody
 # who was not hostile is unprovoked.
+# What a loot that listed nothing took (and every loot before 2026-11-15 said).
+EVERYTHING = "everything they carried"
 _TAG_HOW = {"meant": "unprovoked", "careless": "careless", "accident": "accident"}
 _GRAVITY = {"accident": 0, "careless": 1, "meant": 2}
 _PLACEHOLDER = re.compile(r"\{(\w*)\}")
@@ -283,7 +285,7 @@ def record(actor, tag: str, *, scene=None, minute: int | None = None,
            place: str | None = None, place_name: str | None = None,
            subject: str | None = None, subject_name: str = "", what: str = "",
            how: str = "meant", witnesses: list[str] | None = None,
-           unseen: bool = False, manner: str = "") -> dict:
+           unseen: bool = False, manner: str = "", items: list | None = None) -> dict:
     """Write one deed: the ONE writer of `Actor.deeds`. Returns the `deed` effect record
     the outcome of the act carries, for the history line and the turn log.
 
@@ -331,6 +333,9 @@ def record(actor, tag: str, *, scene=None, minute: int | None = None,
         # the row's either way; the watch reads it (rules/trial.py: the owner's ruling of
         # 2026-11-01, "letting someone bleed out ... not murder"). Absent on other deeds.
         **({"manner": manner} if manner else {}),
+        # What a theft took, one carried thing a line as the loot said it ("dagger",
+        # "5 sp"): what the watch prices the fine on and gives back (rules/trial.py).
+        **({"items": [str(i) for i in items]} if items else {}),
         "origin": f"rule:deeds/{tag}",
     }
     actor.deeds.append(row)
@@ -472,12 +477,13 @@ def _recorder(engine, pc, out: list):
         logging.getLogger(__name__).exception("the deed recorder could not name the place")
         here = ""
 
-    def rec(tag, subject, *, how="meant", what="", unseen=False, name=None, manner=""):
+    def rec(tag, subject, *, how="meant", what="", unseen=False, name=None, manner="",
+            items=None):
         a = (getattr(scene, "people", None) or {}).get(subject) if subject else None
         out.append(record(pc, tag, scene=scene, place_name=here, subject=subject,
                           subject_name=name if name is not None else
                           (getattr(a, "name", "") if a is not None else ""),
-                          what=what, how=how, unseen=unseen, manner=manner))
+                          what=what, how=how, unseen=unseen, manner=manner, items=items))
     return rec
 
 
@@ -545,17 +551,23 @@ def _acts(engine, pc, intent, outcome, before_: dict) -> list[dict]:
         # Theft: taken without consent from somebody who was not hostile. Not scaled by
         # value — a fork and a fortune are both a theft. Robbing a hostile in a fight, or
         # a corpse, is not theft here (plan §7.1).
-        victim, what = None, ""
+        victim, what, items = None, "", None
         if k == "give" and e.get("how") == "took_from" and e.get("to") == pc.ref:
             victim, what = str(e.get("from") or ""), _thing(e)
         elif k == "stolen" and e.get("ref") == pc.ref:
             victim, what = str(e.get("from") or ""), str(e.get("item") or "")
         elif k == "took" and outcome.op == "loot" and e.get("ref") == pc.ref:
-            victim, what = str(e.get("from") or ""), "everything they carried"
+            items = [str(i) for i in e.get("items") or ()]
+            victim, what = str(e.get("from") or ""), ", ".join(items) or EVERYTHING
         if victim:
             b = who.get(victim)
-            if b and not b["hostile"] and not b["dead"]:
-                rec("deed.theft", victim, what=what)
+            # Hostile because the player struck first is no defence: that is a robbery.
+            # Playtest 2026-11-15 #70: a merchant punched senseless and stripped was
+            # "hostile" (he had fought back), so the stripping was no theft and the
+            # trial had only "assault" to charge.
+            if b and not b["dead"] and (not b["hostile"] or victim in {
+                    str(r.get("subject")) for r in of(pc, "deed.violence.unprovoked")}):
+                rec("deed.theft", victim, what=what, items=items)
             continue
         # Trespass: a home's door opened by breaking in.
         if k == "break_in" and e.get("opened") and mine:

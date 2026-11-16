@@ -65,7 +65,10 @@ def test_a_doze_by_the_fire_rents_no_room(inn):
                          {"act": "wait", "span": "doze off", "until": "a while"}]}
     raw = [{"op": "rest", "actor": "pc", "params": {"kind": "night"}}]
     out = acts_to_ops.timed_waits(raw, frame, inn)
-    assert [r["op"] for r in out] == ["narrate_only"]
+    # No rest; the doze is an open wait, the engine's few minutes on the clock (playtest
+    # 2026-11-15 #46: an untimed wait used to pass no time at all).
+    assert [r["op"] for r in out] == ["narrate_only", "advance_time"]
+    assert out[1]["params"]["amount"] == acts_to_ops.OPEN_WAIT_MINUTES
 
 
 def test_a_rest_the_words_ask_for_beside_a_wait_stays(inn):

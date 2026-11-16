@@ -42,7 +42,7 @@ ACTS = (
     "sell", "give", "take", "drop", "steal", "attack", "cast", "use", "consume", "wait",
     "rest", "rise", "call_on", "break_in", "stealth", "athletics", "exert", "gather",
     "follow", "request", "claim", "craft", "commission", "escape", "loot", "harvest", "prone",
-    "disguise", "threaten", "other",
+    "disguise", "threaten", "surrender", "other",
 )
 # `prone` since 2026-11-15, from the playtest that day (#62, #64): "I drop to my knees, put
 # my hands behind my head" was read `go`, the engine told "Vesna Kroll moves from near to
@@ -72,6 +72,13 @@ ACTS = (
 # yield (give up the fight, surrender, give up the ship), hand_over (a purse, the goods,
 # the keys), back_off (stand aside, leave), obey (anything else).
 DEMANDS = ("yield", "hand_over", "back_off", "obey")
+# `surrender` since 2026-11-15, from the playtest that day: "I raise my hands ... and
+# surrender to the sergeant of the watch" came back `follow` (the line below once told it
+# "give yourself up to whoever is taking you somewhere"), "tell the sergeant I yield and
+# will go quietly" and "tell the sergeant of the watch that I am the one who robbed the
+# merchant" came back `talk`, and neither owes an op, so the fight with the watch went on
+# and the confession was talk. Giving yourself up is a deed of its own; it owes the
+# engine's `surrender` op, built whole (`acts_to_ops._surrender`).
 # `commission` since 2026-11-01. Owner report that day (Corvin, turns 21-29): "can you put
 # them together and i will give you 10 gold peices" to the smith, about a forged blank for a
 # trident — read as a question with no action, then a `give` of "the money" with no
@@ -289,7 +296,7 @@ ACT_COSTS: dict[str, str] = {
     "talk": "addresses", "insult": "addresses", "request": "addresses", "buy": "addresses",
     "threaten": "addresses",
     "sell": "addresses", "commission": "addresses", "call_on": "addresses",
-    "attack": "addresses",
+    "attack": "addresses", "surrender": "addresses",
 }
 # The engine's own facts about time, which overrule the reader in code: these acts' ops
 # happen at once (a hand-over, a bite, a draw), so a reading of `takes_time` on one is
@@ -484,6 +491,8 @@ ACT_SLOTS: dict[str, tuple[str, ...]] = {
     "prone": (),
     # Who or what the character means to pass for ("a dock labourer", "one of the guards").
     "disguise": ("object",),
+    # Who the player gives themselves up to ("the sergeant", "the city watch").
+    "surrender": ("target",),
     "other": ("target", "object", "place"),
 }
 
@@ -556,8 +565,8 @@ exert     lift, push, pull, heave, drag, hold up or shift something heavy by mai
           strength, alone or with somebody; the target is whoever you help with it.
           Never a person pushed or shoved: that is attack
 gather   forage, gather, fill waterskins
-follow    follow somebody or a trail; go along with, come quietly with or give yourself
-          up to whoever is taking you somewhere (going quietly is never stealth)
+follow    follow somebody or a trail; go along with or come quietly with whoever is
+          taking you somewhere (going quietly is never stealth)
 claim     assert who or what you are
 craft     make or work something yourself at a trade: forge, smith, hammer out or
           assemble metal work; tan, cure or stitch leather; brew, mix or bottle alchemy;
@@ -577,6 +586,10 @@ prone     drop to the ground, throw yourself flat, hit the deck, lie down in a f
 disguise  make yourself look like somebody else or like nobody anyone would know: a
           disguise, a false look, passing yourself off as another, using the Disguise
           skill; the object is who or what you mean to pass for
+surrender give yourself up: yield, lay down your arms, put your hands up to be taken,
+          hand yourself in, or own up to the watch or a guard that you did a crime; the
+          target is who you give yourself up to. Said in words ("I tell the sergeant I
+          yield"), it is still surrender
 other     anything else
 
 Each action also says by what MEANS it is done:
@@ -1199,6 +1212,34 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "throw myself flat as the arrows come in", "act": "prone"},
          {"span": "get back up", "act": "rise"}]}),
+    # Giving yourself up (playtest 2026-11-15): a yield in a fight, a yield said in words,
+    # a confession to the law, a call for the watch to come and take you.
+    ("I drop my sword, raise my hands and surrender to the guard captain.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "drop my sword", "object": "my sword", "act": "drop"},
+         {"span": "raise my hands and surrender to the guard captain",
+          "target": "the guard captain", "act": "surrender"}]}),
+    ("I kneel and tell the watchman I yield and will come quietly.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "kneel", "act": "prone"},
+         {"span": "tell the watchman I yield and will come quietly",
+          "target": "the watchman", "act": "surrender"}]}),
+    ("I tell the guard that I'm the one who broke into the chandler's last night.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "tell the guard that I'm the one who broke into the chandler's last "
+                  "night", "target": "the guard", "act": "surrender"}]}),
+    # Live 2026-11-15: "I shout ... for the city watch, telling everyone I beat a merchant
+    # senseless" came back two `talk`s; owning up aloud with the watch called is a
+    # surrender, said or not.
+    ("I yell for the guards and tell the whole street I'm the one who knifed the tailor.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "yell for the guards and tell the whole street I'm the one who knifed "
+                  "the tailor", "target": "the guards", "act": "surrender"}]}),
+    ("I call for the town guard and wait for them to take me in.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "call for the town guard", "target": "the town guard",
+          "act": "surrender"},
+         {"span": "wait for them to take me in", "act": "wait"}]}),
     ("I walk over to the tannery and look at the drying hides.",
      {"question": False, "claims": [], "actions": [
          {"span": "walk over to the tannery", "place": "the tannery", "act": "go"},

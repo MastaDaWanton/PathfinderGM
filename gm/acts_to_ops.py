@@ -1101,6 +1101,8 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 _escape(row, a, scene, pc)
             if act in ("prone", "rise") and pc is not None:
                 _posture(row, act, pc)
+            if act == "surrender" and pc is not None:
+                _surrender(row, a, scene, pc)
         rows.append(row)
     # One commission a keeper a turn: "agree to his price and pay" is read as two deeds
     # (`sell`, `give`), and each agrees the same job (`_agreed_work`). The first stands.
@@ -1115,6 +1117,15 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 row.note = "the same work agreed once already this turn"
             seen.add(who)
     _take_is_the_harvest(rows)
+    # One surrender a turn: live 2026-11-15, "shout for the city watch, telling everyone I
+    # beat a merchant" was read as two surrenders and the call went out twice.
+    given = False
+    for row in rows:
+        for b in [b for b in row.intents if b.get("op") == "surrender"]:
+            if given:
+                row.intents.remove(b)
+                row.note = "giving themselves up once this turn already"
+            given = True
     return rows
 
 
@@ -1196,6 +1207,20 @@ def _escape(row: Row, a: dict, scene, pc) -> None:
     row.note = "a grapple broken: " + (
         {"cmb": "the combat manoeuvre", "escape artist": "Escape Artist"}.get(
             how or "", "the better of the combat manoeuvre and Escape Artist"))
+
+
+def _surrender(row: Row, a: dict, scene, pc) -> None:
+    """Giving yourself up, built whole: the engine's `surrender` op (`Engine._op_surrender`,
+    rules/trial.py `give_up`). Who is the law here is the engine's; the words only say
+    whom the player turned to first (`person`), never whether they are the law."""
+    built: dict = {"op": "surrender", "actor": pc.ref, "params": {},
+                   "because": "the player gives themselves up"}
+    words = " ".join(str(a.get("target") or "").split())
+    who = person(scene, words) if words else ""
+    if who:
+        built["target"] = who
+    row.intents.append(built)
+    row.note = "giving themselves up to the law"
 
 
 def _whose_body(frame, i: int, scene) -> str:
@@ -3849,6 +3874,34 @@ def timed_rests(raw, frame: dict | None, *, notes: list | None = None) -> list:
     return out
 
 
+# What a wait the words give no length to puts on the clock ("I wait to see who comes").
+# HOUSE: ten minutes, "a while"; the length the watch takes to answer a report
+# (content/rules/law.json `report.minutes`), so waiting over a crime sees who comes.
+OPEN_WAIT_MINUTES = 10
+_OWN_CLOCK = frozenset({"advance_time", "rest", "travel", "venture", "journey", "forage",
+                        "prospect", "gather"})
+
+
+def _open_wait(raw, wait, resting, scene, notes) -> list:
+    """A wait with no time in the words passes `OPEN_WAIT_MINUTES` — by the engine's
+    number, never the plan's — unless the plan already moves the clock.
+
+    Playtest 2026-11-15 #46: "I stand over the merchant and wait to see who comes" was
+    read `wait` twice, and the plan was a bare narrate_only: no rule applied and the clock
+    stuck at 8h 32m, so nothing that was coming could come."""
+    pc = scene.pc() if scene is not None and hasattr(scene, "pc") else None
+    if wait is None or resting or pc is None or wait.get("time") \
+            or getattr(scene, "in_encounter", False) \
+            or any(_op(r) in _OWN_CLOCK for r in raw):
+        return raw
+    if notes is not None:
+        notes.append(f"an open wait: {OPEN_WAIT_MINUTES} minutes on the clock")
+    return list(raw) + [{
+        "op": "advance_time", "actor": pc.ref,
+        "params": {"amount": OPEN_WAIT_MINUTES, "unit": "minutes"},
+        "because": "the player waited a while"}]
+
+
 def timed_waits(raw, frame: dict | None, scene, *, notes: list | None = None) -> list:
     """A wait the words put a time of day on runs to it: the plan's `advance_time` is set
     to the minutes from now to that time (`interpret.until_minutes`), the clock's
@@ -3883,7 +3936,7 @@ def timed_waits(raw, frame: dict | None, scene, *, notes: list | None = None) ->
     clock = int(getattr(scene, "clock_minutes", 0) or 0)
     minutes = interpret.until_minutes(wait, clock) if wait is not None else None
     if minutes is None:
-        return raw
+        return _open_wait(raw, wait, resting, scene, notes)
     out, changed = [], False
     # One wait, one clock: a `rest` the plan wrote beside the wait, with no rest act of the
     # reading behind it, is the same night counted twice. Measured on the narration

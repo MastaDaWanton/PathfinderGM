@@ -129,8 +129,6 @@ def settle(engine) -> list:
     """The law's move at the end of a batch: an unanswered arrest answered (run, or taken),
     or a new one begun. Empty when nothing is owed. Out of a fight only — in one, the
     warrant's reader is `_law_joins`, and a confrontation still pending ends there."""
-    from .engine import Outcome
-
     from . import trial
 
     scene = engine.scene
@@ -145,6 +143,20 @@ def settle(engine) -> list:
         if held is not None:
             pc.remove_effects(source=SOURCE)
         return []
+    # What the clock brought before the law looks: a witness's report landing (and the
+    # watch it brings, `trial.deliver`), and the gate's own watch posted.
+    told = trial.deliver(engine) + post_the_gate(engine)
+    if trial.custody(pc) is not None:
+        return told                       # the watch the player called took them
+    return told + _answer_or_begin(engine, pc, held)
+
+
+def _answer_or_begin(engine, pc, held) -> list:
+    from .engine import Outcome
+
+    from . import trial
+
+    scene = engine.scene
     town = _town(engine)
     law = states.standing_with_the_law(pc, town)
     if held is not None:
@@ -191,6 +203,51 @@ def settle(engine) -> list:
               + trial.choices(pc.name, ["go quietly",
                                         "talk their way out (Diplomacy or Bluff)",
                                         "run", "fight"])))]
+
+
+def post_the_gate(engine) -> list:
+    """The watch at a town or a city's gate, posted as people of the scene the first time
+    the party stands there (content/rules/law.json `gate_watch`): once ever per gate, the
+    way `keepers.staff` stands a keeper up once ever, so a gate the player cleared of its
+    guards is not refilled every visit. A village's way in is a road with nobody on it.
+
+    Playtest 2026-11-15 #51: the travel tell said "the guards at the gate know [your
+    name], look twice at you" and "In the scene" held nobody but the player, so the
+    arrest (which needs a guard who sees them) could never fire at the one door a warrant
+    is meant to bite at. The seen-people ruling (2026-10-01): if the narration shows
+    them, they are actors."""
+    from . import places as places_mod
+    from . import trial
+    from .engine import Outcome
+
+    scene = engine.scene
+    at = str(scene.at or "")
+    here = places_mod.find(engine.places(), at) if at else None
+    if here is None or " ".join(here.name.split()).lower() != "the gate":
+        return []
+    loc = engine.world.get(scene.location_id) if engine.world is not None else None
+    if places_mod.scale_of(loc) not in ("town", "city"):
+        return []
+    # Only when the law has a word for the player here: that is when the travel tell
+    # puts guards at the gate (`Engine.watch_at_the_way_out`). shortcut: a clean visit is
+    # narrated without them; post them always if the gate should be peopled for everyone.
+    pc = scene.pc()
+    if pc is None or not states.standing_with_the_law(pc, _town(engine)):
+        return []
+    key = f"{at}#watch"
+    if key in scene.staffed:
+        return []
+    scene.staffed.append(key)
+    if any(a.has_state(states.GUARD) for a in scene.actors.values() if not a.is_pc):
+        return []
+    born = engine._bring_in("watchman", count=int(trial.document()["gate_watch"]["count"]))
+    come = [scene.actors[b["ref"]] for b in born if b["ref"] in scene.actors]
+    if not come:
+        return []
+    return [Outcome(intent_id="", op="arrest",
+                    effects=[{"kind": "posted", "by": [a.ref for a in come],
+                              "origin": SOURCE}],
+                    tell=f"The gate is watched: {_names(come)} stand{'s' if len(come) == 1 else ''} at it.")]
 
 
 _COUNT = {2: "Two", 3: "Three", 4: "Four", 5: "Five", 6: "Six"}
