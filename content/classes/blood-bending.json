@@ -85,14 +85,16 @@
     {
       "id": "ki",
       "from_level": 1,
+      "ability": "Battle Blood Ki Pool",
       "max": "floor(level/2) + con_mod",
       "starts": "max",
       "refresh": "rest.night",
-      "_note": "Battle Blood Ki Pool, granted at Control Blood 2. Listed from level 1 because Control Blood levels are chosen, not fixed to character level; the engine creates it when the path is taken."
+      "_note": "Battle Blood Ki Pool, granted at Control Blood 2. Listed from level 1 because Control Blood levels are chosen, not fixed to character level; `ability` makes it exist only while the character can use Battle Blood Ki Pool (rules/classes.py apply)."
     },
     {
       "id": "rage",
       "from_level": 1,
+      "ability": "Blood Rage",
       "max": "4 + con_mod + 2*(level-1)",
       "starts": "max",
       "refresh": "rest.night",
@@ -101,6 +103,7 @@
     {
       "id": "unbalancing strike",
       "from_level": 3,
+      "ability": "Unbalancing Strike",
       "max": "floor(level/4) + con_mod",
       "starts": "max",
       "refresh": "rest.night",
@@ -109,6 +112,7 @@
     {
       "id": "stunning strike",
       "from_level": 13,
+      "ability": "Stunning Strike",
       "max": "floor(level/4)",
       "starts": "max",
       "refresh": "rest.night"
@@ -116,6 +120,7 @@
     {
       "id": "rapid coagulation",
       "from_level": 4,
+      "ability": "Rapid Coagulation",
       "max": "1",
       "starts": "max",
       "refresh": "encounter.end",
@@ -580,17 +585,8 @@
         ]
       },
       "needs": {
-        "Blood Spike Projectile": [
-          "targeting a particular Blood Pool on the map"
-        ],
-        "Siphon Pool": [
-          "targeting a particular Blood Pool on the map"
-        ],
         "Blood Mine": [
           "a save DC computed from level and Constitution",
-          "targeting a particular Blood Pool on the map"
-        ],
-        "Crimson Torrent": [
           "targeting a particular Blood Pool on the map"
         ],
         "Blood Boil": [
@@ -606,7 +602,89 @@
           "a save DC computed from level and Constitution"
         ]
       },
-      "effects_converted": true
+      "effects_converted": true,
+      "passive": [
+        "Blood Pool Manifestation"
+      ],
+      "grants": {
+        "Blood Spike Projectile": {
+          "action": "standard",
+          "affects": "target",
+          "attack": "ranged",
+          "range_ft": 60,
+          "harmful": true,
+          "hp_cost": {
+            "dice": "1d8"
+          },
+          "roll": {
+            "column": "blood",
+            "bonus": "con_mod",
+            "as": "damage",
+            "type": "piercing"
+          },
+          "stacks": {
+            "pool": "blood stack",
+            "amount": 1
+          },
+          "leaves_pool": "target",
+          "tell": "{name} hardens a spike of their own blood and hurls it at {target}.",
+          "not_yet": [
+            "launching the blood spikes already standing in a pool alongside it"
+          ],
+          "_note": "The author's sentence: 'take 1d8 non-lethal dmg and launch a hardened spike of blood at a target within Blood Sense range. Deals Blood DMG + CON modifier as piercing damage, leaves 1 blood stack on the target, and creates a 5-ft Blood Pool adjacent to the target.' The class says Blood DMG attacks roll to hit (Siphon Pool's '+2 on your next Blood DMG attack roll') but not against which AC; a hardened physical spike is taken as a ranged attack against full AC, as the kineticist's physical blast is (Occult Adventures, Kinetic Blast). Range: Blood Sense's 60 ft, which the table grants at 2nd; at 1st the same 60 ft is assumed (owner's call). Playtest 2026-11-15 #32: this charged 1d8 and did nothing else."
+        },
+        "Blood Pool Manifestation": {
+          "pool_on_cost": "self",
+          "_note": "'a Blood Pool appears ... in your square if self-inflicted': every hp_cost paid spills one (Engine._pay_hp_cost). The target's square is the spending ability's own `leaves_pool`."
+        },
+        "Siphon Pool": {
+          "action": "swift",
+          "affects": "self",
+          "spends_pool": 1,
+          "roll": {
+            "count": 1,
+            "die": 8,
+            "as": "heal_nonlethal"
+          },
+          "effect": {
+            "temp_hp": {
+              "dice": "1d8"
+            }
+          },
+          "tell": "{name} draws a pool of their spilled blood back into the body.",
+          "not_yet": [
+            "the +2 on the next Blood DMG attack roll the class offers in place of each 1d8",
+            "1d8 more per spike standing in the pool"
+          ],
+          "_note": "'absorb a Blood Pool within Blood Sense range to restore 1d8 Non-Lethal damage ... Also gain 1d8 Temp HP'. The first of each 'or' is what the converter took, and what runs."
+        },
+        "Crimson Torrent": {
+          "action": "standard",
+          "area": {
+            "shape": "line",
+            "ft": 60
+          },
+          "harmful": true,
+          "hp_cost": {
+            "dice": "2d10"
+          },
+          "roll": {
+            "column": "blood",
+            "times": 3,
+            "as": "damage"
+          },
+          "save": {
+            "save": "ref",
+            "dc": "10 + floor(level/2) + con_mod",
+            "success": "half"
+          },
+          "tell": "{name} looses a beam of blood at high pressure.",
+          "not_yet": [
+            "Blood Pools in the line detonating for +1d8 each"
+          ],
+          "_note": "'Cost 2d10 Non-Lethal damage to fire a high-pressure beam in a 60-ft line dealing Blood DMG x3 (Reflex half).' The Reflex DC is Blood Mine's and Blood Boil's: The class's 'DC 10+12LVL+CONmod' is 10 + half level + Con, the CRB's class-ability DC."
+        }
+      }
     },
     "coagulator": {
       "name": "Coagulator",
@@ -776,6 +854,15 @@
         "Caustic Blood": [
           "targeting a particular Blood Pool on the map"
         ],
+        "Sanguine Spray": [
+          "a trigger when the bender is hit or takes damage"
+        ],
+        "Viscous Threat": [
+          "a trigger when the bender is hit or takes damage"
+        ],
+        "Blood Sponge": [
+          "a trigger when the bender is hit or takes damage"
+        ],
         "Hemophormic Retribution": [
           "a save DC computed from level and Constitution"
         ],
@@ -841,7 +928,11 @@
         "Coagulated Plate": "coagulated plate"
       },
       "passive": [
-        "Iron Clot"
+        "Iron Clot",
+        "Sanguine Spray",
+        "Viscous Threat",
+        "Blood Sponge",
+        "Caustic Blood"
       ]
     },
     "blood commander": {
@@ -954,6 +1045,12 @@
       "needs": {
         "Blood Siphon": [
           "a save DC computed from level and Constitution"
+        ],
+        "Blood Transfusion": [
+          "a link held between two creatures, paid each turn"
+        ],
+        "Extracorporeal Blood Manipulation": [
+          "making objects out of blood"
         ]
       },
       "effects_converted": true,
@@ -961,6 +1058,58 @@
         "Blood Buffer"
       ],
       "grants": {
+        "Blood Transfer": {
+          "action": "standard",
+          "affects": "ally",
+          "roll": {
+            "column": "blood",
+            "as": "heal"
+          },
+          "hp_cost": {
+            "roll": true
+          },
+          "tell": "{name} opens a vein and sends the blood into {target}.",
+          "not_yet": [
+            "the blood afflictions that travel with it"
+          ],
+          "_note": "'Send blood to deal Blood DMG to self and heal a receiver for equal HP.' One roll, both sides; the price is non-lethal by Blood Bond. The class names no action; a standard action is assumed (owner's call)."
+        },
+        "DMG Purge": {
+          "action": "full-round",
+          "affects": "self",
+          "roll": {
+            "count": 0,
+            "flat": "floor(nonlethal/2)",
+            "as": "heal_nonlethal"
+          },
+          "tell": "{name} lets the spent blood settle back into the body.",
+          "_note": "'Full-round action. Regain half of Non-Lethal damage taken.'"
+        },
+        "Blood Javelin": {
+          "action": "standard",
+          "affects": "target",
+          "attack": "ranged",
+          "range_ft": 60,
+          "harmful": true,
+          "hp_cost": {
+            "column": "blood"
+          },
+          "roll": {
+            "column": "blood",
+            "times": 2,
+            "as": "damage",
+            "type": "piercing"
+          },
+          "stacks": {
+            "pool": "blood stack",
+            "amount": 2
+          },
+          "tell": "{name} draws a javelin of blood from their own veins and throws it at {target}.",
+          "not_yet": [
+            "-1 to hit per stack on the creature carrying them"
+          ],
+          "_note": "'Take Blood DMG to form a 60-ft javelin dealing Blood DMG x2 and leaving 2 blood stacks.' A ranged attack against full AC, as Blood Spike Projectile."
+        },
         "Blood Buffer": {
           "_note": "'Reduce incoming Non-Lethal Damage by 2 (Lvl 1) or 3 (Lvl 3).' against: nonlethal so it guards what enemies deal and never discounts what the bender pays — costs go straight to take_nonlethal and bypass DR entirely.",
           "dr": {
@@ -1088,19 +1237,55 @@
         ],
         "Rupture Self": [
           "targeting a particular Blood Pool on the map"
+        ],
+        "Coagulant Stacks": [
+          "movement taken off a creature by the stacks it carries"
         ]
       },
       "effects_converted": true,
       "passive": [
         "Swift Strikes",
         "Uncanny Dodge",
-        "Extracorporeal Blood Rage Armor"
+        "Extracorporeal Blood Rage Armor",
+        "Coagulant Stacks"
       ],
       "toggles": {
         "Extracorporeal Blood Armament": "blood armament",
         "Blood Rage": "blood rage"
       },
       "grants": {
+        "Blood Burst": {
+          "action": "standard",
+          "area": {
+            "shape": "burst",
+            "ft": 20,
+            "centre": "self"
+          },
+          "harmful": true,
+          "hp_cost": {
+            "formula": "floor(hp/5)",
+            "lethality": "lethal"
+          },
+          "roll": {
+            "column": "blood",
+            "as": "damage"
+          },
+          "save": {
+            "save": "ref",
+            "dc": "10 + floor(level/2) + con_mod",
+            "success": "negates"
+          },
+          "stacks": {
+            "pool": "blood stack",
+            "amount": 1
+          },
+          "tell": "{name} bursts blood outward from every vein.",
+          "not_yet": [
+            "allies' +5 on the save",
+            "the 40 ft and 60 ft radii of Control Blood 4 and 5"
+          ],
+          "_note": "'Eject blood dealing 20% current HP in lethal damage to self. Area enemies take Blood DMG on failed Reflex save (DC 10+12LVL+CONmod) and gain 1 blood stack.' Lethal, as the sentence says, not Blood Bond's non-lethal. The class's 'DC 10+12LVL+CONmod' is 10 + half level + Con, the CRB's class-ability DC."
+        },
         "Extracorporeal Blood Armament": {
           "action": "free",
           "weapon": {

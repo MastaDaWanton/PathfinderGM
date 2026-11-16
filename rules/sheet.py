@@ -3165,10 +3165,23 @@ class Actor:
         every level 1-20 — the weapons table's row for anybody's fist.
         """
         row = self._weapon_row(key)
+        from . import classfeatures
+
+        # A fist that may strike either way strikes to harm unless told otherwise.
+        # Improved Unarmed Strike: "your unarmed strikes can deal lethal or nonlethal
+        # damage, at your choice" (CRB p.129), and the monk's unarmed strike grants it.
+        # Playtest 2026-11-15 #36: a Blood Bender (the class's `unarmed strike`, written
+        # the monk's way) punched for "4 non-lethal" with no choice made. Non-lethal stays
+        # hers to ask for, with no -4 (`lethality_swap`).
+        if str(row.get("name", "")).lower().startswith("unarmed strike") \
+                and not (row.get("stat_block") or row.get("natural")
+                         or row.get("granted_by")) \
+                and (self.has_state(STRIKES_EITHER_WAY)
+                     or self.has_state(classfeatures.UNARMED_STRIKE)):
+            row = dict(row, nonlethal=False)
         if not self.char_class or row.get("stat_block") or row.get("natural") \
                 or row.get("granted_by"):
             return row
-        from . import classfeatures
 
         wanted = (key or self.wielded_key()).strip().lower()
         grants = classfeatures.weapon_grants(self, wanted)
@@ -5591,6 +5604,13 @@ class Actor:
         # has_state half of what `immunities` lists (`immune_to` asks the tag).
         if self.char_class:
             out.extend(_classfeatures.tags(self))
+        # A path's `core` features, at the tier reached, are the same class features
+        # by the same tag: Battle Blood's Uncanny Dodge was answered "always active" and
+        # read by nothing, because only the level table's grants were tagged.
+        if getattr(self, "paths", None):
+            from . import leveling as _leveling
+
+            out.extend(_leveling.core_tags(self))
         # What this character's granted powers hold — a domain's Fire Resistance
         # (`resist.fire.10` from 6th), a bloodline's Dragon Resistances, a school's
         # Resistance — read off the choices live (`rules/grantedpowers.py`), like the

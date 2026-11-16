@@ -1217,7 +1217,10 @@ def feat_rows(actor, allow=None, waive: bool = False, held_out: bool = True) -> 
     forge leaves held feats in (`held_out=False`): its draft's own picks are filtered by
     the page, which knows which are only tentative.
     """
+    from . import casting
+
     held = feats_mod._held(actor) if held_out else set()
+    casts = casting.is_caster(actor)
     open_: list[dict] = []
     shut: list[dict] = []
     for feat in feats_mod.all_feats().values():
@@ -1246,6 +1249,13 @@ def feat_rows(actor, allow=None, waive: bool = False, held_out: bool = True) -> 
         if "mythic" in {t.lower() for t in (feat.types or [])}:
             verdict = {"ok": False, "unmet": ["a mythic tier, which this game has none of"],
                        "unknown": []}
+        # A metamagic feat changes a spell as it is cast (CRB, Metamagic Feats), and most
+        # print no prerequisite at all — so all 32 were offered to a Blood Bender with no
+        # spells (playtest 2026-11-15 #3). Shut, with the reason, for a body that casts
+        # nothing; the page hides what is shut.
+        elif "metamagic" in {t.lower() for t in types} and not casts:
+            verdict = {"ok": False, "unmet": ["spells to apply it to, and this character "
+                                              "casts none"], "unknown": []}
         if verdict["ok"]:
             open_.append(row)
         else:

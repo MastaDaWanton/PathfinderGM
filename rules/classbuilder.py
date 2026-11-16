@@ -215,6 +215,10 @@ POOL_ROW = (
                    ClassField("resource", "Paid in", type="text"))),
     ClassField("source", "Source", advanced=True, consumer="rules/resources.py:define",
                help="Defaults to the class name."),
+    ClassField("ability", "Belongs to ability", advanced=True,
+               consumer="rules/classes.py:apply",
+               help="The ability that spends it. The pool exists only while the character "
+                    "can use that ability — a path's pool waits for the path."),
 )
 
 CASTING_FIELDS = (

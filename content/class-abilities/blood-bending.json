@@ -1,0 +1,21 @@
+{
+  "class": "blood bending",
+  "_source": "The owner's homebrew, content/classes/blood-bending.json: the level table's own features, not a path's. A pool there names the ability that spends it (`ability`), and the pool exists only while this document does (rules/classes.py apply).",
+  "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
+  "abilities": [
+    {
+      "key": "rapid coagulation",
+      "name": "Rapid Coagulation",
+      "aliases": ["coagulate", "rapid coagulate"],
+      "level": 4,
+      "source": "content/classes/blood-bending.json pools: 'Once per combat, regain 1d10+Con.' The class names no action; a swift action is assumed, as for the class's other self-mending (Siphon Pool) — the owner's call.",
+      "text": "Regain 1d10 + Con hit points, once a fight.",
+      "action": "swift",
+      "cost": {"pool": "rapid coagulation", "amount": 1},
+      "affects": "self",
+      "roll": {"count": 1, "die": 10, "bonus": "con_mod", "as": "heal"},
+      "ability_type": "ex",
+      "tell": "{name}'s wounds clot over at once."
+    }
+  ]
+}

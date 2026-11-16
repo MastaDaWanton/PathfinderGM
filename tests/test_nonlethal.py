@@ -50,9 +50,11 @@ def pc():
 
 def bender(level: int = 6, con: int = 16):
     """A Blood Bender built the way the app builds one — through `from_dict`, so the
-    class actually applies rather than being poked onto the sheet by the test."""
+    class actually applies rather than being poked onto the sheet by the test. On Battle
+    Blood, whose abilities the rage and ki pools belong to (playtest 2026-11-15 #6)."""
     d = to_dict(load_pc("fixtures/pc-kesst.json"))
     d["class"], d["level"] = "blood bending", level
+    d["paths"] = ["battle blood"]
     d["abilities"]["con"] = con
     d["hp_max"] = d["hp"] = 40
     # Kesst's own ranks are a 3rd-level character's and `validate` rightly refuses them on
@@ -375,14 +377,16 @@ def test_a_bender_arrives_with_their_pools_filled():
     b = bender(level=6, con=16)
     assert b.pool("rage").maximum == 17                 # 4 + 3 + 2*5
     assert b.pool("ki").maximum == 6                    # floor(6/2) + 3
-    assert b.pool("unbalancing strike").maximum == 4    # floor(6/4) + 3
+    # Unbalancing strike's pool waits for a document saying what it does: the class
+    # file prints only its uses (owner's call, playtest 2026-11-15).
+    assert b.pool("unbalancing strike") is None
 
 
 def test_a_pool_not_yet_earned_is_not_there():
-    """Stunning Strike arrives at 13th. A 6th-level character holding it is an ability the
-    player will try to use."""
-    assert bender(level=6).pool("stunning strike") is None
-    assert bender(level=13).pool("stunning strike") is not None
+    """Rapid Coagulation arrives at 4th. A 3rd-level character holding it is an ability
+    the player will try to use."""
+    assert bender(level=3).pool("rapid coagulation") is None
+    assert bender(level=4).pool("rapid coagulation") is not None
 
 
 def test_reloading_does_not_refill_a_spent_pool():

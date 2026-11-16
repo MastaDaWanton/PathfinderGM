@@ -1252,6 +1252,16 @@ def pools_for(class_id: str, level: int) -> list[dict]:
     return out
 
 
+def _has_ability(actor, name: str) -> bool:
+    """Whether the character can use this ability now: a path's at the tier reached
+    (`leveling.usable_names`), or a core class document's (`class_abilities.names`)."""
+    from . import class_abilities, leveling
+
+    want = " ".join(name.split()).lower()
+    held = leveling.usable_names(actor) + class_abilities.names(actor)
+    return any(" ".join(str(n).split()).lower() == want for n in held)
+
+
 def apply(actor) -> dict:
     """Give an actor everything their class grants at their current level.
 
@@ -1296,6 +1306,19 @@ def apply(actor) -> dict:
 
     made: list[str] = []
     for spec in pools_for(cid, level):
+        # A pool that belongs to an ability (`ability`) exists only while that ability
+        # does. Playtest 2026-11-15 #6/#96: a Path A Blood Spike showed "Ki 3 of 3" and
+        # "Rage 7 of 7" — Battle Blood's pools — and "I fly into a Blood Rage" was then
+        # refused, because the pools came by level and the abilities by path. A character
+        # saved with the pool loses it here, on load, the way a corrected formula reaches
+        # characters already in play.
+        if spec.get("ability") and not _has_ability(actor, str(spec["ability"])):
+            pid = str(spec["id"]).strip().lower()
+            had = actor.pools.get(pid)
+            if had is not None and had.source in ("", spec.get("source"),
+                                                  cls.get("name", cid)):
+                del actor.pools[pid]
+            continue
         resources.define(actor, {**spec,
                                  "source": spec.get("source") or cls.get("name", cid)})
         made.append(str(spec["id"]).strip().lower())
