@@ -19388,8 +19388,14 @@ class Engine:
             self._hours_underway.pop(head.id, None)
         effects = [{"kind": "place", "id": head.id, "name": head.name, "parent": parent.id,
                     "fresh": fresh, "spots": [m.name for m in made[1:]]}] + list(moved.effects)
-        tell = (f"{head.name}, {'found for the first time' if fresh else 'as before'}, off "
-                f"{parent.name}" + (f" — {hours} hour{'s' if hours != 1 else ''} away" if hours else "")
+        # A whole sentence. The fragment "the crypt, found for the first time, off the
+        # graveyard." came back on the page as "You descend into the crypt, … a find of
+        # ancient stone" (playtest 2026-11-16 #26): a slot asked to write a fact it cannot
+        # parse writes the fact's words.
+        tell = (f"{head.name[:1].upper()}{head.name[1:]} opens off {parent.name}"
+                + (f", {hours} hour{'s' if hours != 1 else ''} away" if hours else "")
+                + (": you have not been inside it before" if fresh else
+                   ": you have been inside it before")
                 + ". " + moved.tell + toll_note)
         # Something may live here. Half the time where nothing rates the ground; a
         # place's stated danger moves it (`volatility.scale`: a third as often on calm

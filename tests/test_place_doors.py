@@ -188,7 +188,7 @@ def test_venturing_moves_the_party_and_costs_the_hours():
     _run(engine, "travel", {"place": started_in})
     again = _run(engine, "venture", {"kind": "cave"})
     assert not _refused(again) and len(s.founded) == n
-    assert "as before" in again.tell
+    assert "you have been inside it before" in again.tell
 
 
 def test_an_unknown_kind_of_ground_is_refused_with_the_kinds_named():

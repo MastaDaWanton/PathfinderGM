@@ -257,6 +257,11 @@ class Facts:
     # turned "you are released from the guardhouse" into "you are held in the
     # guardhouse" — beside the tell "is let go, the matter closed".
     let_go: bool = False
+    # The reader read the player's line as a search or a look (`interpret` acts), so a
+    # Survival roll this turn may be a search as well as a Perception roll
+    # (`found_nothing`). Playtest 2026-11-16 #50: "go over every brick … taking twenty on
+    # the search" was planned as a Survival check.
+    searching: bool = False
 
     @property
     def passed(self) -> frozenset[int] | None:
@@ -475,8 +480,40 @@ def facts_from(ctx) -> Facts:
                  **_unseen_of(ctx, scene, pc),
                  was_clock=(None if getattr(ctx, "was_clock", None) is None
                             else int(ctx.was_clock)),
-                 led=led, let_go=let_go,
+                 led=led, let_go=let_go, searching=searching_of(getattr(ctx, "reading", None)),
                  **(_height_of(scene, pc) if start == end else {}))
+
+
+def searching_of(reading) -> bool:
+    """Whether the interpreter read a search or a look in the player's line (its closed
+    `act` enum, never the English)."""
+    if not isinstance(reading, dict) or reading.get("error"):
+        return False
+    return any(isinstance(a, dict) and a.get("act") in ("search", "look")
+               for a in reading.get("actions") or ())
+
+
+def found_nothing(o: dict, searching: bool = False) -> bool:
+    """Whether this outcome is a search whose roll was made and that turned up nothing: a
+    Perception check (or, when the player's line was read as a search, a Survival check)
+    that succeeded with no effect at all. Whatever a search finds the engine records as an
+    effect of the roll — a way down (`dungeons.searched`), a trap, a hidden body
+    (`knows_where`) — so a made search with none found nothing. CRB p.102: Perception
+    notices what is there; a good roll over nothing is still nothing.
+
+    Playtest 2026-11-16 #50 and #53: a Survival 16 over DC 12 and a Perception 10 over DC
+    8, both "searching for hidden passages", both with no effect, and the page said "Your
+    methodical search reveals a hidden passage" — the first written by OUR attempt repair,
+    told "the attempt works" over the model's own "reveals nothing but solid masonry"; the
+    second by the act slot, told only "makes the perception check by 2". The track
+    precedent below (`_track_found_it`) is the same rule for a trail. Not an opposed roll:
+    winning against somebody's Stealth is the finding."""
+    if o.get("op") != "check" or o.get("verdict") != "success" or _effects(o):
+        return False
+    if (o.get("dc") or {}).get("basis") == "opposed":
+        return False
+    label = _roll_label(o).lower()
+    return label.startswith("perception") or (searching and label.startswith("survival"))
 
 
 def _height_of(scene, pc) -> dict:
@@ -1620,6 +1657,9 @@ class Attempt:
     save: bool = False
     request: str = ""      # "payment" | "favour" — a Diplomacy request (`rules/requests.py`)
     of: str = ""           # who a request or an aid was made of
+    # A search that was made and found nothing (`found_nothing`): asked as "failure", so a
+    # page that finds something is the contradiction and "nothing turns up" agrees.
+    empty: bool = False
 
 
 def _roll_label(o: dict, at: int = 0) -> str:
@@ -1715,6 +1755,12 @@ def attempts_of(facts: Facts) -> list[Attempt]:
             out.append(Attempt(f"a{len(out) + 1}", who, label, verdict,
                                why=f"asking {_name(facts, of)} for {what}",
                                request=kind, of=of))
+            continue
+        if found_nothing(o, facts.searching):
+            # Made, and nothing found: on the page that is the search failing to turn
+            # anything up, and a find is the contradiction (playtest 2026-11-16 #50, #53).
+            out.append(Attempt(f"a{len(out) + 1}", who, label, "failure", why=why,
+                               empty=True))
             continue
         out.append(Attempt(f"a{len(out) + 1}", who, label, verdict, why=why,
                            save=o.get("op") == "save" or label.lower().endswith(" save")))
@@ -2353,6 +2399,12 @@ def _anything_into(facts: Facts, ref: str) -> bool:
             if got == ref and e.get("kind") == "earned" \
                     and int(e.get("paid_cp", 0) or 0) > 0:
                 return True
+            # A ship yielded to them (`Engine._ship_taken`) is theirs now: "casting aside
+            # their weapon to yield the ship to you" was read back as a thing handed over
+            # by the captain, judged a gift the engine never made, and cut — the turn's
+            # biggest outcome lost from the page (playtest 2026-11-16 #5).
+            if e.get("kind") == "ship_taken" and e.get("by") == ref:
+                return True
     return False
 def _parts_with_unlisted(facts: Facts, frm: str, things_moved) -> bool:
     """Whether a thing the engine has no name for, put down by `frm`, is judged at all:
@@ -2444,6 +2496,10 @@ def _attempt_fact(a: Attempt, facts: Facts) -> str:
     the = "" if a.label.lower().startswith(("the ", "their ")) else "the "
     what = f"{the}{a.label}" + (f" ({a.why})" if a.why else "")
     ok = a.verdict == "success"
+    if a.empty:
+        return (f"{subj} {'search' if pc else 'searches'} well — {what} is made — and "
+                f"{'find' if pc else 'finds'} nothing: no hidden way, door, seam, passage "
+                f"or thing turns up, and nothing is found.")
     if a.request:
         asked = "payment for the work" if a.request == "payment" else "the favour"
         if ok:

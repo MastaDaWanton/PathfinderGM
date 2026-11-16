@@ -2072,7 +2072,7 @@ def scene_now(scene, was_clock: int | None = None, outcomes=None, gone=()) -> st
     light = light_now(scene, outcomes)
     if light:
         out.append(light)
-    body = body_now(scene.pc() if hasattr(scene, "pc") else None)
+    body = body_now(scene.pc() if hasattr(scene, "pc") else None, scene)
     if body:
         out.append(body)
     return "\n\n".join(out)
@@ -2174,7 +2174,7 @@ def light_now(scene, outcomes=None) -> str:
             f"Never sunlight or glare; no numbers.")
 
 
-def body_now(pc) -> str:
+def body_now(pc, scene=None) -> str:
     """What the player's body is carrying, as engine facts in words, last in the prompt.
 
     The owner, 2026-10-05: *"prose acts like im okay but im literally starving and days
@@ -2189,7 +2189,15 @@ def body_now(pc) -> str:
         return ""
     from rules import survival as _survival
 
-    said = [s.words for s in _survival.strains(pc)]
+    # Given the scene, only what this beat owes (`body_shown.owed`, playtest 2026-11-16
+    # #25 and #46: the line in every brief became an ache in every beat, and once a
+    # gardener's "searing pain in their wounds").
+    if scene is not None:
+        from .checks import body_shown
+
+        said = [s.words for s in body_shown.owed(scene)]
+    else:
+        said = [s.words for s in _survival.strains(pc)]
     if not said:
         return ""
     return ("THE PLAYER'S BODY (engine facts, this moment — it shows in how they move, "

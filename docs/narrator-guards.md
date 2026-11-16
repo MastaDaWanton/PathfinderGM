@@ -1068,3 +1068,71 @@ stalled (ModelStalled, 120 s) and one fell back to the engine line, so the sampl
   person at the inn and is the matter's carrier); no beat gave anyone two stances.
 - Not separable statistically from 1 vs 3 beats; the claim rests on the plan, which is
   deterministic (`test_the_aside_never_goes_to_somebody_another_slot_already_shows`).
+
+## A find nobody made, and the ache in every beat (2026-11-16)
+
+The second playtest of 0.3.8 (pgm-work/playtest-2026-11-16.md), items 5, 10, 25, 26, 36, 38,
+46, 50 and 53. Read off the save's turn log before anything was built: most of these slips
+were written by our own repairs and plan, not by the narrator.
+
+- **The invented passage (#50, #53).** Beat 256: a Survival 16 over DC 12, no effect. The
+  model wrote "Your methodical search reveals nothing but solid, unyielding masonry", which was
+  true. The attempts question was told "you succeed at the Survival check: the attempt works"
+  and called it a contradiction. The repair then wrote "reveals a hidden passage concealed
+  within the masonry". Beat 259: the act slot was told only "makes the perception check by 2",
+  beside the player's "to find the hidden passage", and wrote "a hidden seam behind a
+  bricked-up opening". The tells check could not see either, because no tell contradicts a
+  find that is simply missing. **Fixed:** whatever a search finds, the engine records as an
+  effect of the roll (`dungeons.searched`, a found trap, `knows_where`). So a made Perception
+  check, or a Survival check the reader read as a search, with no effect found nothing
+  (`beat_verify.found_nothing`; the same rule as the track precedent `_track_found_it`). The
+  attempts question asks such a search as finding nothing (`Attempt.empty`), so a find on the
+  page is the contradiction and its repair is told "find nothing". The act slot is told the
+  search turned up nothing, and table talk is told it too. CRB p.102: Perception notices what
+  is there.
+- **The ship that was never yielded (#5).** The slot wrote "casting aside their weapon to
+  yield the ship to you". The read-back took it as a thing handed over and cut it. The
+  engine's `ship_taken` effect now counts as something coming to the player
+  (`_anything_into`).
+- **Another town's matter (#10).** At sea, Kalimnar's strain was pulled because "merchant"
+  was in the tells, and it was written rippling "through the port… the great square". In
+  Mirabalos's sewers the same happened with Xylorvotha's and Kalimnar's strains. A situation
+  card pinned to another settlement is no longer a candidate (`cards.salience`). A matter of
+  the player's own still travels with them.
+- **The ache (#25, #46).** `body_shown` owed the wounds on every beat, and its rewrite put
+  "your body aching" into almost every beat from 202 to 247, twice in beat 205. The brief
+  carried the body line every time, and once the aside gave the wounds to the gardener.
+  tbaMUD repeats "You are hungry." from `point_update` on the clock (src/limits.c
+  `gain_condition`), not on every command. **Fixed:** a strain is owed when it is new or
+  changed, or an hour of game time after it was last told (`body_shown.owed`,
+  `RETELL_MINUTES`). The brief and the check read the same list, and `note_told` records what
+  shipped.
+- **The raw travel tell (#38).** The body repair rewrote the slot's only sentence in place.
+  `keep_act_slots` took the rewrite for a cut and pasted the engine's line. Rewrites are now
+  mapped back to the sentence they replaced. When a slot really is cut, its stand-in drops the
+  roll's own verdict sentence if the rest of the tell says what came of it.
+- **The mite "further in" (#36).** The aside chose a creature kept far with no square, out of
+  a fight (`Engine._inhabit`). Such a creature is not offered to the aside.
+- **"A find of ancient stone" (#26).** The venture tell was a fragment, "the crypt, found for
+  the first time, off the graveyard.". It is now a sentence: "The crypt opens off the
+  graveyard: you have not been inside it before."
+
+Not covered: #43's table talk matched the engine's refusal, which came from a wrong walk
+(#42, the travel lane). The aside can still invent a person who is not here (seen once below,
+"The merchant continues to adjust the crates"). A real cut's stand-in is still the engine's
+line, not retold.
+
+**Measured** with `tools/narration_diag/drive.py`. Turns were replayed from the playtest's own
+engine snapshots against master (85600af4) and this branch, on the same Ollama, which other
+lanes were using at the same time (turns took 35-600 s). Three runs each:
+
+| item | master | this branch |
+|---|---|---|
+| #50, #53: a find on the page with no find in the engine | 6 of 6 | 0 of 6 |
+| #5: the yield of the ship on the page | 1 of 3 | 3 of 3 (one only as the engine's line) |
+| #10: another town's strain on the deck | 3 of 3 | 0 of 3 |
+| #25: a six-turn walk through the sewers from beat 228, beats with a body word | 6 of 6 | 1 of 6 |
+
+The master walk also invented the culvert seam again on its second beat. These are small
+samples: the claim rests on the mechanism, which the tests pin
+(tests/test_playtest_2026_11_16_narration.py).

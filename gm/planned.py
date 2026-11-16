@@ -391,8 +391,14 @@ def present(engine) -> list[dict]:
         body = _body(a)
         if body:
             what.append(body)
+        # Kept far with no square, out of a fight: further in, where the player has not
+        # seen it (`Engine._inhabit`'s "Something lives here: a mite, further in.").
+        scene = engine.scene
+        further = (not getattr(scene, "in_encounter", False)
+                   and (getattr(scene, "zones", None) or {}).get(ref) == "far"
+                   and ref not in (getattr(scene, "positions", None) or {}))
         out.append({"ref": ref, "name": a.name, "what": ", ".join(what),
-                    "can_answer": not dead and not a.is_down})
+                    "can_answer": not dead and not a.is_down, "further_in": further})
     return out
 
 
@@ -1110,6 +1116,17 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
             say += (f" It concerns {theirs}, which is somebody else's matter: the player "
                     "has not taken it on, so never write it as something they seek, "
                     "pursue or keep in mind.")
+        # A search made and nothing found (`beat_verify.found_nothing`): said, because "makes
+        # the perception check by 2" beside "searching for a bricked-up opening" was
+        # written "Your fingers catch on a hidden seam behind a bricked-up opening"
+        # (playtest 2026-11-16 #53). The engine's record of a find is an effect; none here.
+        from . import beat_verify
+
+        searching = beat_verify.searching_of(reading)
+        if any(beat_verify.found_nothing(o.as_dict() if hasattr(o, "as_dict") else o,
+                                         searching) for o in act):
+            say += (" The search is made well and turns up NOTHING: no hidden way, door, "
+                    "seam, passage or thing is found. Write it finding nothing.")
         # The player's character named in the act's own tells: said once who that is. The
         # 2026-11-05 rerun's gallows walk came back "snaps Corvin T. into the air, and he dies
         # instantly" — the name turned to "you" downstream (`pc_to_second_person`), the
@@ -1280,7 +1297,10 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
             # matter's giver and carrier); the slot goes when nobody else is here. Not
             # covered: the "still" pair, whose slot names nobody by ref.
             engaged = _engaged(outcomes, matter, me)
-            people = [p for p in people if p["ref"] not in engaged]
+            # Nor a creature further in, unseen: playtest 2026-11-16 #36, the venture's
+            # tell put the mite "further in" and the aside wrote "A small fey moves among
+            # the shadows, continuing its silent work in the dark".
+            people = [p for p in people if p["ref"] not in engaged and not p["further_in"]]
         if speaker is None and people:
             names = ", ".join(f'{p["name"]} ({p["ref"]})' for p in people)
             slots.append({"key": "aside", "want": ASIDE_WANT,
@@ -2171,10 +2191,26 @@ def engine_line(tells) -> str:
     tell: a capital after every full stop would make "Mira H. goes" "Mira H. Goes"."""
     from .beat_verify import _XP_LINE
 
-    lines = (_XP_LINE.sub("", _BRACKETED.sub("", narration_mod.page_line(t)))
-             for t in tells or () if t)
+    lines = (_without_the_roll(_XP_LINE.sub("", _BRACKETED.sub(
+        "", narration_mod.page_line(t)))) for t in tells or () if t)
     return " ".join(_opens_a_sentence(" ".join(x.split())) for x in lines
                     if x.strip()).strip()
+
+
+# The engine's own verdict sentence for a check or a save ("Vesna Kroll makes the
+# intimidate check by 12.", "misses the perception check by 6.", "makes the stealth check,
+# only just."): its template, read as the engine writes it, never the model's English.
+_ROLL_SENTENCE = re.compile(r"[^.!?]*\b(?:makes?|miss(?:es)?) the [a-z ]+? (?:check|save)\b"
+                            r"[^.!?]*[.!?]\s*")
+
+
+def _without_the_roll(line: str) -> str:
+    """The tell with its verdict sentence dropped when the rest still says what came of it.
+    Playtest 2026-11-16 (the #5 replay, after the fix): a repair cut the yield's slot and
+    the stand-in read "You make the intimidate check. The captain is shaken. …" on the
+    page; the rest of the tell is the outcome. A tell that is only the verdict keeps it."""
+    rest = _ROLL_SENTENCE.sub("", line or "")
+    return rest if rest.strip() else line
 
 
 def _opens_a_sentence(line: str) -> str:

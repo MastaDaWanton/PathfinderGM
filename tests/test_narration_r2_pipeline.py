@@ -201,7 +201,9 @@ def test_a_cut_leaves_no_fragment_and_the_engine_line_is_whole_second_person():
     assert planned.engine_line([
         "Tam makes the intimidate check, only just. You gain 100 XP for the intimidate "
         "check (DC 12) (6,000 of 9,000 for level 4). The guild clerk is unmoved."]) == \
-        "Tam makes the intimidate check, only just. The guild clerk is unmoved."
+        "The guild clerk is unmoved."
+    # (The roll's own sentence goes too when the rest tells the outcome: playtest
+    # 2026-11-16, "You make the intimidate check. The captain is shaken." on a page.)
 
 
 # --- 2. the narrator checks on a planned beat ------------------------------------------------
