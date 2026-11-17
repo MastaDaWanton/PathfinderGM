@@ -3586,9 +3586,11 @@ _JOB_SYSTEM = (
     "number of the sentence in which the speaker puts a PARTICULAR piece of work to the "
     "player: what the job is (escorting, carrying, guarding, delivering, fetching or the "
     "like, named), who or what it is for, where it is done or goes, when it starts, papers "
-    "to sign for it, or a sum of pay. Saying only that work or hands are wanted, asking "
-    "what the player can do, or taking their name is NOT. A price for goods or a room is "
-    "NOT. Answer \"none\" when no sentence does.")
+    "to sign for it, or a sum of pay. Openings or contracts said to be posted, listed or "
+    "written up somewhere for the player to read (a board, a list, a ledger) ARE. Saying "
+    "only that work or hands are wanted, asking what the player can do, or taking their "
+    "name is NOT. A price for goods or a room is NOT. Answer \"none\" when no sentence "
+    "does.")
 _JOB_DEMO_USER = (
     "The speaker: the ferry master\n\n"
     "1. \"Hands are wanted on the crossings this month.\"\n2. \"What can you do?\"")
@@ -3598,6 +3600,14 @@ _JOB_DEMO_USER_2 = (
     "1. \"Good.\"\n2. \"You'll ride the salt barge down to the weir at dawn and keep the "
     "river rats off it.\"")
 _JOB_DEMO_ANSWER_2 = {"sentence": "2"}
+# Playtest 2026-11-17b #12/#13: the guild clerk, holding no job, said "several openings for
+# escort and caravan work ... posted on the notice board", read as only "work is wanted",
+# and the player's next turn went to read a board that did not exist.
+_JOB_DEMO_USER_3 = (
+    "The speaker: the clerk of the guild\n\n"
+    "1. \"The guild always needs hands.\"\n2. \"There are several openings for caravan "
+    "work; the contracts are pinned on the board by the door.\"")
+_JOB_DEMO_ANSWER_3 = {"sentence": "2"}
 
 
 # With real jobs (rules/jobs.py, 2026-10-27) a speaker who holds work is read against it: the
@@ -3737,6 +3747,8 @@ def invented_job_sentence(text: str, speaker: str, *, held: str = "", chat=None,
                 {"role": "assistant", "content": json.dumps(_JOB_DEMO_ANSWER)},
                 {"role": "user", "content": _JOB_DEMO_USER_2},
                 {"role": "assistant", "content": json.dumps(_JOB_DEMO_ANSWER_2)},
+                {"role": "user", "content": _JOB_DEMO_USER_3},
+                {"role": "assistant", "content": json.dumps(_JOB_DEMO_ANSWER_3)},
                 {"role": "user", "content": user}]
     if bare_template(model):
         msgs = _raw_prompt(msgs)

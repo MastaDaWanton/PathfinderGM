@@ -503,7 +503,8 @@ def test_the_appended_smithy_is_published_for_world_bible():
                        .read_text(encoding="utf-8"))
     # The laboratory joined 2026-10-06 (alchemy lane G: "every city has a laboratory").
     assert vocab["appended_to_authored"]["city"][0] == "the smithy"
-    assert vocab["appended_to_authored"] == {"city": list(places.APPENDED_TO_AUTHORED["city"])}
+    assert vocab["appended_to_authored"] == {k: list(v)
+                                             for k, v in places.APPENDED_TO_AUTHORED.items()}
 
 
 # --- 8. the World Bible contract names the material fields ----------------------------------------

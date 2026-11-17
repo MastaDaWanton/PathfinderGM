@@ -1554,3 +1554,42 @@ in `about`.
 An export carries `ruins` on at least one settlement, `tools/check_places.py` accepts the
 fields above and nothing else, and a way down found under that settlement names those
 builders, that age and that ending in its rooms' traces, every time.
+
+## 30. An inn in every settlement's `play.places[]` — somewhere a traveller can sleep
+
+*Asked 2026-11-17 (fix/inns-and-jobs; 29 left free for feat/travel-pacing). Optional:
+without it the app appends `the inn` to every authored settlement that lists no inn, and
+`the tavern` beside it to a city (`places.APPENDED_TO_AUTHORED`, published in
+`docs/place-vocabulary.json`), which is how every world plays today.*
+
+Playtest 2026-11-17b #4/#7/#8: in Mirabalos (Pangrella's export, a city of 23 places) "head
+to an inn in the city" walked the player aboard her own ship twice, the harbourmaster named
+the gardens as a place to rest, and the city's own news spoke of "the death at the tavern"
+that its place list did not hold. Measured that day: no inn or tavern in 8 of Pangrella's 12
+settlements (all 6 towns, 2 of 6 cities). A settlement with nowhere to let a bed is one the
+rest door cannot price a night in (CRB Goods and Services, inn stay 2 sp / 5 sp / 2 gp).
+
+**Shape.** No new field: a row in `play.places[]` for each place that lets beds, under a
+name of the world's own, with the kind the app reads (`"kind": "inn"` or `"kind": "tavern"`),
+and, when the world knows it, the optional word `lodging` (docs/from-world-bible.md, "Where
+beds are let"):
+
+```json
+{"id": "7ef5e373c993~urban:the-salt-lantern", "name": "the Salt Lantern",
+ "kind": "inn", "lodging": "common", "parent": "7ef5e373c993",
+ "about": "Where the caravans' drivers sleep, two to a bed."}
+```
+
+| scale | at least |
+|---|---|
+| village | one inn (or one tavern that lets beds) |
+| town | one inn |
+| city | one inn and one tavern |
+
+**Rule 1 still holds.** A word, never a price: the stay's cost, the meals and the drink
+are the app's (CRB Goods and Services, "Food, Drink, and Lodging").
+
+### Done when
+
+Every settlement in an export holds an inn or tavern row of its own, `tools/check_places.py`
+reports none appended for lodging.

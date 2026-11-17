@@ -23347,6 +23347,12 @@ class Engine:
         # A temple's casting for pay (rules/services.py, playtest 2026-11-16 #70).
         if item_id.startswith(services_mod.PREFIX):
             return self._buy_spell(intent, actor, item_id, seller)
+        # A night's stay at an inn or a tavern (rules/lodging.py, playtest 2026-11-17b #10).
+        from . import lodging as lodging_mod
+
+        if item_id.startswith(lodging_mod.PREFIX) or (
+                lodging_mod.lets_beds(self.scene) and lodging_mod.find(item_id) is not None):
+            return self._buy_stay(intent, actor, item_id, seller)
         # Whoever keeps this counter, by name, when the plan named no seller: the panel
         # never does, and "pays the stallholder" read wrong with Azhil Vex standing
         # behind it (live, 2026-09-27).
@@ -23516,6 +23522,63 @@ class Engine:
             tell=f"{actor.name} pays {priest.name} {price} for {spell.name}"
                  + (f" ({moved})" if moved else "") + f". {_sentence(done.tell)} "
                  f"({goods.purse_line(actor.purse, coins)} left.)",
+            because=intent.because)
+
+    def _buy_stay(self, intent: Intent, actor, item_id: str, seller) -> Outcome:
+        """A night's stay bought at an inn's or a tavern's counter (rules/lodging.py).
+
+        The book's stay (CRB Goods and Services: poor 2 sp, common 5 sp, good 2 gp a day),
+        moved by the keeper's own terms as the rest door's bill is (`_room_bill`), never
+        haggled, paid through `goods.spend` and held for the day through the applicator
+        (`lodging.hold`), so the night slept here after it costs nothing more. A room
+        already held today is not sold twice."""
+        from . import goods
+        from . import keepers as keepers_mod
+        from . import lodging
+        from . import pricing
+
+        at = str(self.scene.at or "")
+        keeper = self.scene.actors.get(seller) if seller else None
+        if keeper is None:
+            keeper = keepers_mod.keeper_in(self.scene, at)
+        if not lodging.lets_beds(self.scene, at) or keeper is None \
+                or keeper.ref not in self.scene.actors:
+            return self._refuse(intent, "Nobody here lets rooms: a bed is let at an inn or "
+                                        "a tavern, by whoever keeps it.")
+        row = lodging.find(item_id)
+        if row is None:
+            return self._refuse(intent, f"{_sentence(keeper.name)} lets no such room. "
+                                        f"Let here: a poor, a common or a good stay.")
+        name = self._place_name(at)
+        if lodging.held(actor, at):
+            return self._refuse(intent, f"{actor.name}'s room at {name} is already paid "
+                                        f"for today.")
+        if self._will_not_deal(keeper):
+            return self._refuse(intent, self._will_not_deal(keeper))
+        percent, why = pricing.seller_percent(self.scene, keeper)
+        cost = pricing.moved_cp(row["cp"], percent)
+        moved = tradecraft.terms_said(keeper, percent, why)
+        coins = self._coins_here()
+        price = goods.purse_line(goods.coins_for(cost), coins)
+        purse, paid = goods.spend(actor.purse, cost)
+        if not paid:
+            return Outcome(intent_id=intent.id, op="buy", effects=[],
+                           tell=f"A {row['quality']} room at {name} is {price} a night and "
+                                f"{actor.name} has {goods.purse_line(actor.purse, coins)}. "
+                                f"Nothing changes hands.", because=intent.because)
+        actor.purse = purse
+        lodging.hold(actor, at, name, self.scene.ROUNDS_PER_MINUTE, row["quality"])
+        return Outcome(
+            intent_id=intent.id, op="buy",
+            effects=[{"ref": actor.ref, "kind": "bought", "item": f"a {row['quality']} room",
+                      "count": 1, "paid_cp": cost, "from": keeper.ref,
+                      "service": "inn-stay", "stay": row["quality"],
+                      "origin": lodging.ORIGIN}],
+            tell=f"{actor.name} pays {keeper.name} {price} for a {row['quality']} room at "
+                 f"{name} for the night ({lodging.ABOUT[row['quality']]})"
+                 + (f" ({moved})" if moved else "")
+                 + f". The room is {actor.name}'s until this time tomorrow. "
+                   f"({goods.purse_line(actor.purse, coins)} left.)",
             because=intent.because)
 
     def _cargo_terms(self, actor, keeper) -> tuple[int, str, float]:

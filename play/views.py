@@ -7067,6 +7067,8 @@ def _offer_and_seller(c, player_text: str):
     # silk from the Red Gull's hold" is an offer, never a sale (`acts_to_ops._sell`), and
     # the screen is where a priced sale is made in one step.
     selling = "" if want else judgement.sale_offered(player_text)
+    if want and _room_slept_in(c, player_text, want):
+        want = ""
     if not (want or selling) or c.scene.in_encounter:
         return None, None
     pc = c.scene.pc()
@@ -7086,6 +7088,20 @@ def _offer_and_seller(c, player_text: str):
     if _counter_refusal(c, pc) is not None:
         return None, None
     return {"open": True, "want": want, "line": "", **extra}, merchant
+
+
+def _room_slept_in(c, player_text: str, want: str) -> bool:
+    """Whether the purchase is a room the same line sleeps in: "I pay for a room for the
+    night and go to bed" is the rest door's, which bills the room and holds it
+    (`Engine._room_bill`), so no counter opens to sell it a second time. The reading's
+    `rest` and the inn's own stays (`lodging.find`), never the words."""
+    from gm import interpret
+    from rules import lodging
+
+    if not lodging.lets_beds(c.scene) or lodging.find(want) is None:
+        return False
+    reading = interpret.reading_of(str(player_text or "")) or {}
+    return any(a.get("act") == "rest" for a in reading.get("actions") or [])
 
 
 def _trade_offer(c, player_text: str) -> dict | None:
@@ -7110,7 +7126,7 @@ def _buying_note(c, player_text: str) -> str:
         # 2026-09-27, the market shut for the night: the prose invented a vendor, sold
         # bread and torches, and finished "The transaction for the egg is complete".
         want = judgement.purchase_sought(player_text)
-        if not want or c.scene.in_encounter:
+        if not want or c.scene.in_encounter or _room_slept_in(c, player_text, want):
             return ""
         from rules import keepers
 
@@ -7411,6 +7427,24 @@ def trade(request):
             want_line = "" if pick else (f"{merchant.name} casts no such spell for pay. "
                                          f"This is what the temple casts.")
 
+    # An inn's or a tavern's rooms beside its food and drink (rules/lodging.py, playtest
+    # 2026-11-17b #10), priced as the engine's buy door charges them (`Engine._buy_stay`:
+    # the keeper's terms, never a haggle).
+    from rules import lodging as lodging_mod
+
+    stay_rows: list[dict] = []
+    if not temple and lodging_mod.lets_beds(c.scene) \
+            and _keepers.keeper_in(c.scene, str(c.scene.at or "")) is merchant:
+        stay_percent, _why = pricing.seller_percent(c.scene, merchant)
+        for r in lodging_mod.menu():
+            gp = pricing.moved_cp(r["cp"], stay_percent) / 100
+            stay_rows.append({"id": r["id"], "name": r["shown"], "tier": "common",
+                              "count": 1, "gp": gp, "price": pricing.as_text(gp),
+                              "does_something": True, "shelf": "gear", "staple": False})
+        stay = lodging_mod.find(want) if want and not (pick or picks) else None
+        if stay is not None:
+            pick, want_line = stay["id"], ""
+
     return JsonResponse({
         "stall": stall, "place": place, "day": day, "pick": pick, "want_line": want_line,
         "picks": picks or ([pick] if pick else []),
@@ -7436,9 +7470,9 @@ def trade(request):
               "unit": goods.unit_for(getattr(s, "base", "") or s.name)}
              for s in pc.stock.values() if not temple),
             key=lambda r: -r["gp"]),
-        "theirs": temple_rows if temple else sorted((_row(m, tradecraft.buy_price(
-            pricing.worth(m, buyer=pc, town=place), percent)) for m in shelf),
-                         key=lambda r: -r["gp"]),
+        "theirs": temple_rows if temple else stay_rows + sorted(
+            (_row(m, tradecraft.buy_price(pricing.worth(m, buyer=pc, town=place), percent))
+             for m in shelf), key=lambda r: -r["gp"]),
         "haggled": haggled,
         # Why the prices moved, in words ("the smith likes you: 5% off"), or "".
         "terms": moved if temple else tradecraft.terms_said(merchant, percent, why),

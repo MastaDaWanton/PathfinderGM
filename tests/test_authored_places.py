@@ -58,9 +58,12 @@ def test_the_world_s_own_rooms_are_the_ones_the_party_stands_in():
     own scale against this app's published table: a town holds nine."""
     got = places.home_set(WORLD.get(PANGRELLA))
     names = [p.name for p in got]
-    assert len(got) == 9, names
+    # Nine authored, and the inn its author did not list (`APPENDED_TO_AUTHORED`,
+    # playtest 2026-11-17b #8): somewhere to sleep, appended as the way in is.
+    assert len(got) == 10, names
     assert "the mine head" in names and "the guildhall" in names, names
-    assert all(p.origin == "world" for p in got)
+    assert names[-1] == "the inn" and got[-1].origin == "generated", names
+    assert all(p.origin == "world" for p in got[:-1])
     assert all(p.id.startswith(f"{PANGRELLA}~urban:") for p in got), names
 
 
@@ -88,7 +91,9 @@ def test_the_implied_table_is_not_consulted_when_the_world_has_spoken():
                 places=[_place(), _place(id="aaaabbbbcccc~urban:the-gate",
                                          name="the gate", exits=[])])
     got = places.home_set(port)
-    assert [p.name for p in got] == ["the market", "the gate"]
+    # The inn is appended, as the way in is: a bed is structural, not decoration
+    # (`APPENDED_TO_AUTHORED`, playtest 2026-11-17b #8). The docks is not.
+    assert [p.name for p in got] == ["the market", "the gate", "the inn"]
     # And the cue table would genuinely have fired, so this is testing the branch and not
     # a town whose words imply nothing.
     assert "the docks" in [s for s, _a in places.implied_spots(port)]
@@ -148,7 +153,8 @@ def test_a_place_whose_id_carries_no_ground_is_dropped_rather_than_stood_on():
     # The yard is gone, which is what this test is about. "the way in" is appended to any
     # settlement that names no entrance (2026-09-21, item 46) and this one names only a
     # market, so it arrives here too — it is not the dropped room coming back.
-    assert [p.name for p in got] == ["the market", "the way in"]
+    # The inn likewise (2026-11-17b #8).
+    assert [p.name for p in got] == ["the market", "the way in", "the inn"]
 
 
 def test_an_entirely_unusable_list_falls_back_to_generating():

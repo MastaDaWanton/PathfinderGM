@@ -228,8 +228,17 @@ ALWAYS_BY_SCALE = {
     # arriving at is also a settlement the LAW cannot watch — `_op_travel`'s warrant check
     # asks whether the party is leaving by the gate, and in a place with none it has never
     # once fired.
-    "village": ("the way in", "the well"),
-    "town": ("the gate", "the guardhouse", "the well", "the guildhall"),
+    #
+    # And a bed, at every scale (playtest 2026-11-17b #4/#5/#7/#8): the essentials' "somewhere
+    # to sleep" was the leisure category's first row, taken only while the budget lasted,
+    # so a village whose words earned four places had none, and an authored city (below)
+    # had whatever its author listed. Mirabalos, a city of the shipped Pangrella export,
+    # listed an arena and gardens and no bed, and "head to an inn" walked the player to her
+    # own ship. The inn is guaranteed at every scale; a city has a tavern beside it. A
+    # town is not given its tavern by scale: its budget is where the essentials live (the
+    # smithy's note below), and the fill or the `found` door gives it one.
+    "village": ("the way in", "the well", "the inn"),
+    "town": ("the gate", "the guardhouse", "the well", "the guildhall", "the inn"),
     # A city has a smithy, whatever the seed (blacksmithing plan §10). Measured 2026-10-03
     # over 200 seeds per scale: the old fill gave a smithy to 0 of 200 villages, 0 of 200
     # towns and 0 of 200 cities. In a village and a town the guarantees and the four
@@ -255,7 +264,7 @@ ALWAYS_BY_SCALE = {
     # workers at once — a room a town keeps, not a tool you carry (aonprd Rules ID 1291).
     # Towns and villages get one from their own words or the `found` door, as the smithy.
     "city": ("the gate", "the guardhouse", "the barracks", "the well", "the guildhall",
-             "the smithy", "the laboratory"),
+             "the smithy", "the laboratory", "the inn", "the tavern"),
 }
 
 # Rows a settlement only ever has by name — guaranteed by its scale (`ALWAYS_BY_SCALE`),
@@ -1164,7 +1173,14 @@ def _with_a_way_in(authored: tuple[Place, ...], here: str, location) -> tuple[Pl
 # open point 7): "every city has a laboratory to rent". Published in
 # docs/place-vocabulary.json (`appended_to_authored`) so the author can see it happen and
 # write their own instead.
-APPENDED_TO_AUTHORED = {"city": ("the smithy", "the laboratory")}
+#
+# And a bed, from 2026-11-17 (playtest 2026-11-17b #8): somewhere to sleep is what a
+# settlement is FOR in the rest door's rule (`lodging.lets_beds`, `Engine._room_bill`), as
+# the smithy is for the forge's. Measured that day on the shipped Pangrella export: no
+# inn or tavern in 8 of its 12 authored settlements (all 6 towns; Mirabalos and
+# Khalmorin of its 6 cities). By scale, as `ALWAYS_BY_SCALE` gives a generated one.
+APPENDED_TO_AUTHORED = {"village": ("the inn",), "town": ("the inn",),
+                        "city": ("the smithy", "the laboratory", "the inn", "the tavern")}
 
 
 def _with_a_smithy(authored: tuple[Place, ...], here: str,
@@ -1188,6 +1204,10 @@ def _with_a_smithy(authored: tuple[Place, ...], here: str,
     Sublime, Transmute and rare reagents need one (`laboratory_here`). An author's own
     laboratory by any name stands, as long as its kind is one whose keeper is an
     alchemist (`"kind": "laboratory"`, read by `_authored`).
+
+    The inn and a city's tavern joined 2026-11-17 (`APPENDED_TO_AUTHORED`'s note): a bed
+    is what the rest door's price and a night off the ground need, and an author's own
+    inn or tavern by any name (`"kind": "inn"`) stands.
 
     Attached as the way in is: its exits run to the first place, and the first place
     gains it, so it is reachable (an exit is adjacency, and adjacency runs both ways). In
@@ -1339,6 +1359,12 @@ def _wanted(scale: str, earned: tuple[tuple[str, str], ...],
     # nothing else.
     rows = [r for r in rows if r[0] not in ONLY_WHEN_NAMED]
     for category in ESSENTIAL_CATEGORIES:
+        # The bed is the leisure essential ("somewhere to sleep"), and the inn is now
+        # guaranteed by scale: taking a second leisure row for it pushed a village's lane
+        # out (`tools/check_places.py`: "nothing of the hidden kind", 2026-11-17). Only
+        # leisure: a city's guaranteed smithy is trade, and its market still comes here.
+        if category == "leisure" and "the inn" in seen:
+            continue
         take(next((r for r in rows if r[3] == category and r[0] not in seen), None),
              capped=False)
     # Within a category, the biggest thing this settlement is entitled to comes first. A
@@ -2383,6 +2409,12 @@ def find(places, wanted: str, near: str = "") -> Place | None:
     want = " ".join(str(wanted or "").split()).lower()
     if not want:
         return None
+    # "an inn in the city" is the inn: a place is named by the definite article, and the
+    # indefinite one names one of a kind. Playtest 2026-11-17b #4: "head to an inn in the
+    # city" was found nowhere, and the plan's own walk took her aboard her ship.
+    for article in ("a ", "an "):
+        if want.startswith(article) and len(want) > len(article):
+            want = "the " + want[len(article):]
     named = [p for p in places or ()
              if want in (p.id.lower(), p.name.lower(), p.name.lower().removeprefix("the "))]
     if named:

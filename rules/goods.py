@@ -1139,6 +1139,14 @@ def _want_words(text: str) -> list[str]:
             if w not in _MEASURE_WORDS]
 
 
+# The words a tavern's food and drink are asked for by, beside their names: "a drink" is
+# the mug of ale, "food" a meal. Playtest 2026-11-17b #10: "I buy a meal and a drink from
+# the barkeep" named no row. A closed table by the GEAR key, never the player's English.
+ASKED_AS = {"ale": "drink beer", "ale gallon": "drink beer", "wine": "drink",
+            "fine wine": "drink", "good meal": "food supper dinner",
+            "common meal": "food supper dinner", "poor meal": "food supper dinner"}
+
+
 def match_want(want: str, rows) -> tuple[object | None, list]:
     """The shelf row the player asked for, or None and what is nearest.
 
@@ -1166,7 +1174,8 @@ def match_want(want: str, rows) -> tuple[object | None, list]:
         bare = rid.split(":", 1)[1] if rid.split(":", 1)[0] + ":" in PREFIXES.values() \
             else rid
         have = {_stem(w) for w in re.findall(
-            r"[a-z][a-z'-]*", f"{name} {bare.replace('-', ' ')}".lower())}
+            r"[a-z][a-z'-]*", f"{name} {bare.replace('-', ' ')} "
+                              f"{ASKED_AS.get(bare, '')}".lower())}
         if all(w in have for w in words):
             fits.append(r)
     if not fits:
@@ -1199,6 +1208,19 @@ def wants_among(want: str, rows) -> list:
         if at is not None:
             taken |= set(range(at, at + n))
             found.append((at, r))
+    if not found:
+        # Each thing of the list on its own, when no name stands whole in it: "a meal and
+        # a drink" is a meal and a drink (playtest 2026-11-17b #10). Cut only at the
+        # list's own joins, and each part matched by the shelf's one matcher.
+        parts = [p for p in re.split(r",|\band\b|\bthen\b", str(want or "").lower())
+                 if p.strip()]
+        if len(parts) > 1:
+            out = []
+            for part in parts:
+                hit, _ = match_want(part, rows)
+                if hit is not None and hit not in out:
+                    out.append(hit)
+            return out
     return [r for _, r in sorted(found, key=lambda x: x[0])]
 
 
@@ -1225,4 +1247,9 @@ def fit_rank(want: str, row) -> tuple:
     v = getattr(row, "price_gp", None)
     if v is None and isinstance(row, dict):
         v = row.get("gp")
-    return (0 if wanted and _head(name) == wanted else 1, float(v or 0))
+    # And the book's own "common" quality before the cheaper poor one: "a meal" at a
+    # tavern is the common meal (CRB, Food, Drink, and Lodging: poor, common, good).
+    # Only among things that ARE the want: "a drink" is still the cheapest drink, the ale.
+    head = bool(wanted) and _head(name) == wanted
+    return (0 if head else 1, 0 if head and "common" in name.lower().split() else 1,
+            float(v or 0))

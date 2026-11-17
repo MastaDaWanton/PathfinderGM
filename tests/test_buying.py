@@ -126,6 +126,11 @@ def at_the_market(tmp_path):
         c = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
         c.scene.location_id = TOWN
         c.scene.clock_minutes = 10 * HOUR
+        # The start is drawn, and a drawn start can be a fight (a robbery in the back
+        # streets): a counter opens to nobody mid-round. Measured 2026-11-17 when the
+        # settlements' place lists grew an inn and the draw changed.
+        if c.scene.in_encounter:
+            c.scene.end_encounter()
         c.engine().place_party(MARKET)
         c.save()
         yield cm
