@@ -4341,6 +4341,14 @@ class GMAgent:
             def job(speaker: str, text: str, held: str = ""):
                 return beat_verify.invented_job_sentence(text, speaker, held=held, **route)
 
+        # And a reply read against what its speaker knows (`planned._knowledge_kept`;
+        # playtest 2026-11-16 #54/#58/#66/#96). Off with the read back.
+        known = None
+        if beat_verify.ENABLED and self.prose_model:
+            def known(speaker: str, text: str, facts):
+                return beat_verify.against_tells(text, facts, speaker=speaker or "they",
+                                                 **route)
+
         # The extra step (the owner, 2026-11-02): the written beat read sentence by sentence
         # against its own tells, a slot that breaks one asked again with the tell named
         # (`planned._tells_kept`, docs/narration-faithfulness.md). Off with the read back.
@@ -4361,7 +4369,7 @@ class GMAgent:
         try:
             beat = planned.write(
                 self.engine, brief=brief, outcomes=outcomes, player_input=player_input,
-                goal=goal, job=job, faith=faith,
+                goal=goal, job=job, faith=faith, known=known,
                 who=(self.prose_model, self.prose_host, self.prose_provider,
                      self.prose_key),
                 # The beat before, as the bench showed it: its last 900 characters.

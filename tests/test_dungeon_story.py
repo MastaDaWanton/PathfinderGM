@@ -259,6 +259,10 @@ def test_walking_the_rooms_tells_each_trace_meets_the_ally_and_finds_the_leader(
     assert ally.name == f"the {tag['ally']['as']}"
     assert states.attitude_of(ally) == "friendly"
     assert ally.notes and "{" not in ally.notes and ally.notes in told[ally_room["id"]]
+    # And the complication is theirs to know (playtest 2026-11-16 #58: the smuggler who
+    # "will not leave without" the cargo told the player it was gone).
+    if tag.get("complication"):
+        assert tag["complication"].split("{")[0].strip() in ally.notes
     climax = rooms[-1]["dungeon"]
     if climax["foes"]:
         boss = s.people[climax["foes"][0]]
