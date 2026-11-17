@@ -200,7 +200,7 @@ def in_the_room(scene, phrase: str) -> str:
         return ""
     said = [w for w in _WORDS.findall(head.lower()) if len(w) > 2 and w not in _NOT_A_NAME]
     noun = _head_noun(head)
-    best, score = "", (0, 0, 0)
+    best, score = "", (0, 0, 0, 0)
     for ref, a in (getattr(scene, "actors", {}) or {}).items():
         if getattr(a, "is_pc", False):
             continue
@@ -225,7 +225,15 @@ def in_the_room(scene, phrase: str) -> str:
         shared = max(len(want & owns), len(_ones(want) & _ones(owns)))
         if by_trade:
             shared = max(shared, len(want))
-        if not shared:
+        # Last of all, a creature answers to its kind (`bestiary.kind_names`): playtest
+        # 2026-11-17 #47, "I stab at the dog" at a dying dog shown by a title found nobody.
+        kind = 0
+        if not shared and noun and getattr(a, "from_template", None):
+            from . import bestiary
+
+            kind = int(any(noun in _words(k)
+                           for k in bestiary.kind_names(str(a.from_template))))
+        if not shared and not kind:
             continue
         whole = max((len(_name_run(n)) for n in names if n.strip() and _says_whole(said, n)),
                     default=0)
@@ -233,7 +241,7 @@ def in_the_room(scene, phrase: str) -> str:
         # matched by what the phrase is about — its head noun — not by any word it holds.
         described = int(bool(noun) and _is_description(shown, true)
                          and noun in _words(shown))
-        key = (whole, described, shared)
+        key = (whole, described, shared, kind)
         if key > score:
             best, score = ref, key
     return best

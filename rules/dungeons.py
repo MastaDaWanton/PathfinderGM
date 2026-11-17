@@ -759,8 +759,12 @@ def stock_room(engine, place, d: dict, concept: dict) -> tuple[list[dict], str]:
     person = got.row.get("id") in (_people_ids(tag["leader"]) | _people_ids(tag["enemies"]))
     on_sight = (bool(tag.get("hostile")) if person
                 else got.row.get("creature_type") in (gathering.AGGRESSIVE | _ON_SIGHT))
+    # A creature goes by its kind; the title is told once, in the line below. Playtest
+    # 2026-11-17 #46/#47: named "the beast they kept", the dog's tells read "the beast
+    # they kept's attack", and "I stab at the dog" found nobody once it was down. A
+    # person's title is a noun phrase ("the band's captain") and stays their name.
     fx, _said = engine._inhabit(place, guarding=climax, row=got.row, count=got.count,
-                                name=title, hostile=on_sight)
+                                name=title if person else None, hostile=on_sight)
     refs = [r for e in fx for r in (e.get("refs") or [e.get("ref")]) if r]
     if person and not on_sight:
         for r in refs:
@@ -1110,7 +1114,17 @@ def spring(engine, trap: dict, victims: list) -> tuple[list, list[dict], list[st
             fall = engine.dice.roll(plan["dice"], label=plan["name"], visibility="hidden")
             rolls.append(fall)
             hit = engine._apply_damage(v, fall.total, plan["type"])
-            bits.append(f"{v.name} falls {eff['pit_ft']} feet into the pit.")
+            # At the bottom until they climb out (`climb_out`), through the one applicator.
+            # Playtest 2026-11-17 #38: the fall did its damage and nothing held her down
+            # there, so "I climb up out of the pit" had nothing to leave.
+            climb = int(eff.get("climb") or PIT_CLIMB_DC)
+            v.add_condition(IN_A_PIT, source=origin, origin=origin,
+                            payload={"climb": climb, "pit_ft": int(eff["pit_ft"]),
+                                     "at": getattr(v, "at", "")})
+            fx.append({"ref": v.ref, "kind": "condition", "condition": IN_A_PIT,
+                       "origin": origin})
+            bits.append(f"{v.name} falls {eff['pit_ft']} feet into the pit, and is at the "
+                        f"bottom of it: climbing out is a DC {climb} Climb check.")
         hit["origin"] = origin
         fx.append(hit)
         hurt.append(v)
@@ -1393,6 +1407,58 @@ def settle(engine) -> list:
     return out
 
 
+# At the bottom of a pit a trap dropped them into (`spring`): a condition, so it is a tag
+# (`states.TAGS`) on an `ActiveEffect` whose payload carries the trap's Climb DC. The
+# printed pit blocks (CRB p.420) give no DC out; the Climb table does (CRB p.90): DC 15 "a
+# surface with adequate handholds and footholds", the default for a row that names none.
+IN_A_PIT = "in a pit"
+PIT_CLIMB_DC = 15
+
+
+def in_pit(actor) -> dict | None:
+    """The pit effect's payload when `actor` is at the bottom of one, else None."""
+    if actor is None or not actor.has_state("state.position.pit"):
+        return None
+    eff = next((e for e in actor.effects if e.key == IN_A_PIT), None)
+    return dict(eff.payload or {}) if eff is not None else {"climb": PIT_CLIMB_DC}
+
+
+def climb_out(engine, intent, actor, partial: dict):
+    """A Climb check out of the pit, at the pit's DC whatever the plan wrote (playtest
+    2026-11-17 #40: the plan's "average (DC 10)"), or None when they are in no pit.
+
+    Climb, CRB p.90: success advances "at one-quarter your normal speed"; "a failed check
+    by 4 or less means you make no progress, and one that fails by 5 or more means you
+    fall from whatever height you have already attained" — from the bottom that is under
+    10 ft, so no falling damage (1d6 per 10 ft, CRB p.443). The time is the climb's: the
+    pit's depth at a quarter speed, two move actions a round."""
+    from .engine import Outcome
+
+    pit = in_pit(actor)
+    if pit is None:
+        return None
+    dc = int(pit.get("climb") or PIT_CLIMB_DC)
+    mods = list(actor.skill_modifiers("climb"))
+    roll = engine._roll_or_suspend(intent, actor, mods, "Climb check — out of the pit", dc,
+                                   partial)
+    made = roll.total >= dc
+    engine._judge(roll, made)
+    if made:
+        per_round = max(5, int(getattr(actor, "speed", 30) or 30) // 2)
+        engine.scene.advance(0, rounds=max(1, -(-int(pit.get("pit_ft") or 10) // per_round)))
+        actor.remove_effects(match=lambda e: e.key == IN_A_PIT)
+        tell = f"{actor.name} climbs up out of the pit ({roll.total} against DC {dc})."
+    else:
+        engine.scene.advance(0, rounds=1)
+        tell = (f"{actor.name} " + ("slips back to the bottom of the pit"
+                                    if dc - roll.total >= 5 else "makes no headway up the pit wall")
+                + f" ({roll.total} against DC {dc}).")
+    return Outcome(intent_id=intent.id, op="check", rolls=[roll], dc=dc,
+                   verdict="success" if made else "failure",
+                   effects=[{"ref": actor.ref, "kind": "climb_out", "made": made, "dc": dc}],
+                   tell=tell, because=intent.because)
+
+
 def break_door(engine, intent, pc, how: str, partial: dict, *, strict: bool = False):
     """`break_in` at a closed dungeon door or way down: Strength against its break DC, or
     Disable Device against its lock. None when no dungeon door is shut here — or, when
@@ -1449,9 +1515,9 @@ def break_door(engine, intent, pc, how: str, partial: dict, *, strict: bool = Fa
         door["state"] = "open"
         bits.append(f"{_cap(door['name'])} gives: the way to "
                     f"{getattr(dest, 'name', 'beyond')} is open.")
-        bits.append(engine.reward_check(pc, "strength" if how == "force" else "disable device",
-                                        dc, modifier=roll.modifier_total,
-                                        obstacle=f"door:{far}").strip())
+        # No XP: a door has break and lock DCs, not a CR (CRB p.397 pays for CR'd
+        # challenges; doors, CRB p.412, list none). Playtest 2026-11-17 #44: forcing two
+        # stuck doors paid 200 XP each and carried her to level 2.
     else:
         bits.append(f"{_cap(door['name'])} holds.")
     fx.append({"kind": "dungeon_door", "to": far, "how": how, "opened": opened})

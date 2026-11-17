@@ -438,6 +438,11 @@ TAGS: dict[str, tuple[str, ...]] = {
     # new disguise is made.
     "disguised":   ("state.disguised",),
     "prone":       ("state.position.prone", "recovery.rest"),
+    # At the bottom of a pit trap's pit (rules/dungeons.py `spring`): the way out is a
+    # Climb check at the pit's DC (`dungeons.climb_out`), and until it is made nobody
+    # walks off (`_op_travel`, `_op_move`). Not an Appendix 2 condition, so no row in
+    # `tables.CONDITIONS`; no `recovery.rest` — a night's sleep leaves you in the pit.
+    "in a pit":    ("state.position.pit",),
     "flat-footed": ("state.position.flat-footed", "recovery.rest", "state.exposed"),
     "bleed":       ("state.wound.bleeding",),
     # A poison or a disease running in the body (Core Rulebook, Afflictions, pp. 555-557):
