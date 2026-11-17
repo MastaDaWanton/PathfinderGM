@@ -644,6 +644,28 @@ def door_between(scene, a: str, b: str) -> dict | None:
     return None
 
 
+def shut_door_named(scene, words) -> str:
+    """The name of the place beyond a closed door out of here that `words` name — by that
+    place's name ("the door to the beast's pool") or by the door's own last word ("the
+    stuck door") — or "". Names the engine holds, matched against the player's words."""
+    said = " ".join(str(words or "").lower().split())
+    here = str(getattr(scene, "at", "") or "")
+    founded = getattr(scene, "founded", None) or []
+    if not said or not here or not founded:
+        return ""
+    up = (_rec(scene, here) or {}).get("parent")
+    near = [r.get("id") for r in founded if r.get("parent") == here] + [up]
+    for other in near:
+        door = door_between(scene, here, other) if other else None
+        if door is None:
+            continue
+        name = str((_rec(scene, other) or {}).get("name") or "").lower()
+        noun = (str(door.get("name") or "").lower().split() or [""])[-1]
+        if (name and name in said) or (noun and noun in said.split()):
+            return name or noun
+    return ""
+
+
 def shut_line(scene, a: str, b: str) -> str:
     door = door_between(scene, a, b)
     if door is None:

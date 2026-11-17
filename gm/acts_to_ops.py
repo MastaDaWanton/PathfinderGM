@@ -907,6 +907,21 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
     led = _walk_rides_the_follow(frame, scene)
     for i, a in enumerate(frame.get("actions") or []):
         act = str(a.get("act") or "")
+        if act == "attack" and a.get("target") and not person(scene, a["target"]):
+            # A blow at a shut door out of here is the door forced (`break_in`, which
+            # dungeons.break_door rolls at the book's DC). Playtest 2026-11-17 #43: "I
+            # throw my shoulder against the door to the beast's pool again" was read
+            # `attack, target: the door…`, nobody answered to it, and the turn was a 422
+            # "Nobody here answers to the door to the beast's pool" — while the same door
+            # forced in other words a turn earlier had worked. Rewritten in the reading,
+            # so every later reader of it (`broken_into`, `victims`) agrees.
+            from rules import dungeons
+
+            beyond = dungeons.shut_door_named(scene, a["target"])
+            if beyond:
+                a.pop("blow", None)
+                a.update(act="break_in", target=beyond)
+                act = "break_in"
         row = Row(index=i, act=act, commit=str(a.get("commit") or "done"))
         if i in bought:
             row.note = bought[i]
