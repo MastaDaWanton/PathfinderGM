@@ -921,6 +921,18 @@ def place_in_its_own_words(location, budget: int = PLACE_WORDS_BUDGET) -> str:
     return text.strip()
 
 
+def held_count(s) -> str:
+    """How much of a shelf entry is carried, for the brief: a measured thing by its measure
+    (rope's count is feet: "×49" read as forty-nine ropes, playtest 2026-11-17 #17), else
+    "×n" for more than one."""
+    from rules import goods as _goods
+
+    unit = _goods.unit_for(getattr(s, "base", "") or getattr(s, "name", ""))
+    if unit:
+        return f", {_goods.measure(int(s.count), unit)}"
+    return f" ×{s.count}" if s.count > 1 else ""
+
+
 def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 known=(), recent=None, secret=False, turn=0, names_for=None,
                 absent: str = "", buying: str = "", reading=None, player_text: str = "",
@@ -1140,8 +1152,8 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
             # it could cite". A player character is the only one with a satchel.
             stock = getattr(actor, "stock", None) or {}
             if stock:
-                jars = ", ".join(f"{iid} ({s.base}" + (f" ×{s.count}" if s.count > 1 else "")
-                                 + ")" for iid, s in sorted(stock.items()))
+                jars = ", ".join(f"{iid} ({s.base}{held_count(s)})"
+                                 for iid, s in sorted(stock.items()))
                 lines.append(f"    CARRYING (use_item by id): {jars}")
             # The raw herbs, with what the character KNOWS of each and nothing more
             # (docs/herbalism-revamp-plan.md §8.1, law 3): an unknown property never

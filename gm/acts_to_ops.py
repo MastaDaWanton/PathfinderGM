@@ -56,6 +56,8 @@ PAYING_ACTS = frozenset({"give", "buy", "drop"})
 
 _PRONOUNS = frozenset({"him", "her", "them", "he", "she", "they", "his", "their"})
 _IT = frozenset({"it", "them", "these", "those", "this", "that"})
+# The words for the whole of what a container holds: a quantifier, not a thing's name.
+_WHOLE = frozenset({"everything", "contents", "inside", "all", "stuff", "lot", "within"})
 _NUMBERS = {"a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
             "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
             "twelve": 12, "fifteen": 15, "twenty": 20, "thirty": 30, "forty": 40,
@@ -446,12 +448,7 @@ def _stock_id(pc, words) -> str:
     wrong jar."""
     from rules import holding
 
-    for sid, item in (getattr(pc, "stock", {}) or {}).items():
-        for name in (getattr(item, "name", ""), getattr(item, "base", ""),
-                     str(sid).split("#")[0].replace("-", " "), sid):
-            if name and holding.same(name, words):
-                return sid
-    return ""
+    return holding.stock_key(getattr(pc, "stock", {}) or {}, words)
 
 
 def _carried(pc, words, coming=()) -> str:
@@ -549,6 +546,20 @@ def _take(row: Row, frame, i, scene, pc, recent=()) -> None:
                      if p.get("act") in ("take", "steal")), None)
         if prev is not None and prev.get("target"):
             source = " ".join(str(prev["target"]).split())
+    if source and _mine(source) and not coin and not person(scene, source):
+        # Out of the player's own pack, pocket or pouch: what it holds is what they carry,
+        # and taking it out moves nothing (playtest 2026-11-17 #18: "take a torch out of my
+        # pack" built a pick-up, refused "a torch is not here: it lies at the market").
+        # Not `holding.is_container`, whose closed list has no "pack": "my" says whose.
+        boxed = any(r.get("held_by") == pc.ref and holding.key_in(
+            ((r.get("contents") or {}).get("goods") or {}), thing)
+            for r in getattr(scene, "props", None) or ())
+        if not boxed:
+            if _carried(pc, thing):
+                row.note = f"{thing} is already carried"
+            else:
+                row.missing = row.unheld = f"{pc.name} has no {_plain(thing)}"
+            return
     if getattr(scene, "in_encounter", False) and not coin \
             and not (source and holding.is_container(source)):
         # In a fight, a thing taken off a foe is 1e's Steal (CMB against CMD, the `attack`
@@ -576,6 +587,12 @@ def _take(row: Row, frame, i, scene, pc, recent=()) -> None:
         params.update(item=amount[0], count=amount[1])
     if source and holding.is_container(source):
         params["from_"] = _plain(source)
+        if set(re.findall(r"[a-z]+", _plain(thing))) & _WHOLE:
+            # "everything that's in the gaoler's box", "what's inside": the box emptied,
+            # its contents the engine's record (`Engine._empty_box`). Playtest 2026-11-17
+            # #42: the give of "everything" was answered "'everything' is a word, not a
+            # thing", logged resolved, and the 50 gp stayed in the box.
+            params["item"] = "everything"
     elif source:
         who = person(scene, source) or _counter_keeper(scene)
         if who:
@@ -1091,8 +1108,11 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                     _to_the_fixture(row, kind, scene, pc)
                 _sneak(row, a, scene, pc)
             if act == "use" and pc is not None and not row.ops:
-                if not (_skill_used(row, a, pc) or _put_on(row, a, pc)):
+                if not (_skill_used(row, a, pc) or _put_on(row, a, pc)
+                        or _light(row, a, pc)):
                     _draw(row, a, pc)
+            if act in ("other", "look", "use") and pc is not None and not row.intents:
+                _look_in(row, frame, i, scene, rows)
             if act == "disguise" and pc is not None:
                 _disguise(row, a, pc)
             # Taking 10 or 20 is always on the ground at hand: nobody takes 20 on a tavern.
@@ -1366,6 +1386,64 @@ def _draw(row: Row, a: dict, pc) -> None:
         row.intents.append({"op": "wear", "actor": pc.ref,
                             "params": {"item": str(carried), "actor": pc.ref},
                             "because": f"the player draws the {carried}"})
+
+
+def _light(row: Row, a: dict, pc) -> bool:
+    """A `use` of a thing on the player's shelf that gives light (a torch, a sunrod: its
+    own `light` document, `consumables._light`): the `use_item` that lights it, through
+    the engine's door. True when it was built.
+
+    Playtest 2026-11-17 #13 and #15: "I light a torch" and "I light one of my torches",
+    three torches on the shelf, built no op either way, and the page lit a torch the engine
+    never did — on the way into a dark dungeon. The shelf's own record says what lights,
+    never the verb: "use my torch" and "light my torch" are one deed."""
+    from rules import consumables
+
+    said = " ".join(str(a.get("object") or "").split())
+    sid = _stock_id(pc, said) if said else ""
+    held = (getattr(pc, "stock", {}) or {}).get(sid) if sid else None
+    if held is None or not any(str(s.get("type")) in ("light", "manifest")
+                               for s in consumables._specs(held)):
+        return False
+    row.intents.append({"op": "use_item", "actor": pc.ref,
+                        "params": {"item": sid, "how": "light"},
+                        "because": f"the player lights the {held.name}"})
+    row.note = f"lights the {held.name}"
+    return True
+
+
+def _look_in(row: Row, frame, i: int, scene, rows=()) -> None:
+    """Opening or looking into a container that holds something on the engine's record
+    ("open the gaoler's box", "see what's inside" after it): `narrate_only` with
+    `looks_in`, which tells the contents (`Engine._looks_in`). Once a box a turn.
+    Playtest 2026-11-17 #41: the prose pried the lid and never said what was inside.
+    The record decides — a container named here with `contents` — never the verb."""
+    from rules import holding
+
+    acts = frame.get("actions") or []
+    said = " ".join(str(acts[i].get("object") or "").split())
+    if said and not holding.is_container(said) and (
+            set(re.findall(r"[a-z]+", _plain(said))) & _WHOLE or said.lower() in _IT):
+        # "what's inside", "it": the container of the deed before it.
+        said = next((" ".join(str(p.get("object") or "").split())
+                     for p in reversed(acts[:i])
+                     if holding.is_container(str(p.get("object") or ""))), "")
+    if not said or not holding.is_container(said):
+        return
+    want = holding.head_of(said)
+    here = str(getattr(scene, "at", "") or "")
+    pc = scene.pc()
+    if not any("contents" in r and (holding.same(r.get("name"), said)
+                                    or holding.head_of(r.get("name")) == want)
+               and (r.get("at") == here or r.get("held_by") == pc.ref)
+               for r in getattr(scene, "props", None) or ()):
+        return
+    if any(b.get("params", {}).get("looks_in") and holding.head_of(b["params"]["looks_in"])
+           == want for r in rows for b in r.intents):
+        return
+    row.intents.append({"op": "narrate_only", "actor": pc.ref,
+                        "params": {"looks_in": _plain(said)},
+                        "because": "the player looks inside"})
 
 
 def _disguise(row: Row, a: dict, pc, what: str | None = None) -> None:
@@ -1967,7 +2045,7 @@ def things_not_here(raw, rows: list[Row], *, notes: list | None = None) -> list:
     if notes is not None:
         notes.append(f"things the deeds handle that are not here: {line}")
     for r in out:
-        if _op(r) == "narrate_only":
+        if _op(r) == "narrate_only" and not (r.get("params") or {}).get("looks_in"):
             had = " ".join(str((r.get("params") or {}).get("not_here") or "").split())
             if line in had:
                 return out
@@ -2002,7 +2080,7 @@ def nowhere_to_go(raw, rows: list[Row], *, notes: list | None = None) -> list:
     if notes is not None:
         notes.append(f"a walk to nowhere the engine holds: {said[0]}")
     for r in out:
-        if _op(r) == "narrate_only":
+        if _op(r) == "narrate_only" and not (r.get("params") or {}).get("looks_in"):
             r["params"] = dict(r.get("params") or {}, not_here=said[0])
             return out
     return out + [{"op": "narrate_only", "because": "the player walked to nowhere known",
@@ -3066,6 +3144,10 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     # plan's own for the same outfit would find it already on and be refused beside it.
     dressing = {str((b.get("params") or {}).get("item") or "") for b in built
                 if b.get("op") == "wear"} - {""}
+    lighting = [str((b.get("params") or {}).get("item") or "") for b in built
+                if b.get("op") == "use_item"]
+    taken = any(r.act in ("take", "steal") and any(b.get("op") == "give" for b in r.intents)
+                for r in rows)
     # A loot or a harvest the table built is the turn's word on that body: the plan's own
     # loot, or a skill check it wrote for the cutting, would strip or roll a second time.
     looting = any(b.get("op") == "loot" for b in built)
@@ -3151,6 +3233,25 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
             continue
         if op == "wear" and dressing and str(((r or {}).get("params") or {}).get("item")
                                               or "").lower().strip() in dressing:
+            continue
+        if op == "use_item" and _is_coin(((r or {}).get("params") or {}).get("item")):
+            # Coin is spent by a trade, never used: playtest 2026-11-16 N2's `use_item gold
+            # piece` was refused into "she has no gold" with 12 gp in her purse.
+            if notes is not None:
+                notes.append("the plan's use_item of coin dropped")
+            continue
+        if op == "take_off" and taken and not (acts & {"use", "drop", "other"}):
+            # A take the table built whole is the turn's take: the plan's `take_off` beside
+            # it is the planner reaching for an op called "take". Playtest 2026-11-17 #48:
+            # beside the give of the cargo chest's coin it wrote `take_off
+            # cargo_chest_coins`, told "is wearing nothing called cargo_chest_coins".
+            if notes is not None:
+                notes.append("the plan's take_off dropped: the reading's take is a give")
+            continue
+        if op == "use_item" and lighting and any(
+                _same_thing(((r or {}).get("params") or {}).get("item"), x, pc)
+                for x in lighting):
+            # The torch the table lights (`_light`): the plan's own would light a second.
             continue
         if op == "disguise":
             # Code-only (`intents.CODE_ONLY_OPS`): a disguise is the reading's act.

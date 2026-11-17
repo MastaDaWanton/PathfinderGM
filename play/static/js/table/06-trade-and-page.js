@@ -200,8 +200,9 @@ async function openTrade(want, line) {
     return;
   }
   // Put in once, not once per mention: a second "I buy rope" opens on the same basket.
-  if (TRADE.pick && !tradeDeal().some(l => l.side === "buy" && l.id === TRADE.pick)) {
-    tradeAdd("buy", TRADE.pick, false);
+  // Every thing a typed list named that the counter has (`picks`, playtest 2026-11-17 #11).
+  for (const id of (TRADE.picks && TRADE.picks.length ? TRADE.picks : [TRADE.pick])) {
+    if (id && !tradeDeal().some(l => l.side === "buy" && l.id === id)) tradeAdd("buy", id, false);
   }
   if (TRADE.want_line) $("#trademsg").textContent = TRADE.want_line;
   drawTrade();

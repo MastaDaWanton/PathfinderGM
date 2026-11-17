@@ -7147,8 +7147,33 @@ class Engine:
         said = " ".join(str(intent.params.get("not_here") or "").split())
         if said:
             return self._refuse(intent, said)
+        box = str(intent.params.get("looks_in") or "")
+        if box:
+            return self._looks_in(intent, box)
         return Outcome(intent_id=intent.id, op=intent.op, status="resolved",
                        tell="", because=intent.because)
+
+    def _looks_in(self, intent: Intent, name: str) -> Outcome:
+        """What a container here holds, told from its record and moving nothing (taking it
+        is `give`'s, `_empty_box`). Playtest 2026-11-17 #41: "I open the gaoler's box and
+        see what's inside" was a bare narrate_only, and the prose pried the lid and never
+        said what was in it — 50 gp the engine held."""
+        pc = self.scene.pc()
+        box = self._container_named(name, pc)
+        if box is None:
+            return self._refuse(intent, f"There is no {holding.plain(name) or name} here.")
+        coins = self._coins_here()
+        got = (box.get("contents") or {}).get("purse") or {}
+        inside = ([goods.purse_line(got, coins)] if goods.in_copper(got) else []) + [
+            f"{n} × {k}" if int(n or 1) != 1 else str(k)
+            for k, n in ((box.get("contents") or {}).get("goods") or {}).items()]
+        the = _sentence(self._the(str(box.get("name") or name)))
+        return Outcome(intent_id=intent.id, op=intent.op, status="resolved",
+                       because=intent.because,
+                       effects=[{"kind": "looked_in", "container": str(box.get("name")),
+                                 "items": inside}],
+                       tell=(f"{the} opens. Inside: {', '.join(inside)}." if inside
+                             else f"{the} opens. It is empty."))
 
     # provoke -----------------------------------------------------------------------------
 
@@ -18217,6 +18242,10 @@ class Engine:
                 # Plunder (owner call, 2026-11-16): a prize's goods are her taker's, the way
                 # Skull & Shackles plunder is the crew's; `plunder` says which ship.
                 lot["plunder"] = vessel.id
+                # And taken from her owners: stolen, as a thing taken is on the props
+                # ledger (docs/items-have-owners.md), so a sentence for the ship gives it
+                # back with her (`trial._confiscate`, playtest 2026-11-16 N3).
+                lot["stolen"] = True
             vessel.cargo = []
         rows = [dict(v) for v in self.scene.vessels if str(v.get("id")) != vessel.id]
         rows.append(vessel.as_dict())
@@ -28494,6 +28523,37 @@ class Engine:
                       "goods": dict(taker.goods),
                       **({"grant": grant["name"]} if grant is not None else {})}])
 
+    def _empty_box(self, intent: Intent, taker, box: dict) -> Outcome:
+        """Everything in a container into the taker's hands: its coin into the purse, its
+        goods into the pack. Playtest 2026-11-17 #42: "I take everything that's in the
+        gaoler's box" was answered "'everything' is a word, not a thing" with 50 gp in it
+        (rules/dungeons.py puts a dungeon's treasure in a box on the props ledger). The
+        contents are the record's, so nothing is minted; an empty box says so. The MUD shape:
+        CircleMUD/tbaMUD's `get all <container>` moves each thing the container holds."""
+        coins = self._coins_here()
+        name = self._the(str(box.get("name") or "the box"))
+        got = holding.empty_coin(box) if holding.coin_in(box) > 0 else {}
+        cp = goods.in_copper(got) if got else 0
+        if cp:
+            taker.purse = goods.credit(taker.purse, cp)
+        inside = (box.get("contents") or {}).get("goods") or {}
+        moved = []
+        for thing, n in list(inside.items()):
+            taker.goods[thing] = taker.goods.get(thing, 0) + int(n or 1)
+            moved.append(f"{n} × {thing}" if int(n or 1) != 1 else str(thing))
+        inside.clear()
+        said = ([goods.purse_line(got, coins)] if cp else []) + moved
+        if not said:
+            return Outcome(intent_id=intent.id, op="give", effects=[], because=intent.because,
+                           tell=f"{_sentence(name)} is empty: there is nothing in it to take.")
+        return Outcome(
+            intent_id=intent.id, op="give", because=intent.because,
+            tell=f"{taker.name} empties {name}: {', '.join(said)}.",
+            effects=[{"ref": taker.ref, "kind": "give", "item": "coin" if cp else moved[0],
+                      "count": cp, "how": "emptied", "from": name, "to": taker.ref,
+                      "items": moved, "purse": dict(taker.purse),
+                      "goods": dict(taker.goods)}])
+
     def _give_money(self, intent: Intent, item: str, taker, giver, source) -> Outcome:
         """Coin with no amount named — "the coins", "the payment", "the money".
 
@@ -28641,6 +28701,14 @@ class Engine:
             return False
         if holding.key_in(getattr(taker, "goods", None) or {}, name):
             return False
+        # The shelf too, where bought gear is filed (`goods.deliver`); and a thing it holds
+        # named among other words ("torch in one hand and dagger in the other", playtest
+        # 2026-11-17 #45, was refused "There is no torch in one hand … here").
+        shelf = getattr(taker, "stock", None) or {}
+        if holding.stock_key(shelf, name) or holding.named_among(
+                {getattr(s, "name", "") or sid: sid for sid, s in shelf.items()}, name) \
+                or holding.named_among(getattr(taker, "goods", None) or {}, name):
+            return False
         if any(r.get("held_by") == taker.ref and holding.same(r.get("name"), name)
                for r in self.scene.props):
             return False
@@ -28757,6 +28825,8 @@ class Engine:
         # is for one thing; and a drop with nobody to take it lays each thing on the
         # ground, as one dropped thing is laid (`_lay_down`).
         if re.search(r"\b(stuff|everything|belongings|wares|inventory)\b", item, re.I):
+            if source is not None and giver is None and taker is not None:
+                return self._empty_box(intent, taker, source)
             # A giver only the actor implied is not a whole pack offered up: "the
             # merchant's stuff" with the player acting was never the player's own.
             if giver is None or (inferred and giver.is_pc):
@@ -31510,7 +31580,9 @@ class Engine:
                     id=intent.id, op="wear", actor=actor.ref,
                     params={"item": "unarmed"}, because=intent.because), partial)
             else:
-                return no(f"{actor.name} is wearing nothing called {said or 'that'}.")
+                # Said plainly: a planner's id ("cargo_chest_coins", #48) is no word.
+                return no(f"{actor.name} is wearing nothing called "
+                          f"{holding.plain(said) or 'that'}.")
         worn = str(getattr(actor, kind) or "none")
         if worn == "none":
             return no(f"{actor.name} is wearing no {kind}.")

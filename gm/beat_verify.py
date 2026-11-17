@@ -180,6 +180,10 @@ class Facts:
     # Not an intimate beat: an intimate scene between adults is not read for the body's
     # conditions (its own words are the scene's, `GMAgent._repair_state_claims` likewise).
     intimate: bool = False
+    # The turn opened the counter's screen for a typed purchase or offer (the brief's AT THE
+    # COUNTER fact, `play.views._buying_note`): the screen is where coin moves, so a page
+    # that pays or sells is judged as a trade the engine holds a side of (N8).
+    counter_open: bool = False
     # The kinds of place (`places.SETTINGS`) the beat may truthfully put the party in: the
     # union of where it began, where it ends and what its walk passed through
     # (`places.settings_for`). Empty when the engine cannot say, and then no `setting`
@@ -472,6 +476,7 @@ def facts_from(ctx) -> Facts:
                  outcomes=outcomes, in_fight=bool(getattr(scene, "in_encounter", False)),
                  pc_ref=str(getattr(pc, "ref", "pc") or "pc"),
                  intimate=bool(getattr(ctx, "intimate", False)),
+                 counter_open="AT THE COUNTER (fact)" in str(getattr(ctx, "brief", "") or ""),
                  settings=tuple(sorted(settings)),
                  **_blows_of(ctx, outcomes, pc),
                  **_foe_blows_of(ctx, outcomes, scene),
@@ -2928,7 +2933,7 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             # A commission too since 2026-11-03: a price agreed for work already paid is
             # refused ("pays nothing more"), and the page that hands the coins over again
             # is a payment the engine never took.
-            if item == OTHER_THING and not any(
+            if item == OTHER_THING and not facts.counter_open and not any(
                     o.get("op") in (*_TRADE_OPS, "haggle", "rest", "commission")
                     for o in facts.outcomes):
                 continue

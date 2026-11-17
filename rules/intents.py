@@ -758,7 +758,9 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # item 29). It travels on `narrate_only` because there is no ref to hang it on — that
     # is the whole point — and `_op_narrate_only` tells it, so the narrator dresses a fact
     # instead of conjuring somebody to satisfy the sentence.
-    "narrate_only": ((), ("not_here",), "hidden"),
+    # `looks_in`: a container the player opens or looks into, whose contents the engine
+    # tells (`Engine._op_narrate_only`, playtest 2026-11-17 #41). Code-only as well.
+    "narrate_only": ((), ("not_here", "looks_in"), "hidden"),
     # Experience awarded outright: the GM's story award for a matter the fights do not
     # pay, and the author's own hand through `/cheat I gain 2000 experience` — which
     # did nothing twice on 2026-09-18 because no op carried experience at all
@@ -807,7 +809,7 @@ PARAM_ALIASES = {
 # `undecided` is `judgement.check_the_target` handing an ambiguous attack back as a
 # printed question; `not_here` is the world's answer for a person the player looked for
 # who is not here, which the engine prints instead of anybody being created (item 29).
-CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending", "request", "job",
+CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "looks_in", "defending", "request", "job",
                               "demand",
                               "ends_when", "pace", "diversion", "past", "together",
                               # A held player's save (`Engine.held_save_turn`) names the

@@ -1175,6 +1175,33 @@ def match_want(want: str, rows) -> tuple[object | None, list]:
     return fits[0], fits
 
 
+def wants_among(want: str, rows) -> list:
+    """Every shelf row named whole inside a want that lists several things, in the want's
+    order, longest name first where two overlap: "a few torches, a flint and steel, a
+    healer's kit" is the torch, the flint and steel and the healer's kit. The shelf is the
+    closed vocabulary here, never the want (`holding.named_among`'s rule). Playtest
+    2026-11-17 #11: a typed shopping list matched no one row, and nothing was picked."""
+    from .population import _stem
+
+    said = [_stem(w) for w in re.findall(r"[a-z][a-z'-]*", str(want or "").lower())]
+    found: list[tuple[int, object]] = []
+    taken: set[int] = set()
+    named = []
+    for r in rows:
+        name = str(getattr(r, "name", "") or (r.get("name") if isinstance(r, dict) else ""))
+        words = [_stem(w) for w in re.findall(r"[a-z][a-z'-]*", name.lower())]
+        if words:
+            named.append((words, r))
+    for words, r in sorted(named, key=lambda x: -len(x[0])):
+        n = len(words)
+        at = next((i for i in range(len(said) - n + 1) if said[i:i + n] == words
+                   and not taken & set(range(i, i + n))), None)
+        if at is not None:
+            taken |= set(range(at, at + n))
+            found.append((at, r))
+    return [r for _, r in sorted(found, key=lambda x: x[0])]
+
+
 def _head(text: str) -> str:
     """The last word of a name, its parenthesis dropped: "light horse (combat-trained)" is
     a horse, "rope dart" a dart."""

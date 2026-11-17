@@ -7063,24 +7063,29 @@ def _offer_and_seller(c, player_text: str):
     from rules import keepers
 
     want = judgement.purchase_sought(player_text)
-    if not want or c.scene.in_encounter:
+    # A sale offered opens the same counter (playtest 2026-11-17 #8): "offer to sell the
+    # silk from the Red Gull's hold" is an offer, never a sale (`acts_to_ops._sell`), and
+    # the screen is where a priced sale is made in one step.
+    selling = "" if want else judgement.sale_offered(player_text)
+    if not (want or selling) or c.scene.in_encounter:
         return None, None
     pc = c.scene.pc()
     if pc is None:
         return None, None
+    extra = {"sell": selling} if selling else {}
     counter, seller, _at, choices = _counter_pick(c, want=want)
     if choices:
         if seller is None or keepers.shut_here(c.scene, seller):
             return None, None
         if _counter_refusal(c, pc, seller) is not None:
             return None, None
-        return {"open": True, "want": want, "line": counter.id}, seller
+        return {"open": True, "want": want, "line": counter.id, **extra}, seller
     merchant = _merchant_here(c.scene)
     if keepers.shut_here(c.scene) or merchant is None:
         return None, None
     if _counter_refusal(c, pc) is not None:
         return None, None
-    return {"open": True, "want": want, "line": ""}, merchant
+    return {"open": True, "want": want, "line": "", **extra}, merchant
 
 
 def _trade_offer(c, player_text: str) -> dict | None:
@@ -7122,6 +7127,11 @@ def _buying_note(c, player_text: str) -> str:
         # Which counter, by name: the market is its counters, and the prose that walks
         # the player to "the stallholder" without saying which invents one (item 10).
         where = f" at {label}" if label else ""
+    if offer.get("sell"):
+        return (f"The player offers {offer['sell']} for sale: the counter's own screen opens "
+                f"for it after this beat. {who}{where} comes to the counter and may look the "
+                f"goods over and name a price; nothing is sold and no coin changes hands in "
+                f"the prose — the player sells on the screen.")
     return (f"The player is buying {offer['want']}: the counter's own screen opens for it "
             f"after this beat. {who}{where} comes to the counter and may show the goods "
             f"and name a price; nothing is handed over and no coin changes hands in the "
@@ -7356,10 +7366,16 @@ def trade(request):
     # it is not, the keeper says so (tbaMUD: "Sorry, I haven't got exactly that item.")
     # and nothing is guessed in its place.
     pick, want_line = "", ""
+    picks: list[str] = []
     if want:
         found, _fits = goods.match_want(want, shelf)
+        listed = goods.wants_among(want, shelf) if found is None else []
         if found is not None:
             pick = str(getattr(found, "id", ""))
+        elif listed:
+            # A list of things (#11): each one the shelf has, in the basket.
+            picks = [str(getattr(g, "id", "")) for g in listed]
+            pick = picks[0]
         else:
             who = getattr(merchant, "name", "") or "The keeper"
             thing = re.sub(r"^(?:a|an|some|the)\s+", "", want)
@@ -7397,6 +7413,7 @@ def trade(request):
 
     return JsonResponse({
         "stall": stall, "place": place, "day": day, "pick": pick, "want_line": want_line,
+        "picks": picks or ([pick] if pick else []),
         "line": counter.id if counter is not None else "",
         "counter": counter.label if counter is not None else "",
         "lines": _lines_of(c, at, choices) if choices else [],

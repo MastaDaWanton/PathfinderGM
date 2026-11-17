@@ -1466,9 +1466,24 @@ def _confiscate(engine, pc, chs=()) -> list[dict]:
         if ship is not None and ship.held_by == pc.ref:
             # A seized ship goes back to the master who swore it (#85): hers no longer.
             ship.held_by = ""
+            # Her cargo goes back into her hold with her (playtest 2026-11-16 N3): the
+            # plunder lots still the player's, wherever they lie. shortcut: plunder already
+            # sold is not repaid beyond the fine, which is the ship's own book price.
+            from . import trade as trade_mod
+
+            back = [x for x in trade_mod.lots(scene) if x.get("plunder") == ship.id
+                    and x.get("stowed") != "taken"]
+            if back:
+                ship.cargo = list(ship.cargo or []) + [
+                    {"key": x["key"], "units": int(x.get("units", 0)),
+                     "commodity": x.get("commodity") or ""} for x in back]
+                scene.cargo = [x for x in trade_mod.lots(scene) if x not in back]
             engine._keep_vessel(ship)
             out.append({"item": ship.name, "owner": "",
                         "owner_name": c.subject_name or "her master"})
+            for x in back:
+                out.append({"item": trade_mod.said(x), "owner": "",
+                            "owner_name": c.subject_name or "her master"})
         owner = scene.people.get(c.subject)
         for name in c.taken:
             # shortcut: the haul's coin is not handed back, the fine already takes the

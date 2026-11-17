@@ -11001,6 +11001,19 @@ def purchase_sought(player_text: str) -> str:
     return what
 
 
+def sale_offered(player_text: str) -> str:
+    """What the player offers for sale, in their words, when the reading has a `sell` only
+    tried — an offer, which the counter's screen settles — or "". The reading only: with
+    none, nothing is guessed (playtest 2026-11-17 #8)."""
+    from . import interpret as _interpret
+
+    reading = _interpret.reading_of(str(player_text or ""))
+    for a in (reading or {}).get("actions") or []:
+        if a.get("act") == "sell" and a.get("commit") == "tried" and a.get("object"):
+            return str(a["object"])
+    return ""
+
+
 def strip_counter_buys(raw_intents, player_text: str, scene=None) -> list:
     """A purchase the player declared is made on the counter's screen, not in the plan:
     a `buy` the model wrote for it would settle the sale before the player saw the price
@@ -11020,7 +11033,14 @@ def strip_counter_buys(raw_intents, player_text: str, scene=None) -> list:
         # the plan wrote `give item="gp"` beside the purchase.
         coin = item in ("gp", "sp", "cp", "pp", "gold", "silver", "copper", "coin",
                         "coins") or item.endswith((" gp", " sp", " cp", " coins"))
-        return op == "buy" or (op == "give" and (to in ("pc", "you", "player") or coin))
+        # And coin "used" for it: playtest 2026-11-16 N2, beside a temple purchase the plan
+        # wrote `use_item gold piece`, refused into "she has no gold" with 12 gp in hand.
+        from rules import goods, holding
+
+        coin = coin or holding.is_money(item) or bool(goods.coin_named(item))
+        return op == "buy" or (op in ("give", "use_item")
+                               and (to in ("pc", "you", "player") or coin)
+                               and (op == "give" or coin))
     return [r for r in raw_intents if not settles_it(r)]
 
 
