@@ -93,6 +93,14 @@ HANDS = (
     "a smell of smoke and hot iron that goes everywhere they do",
 )
 
+# The hands lines that tell one trade (`lives._HANDS_FIT` gives them that trade alone):
+# never drawn for a person whose work is not known.
+ONE_TRADE = frozenset({
+    "hands stained to the wrist with dye that will not wash out",
+    "fingers stained black at the tips with ink",
+    "a smell of smoke and hot iron that goes everywhere they do",
+})
+
 # Words in a body line that mean the head is not a head of hair.
 _NO_HAIR = ("feather", "beak", "frog", "scale", "fur", "feline", "simian", "rodent",
             "crow", "hairless", "shell", "chitin")
@@ -122,7 +130,14 @@ def details_for(body: str, ref: str, location_id: str | None = None) -> str:
     if not _no_hair(body or ""):
         bits.append(_pick(HEAD, ref, where, "head"))
     bits.append(_pick(MARK, ref, where, "mark"))
-    bits.append(_pick(HANDS, ref, where, "hands"))
+    hands = _pick(HANDS, ref, where, "hands")
+    if hands in ONE_TRADE:
+        # No work is known here, and a line that belongs to one trade would give it to
+        # whoever this is. Playtest 2026-11-16 #88: the harbourmaster's "presence marked
+        # by the scent of smoke and hot iron", a smith's. Re-picked, so every other pick
+        # stays the face it was.
+        hands = _pick(tuple(h for h in HANDS if h not in ONE_TRADE), ref, where, "hands")
+    bits.append(hands)
     # Three, so the line stays a line: years and a mark always, and one of the other
     # two — the head where a people has one, the hands otherwise.
     if len(bits) == 4:

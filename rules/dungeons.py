@@ -853,6 +853,12 @@ def spread_rumours(engine) -> None:
     key = f"rumours:{town_of}"
     if not town_of or key in scene.said or engine.world is None:
         return
+    from . import ships
+
+    if ships.vessel_of(town_of):
+        # A ship at the quay is no settlement: her rigging opened onto "the sewers off the
+        # rigging" (playtest 2026-11-16 #90). The town's talk is spread ashore.
+        return
     if places_mod.setting_of(str(scene.at or "")) not in ("in", "outside"):
         return
     town = _town(engine)

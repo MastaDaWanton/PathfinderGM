@@ -7804,6 +7804,16 @@ class Engine:
         from . import attitude as attitude_mod, awareness
 
         bits = [said]
+        if heard is None and speaker is not None and speaker.is_pc and not any(
+                not a.is_pc and self.scene.conscious(r)
+                for r, a in self.scene.actors.items()):
+            # Said with nobody here to hear it: the negative stated, so no answer is
+            # written for anybody. Playtest 2026-11-16 #74: alone at the east crossing,
+            # "I ask the foreman…" (the plan aimed it at a dock labourer in Zhilvarnia),
+            # the beat had "the foreman shakes his head", and a foreman was made on the
+            # spot. The room, not the target: a say's target is never read
+            # (tests/test_dangling_placeholders.py).
+            bits.append("Nobody here answers.")
         # Speaking from hiding: "in combat or speaking" is -20 on the Perception DC to
         # notice an invisible creature (CRB p.564), and everybody who hears it gets a
         # fresh check against the hiding at the end of the batch (`_awareness_settle`).
@@ -16249,6 +16259,17 @@ class Engine:
         bits.extend(s for s in passing_said if s)
         if moved:
             bits.append(f"You are at {going_to.name} now.")
+            from . import ships as ships_mod
+
+            if " ".join(going_to.name.split()).lower() in ships_mod.PORT_PLACES:
+                # The party's own ships at this quay, said on arriving at it. Playtest
+                # 2026-11-16 #87: "I walk down to the docks to see whether the Red Gull is
+                # still tied up" — the beat never said, though the engine knew.
+                held = [ships_mod.name_for(v) for v in self.moored_here()]
+                if held:
+                    ships_said = _and_list(held)
+                    bits.append(f"{ships_said[:1].upper()}{ships_said[1:]} "
+                                f"{'lies' if len(held) == 1 else 'lie'} at the quay.")
         if moved and direction == "out" and found_loc is not None:
             from . import geography
 
@@ -31466,11 +31487,15 @@ class Engine:
         from . import residency
         from . import trial as trial_mod
 
-        when = residency.time_words(now).split(", ", 1)[-1]
+        # "about 8 in the morning", not "early morning (about 8 in the morning)": a line a
+        # page can carry whole. Playtest 2026-11-16 #99: the backstop pasted this refusal
+        # onto the page, brackets and "the time … meant to sleep until dawn" and all.
+        part, _, about = residency.time_words(now).split(", ", 1)[-1].partition(" (")
         said = until if until.lower().startswith(("until", "till")) else f"until {until}"
+        then = said.split(" ", 1)[1] if " " in said else said
         return self._refuse(
-            intent, (f"It is {when} now: the time {actor.name} meant to sleep {said} has "
-                     f"already come today, so {actor.name} has not lain down. "
+            intent, (f"It is {about.rstrip(')') or part}, and {then} has already "
+                     f"come today, so {actor.name} has not lain down. "
                      + trial_mod.choices(actor.name, [
                          "sleep now, a night's eight hours",
                          f"wait until evening, then sleep {said}"])),

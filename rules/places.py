@@ -2086,6 +2086,14 @@ def settings_for(place, known=()) -> frozenset[str]:
     pid = str(getattr(place, "id", "") or "")
     if not pid:
         return frozenset()
+    from . import ships
+
+    if ships.vessel_of(pid):
+        # Any room of a ship is aboard her: her hold, her cabin, her deck. Playtest
+        # 2026-11-16 #98: below decks was "indoors, under a roof" and not aboard a ship,
+        # so the page's true "the shadows of the ship's hold" was repaired into "the
+        # shadows of the building's interior".
+        return frozenset({SET_SHIP})
     ground = str(getattr(place, "terrain", "") or "") or terrain_of(pid)
     kinds = {kind_named(w) for w in words_for_here(place, known)}
     tavern = bool(kinds & _TAVERN_KINDS)

@@ -859,6 +859,19 @@ def matter_slot(pull) -> dict | None:
         return {"key": "matter", "want": MATTER_WANT,
                 "say": lead + what + ". Let it touch the scene in one sentence, as a fact, "
                                      "without resolving it."}
+    carrier = _one_line((pull.get("carrier") or {}).get("name"), 60)
+    if stands == "situation" and carrier:
+        # Talk in town (`cards._rumour_pull`): somebody's words, about somewhere else.
+        # Playtest 2026-11-16 #67 and #90: told "seen or heard here", the slot hung the
+        # talk in the air, and on the Red Gull's deck put "the sewers beneath the rigging".
+        return {"key": "matter", "want": MATTER_WANT, "not_own": title,
+                "approach": "go_between",
+                "carrier_ref": str((pull.get("carrier") or {}).get("ref") or ""),
+                "say": f"{carrier}, who is here, mentions in passing, in one sentence of "
+                       f"their own words, the talk in town ({title}): {fact or title}. It "
+                       "is talk about that place, which is somewhere else, not here. It is "
+                       "not the player's goal: never write that they seek it, pursue it or "
+                       "keep it in mind. Do not resolve it."}
     if stands == "situation":
         return {"key": "matter", "want": MATTER_WANT, "not_own": title,
                 "say": f"A matter of the world here, not a task of the player's: {what}. Let "
@@ -1304,6 +1317,7 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
         if speaker is None and people:
             names = ", ".join(f'{p["name"]} ({p["ref"]})' for p in people)
             slots.append({"key": "aside", "want": ASIDE_WANT,
+                          "names": [p["name"] for p in people],
                           "say": f"Nobody was spoken to. One of the people here ({names}) "
                                  "goes on with what they were already doing, in one "
                                  "sentence, without speaking."})
@@ -1844,6 +1858,44 @@ def _matter_is_its_own(out: Planned, plan, slots, i, written, who, s: dict, text
     return None
 
 
+def _name_words(names) -> list[str]:
+    """The words a person here is told by: "a deckhand" -> deckhand, "the Korvu
+    harbourmaster" -> korvu, harbourmaster. Our own names, never the page's English."""
+    skip = {"the", "a", "an", "of", "and"}
+    return sorted({w for n in names for w in re.findall(r"[a-z][a-z'-]{2,}", str(n).lower())
+                   if w not in skip})
+
+
+def _aside_is_theirs(out: Planned, plan, slots, i, written, who, s: dict, text: str, *,
+                     final: bool, lift) -> str | None:
+    """The aside as it may stand: about one of the people it was offered, by their own
+    name words, asked once more with them named, else dropped (the aside is never core).
+
+    E2 of the 2026-11-16 playtest (narration lane, live), and docs/narrator-guards.md's
+    "not covered" of the same day: offered the deckhand on the Red Gull's deck, the slot
+    wrote "The merchant continues to adjust the crates" — nobody of that name was aboard,
+    and the seen-people ruling then makes whoever the page shows. The same shape as
+    `_matter_is_its_own`."""
+    from rules import cards as cards_mod
+
+    keys = _name_words(s["names"])
+    if not keys or cards_mod._identity_hits(keys, text):
+        return text
+    them = " or ".join(str(n) for n in s["names"])
+    redo = (f"You wrote: {text!r}. Nobody of that description is here. Write the one "
+            f"sentence about {them}, by that name, and about nobody else.")
+    text2, _data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
+                         core=False, redo=redo)
+    ok = bool(text2) and bool(cards_mod._identity_hits(keys, text2))
+    out.calls[-1]["note"] = "not one of the people here, named" + ("" if ok else " — still not")
+    if ok:
+        out.notes.append('the "aside" slot wrote somebody not here — asked again, fixed')
+        return text2
+    out.notes.append(f'the "aside" slot wrote somebody not here twice: dropped '
+                     f'({text[:80]!r})')
+    return None
+
+
 def _no_job_made_up(out: Planned, plan, slots, i, written, who, s: dict, text: str, job,
                     *, final: bool, lift, core: bool) -> str:
     """The reply as it may stand, when its speaker holds no work for the player
@@ -2295,6 +2347,12 @@ def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,
         if s["key"] == "matter" and s.get("keys"):
             text = _matter_is_its_own(out, plan, slots, i, written, who, s, text,
                                       final=final, lift=lift)
+            if text is None:
+                out.slots.append({**s, "wrote": "", "dropped": True})
+                continue
+        if s["key"] == "aside" and s.get("names"):
+            text = _aside_is_theirs(out, plan, slots, i, written, who, s, text,
+                                    final=final, lift=lift)
             if text is None:
                 out.slots.append({**s, "wrote": "", "dropped": True})
                 continue

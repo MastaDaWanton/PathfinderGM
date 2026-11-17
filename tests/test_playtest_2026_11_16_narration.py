@@ -161,8 +161,8 @@ def test_the_body_is_owed_once_an_hour_or_when_it_changes():
     assert [x.key for x in body_shown.owed(s)] == ["wounds"]
     s.clock_minutes -= body_shown.RETELL_MINUTES
     pc.hp = 5                                   # worse: told again at once
-    assert [x.words for x in body_shown.owed(s)] == ["gravely hurt, with little strength "
-                                                     "left in them"]
+    assert [x.words for x in body_shown.owed(s)] == ["gravely hurt, wounds that hurt with "
+                                                     "every movement"]
 
 
 def test_a_body_shown_when_not_owed_does_not_push_the_next_telling_away():
