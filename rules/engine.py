@@ -1192,9 +1192,9 @@ class Scene:
                     # releasing all happened in total silence. Law 3 says the narrator
                     # may only dress what the engine recorded, so an expiry nobody
                     # records is an expiry the player can never be told about.
-                    self.hazards.extend(
-                        {"kind": "effect_ended", "ref": a.ref, "what": name}
-                        for name in a.tick_effects(1))
+                    had = list(a.effects)
+                    if a.tick_effects(1):
+                        self.hazards.extend(_ended_records(a, had))
                     self.hazards.extend(
                         {"kind": "pool_ready", "ref": a.ref, "pool": pid}
                         for pid in a.tick_pools(1))
@@ -1683,9 +1683,7 @@ class Scene:
             ended.extend(f"{a.name}: {name}" for name in names)
             if names:
                 # Which effects went, by identity, so each record carries its origin.
-                told.extend({"kind": "effect_ended", "ref": a.ref, "what": e.ended_label,
-                             "origin": e.origin}
-                            for e in had if not any(e is x for x in a.effects))
+                told.extend(_ended_records(a, had))
             pools = a.tick_pools(rounds)
             ended.extend(f"{a.name}: {pid} is ready" for pid in pools)
             told.extend({"kind": "pool_ready", "ref": a.ref, "pool": pid} for pid in pools)
@@ -28936,8 +28934,7 @@ class Engine:
         # named among other words ("torch in one hand and dagger in the other", playtest
         # 2026-11-17 #45, was refused "There is no torch in one hand … here").
         shelf = getattr(taker, "stock", None) or {}
-        if holding.stock_key(shelf, name) or holding.named_among(
-                {getattr(s, "name", "") or sid: sid for sid, s in shelf.items()}, name) \
+        if holding.stock_key(shelf, name) or holding.stock_among(shelf, name) \
                 or holding.named_among(getattr(taker, "goods", None) or {}, name):
             return False
         if any(r.get("held_by") == taker.ref and holding.same(r.get("name"), name)
@@ -32005,11 +32002,23 @@ class Engine:
         # slept down the short night's path: the hours pass, nothing heals or comes back.
         since = self._since_last_night(actor) if kind == "night" else None
         if since is not None:
+            # The level settles all the same. Playtest 2026-11-17b #2: "Enough to advance —
+            # it will settle with a night's sleep", then eight hours slept inside the 24 were
+            # refused whole, and the level waited with no word of when. The once-a-day rule
+            # is natural healing's and the slots' (CRB Natural Healing, p.191; Preparing
+            # Wizard Spells); the CRB ties a level to no rest at all — "as soon as he earns
+            # enough experience points" (Advancing Your Character). The sleep that settles
+            # it is this app's ruling ("sleeping should initiate the leveling process"), and
+            # any eight hours' sleep is sleep (`Actor.settle_level`).
+            lv = actor.settle_level(self.dice)
+            settled = (f" Level {lv['level']} settles all the same: +{lv['hp']} hp"
+                       + (f", {', '.join(lv['grants'])}" if lv.get("grants") else "") + "."
+                       if lv and lv.get("ok") else "")
             return self._with_bill(self._short_night(
                 intent, actor, camp,
                 why=(f"{actor.name} already had a full night's rest "
                      f"{sky.span_words(max(1, since))} ago: one full night a day, so "
-                     f"nothing heals and nothing is recovered.")), bill)
+                     f"nothing heals and nothing is recovered.{settled}")), bill)
 
         # The whole night through one door (`Actor.sleep_through`), shared with the sleep
         # a body drops into when it will not be refused any longer (`survival._wake`):
@@ -34080,6 +34089,25 @@ _DESTROYED_SAID = "is destroyed"
 _BROKEN_SAID = "is broken: inert, but not destroyed"
 
 
+def _ended_records(actor, had) -> list[dict]:
+    """The `effect_ended` record of each effect in `had` the actor no longer carries, by
+    identity, each with its origin. A carried light an item gave (`light.carried`, origin
+    `item:`) says which thing burnt out: playtest 2026-11-17b #1, her torch ran out in her
+    sleep as "Normal light 20 ft, one step brighter out to 40 ft wears off Vesna Kroll",
+    and the page said "You strike a torch, and its flame pushes back the gloom"."""
+    out = []
+    for e in had:
+        if any(e is x for x in actor.effects):
+            continue
+        rec = {"kind": "effect_ended", "ref": actor.ref, "what": e.ended_label,
+               "origin": e.origin}
+        if str(e.origin or "").startswith("item:") and any(
+                states.matches(str(t), "light") for t in e.tags or ()):
+            rec["burnt_out"] = e.source or "light"
+        out.append(rec)
+    return out
+
+
 def _ward_tell(scene: Scene, e: dict) -> str:
     """One thing a standing effect did, in the voice the rest of the log is written in.
 
@@ -34155,6 +34183,8 @@ def _ward_tell(scene: Scene, e: dict) -> str:
             now = attitude_mod.of(who)
             back = f"; {name} is {now} again" if now and now != step else ""
             return f"{name} no longer acts {step}{toward}{back}."
+        if e.get("burnt_out"):
+            return f"{name}'s {e['burnt_out']} burns out, and its light is gone."
         return f"{e.get('what', 'Something')} wears off {name}."
     if kind == "ward_ended":
         return f"{e.get('what') or source} fades."

@@ -2444,14 +2444,46 @@ def find_outcome_claims(narration: str, backed=(), restrained: bool = True) -> l
     return claims
 
 
+# Quote marks at a sentence's head belong to the speech either side of the break, never to
+# the sentence cut: playtest 2026-11-17b #9, a price cut from the start of the barkeep's
+# reply took the close of the player's question and the open of the reply with it, and the
+# page read "…What do I owe you? I can get you a seat…,' the one behind the bar says".
+_EDGE_QUOTES = "\"'“”‘’"
+
+
+def _sentence_span(text: str, index: int) -> tuple[int, int]:
+    """The (start, end) of the sentence around `index`, the spaces and quote marks at its
+    head left outside it."""
+    start = max((text.rfind(c, 0, index) for c in ".!?\n"), default=-1) + 1
+    while start < index and (text[start].isspace() or text[start] in _EDGE_QUOTES):
+        start += 1
+    ends = [e for e in (text.find(c, index) for c in ".!?\n") if e != -1]
+    return start, (min(ends) + 1 if ends else len(text))
+
+
 def _sentence_around(text: str, index: int) -> str:
-    start = max(
-        (text.rfind(c, 0, index) for c in ".!?\n"), default=-1
-    )
-    end_candidates = [text.find(c, index) for c in ".!?\n"]
-    end_candidates = [e for e in end_candidates if e != -1]
-    end = min(end_candidates) + 1 if end_candidates else len(text)
-    return text[start + 1:end].strip()
+    start, end = _sentence_span(text, index)
+    return text[start:end].strip()
+
+
+def cut_span(text: str, start: int, end: int) -> str:
+    """`text` without text[start:end]; a quotation it opened stays opened on the words
+    after it ("…' I can get you" would read as a closing mark)."""
+    head, tail = text[:start], text[end:]
+    if head and head[-1] in _EDGE_QUOTES and (len(head) == 1 or head[-2].isspace()):
+        tail = tail.lstrip()
+    elif tail[:1] and not tail[:1].isspace() and head and not head[-1].isspace():
+        tail = " " + tail
+    return head + tail
+
+
+def cut_sentence(text: str, sentence: str) -> str:
+    """`text` without every copy of `sentence` (`cut_span`), as `str.replace` cut it."""
+    at = text.find(sentence) if sentence else -1
+    while at >= 0:
+        text = cut_span(text, at, at + len(sentence))
+        at = text.find(sentence, at)
+    return text
 
 
 def cut_outcome_claims(text: str, restrained: bool = True,
@@ -2474,10 +2506,7 @@ def cut_outcome_claims(text: str, restrained: bool = True,
 
     spans: list[tuple[int, int]] = []
     for c in claims:
-        start = max((text.rfind(ch, 0, c.start) for ch in ".!?\n"), default=-1) + 1
-        ends = [e for e in (text.find(ch, c.start) for ch in ".!?\n") if e != -1]
-        end = min(ends) + 1 if ends else len(text)
-        spans.append((start, end))
+        spans.append(_sentence_span(text, c.start))
 
     spans.sort()
     merged: list[list[int]] = []
@@ -2490,5 +2519,5 @@ def cut_outcome_claims(text: str, restrained: bool = True,
     cut = [text[s:e].strip() for s, e in merged]
     out = text
     for s, e in reversed(merged):
-        out = out[:s] + " " + out[e:]
+        out = cut_span(out, s, e)
     return " ".join(out.split()), cut

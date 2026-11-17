@@ -2449,6 +2449,26 @@ SETTLEMENT_WORDS = frozenset({"town", "city", "village", "settlement", "hamlet",
 _CENTRES = ("the great square", "the market", "the square", "the green", "the well")
 
 
+# Where "ashore" is from a ship: the land end of her gangplank (`_gangplank`). Playtest
+# 2026-11-17b #6: "I go ashore and ask the harbourmaster…" from her own deck was read
+# `go: ashore`, no place is called that, no travel was built, and she asked a harbourmaster
+# who stood on the quay. A word for the land, never for a ship's room: the gangplank's own
+# exit answers it, so a ship at sea has no "ashore" and the walk is refused as nowhere.
+ASHORE = frozenset({"ashore", "shore", "land", "dry land"})
+
+
+def _ashore(places, here: str) -> Place | None:
+    """The town place a ship's rooms step off onto, or None: not aboard, or at sea."""
+    from . import ships
+
+    vid = ships.vessel_of(here)
+    if not vid:
+        return None
+    by_id = {p.id: p for p in places or ()}
+    return next((by_id[x] for p in by_id.values() if ships.vessel_of(p.id) == vid
+                 for x in p.exits if x in by_id and ships.vessel_of(x) != vid), None)
+
+
 def the_settlement(places, wanted: str, here: str, name: str = "") -> Place | None:
     """The place a walk to "the town" means, or None when the words are not the town.
 
@@ -2461,6 +2481,8 @@ def the_settlement(places, wanted: str, here: str, name: str = "") -> Place | No
     want = " ".join(str(wanted or "").split()).lower()
     for article in ("the ", "a "):
         want = want.removeprefix(article)
+    if want in ASHORE:
+        return _ashore(places, here)
     if not want or not (want in SETTLEMENT_WORDS or (name and want == name.lower())):
         return None
     rooms = [p for p in places or () if setting_of(p.id) != "outside"

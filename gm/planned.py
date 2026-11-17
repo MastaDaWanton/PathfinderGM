@@ -1318,7 +1318,8 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
                       "want": min(FACT_CEILING, FACT_WANT + FACT_EACH * (len(tells) - 1)),
                       "say": say, "tells": tells, **({"not_own": theirs} if theirs else {}),
                       **({"must_tell": must} if must else {}),
-                      **({"verbatim": spoken} if spoken.strip() else {})})
+                      **({"verbatim": spoken, "typed": player_input}
+                         if spoken.strip() else {})})
         employer = next((e.get("employer") for o in act
                          for e in (getattr(o, "effects", None) or [])
                          if isinstance(e, dict) and e.get("kind") == "job"
@@ -1865,6 +1866,34 @@ def misquoted(text: str, words: str) -> list[str]:
         piece = _folded(text[a + 1:b - 1]).strip(" ,.;:!?\"'“”‘")
         if piece and piece not in said:
             out.append(text[a:b])
+    return out
+
+
+# Speech verbs that say HOW a line was spoken, which is the player's to choose. Playtest
+# 2026-11-17b #9: '"A room for the night, and a hot meal. What do I owe you?" I ask the
+# barkeep' came back 'You look at the Korvu behind the bar and demand, "…"' — a polite
+# question told as a demand. A closed list, matched only right before the player's own
+# quotation (`speech.spans`), and only when the player did not use the verb themselves.
+_LOADED_SPEECH = re.compile(
+    r"\b(demand|order|command|snap|bark|growl|snarl|hiss|spit|shout|yell|bellow|roar|"
+    r"plead|beg|insist|scream|sneer)(s|ed)?(,?\s*)$", re.I)
+
+
+def plain_speech(text: str, typed: str) -> str:
+    """`text` with a loaded verb right before a quotation put back to "say", or "ask" for
+    a question, when the player's own line (`typed`) never used that verb."""
+    from . import speech
+
+    typed_words = set(re.findall(r"[a-z]+", _folded(typed)))
+    out = str(text or "")
+    for a, b in reversed(speech.spans(out)):
+        m = _LOADED_SPEECH.search(out[:a])
+        if not m or {m.group(1).lower(), m.group(1).lower() + (m.group(2) or "").lower()} \
+                & typed_words:
+            continue
+        verb = "ask" if out[a:b].rstrip("\"'”’ ").endswith("?") else "say"
+        verb = (verb + (m.group(2) or "").lower()).replace("sayed", "said")
+        out = out[:m.start()] + verb + m.group(3) + out[a:]
     return out
 
 
@@ -2614,6 +2643,11 @@ def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,
         if s.get("verbatim"):
             text = _quoted_as_said(out, plan, slots, i, written, who, s, text,
                                    final=final, lift=lift, core=core)
+            plain = plain_speech(text, str(s.get("typed") or ""))
+            if plain != text:
+                out.notes.append(f'the "{s["key"]}" slot: how the player spoke is theirs — '
+                                 f'the plain verb put back')
+                text = plain
         wrong = check(s["key"], text) if check is not None else ""
         if wrong:
             text2, data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,

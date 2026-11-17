@@ -1146,7 +1146,7 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                         or _light(row, a, pc)):
                     _draw(row, a, pc)
             if act in ("other", "look", "use") and pc is not None and not row.intents:
-                _look_in(row, frame, i, scene, rows)
+                _look_in(row, frame, i, scene, rows, places)
             if act == "disguise" and pc is not None:
                 _disguise(row, a, pc)
             # Taking 10 or 20 is always on the ground at hand: nobody takes 20 on a tavern.
@@ -1443,14 +1443,22 @@ def _light(row: Row, a: dict, pc) -> bool:
     Playtest 2026-11-17 #13 and #15: "I light a torch" and "I light one of my torches",
     three torches on the shelf, built no op either way, and the page lit a torch the engine
     never did — on the way into a dark dungeon. The shelf's own record says what lights,
-    never the verb: "use my torch" and "light my torch" are one deed."""
-    from rules import consumables
+    never the verb: "use my torch" and "light my torch" are one deed. And 2026-11-17b #3:
+    "a fresh torch" is the torch, its name found whole among the words — among the things
+    that light only, so "the torch with my flint and steel" is still the torch."""
+    from rules import consumables, holding
 
+    def lights(item) -> bool:
+        return any(str(s.get("type")) in ("light", "manifest")
+                   for s in consumables._specs(item))
+
+    shelf = getattr(pc, "stock", {}) or {}
     said = " ".join(str(a.get("object") or "").split())
     sid = _stock_id(pc, said) if said else ""
-    held = (getattr(pc, "stock", {}) or {}).get(sid) if sid else None
-    if held is None or not any(str(s.get("type")) in ("light", "manifest")
-                               for s in consumables._specs(held)):
+    if said and (not sid or not lights(shelf[sid])):
+        sid = holding.stock_among({k: v for k, v in shelf.items() if lights(v)}, said)
+    held = shelf.get(sid) if sid else None
+    if held is None or not lights(held):
         return False
     row.intents.append({"op": "use_item", "actor": pc.ref,
                         "params": {"item": sid, "how": "light"},
@@ -1459,13 +1467,21 @@ def _light(row: Row, a: dict, pc) -> bool:
     return True
 
 
-def _look_in(row: Row, frame, i: int, scene, rows=()) -> None:
+def _look_in(row: Row, frame, i: int, scene, rows=(), places=()) -> None:
     """Opening or looking into a container that holds something on the engine's record
     ("open the gaoler's box", "see what's inside" after it): `narrate_only` with
     `looks_in`, which tells the contents (`Engine._looks_in`). Once a box a turn.
     Playtest 2026-11-17 #41: the prose pried the lid and never said what was inside.
-    The record decides — a container named here with `contents` — never the verb."""
+    The record decides — a container named here with `contents` — never the verb.
+
+    "Here" is where the sentence has walked by then: R1 of 2026-11-17, "I go to the broken
+    pen and open the gaoler's box to see what's inside" from the cells, looked for the box
+    in the cells, found none, and nothing was said of the 50 gp in it. One action at a
+    time, each against the place the last one leaves (Inform's DM4 §34, as `order`)."""
     from rules import holding
+    from rules import places as places_mod
+
+    from . import interpret
 
     acts = frame.get("actions") or []
     said = " ".join(str(acts[i].get("object") or "").split())
@@ -1479,6 +1495,10 @@ def _look_in(row: Row, frame, i: int, scene, rows=()) -> None:
         return
     want = holding.head_of(said)
     here = str(getattr(scene, "at", "") or "")
+    for p in acts[:i]:
+        if places and p.get("act") == "go" and p.get("place") and interpret.acting(p):
+            went = places_mod.find(places, str(p["place"]), near=here)
+            here = went.id if went is not None else here
     pc = scene.pc()
     if not any("contents" in r and (holding.same(r.get("name"), said)
                                     or holding.head_of(r.get("name")) == want)

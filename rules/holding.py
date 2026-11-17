@@ -100,6 +100,16 @@ def stock_key(stock, name) -> str:
     return ""
 
 
+def stock_among(stock, phrase) -> str:
+    """The id of the shelf entry whose own name stands whole among the words (`named_among`
+    over the shelf's names), or "": "a fresh torch" is the torch. Asked after `stock_key`
+    finds nothing. Playtest 2026-11-17b #3: "I light a fresh torch" built no light, three
+    torches on the shelf, because "fresh torch" is not `same` as "torch"."""
+    names = {getattr(s, "name", "") or sid: sid for sid, s in (stock or {}).items()}
+    hit = named_among(names, phrase)
+    return names[hit] if hit else ""
+
+
 # --- a key is bookkeeping, never a word on the page -----------------------------------------
 #
 # The shapes a thing's KEY takes, which no person says (the ruling of 2026-09-28: refs drive

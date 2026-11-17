@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 
 from rules.intents import (Intent, IntentError, claims_held_by_hiding,
-                          claims_the_engine_backs, cut_outcome_claims,
+                          claims_the_engine_backs, cut_outcome_claims, cut_sentence,
                           find_outcome_claims)
 
 from . import client, judgement, narration as narration_mod, prompts
@@ -3685,7 +3685,7 @@ class GMAgent:
                 narration = narration.replace(claim.sentence, fixed)
                 repairs.append(f"{claim.why}: {claim.sentence!r} -> {fixed!r}")
             else:
-                narration = narration.replace(claim.sentence, "").strip()
+                narration = cut_sentence(narration, claim.sentence).strip()
                 repairs.append(f"{claim.why}: cut {claim.sentence!r}")
 
         # Belt and braces, by character span. The `replace` calls above are silent no-ops
