@@ -9130,6 +9130,29 @@ def provoked_one(raw_intents, player_text: str, scene) -> str:
     return ""
 
 
+def _names_a_creature_not_a_slur(player_text: str, scene) -> bool:
+    """Whether every insulting word the sentence holds is the name of a creature the
+    engine has in the scene — talk ABOUT the rat, not calling somebody one. Playtest
+    2026-11-17 #33: "The rat's dealt with … Come with me and you'll have your cargo back"
+    provoked the starving smuggler on "rat", the dire rat she had just fought. The
+    creatures' names are the engine's closed vocabulary; a name-call ("you rat") or a
+    provoking verb still provokes."""
+    text = str(player_text or "")
+    if _CALLS_A_NAME.search(text) or _PROVOKES.search(text) or _SLIGHTS.search(text):
+        return False
+    found = list(_INSULTING.finditer(text))
+    # "you rat", "you filthy rat": said to somebody's face, a name-call.
+    if not found or any(re.search(r"\byou(?:\s+\w+){0,2}\s*$", text[:m.start()], re.I)
+                        for m in found):
+        return False
+    said = [m.group(0).lower() for m in found]
+    names = set()
+    for a in (getattr(scene, "people", {}) or {}).values():
+        if not getattr(a, "is_pc", False):
+            names.update(re.findall(r"[a-z]+", str(getattr(a, "name", "") or "").lower()))
+    return all(w in names for w in said)
+
+
 def inject_provoke(raw_intents, player_text: str, scene) -> list:
     """The player's words insult or slight somebody here: the plan provokes them, first
     in the list — before the `say` that carries the words, so that exchange earns no
@@ -9141,7 +9164,7 @@ def inject_provoke(raw_intents, player_text: str, scene) -> list:
            for r in raw_intents):
         return raw_intents
     how = provocation_in(player_text)
-    if not how:
+    if not how or _names_a_creature_not_a_slur(player_text, scene):
         return raw_intents
     ref = provoked_one(raw_intents, player_text, scene)
     if not ref:
@@ -9503,10 +9526,15 @@ def answer_the_absent(raw_intents, player_text: str, scene, world=None):
     from rules import scope as scope_mod
 
     found = _sought(scene, world, player_text)
-    if found.get("scope") not in (scope_mod.ELSEWHERE, scope_mod.NOWHERE,
-                                  scope_mod.AMBIGUOUS):
+    # Somebody sought to buy the party's own cargo is the market's question, and the
+    # trade code holds the answer (`buyers_for_cargo`): playtest 2026-11-17 #5, "find a
+    # cloth merchant who'll buy a hold full of Khy'vyr silk" was a population miss on the
+    # whole phrase and nothing was said.
+    said = "" if found.get("scope") == scope_mod.HERE else         buyers_for_cargo(scene, world, player_text)
+    if not said and found.get("scope") not in (scope_mod.ELSEWHERE, scope_mod.NOWHERE,
+                                               scope_mod.AMBIGUOUS):
         return raw_intents
-    said = str(found.get("line") or "")
+    said = said or str(found.get("line") or "")
     if not said:
         return raw_intents
     out = [dict(r) if isinstance(r, dict) else r for r in raw_intents]
@@ -9517,6 +9545,42 @@ def answer_the_absent(raw_intents, player_text: str, scene, world=None):
     return out + [{"op": "narrate_only",
                    "because": "the player looked for somebody who is not here",
                    "params": {"not_here": said}}]
+
+
+def buyers_for_cargo(scene, world, player_text: str) -> str:
+    """Who in this town buys the cargo a seek's buyer is wanted for, in the trade code's
+    own words, or "". The cargo is a closed vocabulary — the party's own lots, by their
+    row's name — matched whole-word against the reading's seek target; no other English
+    is read. The buyers are the market's merchants, who take bulk goods at the market's
+    standing (`Engine._sell_cargo`), or nobody when the market is full of it."""
+    from rules import trade as trade_mod
+
+    from . import interpret as _interpret
+
+    reading = _interpret.reading_of(player_text)
+    if not reading or reading.get("error") or scene is None:
+        return ""
+    said = set(trade_mod.words_of(_interpret.target_of(reading, acts=("seek",))))
+    if not said:
+        return ""
+    keys = sorted({str(x.get("key") or "") for x in trade_mod.lots(scene)
+                   if x.get("stowed") != "taken"} & set(trade_mod.ROWS))
+    key = next((k for k in keys if set(trade_mod.words_of(trade_mod.ROWS[k][0])) <= said),
+               "")
+    if not key:
+        return ""
+    place = str(getattr(scene, "location_id", "") or "")
+    town = str(getattr(world.get(place), "name", "") or "this town") if world else "this town"
+    name, unit = trade_mod.ROWS[key][0], trade_mod.ROWS[key][2]
+    room = trade_mod.can_sell(scene, world, place, key)
+    if room <= 0:
+        return (f"Nobody in {town} will take more {name}: the market is full of it, and it "
+                f"clears over {trade_mod.RECOVER_DAYS} days.")
+    how = {"demand": ", and pay dear for it: it is wanted here",
+           "supply": ", though it is made here and goes cheap"}.get(
+        trade_mod.standing(world, place, key), "")
+    return (f"The merchants of {town}'s market buy {name}{how}. They will take up to "
+            f"{room} {unit} of it.")
 
 
 _ASKS_A_NAME = re.compile(r"\b(?:your|his|her|their|the)\s+name\b|\bwho are you\b|"

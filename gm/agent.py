@@ -916,6 +916,8 @@ class GMAgent:
                 # A journey the plan wrote with nowhere to go, given the place the reading's
                 # journey names (`acts_to_ops.journey_named`).
                 raw = acts_to_ops.journey_named(raw, read_ok, notes=own_words)
+                # Somebody the walk leads along goes in its `with` (`acts_to_ops.led_along`).
+                raw = acts_to_ops.led_along(raw, read_ok, self.engine.scene, notes=own_words)
                 raw = judgement.resolve_sold_items(raw, self.engine.scene)
                 raw = judgement.inject_ability(raw, player_input, self.engine.scene)
                 # And its complement: a power the player named that nobody has is a

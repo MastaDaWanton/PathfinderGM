@@ -200,6 +200,10 @@ TRAVELS_WITH_YOU = "bond.travels-with-you"
 # `hirelings.GUARDS` — the state the party's cargo is defended by.
 HIRED = "bond.hired"
 GUARDING = "bond.guarding"
+# A toll-keeper met on the way (rules/ontheway.py) who has not been paid: the price in
+# copper and the place the party came from ride in the payload. Granted and lifted by the
+# engine alone (`Engine._ask_toll`, `Engine._pay_toll`).
+ASKS_A_TOLL = "bond.asks-a-toll"
 # Non-lethal damage that will not mend until a need is met (CRB p.444, Starvation and
 # Thirst: "cannot be recovered until the character gets food or water, as needed—not even
 # magic that restores hit points heals this damage"). Granted by the `withheld` effect

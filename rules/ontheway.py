@@ -172,6 +172,10 @@ class Meeting:
     aggressive: bool = False
     # Which hop, or which watch, it happened on. The caller stops there.
     after: int = 0
+    # A toll's price in copper (`TOLL_DICE`), rolled with the meeting: playtest 2026-11-17
+    # #21, asked "How much?", the toll-keeper said "a few silver pieces" — the engine's
+    # meeting carried no figure, and `TOLL_DICE` was defined and never rolled.
+    price_cp: int = 0
 
 
 def _band(table, roll: int) -> str:
@@ -302,8 +306,10 @@ def road(dice, hours: int, biome: str, level: int = 1, *,
         if kind == "toll":
             got = npcs.choose(["toll", "guard", "warden"],
                               max(1, int(level or 1))) or {}
+            price = dice.roll(TOLL_DICE, label="the toll", visibility="hidden").total
             return Meeting(kind="toll", roll=r, words=("toll-keeper", "warden"),
-                           count=1, template=str(got.get("id") or "guildhand"), after=w)
+                           count=1, template=str(got.get("id") or "guildhand"), after=w,
+                           price_cp=price)
         got = npcs.choose(["merchant", "guard", "traveler"],
                           max(1, int(level or 1))) or {}
         return Meeting(kind="travellers", roll=r, words=("merchant", "guard"), count=2,
