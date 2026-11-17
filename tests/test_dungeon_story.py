@@ -240,6 +240,9 @@ def test_walking_the_rooms_tells_each_trace_meets_the_ally_and_finds_the_leader(
     assert quest.title.split()[0] == tag["quest"].split()[0] and "below the cave" in quest.title
     rooms = [p for p in s.founded if (p.get("dungeon") or {}).get("of") == head["id"]]
     s.pc().abilities["str"] = 60
+    # Eyes for the dark: a room walked into pitch dark tells no trace (#57, below).
+    s.pc().add_condition("probe-eyes", source="test")
+    s.pc().effects[-1].tags = ("sense.darkvision.60",)
     told = {}
     for r in rooms:
         if s.in_encounter:
@@ -264,6 +267,28 @@ def test_walking_the_rooms_tells_each_trace_meets_the_ally_and_finds_the_leader(
         boss = s.people[climax["foes"][0]]
         assert boss.name == tag["leader"]["title"]
         assert tag["leader"]["title"] in told[rooms[-1]["id"]].lower()
+
+
+def test_a_room_walked_into_pitch_dark_shows_nothing_and_keeps_its_trace(always):
+    """Playtest 2026-11-16 #57: a human with no light walked into the cells and was told
+    the scorched plaster, the charcoal beams and the smuggler's ink-dotted knuckles. A
+    room entered with no light and no darkvision says it is dark and nothing it looks
+    like; its trace is told on the first visit there is light to see it by."""
+    s, engine, head, concept = _found()
+    rooms = [p for p in s.founded if (p.get("dungeon") or {}).get("of") == head["id"]]
+    first = rooms[0]
+    out = _run(engine, "travel", {"place": first["id"]})
+    told = " ".join(o.tell for o in out)
+    assert s.at == first["id"], told
+    assert "pitch dark" in told and first["dungeon"]["trace"] not in told, told
+    assert first["about"] not in told
+    if s.in_encounter:
+        s.end_encounter()
+    s.pc().add_condition("probe-eyes", source="test")
+    s.pc().effects[-1].tags = ("sense.darkvision.60",)
+    _run(engine, "travel", {"place": head["deeper"]["spot"]})
+    out = _run(engine, "travel", {"place": first["id"]})
+    assert first["dungeon"]["trace"] in " ".join(o.tell for o in out)
 
 
 def test_the_boss_is_the_tags_leader_and_defeating_it_finishes_the_quest(always):

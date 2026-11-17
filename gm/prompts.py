@@ -1234,6 +1234,11 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
             # the person's name (`faces.for_a_model`, measured 2026-10-09).
             looks = (f" Looks (fact — every description of them keeps to it): "
                      f"{_faces.for_a_model(face)}" if face else "")
+            unseen = hasattr(scene, "sees_nothing") and scene.sees_nothing(scene.pc(), actor)
+            if unseen:
+                # Pitch dark to the player (#57): heard, never seen.
+                looks = (" UNSEEN in the dark (fact): the player can hear, smell or touch "
+                         "them, and sees nothing of their face, body or clothes.")
             # A creature's size and kind from its own record, as a fact: the grioth, a
             # Medium monstrous humanoid, was written "massive", "large" and "towering"
             # because no brief ever said how big it was (owner's report, 2026-10-27). A
@@ -1244,7 +1249,7 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 body = _bestiary.body_said(_bestiary.body_words(actor))
             except Exception:  # noqa: BLE001 — a block that will not load says nothing
                 body = ""
-            if body:
+            if body and not unseen:
                 looks += (f" What it is (fact — its size and kind; never write it bigger "
                           f"or smaller): {body}.")
             # Who this person is TO the player. Both are facts the engine holds and the
@@ -2132,9 +2137,18 @@ def light_now(scene, outcomes=None) -> str:
     searching = any(getattr(o, "op", None) == "check"
                     and "perception" in str(getattr(o, "tell", "") or "").lower()
                     for o in outcomes or ())
-    if not (fighting or searching):
-        return ""
     seen = light_shown.sight(scene)
+    if not (fighting or searching):
+        # Pitch dark is said on every beat, not only a fight's: playtest 2026-11-16 #57,
+        # a walk into an unlit cell block came back with scorched plaster, charcoal beams
+        # and a stranger's ink-dotted knuckles. Dim light, which still shows shapes, keeps
+        # the fight-and-search rule above.
+        if seen is None or seen["level"] != "dark":
+            return ""
+        return (f"THE LIGHT (engine fact, this moment): {seen['why']}, pitch dark — the "
+                f"player sees nothing at all. Write only what they hear, smell and feel: "
+                f"no colours, no shapes, no faces, nothing of the room that would have to "
+                f"be seen. No numbers.")
     if seen is None:
         # Lit where the player stands, in a place the night or the ground holds dark:
         # the light they fight in is a thing they carry, and its edge is part of it.

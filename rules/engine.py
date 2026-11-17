@@ -1498,6 +1498,32 @@ class Scene:
                 best = max(best, min(level + 1, levels.index("normal")))
         return levels[best]
 
+    def sees_nothing(self, viewer, subject=None) -> bool:
+        """Whether `viewer` sees nothing of `subject` (or of the ground it stands on, with
+        no subject) for want of light: darkness where it stands as `viewer` sees it, and
+        no darkvision that reaches. "In areas of darkness, creatures without darkvision
+        are effectively blinded" (CRB p.172, Vision and Light). The one reader for what
+        the dark takes away: attacks of opportunity and the withdraw (rules/reactions.py),
+        and everything visual the tells and the brief would hand the narrator (playtest
+        2026-11-16 #57: a human with no light was told the room's scorched plaster and a
+        stranger's ink-dotted knuckles)."""
+        if viewer is None:
+            return False
+        who = subject if subject is not None else viewer
+        if self.light_at(self.positions.get(getattr(who, "ref", "")), viewer=viewer) != "dark":
+            return False
+        eyes = viewer.eyes() if hasattr(viewer, "eyes") else {}
+        dark_ft = int(eyes.get("darkvision") or 0)
+        if not dark_ft:
+            return True
+        here = self.positions.get(getattr(viewer, "ref", ""))
+        there = self.positions.get(getattr(who, "ref", ""))
+        if who is viewer or not here or not there:
+            return False
+        return gridmod.distance_between(
+            tuple(here[:2]), str(getattr(viewer, "size", "medium") or "medium"),
+            tuple(there[:2]), str(getattr(who, "size", "medium") or "medium")) > dark_ft
+
     # Ten rounds to the minute, written once. Six sites multiplied their own way to get
     # here — `hours * 600`, `worked * MINUTES_PER_HOUR`, `days * 24 * 60`, `rounds // 10`
     # — and four of them then ticked nothing at all.
@@ -6881,6 +6907,66 @@ class Engine:
             tell=f"{pc.name} turns to leave the fight and is struck at by {who}; "
                  f"{pc.name} is {why} and never gets away.",
             because=intent.because)
+
+    def _pursuers(self, pc, escorts=()) -> list[str]:
+        """Who comes after a party walking out of a fight: refs, in the sides' order.
+
+        The CRB has no pursuit rule for a withdraw; the creature's turn is its own. So it
+        is decided by what the creature is (playtest 2026-11-16 #55, the owner's "hungry
+        beasts pursue"): a beast or a mindless thing (`morale.can_yield` false, Int under
+        3) that is still in the fight, can act, is not held or cornered, sees its quarry
+        (`awareness.sees` — the hidden and the invisible get away) and is at least as
+        fast on its feet keeps after it. A slower one cannot keep up: the walk out is a
+        double move at least. A person decides for themselves and is left to the fight's
+        end as before (an owner call, 2026-11-16). No tabletop or MUD source for a
+        pursuit rule of this shape was found (searched 2026-11-16); it is a reading of
+        creature behaviour, said as such.
+        """
+        from . import awareness, morale
+
+        if pc is None or not self.scene.in_encounter:
+            return []
+        ours = {pc.ref, *(escorts or ())}
+        pace = int(getattr(pc, "speed_feet", 30) or 30)
+        out: list[str] = []
+        for refs in self.scene.sides.values():
+            for r in refs:
+                a = self.scene.actors.get(r)
+                if a is None or a.is_pc or r in ours or r in out:
+                    continue
+                if a.is_down or a.is_helpless or not a.can_act() or morale.yielded(a)                         or self._cornered(a) or morale.can_yield(a):
+                    continue
+                if int(getattr(a, "speed_feet", 0) or 0) < pace:
+                    continue
+                if not awareness.sees(self.scene, a, pc):
+                    continue
+                out.append(r)
+        return out
+
+    def _lies_in_wait(self, place_id: str) -> list[str]:
+        """Who at `place_id` attacks a party walking into it: standing, able to act,
+        hostile (`states.attitude_of`), not yielded, and a beast or a mindless thing —
+        what a walker cannot talk past (`_pursuers`' line). Playtest 2026-11-16 #65: the
+        dire rat a fight was walked out of sat in the turnkey's room, and the walk out of
+        the sewers went straight through it. A hostile person is left to their own
+        choosing, as `_pursuers` leaves them (owner call). The Diku line's MEMORY flag
+        is the prior art: "Mob will remember the players that initiate attacks on it, and
+        initiate an attack on that player if it ever runs into him again" (CircleMUD
+        Builder's Manual, circlemud.org/cdp/building/building.txt)."""
+        from . import morale
+
+        pc = self.scene.pc()
+        out = []
+        for r, a in (self.scene.people or {}).items():
+            if a is pc or a.is_pc or str(getattr(a, "at", "") or "") != place_id:
+                continue
+            if a.is_down or not a.can_act() or morale.yielded(a) or morale.can_yield(a):
+                continue
+            if a.has_state("state.hidden") or a.has_state(states.TRAVELS_WITH_YOU):
+                continue
+            if states.attitude_of(a) == "hostile":
+                out.append(r)
+        return out
 
     def _spend_reaction(self, ref: str, budget: str) -> bool:
         """Take one from this creature's allowance, or refuse.
@@ -15882,6 +15968,7 @@ class Engine:
         # sentence in the tell (the first step was asked above, before the withdraw, and a
         # refusal there still refuses the whole travel).
         passing_said: list[str] = []
+        waiting: list[str] = []
         passing_met: list[dict] = []
         watch_stop = ""
         law_line = ""
@@ -15923,6 +16010,16 @@ class Engine:
                     # nothing (`journey.HUSTLE_FREE_HOURS`).
                     step = max(1, -(-step // journey_mod.PACES[pace]))
                     ridden_minutes += step
+                # Somebody hostile in a room on the way stops the walk there, as a
+                # meeting does: playtest 2026-11-16 #65, the walk out of the sewers went
+                # through the turnkey's room past the dire rat it had just fought.
+                waiting = self._lies_in_wait(hop.id)
+                if waiting:
+                    minutes += step
+                    if step_hours and not underway:
+                        far_walked = step_hours
+                    going_to = hop
+                    break
                 if hop.terrain == "deck":           # `ships.DECK`
                     # Up the gangplank or down a hatch: a deck is no street. Live
                     # 2026-11-16 (#19), boarding the Red Gull met "two of them going at
@@ -15963,9 +16060,14 @@ class Engine:
             # separately — and so is the last hop of a walk the watch stopped, which
             # ended where it stood. A walk a meeting interrupted stops at the meeting's
             # place, so everything in hand is a place passed through.
-            kept = passed if met is not None else passed[:-1]
+            kept = passed if (met is not None or waiting) else passed[:-1]
             went_by = tuple(p.name for p in kept)
-            went_by_about = [{"name": p.name, "about": p.about} for p in kept if p.about]
+            # Rooms under the ground walked without light or darkvision are not seen
+            # (#57). Read by the light where the walk starts — shortcut: a lit room on
+            # the way still counts as dark; a per-room light needs lights kept per place.
+            blind = pc is not None and self.scene.sees_nothing(pc)
+            went_by_about = [{"name": p.name, "about": p.about} for p in kept if p.about
+                             and not (blind and places_mod.terrain_of(p.id) == "underground")]
 
         # The gate reads the warrant (docs/wanted.md, reader one), now hop by hop in the
         # walk above, against the step actually taken — so a suspected character stopped
@@ -15987,14 +16089,35 @@ class Engine:
         fight_ended = False
         xp_line = ""
         dying_tells: list[str] = []
+        chasing: list[str] = []
         if moved:
+            # Who comes after the party (`_pursuers`): the fight goes on where it stops,
+            # with them and nobody else. Playtest 2026-11-16 #55: "The fight is left
+            # behind" of a hungry dire rat at 40 ft against a walker at 30.
+            if self.scene.in_encounter:
+                chasing = self._pursuers(pc, escorts)
+                ours = {pc.ref if pc is not None else "", *escorts}
+                foes = [r for refs in self.scene.sides.values() for r in refs
+                        if r not in ours and r in self.scene.actors]
+                for r in foes:
+                    a = self.scene.actors[r]
+                    if r not in chasing and not a.is_down:
+                        # Left standing, it keeps the grudge (`_lies_in_wait`).
+                        from . import attitude as attitude_mod
+
+                        self._set_attitude(a, attitude_mod.HOSTILE, None, "rule:fight-left")
             # In this order: pay, then end, then walk. `_settle_xp` needs the sides and
             # the bodies, `end_encounter` clears the sides, and a fight walked out of
             # used to pay nothing without a word — the tell below carries the line.
-            if self.scene.in_encounter:
+            if self.scene.in_encounter and not chasing:
                 xp_line = self._settle_xp()
                 self.scene.end_encounter()
                 fight_ended = True
+            elif chasing:
+                # The order cannot walk (`Scene.move` keeps the player in it): it is
+                # closed unpaid here and opened again from the pursuers' side on the
+                # ground the party stops on, below — the fight is not over, so no XP.
+                self.scene.end_encounter()
             for a in list(self.scene.actors.values()):
                 if a.is_pc:
                     continue
@@ -16003,7 +16126,7 @@ class Engine:
                     # stay where they fell. Said, rather than silently dropped.
                     stayed_down.append(a.name)
                     escorts.remove(a.ref)
-                if a.ref not in escorts:
+                if a.ref not in escorts and a.ref not in chasing:
                     # Three doors used to shed people and only two resolved the dying
                     # first; travel left them bleeding with no tell. Nobody bleeds out
                     # in silence because the party changed rooms.
@@ -16084,6 +16207,10 @@ class Engine:
                 self.place_party(going_to.id)
             for ref in escorts:
                 self.scene.move(ref, going_to.id)
+            for ref in chasing:
+                # On the party's heels: at the edge of the fight, not beside them.
+                self.scene.zones[ref] = "near"
+                self.scene.move(ref, going_to.id)
             # New room, new ground — the rule `place_party` states and this door never
             # kept. `Scene.move` changes where everybody is and touches no map, so
             # travelling from the well to the market left the WELL's floor on screen with
@@ -16135,6 +16262,26 @@ class Engine:
         # Whoever the walk ran into arrives by the one door creatures arrive by, onto
         # the ground that has just been laid. After the move, never before: they are in
         # the place the party stopped at, and `_bring_in` places them on its grid.
+        # Whoever lay in wait on the way (`_lies_in_wait`) opens the fight from their
+        # side, on the ground just laid.
+        waiting_tell = ""
+        if chasing and pc is not None:
+            on_heels = [r for r in chasing if r in self.scene.actors]
+            if on_heels and not self.scene.in_encounter:
+                self._ensure_encounter(on_heels[0], target=pc.ref)
+            for r in on_heels:
+                self.join_fight(r, "them")
+        if waiting and pc is not None:
+            here_now = [r for r in waiting if r in self.scene.actors]
+            if here_now and not self.scene.in_encounter:
+                self._ensure_encounter(here_now[0], target=pc.ref)
+            for r in here_now:
+                self.join_fight(r, "them")
+            names = [self.scene.actors[r].name for r in here_now]
+            said = _and_then(tuple(names))
+            waiting_tell = (f"{said[:1].upper()}{said[1:]} "
+                            f"{'is' if len(names) == 1 else 'are'} still here, and "
+                            f"{'comes' if len(names) == 1 else 'come'} at you.")
         met_tell = ""
         met_refs: list[str] = []
         if met is not None:
@@ -16277,7 +16424,7 @@ class Engine:
         if watch_stop:
             # The rule's own sentence, about the way out the walk did not take.
             bits.append(watch_stop)
-        if (met is not None or watch_stop) and meant_for != going_to.name:
+        if (met is not None or watch_stop or waiting) and meant_for != going_to.name:
             # Said plainly, because the player asked for somewhere else and needs to
             # know they did not get there — the roguelike's "you were interrupted", and
             # the thing that makes the next turn's repeat of the command make sense.
@@ -16285,6 +16432,14 @@ class Engine:
                         f"{going_to.name}.")
         if fight_ended:
             bits.append("The fight is left behind." + xp_line)
+        if chasing:
+            names = [self.scene.actors[r].name for r in chasing if r in self.scene.actors]
+            said = _and_then(tuple(names))
+            bits.append(f"{said[:1].upper()}{said[1:]} "
+                        f"{'comes' if len(names) == 1 else 'come'} after you, and the "
+                        f"fight goes on here.")
+        if waiting_tell:
+            bits.append(waiting_tell)
         if stayed_down:
             bits.append(f"{', '.join(stayed_down)} cannot come: they stay where they fell.")
         bits.extend(dying_tells)
@@ -16309,15 +16464,16 @@ class Engine:
         effect = {"kind": "biome", "biome": going_to.terrain, "was": was_ground,
                   "left": left, "place": self.scene.at, "was_place": was_place,
                   "fight_ended": fight_ended, "went_by": list(went_by),
+                  "pursued_by": list(chasing), "waylaid_by": list(waiting),
                   "met": met.kind if met is not None else ""}
         # The register's fields (docs/fix-interfaces.md §2.7), each only when set.
         extra = {"minutes": spent if moved else 0,
                  "went_by_about": went_by_about,
                  "setting": setting, "was_setting": was_setting,
                  "direction": direction,
-                 "stopped_short": bool((met is not None or watch_stop)
+                 "stopped_short": bool((met is not None or watch_stop or waiting)
                                        and meant_for != going_to.name),
-                 "meant_for": meant_for if (met is not None or watch_stop)
+                 "meant_for": meant_for if (met is not None or watch_stop or waiting)
                  and meant_for != going_to.name else "",
                  "passed_meetings": passing_met,
                  "watch_stopped": bool(watch_stop),
@@ -16335,7 +16491,9 @@ class Engine:
         # (rules/dungeons.py), after the arrival so whatever lives there is brought in
         # onto the room's own ground.
         more: list[dict] = []
-        if moved and not self.scene.in_encounter:
+        # A fight this walk brought along or ran into is no reason to skip the room: the
+        # player is in it (#55/#65), and the room is still said.
+        if moved and (not self.scene.in_encounter or chasing or waiting):
             from . import dungeons
 
             more, said = dungeons.arrived(self, going_to)
@@ -19781,8 +19939,10 @@ class Engine:
         if aggressive and pc is not None and (by is None or by.ref == pc.ref):
             self._ensure_encounter(pc.ref, target=ref)
             # The rest of a group fight beside the one the fight was opened on.
+            # Every one of them when the fight was already running (a pursuit brought
+            # it into this room, `_op_travel`), else the rest beside the first.
             if self.scene.in_encounter:
-                for r in refs[1:]:
+                for r in refs:
                     if r in self.scene.actors and not any(
                             r in side for side in self.scene.sides.values()):
                         a = self.scene.actors[r]

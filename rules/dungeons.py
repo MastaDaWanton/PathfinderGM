@@ -957,11 +957,21 @@ def arrived(engine, place) -> tuple[list[dict], list[str]]:
     d = room(engine.scene, place.id)
     if d is None:
         return fx, bits
-    bits.append(f"{_cap(place.name)}: {place.about}.")
-    if not d["stocked"] and d.get("trace"):
-        # The room's one trace of its history, told on the first entry so the narrator
-        # has it and invents none (the owner's "cohesive story", shown and not told).
-        bits.append(d["trace"])
+    if pc is not None and engine.scene.sees_nothing(pc):
+        # No light and no darkvision: what the room looks like is not the player's to
+        # be told (playtest 2026-11-16 #57). Its trace waits for a lit visit.
+        bits.append(f"{_cap(place.name)} is pitch dark: nothing of it can be seen, only "
+                    f"heard, smelt and felt.")
+        d.setdefault("traced", False)
+    else:
+        bits.append(f"{_cap(place.name)}: {place.about}.")
+        # A room saved before `traced` was kept told its trace when it was stocked.
+        if not d.get("traced", d["stocked"]) and d.get("trace"):
+            # The room's one trace of its history, told on the first SEEN entry so the
+            # narrator has it and invents none (the owner's "cohesive story", shown and
+            # not told).
+            bits.append(d["trace"])
+            d["traced"] = True
     trap = d.get("trap")
     if trap and trap["armed"] and trap["on"] == "room":
         row = traps()[trap["id"]]
