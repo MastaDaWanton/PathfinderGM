@@ -559,8 +559,9 @@ def provoked_by_withdraw(scene, mover_ref: str,
         return cache[anchor]
 
     at_start = threat(start)
-    if mover.has_state("state.senses.blinded"):
-        # "You can't withdraw from combat if you're blinded": no square is exempt.
+    if mover.has_state("state.senses.blinded") or _in_the_dark(scene, mover):
+        # "You can't withdraw from combat if you're blinded": no square is exempt. Nor
+        # in darkness without darkvision, which is "effectively blinded" (CRB p.172).
         seen: set[str] = set()
     else:
         seen = {r for r in at_start if _seen_by(scene, mover_ref, r)}
@@ -579,12 +580,14 @@ def _seen_by(scene, viewer_ref: str, ref: str) -> bool:
 
     Unseen is the vocabulary's `state.hidden` (invisible, or anything a document hides
     under it) or no clear line between the two on the map (a wall, a fog cloud's
-    obscuring squares). Not modelled: see invisibility, darkness and its darkvision —
-    the map has no light level yet, so a foe in the dark reads as seen.
+    obscuring squares), or darkness the withdrawer has no darkvision for
+    (`Scene.sees_nothing`). Not modelled: see invisibility.
     """
     foe = scene.actors.get(ref)
     viewer = scene.actors.get(viewer_ref)
     if foe is None or viewer is None or foe.has_state("state.hidden"):
+        return False
+    if _in_the_dark(scene, viewer, foe):
         return False
     a, b = scene.positions.get(viewer_ref), scene.positions.get(ref)
     if a is None or b is None:
@@ -686,7 +689,16 @@ def _cannot_see(scene, watcher_ref: str, mover_ref: str) -> bool:
     mover = scene.actors.get(mover_ref)
     if watcher is None or mover is None:
         return False
-    return not awareness.sees(scene, watcher, mover)
+    # Darkness is total concealment to eyes without darkvision (CRB p.172): playtest
+    # 2026-11-16 #55, a dire rat (low-light vision, no darkvision) in an unlit cellar.
+    return not awareness.sees(scene, watcher, mover) or _in_the_dark(scene, watcher, mover)
+
+
+def _in_the_dark(scene, viewer, subject=None) -> bool:
+    """`Scene.sees_nothing`, for a scene that has the light model (a bare test double
+    may not)."""
+    reader = getattr(scene, "sees_nothing", None)
+    return bool(reader(viewer, subject)) if callable(reader) else False
 
 
 __all__ = ["Reaction", "TRIGGERS", "UNPROVOKING", "budget_for",

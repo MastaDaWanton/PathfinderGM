@@ -186,6 +186,10 @@ def test_venturing_moves_the_party_and_costs_the_hours():
     # the market.
     n = len(s.founded)
     _run(engine, "travel", {"place": started_in})
+    if s.in_encounter:
+        # What lives in the cave may follow the party out (`Engine._pursuers`, playtest
+        # 2026-11-16 #55); this test is about the cave, not that fight.
+        s.end_encounter()
     again = _run(engine, "venture", {"kind": "cave"})
     assert not _refused(again) and len(s.founded) == n
     assert "you have been inside it before" in again.tell

@@ -5344,6 +5344,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
                 who = c.scene.actors.get(ref)
                 if who is None or not getattr(who, "appearance", ""):
                     continue
+                if c.scene.sees_nothing(c.scene.pc(), who):
+                    # Unseen in the dark (playtest 2026-11-16 #57): owed, not given, so
+                    # the face comes on the first beat there is light to see it by.
+                    continue
                 # The people's line once per campaign; after that this person's own
                 # details (rules/faces.py, "a people described once").
                 from rules import faces as faces_mod
