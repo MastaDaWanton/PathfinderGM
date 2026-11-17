@@ -532,7 +532,8 @@ go        walk somewhere within reach (a place in town, the crossroads, the fiel
           room, to the hearth, a corner, the bar, the window), false for anywhere else;
           `fixture` is which fixture the walk is to (counter for a bar, bookshelf, stair,
           barrel…; gallery for a wall-walk, landing, loft or balcony above the floor;
-          floor for back down to the ground), or none
+          floor for back down to the ground), or none. The object is what or who you
+          take along: a thing carried, or a person you lead or who comes with you
 journey   take the road or a ship to another town; book or take passage, board a ship
           bound somewhere, set sail, sail on, or order a ship's crew to sail somewhere
 leave     walk or climb out of where you are — a building, ground gone down into (a
@@ -1006,6 +1007,18 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "take the lamp along to the old woman's hut",
           "place": "the old woman's hut", "object": "the lamp", "act": "go"}]}),
+    # Somebody led, or coming along, is the walk's object (playtest 2026-11-17 #34): "I lead
+    # the smuggler on into the broken pen" was read `follow: the smuggler`, the walk was
+    # refused as leaving him behind, and "…and the smuggler comes with me" was a claim.
+    ("Lamp up, I lead the tinker on through the archway.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "Lamp up", "act": "other"},
+         {"span": "lead the tinker on through the archway", "place": "the archway",
+          "object": "the tinker", "act": "go"}]}),
+    ("I head down to the mill, and Orla comes with me.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "head down to the mill, and Orla comes with me", "place": "the mill",
+          "object": "Orla", "act": "go"}]}),
     # A purpose clause or a plan: intended, never done. "going to <a place>" is going;
     # "going to <do something>" is a plan.
     ("I'm going to the baker's to buy bread.",

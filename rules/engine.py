@@ -5726,6 +5726,9 @@ class Engine:
             # queued behind it by the same mover does not happen (`_held_by_failed_move`).
             if intent.op == "check":
                 queue = self._held_by_failed_move(intent, outcome, queue)
+            # A walk something stopped gets the walker no further this turn either.
+            if intent.op in ("travel", "journey", "venture"):
+                queue = self._held_by_stopped_walk(intent, outcome, queue)
             # A weapon drawn in a fight is a move action: what that leaves of the turn is
             # written onto the blows still queued behind it (`_draw_paid`).
             if intent.op == "wear":
@@ -5916,6 +5919,25 @@ class Engine:
             outcome.tell = (f"{outcome.tell} {name} gets no further, and the way on is "
                             f"still to go.").strip()
         return kept
+
+    def _held_by_stopped_walk(self, walk: Intent, outcome: Outcome,
+                              queue: list[dict]) -> list[dict]:
+        """Take the walker's later walks off the queue when this one was stopped — a
+        meeting, somebody lying in wait, pursuers — and a fight is on. Playtest 2026-11-17
+        #1: "The penguin is still here, and comes at you" on the deck, and the same plan's
+        next travel walked on ashore: "The fight is left behind". The roguelikes' rule for
+        a computed path: walk it until something disturbs you, then hand back the keys."""
+        if outcome.status != "resolved" or not self.scene.in_encounter:
+            return queue
+        stopped = any(isinstance(e, dict) and (e.get("met") or e.get("waylaid_by")
+                                              or e.get("pursued_by"))
+                      for e in outcome.effects)
+        if not stopped:
+            return queue
+        mover = walk.actor or ""
+        return [r for r in queue
+                if not (r.get("op") in ("travel", "journey", "venture", "move")
+                        and str(r.get("actor") or mover) == mover)]
 
     def _settle_gate(self, gate: Intent, outcome: Outcome, queue: list[dict]) -> list[dict]:
         """Take off the queue what a poison's save just ruled out.
@@ -7039,6 +7061,9 @@ class Engine:
                 out.append(r)
         return out
 
+    # How long a beast left standing after a fight walked out of stays roused (`_lies_in_wait`).
+    GRUDGE_MINUTES = 24 * 60
+
     def _lies_in_wait(self, place_id: str) -> list[str]:
         """Who at `place_id` attacks a party walking into it: standing, able to act,
         hostile (`states.attitude_of`), not yielded, and a beast or a mindless thing —
@@ -7049,6 +7074,7 @@ class Engine:
         is the prior art: "Mob will remember the players that initiate attacks on it, and
         initiate an attack on that player if it ever runs into him again" (CircleMUD
         Builder's Manual, circlemud.org/cdp/building/building.txt)."""
+        from . import attitude as attitude_mod
         from . import morale
 
         pc = self.scene.pc()
@@ -7059,6 +7085,24 @@ class Engine:
             if a.is_down or not a.can_act() or morale.yielded(a) or morale.can_yield(a):
                 continue
             if a.has_state("state.hidden") or a.has_state(states.TRAVELS_WITH_YOU):
+                continue
+            left = next((e for e in a.effects if e.source == "rule:fight-left"), None)
+            if left is not None:
+                # The grudge of a fight walked out of lasts a day, then the beast settles:
+                # playtest 2026-11-17 #1, a penguin left on the Red Gull's deck "comes at
+                # you" 44 hours after the fight. A grudge from before the stamp (0.4.0's
+                # first saves) has settled. THIS APP'S call: no rule in the book says how
+                # long an animal stays roused; a day is the owner's to move.
+                at = (left.payload or {}).get("at")
+                if at is None or self.scene.clock_minutes - int(at) > self.GRUDGE_MINUTES:
+                    continue
+            elif morale.TESTED_KEY in {e.key for e in a.effects}                     and not attitude_mod.step_of(attitude_mod.of(a))                     >= attitude_mod.step_of(attitude_mod.COMES_ALONG):
+                # A beast bloodied in a fight before 0.4.0 stamped the grudge (playtest
+                # 2026-11-17 #25: the dire rat fought and fled on T272 sat in torchlight
+                # sixteen hours later). Its morale test is the record that it fought.
+                # shortcut: no clock on these, so they never settle; they are stamped the
+                # first time a fight with them is walked out of again.
+                out.append(r)
                 continue
             if states.attitude_of(a) == "hostile":
                 out.append(r)
@@ -15504,6 +15548,7 @@ class Engine:
         # ground the party is now standing on — the open country it stopped in, or the
         # far town's way in when the meeting fell on the road's last watch.
         made = self._meet_on_the_way(met, zone="far") if met is not None else []
+        toll_line = self._ask_toll(met, made)
         if met is not None and met.aggressive and pc is not None and made:
             self._ensure_encounter(pc.ref, target=made[0]["ref"])
 
@@ -15526,7 +15571,8 @@ class Engine:
                     + ", and the road stops being yours.",
                     ontheway.describe(met, who=[self.scene.actors[m["ref"]].name
                                                 for m in made
-                                                if m["ref"] in self.scene.actors])]
+                                                if m["ref"] in self.scene.actors])
+                    + toll_line]
             if through:
                 bits.insert(0, f"Out by {_and_then(tuple(through))}.")
             if toll_note:
@@ -16002,6 +16048,7 @@ class Engine:
                     f"travel: {w!r} names {len(matches)} people here; say which by "
                     f"ref: {', '.join(matches)}.", "refs")
             escorts.extend(matches)
+        named_escorts = list(escorts)
         # And whoever travels with you, without being named. `with` asked the model to
         # remember who the party is on every single move, and it did not: measured live
         # 2026-09-22, the tell for crossing a village read "Left behind: Drenn
@@ -16017,6 +16064,7 @@ class Engine:
         from . import journey as journey_mod
 
         fell_away: list[str] = []
+        joined: list[str] = []
         # The bond is lifted below, once nothing can refuse the walk: a travel run twice
         # (the attacks of opportunity a withdraw owes go first, `_leaving_the_fight`)
         # must find the same companions falling away the second time, and a refused one
@@ -16050,6 +16098,9 @@ class Engine:
         was_place = self.scene.at
         was_ground = here.terrain
         moved = going_to.id != was_place
+        barred = self._toll_bars(going_to, known) if moved and pc is not None else ""
+        if barred:
+            return self._refuse(intent, barred)
 
         # THE PACE, for a short trip out of town (I3, 2026-09-29). Lane B built riding and
         # galloping for journeys (owner, Q13) and could not give `travel` the param, so a
@@ -16264,6 +16315,13 @@ class Engine:
                     # 2026-11-16 (#19), boarding the Red Gull met "two of them going at
                     # each other in the middle of the road at the Red Gull".
                     met = None
+                elif not underway and (places_mod.setting_of(hop.id) == "under"
+                                       or hop.terrain == "underground"):
+                    # Under the ground is neither street nor road: playtest 2026-11-17
+                    # #20, a sewer channel met the road's toll-keeper. What lives down
+                    # there is the venture's own (`_inhabit`), and lies in wait. The way
+                    # in from the surface (`underway`) is still the road's.
+                    met = None
                 elif places_mod.setting_of(hop.id) == "in":
                     met = ontheway.street(self.dice, level,
                                           apl=encounter_budget.party_apl(self.scene),
@@ -16344,7 +16402,8 @@ class Engine:
                         # Left standing, it keeps the grudge (`_lies_in_wait`).
                         from . import attitude as attitude_mod
 
-                        self._set_attitude(a, attitude_mod.HOSTILE, None, "rule:fight-left")
+                        self._set_attitude(a, attitude_mod.HOSTILE, None, "rule:fight-left",
+                                           payload={"at": self.scene.clock_minutes})
             # In this order: pay, then end, then walk. `_settle_xp` needs the sides and
             # the bodies, `end_encounter` clears the sides, and a fight walked out of
             # used to pay nothing without a word — the tell below carries the line.
@@ -16451,6 +16510,17 @@ class Engine:
                 self.place_party(going_to.id)
             for ref in escorts:
                 self.scene.move(ref, going_to.id)
+            # Somebody taken along by name who would come anyway (friendly or better, the
+            # `company` op's own rule) has joined the party, not been carried one room.
+            # Playtest 2026-11-17 #34/#50: "I go to the broken pen, and the smuggler comes
+            # with me" walked a friendly smuggler there with `with`, unbonded, and the next
+            # walk left him behind, so he was "nowhere to be found" when she came back.
+            for ref in named_escorts:
+                a = self.scene.actors.get(ref)
+                if a is None or ref not in escorts or a.has_state(states.TRAVELS_WITH_YOU)                         or str(getattr(a, "from_template", "") or "") in journey_mod.MOUNTS                         or attitude_mod.step_of(attitude_mod.of(a))                         < attitude_mod.step_of(attitude_mod.COMES_ALONG):
+                    continue
+                self._travels_with_you(a)
+                joined.append(a.name)
             for ref in chasing:
                 # On the party's heels: at the edge of the fight, not beside them.
                 self.scene.zones[ref] = "near"
@@ -16543,6 +16613,7 @@ class Engine:
                     pc, places_mod.location_of(self.scene.at) or self.scene.location_id)
             made = self._meet_on_the_way(met, zone="near")
             met_refs = [m["ref"] for m in made]
+            toll_line = self._ask_toll(met, made, came_from=prev.id)
             # A stop names who and why (Lane B, item 16.3): "the watch comes down the
             # road … You get no further" became background prose — "the watchmen are
             # making their rounds" — because the tell never said who had stopped you.
@@ -16552,7 +16623,7 @@ class Engine:
             met_tell = ontheway.describe(
                 met, going_to.name, law=law_now,
                 who=[self.scene.actors[r].name for r in met_refs if r in self.scene.actors],
-                arrived=going_to.id == meant_id)
+                arrived=going_to.id == meant_id) + toll_line
             if met.kind == "weather":
                 # The one band that is nobody. It costs what it costs on the road
                 # between towns — hours, off the clock — and here it costs the same,
@@ -16717,6 +16788,10 @@ class Engine:
             bits.append(f"Left behind: {', '.join(left)}.")
         if fell_away:
             bits.append(f"{', '.join(fell_away)} does not come with you any more.")
+        if joined:
+            said = _and_then(tuple(joined))
+            bits.append(f"{said[:1].upper()}{said[1:]} "
+                        f"{'comes' if len(joined) == 1 else 'come'} with you.")
         if law_line:
             bits.append(law_line)
         if moved and direction == "along" and setting in ("in", "under") \
@@ -16937,6 +17012,91 @@ class Engine:
         if met.kind in ontheway.PRICED:
             self._mark_priced([m["ref"] for m in made], f"meeting:{met.kind}")
         return made
+
+    def _ask_toll(self, met, made, came_from: str = "") -> str:
+        """A toll-keeper's price, held on them as `bond.asks-a-toll` with the copper and the
+        place the party came from; returns the sentence that says it (" They ask …").
+
+        Playtest 2026-11-17 #21-#24: the toll had no figure ("a few silver pieces"), no way
+        to pay it, and walking on past the keeper drew nothing. The road table's own rule
+        is that a toll is "a decision, pay or go round"; the price is `TOLL_DICE`, the
+        payment a `give` (`_pay_toll`), and the way on is barred until it is made
+        (`_toll_bars`)."""
+        from .activeeffect import ActiveEffect
+
+        if met is None or met.kind != "toll" or not made or not met.price_cp:
+            return ""
+        keeper = self.scene.actors.get(made[0]["ref"])
+        if keeper is None:
+            return ""
+        keeper.apply_effect(ActiveEffect(
+            name="asks a toll", kind="bond", key="toll", source="rule:toll",
+            origin="rule:toll", duration="until-dismissed", tags=(states.ASKS_A_TOLL,),
+            payload={"cp": int(met.price_cp), "from": str(came_from or "")}))
+        line = goods.purse_line(goods.coins_for(int(met.price_cp)), self._coins_here())
+        return f" {_sentence(keeper.name)} asks {line} to let you by."
+
+    @staticmethod
+    def _toll_of(who) -> dict:
+        """The unpaid toll this person asks (`_ask_toll`'s payload), or {}."""
+        if who is None or not who.has_state(states.ASKS_A_TOLL):
+            return {}
+        e = next((e for e in who.effects if e.source == "rule:toll"), None)
+        return dict(e.payload or {}) if e is not None else {}
+
+    def _toll_bars(self, going_to, known) -> str:
+        """The refusal a walk on past an unpaid toll-keeper gets, or "". Turning back the
+        way the party came is free; anything else is past them. A keeper who is down, or
+        a fight already on, bars nothing."""
+        from . import places as places_mod
+
+        if self.scene.in_encounter:
+            return ""
+        here = self.scene.at
+        for a in self.scene.actors.values():
+            toll = self._toll_of(a) if not a.is_pc and not a.is_down else {}
+            if not toll:
+                continue
+            came = str(toll.get("from") or "")
+            first = (places_mod.route(known, here, going_to.id) or (going_to.id,))[0]
+            if came and first == came:
+                continue
+            line = goods.purse_line(goods.coins_for(int(toll.get("cp") or 0)),
+                                    self._coins_here())
+            back = places_mod.find(known, came) if came else None
+            return (f"{_sentence(a.name)} stands in the middle of the way and wants {line} "
+                    f"before you pass. Pay them, or turn back"
+                    + (f" to {back.name}" if back is not None else "") + ".")
+        return ""
+
+    def _pay_toll(self, intent: Intent, giver, keeper, offered_cp: int = 0) -> Outcome:
+        """The toll handed over (`_ask_toll`): the price, or a named sum at least that
+        much, from the payer's purse with change made (`goods.spend`); the keeper stands
+        aside. A sum short of it is refused with the price named."""
+        cp = int(self._toll_of(keeper).get("cp") or 0)
+        coins = self._coins_here()
+        if offered_cp and offered_cp < cp:
+            return self._refuse(
+                intent, f"{_sentence(keeper.name)} wants "
+                        f"{goods.purse_line(goods.coins_for(cp), coins)} and will not let "
+                        f"you by for {goods.purse_line(goods.coins_for(offered_cp), coins)}.")
+        pay = max(cp, int(offered_cp or 0))
+        purse, ok = goods.spend(giver.purse, pay)
+        if not ok:
+            return self._refuse(
+                intent, f"The toll is {goods.purse_line(goods.coins_for(pay), coins)}, and "
+                        f"{giver.name} carries {goods.purse_line(giver.purse, coins)}.")
+        giver.purse = purse
+        keeper.purse = goods.credit(keeper.purse, pay)
+        keeper.remove_effects(source="rule:toll")
+        return Outcome(
+            intent_id=intent.id, op="give", because=intent.because,
+            effects=[{"ref": giver.ref, "kind": "give", "item": "coin", "count": pay,
+                      "how": "toll", "from": giver.ref, "to": keeper.ref,
+                      "purse": dict(giver.purse), "goods": dict(giver.goods)}],
+            tell=(f"{giver.name} pays {keeper.name} the toll: "
+                  f"{goods.purse_line(goods.coins_for(pay), coins)}. "
+                  f"{_sentence(keeper.name)} stands aside, and the way on is open."))
 
     def _mark_priced(self, refs, source: str) -> None:
         """Mark people a budgeted source brought in (`states.PRICED`), through the one
@@ -28962,6 +29122,15 @@ class Engine:
 
         coins = self._coins_here()
         denom = goods.coin_named(item, coins)
+
+        # The player's coin to a toll-keeper who asks a toll is the toll (`_pay_toll`):
+        # "I pay the toll-keeper his toll" (playtest 2026-11-17 #22) named no sum, and
+        # nothing had a path to pay it. A thing in the pack handed over stays a gift.
+        if giver is not None and giver.is_pc and taker is not None and not taker.is_pc \
+                and self._toll_of(taker) \
+                and (denom or not holding.key_in(giver.goods, item)):
+            return self._pay_toll(intent, giver, taker,
+                                  goods.in_copper({denom: count}) if denom else 0)
 
         # Coin with no amount and no denomination — "the coins", "the payment" — is
         # money, never a goods line. Measured 2026-10-03 (item 3): "I pocket the coins"

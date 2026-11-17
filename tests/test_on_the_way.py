@@ -215,9 +215,11 @@ class TestTheRestOfTheRoad:
         assert got.count == 0 and not got.template
 
     def test_a_toll_brings_somebody_to_pay(self):
-        got = ontheway.road(_Fixed(5, 95), hours=6, biome="plains")
+        got = ontheway.road(_Fixed(5, 95, 7), hours=6, biome="plains")
         assert got is not None and got.kind == "toll"
         assert got.count == 1 and got.template
+        # Playtest 2026-11-17 #21: the toll carries its price, rolled on `TOLL_DICE`.
+        assert got.price_cp > 0
 
     def test_what_it_costs_is_hours_and_what_it_asks_is_coin(self):
         """Both are the engine's own currencies — `scene.advance` and `goods.spend` —

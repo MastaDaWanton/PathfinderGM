@@ -695,6 +695,20 @@ def _give(row: Row, frame, i, scene, pc, recent=(), coming=()) -> None:
         # "pay", "give him the money": coin of no named amount, at a keeper asked for
         # work today, is the job's price paid — the commission's own (`_agreed_work`).
         return
+    if not coin_amount(thing) and not _carried(pc, thing, coming):
+        # Paid to somebody asking a toll, a sum not named is the toll (`Engine._pay_toll`):
+        # "I pay the toll-keeper his toll" (playtest 2026-11-17 #22) was "not carrying his
+        # toll" to every door, and no coin moved. Structure: who it goes to holds the toll.
+        from rules import states
+
+        said_to = " ".join(str(a.get("target") or "").split())
+        ref = person(scene, said_to) if said_to else addressed(scene)
+        held = (getattr(scene, "actors", {}) or {}).get(ref)
+        if held is not None and held.has_state(states.ASKS_A_TOLL):
+            row.intents.append({"op": "give", "actor": pc.ref,
+                                "params": {"item": "the toll", "from_": pc.ref, "to": ref},
+                                "because": "the player paid the toll"})
+            return
     if not thing:
         row.note = "nothing named to hand over"
         return
@@ -4000,6 +4014,44 @@ def journey_named(raw, frame: dict | None, *, notes: list | None = None) -> list
             r = {**r, "params": {**(params or {}), "to": places[0]}}
             if notes is not None:
                 notes.append(f"the journey's place, {places[0]}, from the words")
+        out.append(r)
+    return out
+
+
+def led_along(raw, frame: dict | None, scene, *, notes: list | None = None) -> list:
+    """Somebody here the reading's walk takes along (`go`/`leave`/`journey` whose `object`
+    is a person here) is put in every walk's `with`; the engine then decides whether they
+    come and whether they stay with the party (`Engine._op_travel`, the `company` rule).
+
+    Playtest 2026-11-17 #34: the smuggler had just said "I'll follow you into the dark",
+    and "I lead the smuggler on into the broken pen" was refused twice as a travel that
+    would leave him behind, then built a 10 ft move inside the cells. Structure, not
+    English: the reader's slot names the person, the engine's finder says who."""
+    from . import interpret
+
+    if not isinstance(raw, list) or not frame or frame.get("error") or scene is None:
+        return raw
+    led: list[str] = []
+    for a in frame.get("actions") or []:
+        if not isinstance(a, dict) or a.get("act") not in ("go", "leave", "journey")                 or not interpret.acting(a):
+            continue
+        ref = person(scene, a.get("object"))
+        actor = (getattr(scene, "actors", {}) or {}).get(ref)
+        if actor is not None and not actor.is_pc and ref not in led:
+            led.append(ref)
+    if not led:
+        return raw
+    out = []
+    for r in raw:
+        if _op(r) in ("travel", "journey"):
+            params = dict((r or {}).get("params") or {})
+            taken = params.get("with") or []
+            taken = [taken] if isinstance(taken, str) else list(taken)
+            more = [ref for ref in led if ref not in taken]
+            if more:
+                r = {**r, "params": {**params, "with": taken + more}}
+                if notes is not None:
+                    notes.append(f"{', '.join(more)} led along on the walk, from the words")
         out.append(r)
     return out
 
