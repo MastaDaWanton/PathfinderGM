@@ -46,27 +46,28 @@ HARDNESS = 5
 
 # GameMastery Guide, Table 7-49: Ships. AC, hit points, base save, maximum speed in feet,
 # arms (how many siege engines it can carry), ram damage, its size in squares, and the crew
-# it needs and can hold.
+# it needs and can hold. `price_gp` is the CRB's (Table 6-9, Transport): what the law prices
+# a taken ship at (rules/trial.py, the theft fine).
 #
 # Every speed on this table is under sail, and a ship with the wind behind it moves at
 # double — which is the one weather rule this app has, and it is the book's.
 VESSELS: dict[str, dict] = {
     "keelboat": {
-        "name": "keelboat", "ac": 8, "hp": 60, "save": 4, "speed": 30, "arms": 1,
+        "name": "keelboat", "price_gp": 3000, "ac": 8, "hp": 60, "save": 4, "speed": 30, "arms": 1,
         "ram": "2d6+6", "squares": 2, "crew": (1, 4), "passengers": 15,
         "about": "a river boat with a shallow draught and no pretensions",
         "places": (("the deck", "planking, a tiller, and not much room", False),
                    ("the hold", "cargo, bilge water, and a low beam", True)),
     },
     "longship": {
-        "name": "longship", "ac": 6, "hp": 75, "save": 5, "speed": 60, "arms": 1,
+        "name": "longship", "price_gp": 10000, "ac": 6, "hp": 75, "save": 5, "speed": 60, "arms": 1,
         "ram": "4d6+18", "squares": 3, "crew": (50, 50), "passengers": 75,
         "about": "shallow, fast, and built to be dragged up a beach",
         "places": (("the deck", "benches, oars, and the shields along the rail", False),
                    ("the steering deck", "the steerboard, and whoever holds it", False)),
     },
     "sailing ship": {
-        "name": "sailing ship", "ac": 6, "hp": 125, "save": 6, "speed": 60, "arms": 2,
+        "name": "sailing ship", "price_gp": 10000, "ac": 6, "hp": 125, "save": 6, "speed": 60, "arms": 2,
         "ram": "3d6+12", "squares": 3, "crew": (20, 20), "passengers": 50,
         # Two masts, as Ultimate Combat's sailing ship has them (the deck layout follows UC).
         "about": "a trader: two masts, a deep hold, and a crew who want no trouble",
@@ -77,7 +78,7 @@ VESSELS: dict[str, dict] = {
                     False)),
     },
     "warship": {
-        "name": "warship", "ac": 2, "hp": 175, "save": 7, "speed": 60, "arms": 3,
+        "name": "warship", "price_gp": 25000, "ac": 2, "hp": 175, "save": 7, "speed": 60, "arms": 3,
         "ram": "3d6+12", "squares": 4, "crew": (60, 60), "passengers": 80,
         "about": "built to close with other ships and take them",
         "places": (("the deck", "cleared for action, and the engines on it", False),
@@ -87,7 +88,7 @@ VESSELS: dict[str, dict] = {
                    ("the hold", "powder, shot, and water in barrels", True)),
     },
     "galley": {
-        "name": "galley", "ac": 2, "hp": 200, "save": 8, "speed": 90, "arms": 4,
+        "name": "galley", "price_gp": 30000, "ac": 2, "hp": 200, "save": 8, "speed": 90, "arms": 4,
         "ram": "6d6+24", "squares": 4, "crew": (200, 200), "passengers": 250,
         "about": "two hundred oars and a beak at the front for using them on",
         "places": (("the deck", "the gangway down the middle, and the engines", False),

@@ -11942,7 +11942,13 @@ class Engine:
                     name="a warrant", kind="situation", key=states.wanted_tag(town),
                     source=f"rule:ship-seized/{ship.id}", origin=f"rule:ship-seized/{ship.id}",
                     duration="until-dismissed", tags=(states.wanted_tag(town),),
-                    payload={"crime": "theft", "what": ship.name}))
+                    # Sworn by the man she was taken from, who saw it done: a witness,
+                    # never a bare accusation (playtest 2026-11-16 #85), and the ship's
+                    # book price for the theft's fine (`ships.VESSELS`, CRB Table 6-9).
+                    payload={"crime": "theft", "what": ship.name,
+                             "witness": master.name, "ship": ship.id,
+                             "worth_gp": float(ships_mod.VESSELS.get(
+                                 ship.kind, {}).get("price_gp") or 0)}))
                 effects.append({"kind": "wanted", "town": town})
             hands = [a for a in crew if a is not master and not a.is_down]
             quay = next((p for p in self.places() if " ".join(str(p.name).split()).lower()
@@ -15366,8 +15372,8 @@ class Engine:
         return done
 
     def watch_at_the_way_out(self, pc, was_place: str, going_to, known, *,
-                             through: bool = False, crossing: bool = True
-                             ) -> tuple[str, str]:
+                             through: bool = False, crossing: bool | None = None,
+                             name_ways: bool = True) -> tuple[str, str]:
         """(refusal, line) for walking from `was_place` to `going_to` past the watch.
 
         The gate's reading of the warrant, as `_op_travel` has always applied it — moved
@@ -15393,7 +15399,18 @@ class Engine:
         it; asked as though it were the arch, the per-hop watch refused the wanted their
         own temple — "wanted is not house arrest" (`test_moving_inside_the_walls_is_not_
         watched`) — the moment it was built. A gate passed through on a walk that stays
-        inside is a square, not the way out.
+        inside is a square, not the way out. Left None (the exits row asks of one step),
+        it is read off the two places, as `_op_travel` reads it off the walk's two ends.
+
+        On a walk that stays inside, only the town's ARCH is where the watch stands: the
+        first of `places.ENTRANCES` the town has. Playtest 2026-11-16 #73: Mirabalos has
+        the gate AND the docks, and a walk from the cathedral to the quay — inside the
+        walls, leaving by sea being a passage `watch_on_the_road` reads — was stopped at
+        the east crossing as though the docks were the arch. A village whose only way in
+        is its docks still has the watch there.
+
+        `name_ways` is False when this is asked of the candidate ways round (the refusal's
+        list, below), so the list never asks itself.
         """
         from . import dungeons
         from . import places as places_mod
@@ -15413,7 +15430,16 @@ class Engine:
         # one list, so the generator and the law cannot disagree about what an
         # entrance is — and a village, which has a road rather than a gate, was
         # somewhere a warrant could never be enforced at all.
-        at_gate = " ".join(going_to.name.split()).lower() in places_mod.ENTRANCES
+        if crossing is None:
+            crossing = (places_mod.setting_of(was_place) == "outside") \
+                != (places_mod.setting_of(going_to.id) == "outside")
+        name = " ".join(going_to.name.split()).lower()
+        at_gate = name in places_mod.ENTRANCES
+        if at_gate and not crossing:
+            # Inside the walls, the watch stands at the arch alone (#73, above).
+            have = {" ".join(p.name.split()).lower() for p in known
+                    if places_mod.location_of(p.id) == town}
+            at_gate = name == next((x for x in places_mod.ENTRANCES if x in have), name)
         # Any way OUT, by place as well as by biome (Lane B, docs/fix-interfaces.md
         # §1.3 B3). This read `bool(want)`, so a travel by PLACE to ground outside —
         # which is how the outskirts and the road heads are entered — walked past the
@@ -15434,15 +15460,32 @@ class Engine:
         found = self.world.get(self.scene.location_id) if self.world else None
         town_name = str(getattr(found, "name", "") or "the town")
         if law == "wanted":
-            other_ways = [p.name for p in known
-                          if p.origin in ("found", "venture")
-                          and not p.described_only
-                          and p.terrain != places_mod.URBAN]
+            # Only ground outside the walls that a walk from here reaches with the watch
+            # never in the way, each named once. Playtest 2026-11-16 #73/#84: this listed
+            # every venture spot in town — "the crypt, the stair, … the sewers, the
+            # outfall, the main channel, the sump, the sewers, the outfall, the main
+            # channel" — dead ends under the streets, and taking its advice failed.
+            other_ways: list[str] = []
+            for p in (known if name_ways else ()):
+                if p.origin not in ("found", "venture") or p.described_only \
+                        or places_mod.setting_of(p.id) != "outside" \
+                        or p.name in other_ways:
+                    continue
+                prev, clear = was_place, True
+                for hop_id in places_mod.route(known, was_place, p.id) or ():
+                    hop = places_mod.find(known, hop_id)
+                    if hop is None or self.watch_at_the_way_out(
+                            pc, prev, hop, known, through=hop_id != p.id,
+                            crossing=True, name_ways=False)[0]:
+                        clear = False
+                        break
+                    prev = hop_id
+                if clear and prev == p.id:
+                    other_ways.append(p.name)
             how = (f"Leave by another way — {', '.join(other_ways)} — or "
                    f"clear your name."
                    if other_ways else
-                   "Leave by another way — ground you have founded or "
-                   "ventured into outside the walls — or clear your name.")
+                   "Find another way past the watch, or clear your name.")
             return (f"{pc.name} is wanted in {town_name}, and the gate is where the "
                     f"watch stands: they would take you at the arch. {how}"), ""
         if crossing:
