@@ -1029,6 +1029,21 @@ def arrived(engine, place) -> tuple[list[dict], list[str]]:
             rolls, sprung, said = spring(engine, trap, _party(engine))
             fx.extend(sprung)
             bits.extend(said)
+    if d["stocked"]:
+        # Back in a room already stocked: whoever lives here is still here, and the
+        # stocking's own line was told on the first entry only. Playtest 2026-11-17 #27:
+        # back in the turnkey's room by torchlight, the dire rat that had bitten her there
+        # stood in it, and the tell (so the beat) never said so.
+        seen = pc is None or not engine.scene.sees_nothing(pc)
+        for ref in d.get("foes") or ():
+            a = engine.scene.actors.get(ref)
+            if (seen and a is not None and getattr(a, "at", "") == place.id
+                    and not a.has_state("state.hidden")
+                    and not a.has_state("state.down.dead")):
+                from .names import definite
+
+                bits.append(f"{_cap(definite(a.name))} {'lies' if a.is_down else 'is'} "
+                            f"here.")
     if not d["stocked"]:
         d["stocked"] = True
         head = _rec(engine.scene, d.get("of", "")) or {}

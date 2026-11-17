@@ -2627,11 +2627,12 @@ class GMAgent:
         # a name the answer invents is held to the world like any other. Player turns
         # only, and only where a rewrite is allowed at all.
         if rewrite and not acting and player_input and player_input != prompts.CARRY_ON:
-            asked = self._who_was_asked(player_input)
+            asked = self._who_was_asked(player_input, outcomes)
             if asked is not None and not narration_mod.answered(
                     text, asked.ref, self.last_said, player_input):
                 text, answer_notes, answer_attempts = self._answer_the_question(
-                    text, asked, player_input, brief)
+                    text, asked, player_input, brief,
+                    left_behind=asked.ref not in self.engine.scene.actors)
                 repairs += answer_notes
                 attempts += answer_attempts
         # Declared, and the beat picked up after it (owner, 2026-10-01): a deed the player
@@ -2794,7 +2795,9 @@ class GMAgent:
                 for a in self.engine.scene.actors.values() if not a.is_pc)
             text, beasts = narration_mod.creature_nouns_for_pc(
                 text, pc.name, people_only, acting=acting,
-                whose=attribution.who, pc_ref=pc.ref)
+                whose=attribution.who, pc_ref=pc.ref,
+                grounded=" ".join([str(f) for f in (facts or [])]
+                                  + [str((pull or {}).get(k) or "") for k in ("title", "fact")]))
             if beasts:
                 # Into the player's own person, like every other mention of them: this
                 # ran after the name swap above, so the name it wrote stayed a name on
@@ -3823,41 +3826,67 @@ class GMAgent:
         return kept, [f"wrong actor: {why} — the rewrite failed; cut {len(cut)} "
                       f"sentence(s), the tells stand"], attempts
 
-    def _who_was_asked(self, player_input: str):
+    def _who_was_asked(self, player_input: str, outcomes=None):
         """The person the player's line asks something of, when the beat owes them an
         answer: named by the interpreter's reading, else the one person in conversation.
         None out of a fight's way, when nobody or several could be meant, when they are
-        down, when their attitude would refuse a name (`attitude.tells_their_name` — an
-        unwilling person's silence is their answer), or when the party moved."""
+        down, or when their attitude would refuse a name (`attitude.tells_their_name` — an
+        unwilling person's silence is their answer).
+
+        When the party moved, only somebody the reading's talk names at a place this
+        turn's walk left, asked before a walk the reading puts after the asking: they
+        answer before the player goes. Playtest 2026-11-16 N6: "I go up on deck, ask the
+        deckhand what's in the hold, then go ashore and walk to the cathedral" — the walk
+        chained, and the question was never answered, because a moved party asked nobody."""
+        from types import SimpleNamespace
+
         from rules import attitude as attitude_mod
         from rules import scope as scope_mod
+
+        from . import interpret as interpret_mod
 
         scene = self.engine.scene
         if scene.in_encounter or not narration_mod.wants_an_answer(player_input):
             return None
+        was = getattr(self, "_was_at", "")
+        moved = bool(was and was != str(getattr(scene, "at", "") or ""))
+        where = scene
+        if moved:
+            left = {str(e.get(k) or "") for o in outcomes or ()
+                    if getattr(o, "status", "") != "refused"
+                    for e in getattr(o, "effects", ()) or ()
+                    if isinstance(e, dict) and e.get("kind") == "biome"
+                    for k in ("place", "was_place")} | {was}
+            left -= {"", str(scene.at or "")}
+            where = SimpleNamespace(
+                actors={r: a for r, a in scene.people.items()
+                        if not a.is_pc and str(getattr(a, "at", "") or "") in left},
+                founded=getattr(scene, "founded", ()))
         who = None
         reading = getattr(self, "reading", None)
         if isinstance(reading, dict) and not reading.get("error"):
-            for a in reading.get("actions") or ():
-                if isinstance(a, dict) and a.get("act") == "talk" \
-                        and str(a.get("target") or "").strip():
-                    ref = scope_mod.in_the_room(scene, str(a["target"]))
-                    who = scene.actors.get(ref) if ref else None
+            actions = [a for a in reading.get("actions") or () if isinstance(a, dict)]
+            for k, a in enumerate(actions):
+                if a.get("act") == "talk" and str(a.get("target") or "").strip():
+                    if moved and not any(b.get("act") in interpret_mod._MOVING_ACTS
+                                         for b in actions[k + 1:]):
+                        return None     # asked where they arrived: not this door's
+                    ref = scope_mod.in_the_room(where, str(a["target"]))
+                    who = where.actors.get(ref) if ref else None
                     break
-        if who is None:
+        if who is None and not moved:
             talking = self.engine.talking_to()
             who = talking[0] if len(talking) == 1 else None
-        if who is None or who.is_pc or not scene.conscious(who.ref):
+        if who is None or who.is_pc or who.is_down \
+                or (not moved and not scene.conscious(who.ref)):
             return None
         if not attitude_mod.tells_their_name(who):
             return None
-        was = getattr(self, "_was_at", "")
-        if was and was != str(getattr(scene, "at", "") or ""):
-            return None
         return who
 
-    def _answer_the_question(self, text: str, who, player_input: str,
-                             brief: str) -> tuple[str, list[str], list[Attempt]]:
+    def _answer_the_question(self, text: str, who, player_input: str, brief: str,
+                             left_behind: bool = False
+                             ) -> tuple[str, list[str], list[Attempt]]:
         """`who` was asked something and the beat gave no answer: one small call for
         their spoken answer alone, put before the hand-back. Kept only if it is speech —
         a quotation — and does not hand the turn back itself; otherwise the beat is left
@@ -3881,7 +3910,9 @@ class GMAgent:
                 or len(answer) > prompts.ANSWER_MAX_CHARS + 40:
             return text, [f"unanswered: {who.name} — the answer did not hold "
                           f"({answer[:60]!r}); kept, Continue carries it"], [attempt]
-        answered = narration_mod.put_before_the_hand_back(text, answer)
+        # Asked before walking off (`_who_was_asked`): answered before the departure.
+        answered = (narration_mod.put_the_deeds_in(text, answer, before_move=True)
+                    if left_behind else narration_mod.put_before_the_hand_back(text, answer))
         if self._tells_refuse("answer", text, answered):
             return text, [f"unanswered: {who.name} — the answer broke one of the beat's "
                           f"tells ({answer[:60]!r}); kept, Continue carries it"], [attempt]

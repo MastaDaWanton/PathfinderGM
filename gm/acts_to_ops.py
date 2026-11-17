@@ -3211,8 +3211,22 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     # untrained Profession and the job taken at the list price.
     commissioned = {str((b.get("params") or {}).get("who")): b for b in built
                     if b.get("op") == "commission"}
+    # A take the table built as a give is that act's whole deed: when it is the only act
+    # that could stand behind a take-off, the plan's take-off has none. Playtest 2026-11-17
+    # #49: "I take the coin from the crew's cargo chest" was planned as take_off of
+    # "cargo_chest_coins" beside the built give; the take-off resolved as "is wearing
+    # nothing called cargo_chest_coins", and the beat told the one take three times.
+    doffs = interpret._OP_NEEDS["take_off"]
+    taken = [r for r in rows if r.act == "take"
+             and any(i.get("op") == "give" for i in r.intents)]
+    unbacked_doff = bool(taken) and sum(1 for a in acting
+                                        if a.get("act") in doffs) <= len(taken)
     for r in raw:
         op = _op(r)
+        if op == "take_off" and unbacked_doff:
+            if notes is not None:
+                notes.append("the plan's take_off dropped: the take is the built give")
+            continue
         if op == "haggle" and str((r or {}).get("target") or "") in commissioned:
             commissioned[str(r.get("target"))].setdefault("params", {})["haggle"] = True
             if notes is not None:

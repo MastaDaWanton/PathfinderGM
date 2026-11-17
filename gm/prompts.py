@@ -3135,6 +3135,14 @@ def stuck_note(actor) -> str:
     and op names only; the engine owns the DC and the bonus (law 3)."""
     ref = getattr(actor, "ref", "")
     lines = []
+    # Disabled at 0 is on its feet (CRB p.190: "a single move or standard action each
+    # turn"). Playtest 2026-11-17 #29: told only "conditions: disabled", the dire rat's
+    # turn gave "it is too weak to stand" as its reason and wrote it "where it lies, its
+    # body slumped and motionless against the stone floor".
+    if actor.has_state("state.impaired.disabled") and not actor.has_state("state.down"):
+        lines.append("They are DISABLED: still on their feet and able to act, one move "
+                     "or one standard action this turn; a strenuous one costs them blood "
+                     "and may drop them. They are not lying down.")
     if actor.has_state("state.burning"):
         lines.append('They are ON FIRE: it burns them again next round unless put out. '
                      'Putting it out takes the whole turn: {"op": "extinguish", "actor": '

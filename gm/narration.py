@@ -636,7 +636,14 @@ def mend_orphan_close(text: str) -> str:
             start = max([0] + [m.end() for m in re.finditer(r"[.!?…]['’\"”]?\s+|\n\n",
                                                             head)])
         mark = "‘" if text[orphan] == "’" else "'"
-        text = text[:start] + mark + text[start:]
+        mended = text[:start] + mark + text[start:]
+        # Kept only when the new mark opens the line the orphan closes. Playtest
+        # 2026-11-17 #6: a possessive ("the Burrowers' Guild") had already paired with
+        # the line's opening, so the new mark never paired, and each of the four passes
+        # put in another ("''''We work for", the bench's "''''''''").
+        if not any(a == start and b == orphan + 2 for a, b in speech.spans(mended)):
+            return text
+        text = mended
     return text
 
 
@@ -1461,8 +1468,8 @@ _CLAUSE_OPENS = re.compile(
 
 
 def creature_nouns_for_pc(text: str, pc_name: str, others_are_people: bool,
-                          acting: str = "", whose=None, pc_ref: str = "pc"
-                          ) -> tuple[str, list[str]]:
+                          acting: str = "", whose=None, pc_ref: str = "pc",
+                          grounded: str = "") -> tuple[str, list[str]]:
     """"The beast" for the player's character becomes their name.
 
     Measured 2026-09-18 (a homebrew asura at 70 hp with a blank body line): the NPC
@@ -1488,10 +1495,17 @@ def creature_nouns_for_pc(text: str, pc_name: str, others_are_people: bool,
     `whose(sentence, words)` is gm/mentions.py's answer to who the noun means. When it
     has one it decides: the noun is swapped only when it means the player — the two
     guards above were guesses at exactly that question.
+
+    `grounded` is the engine's own words for the beat (its tells). A creature noun
+    they use names something the engine knows, never the player — the engine calls the
+    player by name. Playtest 2026-11-17 #37: the tell read "a door leads to the beast's
+    pool", the dungeon's boss two rooms away, so nobody in the scene was a creature; the
+    page read "two stuck wooden doors lead to your pool" and "The roar of you in the pool".
     """
     if not text or not pc_name or not others_are_people:
         return text, []
     swapped: list[str] = []
+    named = {m.group(2).lower() for m in _CREATURE_NOUNS.finditer(grounded or "")}
 
     def _swapper(run: str):
         def _swap(m):
@@ -1500,6 +1514,8 @@ def creature_nouns_for_pc(text: str, pc_name: str, others_are_people: bool,
             ends = [i for i in (run.find(".", m.end()), run.find("!", m.end()),
                                 run.find("?", m.end())) if i >= 0]
             sentence = run[lo:(min(ends) + 1) if ends else len(run)]
+            if m.group(2).lower() in named:
+                return m.group(0)
             meant = whose(sentence, m.group(0)) if whose else None
             if meant is not None:
                 if meant != pc_ref:

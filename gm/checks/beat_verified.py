@@ -246,7 +246,7 @@ def backstop(ctx, text: str, findings) -> tuple[str, list[str]]:
             continue
         if d.category == "move" or d.sentence not in text:
             continue
-        if d.category in ("foe_weapon", "aimed", "unseen") and d.line:
+        if d.category in ("foe_weapon", "aimed", "unseen", "at_you") and d.line:
             # The engine's own line in the cut sentence's place, its numbers off (the
             # creature's roll is hidden): "the one behind the bar's attack with the sap
             # misses Kesst Vayr." The name becomes "you" later in the groom.

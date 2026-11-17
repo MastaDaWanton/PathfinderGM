@@ -1079,6 +1079,16 @@ def leave_before_leaving(raw_intents, player_text: str, scene, frame=None, *,
     # talk with Snik Dunmoor. Walking up to somebody, or across the room, is not walking
     # off. A `leave`, a `journey` and a `rest` are leavings by what they are.
     walks = bool(have & (_LEAVING_OPS[1] | {"journey"}))
+    # A walk that takes everybody in the conversation along walks off from nobody.
+    # Playtest 2026-11-17 #39: "I go to the broken pen, and the smuggler comes with me"
+    # (travel with c28) took her leave of him first, the tell said so, and the page
+    # wrote "leaving the starving smuggler behind" of the man walking beside her.
+    partners = {a.ref for a in actors.values()
+                if not a.is_pc and a.has_state(states_mod.TALKING)}
+    along = {str(x) for r in raw_intents if op(r) in _LEAVING_OPS[1]
+             for x in ((r.get("params") or {}).get("with") or ())}
+    if partners and partners <= along:
+        return [r for r in raw_intents if not a_leave(r)]
     # And the sleep the reading implies: a search for somewhere to sleep that the plan
     # carries out as a `rest` (owner report 2026-11-01, Corvin, turn 32: "go find a quiet
     # place to sleep out of the way" was read `search, stealth`, the plan's rest stood,
