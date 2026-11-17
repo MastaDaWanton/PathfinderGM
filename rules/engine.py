@@ -6791,6 +6791,8 @@ class Engine:
         if actor is None or not actor.has_state("state.impaired.disabled") \
                 or actor.is_down or actor.hp > 0:
             return None
+        from . import names as names_mod
+
         before = actor.hp
         actor.hp -= 1
         crossed = self._hp_state_effects(actor)
@@ -6802,8 +6804,13 @@ class Engine:
                       "temp_hp": actor.temp_hp, "lethality": "lethal",
                       "nonlethal": actor.nonlethal, "note": "disabled, strained",
                       "origin": "rule:disabled", "was": before}] + crossed,
-            tell=f"The effort costs {actor.name} a hit point, disabled as they are."
-                 + self._hp_state_tell(crossed),
+            # "Then", and the article: playtest 2026-11-17 #30 fused the bite and its
+            # cost into one sentence, "lunges and snaps its teeth at you … remains
+            # unconscious and dying on the ground as it struggles to strike", from
+            # "The effort costs dire rat a hit point … dire rat is unconscious and dying."
+            tell=names_mod.with_articles(
+                f"Then, the act done, the effort costs {actor.name} a hit point, "
+                f"disabled as they are." + self._hp_state_tell(crossed), [actor.name]),
             because="")
 
     def _concentrate(self, intent: Intent, actor, spell, level: int, state: dict,
@@ -16309,7 +16316,12 @@ class Engine:
                     # first; travel left them bleeding with no tell. Nobody bleeds out
                     # in silence because the party changed rooms.
                     if a.has_state("state.down.dying"):
-                        dying_tells.extend(self._resolve_dying(a))
+                        # Said where it happens. Playtest 2026-11-17 #31: "The dire rat
+                        # stabilises where they lie" in the walk's tell was told as "the
+                        # hall of the cells, where the dire rat lies still on the ground".
+                        dying_tells.extend(
+                            t.rstrip(".") + f", back in {here.name}."
+                            for t in self._resolve_dying(a))
                     # Not the hidden, not the dead: "Left behind: the man hiding in
                     # the back room and the body" is a fact the character does not
                     # hold, and the tell lands on the visible card.
@@ -16433,8 +16445,10 @@ class Engine:
                 self.scene.road = {}
             # Walking out is walking away: the conversation ends, and the tell says the
             # party walked away from it if no leave was taken (2026-09-24; reworded
-            # 2026-10-03, see `end_talk`).
-            parted = self.end_talk("walked away")
+            # 2026-10-03, see `end_talk`). Not with whoever walks along: playtest
+            # 2026-11-17 #39, the smuggler led on into the broken pen was told "You take
+            # your leave of the starving smuggler", and the page left him behind.
+            parted = self.end_talk("walked away", keep=escorts)
             # And whoever keeps the room they have just walked into, if it is a room
             # somebody keeps and nobody has kept it yet.
             self.staff_the_place()
@@ -19614,16 +19628,18 @@ class Engine:
         return (f"{who.name} is talking to you." if "they" in str(how)
                 else f"You are in conversation with {who.name}.")
 
-    def end_talk(self, why: str = "", who=None) -> str:
+    def end_talk(self, why: str = "", who=None, keep=()) -> str:
         """End the conversation, for one person or everybody; the tell, or "" if there
-        was none to end."""
+        was none to end. `keep`: the refs whose talk goes on (who walk along with the
+        party)."""
         # Everybody holding the tag, wherever they now stand — not the room. Walking
         # away calls this after the party has moved, when the person left behind is
         # no longer in `scene.actors`; read the room and nobody would be found to
         # leave mid-sentence, and `_settle_talk` would say "no longer here" instead.
         gone = ([who] if who is not None else
                 [a for a in self.scene.people.values() if not a.is_pc])
-        gone = [a for a in gone if a is not None and a.has_state(states.TALKING)]
+        gone = [a for a in gone if a is not None and a.has_state(states.TALKING)
+                and a.ref not in keep]
         for a in gone:
             a.remove_effects(source="talk")
         if not gone:
@@ -23731,8 +23747,16 @@ class Engine:
         pool = source["pool"] or casting.slot_pool(level)
 
         targets = list(state.get("caught") or [])
-        save = (spell.saving_throw or "").strip()
-        sr = (spell.spell_resistance or "").strip()
+        # The stat block's cross-references are the rulebook's, not the cast's: playtest
+        # 2026-11-17 #9 / 2026-11-16 N9 put "Will half (harmless) (see text), DC 12;
+        # spell resistance yes (harmless) (see text)" on the player's page for a paid
+        # Cure Moderate Wounds. A harmless spell offers its willing target no save to
+        # make, so its save and resistance say nothing about this cast at all.
+        harmless = bool(getattr(spell, "save_harmless", False))
+        save = "" if harmless else re.sub(r"\s*\(see text\)", "",
+                                          spell.saving_throw or "", flags=re.I).strip()
+        sr = "" if harmless else re.sub(r"\s*\(see text\)", "",
+                                        spell.spell_resistance or "", flags=re.I).strip()
 
         bits = [f"caster level {cl}"]
         if save and save.lower() not in ("none", "no", "—", "-"):

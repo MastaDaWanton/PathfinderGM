@@ -2445,6 +2445,24 @@ def _hour(facts: Facts) -> int | None:
     return None if facts.clock is None else (int(facts.clock) % (24 * 60)) // 60
 
 
+def _before_the_walk(p: Person, c: Claim, claims: list[Claim], facts: Facts,
+                     text: str) -> bool:
+    """Whether the page shows somebody this turn's own walk left behind, in a sentence
+    before the walk: where the player stood when the beat began, they were there. Playtest
+    2026-11-17 #26: "The Toll-Keeper watches you intently … your movements remain fully
+    visible" was the refused hide's own tell, told before the walk to the turnkey's room;
+    read as an absent man shown here, it was rewritten "The Toll-Keeper is no longer here
+    … your movements are completely unobserved", against the tell."""
+    left = {str(n).lower() for o in _resolved(facts) for e in _effects(o)
+            if e.get("kind") == "biome" for n in e.get("left") or ()}
+    if str(p.name).lower() not in left or not text or not c.sentence:
+        return False
+    walks = [text.find(m.sentence) for m in claims
+             if m.valid and m.category == "move" and m.sentence and m.sentence in text]
+    at = text.find(c.sentence)
+    return at >= 0 and any(w > at for w in walks)
+
+
 def _not_here(p: Person, c: Claim) -> Discrepancy:
     """The page has somebody the engine holds elsewhere here: hurt, arriving or in a fight.
     The fact the repair names is where they are not, and that nothing brought them back —
@@ -2652,11 +2670,18 @@ def _struck_unrolled(c: Claim, facts: Facts) -> Discrepancy | None:
     if p is None or p.pc or not p.here or who in facts.struck_by:
         return None
     name = _name(facts, who)
+    Name = name[:1].upper() + name[1:]
+    # A pursuer is the half that is true: it came after the player, and its blow waits for
+    # its turn. Playtest 2026-11-16 N1: the pursuing dire rat's lunge was cut as an
+    # unrolled blow, and with it the only sentence saying the rat had followed at all.
+    chased = any(who in (e.get("pursued_by") or ()) for o in _resolved(facts)
+                 for e in _effects(o) if e.get("kind") == "biome")
     return Discrepancy(
         "contradiction", "at_you",
-        f"{name[:1].upper() + name[1:]} has not struck at you (the player) this turn: no blow "
+        f"{Name} has not struck at you (the player) this turn: no blow "
         f"of theirs was thrown, so none whistled past you and none landed. Their turn comes "
-        f"after yours.", c.sentence, "", c, ref=who)
+        f"after yours." + (f" {Name} has come after you, and is here." if chased else ""),
+        c.sentence, f"{Name} comes after you." if chased else "", c, ref=who)
 
 
 def _aimed_words(facts: Facts, pairs) -> str:
@@ -3000,7 +3025,7 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             # departed raiders' lunges (2026-10-09). Somebody here, listed by the reader
             # all the same, is not judged — the slot offers every code (`schema`).
             gone = facts.absent(str(s["who"]))
-            if gone is not None:
+            if gone is not None and not _before_the_walk(gone, c, claims, facts, text):
                 out.append(_not_here(gone, c))
         elif c.category in ("arrived", "left"):
             who = str(s["who"])

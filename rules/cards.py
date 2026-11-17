@@ -1215,6 +1215,16 @@ def _pull_one(scene, c: Card, why, *, player_text: str, turn: int, world) -> dic
     from . import residency
 
     mine = stands in (OWN, SITUATION)
+    # A matter of the world is the settlement's, seen or heard in its streets; under them
+    # nobody is there to have heard it. Playtest 2026-11-17 #35: in a dungeon cell the
+    # page read "The heavy, oppressive silence of the underground feels weighted by the
+    # whispered rumors of the bribes and backroom deals … fueling the rivalry between the
+    # local lords" — a town strain with nobody to say it, pasted into a cell.
+    if stands == SITUATION:
+        from . import places as places_mod
+
+        if places_mod.setting_of(str(getattr(scene, "at", "") or "")) == "under":
+            return None
     if c.is_(TAG_RUMOUR):
         return _rumour_pull(scene, c, out, player_text)
     giver = hooks.giver_of(scene, c)

@@ -772,6 +772,11 @@ _READS_MECHANICS = {
         "views._finish makes for already_there, rather than the free prompt's reading of "
         "the tell's words ('You are at … now.'). Nothing it reads reaches the narrator; "
         "the arrival reaches it as the tell.",
+    "gm/agent.py:_who_was_asked":
+        "decides WHO answers a question asked before a walk (playtest 2026-11-16 N6), "
+        "read off the walk's own biome effects: the place ids it left, where the person "
+        "asked still stands. Place ids, not a mechanic; nothing it reads reaches the "
+        "narrator, and the answer's content comes only from the brief.",
     "gm/planned.py:addressee":
         "decides WHO answers the player on a planned beat — the person the player's own "
         "`say` was put to, which the engine wrote into the effect as a ref — so the model "

@@ -1024,6 +1024,16 @@ _DEMOS = [
          {"span": "go to the forge", "place": "the forge", "act": "go"},
          {"span": "to sell the horseshoes", "commit": "intended",
           "object": "the horseshoes", "act": "sell"}]}),
+    # A purpose that somebody else would carry out is still a purpose. Playtest 2026-11-17
+    # #2: "walk to the cathedral to get my wounds healed" came back `other, done`, and the
+    # deeds repair wrote the priest healing her: hp 6/26 before and after.
+    ("I climb out of the boat, then up the steps, and go to the healer's hut to get this "
+     "gash stitched.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "climb out of the boat", "place": "the boat", "act": "leave"},
+         {"span": "go to the healer's hut", "place": "the healer's hut", "act": "go"},
+         {"span": "to get this gash stitched", "commit": "intended",
+          "object": "this gash", "act": "other"}]}),
     # A price is not a second thing sold: "agree to sell the goat to the herder for six
     # silver" came back as two sales on the dev lines, the second of "six silver".
     ("I accept four silver from the tanner for the hides.",
