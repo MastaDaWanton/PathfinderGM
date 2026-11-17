@@ -210,6 +210,7 @@ def test_a_table_line_that_breaks_a_tell_is_asked_again_then_dropped(monkeypatch
         return SimpleNamespace(clashes=[clash] if "punch" in text else [])
 
     monkeypatch.setattr(beat_verify, "against_tells", against)
+    monkeypatch.setattr(beat_verify, "beyond_tells", lambda *a, **kw: [])
     agent = SimpleNamespace(prose_model="m", prose_host="", prose_provider="ollama",
                             prose_key="")
     mends = []

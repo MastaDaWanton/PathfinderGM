@@ -580,7 +580,8 @@ def _held_to_the_tells(agent, ask, msgs, line: str, said: str, premises: list[st
     who = str(getattr(pc, "name", "") or "")
     read = beat_verify.against_tells(strip_gestures(line), premises, who=who, **route)
     if not read.clashes:
-        return line, "", False
+        return _nothing_past_the_facts(ask, msgs, line, said, premises, who, route,
+                                       allowed, recent)
     c0 = read.clashes[0]
     mend = (f'"{c0.words}" is not true: {c0.tell} Say it again so that it agrees with '
             f"that, and add nothing the MOMENT does not say.")
@@ -594,6 +595,49 @@ def _held_to_the_tells(agent, ask, msgs, line: str, said: str, premises: list[st
         return "", f"contradicts the engine: {c0.words} (remake: {why})", True
     if beat_verify.against_tells(strip_gestures(line2), premises, who=who, **route).clashes:
         return "", f"contradicts the engine twice: {c0.words}", True
+    line3, why, _ = _nothing_past_the_facts(ask, msgs, line2, again, premises, who, route,
+                                            allowed, recent)
+    return line3, why, True
+
+
+def _nothing_past_the_facts(ask, msgs, line: str, said: str, premises: list[str], who: str,
+                            route: dict, allowed: str, recent: list[str]
+                            ) -> tuple[str, str, bool]:
+    """(line, why, remade): the line read for a world fact or a deed that no tell and no
+    scene fact carries (`beat_verify.beyond_tells`); on one, asked once more with the words
+    named, read again, and what still adds something is cut sentence by sentence — the
+    line dropped when nothing spoken is left. Playtest 2026-11-16 #71 ("Mirabalos doesn't
+    have any healers in this order" over a refusal that said only that no Father is here)
+    and #93 ("You tripped over your own feet while looking" on a natural one on a search;
+    no tell said so, and 1e has no fumble on a skill check). Unread, the line stands."""
+    from gm import beat_verify
+    from gm.client import ModelUnavailable
+
+    found = beat_verify.beyond_tells(strip_gestures(line), premises, who=who, **route)
+    if not found:
+        return line, "", False
+    words = found[0][1]
+    mend = (f'"{words}" is not in the MOMENT. Say it again without it, and state nothing '
+            f"about the world or about what anyone did that the MOMENT does not say.")
+    try:
+        again = ask(msgs + [{"role": "assistant", "content": said},
+                            {"role": "user", "content": mend}])
+    except ModelUnavailable:
+        again = ""
+    line2, _why = check(again, allowed, recent) if again else ("", "empty")
+    if line2 and not beat_verify.against_tells(strip_gestures(line2), premises, who=who,
+                                               **route).clashes:
+        still = beat_verify.beyond_tells(strip_gestures(line2), premises, who=who, **route)
+        if not still:
+            return line2, "", True
+    else:
+        line2, still = line, found
+    # Cut what still adds: "Ouch, that one is a sting." survives its invented trip.
+    for sentence, _w in still or ():
+        line2 = line2.replace(sentence, "")
+    line2 = " ".join(line2.split())
+    if not strip_gestures(line2):
+        return "", f"states what no fact carries: {words}", True
     return line2, "", True
 
 

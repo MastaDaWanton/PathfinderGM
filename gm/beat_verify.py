@@ -4527,3 +4527,112 @@ def against_tells(text: str, tells, *, who: str = "", only=None, chat=None,
         (out.clashes if c.confirmed else out.refused).append(c)
     out.seconds = time.monotonic() - started
     return out
+
+
+# --- the GM at the table: nothing past the facts (2026-11-16) -----------------------------------
+#
+# `against_tells` above licenses "not about it" for the NARRATOR, whose job is colour. The GM
+# talking across the table has no such licence: its job is a reaction to the moment and the
+# ruling's reason, and every world fact or deed it states is one more thing the player takes
+# as settled. Playtest 2026-11-16 #71: over the refusal "No Father is here, and Mirabalos has
+# none the world names" it said "Mirabalos doesn't have any healers in this order"; #93: over
+# a natural one on a search that found nothing it said "You tripped over your own feet while
+# looking" (no tell said so, and 1e has no fumble on a skill check, `dice.d20_succeeds`). The
+# tells check passed both: neither CONTRADICTS a fact, each only adds one.
+#
+# So the question for a table line is attribution, not contradiction: AIS (Rashkin et al.,
+# "Measuring Attribution in Natural Language Generation Models", Computational Linguistics
+# 49(4), 2023) first sets aside what shares no information about the world, then asks of the
+# rest "according to the source, is this true?". Here the first answer is "reacts" (a feeling,
+# an opinion, a question or advice to the player) and the second splits "from a fact" from
+# "adds". As in `against_tells` the verdict must quote the sentence's own words before code
+# acts on it (`_clash_quoted`), and every slot is a closed enum keyed by sentence.
+
+BEYOND_VERDICTS = ("reacts", "from a fact", "adds")
+
+_BEYOND_SYSTEM = (
+    "You check what a game master says to a player across the table against the FACTS of "
+    "the moment. \"You\" is the player's character, named in the facts. For EACH numbered "
+    "sentence answer:\n"
+    "- \"reacts\" when it only reacts: a feeling, an opinion, a joke, a question to the "
+    "player, or advice on what they might try or will have to do — it states nothing about the world or about "
+    "what anyone did;\n"
+    "- \"from a fact\" when what it states about the world or a deed is said by a fact, in "
+    "any words;\n"
+    "- \"adds\" when it states something about the world, a place, a people, a person or "
+    "what anyone did, that no fact says.\n"
+    "For \"adds\" copy the sentence's own words that state the new thing.")
+_BEYOND_DEMO_USER = (
+    "FACTS (the player's character is Pell Arrow):\n"
+    "F1. Refused: No ferryman is here, and Dunmarsh has none the world names.\n"
+    "F2. The die showed a natural one on the Climb check.\n"
+    "F3. Pell Arrow climbs the wall and fails.\n\n"
+    "SENTENCES:\n"
+    "1. Ouch, that die hates you tonight.\n"
+    "2. There's no ferryman for you to hire here.\n"
+    "3. The river guild keeps every boat on the far bank.\n"
+    "4. You slipped on the wet moss and scraped your knee.\n"
+    "5. You'll have to find another way across, so maybe ask around for a boat.")
+_BEYOND_DEMO_ANSWER = {
+    "1": {"verdict": "reacts", "words": ""},
+    "2": {"verdict": "from a fact", "words": ""},
+    "3": {"verdict": "adds", "words": "The river guild keeps every boat on the far bank"},
+    "4": {"verdict": "adds", "words": "You slipped on the wet moss and scraped your knee"},
+    "5": {"verdict": "reacts", "words": ""}}
+
+
+def beyond_schema(n_sentences: int) -> dict:
+    """One required entry per sentence (required and enum hold under Ollama's grammar)."""
+    item = {"type": "object",
+            "properties": {"verdict": {"type": "string", "enum": list(BEYOND_VERDICTS)},
+                           "words": {"type": "string", "maxLength": 200}},
+            "required": ["verdict", "words"]}
+    keys = [str(i) for i in range(1, n_sentences + 1)]
+    return {"type": "object", "properties": {k: item for k in keys}, "required": keys}
+
+
+def beyond_tells(text: str, premises, *, who: str = "", chat=None, model: str = "",
+                 host: str = "", provider: str = "ollama",
+                 api_key: str = "") -> list[tuple[str, str]] | None:
+    """[(sentence, words)] for each sentence of `text` that states a world fact or a deed
+    no premise carries, its words quoted from the sentence and checked in code. [] when
+    every sentence reacts or comes from a fact; None when the read failed (the caller
+    leaves the line as it is, as every read back does). Premises are taken as given:
+    the table talk's are already plain (`views.plain_tell`)."""
+    from . import narration as narration_mod
+
+    facts = [p for p in (" ".join(str(x).split()) for x in premises or ()) if p]
+    sentences = [" ".join(s.split()) for s in narration_mod._sentences(text)
+                 if re.search(r"[A-Za-z]{2,}", s)]
+    if not sentences:
+        return []
+    if chat is None:
+        from . import client
+
+        chat = client.chat
+    user = ("FACTS" + (f" (the player's character is {who})" if who else "") + ":\n"
+            + ("\n".join(f"F{i}. {t}" for i, t in enumerate(facts, 1)) or "F1. Nothing.")
+            + "\n\nSENTENCES:\n"
+            + "\n".join(f"{i}. {s}" for i, s in enumerate(sentences, 1)))
+    msgs = [{"role": "system", "content": _BEYOND_SYSTEM},
+            {"role": "user", "content": _BEYOND_DEMO_USER},
+            {"role": "assistant", "content": json.dumps(_BEYOND_DEMO_ANSWER)},
+            {"role": "user", "content": user}]
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=40 + 50 * len(sentences), provider=provider,
+                     api_key=api_key, schema=beyond_schema(len(sentences)))
+        answer = reply.json() or {}
+    except Exception:  # noqa: BLE001 — unread: nothing judged
+        return None
+    out: list[tuple[str, str]] = []
+    for k, sentence in enumerate(sentences, 1):
+        row = answer.get(str(k)) if isinstance(answer, dict) else None
+        if not isinstance(row, dict) or row.get("verdict") != "adds":
+            continue
+        words = " ".join(str(row.get("words") or "").split())
+        if _clash_quoted(words, sentence):
+            out.append((sentence, words))
+    return out
