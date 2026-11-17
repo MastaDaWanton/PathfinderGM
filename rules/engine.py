@@ -44,6 +44,7 @@ from . import worldclass
 from . import grid as gridmod
 from . import guards as guards_mod
 from . import reactions
+from . import services as services_mod
 from . import spells as spells_mod
 from . import weapons as weapons_mod
 from .activeeffect import ActiveEffect
@@ -22767,6 +22768,9 @@ class Engine:
         shut = keepers_mod.shut_here(self.scene, self.scene.actors[seller] if seller else None)
         if shut:
             return self._refuse(intent, shut)
+        # A temple's casting for pay (rules/services.py, playtest 2026-11-16 #70).
+        if item_id.startswith(services_mod.PREFIX):
+            return self._buy_spell(intent, actor, item_id, seller)
         # Whoever keeps this counter, by name, when the plan named no seller: the panel
         # never does, and "pays the stallholder" read wrong with Azhil Vex standing
         # behind it (live, 2026-09-27).
@@ -22877,6 +22881,66 @@ class Engine:
                  + arrived_tell,
             because=intent.because,
         )
+
+    def _buy_spell(self, intent: Intent, actor, item_id: str, seller) -> Outcome:
+        """A temple's priest casts a spell on the buyer for the book's fee (rules/services.py).
+
+        Priced by the CRB (caster level x spell level x 10 gp, plus the material), moved by
+        the keeper's own terms like every trade (`_cargo_terms`: regard and thrift, the
+        owner's 2026-11-13 ruling), paid from the purse, and cast
+        through the one cast door with no slot (`_op_cast`, `item_cast`), so the healing is
+        the heal path's own roll and tell. Nothing is paid for a casting that is refused."""
+        from . import places as places_mod
+        from . import keepers as keepers_mod
+
+        priest = self.scene.actors.get(seller) if seller else None
+        if priest is None:
+            priest = keepers_mod.keeper_in(self.scene, str(self.scene.at or ""))
+        if priest is None or not services_mod.keeps_a_temple(priest):
+            return self._refuse(intent, "Nobody here keeps a temple, so there is nobody to "
+                                        "cast a spell for pay.")
+        if self._will_not_deal(priest):
+            return self._refuse(intent, self._will_not_deal(priest))
+        loc = self.world.get(self.scene.location_id) if self.world else None
+        scale = places_mod.scale_of(loc) if loc is not None else "town"
+        row = services_mod.find(item_id, scale)
+        if row is None:
+            on = ", ".join(r["spell_name"] for r in services_mod.menu(scale))
+            return self._refuse(intent, f"{_sentence(priest.name)} casts no such spell for "
+                                        f"pay. Cast here: {on or 'nothing'}.")
+        # The keeper's own terms, and never the watch's markup: a temple is sanctuary
+        # (owner call 2026-11-16, `play.views._counter_refusal`).
+        percent, moved, _markup = self._cargo_terms(actor, priest)
+        from . import pricing
+
+        cost = pricing.moved_cp(row["cp"], percent)
+        coins = self._coins_here()
+        price = goods.purse_line(goods.coins_for(cost), coins)
+        spell = spells_mod.get(row["spell"])
+        purse, paid = goods.spend(actor.purse, cost)
+        if not paid:
+            return Outcome(intent_id=intent.id, op="buy", effects=[],
+                           tell=f"{spell.name} is {price} at the temple and {actor.name} has "
+                                f"{goods.purse_line(actor.purse, coins)}. Nothing is cast "
+                                f"and no coin changes hands.", because=intent.because)
+        cast = Intent(op="cast", actor=priest.ref, target=actor.ref,
+                      params={"spell": row["spell"]}, because="a casting paid for")
+        done = self._op_cast(cast, {"item_cast": {
+            "level": row["level"], "cl": row["cl"],
+            # Harmless healing: the DC is the spell level's floor, never a guessed score.
+            "dc": 10 + row["level"], "origin": f"service:{priest.ref}"}})
+        if done.status == "refused":
+            return self._refuse(intent, done.tell)
+        actor.purse = purse
+        return Outcome(
+            intent_id=intent.id, op="buy",
+            effects=[{"ref": actor.ref, "kind": "bought", "item": spell.name, "count": 1,
+                      "paid_cp": cost, "from": priest.ref, "service": row["spell"]}]
+                    + list(done.effects),
+            tell=f"{actor.name} pays {priest.name} {price} for {spell.name}"
+                 + (f" ({moved})" if moved else "") + f". {_sentence(done.tell)} "
+                 f"({goods.purse_line(actor.purse, coins)} left.)",
+            because=intent.because)
 
     def _cargo_terms(self, actor, keeper) -> tuple[int, str, float]:
         """(percent, the reason in words, the law's markup) a bulk trade is moved by: the
@@ -33819,8 +33883,9 @@ def _uses_per_day(row: dict) -> int | None:
 
 
 def _cast_opener(actor, spell, bits: list[str], item: dict | None) -> str:
-    """The cast's first sentence: who cast what, or which item released it."""
-    if item:
+    """The cast's first sentence: who cast what, or which item released it. A paid
+    casting (`Engine._buy_spell`) is the door's no-slot cast with no item to name."""
+    if item and item.get("name"):
         return (f"{actor.name} calls on the {item['name']}: {spell.name} "
                 f"({'; '.join(bits)}).")
     return f"{actor.name} casts {spell.name} ({'; '.join(bits)})."
