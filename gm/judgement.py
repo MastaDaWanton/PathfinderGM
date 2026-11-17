@@ -6819,6 +6819,28 @@ def _said_whole(entry: dict) -> dict:
     return dict(entry, params=params)
 
 
+def _quoted_if_quoted(entry: dict, player_text: str) -> dict:
+    """A say whose words are the player's quotation, word for word, marked `quoted`, so the
+    engine's tell quotes them (`says to X: "…"`) instead of reporting them ("to the effect
+    that …"). Playtest 2026-11-16 #60: the planner wrote the say itself, `inject_say` (which
+    marks a quotation) stood aside for it, the tell reported the quoted line, and the slot
+    retold it edited — "You said the beast ate your crew" came back "You mentioned the beast
+    ate your crew". Read off the quote marks (`speech.spans`), never the words' meaning."""
+    from . import speech
+
+    params = dict(entry.get("params") or {})
+    if params.get("quoted"):
+        return entry
+    text = str(player_text or "")
+    quoted = [" ".join(text[a + 1:b - 1].split()).strip(" ,") for a, b in speech.spans(text)
+              if text[a] == '"' or text[a] in "“”"]
+    words = " ".join(str(params.get("words") or "").split()).strip(" ,")
+    if words and quoted and (words in quoted or words == " ".join(quoted)):
+        params["quoted"] = True
+        return dict(entry, params=params)
+    return entry
+
+
 def own_words_only(raw_intents, player_text: str, reading=None, *,
                    notes: list | None = None) -> list:
     """A `say` the player's character makes carries the player's words, or none.
@@ -6899,7 +6921,7 @@ def own_words_only(raw_intents, player_text: str, reading=None, *,
                                  f"whole {says[:80]!r}")
                 params["words"] = says
                 entry = dict(entry, params=params)
-            out.append(_said_whole(entry))
+            out.append(_said_whole(_quoted_if_quoted(entry, player_text)))
             continue
         # The redactor's guess only when the reader did not read the line. Playtest
         # 2026-11-15 #68: "I say nothing and stare at the wall" was read as a talk with
@@ -6909,7 +6931,8 @@ def own_words_only(raw_intents, player_text: str, reading=None, *,
         instead = says or ("" if wordless else spoken(player_text))
         if instead:
             params["words"] = instead
-            out.append(_said_whole(dict(entry, params=params, because="the player said it")))
+            out.append(_said_whole(_quoted_if_quoted(
+                dict(entry, params=params, because="the player said it"), player_text)))
             if notes is not None and words:
                 notes.append(f"a say in words the player never wrote: {words[:80]!r} "
                              f"-> the player's own {instead[:80]!r}")

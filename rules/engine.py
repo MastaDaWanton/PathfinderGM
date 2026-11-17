@@ -33552,6 +33552,15 @@ def reported_speech(who: str, at: str, words: str, heard: str = "") -> str:
     # A name is said by more than its article ("the" alone is not "the sergeant").
     if k and name[:1] in (["the"], ["a"], ["an"]) and k < 2:
         k = 0
+    # Or by its article and a word of the name past it ("the smuggler" of "the starving
+    # smuggler"), or by a pronoun. Playtest 2026-11-16 #64 kept the frame: "to the effect
+    # that tell the smuggler I'll be back for the beast".
+    if not k and len(rest) > 2 and rest[0].lower() in ("the", "a", "an") \
+            and rest[1].lower().strip(",") in set(name[1:]) - {"of", "the", "a", "an"}:
+        k = 2
+    elif not k and len(rest) > 1 and rest[0].lower() in ("him", "her", "them") \
+            and "that" not in (t.lower() for t in rest[:8]):
+        k = 1
     if k and k < len(rest) and rest[k].lower() == "that":
         k += 1
     elif not k and "that" in (t.lower() for t in rest[:8]):
@@ -33570,7 +33579,8 @@ def reported_speech(who: str, at: str, words: str, heard: str = "") -> str:
         subject = _SUBJECT_OF.get(named.lower(), named)
         return f"{who} speaks{at}, to the effect that {subject} {' '.join(rest[j + 1:])}"
     content = " ".join(rest[k:])
-    if not k or not content:
+    # "tell the smith about the sword" is no statement made: told as it was said.
+    if not k or not content or rest[k].lower() == "about":
         return plain
     return f"{who} speaks{at}, to the effect that {content}"
 
