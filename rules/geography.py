@@ -835,6 +835,23 @@ def where(world, scene, here=None) -> Where:
     setting = places_mod.setting_of(at) if at else (
         "in" if detail in ("", places_mod.URBAN) else "outside")
     road = getattr(scene, "road", None) or {}
+    from . import ships as ships_mod
+
+    ship = ships_mod.aboard(scene)
+    if ship is not None:
+        # Aboard, the ship is where she is (playtest 2026-11-16 #100): her hold read
+        # "Mirabalos — city" at the quay, because the town is only her mooring; and at
+        # sea, where the location IS the ship, the line was blank. The room is the page
+        # head's (`places_found`); this line names the ship and where she lies.
+        port = world.get(ship.at) if (world is not None and ship.at) else None
+        bound = world.get(ship.bound_for) if (world is not None and ship.bound_for) else None
+        if ship.at:
+            detail = f"moored at {getattr(port, 'name', '') or 'port'}"
+        elif bound is not None:
+            detail = f"at sea, bound for {bound.name}"
+        else:
+            detail = "at sea"
+        return Where(setting="aboard", label=ship.name, detail=detail)
     if setting == "outside" and outskirts_mod.is_along(at) and road.get("to_name"):
         walked = int(road.get("walked") or 0)
         out_of = f"{name}" if name else "where you set out"

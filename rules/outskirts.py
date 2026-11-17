@@ -365,6 +365,11 @@ def hop_minutes(frm, to, scale: str, speed_ft: int = 30) -> int:
     # minute, not the overland hour between two places out in the land (rules/dungeons.py).
     if "dungeon" in (getattr(frm, "origin", ""), getattr(to, "origin", "")):
         return 1
+    # A ladder between decks, or the gangplank to the quay, is a move action, not a walk
+    # across town: playtest 2026-11-16 #95, hold to deck was charged the city's band and
+    # told as "a few minutes' walk". Seconds, so no minute is charged and none is said.
+    if "ship" in (getattr(frm, "origin", ""), getattr(to, "origin", "")):
+        return 0
     a = places_mod.setting_of(getattr(frm, "id", "") or "")
     b = places_mod.setting_of(getattr(to, "id", "") or "")
     if a != "outside" and b != "outside":

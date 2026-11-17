@@ -1634,7 +1634,42 @@ def for_scene(location, at: str, terrain_hint: str = "",
             base = tuple(_replace(p, exits=tuple(p.exits) + (region[0].id,))
                          if p.id == outskirts.id else p for p in base)
         base = base + region
-    return with_founded(with_storeys(base), founded, at)
+    return _outfall_to_water(with_founded(with_storeys(base), founded, at))
+
+
+# Where a town's sewers empty: the first of these its own places name (playtest 2026-11-16
+# #83). A quay before a beach, the river's crossing where there is no quay.
+_WATERSIDE = ("the harbour", "the docks", "the quay", "the wharf", "the shore",
+              "the bridge", "the ford")
+
+
+def _outfall_to_water(known: tuple[Place, ...]) -> tuple[Place, ...]:
+    """A sewers' outfall opens onto the town's water, when the town has any: playtest
+    2026-11-16 #83, the outfall under a port city was a dead end, its only way back the
+    sewers. An outfall is where a sewer empties into the river or the sea — in a port,
+    the harbour — so it gains a way out to the town's waterside place and back, and says
+    where it empties. A town with no waterside place keeps the outfall as it was. From
+    there a ship lying off is swum to, as from any beach (owner ruling 2026-11-14)."""
+    outfall = VENTURES["sewers"]["spots"][0][0]
+    sewers = _slug(VENTURES["sewers"]["label"])
+    falls = [p for p in known if p.origin == "venture" and p.name == outfall
+             and str(p.parent).rsplit("/", 1)[-1] == sewers]
+    if not falls:
+        return known
+    named = {" ".join(str(p.name).split()).lower(): p for p in known}
+    water = next((named[w] for w in _WATERSIDE if w in named), None)
+    if water is None:
+        return known
+    ids = {p.id for p in falls}
+    out = []
+    for p in known:
+        if p.id in ids and water.id not in p.exits:
+            p = _replace(p, exits=tuple(p.exits) + (water.id,),
+                         about=f"where the sewer empties out by {water.name}")
+        elif p.id == water.id:
+            p = _replace(p, exits=tuple(p.exits) + tuple(i for i in ids if i not in p.exits))
+        out.append(p)
+    return tuple(out)
 
 
 def _gangplank(town: tuple[Place, ...], rooms: tuple[Place, ...]) -> tuple[Place, ...]:
@@ -2095,6 +2130,11 @@ def settings_for(place, known=()) -> frozenset[str]:
     except Exception:  # noqa: BLE001 — a place with no floor plan answer is not judged
         return frozenset()
     out: set[str] = set()
+    if ground == "deck":                    # `ships.DECK`
+        # A ship's own rooms are aboard her, below decks too, and never a street: the
+        # 2026-11-16 overnight save's beat checks flagged "the ship's hold" as "not aboard
+        # a ship or boat" with the player standing in her hold.
+        return frozenset({SET_SHIP} | ({SET_BUILDING} if roofed else set()))
     if ground == "underground":
         out |= {SET_UNDER, SET_BUILDING}
     elif ground == "ruins":
