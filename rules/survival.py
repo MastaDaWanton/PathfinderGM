@@ -1165,7 +1165,10 @@ def strains(actor) -> list[Strain]:
     hp, top = int(getattr(actor, "hp", 0) or 0), int(getattr(actor, "hp_max", 0) or 0)
     left = hp - int(getattr(actor, "nonlethal", 0) or 0)
     if top > 0 and left * 4 <= top:
-        out.append(Strain("wounds", "gravely hurt, with little strength left in them"))
+        # The wounds, not the strength: "little strength left in them" came back as "your
+        # heavy limbs trembling" (playtest 2026-11-16 #89), the fatigue that had ended a
+        # beat before, and the check then wrote a second, wound line under it.
+        out.append(Strain("wounds", "gravely hurt, wounds that hurt with every movement"))
     elif top > 0 and left * 2 <= top:
         out.append(Strain("wounds", "badly hurt"))
     fed = int(getattr(actor, "fed_minutes", 0) or 0) // MINUTES_PER_HOUR

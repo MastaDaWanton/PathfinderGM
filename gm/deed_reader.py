@@ -316,13 +316,17 @@ _SLEPT_SYSTEM = (
 # either, so the question widens to the bed and the room — measured live 2026-10-17, a
 # refused rest's page had "You have your keys, your room is secured" and "You find a small,
 # secluded room at the back of the inn" before the player lay down.
+# A choice put to the player is not a sleep: playtest 2026-11-16 #99, "You must decide
+# whether to sleep now for eight hours or wait until evening to rest" (the refusal's own
+# choices, told) was read as the player sleeping, cut, and the refusal pasted in its place.
 _REFUSED_REST_SYSTEM = (
     "You check one passage of a tabletop game, narrated to the player as \"you\". The "
     "rules REFUSED the player's rest this moment: they take no room, get no bed or key, "
     "and do not sleep; they stay where they are, awake. Find the first sentence where the "
     "player is given or takes a room, a bed or a key, goes off to a room or bed, lies down "
     "to sleep, sleeps, or lets hours go by. Only the player counts; asking for a room, "
-    "being tired or wanting to sleep do not. Answer its number, or 0 when there is none.")
+    "being tired, wanting to sleep, or being told what they may still choose (to sleep now "
+    "or later) do not. Answer its number, or 0 when there is none.")
 
 
 def read_slept(text: str, *, chat=None, model: str = "", host: str = "",

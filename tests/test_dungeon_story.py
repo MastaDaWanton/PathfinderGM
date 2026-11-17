@@ -18,7 +18,7 @@ from rules import cards, dungeons, npcs, places, states
 from rules import bestiary
 from rules.dice import Dice
 from rules.engine import Engine, Scene
-from rules.sheet import load_pc
+from rules.sheet import from_dict, load_pc
 from world import loader
 
 VYRAKON = "5bbd0c40345f"
@@ -354,8 +354,19 @@ def test_the_town_talks_of_a_way_down_before_it_is_found_once(monkeypatch):
         dungeons.fill(a["said"], {"town": "Pangrella"})[:12]
         for a in dungeons.story()["attitudes"]))
     assert "{" not in card.facts[0]
+    # Talk is somebody's words (playtest 2026-11-16 #67): with nobody here to say it, it
+    # waits; in conversation, the player is busy and it waits; a townsman here, free, says
+    # it in passing.
+    assert cards.thread_to_pull(s, recent=[], turn=1, world=WORLD) is None
+    carter = s.add(from_dict({"name": "the carter", "kind": "npc", "hp": 8, "hp_max": 8,
+                              "abilities": {k: 10 for k in ("str", "dex", "con", "int",
+                                                            "wis", "cha")}}, ref="c1"))
+    engine.join_talk(carter, how="you spoke to them")
+    assert cards.thread_to_pull(s, recent=[], turn=1, world=WORLD) is None
+    engine.end_talk(who=carter)
     pulled = cards.thread_to_pull(s, recent=[], turn=1, world=WORLD)
     assert pulled and pulled["id"] == card.id
+    assert pulled["approach"] == "go_between" and pulled["carrier"]["ref"] == "c1"
     cards.note_mentions(s, card.facts[0], turn=2)
     assert not any(c.id == card.id for _n, _w, c in cards.salience(s, recent=[], turn=20))
     # Asked twice, still one.

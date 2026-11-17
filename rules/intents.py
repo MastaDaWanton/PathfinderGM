@@ -2088,7 +2088,13 @@ _OUTCOME_PATTERNS: list[tuple[str, str]] = [
     # about a blow that never rolled. Anything described as being *from the blow* asserts
     # the blow happened.
     (r"\bfrom the blow\b", "states an attack having landed"),
-    (r"\b(?:misses|missed|goes wide|glances off|skitters past|flashes past|sails wide)\b",
+    (r"\b(?:misses|missed|goes wide|glances off|sails wide)\b", "states an attack missing"),
+    # "skitters past" and "flashes past" are a miss only with a weapon going by. Playtest
+    # 2026-11-16 #61: the night's one event, "a lone Mite skitters past your head in the
+    # dark" (the engine's "a Mite comes near the camp, and goes on by"), was cut as an
+    # attack missing, and the page lost it.
+    (r"\b(?:blow|blade|arrow|bolt|dart|stone|shot|strike|swing|dagger|rapier|sword|knife|"
+     r"axe|spear|club|mace|fist|claw|bite|steel)\b[^.!?]{0,30}?\b(?:skitters|flashes) past\b",
      "states an attack missing"),
     (r"\byou (?:dodge|duck|roll) (?:clear|aside|away)\b", "states a save succeeding"),
     (r"\bthe (?:save|check|roll) (?:succeeds|fails)\b", "states a roll's result"),
@@ -2341,6 +2347,13 @@ def claims_the_engine_backs(outcomes) -> frozenset[str]:
         # when an op actually took them through one.
         if op in ("travel", "move"):
             allow("moved")
+        # A walk the engine stopped short (`stopped_short`: the watch at the gate, a
+        # meeting on the way) failed to get there, and "you fail to reach the docks" is
+        # the report. Playtest 2026-11-16 #74: that sentence was cut as an invented
+        # verdict, its repair wrote "as you approach the docks", and the page never said
+        # she was stopped at the east crossing.
+        if any(isinstance(e, dict) and e.get("stopped_short") for e in effects):
+            allow("verdict")
         # The sums this turn's tells state, as tokens: a sum the engine said may be said
         # again (`sums_told`, below).
         backed.update(f"sum:{s}" for s in sums_told([o]))

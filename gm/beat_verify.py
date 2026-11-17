@@ -1596,7 +1596,8 @@ _SET_HERE = (
     ("a town street, square or market", "in the open air of the town"),
     ("underground", "underground"),
     ("open country", "out in open country"),
-    ("aboard a ship or boat", "by the water"),
+    # Reached only aboard: the docks are a street too, the coast open country.
+    ("aboard a ship or boat", "aboard a ship"),
 )
 
 
@@ -2067,6 +2068,18 @@ _HOUR_WORD = re.compile(
     r"\b(?:(?:pre )?dawn\w*|daybreak|sunrise|sun|suns|sunlit|sunlight|sunset|sundown|"
     r"morning\w*|noon\w*|midday|afternoon\w*|evening\w*|dusk\w*|twilight|gloaming|"
     r"night\w*|midnight|moon\w*|stars?|starlight|starlit|first light|daylight|day)\b")
+
+
+# What an hour's quote says of the open sky: a cellar has no morning air and no sunlight.
+_SKY_WORD = re.compile(r"\b(?:air|sky|skies|sun|suns|sunlit|sunlight|sunrise|sunset|"
+                       r"daylight|breeze|wind|winds|horizon|clouds?|stars?|starlight|moon\w*)\b")
+
+
+def _underground_only(facts) -> bool:
+    """The whole beat is underground: every kind of place it may be set in is under the
+    ground or a room (`places.settings_for` of a cave, a sewer, a dungeon's rooms)."""
+    kinds = set(facts.settings or ())
+    return "underground" in kinds and kinds <= {"underground", "inside a building"}
 
 
 def place_quote(quote: str, sentences: list[tuple[str, str]]) -> str:
@@ -2755,10 +2768,14 @@ def _setting_wrong(c: Claim, facts: Facts) -> Discrepancy | None:
             return None
     here = next((said for k, said in _SET_HERE if k in facts.settings), "here")
     where = facts.end or "this place"
+    absent = _SET_ABSENT.get(kind, "none of that")
+    if set(facts.settings) == {"aboard a ship or boat"} and kind == "inside a building":
+        # Below decks has walls and a roof: the ship's (playtest 2026-11-16 #98).
+        absent = "no building: the walls and the roof round them are the ship's own timbers"
     return Discrepancy(
         "contradiction", "setting",
         f"The player is at {where}, {here} — not {_SET_IN.get(kind, kind)}. There is "
-        f"{_SET_ABSENT.get(kind, 'none of that')} here.", c.sentence, "", c)
+        f"{absent} here.", c.sentence, "", c)
 
 
 # The engine's records of somebody coming or going this turn: a `presence` claim about them
@@ -3052,6 +3069,15 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
                     "contradiction", "hour",
                     f"It is {residency.time_words(int(facts.clock))}, not "
                     f"{s['part']}: the engine keeps the clock.", c.sentence, "", c))
+            elif (_underground_only(facts) and _SKY_WORD.search(_norm(c.quote))
+                  and not _hour_told(c, facts)):
+                # The hour right, its weather wrong: no sky reaches a cell under the
+                # sewers. Playtest 2026-11-16 #62: "You wake stiff and heavy-limbed, the
+                # morning air making your muscles ache" in a burnt-out prison below them.
+                out.append(Discrepancy(
+                    "contradiction", "hour",
+                    "The player is underground: no sky, sun, daylight or open air reaches "
+                    "them there. Say the hour, if at all, without them.", c.sentence, "", c))
 
     out += _omissions(claims, facts, text)
     return out
