@@ -1466,8 +1466,13 @@ def _demo_reply(frame: dict) -> str:
                      **({"within_place": bool(a.get("within_place")),
                          "fixture": a.get("fixture") or "none"}
                         if a["act"] == "go" else {}), **cost, **means})
+    # Compact JSON (playtest 2026-11-16 N4): the reader's prompt was 50,142 characters,
+    # 15,850 tokens of a 16,384 window (Ollama's prompt_eval_count, measured 2026-11-17),
+    # over its budget, so its first demonstration was cut on every reading. The spaces
+    # after ", " and ": " were 2,755 of those tokens across the 115 demonstrations: 13,095
+    # compact, every demonstration kept, and the grammar's reply is the same JSON.
     return json.dumps({"question": frame.get("question", False), "actions": acts,
-                       "claims": frame.get("claims", [])})
+                       "claims": frame.get("claims", [])}, separators=(",", ":"))
 
 
 def messages(sentence: str) -> list[dict]:
@@ -1658,6 +1663,17 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
         # question is asked about (`confirm_sale`).
         if _within(a.get("span"), sentence):
             kept["span"] = " ".join(str(a["span"]).split())
+        # A deed whose words are nothing but its thing is no deed: how something is held,
+        # said beside the deed. Playtest 2026-11-17 #45: "Torch in one hand and dagger in
+        # the other, I go through into the beast's pool" came back `use`, object and span
+        # both the stance phrase; scope looked it up as a thing, refused "There is no torch
+        # in one hand and dagger in the other here", and the page told her light and blade
+        # gone on the walk into the lair. A comparison of two slots, no word read.
+        if kept.get("span") and kept.get("object") \
+                and kept["span"].lower().strip(" ,.") == \
+                " ".join(kept["object"].split()).lower().strip(" ,."):
+            dropped.append(f"{kept['act']} {kept['span']!r}: no deed, only the thing")
+            continue
         actions.append(kept)
     actions = merge_repeats(actions)
     claims = [c for c in (frame.get("claims") or []) if _within(c, sentence)]
@@ -1739,6 +1755,10 @@ def _speech_is_not_a_target(action: dict, dropped: list[str]) -> None:
             action["says"] = words
 
 
+# The reader's reply allowance, in tokens: what its window must leave free.
+READ_TOKENS = 400
+
+
 def interpret(sentence: str, *, model: str | None = None, host: str | None = None,
               provider: str | None = None, api_key: str = "",
               temperature: float = 0.0) -> dict:
@@ -1753,9 +1773,24 @@ def interpret(sentence: str, *, model: str | None = None, host: str | None = Non
     if not cfg.get("model"):
         cfg = modelcfg.for_role("narrator")
     started = time.monotonic()
-    reply = client.chat(messages(sentence), model or cfg["model"],
+    sent = messages(sentence)
+    # Said in the reader's own words when its demonstrations will be cut (N4, 2026-11-16:
+    # 50,142 characters over a 49,988 budget cut the first pair on every reading, and the
+    # client's generic line was the only trace). The test pins the size; this catches a
+    # world whose text tokenises worse than any measured.
+    from . import window
+
+    budget = window.prompt_budget_chars(model or cfg["model"], completion=READ_TOKENS)
+    size = sum(len(m["content"]) for m in sent)
+    if size > budget:
+        import logging
+
+        logging.getLogger("pathfindergm").warning(
+            "the reader's prompt is %d characters, over its %d-character budget: its "
+            "first demonstrations are cut from the front this reading", size, budget)
+    reply = client.chat(sent, model or cfg["model"],
                         host or cfg["host"], as_json=True, think=False,
-                        temperature=temperature, num_predict=400,
+                        temperature=temperature, num_predict=READ_TOKENS,
                         provider=provider or cfg.get("provider", "ollama"),
                         api_key=api_key or cfg.get("api_key", ""), schema=reply_schema())
     try:
@@ -2372,6 +2407,8 @@ _HIDING_DEMOS = [
     ("keeping to the shadows of the wall", "hides"),
     ("slipping past the sentries unseen", "hides"),
     ("ducking behind the carts so the watch won't see me", "hides"),
+    # Playtest 2026-11-17 #23: past somebody in plain sight is a walk (not that line).
+    ("walking on past the doorman", "a way to go"),
 ]
 
 
@@ -2392,9 +2429,13 @@ def confirm_hiding(span: str, *, model: str | None = None) -> str:
 def unhidden(frame: dict | None, ask=None) -> list[str]:
     """Take out of the reading, in place, each `stealth` act done alongside a walk of the
     same line that the targeted question says only names the way (`confirm_hiding`).
-    Returns the spans taken out, for the turn log. Only a stealth act at nobody (no
-    `target`, so no sentry is being slipped past) and only beside an acting go, leave or
-    journey; `ask` None (the suite, the reader off) changes nothing."""
+    Returns the spans taken out, for the turn log. Only beside an acting go, leave or
+    journey; `ask` None (the suite, the reader off) changes nothing.
+
+    A stealth act with a `target` is asked too, since playtest 2026-11-17 #23: "I step past
+    the toll-keeper and go on into the turnkey's room" came back `stealth, target: the
+    toll-keeper`, the question was never asked, and the Stealth was refused for want of
+    cover in plain sight. Slipping past a sentry unseen still answers "hides"."""
     if ask is None or not frame or frame.get("error"):
         return []
     acts = [a for a in frame.get("actions") or [] if acting(a)]
@@ -2402,7 +2443,7 @@ def unhidden(frame: dict | None, ask=None) -> list[str]:
         return []
     out = []
     for a in acts:
-        if a.get("act") == "stealth" and not a.get("target") and a.get("span") \
+        if a.get("act") == "stealth" and a.get("span") \
                 and ask(a["span"]) == "a way to go":
             out.append(a["span"])
     if out:

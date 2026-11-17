@@ -438,6 +438,19 @@ long line has come back unreadable when the reply had under 200 tokens left. Two
 demonstrations written here for #69/#77/#81 were withdrawn for that reason; the net
 addition is 61 characters of gloss. Every new demonstration now costs an old one.
 
+**Under it again (fix/reader-budget, 2026-11-17, N4).** The window, measured rather than
+assumed: Ollama's own `prompt_eval_count` for the reader's 232-message prompt was **15,850
+tokens of the 16,384** `num_ctx`, leaving 534 for a 400-token reply. Raising the budget
+was not honest — the char budget was right, the window really was nearly full — and
+raising `num_ctx` reloads the model for every call that differs (`prompts.NUM_CTX` is one
+window, named once). The demonstrations were JSON with `", "` and `": "` separators;
+written compact (`_demo_reply`) the same 115 demonstrations are **13,095 tokens** and
+47,041 characters: 2,755 tokens back, nothing withdrawn. The grammar's reply is the same
+JSON either way. Pinned by `tests/test_playtest_2026_11_17_reader_budget.py` at the worst
+characters-a-token any world has measured (3.2), and said at runtime by the reader itself
+when a world tokenises worse ("the reader's prompt is N characters, over its budget").
+The interpreter bench (302 labelled lines) before and after is in the lane report.
+
 ## Backward: the narration (lane N)
 
 The prose call's JSON is NOT given new fields. It was cut back to one field because

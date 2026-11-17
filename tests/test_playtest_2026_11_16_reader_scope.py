@@ -247,9 +247,11 @@ def test_a_sneak_beside_a_walk_that_only_names_the_way_is_taken_out():
     hiding = {"actions": [{"act": "go", "place": "the docks", "span": "go to the docks"},
                           {"act": "stealth", "span": "keeping low"}]}
     assert interpret.unhidden(hiding, ask=lambda s: "hides") == []
+    # A sneak past somebody is asked too since playtest 2026-11-17 #23 ("I step past the
+    # toll-keeper" was refused for want of cover); the question's "hides" keeps it.
     past = {"actions": [{"act": "go", "place": "the docks", "span": "go to the docks"},
                         {"act": "stealth", "target": "the guards", "span": "past the guards"}]}
-    assert interpret.unhidden(past, ask=lambda s: "a way to go") == []
+    assert interpret.unhidden(past, ask=lambda s: "hides") == []
     assert len(past["actions"]) == 2
     # No reader in the suite: nothing changes.
     assert interpret.unhidden(frame, ask=None) == []
