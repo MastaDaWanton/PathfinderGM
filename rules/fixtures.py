@@ -591,7 +591,7 @@ def walk_to(scene, kind: str, who) -> tuple[tuple | None, str]:
     return (*spots[0], grid.ground(spots[0])), ""
 
 
-def where_said(grid: Grid | None, start, end) -> str:
+def where_said(grid: Grid | None, start, end, *, indoors: bool = False) -> str:
     """Where a move left its walker in words, for the move's tell: "up onto the wall-walk",
     "onto the stair", "back down to the floor", or "". The tell is all the narrator and the
     tells check know of a move (the third law); "moves to near (25 ft)" said nothing a
@@ -620,7 +620,12 @@ def where_said(grid: Grid | None, start, end) -> str:
     near = sorted((min(distance(end[:2], tuple(p)) for p in g["squares"]), g["name"])
                   for g in grid.fixtures if not g.get("level"))
     near = [n for n in near if n[0] <= 5]
-    return f"beside {near[0][1]}" if near else "out in open ground"
+    if near:
+        return f"beside {near[0][1]}"
+    # Under a roof the open spot is the floor. Playtest 2026-11-17 #36: in a row of prison
+    # cells the tell said "out in open ground", and the page had her "step forward into
+    # the open ground" underground.
+    return "out in the middle of the floor" if indoors else "out in open ground"
 
 
 # --- posts: where a person stands when they come into a room -------------------------

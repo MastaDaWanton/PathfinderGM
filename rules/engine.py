@@ -15784,6 +15784,20 @@ class Engine:
                 p = by_id[p.parent]
             return p.id
 
+        # And the way into a venture from the place it opens off, or back up out of it:
+        # playtest 2026-11-17 #14, "head to the gardens, down the grate, and back through
+        # the culvert to the cells" walked to the gardens, and the planner's plain
+        # travels on into the sewers were refused "One journey a turn". The drop down the
+        # grate is a minute's step, as #41's venture op already made it. Only after the
+        # turn's journey: with none spent yet, the drop spends it as it always did, so
+        # "down the grate, along to the outfall, then across the city" is still two turns
+        # (#79's test).
+        def opens_off(inner, outer) -> bool:
+            top = by_id.get(head(inner))
+            return inner.origin in inside and top is not None and top.parent == outer.id
+
+        if self._journeyed and (opens_off(to, here) or opens_off(here, to)):
+            return True
         return here.origin in inside and to.origin in inside and head(here) == head(to)
 
     def _op_travel(self, intent: Intent, partial: dict) -> Outcome:
@@ -26034,7 +26048,15 @@ class Engine:
             # Where in the place, when the square is a fixture's (`fixtures.where_said`).
             from . import fixtures
 
-            onto = fixtures.where_said(self.scene.grid, from_square, tuple(square))
+            from . import places as places_mod
+
+            try:
+                here = self.here()
+                roofed = places_mod.is_indoors(here.id, here.terrain, here.shape)
+            except IndexError:            # no places at all: a bare test scene
+                roofed = False
+            onto = fixtures.where_said(self.scene.grid, from_square, tuple(square),
+                                       indoors=roofed)
             if onto:
                 tell = f"{went}, {onto}."
             # The step `_close_before` put in front of a blow: told as what it is, so the
@@ -34074,6 +34096,10 @@ def _ac_said(kind: str, base: int, flat_footed: bool, parts=()) -> str:
 # does not. "ask" is kept as the tell's verb: a question is not a statement.
 _TELLS_FRAME = frozenset({"tell", "inform", "assure", "remind", "warn"})
 _ASKS_FRAME = frozenset({"ask"})
+# The speech acts that are the deed itself: "thank the priest" is told "thanks the priest",
+# never "to the effect that thank the priest" (playtest 2026-11-17 #4).
+_SPEECH_DEEDS = frozenset({"thank", "greet", "welcome", "congratulate", "apologise",
+                           "apologize", "salute", "bless"})
 
 
 def reported_speech(who: str, at: str, words: str, heard: str = "") -> str:
@@ -34087,9 +34113,11 @@ def reported_speech(who: str, at: str, words: str, heard: str = "") -> str:
     already decided this is speech and whom it is to."""
     plain = f"{who} speaks{at}, to the effect that {words}"
     toks = str(words or "").split()
+    verb = toks[0].lower() if toks else ""
+    if verb in _SPEECH_DEEDS and len(toks) > 1:
+        return f"{who} {verb}s " + " ".join(toks[1:])
     if len(toks) < 3:
         return plain
-    verb = toks[0].lower()
     if verb in _ASKS_FRAME:
         return f"{who} asks " + " ".join(toks[1:])
     if verb not in _TELLS_FRAME:
