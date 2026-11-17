@@ -8170,6 +8170,12 @@ class Engine:
                                        strict=True)
             if door is not None:
                 return door
+        # Climb at the bottom of a pit IS the climb out, at the pit's DC (playtest
+        # 2026-11-17 #40: the plan's DC 10, made by 7, and she stayed in the pit).
+        if str(skill).lower() == "climb" and helped is None and not opposed:
+            out = dungeons.climb_out(self, intent, actor, partial)
+            if out is not None:
+                return out
         if heard is not None and heard.refused:
             return self._refuse(intent, heard.refused, code="already_heard")
         if heard is not None:
@@ -15803,6 +15809,15 @@ class Engine:
         held = trial_mod.on_travel(self, intent, partial)
         if held is not None:
             return held
+        # At the bottom of a pit, nobody walks off until they climb out (playtest
+        # 2026-11-17 #38). Asked of the tag; the way out named with its DC.
+        from . import dungeons as dungeons_mod
+
+        pit = dungeons_mod.in_pit(self.scene.pc())
+        if pit is not None:
+            return self._refuse(intent, f"{self.scene.pc().name} is at the bottom of the "
+                                        f"pit: climbing out is a DC {pit['climb']} Climb "
+                                        f"check first.", code="in_a_pit")
 
         # One journey a turn (item 35). A plan may name a whole route — measured
         # 2026-09-19 on "I find the mayor and grab him by the collar", which came back
@@ -16883,7 +16898,9 @@ class Engine:
         made = self._bring_in(
             met.template or "guildhand", count=met.count,
             name=(met.creature or {}).get("name")
-                 or (met.words[0].title() if met.words else None))
+                 # A kind, lower-case like `bestiary.kind_word`: title-cased, "Commoner"
+                 # and "Toll-Keeper" read as proper names (playtest 2026-11-16 N7).
+                 or (met.words[0].lower() if met.words else None))
         for m in made:
             self.scene.zones[m["ref"]] = zone
             self.scene.positions.pop(m["ref"], None)
@@ -25948,6 +25965,14 @@ class Engine:
             return self._refuse(intent, f"{actor.name} is glued to the floor and cannot "
                                         f"move until they break free (a DC 17 Strength "
                                         f"check, or 15 slashing to the goo).")
+        if square is not None and actor.has_state("state.position.pit") \
+                and tuple(square)[:2] != tuple(self.scene.positions.get(ref) or ())[:2]:
+            from . import dungeons as dungeons_mod
+
+            pit = dungeons_mod.in_pit(actor) or {}
+            return self._refuse(intent, f"{actor.name} is at the bottom of the pit: "
+                                        f"climbing out is a DC {pit.get('climb')} Climb "
+                                        f"check first.", code="in_a_pit")
         if square is not None and self.scene.has_grid:
             from_square = self.scene.positions.get(ref)
             bumped = self._unseen_in_the_way(actor, from_square, tuple(square))

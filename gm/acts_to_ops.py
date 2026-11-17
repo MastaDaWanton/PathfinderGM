@@ -990,6 +990,11 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
             # The op names: one action at a time through the reading's own op map, so each
             # op is owed by the action that declared it.
             row.ops = interpret.ops_for({"actions": [a]}, scene, places)
+            if act in ("leave", "athletics") and pc is not None \
+                    and pc.has_state("state.position.pit"):
+                _out_of_the_pit(row, pc)
+                rows.append(row)
+                continue
             if act == "go" and pc is not None and _to_the_square(row, a, scene, pc):
                 rows.append(row)              # "I go to C5": the board's own square
                 continue
@@ -1193,6 +1198,19 @@ def _take_is_the_harvest(rows: list[Row]) -> None:
             row.intents = [t for t in row.intents if t not in folded]
             row.note = (f"{folded[0]['params'].get('item')} comes off the carcass with the "
                         f"harvest: one deed, not a second take")
+
+
+def _out_of_the_pit(row: Row, pc) -> None:
+    """Leaving, or climbing, at the bottom of a pit is the climb out, built whole: a Climb
+    check the engine sets at the pit's DC (`dungeons.climb_out`). Inform's EXIT leaves
+    the container you are in, and the pit is that container, so no walk is owed.
+
+    Playtest 2026-11-17 #38: "I climb up out of the pit" read `leave` and built nothing,
+    and the next turn's Climb check was the plan's DC 10, which changed nothing."""
+    row.ops = []
+    row.intents.append({"op": "check", "actor": pc.ref, "params": {"skill": "climb"},
+                        "because": "the player climbs out of the pit"})
+    row.note = "at the bottom of a pit: the climb out"
 
 
 def _posture(row: Row, act: str, pc) -> None:

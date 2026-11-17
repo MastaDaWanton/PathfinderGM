@@ -446,7 +446,7 @@
       "who": "people-takers",
       "enemies": {"people": ["thug", "cutthroat"], "creatures": ["dog"]},
       "hostile": false,
-      "leader": {"people": ["thug", "cutthroat"], "title": "the dealer in people"},
+      "leader": {"people": ["thug", "cutthroat"], "title": "the slave-dealer"},
       "ally": {"people": "apprentice", "as": "stolen apprentice",
                "notes": "Taken from a workshop in {town} a week ago; says they are all to be shipped out, and {leader} keeps the list of the taken in {lair}."},
       "complication": "The list of the taken names people {town} believes simply ran away.",

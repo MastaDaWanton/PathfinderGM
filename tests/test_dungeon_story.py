@@ -269,7 +269,12 @@ def test_walking_the_rooms_tells_each_trace_meets_the_ally_and_finds_the_leader(
     climax = rooms[-1]["dungeon"]
     if climax["foes"]:
         boss = s.people[climax["foes"][0]]
-        assert boss.name == tag["leader"]["title"]
+        # A creature goes by its kind, a person by the title (playtest 2026-11-17 #46).
+        if boss.from_template in (dungeons._people_ids(tag["leader"])
+                                  | dungeons._people_ids(tag["enemies"])):
+            assert boss.name == tag["leader"]["title"]
+        else:
+            assert boss.name != tag["leader"]["title"]
         assert tag["leader"]["title"] in told[rooms[-1]["id"]].lower()
 
 

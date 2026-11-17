@@ -387,6 +387,21 @@ _QUOTED = re.compile(r"\"[^\"]*\"|“[^”]*”")
 _PHRASE_BEFORE = re.compile(r"((?:[A-Za-z'’-]+\s+){1,3})$")
 _POSSESSIVE = re.compile(r"(?:['’]s|s['’])$", re.I)
 _SENTENCE_START = re.compile(r"(?:^|[.!?]\s+|\n\s*)$")
+# A tell's verb ends the noun phrase: playtest 2026-11-17 #28, "the dagger misses dire
+# rat" found "the" three words back and printed "misses dire rat". Read nearest first, a
+# third-person verb ("misses", "hits", "strikes") stops the search; "-ous" and "-ss"
+# words are adjectives and nouns ("the ravenous rat", "the glass golem").
+_VERB_S = re.compile(r"(?:[a-rt-z]s|[^s]es|sses)$", re.I)
+
+
+def _definite(words: list[str]) -> bool:
+    """Whether these words straight before a name already open its noun phrase."""
+    for w in reversed(words):
+        if w.lower() in _DETERMINERS or _POSSESSIVE.search(w):
+            return True
+        if _VERB_S.search(w) and not w.lower().endswith("ous"):
+            return False
+    return False
 
 
 def with_articles(text: str, names) -> str:
@@ -434,8 +449,7 @@ def with_articles(text: str, names) -> str:
             if not is_descriptor(name):
                 continue
             prev = _PHRASE_BEFORE.search(before)
-            if prev and any(w.lower() in _DETERMINERS or _POSSESSIVE.search(w)
-                            for w in prev.group(1).split()):
+            if prev and _definite(prev.group(1).split()):
                 continue                 # "the ship's master", "the great bat": definite
             edits.append((lo, hi, f"{'The' if opening else 'the'} {name}"))
     for lo, hi, new in sorted(edits, reverse=True):
