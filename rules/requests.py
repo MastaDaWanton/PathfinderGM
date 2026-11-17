@@ -223,7 +223,9 @@ def sells(scene, actor) -> str:
     if cid:
         return market.COUNTER_PREFIX + cid
     kind = keepers.kind_of(place, getattr(scene, "founded", None) or ())
-    if keepers.keeps_a_counter(actor) or kind in _lodging_kinds():
+    from . import services
+
+    if keepers.keeps_a_counter(actor) or kind in _lodging_kinds()             or services.keeps_a_temple(actor):
         return kind
     return ""
 
@@ -237,6 +239,14 @@ def offered(scene, actor, want: str):
     kind = sells(scene, actor)
     if not kind or not str(want or "").strip():
         return None
+    from . import services
+
+    if services.keeps_a_temple(actor):
+        # A temple sells castings and nothing else (playtest 2026-11-16 #70): healing
+        # asked of its priest is bought at the counter, never begged with Diplomacy. The
+        # widest menu is matched here; the counter says what this temple does not cast.
+        row = services.find(want, "city")
+        return ("goods", row) if row is not None else None
     if kind in _lodging_kinds():
         found, _ = goods.match_want(want, [{"id": INN_STAY, "name": _INN_STAY_NAME}])
         if found is not None:

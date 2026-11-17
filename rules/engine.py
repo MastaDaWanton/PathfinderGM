@@ -44,6 +44,7 @@ from . import worldclass
 from . import grid as gridmod
 from . import guards as guards_mod
 from . import reactions
+from . import services as services_mod
 from . import spells as spells_mod
 from . import weapons as weapons_mod
 from .activeeffect import ActiveEffect
@@ -12028,7 +12029,13 @@ class Engine:
                     name="a warrant", kind="situation", key=states.wanted_tag(town),
                     source=f"rule:ship-seized/{ship.id}", origin=f"rule:ship-seized/{ship.id}",
                     duration="until-dismissed", tags=(states.wanted_tag(town),),
-                    payload={"crime": "theft", "what": ship.name}))
+                    # Sworn by the man she was taken from, who saw it done: a witness,
+                    # never a bare accusation (playtest 2026-11-16 #85), and the ship's
+                    # book price for the theft's fine (`ships.VESSELS`, CRB Table 6-9).
+                    payload={"crime": "theft", "what": ship.name,
+                             "witness": master.name, "ship": ship.id,
+                             "worth_gp": float(ships_mod.VESSELS.get(
+                                 ship.kind, {}).get("price_gp") or 0)}))
                 effects.append({"kind": "wanted", "town": town})
             hands = [a for a in crew if a is not master and not a.is_down]
             quay = next((p for p in self.places() if " ".join(str(p.name).split()).lower()
@@ -15452,8 +15459,8 @@ class Engine:
         return done
 
     def watch_at_the_way_out(self, pc, was_place: str, going_to, known, *,
-                             through: bool = False, crossing: bool = True
-                             ) -> tuple[str, str]:
+                             through: bool = False, crossing: bool | None = None,
+                             name_ways: bool = True) -> tuple[str, str]:
         """(refusal, line) for walking from `was_place` to `going_to` past the watch.
 
         The gate's reading of the warrant, as `_op_travel` has always applied it — moved
@@ -15479,7 +15486,18 @@ class Engine:
         it; asked as though it were the arch, the per-hop watch refused the wanted their
         own temple — "wanted is not house arrest" (`test_moving_inside_the_walls_is_not_
         watched`) — the moment it was built. A gate passed through on a walk that stays
-        inside is a square, not the way out.
+        inside is a square, not the way out. Left None (the exits row asks of one step),
+        it is read off the two places, as `_op_travel` reads it off the walk's two ends.
+
+        On a walk that stays inside, only the town's ARCH is where the watch stands: the
+        first of `places.ENTRANCES` the town has. Playtest 2026-11-16 #73: Mirabalos has
+        the gate AND the docks, and a walk from the cathedral to the quay — inside the
+        walls, leaving by sea being a passage `watch_on_the_road` reads — was stopped at
+        the east crossing as though the docks were the arch. A village whose only way in
+        is its docks still has the watch there.
+
+        `name_ways` is False when this is asked of the candidate ways round (the refusal's
+        list, below), so the list never asks itself.
         """
         from . import dungeons
         from . import places as places_mod
@@ -15499,7 +15517,16 @@ class Engine:
         # one list, so the generator and the law cannot disagree about what an
         # entrance is — and a village, which has a road rather than a gate, was
         # somewhere a warrant could never be enforced at all.
-        at_gate = " ".join(going_to.name.split()).lower() in places_mod.ENTRANCES
+        if crossing is None:
+            crossing = (places_mod.setting_of(was_place) == "outside") \
+                != (places_mod.setting_of(going_to.id) == "outside")
+        name = " ".join(going_to.name.split()).lower()
+        at_gate = name in places_mod.ENTRANCES
+        if at_gate and not crossing:
+            # Inside the walls, the watch stands at the arch alone (#73, above).
+            have = {" ".join(p.name.split()).lower() for p in known
+                    if places_mod.location_of(p.id) == town}
+            at_gate = name == next((x for x in places_mod.ENTRANCES if x in have), name)
         # Any way OUT, by place as well as by biome (Lane B, docs/fix-interfaces.md
         # §1.3 B3). This read `bool(want)`, so a travel by PLACE to ground outside —
         # which is how the outskirts and the road heads are entered — walked past the
@@ -15520,15 +15547,32 @@ class Engine:
         found = self.world.get(self.scene.location_id) if self.world else None
         town_name = str(getattr(found, "name", "") or "the town")
         if law == "wanted":
-            other_ways = [p.name for p in known
-                          if p.origin in ("found", "venture")
-                          and not p.described_only
-                          and p.terrain != places_mod.URBAN]
+            # Only ground outside the walls that a walk from here reaches with the watch
+            # never in the way, each named once. Playtest 2026-11-16 #73/#84: this listed
+            # every venture spot in town — "the crypt, the stair, … the sewers, the
+            # outfall, the main channel, the sump, the sewers, the outfall, the main
+            # channel" — dead ends under the streets, and taking its advice failed.
+            other_ways: list[str] = []
+            for p in (known if name_ways else ()):
+                if p.origin not in ("found", "venture") or p.described_only \
+                        or places_mod.setting_of(p.id) != "outside" \
+                        or p.name in other_ways:
+                    continue
+                prev, clear = was_place, True
+                for hop_id in places_mod.route(known, was_place, p.id) or ():
+                    hop = places_mod.find(known, hop_id)
+                    if hop is None or self.watch_at_the_way_out(
+                            pc, prev, hop, known, through=hop_id != p.id,
+                            crossing=True, name_ways=False)[0]:
+                        clear = False
+                        break
+                    prev = hop_id
+                if clear and prev == p.id:
+                    other_ways.append(p.name)
             how = (f"Leave by another way — {', '.join(other_ways)} — or "
                    f"clear your name."
                    if other_ways else
-                   "Leave by another way — ground you have founded or "
-                   "ventured into outside the walls — or clear your name.")
+                   "Find another way past the watch, or clear your name.")
             return (f"{pc.name} is wanted in {town_name}, and the gate is where the "
                     f"watch stands: they would take you at the arch. {how}"), ""
         if crossing:
@@ -22884,6 +22928,9 @@ class Engine:
         shut = keepers_mod.shut_here(self.scene, self.scene.actors[seller] if seller else None)
         if shut:
             return self._refuse(intent, shut)
+        # A temple's casting for pay (rules/services.py, playtest 2026-11-16 #70).
+        if item_id.startswith(services_mod.PREFIX):
+            return self._buy_spell(intent, actor, item_id, seller)
         # Whoever keeps this counter, by name, when the plan named no seller: the panel
         # never does, and "pays the stallholder" read wrong with Azhil Vex standing
         # behind it (live, 2026-09-27).
@@ -22994,6 +23041,66 @@ class Engine:
                  + arrived_tell,
             because=intent.because,
         )
+
+    def _buy_spell(self, intent: Intent, actor, item_id: str, seller) -> Outcome:
+        """A temple's priest casts a spell on the buyer for the book's fee (rules/services.py).
+
+        Priced by the CRB (caster level x spell level x 10 gp, plus the material), moved by
+        the keeper's own terms like every trade (`_cargo_terms`: regard and thrift, the
+        owner's 2026-11-13 ruling), paid from the purse, and cast
+        through the one cast door with no slot (`_op_cast`, `item_cast`), so the healing is
+        the heal path's own roll and tell. Nothing is paid for a casting that is refused."""
+        from . import places as places_mod
+        from . import keepers as keepers_mod
+
+        priest = self.scene.actors.get(seller) if seller else None
+        if priest is None:
+            priest = keepers_mod.keeper_in(self.scene, str(self.scene.at or ""))
+        if priest is None or not services_mod.keeps_a_temple(priest):
+            return self._refuse(intent, "Nobody here keeps a temple, so there is nobody to "
+                                        "cast a spell for pay.")
+        if self._will_not_deal(priest):
+            return self._refuse(intent, self._will_not_deal(priest))
+        loc = self.world.get(self.scene.location_id) if self.world else None
+        scale = places_mod.scale_of(loc) if loc is not None else "town"
+        row = services_mod.find(item_id, scale)
+        if row is None:
+            on = ", ".join(r["spell_name"] for r in services_mod.menu(scale))
+            return self._refuse(intent, f"{_sentence(priest.name)} casts no such spell for "
+                                        f"pay. Cast here: {on or 'nothing'}.")
+        # The keeper's own terms, and never the watch's markup: a temple is sanctuary
+        # (owner call 2026-11-16, `play.views._counter_refusal`).
+        percent, moved, _markup = self._cargo_terms(actor, priest)
+        from . import pricing
+
+        cost = pricing.moved_cp(row["cp"], percent)
+        coins = self._coins_here()
+        price = goods.purse_line(goods.coins_for(cost), coins)
+        spell = spells_mod.get(row["spell"])
+        purse, paid = goods.spend(actor.purse, cost)
+        if not paid:
+            return Outcome(intent_id=intent.id, op="buy", effects=[],
+                           tell=f"{spell.name} is {price} at the temple and {actor.name} has "
+                                f"{goods.purse_line(actor.purse, coins)}. Nothing is cast "
+                                f"and no coin changes hands.", because=intent.because)
+        cast = Intent(op="cast", actor=priest.ref, target=actor.ref,
+                      params={"spell": row["spell"]}, because="a casting paid for")
+        done = self._op_cast(cast, {"item_cast": {
+            "level": row["level"], "cl": row["cl"],
+            # Harmless healing: the DC is the spell level's floor, never a guessed score.
+            "dc": 10 + row["level"], "origin": f"service:{priest.ref}"}})
+        if done.status == "refused":
+            return self._refuse(intent, done.tell)
+        actor.purse = purse
+        return Outcome(
+            intent_id=intent.id, op="buy",
+            effects=[{"ref": actor.ref, "kind": "bought", "item": spell.name, "count": 1,
+                      "paid_cp": cost, "from": priest.ref, "service": row["spell"]}]
+                    + list(done.effects),
+            tell=f"{actor.name} pays {priest.name} {price} for {spell.name}"
+                 + (f" ({moved})" if moved else "") + f". {_sentence(done.tell)} "
+                 f"({goods.purse_line(actor.purse, coins)} left.)",
+            because=intent.because)
 
     def _cargo_terms(self, actor, keeper) -> tuple[int, str, float]:
         """(percent, the reason in words, the law's markup) a bulk trade is moved by: the
@@ -33936,8 +34043,9 @@ def _uses_per_day(row: dict) -> int | None:
 
 
 def _cast_opener(actor, spell, bits: list[str], item: dict | None) -> str:
-    """The cast's first sentence: who cast what, or which item released it."""
-    if item:
+    """The cast's first sentence: who cast what, or which item released it. A paid
+    casting (`Engine._buy_spell`) is the door's no-slot cast with no item to name."""
+    if item and item.get("name"):
         return (f"{actor.name} calls on the {item['name']}: {spell.name} "
                 f"({'; '.join(bits)}).")
     return f"{actor.name} casts {spell.name} ({'; '.join(bits)})."

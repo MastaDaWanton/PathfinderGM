@@ -6945,6 +6945,7 @@ def _merchant_here(scene):
     for another.
     """
     from rules import keepers, states
+    from rules import services as services_mod
 
     found = []
     for ref, a in scene.actors.items():
@@ -6955,8 +6956,9 @@ def _merchant_here(scene):
         # they are called. The name test below cannot see a keeper: they are named out
         # of the world ("Gorvothys Vyrnys") precisely so that they are a person and not
         # a job title, and a panel that only opens for people called "the stallholder"
-        # would refuse every real shopkeeper this app builds.
-        if keepers.keeps_a_counter(a):
+        # would refuse every real shopkeeper this app builds. A temple's keeper sells its
+        # castings across the same panel (rules/services.py, playtest 2026-11-16 #70).
+        if keepers.keeps_a_counter(a) or services_mod.keeps_a_temple(a):
             found.append(a)
             continue
         if keepers.is_keeper(wid) and not keepers.counter_of(wid) \
@@ -7157,6 +7159,12 @@ def _counter_refusal(c, pc, merchant=None):
     if refused:
         return JsonResponse({"error": refused}, status=409)
     if states.standing_with_the_law(pc, town) != "wanted":
+        return None
+    from rules import services as services_mod
+
+    if services_mod.keeps_a_temple(merchant):
+        # Sanctuary: a temple tends the hurt whoever is looking for them (owner call,
+        # 2026-11-16 overnight). The refusal below is the watch's reach, not the faith's.
         return None
     return JsonResponse({"error": (
         f"{merchant.name} looks at {pc.name} and then at the door. {pc.name} is "
@@ -7365,6 +7373,28 @@ def trade(request):
         # A keeper minted for this counter is part of the save from now on.
         c.save()
 
+    from rules import services as services_mod
+
+    temple = services_mod.keeps_a_temple(merchant)
+    temple_rows: list[dict] = []
+    if temple:
+        # A temple's wares are its castings (rules/services.py), priced as the engine's buy
+        # door charges them (`Engine._buy_spell`: the keeper's terms, never a haggle), and
+        # it buys nothing.
+        scale = places_mod.scale_of(c.location) if c.location is not None else "town"
+        percent, moved, _markup = c.engine()._cargo_terms(pc, merchant)
+        for r in services_mod.menu(scale):
+            gp = pricing.moved_cp(r["cp"], percent) / 100
+            temple_rows.append({"id": r["id"], "name": r["spell_name"].capitalize(),
+                                "tier": "common", "count": 1, "gp": gp,
+                                "price": pricing.as_text(gp), "does_something": True,
+                                "shelf": "magic", "staple": False})
+        if want:
+            found_row = services_mod.find(want, scale)
+            pick = found_row["id"] if found_row is not None else ""
+            want_line = "" if pick else (f"{merchant.name} casts no such spell for pay. "
+                                         f"This is what the temple casts.")
+
     return JsonResponse({
         "stall": stall, "place": place, "day": day, "pick": pick, "want_line": want_line,
         "line": counter.id if counter is not None else "",
@@ -7387,19 +7417,20 @@ def trade(request):
             ({**_row(s, tradecraft.sell_price(
                 pricing.what_a_shop_pays(s, seller=pc, town=place), percent), s.count),
               "unit": goods.unit_for(getattr(s, "base", "") or s.name)}
-             for s in pc.stock.values()),
+             for s in pc.stock.values() if not temple),
             key=lambda r: -r["gp"]),
-        "theirs": sorted((_row(m, tradecraft.buy_price(
+        "theirs": temple_rows if temple else sorted((_row(m, tradecraft.buy_price(
             pricing.worth(m, buyer=pc, town=place), percent)) for m in shelf),
                          key=lambda r: -r["gp"]),
         "haggled": haggled,
         # Why the prices moved, in words ("the smith likes you: 5% off"), or "".
-        "terms": tradecraft.terms_said(merchant, percent, why),
+        "terms": moved if temple else tradecraft.terms_said(merchant, percent, why),
         "terms_percent": percent,
-        "can_haggle": not haggle_spent,
+        "can_haggle": not haggle_spent and not temple,
         "law": states.standing_with_the_law(pc, place),
         # Bulk trade goods (rules/trade.py): what this place makes, and the party's lots.
-        "cargo": _cargo_block(c, pc, merchant),
+        "cargo": (dict(_cargo_block(c, pc, merchant), offers=[], lots=[]) if temple
+                  else _cargo_block(c, pc, merchant)),
     })
 
 
@@ -7491,6 +7522,11 @@ def trade_do(request):
     op = str(body.get("op", "")).strip().lower()
     if op not in ("sell", "buy"):
         return JsonResponse({"error": "sell or buy"}, status=400)
+    from rules import services as services_mod
+
+    if op == "sell" and services_mod.keeps_a_temple(merchant):
+        return JsonResponse({"error": f"{merchant.name} buys nothing: a temple casts for "
+                                      f"pay, and is no shop."}, status=409)
 
     place, stall, day = _stall_of(c, counter, merchant, str(body.get("stall") or ""))
     item = str(body.get("item", "")).strip().lower()
