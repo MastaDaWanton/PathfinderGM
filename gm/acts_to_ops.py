@@ -3891,7 +3891,7 @@ def wage_not_tipped(raw, scene, *, notes: list | None = None) -> list:
 
 
 def address_the_named(raw, frame: dict | None, scene, *,
-                      notes: list | None = None) -> list:
+                      notes: list | None = None, places=()) -> list:
     """The player's line goes to the person the reading's `talk` names — never to
     somebody else the plan picked.
 
@@ -3926,6 +3926,10 @@ def address_the_named(raw, frame: dict | None, scene, *,
              and str(a.get("target") or "").strip()]
     says = [k for k, r in enumerate(raw) if _op(r) == "say"
             and str(r.get("actor") or "pc").lower() in ("pc", pc.ref.lower(), "none", "")]
+    if places and len(named) > 1 and len(named) == len(says):
+        return _each_to_its_own(raw, frame, scene, places, says, notes)
+    # Who is spoken to after the line's own walk is looked for where it ends (#94).
+    scene = interpret.scene_by_then(frame, scene, places) if places else scene
     if not named and len(says) == 1:
         return _said_to_nobody(raw, frame, scene, says[0], notes)
     if len(named) != 1 or len(says) != 1:
@@ -3952,6 +3956,57 @@ def address_the_named(raw, frame: dict | None, scene, *,
         out.insert(intro, out.pop(k))
     if notes is not None:
         notes.append(f"the say to {was} goes to {want}: the one the player's words name")
+    return out
+
+
+def once_each_walk(raw, *, notes: list | None = None) -> list:
+    """A plan's second `travel` to the place an earlier one in the list already goes,
+    struck. Live 2026-11-17 on the playtest's #75 line, once the whole line ran: the plan
+    wrote the walk to the docks three times, and the two the engine refused ("The party has
+    already travelled this turn and is at the docks") reached the page as "Since you've
+    already made your travel for this turn". The same op with the same params, compared
+    as data; a walk on to somewhere else is kept for the engine's one-journey rule."""
+    if not isinstance(raw, list):
+        return raw
+    seen, out = [], []
+    for r in raw:
+        if _op(r) == "travel":
+            key = dict((r or {}).get("params") or {})
+            if key in seen:
+                if notes is not None:
+                    notes.append(f"a second travel to {key.get('place')!r} struck")
+                continue
+            seen.append(key)
+        out.append(r)
+    return out
+
+
+def _each_to_its_own(raw, frame, scene, places, says: list[int], notes) -> list:
+    """Two or more lines to two or more people named, as many says as talks: the n-th
+    say goes to the one the n-th talk names, looked for where the line has walked to by
+    then (`interpret.scene_by_then`). Live 2026-11-17 on the playtest's #75 line: "I tell
+    the deckhand I'll be back by nightfall, then walk down to the docks and ask the
+    foreman…" ran whole, and the parting words went to nobody ("Vesna Kroll speaks, to
+    the effect that…"), since this door paired only one talk with one say. Nobody new is
+    named here: a name not found leaves that say as the plan wrote it."""
+    from . import interpret
+
+    talks = [k for k, a in enumerate(frame.get("actions") or [])
+             if a.get("act") in ("talk", "insult") and interpret.acting(a)
+             and str(a.get("target") or "").strip()]
+    out = list(raw)
+    for k, at in zip(says, talks):
+        name = str(frame["actions"][at]["target"]).strip()
+        want = person(interpret.scene_by_then(frame, scene, places, upto=at), name)
+        params = dict(out[k].get("params") or {})
+        if not want or params.get("to") == want:
+            continue
+        was = params.get("to") or "nobody named"
+        params["to"] = want
+        out[k] = dict(out[k], params=params,
+                      **({"target": want} if out[k].get("target") else {}))
+        if notes is not None:
+            notes.append(f"the say to {was} goes to {want}: the one the player's words name")
     return out
 
 
@@ -4130,7 +4185,9 @@ def timed_waits(raw, frame: dict | None, scene, *, notes: list | None = None) ->
 # is the survival door's, `judgement.inject_survival`), so the plan's `eat`, written last,
 # had no owner and the night ran first: "rests for 8 hours ... hunger holds it until Ansel
 # eats", and only then "Ansel has no bread to eat".
-_PLACED_BY_ACT = {"consume": ("eat", "drink", "taste", "use_item")}
+# And a climb's check where the climb is in the words, before the walk that follows it
+# (playtest 2026-11-16 E4: "climb out and walk to X" rolled the climb after the travel).
+_PLACED_BY_ACT = {"consume": ("eat", "drink", "taste", "use_item"), "athletics": ("check",)}
 
 
 def order(raw, rows: list[Row]) -> list:

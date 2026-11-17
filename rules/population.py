@@ -982,7 +982,16 @@ def find(scene, phrase: str, *, rings: tuple[str, ...] | None = None,
             return Found(scope=HERE if name == HERE else ELSEWHERE, ring=name, people=[rec])
         if told:
             return Found(scope=AMBIGUOUS, ring=told[0][0], people=[r for _n, r in told])
+    # A bare trade ("the foreman", "the smith") asks for whoever does that work HERE, never
+    # one met in another town: playtest 2026-11-16 #75, "ask the foreman" at Mirabalos'
+    # docks found a dock labourer glimpsed in Zhilvarnia (the trade read as work:labourer)
+    # and refused "The dock laborer is in Zhilvarnia now, not here". Somebody standing here
+    # still answers to it, wherever their home.
+    trade_only = all(w.startswith("work:") for w in words)
+    home = getattr(scene, "location_id", None)
     for name, members in ringed():
+        if trade_only and name != HERE:
+            members = [r for r in members if r.get("home") == home]
         fits = [r for r in members if _fits(words, _bag(r, scene), peoples)]
         if len(fits) == 1:
             return Found(scope=HERE if name == HERE else ELSEWHERE, ring=name, people=fits)

@@ -407,6 +407,37 @@ would now strike somebody), two sales gained a second act, and one line was wron
 ways. On the dev lines three got better. A first try that also reworded the `insult` gloss ("a fight picked with WORDS
 alone") flipped the same `insult` line and was withdrawn for the smaller change.
 
+### The reader and scope (playtest 2026-11-16 overnight, fix/reader-and-scope)
+
+The reader read most of the night's lost deeds right; code then lost them. Probed live on
+the playtest's own lines before any change: "I tell the smuggler I'll be back for the
+beast, then make my way back out…" came back talk + go + go, and '"Father, …" I show him my
+coin' talk + other. What lost them, and what holds them now:
+- **The turn budget ended the turn on the words** (`sequence._spoken_with`). Words followed
+  at once by walking off are parting words and cost nothing (the owner's 2026-10-17 ruling,
+  speech before the leave); a quick deed at the same listener goes with the words.
+- **A noun of address was looked for as a person** (`judgement.addressed_in_speech`): a
+  target found only inside the player's quotation is how the listener is called.
+- **The person after a walk was looked for before it** (`interpret.scene_by_then`,
+  `engine.SeenFrom`): the absent-answer and the addressee are asked from where the line's
+  own walk ends.
+- **A bare trade matched somebody in another town** (`population.find`).
+- **Place names**: a name qualified by where it is (`places.by_locative`, "the well room
+  under the sewers") and the worship kinds at three scales (`places.WORSHIP`).
+- **One gloss line** for `follow` (a road, tunnel or river is gone along, `go`). Probed:
+  the tunnel and river lines moved to `go`; "follow the tracks" stayed `track`; "follow
+  the trail of blood to the cellar" moved from `track` to `go`, the one line that got
+  arguably worse.
+- **`stealth` beside a walk is asked again** (`interpret.confirm_hiding`), one closed
+  question, because a gloss line did not move "keeping well away from the gate".
+
+**The reader's prompt is over its window.** Measured on integrate/0.4.0 before this lane:
+50,142 characters against the client's 49,988-character budget, so the first demonstration
+pair is cut from the front on every reading ("the prompt was cut to fit the window"), and a
+long line has come back unreadable when the reply had under 200 tokens left. Two
+demonstrations written here for #69/#77/#81 were withdrawn for that reason; the net
+addition is 61 characters of gloss. Every new demonstration now costs an old one.
+
 ## Backward: the narration (lane N)
 
 The prose call's JSON is NOT given new fields. It was cut back to one field because

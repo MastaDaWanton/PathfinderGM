@@ -202,6 +202,36 @@ class _Here(Mapping):
         return f"_Here({dict(self)!r})"
 
 
+class SeenFrom:
+    """The scene as it will stand from another place: everything the scene's, but `at`
+    and so `actors` (`_Here`) the other place's. Nothing is written through it; every
+    finder that asks "who is here" asks it of this.
+
+    For a turn's later deed after its own move: playtest 2026-11-16 #94, "go back up on
+    deck and ask the deckhand…" was planned in the hold, the deckhand standing on deck was
+    looked for in the hold, and the turn refused "a deckhand is not here" though the walk
+    put her beside him first. Inform runs a command's actions one at a time because what
+    a noun phrase means depends on where the player is by then (DM4 §34); the planner
+    plans the line at once, so its lookups are asked from where the walk ends."""
+
+    def __init__(self, scene: "Scene", at: str):
+        self._scene = scene
+        self._from = at
+
+    @property
+    def at(self) -> str:
+        # Read-only: the party's own `at` keeps its named writers
+        # (tests/test_one_spatial_authority.py).
+        return self._from
+
+    def __getattr__(self, name):
+        return getattr(self._scene, name)
+
+    @property
+    def actors(self) -> Mapping[str, "Actor"]:
+        return _Here(self)
+
+
 @dataclass
 class Scene:
     """Everything the engine owns. The world agent may read this and writes none of it —
@@ -3252,9 +3282,16 @@ class Engine:
         # Who searches earlier in this list (a creature's Perception with no DC): its blow
         # after the search is the search's to decide, at resolution (`_op_attack`'s floor).
         searched: set[str] = set()
+        # Who stands where an earlier `travel` in this list goes: there by the time a later
+        # intent runs. Playtest 2026-11-16 #94, "go back up on deck and ask the deckhand":
+        # the say to the deckhand on deck was refused "unknown ref" three plans running,
+        # because the list was checked against the hold before anything moved.
+        arrived: set[str] = set()
         for i, intent in enumerate(intents):
             self._standing_means(intent)
-            self._check_refs(intent, i, extra=pending | introduced)
+            self._check_refs(intent, i, extra=pending | introduced | arrived)
+            if intent.op == "travel" and intent.params.get("place"):
+                arrived |= self._standing_at(str(intent.params["place"]))
             self._check_legality(intent, i, moved=moved)
             self._check_unseen_target(intent, i, searched)
             self._force_visibility(intent)
@@ -3631,6 +3668,17 @@ class Engine:
         # sends it to the `refs` branch, which is the one branch that repairs.
         return isinstance(ref, str) and bool(ref) and (
             ref in self.scene.actors or ref in (extra or set()))
+
+    def _standing_at(self, place: str) -> set[str]:
+        """The refs of everybody standing at the place a travel names, never the party
+        (`validate`'s `arrived`). Empty when the finder knows no such place."""
+        from . import places as places_mod
+
+        there = places_mod.find(self.places(), place, near=self.scene.at or "")
+        if there is None or there.id == self.scene.at:
+            return set()
+        return {r for r, a in self.scene.people.items()
+                if a.at == there.id and not a.is_pc}
 
     def _elsewhere(self, ref) -> str:
         """Where a ref the campaign holds but the party cannot reach is standing, or "".
@@ -5638,6 +5686,10 @@ class Engine:
             # resumed on the player's own d20 arrives here exactly as a hidden one does.
             if intent.gate:
                 queue = self._settle_gate(intent, outcome, queue)
+            # A climb, a swim or a jump that fails gets the mover no further: the walk
+            # queued behind it by the same mover does not happen (`_held_by_failed_move`).
+            if intent.op == "check":
+                queue = self._held_by_failed_move(intent, outcome, queue)
             # A weapon drawn in a fight is a move action: what that leaves of the turn is
             # written onto the blows still queued behind it (`_draw_paid`).
             if intent.op == "wear":
@@ -5801,6 +5853,33 @@ class Engine:
             if len(self.scene.log) > self.scene.LOG_KEPT:
                 del self.scene.log[:-self.scene.LOG_KEPT]
         return Resolution(outcomes=outcomes)
+
+    # The skills whose check IS getting somewhere: Climb ("you make no progress", CRB
+    # p.91), Swim (p.108), and the jump of Acrobatics (p.88).
+    _MOVING_SKILLS: ClassVar[frozenset] = frozenset({"climb", "swim", "acrobatics"})
+
+    def _held_by_failed_move(self, check: Intent, outcome: Outcome,
+                             queue: list[dict]) -> list[dict]:
+        """Take the mover's queued walks off the queue when their climb, swim or jump
+        has failed. Playtest 2026-11-16 E4: "climb out and walk to X" walked her to X with
+        the climb failed. By the book a failed Climb makes no progress, a failed Swim
+        none either; the walk beyond it starts from where the mover still is, so it is
+        the next turn's to try again. Only the mover's own, and only a resolved failure:
+        a check refused or unrolled holds nothing back."""
+        skill = str(check.params.get("skill") or "").strip().lower()
+        if skill not in self._MOVING_SKILLS or outcome.status != "resolved" \
+                or outcome.verdict != "failure":
+            return queue
+        mover = check.actor or ""
+        kept = [r for r in queue
+                if not (r.get("op") in ("travel", "venture")
+                        and str(r.get("actor") or mover) == mover)]
+        if len(kept) < len(queue):
+            who = self.scene.people.get(mover)
+            name = getattr(who, "name", "") or "The climber"
+            outcome.tell = (f"{outcome.tell} {name} gets no further, and the way on is "
+                            f"still to go.").strip()
+        return kept
 
     def _settle_gate(self, gate: Intent, outcome: Outcome, queue: list[dict]) -> list[dict]:
         """Take off the queue what a poison's save just ruled out.

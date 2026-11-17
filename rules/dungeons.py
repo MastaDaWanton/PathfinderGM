@@ -446,6 +446,19 @@ def fill(text: str, slots: dict) -> str:
     return _cap(_SLOT.sub(lambda m: str(slots.get(m.group(1), m.group(0))), str(text or "")))
 
 
+def room_names() -> frozenset[str]:
+    """Every name a dungeon room can be given, without "the": the stock rooms (`ROOMS`)
+    and the story's builders' and tags' (content/dungeons/). A closed vocabulary, as
+    `places.generated_names` is."""
+    st = story()
+    rows = [r for fam in ROOMS.values() for r in fam]
+    for kind in ("builders", "tags"):
+        for spec in (st.get(kind) or {}).values():
+            for fam in ((spec.get("rooms") or spec.get("places") or {}).values()):
+                rows += [tuple(x) for x in fam]
+    return frozenset(str(r[0]).removeprefix("the ") for r in rows)
+
+
 def _concept_rooms(concept: dict, n: int) -> tuple[list[tuple[str, str]], list[str]]:
     """(name, about) for each of `n` rooms, and the layer each belongs to: the builders'
     rooms from the way in, in their own order (the gatehouse before the armoury behind

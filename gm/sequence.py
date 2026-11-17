@@ -278,6 +278,49 @@ def clauses_of(span, parts: list[str]) -> list[int]:
 QUICK_PER_TURN = 2
 
 
+_SPOKEN = frozenset({"talk", "request"})
+_LISTENER_PRONOUNS = frozenset({"him", "her", "them", "it"})
+
+
+def _departs(a: dict) -> bool:
+    """Whether a reader's act walks away from where the words were said: a walk to
+    somewhere else, leaving, a journey, going to bed. The reader's closed act and its own
+    `within_place` answer, never the words."""
+    act = a.get("act")
+    return act in ("leave", "journey", "rest") or (act == "go" and not a.get("within_place"))
+
+
+def _spoken_with(placed: list) -> None:
+    """What words to somebody cost when the next deed goes with them, in place.
+
+    * **Parting words.** Words followed at once by walking off are said on the way out,
+      and nobody's answer is waited for: the owner's ruling of 2026-10-17 ("a deed in the
+      player's own line that ends the talk counts as taking leave … speech and payment
+      before the leave"). Playtest 2026-11-16 #63, three times: "I tell the smuggler I'll
+      be back for the beast, then make my way back out…" was read talk + go + go, the
+      budget ended the turn on the talk, and the walk went back to the pen — she stayed
+      in the cells. They cost nothing of the turn.
+    * **A gesture with the words.** A quick deed at the same listener straight after the
+      words ("…I can pay." I show him my coin) is done while speaking: playtest #72, the
+      coin shown was cut off into the pen and only the speech was played. The words take
+      the gesture's place in the count and the gesture ends the turn, so the listener
+      answers both. Who is the same listener is the reader's slots compared, or a bare
+      pronoun, never a reading of the words."""
+    for k in range(len(placed) - 1):
+        c, first, last, a = placed[k]
+        if c != "addresses" or a.get("act") not in _SPOKEN:
+            continue
+        nc, nfirst, nlast, nxt = placed[k + 1]
+        if _departs(nxt):
+            placed[k] = ("free", first, last, a)
+            continue
+        said_to = " ".join(str(a.get("target") or "").lower().split())
+        at = " ".join(str(nxt.get("target") or "").lower().split())
+        if nc == "quick" and at and (at == said_to or at in _LISTENER_PRONOUNS):
+            placed[k] = ("quick", first, last, a)
+            placed[k + 1] = ("addresses", nfirst, nlast, nxt)
+
+
 def within_budget(parts: list[str], actions: list[dict], cost) -> tuple | None:
     """Where the turn's budget ends a line of several clauses: `(now, later, why)`, the
     clauses done this turn and the ones left for the pen, or None when the whole line
@@ -321,6 +364,7 @@ def within_budget(parts: list[str], actions: list[dict], cost) -> tuple | None:
                 continue
             return None
         placed.append((c, min(where), max(where), a))
+    _spoken_with(placed)
 
     quick, done_to, cut, why, stop = 0, -1, None, "", None
     for k, (c, first, last, _a) in enumerate(placed):
