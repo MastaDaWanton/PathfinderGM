@@ -223,8 +223,7 @@ def ways_from(engine, world, place_ids) -> dict[str, list[dict]]:
             # Mirabalos, nothing offered to sail her).
             for leg in engine._her_waters(ship):
                 if (leg.by_sea or leg.by in ("sea", "river")) and leg.to_id != ship.bound_for:
-                    days = ships.days_for(leg.miles if leg.source == "exact" else None,
-                                          ship.kind, leg.days_apart)
+                    days = ships.leg_days(leg, ship.kind)
                     more.append({"id": leg.to_id, "name": leg.to_name, "group": "road",
                                  "blocked": "", "journey": True, "minutes": 0,
                                  "time_words": _days_aboard(days, leg.by == "river")})

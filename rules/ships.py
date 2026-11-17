@@ -116,11 +116,41 @@ PORT_PLACES = ("the docks", "the harbour", "the quay", "the wharf")
 # which is most of why the sea is faster than the road even at the same speed.
 HOURS_AT_SEA = 24
 
-# A cruise (`Engine._cruise`): the sea's check is made each watch, four watches a day —
-# the land's rate (Ultimate Wilderness p.127: four checks a day), not a voyage's one — and a
-# turn's cruise is at most one day of them.
+# How far each vessel goes in a day: Core Rulebook Table 7-9, Mounts and Vehicles (aonprd
+# Rules "Movement", Exploration Movement, fetched 2026-11-16): "Sailing ship (sailed) 2
+# miles [an hour], 48 miles [a day]"; warship 60, longship 72, galley 96; "for a sailing
+# ship, it represents 24 hours". The keelboat is rowed 10 miles in its 10 hours "and can
+# also float an additional 14 hours, if someone can guide it, adding an additional 42
+# miles" — a passage boat has a crew to guide her, so 52.
+#
+# Until 2026-11-16 the day was worked out from Ultimate Combat's TACTICAL speed (60 ft a
+# round, so 6 mph for 24 hours, 144 miles a day): three times the book's sailing ship, and
+# with World Bible's 192-mile crossings it made every sea passage of the shipped worlds a
+# day and a half (the owner: "over water it should be a few weeks minimum"). The table is
+# the overland rule and the feet are the battle's; UC prints no conversion between them.
+MILES_A_DAY: dict[str, int] = {"keelboat": 52, "longship": 72, "sailing ship": 48,
+                               "warship": 60, "galley": 96}
+
+# The shortest passage between two settlements, in days, when the world's miles are not
+# marked measured (`journey.Leg.measured`). The owner, 2026-11-16: "over land ... it should
+# be a few days minimum to other cities and over water it should be a few weeks minimum."
+# Two weeks is the app's reading of "a few weeks"; a river runs inside one continent, so
+# it takes the road's floor (`journey.ROAD_DAYS_AT_LEAST`). Why a floor and not the miles:
+# World Bible's distances are DERIVED from its containment tree and "never measured"
+# (World Bible agent_engine/distance.py, its own words), banded in walking days at 24
+# miles a day, so its sea band of 192-216 miles is eight or nine days ON FOOT and four by
+# the book's sailing ship. for-world-bible ask 28 asks for measured miles at a voyage's
+# scale; a world that marks its miles measured is taken at its word.
+PASSAGE_DAYS_AT_LEAST = 14
+
+# A cruise (`Engine._cruise`): a ship hunting sails looks each watch, four watches a day —
+# the land's rate (Ultimate Wilderness p.127: four checks a day), not a passage's one roll
+# a stretch — so a day of it meets something 1 - 0.8^4 = 59% of the time. The cruise runs
+# day after day until she meets something or `CRUISE_DAYS` pass (2026-11-16: one day a
+# turn was the day-by-day the owner asked to be rid of).
 WATCH_MINUTES = 6 * 60
 CRUISE_WATCHES = 4
+CRUISE_DAYS = 7
 
 # 0 hit points is not sunk: it is SINKING, which is ten rounds of people getting off.
 SINKS_AFTER = 10
@@ -335,27 +365,35 @@ def deck_of(vessel: Vessel) -> str:
 # --- what the sea costs ------------------------------------------------------------------------
 
 def days_for(miles: int | None, kind: str, days_apart: int = 1,
-             with_the_wind: bool = False) -> int:
+             with_the_wind: bool = False, *, measured: bool = False,
+             river: bool = False) -> int:
     """How long a passage takes, in days.
 
-    Miles when the world states them, at the vessel's own speed — a ship's speed is feet
-    per round like everything else in this game, and the conversion to miles an hour is
-    the one `rules/journey.py` already uses. When the world states no distance, the tree's
-    own ordering stands in, exactly as it does for a road: two settlements on one
-    continent are nearer than two on different ones, whatever the miles turn out to be.
+    Miles when the world states them, at the vessel's day's run (`MILES_A_DAY`, the CRB's
+    Table 7-9). When the world states no distance, the tree's own ordering stands in,
+    exactly as it does for a road: two settlements on one continent are nearer than two on
+    different ones, whatever the miles turn out to be.
 
-    Never less than a day. A crossing that takes an afternoon is a ferry, and a ferry is
-    not a passage — it is a road with water under it.
+    Never less than the passage floor (`PASSAGE_DAYS_AT_LEAST` at sea, the road's on a
+    river) unless the world marked its miles `measured`; never less than a day.
     """
     from . import journey as journey_mod
 
-    speed = int(VESSELS.get(kind, VESSELS["sailing ship"])["speed"])
-    if with_the_wind:
-        speed *= 2                      # "vessels move at double speed with the wind"
-    if not miles:
-        return max(1, int(days_apart))
-    mph = max(0.1, speed / journey_mod.FEET_PER_MPH)
-    return max(1, round(int(miles) / (mph * HOURS_AT_SEA)))
+    per_day = miles_a_day(kind) * (2 if with_the_wind else 1)
+    days = (max(1, round(int(miles) / max(1, per_day))) if miles
+            else max(1, int(days_apart)))
+    if measured:
+        return days
+    return max(days, journey_mod.ROAD_DAYS_AT_LEAST if river else PASSAGE_DAYS_AT_LEAST)
+
+
+def leg_days(leg, kind: str) -> int:
+    """`days_for` for a journey leg: its miles when stated, its tree days when not, and
+    whether the world measured them. The one reading of a leg's days at sea — the booking,
+    the exits row and a held ship coming about all ask it."""
+    return days_for(leg.miles if leg.source == "exact" else None, kind, leg.days_apart,
+                    measured=bool(getattr(leg, "measured", False)),
+                    river=getattr(leg, "by", "") == "river")
 
 
 def ram_damage(kind: str) -> str:
@@ -498,7 +536,11 @@ def her_waters(world, vessel: Vessel) -> list:
         town = world.get(vessel.came_from) if world is not None else None
         legs.append(journey_mod.Leg(to_id=vessel.came_from,
                                     to_name=str(getattr(town, "name", "") or "port"),
-                                    days_apart=1, by="sea", by_sea=True, to_port=True))
+                                    days_apart=1, by="sea", by_sea=True, to_port=True,
+                                    # A day back to her own port is the cruise's own
+                                    # reach, not a passage between two settlements: the
+                                    # passage floor is not hers.
+                                    measured=True))
     return legs
 
 
@@ -520,16 +562,13 @@ def crewed(vessel: Vessel) -> bool:
 # passenger, as every row of that table is; food is the ship's, as a berth's always was.
 PASSAGE_CP_PER_MILE = 10
 
-# A day at sea is a whole one (HOURS_AT_SEA): a sailing ship at 60 ft makes 6 miles an
-# hour, so 144 miles a day.
+# A day at sea is a whole one (HOURS_AT_SEA): the CRB's sailing ship makes 2 miles an
+# hour, 48 miles a day (`MILES_A_DAY`).
 MINUTES_A_DAY = 24 * 60
 
 
 def miles_a_day(kind: str) -> int:
-    from . import journey as journey_mod
-
-    speed = int(VESSELS.get(kind, VESSELS["sailing ship"])["speed"])
-    return int(speed / journey_mod.FEET_PER_MPH * HOURS_AT_SEA)
+    return int(MILES_A_DAY.get(kind, MILES_A_DAY["sailing ship"]))
 
 
 def fare_cp(miles: int, heads: int = 1) -> int:
@@ -585,6 +624,13 @@ def day_at_sea(dice, level: int) -> str:
         return "calm"
     worst = dice.roll("1d100", label="how bad the storm is", visibility="hidden").total
     return "wreck" if worst <= WRECK_PCT_OF_STORMS else "storm"
+
+
+def storm_wrecks(dice) -> bool:
+    """Whether a storm a voyage met (the journey table's `storm` band, 2026-11-16) is the
+    powerful kind that breaks her: one in ten, as `day_at_sea` reads it."""
+    return dice.roll("1d100", label="how bad the storm is",
+                     visibility="hidden").total <= WRECK_PCT_OF_STORMS
 
 
 # The storm on deck, as the Core Rulebook's Storm entry writes it (Environment,
