@@ -49,6 +49,15 @@ class Judgement:
     why: str = ""
 
 
+def engine_keeps(card) -> bool:
+    """Whether the engine's own record is the whole truth of this card: a job and a loss to
+    get back settle themselves, and a dungeon's quest is ticked only by `dungeons.settle`,
+    on the rooms' own state. Nobody's word moves one, not even with a fact."""
+    from . import dungeons
+
+    return card.kind == "job" or bool(card.recover) or dungeons.is_quest(card)
+
+
 def judge(engine, card, index: int, events=()) -> Judgement:
     """Whether objective `index` (0-based) of `card` is done by the engine's own state.
 
@@ -58,10 +67,7 @@ def judge(engine, card, index: int, events=()) -> Judgement:
 
     scene = engine.scene
     pc = scene.pc()
-    from . import dungeons
-
-    # A dungeon's quest is ticked only by `dungeons.settle`, on the rooms' own state.
-    if card.kind == "job" or card.recover or dungeons.is_quest(card):
+    if engine_keeps(card):
         return Judgement(ENGINE)
     if cards_mod.standing(card) != cards_mod.OWN:
         return Judgement(REFUSE, f"{card.title} is not {pc.name if pc else 'the player'}'s "

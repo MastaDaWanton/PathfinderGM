@@ -18,7 +18,7 @@ formula through a closed band vocabulary, ever lands. No model-authored number o
 mechanic touches the ledger.
 
 **The living undercurrent.** Every `TURNS_BETWEEN_LOOKS` resolved turns, the watcher
-reads the recent transcript against the GM's private note and either leaves it alone,
+reads the engine's recent tells (never the narration) against the GM's private note and either leaves it alone,
 advances it one step, or — when the old thread has clearly resolved on stage — mints a
 new one, preferring the world's own unused unwritten hooks. One sentence, rewritten in
 place, never appended twice.
@@ -162,8 +162,14 @@ def _jobs_for(c) -> list[dict]:
         jobs.append({
             "job": "undercurrent", "campaign": c.id, "was": note,
             "thread": thread,
-            "recent": [f"{b.get('who', '?')}: {str(b.get('text', ''))[:300]}"
-                       for b in c.transcript[-12:]],
+            # The engine's tells, never the narration. Playtest 2026-11-16 #97: read off
+            # twelve beats of prose, the note became "Aethonira, watching the player's
+            # interaction with the Korvu deckhand, notes ... confirming his status as a
+            # skilled survivor of the Nahyrin's previous purges" — a watcher nobody saw and
+            # a history nobody gave him, kept as the GM's memory and fed to later turns.
+            # The cards were moved onto tells for #51 (`_what_happened`); this was the one
+            # path left reading prose. Six turns, as twelve beats were.
+            "recent": _what_happened(c, UNDERCURRENT_TURNS_READ),
             "hooks": [h for h in opening.hook_texts(c.world)
                       if h and h not in (thread or "")][:5],
             "known": frozenset(known),
@@ -178,8 +184,14 @@ def _jobs_for(c) -> list[dict]:
     # scheme's own steps, and an unheard quest is somebody else's. Playtest 2026-11-16 #23:
     # "The news of the death at the tavern begins to circulate among the local
     # authorities" was laid on the favour scheme's secret plan card, out of harbour gossip.
+    # Nor a card the engine keeps whole (`objectives.engine_keeps`): playtest 2026-11-16
+    # #82, "The passage into the sewers from the gardens is now clear" laid on the dungeon's
+    # quest while nothing was cleared — she walked down a grate she had used before.
+    from rules import objectives as objectives_mod
+
     live = [k for k in cards_mod.load(c.scene)
-            if k.live and not k.secret and cards_mod.standing(k) != cards_mod.UNHEARD]
+            if k.live and not k.secret and cards_mod.standing(k) != cards_mod.UNHEARD
+            and not objectives_mod.engine_keeps(k)]
     since = _LAST_CARD_LOOK.get(c.id, _LAST_LOOK[c.id])
     if live and turns - since >= CARD_TURNS_BETWEEN_LOOKS:
         _LAST_CARD_LOOK[c.id] = turns
@@ -210,6 +222,9 @@ def _jobs_for(c) -> list[dict]:
     return jobs
 
 
+# How many of the player's turns back a look at the undercurrent reads (it read twelve
+# beats of the transcript: six turns).
+UNDERCURRENT_TURNS_READ = 6
 # How many of the player's turns back a look at the cards reads (it read eight beats of the
 # transcript: four turns, the player's line and the GM's each).
 CARD_TURNS_READ = 4
@@ -584,8 +599,8 @@ def _propose_undercurrent(job: dict, cfg: dict) -> dict | None:
          {"role": "user", "content":
              (f"The campaign's hidden thread, known only to the GM: {thread}\n"
               if thread else "The campaign has no hidden thread yet.\n")
-             + "What has happened at the table recently:\n"
-             + "".join(f"{line}\n" for line in job.get("recent", []))
+             + "What the engine says has happened recently:\n"
+             + ("".join(f"- {line}\n" for line in job.get("recent", [])) or "- nothing\n")
              + "\nDecide what the hidden thread should do next:\n"
                '- "keep": it is fine as it stands. This is the usual answer.\n'
                '- "advance": play has touched it; rewrite it one small step further '
@@ -891,7 +906,7 @@ def _apply_cards(c, p: dict) -> bool:
     """Land the card proposals that still hold. A card the engine moved since the
     model read it — a different stage or clock — is left alone: the tell that moved
     it is the truer fact, and the model's was written against a table that is gone."""
-    from rules import cards as cards_mod
+    from rules import cards as cards_mod, objectives as objectives_mod
 
     turn = len(c.transcript)
     changed = False
@@ -902,6 +917,12 @@ def _apply_cards(c, p: dict) -> bool:
         if card is None or not card.live:
             continue
         if tuple(ch.get("was") or ()) != (card.stage, card.clock):
+            continue
+        if objectives_mod.engine_keeps(card):
+            # The snapshot left these out (`_jobs_for`); an id named anyway is refused.
+            c.turn_log.append({"kind": "watcher", "did": "card", "card": card.id,
+                               "action": "refused",
+                               "why": "the engine keeps this card's truth itself"})
             continue
         if ch["action"] == "advance":
             # The fact has to be ABOUT the card: one of its identity words or one of
@@ -947,8 +968,6 @@ def _apply_cards(c, p: dict) -> bool:
             # engine holds (`rules/objectives.py`) exactly as the planner's quest_step
             # is. Only an objective the engine has nothing to check against is ticked on
             # the watcher's word; one whose scheme step holds is left to that step.
-            from rules import objectives as objectives_mod
-
             engine = engine or c.engine()
             index = int(ch["objective"]) - 1
             verdict = objectives_mod.judge(engine, card, index)
