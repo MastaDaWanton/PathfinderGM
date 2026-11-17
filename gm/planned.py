@@ -934,7 +934,45 @@ def known_to(engine, ref: str) -> list[str]:
     block = (bestiary.lookup(tpl) if tpl else None) or {}
     if notes and notes != " ".join(str(block.get("notes") or "").split()):
         out.append(f"About {name}, what they know of themselves and this place: {notes}")
-    return out + _ship_known(engine, ref, name) + _places_known(engine, name)
+    return (out + _ship_known(engine, ref, name) + _places_known(engine, name)
+            + _goods_known(engine, a, name))
+
+
+def _goods_known(engine, a, name: str) -> list[str]:
+    """A trader here (a counter's keeper, or the master of the market) knows what the
+    party's goods fetch at this market: the engine's own book (`trade.book_cp`, before
+    anybody's terms), for each lot the party can trade from here. Playtest 2026-11-17 #7:
+    asked who buys silk by the bale and what it fetches, the master named the merchants'
+    row and the docks and gave no price, while the trade code held one. [] for anyone
+    else, or with no lot here."""
+    from rules import goods, keepers
+    from rules import trade as trade_mod
+
+    scene = engine.scene
+    world = getattr(engine, "world", None)
+    master = keepers.master_here(scene)
+    trader = keepers.counter_of(getattr(a, "world_entity_id", "") or "") or (
+        master is not None and master.ref == a.ref)
+    place = str(getattr(scene, "location_id", "") or "")
+    if not trader or world is None or not place:
+        return []
+    coins = goods.coins_here(world, scene)
+    out = []
+    for lot in trade_mod.reachable(scene):
+        key = lot.get("key")
+        if key not in trade_mod.ROWS:
+            continue
+        units = min(int(lot.get("units", 0)), trade_mod.can_sell(scene, world, place, key))
+        if units <= 0:
+            out.append(f"{name} knows this market will take no more {lot['name']} today.")
+            continue
+        cp = trade_mod.book_cp(scene, world, place, key, units, buying=False)
+        why = {"demand": ", wanted here", "supply": ", made here, so cheap"}.get(
+            trade_mod.standing(world, place, key), "")
+        out.append(f"{name} knows what the player's goods fetch at this market, before "
+                   f"any haggling: {trade_mod.said(dict(lot, units=units))} for about "
+                   f"{goods.purse_line(goods.coins_for(cp), coins)}{why}.")
+    return out
 
 
 def matter_slot(pull) -> dict | None:

@@ -6838,6 +6838,14 @@ def _quoted_if_quoted(entry: dict, player_text: str) -> dict:
     if words and quoted and (words in quoted or words == " ".join(quoted)):
         params["quoted"] = True
         return dict(entry, params=params)
+    # A piece of one quotation is that quotation, quoted whole. Playtest 2026-11-17 #3: the
+    # plan's say was "I need healing. What will it cost?" of the player's "Father, I need
+    # healing. What will it cost?" — the address dropped, so neither test above held, the
+    # tell reported it, and the page retold it as "asking what the cost will be".
+    whole = next((q for q in quoted if words and words in q), "")
+    if whole:
+        params.update(words=whole, quoted=True)
+        return dict(entry, params=params)
     return entry
 
 
@@ -6938,6 +6946,29 @@ def own_words_only(raw_intents, player_text: str, reading=None, *,
                              f"-> the player's own {instead[:80]!r}")
         elif notes is not None:
             notes.append(f"a say in words the player never wrote: dropped {words[:80]!r}")
+    # One line said once. Playtest 2026-11-16 N5: on "Father, I'm badly hurt. Can you heal
+    # me? I can pay." the plan wrote two says, the whole line and "I can pay." (carried up
+    # to the reader's whole words, above), and the engine told it twice. A player's say
+    # whose words lie inside another's, to the same person, is that say.
+    def _mine(e) -> bool:
+        return (isinstance(e, dict) and str(e.get("op", "")).lower() == "say"
+                and str(e.get("actor") or "pc").lower() in ("pc", "none", ""))
+
+    def _flat(e) -> str:
+        return " ".join(str((e.get("params") or {}).get("words") or "").lower().split())
+
+    def _to(e) -> str:
+        return str((e.get("params") or {}).get("to") or e.get("target") or "")
+
+    said = [e for e in out if _mine(e)]
+    twice = [e for k, e in enumerate(said) if any(
+        _to(o) in ("", _to(e)) or _to(e) == ""
+        for j, o in enumerate(said) if j != k and _flat(e) and _flat(e) in _flat(o)
+        and (_flat(e) != _flat(o) or j < k))]
+    if twice:
+        if notes is not None:
+            notes.append(f"the same say twice: {len(twice)} dropped")
+        out = [e for e in out if not any(e is t for t in twice)]
     if not out and raw_intents:
         # Never an empty list for want of a line: the turn still says it had nothing.
         out = [{"op": "narrate_only", "because": "nothing the player said was theirs"}]

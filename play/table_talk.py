@@ -238,6 +238,15 @@ def scene_facts(c) -> tuple[list[str], list[str]]:
     ranks = sorted(k for k, v in (getattr(pc, "ranks", None) or {}).items() if v)
     if pc is not None and ranks:
         checked.append(f"{pc.name} is trained in these skills: {', '.join(ranks)}.")
+    # And what they carry, by the sheet. Playtest 2026-11-17 #16: over a wrong refusal
+    # ("There is no one of my torches here") the table said "You don't have any torches in
+    # your pack" while she had three, and the read passed it for want of the sheet.
+    if pc is not None:
+        from rules import holding
+
+        things = holding.carried_list(pc)
+        if things:
+            checked.append(f"{pc.name} carries, by the sheet: {', '.join(things)}.")
     return said, checked
 
 
