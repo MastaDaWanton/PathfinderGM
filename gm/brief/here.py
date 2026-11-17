@@ -56,6 +56,10 @@ def section(ctx) -> tuple[str, dict]:
     setting = where.setting if where is not None else "in"
     if setting == "road":
         lines = [f"\nHERE: {where.label}, {where.detail}; {location.name} is {scale}."]
+    elif setting == "aboard":
+        # Aboard her at the quay (playtest 2026-11-16 #100): the ship, then the town.
+        lines = [f"\nHERE: aboard {where.label}, {where.detail}; {location.name} is "
+                 f"{scale}."]
     elif setting in ("outside", "under"):
         lines = [f"\nHERE: {setting} {location.name}, {scale}."]
     else:
@@ -97,6 +101,9 @@ def section(ctx) -> tuple[str, dict]:
         if setting == "in":
             lines.append(f"  The party is at {here.name}. Not anywhere else in "
                          f"{location.name}; they are there now.")
+        elif setting == "aboard":
+            lines.append(f"  The party is at {here.name}, aboard {where.label}, and not "
+                         f"anywhere else; they are there now.")
         else:
             lines.append(f"  The party is at {here.name}, {setting if setting != 'road' else 'outside'} "
                          f"{location.name}, and not anywhere else; they are there now.")

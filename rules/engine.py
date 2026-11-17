@@ -4375,6 +4375,15 @@ class Engine:
         self._battle_joined = False
         self._journeyed = ""
         self._provoked = set()
+        # A ship kept before holds were laden (saves from before playtest 2026-11-16 #92)
+        # is laden through the one door the first time a turn finds her.
+        from . import ships as ships_mod
+
+        for raw in list(self.scene.vessels):
+            if "cargo" not in raw:
+                v = ships_mod.Vessel.from_dict(raw)
+                if v is not None:
+                    self._keep_vessel(v)
         # Homes whose door opened to the party this batch (`_op_call_on`, `_knock`).
         self._let_in = set()
         before = int(getattr(self.scene, "clock_minutes", 0) or 0)
@@ -15498,6 +15507,35 @@ class Engine:
             return None
         return keeper
 
+    def _a_step_within(self, place: str) -> bool:
+        """Whether a travel to `place` stays inside the venture or the ship the party is
+        in — the sewers' outfall from their main channel, the deck from the hold. Those
+        rooms are a minute apart (`outskirts.hop_minutes`), so the step is no journey
+        (playtest 2026-11-16 #79). A venture's rooms are found up their parents to its
+        head; a ship's rooms are read off her id (`ships.vessel_of`)."""
+        from . import places as places_mod
+        from . import ships as ships_mod
+
+        if not place:
+            return False
+        known = self.places()
+        here = self.here()
+        to = places_mod.find(known, place, near=here.id)
+        if to is None or to.id == here.id:
+            return False
+        vid = ships_mod.vessel_of(here.id)
+        if vid or ships_mod.vessel_of(to.id):
+            return vid == ships_mod.vessel_of(to.id)
+        inside = ("venture", "dungeon")
+        by_id = {p.id: p for p in known}
+
+        def head(p):
+            while p.parent in by_id and by_id[p.parent].origin in inside:
+                p = by_id[p.parent]
+            return p.id
+
+        return here.origin in inside and to.origin in inside and head(here) == head(to)
+
     def _op_travel(self, intent: Intent, partial: dict) -> Outcome:
         """Move the ground underfoot — and leave behind everyone who is not coming.
 
@@ -15541,7 +15579,14 @@ class Engine:
         # destination and the system finds the way; here the model was handing over the
         # way itself. The refusal names where the party now stands so the next turn can
         # carry on from it, which is the roguelike's "repeat the command to resume".
-        if self._journeyed:
+        #
+        # A step between the rooms of one venture or one ship is no journey (playtest
+        # 2026-11-16 #79: down the grate and a few minutes along to the outfall was cut in
+        # two). It neither waits on the turn's journey nor spends it.
+        from . import ships as ships_mod
+
+        within = self._a_step_within(str(intent.params.get("place") or ""))
+        if self._journeyed and not within:
             return self._refuse(
                 intent, f"The party has already travelled this turn and is at "
                         f"{self._journeyed}. One journey a turn — the rest of the way "
@@ -16114,8 +16159,10 @@ class Engine:
             self.scene.settle_relations()
             # The one journey this batch is spent. Set only where the party actually
             # moved: a refused travel, or a travel to the ground already underfoot,
-            # costs the turn nothing and must not bar the real one behind it.
-            self._journeyed = going_to.name
+            # costs the turn nothing and must not bar the real one behind it. Nor does a
+            # step within one venture or ship (#79, above).
+            if not within:
+                self._journeyed = going_to.name
             # Back inside the walls is off the road. `scene.road` remembers how far
             # along an interrupted road the party got, keyed on the settlement they set
             # out from — and walking back into that settlement does not change the
@@ -16227,6 +16274,17 @@ class Engine:
                 bits.append(f"You go down under {town_name}.")
             elif was_setting == "under" and setting == "in":
                 bits.append(f"You come back up into {town_name}.")
+        elif moved and ships_mod.vessel_of(going_to.id) != ships_mod.vessel_of(was_place):
+            # Over a gangplank is boarding or landing, not a change of country: playtest
+            # 2026-11-16 #91, stepping from the quay onto her own ship told "The ground
+            # changes: a ship's planking: decks, rigging and the hold below".
+            vid = ships_mod.vessel_of(going_to.id)
+            if vid:
+                ship = self.vessel(vid)
+                name = ship.name if ship is not None else ships_mod.name_for(vid)
+                bits.append(f"You go aboard {name}.")
+            else:
+                bits.append("You step ashore.")
         elif going_to.terrain != was_ground:
             bits.append(f"The ground changes: {biomes.describe(going_to.terrain).lower()}.")
         if went_by:
@@ -17836,7 +17894,28 @@ class Engine:
 
     def _keep_vessel(self, vessel) -> None:
         """Write a vessel back. The one door: a hull's hit points are stored state, and
-        two writers of stored state is how a save and a scene start disagreeing."""
+        two writers of stored state is how a save and a scene start disagreeing.
+
+        Laden here the first time she is kept (`ships.lading`, playtest 2026-11-16 #92),
+        off the trade of the port she sailed from; and a held ship's cargo is her holder's
+        (`_ship_taken`), so it moves to `Scene.cargo` as their lots in her hold, where
+        selling, landing and sinking already know what to do with it."""
+        from . import ships as ships_mod
+        from . import trade as trade_mod
+
+        if vessel.cargo is None:
+            vessel.cargo = ships_mod.lading(
+                vessel.id, vessel.kind,
+                trade_mod.supplied_at(self.world, vessel.came_from or vessel.at))
+        if vessel.held_by and vessel.cargo:
+            for got in vessel.cargo:
+                lot = trade_mod.add_lot(self.scene, got["key"], int(got["units"]),
+                                        vessel.held_by, 0, "", str(got.get("commodity") or ""),
+                                        vessel=vessel.id)
+                # Plunder (owner call, 2026-11-16): a prize's goods are her taker's, the way
+                # Skull & Shackles plunder is the crew's; `plunder` says which ship.
+                lot["plunder"] = vessel.id
+            vessel.cargo = []
         rows = [dict(v) for v in self.scene.vessels if str(v.get("id")) != vessel.id]
         rows.append(vessel.as_dict())
         self.scene.vessels = rows
@@ -18468,7 +18547,9 @@ class Engine:
         effects.append({"kind": "journey", "to": port, "to_name": port_name,
                         "arrived": True, "how": "sea", "place": self.scene.at})
         bits.extend(company)
-        landed = trade_mod.unload(self.scene, ship.id, port)
+        # Her own hold stays her own in a ship the party holds: what is in it is sold from
+        # it at the quay (`trade.reachable`), not swung ashore like freight (#92).
+        landed = [] if held else trade_mod.unload(self.scene, ship.id, port)
         if landed:
             bits.append(f"{_sentence(_and_list(landed))} {'is' if len(landed) == 1 else 'are'}"
                         f" swung onto the quay.")
@@ -19715,12 +19796,13 @@ class Engine:
         # A whole sentence. The fragment "the crypt, found for the first time, off the
         # graveyard." came back on the page as "You descend into the crypt, … a find of
         # ancient stone" (playtest 2026-11-16 #26): a slot asked to write a fact it cannot
-        # parse writes the fact's words.
+        # parse writes the fact's words. Agreed with its name (#80: "The sewers opens").
         tell = ((walked.tell + " " if walked is not None and walked.tell else "")
-                + f"{head.name[:1].upper()}{head.name[1:]} opens off {parent.name}"
+                + f"{head.name[:1].upper()}{head.name[1:]} "
+                + f"{english.verb(head.name, 'opens', 'open')} off {parent.name}"
                 + (f", {hours} hour{'s' if hours != 1 else ''} away" if hours else "")
-                + (": you have not been inside it before" if fresh else
-                   ": you have been inside it before")
+                + f": you have{' not' if fresh else ''} been inside "
+                + f"{'them' if english.is_plural(head.name) else 'it'} before"
                 + ". " + moved.tell + toll_note)
         # Something may live here. Half the time where nothing rates the ground; a
         # place's stated danger moves it (`volatility.scale`: a third as often on calm

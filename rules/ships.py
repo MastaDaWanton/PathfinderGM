@@ -167,6 +167,11 @@ class Vessel:
     # The town her seizure was sworn in, by the master who yielded her (2026-11-16,
     # `Engine._ships_left_settle`): sworn once, whoever answers for her after him.
     sworn: str = ""
+    # What her hold carries that is her owners' (`lading`, playtest 2026-11-16 #92): rows
+    # of `rules/trade.py`, {"key", "units", "commodity"}. None until she is laden (the
+    # first `Engine._keep_vessel`); [] once emptied, or once taken — a prize's cargo moves
+    # to `Scene.cargo` as the holder's lots in her hold, where selling it already works.
+    cargo: list | None = None
 
     def as_dict(self) -> dict:
         return {"id": self.id, "name": self.name, "kind": self.kind, "hp": self.hp,
@@ -177,7 +182,9 @@ class Vessel:
                 "river": self.river,
                 **({"lands_at": self.lands_at} if self.lands_at else {}),
                 **({"held_by": self.held_by} if self.held_by else {}),
-                **({"sworn": self.sworn} if self.sworn else {})}
+                **({"sworn": self.sworn} if self.sworn else {}),
+                **({"cargo": [dict(x) for x in self.cargo]} if self.cargo is not None
+                   else {})}
 
     @classmethod
     def from_dict(cls, d: dict) -> "Vessel | None":
@@ -198,7 +205,9 @@ class Vessel:
                               else None),
                    passengers=[str(r) for r in (d.get("passengers") or [])],
                    river=bool(d.get("river")), lands_at=str(d.get("lands_at") or ""),
-                   held_by=str(d.get("held_by") or ""), sworn=str(d.get("sworn") or ""))
+                   held_by=str(d.get("held_by") or ""), sworn=str(d.get("sworn") or ""),
+                   cargo=([dict(x) for x in d["cargo"] if isinstance(x, dict)]
+                          if isinstance(d.get("cargo"), list) else None))
 
     @property
     def row(self) -> dict:
@@ -304,6 +313,74 @@ def offered_at(port_id: str, scale: str, n: int = 2) -> list[Vessel]:
         out.append(Vessel(id=vid, name=name_for(vid), kind=kind, hp=int(row["hp"]),
                           crew=int(row["crew"][0]), at=str(port_id)))
     return out
+
+
+# --- what a trader carries ---------------------------------------------------------------
+#
+# Playtest 2026-11-16 #92: a merchantman taken by threat had nothing in her hold, so a
+# Perception roll decided whether the crates in plain sight held anything. A trader's hold
+# is laden; what is in it is seen, not searched for.
+#
+# How much: Skull & Shackles' plunder (The Wormwood Mutiny, as quoted on Paizo's forums;
+# the book itself could not be read): a point of plunder is about 1,000 gp of goods and
+# takes about 10 tons of hold. A prize of mixed goods runs about 3 points. A keelboat is
+# rated one point here, which is this app's call. What the goods are is her home port's own
+# trade (`trade.supplied_at`), priced and weighed by the trade table (`trade.ROWS`). Cheap
+# goods fill the hold before they reach the value: a grain ship carries grain by the ton,
+# not 1,000 gp of it per point.
+PLUNDER = {"sailing ship": 3, "keelboat": 1}
+PLUNDER_GP = 1000
+PLUNDER_LB = 20000
+# A port that ships nothing the trade table prices still loads something. These are staples
+# from the Core table. Livestock never goes in: a hold of animals needs feeding.
+STAPLES = ("wheat", "iron", "linen", "salt", "wool", "cheese")
+
+
+def lading(vessel_id: str, kind: str, supplies: dict | None = None) -> list[dict]:
+    """The cargo a trader of this kind carries out of a port that ships `supplies` ({row:
+    the world's word}). One or two rows, seeded off her id like her name, so the same ship
+    always carries the same goods. [] for a kind that carries no trade (a warship's hold is
+    powder and shot)."""
+    from . import trade
+
+    points = PLUNDER.get(kind, 0)
+    if not points:
+        return []
+    supplies = dict(supplies or {})
+    rows = [k for k in supplies if k in trade.ROWS and trade.ROWS[k][4] != "livestock"]         or list(STAPLES)
+    seed = _seed(f"{vessel_id}|cargo")
+    picks = [rows[seed % len(rows)]]
+    other = rows[(seed >> 8) % len(rows)]
+    if other not in picks:
+        picks.append(other)
+    out = []
+    for key in picks:
+        _name, cp, _unit, lb, _kind = trade.ROWS[key]
+        units = int(points * PLUNDER_GP * 100 / len(picks) // cp)
+        if lb:
+            units = min(units, int(points * PLUNDER_LB / len(picks) // lb))
+        if units > 0:
+            out.append({"key": key, "units": units,
+                        "commodity": str(supplies.get(key) or trade.ROWS[key][0])})
+    return out
+
+
+def hold_said(scene, vessel: Vessel) -> tuple[list[str], list[str]]:
+    """Everything in her hold, in words ("15000 lb of iron"): (her owners' cargo, the
+    party's lots stowed in her — `trade.shipping_in`, a prize's cargo among them), each
+    with the world's own name for it when it has one."""
+    from . import trade
+
+    def said(lot: dict) -> str:
+        words = trade.said({"key": lot["key"], "name": trade.ROWS[lot["key"]][0],
+                            "units": lot["units"]})
+        own = str(lot.get("commodity") or "")
+        return words + (f" ({own})" if own and own.lower() != trade.ROWS[lot["key"]][0]
+                        else "")
+
+    theirs = [said(x) for x in (vessel.cargo or ()) if x.get("key") in trade.ROWS]
+    ours = [said(x) for x in trade.shipping_in(scene, vessel.id)]
+    return theirs, ours
 
 
 def places_of(vessel: Vessel):
