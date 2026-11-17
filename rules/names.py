@@ -382,7 +382,9 @@ def definite(name: str) -> str:
 
 
 _QUOTED = re.compile(r"\"[^\"]*\"|“[^”]*”")
-_WORD_BEFORE = re.compile(r"([A-Za-z'’]+)\s+$")
+# Up to three words straight before a name, no punctuation between: a determiner
+# anywhere in them already opens the noun phrase ("the great bat", "a grey old man").
+_PHRASE_BEFORE = re.compile(r"((?:[A-Za-z'’-]+\s+){1,3})$")
 _POSSESSIVE = re.compile(r"(?:['’]s|s['’])$", re.I)
 _SENTENCE_START = re.compile(r"(?:^|[.!?]\s+|\n\s*)$")
 
@@ -431,10 +433,10 @@ def with_articles(text: str, names) -> str:
             claimed.append((lo, hi))
             if not is_descriptor(name):
                 continue
-            prev = _WORD_BEFORE.search(before)
-            if prev and (prev.group(1).lower() in _DETERMINERS
-                         or _POSSESSIVE.search(prev.group(1))):
-                continue                 # "the ship's master", "Kesst's man": definite
+            prev = _PHRASE_BEFORE.search(before)
+            if prev and any(w.lower() in _DETERMINERS or _POSSESSIVE.search(w)
+                            for w in prev.group(1).split()):
+                continue                 # "the ship's master", "the great bat": definite
             edits.append((lo, hi, f"{'The' if opening else 'the'} {name}"))
     for lo, hi, new in sorted(edits, reverse=True):
         text = text[:lo] + new + text[hi:]
