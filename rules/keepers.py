@@ -262,8 +262,18 @@ def keeps_a_counter(actor) -> bool:
     # of the 2026-09-28 playtest); the trade panel never opens across them.
     if places_mod.runs_it(label):
         return False
+    # An inn or a tavern's keeper serves across the bar: its meals, drink and rooms
+    # (CRB Goods and Services, "Food, Drink, and Lodging"; `goods.stocked_at`,
+    # `lodging.menu`). Playtest 2026-11-17b #10: "I buy a meal and a drink from the
+    # barkeep" built nothing and the panel answered 409, the one behind the bar of a
+    # tavern selling nothing at all. By its kind word ("the Forest Inn" is an inn).
+    # shortcut: read off the id's label, so a founded inn under a name of its own ("the
+    # Velvet Veil", kind tavern) keeps no counter; pass the scene's `founded` if one shows up.
+    from . import lodging
+
     return (places_mod.category_of(label) == "trade"
-            or label in places_mod.SELLS_OUTSIDE_TRADE)
+            or label in places_mod.SELLS_OUTSIDE_TRADE
+            or places_mod.kind_named(label.split()[-1] if label else "") in lodging.kinds())
 
 
 def kin_note(scene, actor, at: str = "") -> str:

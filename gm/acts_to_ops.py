@@ -345,7 +345,12 @@ def jobs_spoken(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list
         return bool(jobs_mod.held_by(scene, r)
                     or jobs_mod.hires_hands((getattr(scene, "actors", {}) or {}).get(r)))
 
-    hiring = [r for r in (getattr(scene, "actors", {}) or {}) if hires(r)]
+    # The ones who hold work first: a keeper who hires on demand (the guild's clerk at the
+    # counter) is asked only when nobody here holds any, or the hiring table's own clerk
+    # had a rival in the same room (Pangrella's guildhall, 2026-11-17).
+    holding = [r for r in (getattr(scene, "actors", {}) or {})
+               if jobs_mod.held_by(scene, r)]
+    hiring = holding or [r for r in (getattr(scene, "actors", {}) or {}) if hires(r)]
     for row in rows:
         a = actions[row.index] if row.index < len(actions) else {}
         if row.act not in _JOB_ACTS or not interpret.acting(a):
@@ -360,7 +365,7 @@ def jobs_spoken(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list
             # (first in the room) beside the guild clerk taking names. The room's own
             # finder words it as a tie; the work decides it.
             ref = hiring[0]
-        if not ref or ref in done or not hires(ref):
+        if not ref or ref in done or ref not in hiring:
             continue
         offered = [c for c in jobs_mod.held_by(scene, ref)
                    if cards_mod.standing(c) == cards_mod.OFFERED and c.job.get("work")]
@@ -416,6 +421,16 @@ def jobs_spoken(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list
             notes.append(f"{who}: {answer}")
         if built is None:
             continue
+        if built.get("do") == "offer":
+            # Asking for work is not asking to be paid: live 2026-11-17 (fix/inns-and-jobs),
+            # "I ask the clerk of the guild if there is any paid work for a blade" was read
+            # a `request` for payment, and a Diplomacy roll for a favour (failed, "offers no
+            # payment") stood beside the week of guard work the clerk put. The job is the
+            # answer; the request roll for it goes.
+            row.intents[:] = [i for i in row.intents
+                              if not (i.get("op") == "check" and i.get("target") == ref
+                                      and (i.get("params") or {}).get("request")
+                                      == "payment")]
         row.intents.append({"op": "job", "actor": pc.ref, "target": ref, "params": built,
                             "because": f"the player, to {who}: {answer}"})
         done.add(ref)
@@ -4224,11 +4239,18 @@ def _said_to_nobody(raw, frame, scene, k: int, notes) -> list:
 
     talks = [a for a in frame.get("actions") or []
              if a.get("act") == "talk" and interpret.acting(a)]
-    if not talks or any(str(a.get("cost") or "") != "free" for a in talks):
-        return raw
     say = raw[k]
     params = dict(say.get("params") or {})
     was = str(params.get("to") or say.get("target") or "")
+    # Or said to somebody the line's own walk left behind: playtest 2026-11-17b #11, "I walk
+    # to the guildhall and ask if anyone's hiring a blade", the plan wrote the say `to` the
+    # barkeep she had been talking with in the tavern, the engine found nobody of that ref
+    # at the guildhall, and the clerk, the one person there, was told "ignoring the
+    # inquiry". Asked aloud in a room of one, it is asked of that one (`Engine._op_say`'s
+    # own rule, which an absent `to` had switched off). `scene` is where the walk ends.
+    gone = bool(talks) and bool(was) and was not in (getattr(scene, "actors", {}) or {})
+    if not talks or (not gone and any(str(a.get("cost") or "") != "free" for a in talks)):
+        return raw
     keep = addressed(scene)
     if not was or was == keep:
         return raw
@@ -4240,8 +4262,9 @@ def _said_to_nobody(raw, frame, scene, k: int, notes) -> list:
     if keep:
         out[k]["target"] = keep
     if notes is not None:
-        notes.append(f"the say to {was} goes to {keep or 'nobody'}: the words were said "
-                     f"to nobody who would answer")
+        notes.append(f"the say to {was} goes to {keep or 'nobody'}: "
+                     + ("the one it was meant for is not where the walk ends" if gone else
+                        "the words were said to nobody who would answer"))
     return out
 
 

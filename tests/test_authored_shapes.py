@@ -77,7 +77,11 @@ def test_every_authored_place_carries_its_own_shape():
     #
     # 979 since 2026-10-06: every city gets a laboratory too (the owner, alchemy plan §21
     # open point 7) — none of the 22 authored cities lists one, so 22 more places.
-    assert len(got) == 979, len(got)
+    #
+    # 1065 since 2026-11-17: every settlement gets an inn, and every city a tavern, when
+    # its author listed none (playtest 2026-11-17b #8) — 62 inns and 10 taverns in
+    # Aurvantis, 12 inns and 2 taverns in Pangrella, 86 more places.
+    assert len(got) == 1065, len(got)
     assert all(p.shape is not None for p in got), [
         p.id for p in got if p.shape is None][:5]
 

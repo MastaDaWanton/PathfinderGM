@@ -107,7 +107,10 @@ def test_the_openings_own_company_is_in_the_population(tmp_path):
 
     with override_settings(CAMPAIGN_DIR=str(tmp_path)):
         cm._LIVE.clear()
-        c = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+        # Pinned to a start that brings people in. The draw moved on 2026-11-17 (the towns'
+        # inns) to the road caravan attack, whose raider has no population record: a
+        # separate gap, flagged, not this test's subject.
+        c = cm.begin_with(load_pc("fixtures/pc-kesst.json"), start_id="cutpurse")
         cm._LIVE.clear()
     # The people the start brought in (rules/openings.py, 2026-09-28). The keeper of a
     # counter the start stands at is the keepers' own business and is not the opening's.

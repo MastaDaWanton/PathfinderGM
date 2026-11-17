@@ -33,7 +33,12 @@ def priced():
 def client(tmp_path):
     with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
         cm._LIVE.clear()
-        cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+        c = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+        # The start is drawn, and a drawn start can be a fight, which shuts the counter
+        # (seen 2026-11-17 when the towns' inns made the inn starts drawable).
+        if c.scene.in_encounter:
+            c.scene.end_encounter()
+            c.save()
         yield Client()
         cm._LIVE.clear()
 

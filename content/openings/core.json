@@ -318,7 +318,10 @@
                       "Ask why nobody will look at the notice"],
       "tags": ["start.arrival", "start.in-town"],
       "grants": [],
-      "opens_scheme": ""
+      "opens_scheme": "",
+      "jobs": [
+        {"work": "week", "employer": "$lead", "choices": ["carry", "labour", "guard"]}
+      ]
     },
     {
       "id": "the-hiring-table",

@@ -174,7 +174,8 @@ class TestTheWayInHasAHandleOnTheInside:
         from test_authored_places import _ent, _place
 
         got = places_mod.home_set(_ent(places=[_place()]))
-        assert [p.name for p in got] == ["the market", "the way in"]
+        # And the inn after it (playtest 2026-11-17b #8), attached the same way.
+        assert [p.name for p in got] == ["the market", "the way in", "the inn"]
         assert got[1].id in got[0].exits
         assert got[0].id in got[1].exits
 
