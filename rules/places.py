@@ -2336,6 +2336,28 @@ def distance(a_id: str, b_id: str) -> int:
     return len(a) + len(b) - 2 * common
 
 
+WORSHIP = frozenset({"shrine", "temple", "cathedral"})
+# The prepositions a place's name is qualified by where it is (`find`).
+_LOCATIVE = _re.compile(r"\s+(?:under|below|beneath|in|inside|off|at|by|near|behind|"
+                        r"beyond|past|of|on|beside)\s+")
+
+
+def by_locative(places, wanted: str, near: str = "") -> Place | None:
+    """The place a name qualified by where it is names ("the well room under the
+    sewers"): the head's exact name, the nearest under the qualifier when it names a
+    place too. None when no head is a place's exact name (`find`)."""
+    want = " ".join(str(wanted or "").split()).lower()
+    for m in _LOCATIVE.finditer(want):
+        head = want[:m.start()]
+        hits = [p for p in places or ()
+                if head in (p.name.lower(), p.name.lower().removeprefix("the "))]
+        if hits:
+            under = find(places, want[m.end():], near)
+            inside = [p for p in hits if under is not None and p.id.startswith(under.id)]
+            return _nearest(inside or hits, near)
+    return None
+
+
 def _nearest(found: list, near: str):
     """The first of `found`, or the one nearest `near` when there is a choice (`find`)."""
     if near and len(found) > 1:
@@ -2380,6 +2402,24 @@ def find(places, wanted: str, near: str = "") -> Place | None:
         if want in (f"{room} of {ship}", f"{room} of {ship.removeprefix('the ')}",
                     f"{ship}'s {room.removeprefix('the ')}"):
             return p
+    # A place named with where it is: "the well room under the sewers". Playtest
+    # 2026-11-16 E1: the last-word rule below read it as "the sewers", where she stood,
+    # and the walk to the well room was no walk at all. The head before the locative is
+    # the place, by exact name only; what follows only picks among same-named ones.
+    located = by_locative(places, want, near)
+    if located is not None:
+        return located
+    # A kind word for a house of worship the town has under another scale's name: "the
+    # nearest temple" in a city whose faith is a cathedral. Playtest 2026-11-16 #68: three
+    # plans were refused "there is no 'the temple' here" before the fourth chose the
+    # cathedral, a model call each. Shrine, temple and cathedral are one place of worship
+    # at three scales of `SETTLEMENT_PLACES` (village, town, city); "church" and "chapel"
+    # fold into them (`KIND_WORDS`).
+    last = kind_named(want.split()[-1])
+    if last in WORSHIP:
+        same = [p for p in places or () if p.name.lower().removeprefix("the ") in WORSHIP]
+        if same:
+            return _nearest(same, near)
     # The GM's own dressing of a real place: "the merchant's gate" for "the gate", "the
     # old market" for "the market". Measured at the table, 2026-09-06: the plan wrote
     # `travel` to "the merchant's gate", the exact match failed, and the turn was a 502.

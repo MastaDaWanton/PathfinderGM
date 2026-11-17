@@ -8882,8 +8882,14 @@ def _a_place_word(phrase: str) -> bool:
     # And the places the engine makes itself, a city's middle and crossings and the
     # ventures and their spots: playtest 2026-11-16 #45, the clicked "I go to the great
     # square." logged a population miss for a person called "great square".
-    return any(words == k or words.endswith(" " + k)
-               for k in (*places_mod.KINDS, *places_mod.generated_names()))
+    # And a dungeon room's name, whole: playtest 2026-11-16 #56, the Map's "I go to the
+    # cells." logged a population miss for a person called "cells". Exact only, since
+    # rooms are called "the kennel" and "the mess", which end ways of naming a person.
+    from rules import dungeons
+
+    return words in dungeons.room_names() or any(
+        words == k or words.endswith(" " + k)
+        for k in (*places_mod.KINDS, *places_mod.generated_names()))
 
 
 def sought_indefinitely(player_text: str) -> bool:
@@ -8921,6 +8927,24 @@ def sought_indefinitely(player_text: str) -> bool:
                 or head in ("someone", "somebody", "anyone", "anybody", "whoever"))
 
 
+def addressed_in_speech(target: str, player_text: str) -> bool:
+    """Whether a reading's target is a noun of address inside the player's own quoted
+    words, and nowhere outside them: "Father" in '"Father, I'm badly hurt..."'. Grammar's
+    vocative (the Inform 7 Handbook's "noun of address", ch. 5, "Giving Orders to
+    Characters"): it names the one spoken to as the speaker chooses to call them, which is
+    not a person looked for. Playtest 2026-11-16 #69: "Father" said to the cathedral's
+    priest was looked up as a person, refused "No Father is here", and the beat said no
+    priest was there while she stood talking to him. Structure only (the one quotation
+    scanner, `speech.blanked`): the words' place on the page, never their meaning."""
+    from . import speech
+
+    want = " ".join(str(target or "").lower().split())
+    text = " ".join(str(player_text or "").split())
+    if not want or want not in text.lower():
+        return False
+    return want not in " ".join(speech.blanked(text).lower().split())
+
+
 def person_sought(player_text: str) -> str:
     """The person the player's own sentence goes looking for, or "".
 
@@ -8940,7 +8964,7 @@ def person_sought(player_text: str) -> str:
         # The reading is the answer when there is one, including "nobody new": live
         # 2026-09-27, "I buy a loaf from her and ask her name" read as talking to HER,
         # and falling back to the regex here brought back "her name" as a person.
-        if not target:
+        if not target or addressed_in_speech(target, player_text):
             return ""
         if target:
             # An indefinite description asks for any such person, and its clause is no

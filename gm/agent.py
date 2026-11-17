@@ -417,6 +417,11 @@ class GMAgent:
 
         means.said_aloud(read_ok, player_input,
                          ask=means.claim_kind if interpret.ENABLED else None)
+        # A sneak read beside a walk is asked whether it hides or only names the way
+        # (`interpret.unhidden`, playtest 2026-11-16 #77).
+        for span in interpret.unhidden(
+                read_ok, ask=interpret.confirm_hiding if interpret.ENABLED else None):
+            read_ok.setdefault("dropped", []).append(f"stealth {span!r}: a way to go")
         # The act→op table (gm/acts_to_ops.py): one row per action of the reading.
         self.rows = acts_to_ops.table(read_ok, self.engine.scene,
                                       places=self.engine.places(), sentence=player_input,
@@ -1105,6 +1110,8 @@ class GMAgent:
                 if not interpret.said_to_nobody(read_ok, self.engine.scene):
                     raw = judgement.inject_provoke(raw, player_input, self.engine.scene)
                 raw = judgement.inject_say(raw, player_input, self.engine.scene)
+                by_then = interpret.scene_by_then(read_ok, self.engine.scene,
+                                                  self.engine.places())
                 # And the world's answer when the player looked for somebody who is not
                 # here, stated whether or not the plan reached for them (item 29). Last,
                 # because it reads the player's own sentence and competes with nothing.
@@ -1112,8 +1119,10 @@ class GMAgent:
                 # (playtest 2026-11-16 #9, "a merchant ship" looked up as a person).
                 if not any(isinstance(r, dict) and r.get("op") == "sea"
                            and (r.get("params") or {}).get("do") == "cruise" for r in raw):
-                    raw = judgement.answer_the_absent(raw, player_input,
-                                                      self.engine.scene, self.world)
+                    # Asked from where the line's own walk ends, when one comes first
+                    # (`interpret.scene_by_then`, playtest 2026-11-16 #94).
+                    raw = judgement.answer_the_absent(raw, player_input, by_then,
+                                                      self.world)
                 # And a walk to a place the engine cannot find, on a plan that moves
                 # nobody, is the engine's printed answer — never a narrated nothing
                 # (`acts_to_ops.nowhere_to_go`; the owner's 2026-11-05 save, row 69:
@@ -1140,12 +1149,15 @@ class GMAgent:
                 # And the line goes to whom the words name (`acts_to_ops.address_the_named`):
                 # never the plan's pick of somebody else here.
                 raw = acts_to_ops.address_the_named(raw, read_ok, self.engine.scene,
-                                                    notes=own_words)
+                                                    notes=own_words,
+                                                    places=self.engine.places())
                 # The ops the reading owes, in the order the words do them — after every
                 # injector has appended its own, and before a chip's op is put where the
                 # words put it (which then has the last word on order).
                 if not getattr(self, "attachments", ()):
                     raw = acts_to_ops.order(raw, self.rows)
+                # And one walk to one place is walked once (`acts_to_ops.once_each_walk`).
+                raw = acts_to_ops.once_each_walk(raw, notes=own_words)
                 # And the attached spell or place put where the words do it, after
                 # every injector above has appended its own (gm/sequence.py).
                 raw = judgement.order_the_attached(

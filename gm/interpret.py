@@ -410,6 +410,13 @@ def within_place(action: dict, places=(), here: str = "") -> bool:
             said in (p.name.lower(), p.name.lower().removeprefix("the ")) and p.id != here
             for p in places):
         return False
+    # And one named with where it is (`places.by_locative`): playtest 2026-11-16 E1, "I
+    # walk back down to the well room under the sewers" was read `within_place` with
+    # fixture `floor` in the gardens, and the walk was dropped as a move inside them.
+    if said and places:
+        located = places_mod.by_locative(places, said, here)
+        if located is not None and located.id != here:
+            return False
     # And a ship's room by her name ("the hold of the Red Gull", `places.find`): live
     # 2026-11-16 it was read `within_place` with fixture `floor` and the walk dropped.
     if said and places:
@@ -592,7 +599,8 @@ exert     lift, push, pull, heave, drag, hold up or shift something heavy by mai
           strength, alone or with somebody; the target is whoever you help with it.
           Never a person pushed or shoved: that is attack
 gather   forage, gather, fill waterskins
-follow    follow somebody or a trail; go along with or come quietly with whoever is
+follow    follow somebody or a trail (not a road, tunnel or river: going along one
+          is go); go along with or come quietly with whoever is
           taking you somewhere (going quietly is never stealth)
 claim     assert who or what you are
 craft     make or work something yourself at a trade: forge, smith, hammer out or
@@ -2350,6 +2358,59 @@ def confirm_cruise(span: str, *, model: str | None = None) -> str:
     return CRUISE_ANSWERS.get(_closed(messages, tuple(CRUISE_ANSWERS), model), "")
 
 
+# A `stealth` act beside a walk, asked again (`unhidden`): playtest 2026-11-16 #77, "I keep
+# my head down and carry on to the docks, keeping well away from the gate" was read go +
+# `stealth: the gate`, re-read the same way live with a gloss line added (one line costs
+# demos at the front of a full window, see `messages`), and the Stealth was refused "the
+# foreman is watching" onto the page. Keeping clear of a place is the way a walk goes,
+# not hiding. Demonstrations in no world's words; none is the playtest line.
+HIDING_ANSWERS = ("hides", "a way to go")
+_HIDING_DEMOS = [
+    ("keeping well clear of the barracks", "a way to go"),
+    ("giving the tollhouse a wide berth", "a way to go"),
+    ("by the back lanes, avoiding the market", "a way to go"),
+    ("keeping to the shadows of the wall", "hides"),
+    ("slipping past the sentries unseen", "hides"),
+    ("ducking behind the carts so the watch won't see me", "hides"),
+]
+
+
+def confirm_hiding(span: str, *, model: str | None = None) -> str:
+    """"hides" when the words have the character keep out of sight, "a way to go" when
+    they only say which way a walk goes, or "" when the question failed."""
+    system = ("In a role-playing game the character is walking somewhere. Answer from the "
+              "words alone: does the character try to stay unseen (hide, sneak, keep out "
+              "of sight), or do the words only say which way they go?")
+    messages = [{"role": "system", "content": system}]
+    for said, answer in _HIDING_DEMOS:
+        messages.append({"role": "user", "content": f"The words: {said}"})
+        messages.append({"role": "assistant", "content": json.dumps({"answer": answer})})
+    messages.append({"role": "user", "content": f"The words: {span}"})
+    return _closed(messages, HIDING_ANSWERS, model)
+
+
+def unhidden(frame: dict | None, ask=None) -> list[str]:
+    """Take out of the reading, in place, each `stealth` act done alongside a walk of the
+    same line that the targeted question says only names the way (`confirm_hiding`).
+    Returns the spans taken out, for the turn log. Only a stealth act at nobody (no
+    `target`, so no sentry is being slipped past) and only beside an acting go, leave or
+    journey; `ask` None (the suite, the reader off) changes nothing."""
+    if ask is None or not frame or frame.get("error"):
+        return []
+    acts = [a for a in frame.get("actions") or [] if acting(a)]
+    if not any(a.get("act") in ("go", "leave", "journey") for a in acts):
+        return []
+    out = []
+    for a in acts:
+        if a.get("act") == "stealth" and not a.get("target") and a.get("span") \
+                and ask(a["span"]) == "a way to go":
+            out.append(a["span"])
+    if out:
+        frame["actions"] = [a for a in frame.get("actions") or []
+                            if not (a.get("act") == "stealth" and a.get("span") in out)]
+    return out
+
+
 def confirm_sea(span: str, *, model: str | None = None) -> str:
     """The `sea` op's `do` for the player's words about the other ship, or ""."""
     system = ("In a role-playing game the character is aboard a ship with another, hostile "
@@ -2650,6 +2711,42 @@ def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
             if person is not None and not getattr(person, "is_pc", False):
                 a["here"] = ref
     return ops
+
+
+# The acts whose target is looked for among the people where the act is done.
+_ADDRESSING_ACTS = frozenset({"talk", "seek", "call_on", "request", "insult", "threaten"})
+
+
+def scene_by_then(frame: dict | None, scene, places=(), upto: int | None = None):
+    """The scene the reading's first deed at somebody is done in (or its action `upto`):
+    `scene` itself, or — when moves of the same line come before it — the scene seen
+    from where they end (`engine.SeenFrom`). Playtest 2026-11-16 #94 ("go back up on deck
+    and ask the deckhand") and #75 ("go down to the docks and ask the foreman"): the
+    person was looked for where she stood before the walk. Place names through the
+    engine's own finder, never English; a move that names no place it knows changes
+    nothing."""
+    from rules import places as places_mod
+    from rules.engine import SeenFrom
+
+    if not frame or frame.get("error") or scene is None or not places:
+        return scene
+    here = str(getattr(scene, "at", "") or "")
+    by_then = here
+    for k, a in enumerate(frame.get("actions") or []):
+        if upto is not None and k >= upto:
+            break
+        if not acting(a):
+            continue
+        if upto is None and a.get("act") in _ADDRESSING_ACTS:
+            break
+        if a.get("act") in ("go", "leave", "journey") and a.get("place"):
+            p = places_mod.find(places, a["place"], near=by_then)
+            if p is not None:
+                by_then = p.id
+    else:
+        if upto is None:
+            return scene               # nobody addressed: nothing to look up
+    return scene if by_then == here else SeenFrom(scene, by_then)
 
 
 def until_words(action: dict | None) -> str:
@@ -2986,6 +3083,13 @@ DEED_SKILL_ACTS = {
 # used "to hide" by the one hiding (CRB p.106, "You can't use Stealth while being observed"
 # is a rule about the choice, not a check the world imposes).
 CHOSEN_SKILLS = frozenset({"stealth", "sleight of hand", "disguise"})
+# And the player's own Perception roll, put in front of them to make: a look or a search
+# of theirs asks for it. Playtest 2026-11-16 E3, "Climb back up out of the culvert and
+# walk back up to the gardens" (athletics + go) left the plan's Perception at DC 10
+# waiting for the player's die, a roll nobody asked for that decided nothing. Noticing
+# what hides is the engine's own (rules/awareness.py, the dungeons' searches), not
+# the plan's to hand the player.
+ROLLED_ON_ASKING = CHOSEN_SKILLS | {"perception"}
 
 
 def supported(ops: list[str], frame: dict | None,
@@ -3047,7 +3151,7 @@ def drop_unchosen_checks(raw, frame: dict | None, pc_ref: str = "pc") -> tuple[l
         p = (r.get("params") or {}) if isinstance(r, dict) else {}
         skill = str(p.get("skill") or "").strip().lower()
         if (isinstance(r, dict) and str(r.get("op", "")).lower() == "check"
-                and skill in CHOSEN_SKILLS and r.get("actor") in (None, "", "pc", pc_ref)
+                and skill in ROLLED_ON_ASKING and r.get("actor") in (None, "", "pc", pc_ref)
                 and not acts & DEED_SKILL_ACTS[skill]):
             dropped.append(skill)
             continue
