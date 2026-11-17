@@ -47,7 +47,9 @@ def test_the_players_own_words_stand_and_an_npcs_say_is_theirs():
     mine = {"op": "say", "params": {"words": "Where is the well?"}}
     theirs = {"op": "say", "actor": "c1", "params": {"words": "Go away."}}
     out = judgement.own_words_only([mine, theirs], 'I ask "Where is the well?"', None)
-    assert out == [mine, theirs]
+    # The player's quotation is marked quoted (playtest 2026-11-16 #60); the words stand.
+    assert out == [{"op": "say", "params": {"words": "Where is the well?", "quoted": True}},
+                   theirs]
 
 
 def test_a_say_with_no_words_of_the_players_to_give_is_dropped():

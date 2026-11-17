@@ -793,10 +793,13 @@ def meet_ally(engine, place, concept: dict, head: dict) -> tuple[list[dict], str
     if a is None:
         return [], ""
     engine.scene.zones[ref] = "near"
-    a.notes = fill(ally["notes"], slots)
+    # The complication is theirs to know too: playtest 2026-11-16 #58, the smuggler "will not
+    # leave without" the cargo, and with only the notes held he told the player it was gone.
+    # What a person knows is their notes (`planned.known_to`).
+    a.notes = " ".join(x for x in (fill(ally["notes"], slots),
+                                   fill(tag.get("complication") or "", slots)) if x)
     engine._set_attitude(a, attitude_mod.CONFIDES_A_HINT, None, f"rule:dungeon/{head['id']}")
-    said = (f"{_cap(a.name)} is here, alive. {a.notes}"
-            + (f" {fill(tag['complication'], slots)}" if tag.get("complication") else ""))
+    said = f"{_cap(a.name)} is here, alive. {a.notes}"
     return ([{"kind": "dungeon_ally", "ref": ref, "name": a.name, "at": place.id,
               "dungeon": concept["tag"]}], said)
 

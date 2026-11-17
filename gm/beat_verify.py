@@ -4455,6 +4455,77 @@ def tells_messages(sentences: list[str], premises: list[str], who: str = "") -> 
             {"role": "user", "content": user}]
 
 
+# A reply read against what its speaker knows (`planned.known_to`): the same read, the
+# speaker's facts as its premises, with its own instruction and demonstrations — the tells'
+# demonstrations are deeds, and "a person's words contradict a fact only where they state
+# what the engine decided" lets "I do not know of any temples" through beside a cathedral
+# the speaker knows (playtest 2026-11-16 #66). Synthetic demonstrations, no world's names.
+_KNOWN_SYSTEM = (
+    "You check what one person in a story says against the FACTS of what that person "
+    "knows. The facts are true, and the person knows every one of them. For EACH numbered "
+    "sentence of what they say answer:\n"
+    "- \"contradicts\" when the sentence cannot be true if a fact is true: it denies, "
+    "changes or gets wrong what a fact says (another place, thing, person, cause, outcome "
+    "or way), or the person says there is none of what a fact says there is, or says they "
+    "do not know what a fact says they know;\n"
+    "- \"agrees\" when it says what a fact says, in any words;\n"
+    "- \"not about it\" when no fact speaks of it: a feeling, a warning, a question back, "
+    "a refusal to say, or anything else.\n"
+    "Leaving a fact out is not contradicting it. Name the fact (\"none\" when not about "
+    "it), and for \"contradicts\" copy the sentence's own words that clash.")
+_KNOWN_DEMO_USER = (
+    "FACTS (what the ferryman knows):\n"
+    "F1. About the ferryman, what they know of themselves and this place: rows the crossing "
+    "for the mill; says the miller's son drowned at the weir last spring.\n"
+    "F2. The ferryman knows these places of Thornby (faith and the dead): the chapel, the "
+    "way by the green; the graveyard, next door.\n\n"
+    "SENTENCES:\n"
+    "1. I wouldn't know of any priests or shrines, I only mind the boat.\n"
+    "2. The miller's boy went under at the weir, spring last.\n"
+    "3. Mind the current on the way back.\n"
+    "4. Nobody's drowned here in my time.\n"
+    "5. There's no chapel in Thornby.")
+# Sentence 1 is the shape of #66: ignorance professed of a place the speaker knows, asked of
+# by another word for its kind (shrines, for a chapel).
+_KNOWN_DEMO_ANSWER = {
+    "1": {"verdict": "contradicts", "fact": "F2",
+          "words": "I wouldn't know of any priests or shrines"},
+    "2": {"verdict": "agrees", "fact": "F1", "words": ""},
+    "3": {"verdict": "not about it", "fact": "none", "words": ""},
+    "4": {"verdict": "contradicts", "fact": "F1", "words": "Nobody's drowned here in my time"},
+    "5": {"verdict": "contradicts", "fact": "F2", "words": "There's no chapel in Thornby"}}
+_KNOWN_DEMO_USER_2 = (
+    "FACTS (what the bosun knows):\n"
+    "F1. The bosun knows the Grey Hen's hold: she carries no cargo at all; her hold is "
+    "empty, and she was carrying none.\n"
+    "F2. About the bosun, what they know of themselves and this place: hid in the cable "
+    "tier with the ship's papers when she was boarded, and has them still.\n\n"
+    "SENTENCES:\n"
+    "1. We had forty barrels of salt fish below for the merchants' hall.\n"
+    "2. I don't know who you people are.\n"
+    "3. The papers went over the side when you came aboard.\n"
+    "4. I kept the papers, if that's what you're after.")
+_KNOWN_DEMO_ANSWER_2 = {
+    "1": {"verdict": "contradicts", "fact": "F1",
+          "words": "We had forty barrels of salt fish below"},
+    "2": {"verdict": "not about it", "fact": "none", "words": ""},
+    "3": {"verdict": "contradicts", "fact": "F2", "words": "The papers went over the side"},
+    "4": {"verdict": "agrees", "fact": "F2", "words": ""}}
+
+
+def known_messages(sentences: list[str], premises: list[str], speaker: str) -> list[dict]:
+    user = (f"FACTS (what {speaker} knows):\n"
+            + "\n".join(f"F{i}. {t}" for i, t in enumerate(premises, 1))
+            + "\n\nSENTENCES:\n"
+            + "\n".join(f"{i}. {s}" for i, s in enumerate(sentences, 1)))
+    return [{"role": "system", "content": _KNOWN_SYSTEM},
+            {"role": "user", "content": _KNOWN_DEMO_USER},
+            {"role": "assistant", "content": json.dumps(_KNOWN_DEMO_ANSWER)},
+            {"role": "user", "content": _KNOWN_DEMO_USER_2},
+            {"role": "assistant", "content": json.dumps(_KNOWN_DEMO_ANSWER_2)},
+            {"role": "user", "content": user}]
+
+
 def _clash_quoted(words: str, sentence: str) -> bool:
     """The clashing words are the sentence's own (folded as quotes are, `_norm`), and at
     least `MIN_CLASH_WORDS` of them: the grounding a verdict needs before it costs a
@@ -4481,7 +4552,7 @@ def second_on_tell(sentence: str, tell: str, who: str = "", *, chat=None, model:
 
 def against_tells(text: str, tells, *, who: str = "", only=None, chat=None,
                   model: str = "", host: str = "", provider: str = "ollama",
-                  api_key: str = "") -> TellsRead:
+                  api_key: str = "", speaker: str = "") -> TellsRead:
     """Every sentence of `text` (speech kept: a reply's words are what the narrator made the
     speaker say) read against the beat's tells (`tell_premises`), each contradiction named
     by its tell and the words it clashes on, validated in code (`_clash_quoted`, the fact on
@@ -4489,7 +4560,8 @@ def against_tells(text: str, tells, *, who: str = "", only=None, chat=None,
     be true" — unless `tells_veto` lets no read refuse it, or not the second read on a clash
     that echoes its tell. `only` limits the read to those sentences (a remade slot's). A first read that
     fails judges nothing (`error`): the caller leaves the text as it is, as every read back
-    does."""
+    does. With `speaker`, `tells` are what that speaker knows (`planned.known_to`) and the
+    read is `known_messages`'."""
     from . import narration as narration_mod
 
     out = TellsRead()
@@ -4505,7 +4577,8 @@ def against_tells(text: str, tells, *, who: str = "", only=None, chat=None,
         from . import client
 
         chat = client.chat
-    msgs = tells_messages(sentences, premises, who)
+    msgs = (known_messages(sentences, premises, speaker) if speaker
+            else tells_messages(sentences, premises, who))
     if bare_template(model):
         msgs = _raw_prompt(msgs)
     started = time.monotonic()
