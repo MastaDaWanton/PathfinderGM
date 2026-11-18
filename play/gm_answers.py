@@ -157,6 +157,11 @@ def answer(campaign, engine, question: str) -> tuple[str, str]:
     world's own record and the model, in `views._ask_the_gm`, which runs `look_up` again
     so whatever the books did find is still handed over as grounding.
     """
+    # A crafting question is the GM's to voice, from the facts `craft_facts` reads
+    # (`views._ask_the_gm`): a dump of rule rows is not an answer to "how does drying work".
+    if asks_about_crafts(question):
+        return "gm", ""
+
     wanted = topics_for(question)
     out: list[str] = []
     for name in TOPICS:
@@ -874,4 +879,264 @@ def about_what_is_here(c, engine, question: str):
                "name is a check you make in play")
     out.append("  the engine will not hand over its numbers here; that is what /cheat "
                "is for, and it is a different thing on purpose")
+    return out
+
+
+# --- the crafts --------------------------------------------------------------------------
+#
+# The owner, 2026-11-17 (plan item 19): "Give the GM access to info on crafting mechanics so
+# I can ask it questions about the systems." Before this the /gm door could see places,
+# people, the sheet, spells and creatures, and nothing of the five benches: "how does drying
+# work" was answered from whatever the model remembered about drying.
+#
+# Two halves, both read by code and handed to the model as its `found` grounding, so the
+# answer is in the GM's voice but every fact in it came from here:
+#   - the engine's: the character's own track in each craft (level, mastery, what the next
+#     level costs, the methods unlocked), from `worldclass.track_summary`;
+#   - the rules': the named method's row from the bench's own rule JSON, the track's
+#     `method_descriptions`, and the craft's section of the in-app manual.
+# Every number is read from the data, never written here, so the XP and In Progress
+# changes of feat/owner-crafting reach these answers with no edit.
+#
+# What the character has not discovered stays out (owner default, 2026-11-18): a herb is
+# named only if the character has met it, and only with the properties they know
+# (`knowledge.properties`, the same gate the herb card and the narrator's brief use).
+
+# Track id -> (the manual's section id, the words that name the craft).
+CRAFTS = {
+    "herbalist": ("herbalism", r"herbalis[mt]s?|herb(?:al)?\s+(?:bench|craft)|herbcraft"),
+    "blacksmith": ("forge", r"forge|forging|smith(?:ing|y|s)?|blacksmith(?:ing|s)?|anvil"),
+    "alchemist": ("alchemy", r"alchem(?:y|ist|ists|ical)|alembic"),
+    "leatherworker": ("leatherworking",
+                      r"leather(?:work(?:ing|er|ers)?)?|tann(?:ing|er|ery)"),
+    "enchanter": ("enchanting", r"enchant(?:ing|er|ers|ment|ments)?"),
+}
+
+_CRAFTING = re.compile(
+    r"\b(?:craft(?:ing|s)?|bench(?:es)?|mastery|recipes?|world class(?:es)?|"
+    + "|".join(words for _m, words in CRAFTS.values()) + r")\b", re.I)
+
+
+def _method_forms(method: str) -> str:
+    """`dry` -> "drying|dried|dries|dry": the shapes a question names a method in."""
+    forms = {method, method + "s", method + "es", method + "ed", method + "ing"}
+    if method.endswith("e"):
+        forms |= {method[:-1] + "ing", method + "d"}
+    if method.endswith("y"):
+        forms |= {method[:-1] + "ies", method[:-1] + "ied"}
+    if re.search(r"[^aeiou][aeiou][bdgmnprt]$", method):
+        forms |= {method + method[-1] + "ing", method + method[-1] + "ed"}
+    return "|".join(re.escape(f) for f in sorted(forms, key=len, reverse=True))
+
+
+def _tracks():
+    from rules import worldclass
+
+    return worldclass.tracks()
+
+
+def _methods_named(question: str) -> list[tuple[str, str]]:
+    """(track id, method) for each bench method the question names, in any craft.
+
+    A bare method word ("cut", "read", "mix") is an ordinary verb, so it counts only when
+    the question asks what a thing is or names crafting: "how does drying work" is about
+    the method; "can I read the sign" is not."""
+    low = str(question or "")
+    if not (asks_what_a_thing_is(low) or _CRAFTING.search(low)):
+        return []
+    named = _crafts_named(low)
+    out = []
+    for tid, track in _tracks().items():
+        if named and tid not in named:
+            continue  # "assay at the forge" is the forge's assay, not the lab's too
+        for lvl in track.levels:
+            for m in lvl.methods:
+                if re.fullmatch(CRAFTS.get(tid, ("", "$^"))[1], m, re.I):
+                    # "what does the forge do" is the forge, the whole craft, and not
+                    # only its Forge step; the step's row is still among the craft's.
+                    continue
+                if re.search(r"\b(?:" + _method_forms(m) + r")\b", low, re.I):
+                    out.append((tid, m))
+    return out
+
+
+def _crafts_named(question: str) -> list[str]:
+    low = str(question or "")
+    return [tid for tid, (_s, words) in CRAFTS.items()
+            if tid in _tracks() and re.search(r"\b(?:" + words + r")\b", low, re.I)]
+
+
+def asks_about_crafts(question: str) -> bool:
+    """Is this question about the crafting rules or the character's craft progress?"""
+    return bool(_CRAFTING.search(str(question or "")) or _methods_named(question))
+
+
+def _bench_row(track_id: str, method: str) -> dict:
+    from rules import benches
+
+    try:
+        return dict(benches.module_for(track_id).method_row(method) or {})
+    except (benches.UnknownBench, AttributeError, KeyError):
+        return {}
+
+
+def _rule_lines(row: dict, indent: str = "    ") -> list[str]:
+    """A rule row's plain values, one a line. The minigame's tuning and the nested tables
+    are the bench's machinery, not rules a player asks about, and are left out. Minutes
+    are also given in hours or days, so the model never does the sum."""
+    out = []
+    for key, value in row.items():
+        if str(key).startswith("_") or key == "name" or isinstance(value, (dict, list)):
+            continue
+        said = ("yes" if value else "no") if isinstance(value, bool) else str(value)
+        if "minutes" in str(key) and isinstance(value, (int, float)) \
+                and not isinstance(value, bool) and value >= 60:
+            hours = value / 60
+            said += f" ({hours:g} hours)" if hours < 48 else f" ({hours / 24:g} days)"
+        out.append(f"{indent}{str(key).replace('_', ' ')}: {said}")
+    return out
+
+
+def manual_section(section_id: str) -> str:
+    """The in-app manual's section on one craft, as plain text, or "".
+
+    Read out of the template the manual page renders, through Django's loader so it is
+    found in the frozen app too, rather than kept as a second copy here that would drift
+    from the page the player can open."""
+    from django.template import TemplateDoesNotExist, loader
+
+    try:
+        source = loader.get_template("play/manual.html").template.source
+    except TemplateDoesNotExist:
+        return ""
+    m = re.search(r'<h3 id="' + re.escape(section_id) + r'">(.*?)(?=<h[23][ >])',
+                  source, re.S)
+    if not m:
+        return ""
+    text = re.sub(r"<tr>", "\n", m.group(1))
+    text = re.sub(r"</t[dh]>\s*<t[dh][^>]*>", " — ", text)
+    text = re.sub(r"</p>", "\n", text)
+    text = re.sub(r"<[^>]+>", "", text)
+    text = text.replace("&amp;", "&").replace("&times;", "×")
+    lines = [" ".join(line.split()) for line in text.splitlines()]
+    return "\n".join(f"    {line}" for line in lines if line)
+
+
+def _track_lines(pc, track) -> list[str]:
+    """The character's standing in one craft, off the engine."""
+    from rules import worldclass
+
+    progress = pc.track(track.id) if pc is not None else worldclass.Progress(track=track.id)
+    summary = worldclass.track_summary(track, progress)
+    left = worldclass._remaining(track, progress)
+    out = [f"  your {track.name} level: {summary['level']}, mastery banked: {summary['mp']}"]
+    if left is not None:
+        line = (f"  the next level ({summary['level'] + 1}) costs {left['of']} mastery: "
+                f"{left['need']} more to go")
+        if left.get("milestone"):
+            line += f", and it waits on a deed: {left['milestone']}"
+        out.append(line)
+    out.append("  methods you know: " + ", ".join(track.unlocked_methods(summary["level"])))
+    later = [(lvl.level, m) for lvl in sorted(track.levels, key=lambda x: x.level)
+             if lvl.level > summary["level"] for m in lvl.methods]
+    if later:
+        out.append("  methods still to learn: "
+                   + ", ".join(f"{m} (level {lv})" for lv, m in later))
+    out.append(f"  best material you may work: {track.at(summary['level']).max_tier}; "
+               f"best quality you can reach: {summary['ceiling_name']}")
+    if summary.get("next_rung"):
+        out.append(f"  the quality ceiling rises next: {summary['next_rung']}")
+    if summary.get("picks_banked"):
+        out.append(f"  perk picks waiting: {summary['picks_banked']}")
+    return out
+
+
+def _herbs_named(pc, question: str) -> list[str]:
+    """Each herb the question names that the character has met, with only what they know
+    of it. A herb they have never come across is not named back at all: its name in the
+    answer would be a discovery handed over for free."""
+    if pc is None:
+        return []
+    from rules import herbknowledge, ingredients, knowledge
+
+    low = " ".join(str(question or "").lower().split())
+    everything = ingredients.all_ingredients()
+    out = []
+    for iid in herbknowledge.met(pc):
+        ing = everything.get(iid)
+        name = str(getattr(ing, "name", "") or "").lower()
+        if not name or not re.search(r"\b" + re.escape(name) + r"\b", low):
+            continue
+        rows = knowledge.properties(pc, ing)
+        known = [r["text"] for r in rows if r.get("known")]
+        hidden = sum(1 for r in rows if not r.get("known"))
+        out.append(f"HERB: {ing.name} ({ing.kind}, {ing.tier}) — what you know of it: "
+                   + ("; ".join(known) if known else "nothing yet")
+                   + (f"; {hidden} more properties you have not learned" if hidden else ""))
+    return out
+
+
+def craft_facts(c, engine, question: str) -> list[str]:
+    """The grounding for a crafting question, or [] when it is not one."""
+    if not asks_about_crafts(question):
+        return []
+    from play.craft_views import _raw_track
+
+    pc = c.scene.pc() if getattr(c, "scene", None) is not None else None
+    tracks = _tracks()
+    methods = _methods_named(question)
+    named = _crafts_named(question) or list(dict.fromkeys(t for t, _m in methods))
+    out: list[str] = []
+    for tid in named or [t for t in CRAFTS if t in tracks]:
+        track = tracks[tid]
+        raw = _raw_track(track)
+        out.append(f"CRAFT: {track.name} (the whole craft). {track.summary}")
+        out += _track_lines(pc, track)
+        if not named:
+            continue  # crafting in general: the standing in each craft, no more
+        written = len(track.thresholds)
+        out.append("  how levels are priced: "
+                   + "".join(f"level {i + 2} costs {n}; " for i, n in enumerate(track.thresholds))
+                   + f"then levels {written + 2}, {written + 3}, {written + 4} cost "
+                   + ", ".join(str(track.to_next(lv)) for lv in range(written + 1, written + 4))
+                   + " mastery, and on the same way without end")
+        described = raw.get("method_descriptions") or {}
+        named_here = {m for t, m in methods if t == tid}
+        manual = manual_section(CRAFTS[tid][0])
+        if not named_here:
+            # The craft, not one step: the manual's overview leads and the steps are named
+            # only. Measured live: given every step's row, "what does the forge do" was
+            # answered about the step called Forge, on both runs, and again once the manual
+            # led (its own "Forge (1)" row). A step sharing the craft's word is named here.
+            same = [m for lvl in track.levels for m in lvl.methods
+                    if re.fullmatch(CRAFTS[tid][1], m, re.I)]
+            if same:
+                out.append(f"  WHAT WAS ASKED: the whole {track.name} craft (every step "
+                           f"worked at it), not the one step also called {same[0].title()}; "
+                           "answer about the craft, and name that step only as one of many.")
+            if manual:
+                out.append(f"  THE MANUAL ON {track.name.upper()}:")
+                out.append(manual)
+            out.append("  its steps, by level: " + "; ".join(
+                f"{', '.join(lvl.methods)} (level {lvl.level})"
+                for lvl in sorted(track.levels, key=lambda x: x.level) if lvl.methods))
+            continue
+        for lvl in sorted(track.levels, key=lambda x: x.level):
+            for m in lvl.methods:
+                if named_here and m not in named_here:
+                    continue
+                out.append(f"  STEP {m} (level {lvl.level}): {described.get(m, '')}")
+                helped = (raw.get("method_help") or {}).get(m) or {}
+                for key in ("needs", "for"):
+                    if helped.get(key):
+                        out.append(f"    {key}: {helped[key]}")
+                out += _rule_lines(_bench_row(tid, m))
+        if manual:
+            out.append(f"  THE MANUAL ON {track.name.upper()}:")
+            out.append(manual)
+    shared = manual_section("craft-levels")
+    if shared:
+        out.append("THE MANUAL ON HOW EVERY CRAFT LEVELS:")
+        out.append(shared)
+    out += _herbs_named(pc, question)
     return out
