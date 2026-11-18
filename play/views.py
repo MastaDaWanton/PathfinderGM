@@ -7638,6 +7638,13 @@ def trade_do(request):
         return JsonResponse({"error": f"{type(exc).__name__}: {exc}"}, status=400)
 
     tell = _page_tells(c, resolution.outcomes)
+    # On the record like every turn (`_log_turn`'s shape): frag T109 (owner's save
+    # 2026-11-17) bought a good room here and the turn log had no row of it, so nothing
+    # could say which stay was bought, or that it was bought at all.
+    c.turn_log.append(history_mod.stamp(c, {
+        "kind": "turn", "door": "trade",
+        "intents": [{"op": op, "actor": "pc", "params": params, "because": "at the counter"}],
+        "outcomes": [o.as_dict() for o in resolution.outcomes]}))
     c.transcript.append({"who": "gm", "kind": "consequence", "text": tell})
     c.save()
     return JsonResponse({"ok": True, "tell": tell})

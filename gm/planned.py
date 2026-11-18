@@ -854,6 +854,41 @@ _CATEGORY_WORDS = {"faith": "temples, shrines and the places of the dead",
                    "utility": "wells, stores and what the place needs to run",
                    "transport": "docks, stables and the ways out",
                    "hidden": "back ways where nobody is watching", "": "streets and squares"}
+# The words of those labels that name one kind of place, which a label only says where the
+# settlement has one. jack T276 (owner's save 2026-11-17): Featherperch has no docks, and
+# its stables were labelled "(docks, stables and the ways out)", so asked the way to the
+# docks the page gave one. A kind named and absent is said absent instead.
+_KIND_WORDS = {"docks": "the docks", "stables": "the stables", "workshops": "the workshops",
+               "markets": "the market", "inns": "the inn", "taverns": "the tavern",
+               "wells": "the well"}
+
+
+# Said absent outright: a kind somebody asks the way to. Not a market, an inn or a tavern,
+# whose lack a town makes up some other way (a merchants' row, the other house of beds).
+_SAID_ABSENT = ("docks", "stables", "wells", "workshops")
+
+
+def _and(items: list[str]) -> str:
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def _category_label(cat: str, present: set[str]) -> str:
+    """`_CATEGORY_WORDS[cat]` with every kind word the settlement lacks taken out."""
+    words = _CATEGORY_WORDS.get(cat, cat)
+    items = re.split(r", | and ", words)
+    kept = [w for w in items if w not in _KIND_WORDS or _KIND_WORDS[w] in present]
+    return _and(kept) if kept and kept != items else words
+
+
+def _kinds_absent(present: set[str], settlement: str) -> str:
+    """The one fact that the settlement lacks the kinds somebody asks the way to, or ""."""
+    gone = [w for w in _SAID_ABSENT if _KIND_WORDS[w] not in present]
+    if not gone:
+        return ""
+    said = gone[0] if len(gone) == 1 else ", ".join(gone[:-1]) + f" or {gone[-1]}"
+    # Bare: live, a tail ("there are none here to send anyone to") came back in the
+    # answer nearly word for word.
+    return f"{settlement} has no {said}."
 
 
 def _places_known(engine, name: str) -> list[str]:
@@ -877,6 +912,7 @@ def _places_known(engine, name: str) -> list[str]:
     loc = world.get(scene.location_id) if world is not None else None
     settlement = str(getattr(loc, "name", "") or "the settlement")
     groups: dict[str, list[str]] = {}
+    present = {" ".join(str(p.kind or p.name).split()).lower() for p in town}
     for p in town:
         if p.id == here:
             continue
@@ -890,8 +926,9 @@ def _places_known(engine, name: str) -> list[str]:
         elif hops:
             said += ", next door"
         groups.setdefault(cat, []).append(said)
-    return [f"{name} knows these places of {settlement} ({_CATEGORY_WORDS.get(cat, cat)}): "
-            + "; ".join(items) + "." for cat, items in groups.items()]
+    absent = _kinds_absent(present, settlement)
+    return [f"{name} knows these places of {settlement} ({_category_label(cat, present)}): "
+            + "; ".join(items) + "." for cat, items in groups.items()]         + ([f"{name} knows {absent}"] if absent else [])
 
 
 def _ship_known(engine, ref: str, name: str) -> list[str]:

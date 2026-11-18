@@ -5596,7 +5596,12 @@ def keep_act_slots(before: str, after: str, slots, *, rewrites=None
     sentence is `planned.slot_of`, the matching the tells check and "That's wrong" use."""
     from . import planned
 
-    acts = [s for s in slots or () if isinstance(s, dict) and s.get("tells")
+    # And the reply slot, whose words are the answer the player asked for: jack T208 and
+    # T211 (owner's save 2026-11-17), the innkeeper's reply was written and cut whole by
+    # two checks, and the player had to type "I wait for his reply". It has no tells; what
+    # it wrote goes back.
+    acts = [s for s in slots or () if isinstance(s, dict)
+            and (s.get("tells") or s.get("key") == "reply")
             and str(s.get("wrote") or "").strip()]
     if not acts or not after:
         return after, []
@@ -5615,7 +5620,7 @@ def keep_act_slots(before: str, after: str, slots, *, rewrites=None
         now = [(x, planned.slot_of(_was(x), acts)) for x in narration_mod._sentences(after)]
         if n not in was or any(o == n for _x, o in now):
             continue
-        line = planned.engine_line(s["tells"])
+        line = str(s["wrote"]).strip() if s.get("key") == "reply" and not s.get("tells")             else planned.engine_line(s["tells"])
         if not line or line in after:
             continue
         later = next((x for x, o in now if o is not None and o > n), None)

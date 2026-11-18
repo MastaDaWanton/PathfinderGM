@@ -103,6 +103,17 @@ def menu() -> list[dict]:
             for q, cp in sorted(STAY_CP.items(), key=lambda kv: kv[1])]
 
 
+# How a stay is asked for by its rank rather than the book's word. Owner's saves
+# 2026-11-17: "the cheapest room available" matched no row (frag T106-T109) and "the best
+# room" none (T128); "the private room" is the good stay's own words. A closed vocabulary
+# asked only beside a word for a bed (`_BED_WORDS`), so "the best ale" is still the ale.
+_RANKS = {"poor": frozenset({"cheapest", "cheap", "cheaper", "poorest", "hearth", "floor"}),
+          "good": frozenset({"best", "finest", "nicest", "better", "private"}),
+          "common": frozenset({"common"})}
+_BED_WORDS = frozenset({"room", "rooms", "bed", "beds", "stay", "lodging", "lodgings",
+                        "spot", "space", "place", "chamber", "night"})
+
+
 def find(want: str) -> dict | None:
     """The stay the words ask for, or None. A room asked for with no quality named is the
     common stay, the one the rest door charges (`DEFAULT_STAY`)."""
@@ -112,12 +123,16 @@ def find(want: str) -> dict | None:
     rows = menu()
     if want.startswith(PREFIX):
         return next((r for r in rows if r["id"] == want), None)
+    said = set(re.findall(r"[a-z]+", want))
+    if said & _BED_WORDS:
+        ranked = next((q for q, ws in _RANKS.items() if said & ws), "")
+        if ranked:
+            return next(r for r in rows if r["quality"] == ranked)
     found, fits = goods.match_want(want, rows)
     if found is None:
         return None
     # "good" is one of the matcher's measure words ("a good rope"), so the quality is
     # asked of the want's own words here, against the book's three.
-    said = set(re.findall(r"[a-z]+", want))
     q = next((q for q in STAY_CP if q in said), DEFAULT_STAY)
     return next((r for r in fits if r["quality"] == q), found)
 
@@ -126,8 +141,12 @@ def slug(at: str) -> str:
     """The whole place id as one tag segment, dots made safe. Not the `found` door's
     last-segment slug: two towns' founded taverns are both "…/the-tavern", and a room
     paid for in one was held in the other (seen live 2026-10-16: the tag came out
-    `holds.room.the-tavern`)."""
-    return str(at or "").replace(".", "-")
+    `holds.room.the-tavern`). The house, not the floor: jack T205-T225 (owner's save
+    2026-11-17) paid downstairs, walked up to the upper floor of the inn to sleep, and
+    was billed a second time there."""
+    from . import places
+
+    return places.base_of(str(at or "")).replace(".", "-")
 
 
 def tag(at: str) -> str:
@@ -137,6 +156,21 @@ def tag(at: str) -> str:
 def held(actor, at: str) -> bool:
     """Whether `actor` has a room paid for at `at` today."""
     return bool(at) and actor is not None and actor.has_state(tag(at))
+
+
+def room_held(actor) -> tuple[str, str] | None:
+    """(the house's place id, the stay) of the room `actor` holds today, or None. Read off
+    the hold itself, the one record: its source is the place, its child tag the stay (a
+    hold from before the stay was tagged is the rest door's common one)."""
+    for e in getattr(actor, "effects", None) or ():
+        if getattr(e, "origin", "") != ORIGIN or not str(e.source).startswith("place:"):
+            continue
+        at = str(e.source)[len("place:"):]
+        stay = next((t.rsplit(".", 1)[1] for t in e.tags
+                     if t.startswith(tag(at) + ".") and t.rsplit(".", 1)[1] in STAY_CP),
+                    DEFAULT_STAY)
+        return at, stay
+    return None
 
 
 def owns(actor, at: str) -> bool:
@@ -152,4 +186,5 @@ def hold(actor, at: str, name: str, rounds_per_minute: int, stay: str = DEFAULT_
     return actor.apply_effect(ActiveEffect(
         name=f"a {stay} room at {name}" if stay != DEFAULT_STAY else f"a room at {name}", kind="situation", key=f"room:{at}",
         source=f"place:{at}", origin=ORIGIN, duration="rounds",
-        rounds_left=HELD_MINUTES * int(rounds_per_minute), tags=(tag(at),)))
+        rounds_left=HELD_MINUTES * int(rounds_per_minute),
+        tags=(tag(at), f"{tag(at)}.{stay}")))

@@ -58,11 +58,25 @@ def pass_time(c, engine, pc, minutes: int, doing: str) -> list[str]:
     transcript line written: measured live on the herb bench, two log lines for every
     step was a complaint, and a 10-minute grind has nothing to add.
     """
+    from rules import residency
+    from rules.engine import _ward_tell
+
     minutes = max(0, int(minutes or 0))
     passed = c.scene.advance(minutes)
     lived = survival.told_on_page(c.scene, passed, pc.ref) + engine.comings_on_page()
+    # What the stretch ended, told here and taken off the queue, so the next typed turn
+    # does not tell it as its own: jack (owner's save 2026-11-17) came off 16 hours at the
+    # bench and the next beat narrated him just waking up.
+    lived += [t for t in (_ward_tell(c.scene, r) for r in c.scene.take_ended_said()) if t]
+    head = f"{pc.name} works {sky.span_words(minutes)}{' ' + doing if doing else ''}."
     if lived:
-        head = f"{pc.name} works {sky.span_words(minutes)}{' ' + doing if doing else ''}."
         c.transcript.append({"who": "gm", "kind": "consequence",
                              "text": " ".join([head] + lived)})
+    if minutes >= 60:
+        # The hours reach the model's memory, the excursion's shape (craft_views): the
+        # bench's 16 hours were in the transcript and the clock and nowhere the planner and
+        # narrator read, so the next beat had no idea the day had gone.
+        c.history.append({"role": "user", "content": f"(From the bench: {head})"})
+        c.history.append({"role": "assistant", "content": " ".join(
+            [head] + lived + [f"It is now {residency.time_words(int(c.scene.clock_minutes))}."])})
     return lived
