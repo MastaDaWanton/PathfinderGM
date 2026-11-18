@@ -243,9 +243,11 @@ def test_a_passage_is_counted_in_whole_days_of_the_ship_making_way():
 
 def test_a_crossing_never_takes_less_than_a_day():
     """A crossing that takes an afternoon is a ferry, and a ferry is a road with water
-    under it rather than a passage."""
-    assert ships.days_for(1, "galley") == 1
-    assert ships.days_for(None, "keelboat", 0) == 1
+    under it rather than a passage: even a route the world measured is a day at least.
+    An unmeasured one meets the passage floor (travel pacing, 2026-11-16)."""
+    assert ships.days_for(1, "galley", measured=True) == 1
+    assert ships.days_for(None, "keelboat", 0, measured=True) == 1
+    assert ships.days_for(1, "galley") == ships.PASSAGE_DAYS_AT_LEAST
 
 
 def test_the_wind_is_worth_double_and_says_so():

@@ -24,50 +24,53 @@ from tests.test_ships import _do
 
 
 def _forced(monkeypatch, kind: str, aggressive: bool = True):
-    """The day's check, made to find `kind` once (then nothing), the creature drawn by the
-    real budgeted picker."""
+    """The voyage's stretch check (`ontheway.sea_stretches`) made to find `kind` once, on
+    the first day sailed (then nothing), the creature drawn by the real budgeted picker. A
+    band the table keeps off a river is not met on one, as the real check filters it."""
     real = ontheway._the_land
     left = [kind]
 
-    def sea(dice, level=1, *, apl=None, danger=1.0, climates=()):
-        if not left:
+    def sea(dice, days, level=1, *, apl=None, danger=1.0, climates=(), river=False, **kw):
+        waters = next((b.get("waters") for b in ontheway.events()["sea"]["bands"]
+                       if b["kind"] == kind), ())
+        if not left or (river and "river" not in waters):
             return None
         left.pop()
         if kind == "creature":
             got = real(dice, "water", level, apl, keep=ontheway.open_water)
             return ontheway.Meeting(kind="creature", roll=90, creature=got.row,
                                     template=str(got.row["id"]), count=got.count,
-                                    aggressive=aggressive)
+                                    aggressive=aggressive, day=1)
         return ontheway.Meeting(kind=kind, roll=50, count=0, aggressive=kind == "pirates",
-                                template=str((npcs.choose(["pirate"], level) or {}).get("id")))
+                                template=str((npcs.choose(["pirate"], level) or {}).get("id")),
+                                day=1)
 
-    monkeypatch.setattr(ontheway, "sea", sea)
+    monkeypatch.setattr(ontheway, "sea_stretches", sea)
 
 
 def _quiet_weather(monkeypatch):
-    monkeypatch.setattr(ships, "day_at_sea", lambda dice, level: "calm")
+    """Kept for the callers' reading: the storm is a band of the one table now, so a
+    forced meeting (`_forced`) is already the only thing met."""
 
 
 # --- the table -------------------------------------------------------------------------------
 
-def test_the_day_at_sea_is_one_published_check_and_volatility_moves_only_the_danger():
-    """One check a day at the road's published 20% (UW p.127's rate; one a day as PF2e's GMG
-    rolls travel). Over 6,000 seeded days: the hit rate at the uneasy default sits near 20%,
-    half the hits are a passing sail, and lawless water doubles the pirates and creatures
-    while leaving the merchant and the patrol where they were."""
+def test_lawless_water_widens_only_the_danger_bands():
+    """The voyage table (content/rules/journey-events.json): volatility moves the danger
+    bands (pirates, creatures, storms) and leaves the merchant and the patrol where they
+    were. Over 3,000 seeded fortnights at the uneasy default and at lawless water."""
     counts = {}
     for danger in (1.0, 2.0):
         dice = Dice(seed=11)
-        got = [ontheway.sea(dice, 3, apl=3, danger=danger) for _ in range(6000)]
+        got = [ontheway.sea_stretches(dice, 14, 3, apl=3, danger=danger)
+               for _ in range(3000)]
         kinds = [m.kind for m in got if m is not None]
-        counts[danger] = {k: kinds.count(k) for k in ("merchant", "naval", "pirates",
-                                                     "creature")}
-    calm = counts[1.0]
-    assert 1050 <= sum(calm.values()) <= 1350, calm           # 20% of 6,000 = 1,200
-    assert 0.4 <= (calm["merchant"] + calm["naval"]) / sum(calm.values()) <= 0.6, calm
-    wild = counts[2.0]
-    assert wild["pirates"] + wild["creature"] > 1.6 * (calm["pirates"] + calm["creature"])
-    assert abs(wild["merchant"] - calm["merchant"]) < 0.25 * calm["merchant"], (calm, wild)
+        counts[danger] = {k: kinds.count(k) for k in ("merchant", "pirates", "storm")}
+    calm, wild = counts[1.0], counts[2.0]
+    assert wild["pirates"] + wild["storm"] > 1.4 * (calm["pirates"] + calm["storm"]), counts
+    # The first event of a passage: lawless water meets its danger sooner, so the
+    # merchant's share of first meetings falls rather than rises.
+    assert wild["merchant"] <= calm["merchant"] * 1.1, counts
 
 
 def test_the_open_sea_stocks_salt_water_creatures_only():
@@ -392,7 +395,8 @@ def test_a_storm_keeps_its_tag_across_a_save():
 def test_the_storm_at_sea_lands_the_tag(monkeypatch):
     scene, engine, pc = _at_port()
     _journey(engine)
-    monkeypatch.setattr(ships, "day_at_sea", lambda dice, level: "storm")
+    _forced(monkeypatch, "storm")
+    monkeypatch.setattr(ships, "storm_wrecks", lambda dice: False)
     _journey(engine, days=1)
     assert pc.has_state(states.NO_RANGED_WEAPONS) and pc.has_state("weather.storm")
 
