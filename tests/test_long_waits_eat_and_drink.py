@@ -143,15 +143,24 @@ def test_food_runs_out_on_its_own_grace():
 
 
 def test_a_wait_shorter_than_a_day_is_exactly_what_it_was():
-    """A meal's interval is a day; under it the pack is not touched and the counters run
-    as before — 23 hours since the last drink and a two-hour wait drinks nothing."""
-    pc = _pc(watered_minutes=23 * HOUR, fed_minutes=23 * HOUR, awake_minutes=23 * HOUR)
+    """A meal's interval is a day; short of it the pack is not touched and the counters
+    run as before — 20 hours since the last drink and a two-hour wait drinks nothing.
+    Owner bug list 2026-11-18 #17: once the day comes round inside a short wait the
+    pack IS drawn (frag went 143 hours unfed with 5 rations, the pack fed only waits of
+    a day or more): 23 hours and two more drinks two skins and eats a ration."""
+    pc = _pc(watered_minutes=20 * HOUR, fed_minutes=20 * HOUR, awake_minutes=20 * HOUR)
     pc.goods.update({"waterskin": 4, "trail rations": 2})
     scene, _ = _scene(pc)
     passed = scene.wait(2 * HOUR)
     assert passed["minutes"] == 2 * HOUR and not passed["stopped"]
     assert pc.goods == {"waterskin": 4, "trail rations": 2}
-    assert pc.watered_minutes == 25 * HOUR and pc.awake_minutes == 25 * HOUR
+    assert pc.watered_minutes == 22 * HOUR and pc.awake_minutes == 22 * HOUR
+    pc = _pc(watered_minutes=23 * HOUR, fed_minutes=23 * HOUR, awake_minutes=23 * HOUR)
+    pc.goods.update({"waterskin": 4, "trail rations": 2})
+    scene, _ = _scene(pc)
+    scene.wait(2 * HOUR)
+    assert pc.goods == {"waterskin": 2, "trail rations": 1, "empty waterskin": 2}
+    assert pc.watered_minutes == pc.fed_minutes == 1 * HOUR
 
 
 def test_sleep_inside_a_long_wait_spares_every_will_save():

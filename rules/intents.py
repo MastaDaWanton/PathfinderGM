@@ -760,7 +760,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # (content/rules/gear.json's `eat` rows; the Equipment tab's Eat, 2026-10-01). With no
     # item the meal is the scene's, as it always was: a tavern's supper is not carried.
     "eat": ((), ("actor", "item"), "hidden"),
-    "drink": ((), ("actor",), "hidden"),
+    # `item`: which of the pack's `drink` rows (a waterskin, a mug of ale), else a
+    # waterskin first, else the well. `fill`: fill the pack's empty skins from the water
+    # here instead of drinking (the Equipment tab's Fill; owner bug list 2026-11-18).
+    "drink": ((), ("actor", "item", "fill"), "hidden"),
     # A nibble of a raw herb, to learn what it does (docs/herbalism-revamp-plan.md §8.2):
     # the dose is spent, the herb's own effects land for real, and one benefit and one
     # drawback are learned. `item` is the herb's id or name; every number is the herb's.

@@ -2866,8 +2866,26 @@ def inject_improvised(raw_intents, player_text: str, scene) -> list:
     attacks = [r for r in out if isinstance(r, dict) and str(r.get("op", "")).lower() == "attack"
                and (r.get("actor") or pc.ref) == pc.ref]
     if not attacks:
+        target = None
+        if thrown:
+            # The one the throw is AT, by the scene's own names standing in the words after
+            # "at" (`holding.named_among`: the closed vocabulary is who is here, never the
+            # phrase), asked first: "at the goat" is the goat, whoever else stands here.
+            # Naming somebody goes round the bystander rule, as `_can_be_fought`
+            # says. Owner bug list 2026-11-18, item 18: "I pick up a rock and throw it at
+            # the goat" planned the pick-up alone, the table said "Nice shot", and no
+            # attack was ever rolled — the move action (pick up) and the standard action
+            # (the throw, CRB Actions in Combat) are both the player's this turn.
+            from rules import holding
+
+            named = {a.name: r for r, a in scene.actors.items()
+                     if not a.is_pc and int(getattr(a, "hp", 1)) > 0
+                     and not a.has_state("state.down")}
+            hit = holding.named_among(named, text[m.end():])
+            target = named.get(hit) if hit else None
         engaged = engaged_refs(scene)
-        target = engaged[0] if len(engaged) == 1 else None
+        if target is None:
+            target = engaged[0] if len(engaged) == 1 else None
         if target is None:
             foes = [r for r, a in scene.actors.items() if not a.is_pc and _can_be_fought(a)]
             target = foes[0] if len(foes) == 1 else None

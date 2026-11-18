@@ -49,7 +49,7 @@ _DOC: dict | None = None
 # The verbs a row may carry beside the feat grammar. Anything else is refused by
 # `validate`, because the reader would ignore it and the row would be a promise.
 ROW_KEYS = frozenset({"names", "does", "source", "house_rule", "modifiers", "tags", "eat",
-                      "drink", "carry", "camp", "writes", "not_yet"})
+                      "drink", "fills", "carry", "camp", "writes", "not_yet"})
 EAT_KEYS = frozenset({"spends", "lb"})
 DRINK_KEYS = frozenset({"spends", "gallons", "leaves"})
 MOD_KEYS = frozenset({"type", "target", "amount", "bonus_type", "when", "note"})
@@ -199,7 +199,44 @@ def food(actor, said: str = "") -> dict | None:
     """The carried thing to eat for `said` (an id, a name, or empty for "something to
     eat"), or None. Trail rations first when nothing is named: they are what a pack is
     provisioned with."""
-    pool = [c for c in carried(actor) if c["row"].get("eat")]
+    return _provision(actor, said, "eat", "trail rations")
+
+
+def drinkable(actor, said: str = "") -> dict | None:
+    """`food`, for the pack's `drink` rows: a waterskin first when nothing is named."""
+    return _provision(actor, said, "drink", "waterskin")
+
+
+def provision_row(name) -> str:
+    """"eat", "drink" or "fill" when this thing's gear row is food, drink or an empty
+    vessel, else "": the Equipment tab files these on the consumables shelf, and the
+    engine routes using one to its own door (`Engine._provisions_as_meals`)."""
+    _, row = row_for(name)
+    for verb in ("eat", "drink", "fills"):
+        if (row or {}).get(verb):
+            return "fill" if verb == "fills" else verb
+    return ""
+
+
+def refill(actor) -> tuple[int, str]:
+    """Fill every empty vessel the pack holds (a gear row's `fills`: an empty waterskin
+    becomes a waterskin): (how many, the name of what they became). The caller has
+    already said there is water at hand — `Engine.water_at_hand` is the one question,
+    and the wild lane's rivers and springs answer it too, so this needs no place."""
+    done, became = 0, ""
+    for c in carried(actor):
+        full = str(c["row"].get("fills") or "")
+        if not full:
+            continue
+        n = int(c["count"])
+        spend(actor, c, n)
+        actor.goods[full] = int(actor.goods.get(full, 0) or 0) + n
+        done, became = done + n, full
+    return done, became
+
+
+def _provision(actor, said: str, verb: str, first: str) -> dict | None:
+    pool = [c for c in carried(actor) if c["row"].get(verb)]
     if not pool:
         return None
     want = _norm(said)
@@ -214,7 +251,7 @@ def food(actor, said: str = "") -> dict | None:
         words = [w for w in re.findall(r"[a-z]+", want) if len(w) > 2]
         hit = [c for c in pool if words and all(w in _norm(c["name"]) for w in words)]
         return hit[0] if len(hit) == 1 else None
-    pool.sort(key=lambda c: (c["key"] != "trail rations", c["name"]))
+    pool.sort(key=lambda c: (c["key"] != first, c["name"]))
     return pool[0]
 
 
