@@ -18163,7 +18163,7 @@ class Engine:
                            f" The {spot} it holds is yours once it has gone.")
         return clause
 
-    def _hold_ground(self, ref: str, spot: str, source: str) -> str:
+    def _hold_ground(self, ref: str, spot: str, source: str, *, lair: bool = False) -> str:
         """Put a creature on the ground it holds, through the one applicator. Returns
         the tell.
 
@@ -18172,6 +18172,9 @@ class Engine:
         without a line of their own. `payload.zone` is how close the player was when it
         took the ground, so `_holding_ground_settles` can tell a player who has CLOSED
         on it from one who has merely stayed put.
+
+        `lair`: a dungeon boss and its company keeping the climax room (rules/dungeons.py
+        `stock_room`). They share `source`, never give way, and wake together.
         """
         who = self.scene.actors.get(ref)
         if who is None:
@@ -18180,9 +18183,33 @@ class Engine:
             name="Holding its ground", kind="condition", key=states.HOLDING_GROUND_KEY,
             source=source, origin="rule:gathering", duration="until-dismissed",
             tags=states.tags_for(states.HOLDING_GROUND_KEY),
-            payload={"spot": spot, "zone": self.scene.zones.get(ref, "far")}))
+            payload={"spot": spot, "zone": self.scene.zones.get(ref, "far"),
+                     **({"lair": True} if lair else {})}))
         return (f"{_the_creature(who.name)} holds the ground between you and the {spot}; it neither "
                 f"comes at you nor gives way.")
+
+    def _wake_the_lair(self, source: str, first: str) -> Outcome:
+        """Everyone keeping the lair `source` stops holding it and comes at the player, in
+        one fight (`_ensure_encounter` from the first, `_enrol_the_rest` for the rest)."""
+        refs = [r for r, a in self.scene.actors.items() if not a.is_down and any(
+            e.source == source and any(states.matches(t, states.HOLDING_GROUND)
+                                       for t in e.tags) for e in a.effects)]
+        for r in refs:
+            self.scene.actors[r].remove_effects(
+                match=lambda e: e.source == source and any(
+                    states.matches(t, states.HOLDING_GROUND) for t in e.tags))
+        pc = self.scene.pc()
+        if pc is not None and not self.scene.in_encounter:
+            self._ensure_encounter(first, target=pc.ref)
+        self._enrol_the_rest(refs)
+        who = _the_creature(self.scene.actors[first].name)
+        return Outcome(intent_id="", op="stance",
+                       effects=[{"ref": first, "kind": "stance", "lifted": "lair",
+                                 "refs": refs}],
+                       tell=(f"{who} stops keeping the lair, and "
+                             + ("all of them come at you." if len(refs) > 1
+                                else "comes at you.")),
+                       because="the player closed on the lair or struck it")
 
     # How close each zone is, for "has the player closed on it?" (intents.ZONES order).
     _CLOSENESS: ClassVar[dict] = {"far": 0, "near": 1, "engaged": 2}
@@ -18240,6 +18267,15 @@ class Engine:
             if held is None:
                 continue
             fighting = any(ref in refs for refs in self.scene.sides.values())
+            if held.payload.get("lair") and not who.is_down:
+                # A boss's lair (the owner, 2026-11-18: the boss room is never an instant
+                # fight, so the player can judge it). No reaction roll and no giving way:
+                # struck, or closed on, the whole lair wakes and comes at you together.
+                was = self._CLOSENESS.get(str(held.payload.get("zone") or "far"), 0)
+                now = self._CLOSENESS.get(str(self.scene.zones.get(ref) or "far"), 0)
+                if fighting or now > was:
+                    out.append(self._wake_the_lair(held.source, ref))
+                continue
             if who.is_down or fighting:
                 who.remove_effects(match=lambda e: e is held)
                 if not who.is_down:

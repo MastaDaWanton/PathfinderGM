@@ -803,8 +803,21 @@ def stock_room(engine, place, d: dict, concept: dict) -> tuple[list[dict], str]:
     # 2026-11-17 #46/#47: named "the beast they kept", the dog's tells read "the beast
     # they kept's attack", and "I stab at the dog" found nobody once it was down. A
     # person's title is a noun phrase ("the band's captain") and stays their name.
+    # The boss room is never an instant fight (the owner, 2026-11-18: "make sure every boss
+    # room isn't an instant fight, to allow the player to assess whether they can win").
+    # What would come at you on sight, and any creature that is not a wary person who can
+    # be talked to, keeps its lair instead and watches: closing on any of them, or
+    # striking one, wakes them all (`Engine._holding_ground_settles`).
+    lair = climax and (on_sight or not person)
     fx, _said = engine._inhabit(place, guarding=climax, row=got.row, count=got.count,
-                                name=title if person else None, hostile=on_sight)
+                                name=title if person else None,
+                                hostile=on_sight and not lair)
+    company, beside = (_retinue(engine, place, tag, on_sight and not lair) if climax
+                       else ([], ""))
+    fx += company
+    if lair:
+        for r in [r for e in fx for r in (e.get("refs") or [e.get("ref")]) if r]:
+            engine._hold_ground(r, "lair", f"lair:{d.get('of', '')}", lair=True)
     refs = [r for e in fx for r in (e.get("refs") or [e.get("ref")]) if r]
     if person and not on_sight:
         for r in refs:
@@ -815,7 +828,10 @@ def stock_room(engine, place, d: dict, concept: dict) -> tuple[list[dict], str]:
 
     noun = creature_noun(got.row.get("name", "")).lower()
     calm = ", wary of strangers." if person else ", further in."
-    if title:
+    if title and lair:
+        said = (f"{_cap(title)}, {english.a(noun)}, holds this place, and has seen you; "
+                f"it does not come at you yet.")
+    elif title:
         said = (f"{_cap(title)}, {english.a(noun)}, holds this place"
                 + (", and has seen you." if on_sight else
                    ", and is watching you." if person else calm))
@@ -825,9 +841,64 @@ def stock_room(engine, place, d: dict, concept: dict) -> tuple[list[dict], str]:
                 + (", and have seen you." if on_sight else calm))
     else:
         said = f"{_cap(english.a(noun))} is here" + (", and has seen you." if on_sight else calm)
+    said += beside
+    if lair:
+        said += (" They keep to the lair while you keep your distance: come closer, or "
+                 "strike one, and they all come at you.")
     for e in fx:
         e["dungeon"] = concept["tag"]
     return fx, said
+
+
+def _retinue(engine, place, tag: dict, hostile: bool) -> tuple[list[dict], str]:
+    """Who fights beside the leader in the climax. (effects, the tell's sentence)
+
+    The owner, 2026-11-18: "the boss is one creature but it should not necessarily be the
+    only creature in the fight. The rat king should have at least 5 rats (or 1 swarm of
+    rats) and 2 dire rats fighting with him." The Bestiary's organizations say the same
+    (the wererat's "guild (11-30 plus 5-12 dire rats)").
+
+    A tag that authors its `retinue` (content/dungeons/tags.json) gets it as written: a
+    list of groups, each a list of alternatives `{"creature": id, "count": n}`, one
+    alternative of each group picked on the engine's hidden dice. An authored fight is a
+    document's deliberate placement, so it is not cut to the budget (the encounter
+    ruling's "nothing epic unless a document deliberately places it"). Any other tag's
+    leader is joined by its own enemies at an ordinary wandering draw (mostly average).
+
+    They take the leader's stance: the rats of a rat-king who is watching you are
+    watching you too, and they join the fight he is in."""
+    from . import bestiary
+    from . import encounter_budget as eb
+    from . import gathering
+    from .openings import creature_noun, group_phrase
+
+    groups = tag.get("retinue")
+    picks: list[tuple[dict, int]] = []
+    if groups is None:
+        got = _draw(engine, _spec_rows(tag["enemies"]), kind="wandering", most=eb.MOST)
+        if got is not None:
+            picks.append((got.row, got.count))
+    else:
+        book = bestiary.imported()
+        for alts in groups:
+            alts = [(book[a["creature"]], max(1, int(a.get("count") or 1)))
+                    for a in alts if a.get("creature") in book]
+            if alts:
+                picks.append(alts[gathering.pick_index(engine.dice, len(alts),
+                                                       "who comes with the leader")])
+    fx: list[dict] = []
+    them: list[str] = []
+    many = 0
+    for row, n in picks:
+        made, _said = engine._inhabit(place, row=row, count=n, hostile=hostile)
+        fx += made
+        if made:
+            them.append(group_phrase(creature_noun(row.get("name", "")), n))
+            many += n
+    if not them:
+        return fx, ""
+    words = them[0] if len(them) == 1 else ", ".join(them[:-1]) + " and " + them[-1]
+    return fx, f" {_cap(words)} {'are' if many > 1 else 'is'} with them."
 
 
 def meet_ally(engine, place, concept: dict, head: dict) -> tuple[list[dict], str]:
