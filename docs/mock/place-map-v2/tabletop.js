@@ -6,7 +6,7 @@
 // Painted miniature = a place you have stood in; grey primer = seen, not yet visited;
 // nothing at all = not found. The same model and rules as the other styles (shared/).
 import * as THREE from "three";
-import { OrbitControls } from "./vendor/addons/OrbitControls.js";
+import { OrbitControls } from "./vendor/addons/controls/OrbitControls.js";
 
 const M = MapModel;
 const U = 1 / 10;              // town units to metres-ish
