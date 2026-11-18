@@ -163,8 +163,10 @@ const MapUI = (() => {
     else if (b.dataset.pick) pick(b.dataset.pick);
     else if (b.dataset.readmap) {
       const n = b.dataset.readmap;
-      st.maps = st.maps.includes(n) ? st.maps.filter(x => x !== n) : st.maps.concat(n);
-      st.said = st.maps.includes(n) ? `You study the map of ${D.world.nations[n].name}: its towns and roads go onto yours.` : ""; paint();
+      // One way: what a map taught stays known, as `been` only grows (the fog rule refuses
+      // forgetting; NetHack took map amnesia out because players just wrote the map down).
+      if (!st.maps.includes(n)) st.maps = st.maps.concat(n);
+      st.said = `You buy a map of ${D.world.nations[n].name} and study it: its towns and roads go onto yours.`; paint();
     }
     else if (b.dataset.replay) {
       const s = SITES[st.site], S = M.siteLayout(s.rooms);
@@ -188,7 +190,7 @@ const MapUI = (() => {
     const how = h => h.by === "been" ? "You have stood here."
       : h.by === "road" ? `A road out of ${e(nm(h.from))} is signed for it.`
       : h.by === "heard" ? `Heard of in talk: “${e(h.line)}”`
-      : `On the map of ${e(W.nations[h.nation].name)} you read.`;
+      : `On the map of ${e(W.nations[h.nation].name)} you bought.`;
     let out = "";
     if (st.sel && K.how[st.sel] && st.sel !== st.regionHere) {
       const c = city(st.sel), n = W.nations[c.nation] || {};
@@ -205,8 +207,8 @@ const MapUI = (() => {
       <p>${Object.keys(K.how).length} cities known: ${counts.been} stood in, ${counts.road} from road signs, ${counts.heard} heard of, ${counts.map} from maps.</p>
       <p>Zoom out past the region to come here; press a town for the way there.</p>
       <div class="btnrow"><button type="button" class="go quiet" data-open="region">Region map</button>${nation ? `
-      <button type="button" class="go quiet" data-readmap="${e(nation)}" aria-pressed="${st.maps.includes(nation)}">${st.maps.includes(nation) ? "Put the map away" : `Read a map of ${e(W.nations[nation].name)}`}</button>` : ""}</div>
-      <p class="proposed">Reading a map is proposed: no map item exists in the game yet.</p></div>`;
+      <button type="button" class="go quiet" data-readmap="${e(nation)}" ${st.maps.includes(nation) ? " disabled" : ""}>${st.maps.includes(nation) ? `You have the map of ${e(W.nations[nation].name)}` : `Buy a map of ${e(W.nations[nation].name)}`}</button>` : ""}</div>
+      <p class="proposed">Ruling 2026-11-18: maps are bought, one map to a nation, showing its towns and roads. Not in the game yet; where they are sold and their price are not set.</p></div>`;
     out += placeList(Object.keys(K.how).sort((a, b) => nm(a).localeCompare(nm(b))), nm, id => K.how[id].by !== "been");
     return out;
   }
