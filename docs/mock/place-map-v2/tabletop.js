@@ -1,12 +1,14 @@
 // Style 3, the true 3D tabletop: a parchment map on a wooden table with painted miniatures,
-// in Three.js r170 vendored in vendor/ (the packaged app is offline: no CDN). Kenney's CC0
-// kits were the plan; their download needs a browser session this lane could not script,
-// so every model here is procedural low-poly (the brief's fallback), built from primitives.
+// in Three.js r170 vendored in vendor/ (the packaged app is offline: no CDN). The miniatures
+// are Kenney's CC0 Hexagon Kit and Fantasy Town Kit 2.0 (vendor/kenney, License.txt in each),
+// downloaded by hand from kenney.nl; any model that fails to load falls back to the
+// procedural primitive below, so the board never comes up empty.
 //
 // Painted miniature = a place you have stood in; grey primer = seen, not yet visited;
 // nothing at all = not found. The same model and rules as the other styles (shared/).
 import * as THREE from "three";
 import { OrbitControls } from "./vendor/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "./vendor/addons/loaders/GLTFLoader.js";
 
 const M = MapModel;
 const U = 1 / 10;              // town units to metres-ish
@@ -55,6 +57,7 @@ function init(el, a) {
   stage.querySelector("#tilt").addEventListener("click", ev => { tiltOn = !tiltOn; ev.currentTarget.setAttribute("aria-pressed", tiltOn); });
   new ResizeObserver(resize).observe(stage); resize();
   renderer.setAnimationLoop(frame);
+  window.__three = { camera, controls };  // for screenshots and the perf probe
   renderer.info.autoReset = false;  // count the scene and the tilt-shift pass together, per frame
   window.__perf = () => ({ fps: fps.value, ...renderer.info.memory, calls: lastInfo.calls, triangles: lastInfo.triangles,
                           gl: renderer.getContext().getParameter(renderer.getContext().VERSION) });
@@ -117,7 +120,8 @@ function post() {
 
 // --- Miniatures ---------------------------------------------------------------------------
 function mesh(geo, m, cast = true) { const o = new THREE.Mesh(geo, m); o.castShadow = cast; o.receiveShadow = true; return o; }
-const kindOf = n => /cathedral|temple|chapel/.test(n) ? "steeple" : /keep|tower/.test(n) ? "keep" : /smith/.test(n) ? "smithy"
+const kindOf = n => /cathedral|temple|chapel/.test(n) ? "steeple" : /laborator|alchem/.test(n) ? "lab" : /barrack|guard/.test(n) ? "barracks"
+  : /granar|mill/.test(n) ? "mill" : /stable/.test(n) ? "stables" : /guild|hall/.test(n) ? "hall" : /keep|tower/.test(n) ? "keep" : /smith/.test(n) ? "smithy"
   : /inn|tavern/.test(n) ? "inn" : /market|row/.test(n) ? "market" : /well|cistern/.test(n) ? "well" : /grave/.test(n) ? "grave"
   : /green|woods/.test(n) ? "trees" : /gate/.test(n) ? "gate" : /square/.test(n) ? "plaza" : /crossroads|outskirts|crossing/.test(n) ? "post"
   : /road to/.test(n) ? "road" : /desert/.test(n) ? "dunes" : /cave/.test(n) ? "cave" : /warren/.test(n) ? "huts" : /arena/.test(n) ? "arena" : "house";
@@ -134,7 +138,74 @@ function tree(painted, s = 1) {
   const crown = mesh(new THREE.ConeGeometry(.9 * s, 2 * s, 7), painted ? mat(0x4f7a3c) : PRIMER); crown.position.y = 1.8 * s; g.add(crown);
   return g;
 }
+// --- Kenney's models ------------------------------------------------------------------------
+const KIT = {}, KIT_FILES = ["hex/building-house", "hex/building-cabin", "hex/building-smelter", "hex/building-castle",
+  "hex/building-wizard-tower", "hex/building-market", "hex/building-walls", "hex/building-archery", "hex/building-mill",
+  "hex/building-sheep", "hex/building-tower", "hex/building-mine", "hex/building-village", "hex/unit-house", "hex/unit-mansion",
+  "hex/sand-desert", "hex/grass", "hex/grass-forest", "hex/water", "hex/stone-hill",
+  "town/fountain-round", "town/lantern", "town/tree", "town/tree-high-round", "town/tree-crooked"];
+// Kenney's hex buildings come moulded onto their own hex tile: on a table that tile is the
+// miniature's base, so those get no round base of ours. The Town Kit pieces stand on ours.
+const ON_HEX = { house: "hex/building-house", inn: "hex/building-cabin", smithy: "hex/building-smelter", keep: "hex/building-castle",
+  steeple: "hex/building-wizard-tower", lab: "hex/building-wizard-tower", market: "hex/building-market", gate: "hex/building-walls",
+  barracks: "hex/building-archery", mill: "hex/building-mill", stables: "hex/building-sheep", cave: "hex/building-mine",
+  dunes: "hex/sand-desert", town: "hex/building-village" };
+let kitReady = null;
+function loadKit() {
+  if (kitReady) return kitReady;
+  const loader = new GLTFLoader();
+  kitReady = Promise.all(KIT_FILES.map(f => loader.loadAsync(`vendor/kenney/${f}.glb`).then(g => {
+    const o = g.scene;
+    o.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; m.geometry.userData.keep = true; m.material.userData.keep = true;
+      // Kenney's hex palette is mint; warmed a touch toward the game's parchment and leather.
+      if (f.startsWith("hex/")) m.material.color.setRGB(.92, .9, .74); } });
+    const size = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3());
+    KIT[f] = { o, w: Math.max(size.x, size.z), h: size.y };
+  }).catch(err => console.warn("Kenney model missing, using the primitive:", f, err.message))));
+  return kitReady;
+}
+// A clone `width` across (or `height` tall); grey primer when the place is only seen.
+function kit(f, painted, width, height) {
+  const k = KIT[f]; if (!k) return null;
+  const o = k.o.clone(true), sc = height ? height / k.h : width / k.w;
+  o.scale.setScalar(sc);
+  if (!painted) o.traverse(m => { if (m.isMesh) m.material = PRIMER; });
+  o.userData.top = k.h * sc;
+  return o;
+}
+// One tile's geometry with its node transform baked in, for instancing the region board.
+const TILE = {};
+function tileOf(f) {
+  if (TILE[f] || !KIT[f]) return TILE[f];
+  let m = null; KIT[f].o.traverse(x => { if (x.isMesh && !m) m = x; });
+  KIT[f].o.updateMatrixWorld(true);
+  const geo = m.geometry.clone().applyMatrix4(m.matrixWorld); geo.userData.keep = true;
+  return (TILE[f] = { geo, mat: m.material });
+}
+function kenneyMini(kind, painted) {
+  const g = new THREE.Group(), f = ON_HEX[kind];
+  if (f && KIT[f]) {
+    const o = kit(f, painted, kind === "town" ? 10.5 : kind === "keep" || kind === "gate" ? 3.4 : 3); g.add(o);
+    if (painted && ["house", "inn", "smithy"].includes(kind)) { const ch = new THREE.Object3D(); ch.position.set(.3, o.userData.top, -.3); g.add(ch); smoke.push({ at: ch, seed: Math.random() * 10 }); }
+    if (painted && (kind === "keep" || kind === "gate")) { const fl = flag(0x8e2317); fl.position.set(kind === "gate" ? -1 : .6, o.userData.top - .2, .3); g.add(fl); flags.push(fl); }
+    return g;
+  }
+  const add = o => { if (o) g.add(o); return o; };
+  if (kind === "trees" && KIT["town/tree"]) ["town/tree", "town/tree-high-round", "town/tree-crooked", "town/tree", "town/tree-high-round"]
+    .forEach((t, i) => { const o = add(kit(t, painted, 1.2)); if (o) o.position.set(Math.cos(i * 2.4) * 1.1, 0, Math.sin(i * 2.4) * 1.1); });
+  else if ((kind === "plaza" || kind === "well") && KIT["town/fountain-round"]) add(kit("town/fountain-round", painted, kind === "plaza" ? 2.4 : 1.6));
+  else if (kind === "post" && KIT["town/lantern"]) add(kit("town/lantern", painted, 0, 2.2));
+  else if (kind === "huts" && KIT["hex/unit-house"]) [-1, 0, 1].forEach(i => { const o = add(kit("hex/unit-house", painted, 1.1)); if (o) o.position.set(i * 1.05, 0, (i & 1) * .7); });
+  else if (kind === "hall" && KIT["hex/unit-mansion"]) add(kit("hex/unit-mansion", painted, 2.2));
+  else return null;
+  const base = mesh(new THREE.CylinderGeometry(1.35, 1.42, .18, 24), mat(0x3a2c20, { flatShading: false, roughness: .5 }));
+  base.position.y = -.1; g.add(base);
+  return g;
+}
+
 function miniature(kind, { storeys = 1, colour = 0xc9a64f, painted = true }) {
+  const fromKit = kenneyMini(kind, painted);
+  if (fromKit) return fromKit;
   const g = new THREE.Group(), P = painted, h = 1.2 + (storeys - 1) * .9;
   const add = (o, x = 0, y = 0, z = 0) => { o.position.set(x, y, z); g.add(o); return o; };
   switch (kind) {
@@ -224,7 +295,7 @@ function drawPaper(c, v, half) {
 
 // --- Building each map's board ---------------------------------------------------------------
 function clear() {
-  if (world) { scene.remove(world); world.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material && !o.material.map && o.material !== PRIMER && ![...MATS.values()].includes(o.material)) o.material.dispose(); }); }
+  if (world) { scene.remove(world); world.traverse(o => { if (o.geometry && !o.geometry.userData.keep) o.geometry.dispose(); [].concat(o.material || []).forEach(m => { if (!m.userData.keep && !m.map && m !== PRIMER && ![...MATS.values()].includes(m)) m.dispose(); }); }); }  // the scroll's roll carries an array
   if (paperTex) { paperTex.dispose(); paperTex = null; }
   world = new THREE.Group(); scene.add(world); pick = []; smoke = []; flags = []; clouds = []; routeObj = null;
   candles = candles.filter(c => !c.site);  // a room's torch goes with its room
@@ -234,7 +305,7 @@ async function draw(v) {
   V = v;
   const key = v.level + (v.site ? v.site.key : "");
   const fresh = key !== lastKey; lastKey = key;
-  await loadPaper();
+  await Promise.all([loadPaper(), loadKit()]);
   clear();
   if (v.level === "town") town(v); else if (v.level === "region") region(v); else site(v);
   pc = pcMini(); world.add(pc); placePc();
@@ -250,6 +321,7 @@ function town(v) {
   paperTex = new THREE.CanvasTexture(c); paperTex.colorSpace = THREE.SRGBColorSpace; paperTex.anisotropy = 8;
   const sheet = new THREE.Mesh(new THREE.PlaneGeometry(half * 2 * U, half * 2 * U), new THREE.MeshStandardMaterial({ map: paperTex, roughness: .95 }));
   sheet.rotation.x = -Math.PI / 2; sheet.position.y = .05; sheet.receiveShadow = true; world.add(sheet);
+  world.add(scroll(half * 2 * U, half * 2 * U));
   const ward = i => { if (i === L.square) return "square"; const cc = L.kind[i] === "crossing" ? i : L.street[i];
     const m = /(north|east|south|west)-crossing/.exec(cc || ""); return m ? m[1] : "square"; };
   [...F.found].filter(i => L.pos[i]).forEach(i => {
@@ -264,6 +336,41 @@ function town(v) {
   });
   // Cotton-wool clouds drifting over the fogged paper at the town's edge.
   for (let n = 0; n < 10; n++) { const a = n / 10 * Math.PI * 2, r = 46 + (n % 3) * 6; cloud(Math.cos(a) * r, Math.sin(a) * r, 1 + (n % 3) * .4); }
+}
+// The town map is a scroll: the same paper on its face, the game's leather (card-leather.jpg,
+// the slips' own) on its outside, rolled at the north and south edges round wooden rods.
+let LEATHER = null;
+function leather(rx, ry) {
+  if (!LEATHER) { LEATHER = new THREE.TextureLoader().load("assets/card-leather.jpg"); LEATHER.colorSpace = THREE.SRGBColorSpace; LEATHER.wrapS = LEATHER.wrapT = THREE.RepeatWrapping; }
+  const t = LEATHER.clone(); t.needsUpdate = true; t.repeat.set(rx, ry); return t;
+}
+function spiralTex() {
+  const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d");
+  g.fillStyle = "#e6d8b6"; g.fillRect(0, 0, 256, 256);
+  g.strokeStyle = "#5a3a22"; g.lineWidth = 5; g.beginPath();
+  for (let a = 0; a < Math.PI * 12; a += .05) { const r = 8 + a * 3.1; g.lineTo(128 + Math.cos(a) * r, 128 + Math.sin(a) * r); }
+  g.stroke(); g.lineWidth = 14; g.beginPath(); g.arc(128, 128, 121, 0, 7); g.stroke();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function scroll(width, depth) {
+  const g = new THREE.Group(), r = 3.2, L = width + 3;
+  // The game's leather is near black: its grain as a bump map and a little sheen make it read as
+  // hide in the candlelight; gilt bands near the ends, as on the game's gilt-edged cards.
+  const hide = leather(1, 5);
+  const side = new THREE.MeshStandardMaterial({ map: hide, bumpMap: hide, bumpScale: 3, roughness: .42, color: new THREE.Color(2.6, 2.2, 1.8) });
+  const gilt = mat(0xc9a05a, { flatShading: false, metalness: .85, roughness: .3 });
+  const cap = new THREE.MeshStandardMaterial({ map: spiralTex(), roughness: .9 });
+  const wood = mat(0x3a2414, { flatShading: false, roughness: .35 });
+  [-1, 1].forEach(s => {
+    const z = s * (depth / 2 + r * .3);
+    const roll = mesh(new THREE.CylinderGeometry(r, r, L, 48), [side, cap, cap]); roll.rotation.z = Math.PI / 2; roll.position.set(0, r, z); g.add(roll);
+    const rod = mesh(new THREE.CylinderGeometry(.55, .55, L + 5, 12), wood); rod.rotation.z = Math.PI / 2; rod.position.set(0, r, z); g.add(rod);
+    [-1, 1].forEach(e => { const k = mesh(new THREE.SphereGeometry(1.1, 18, 12), wood); k.position.set(e * (L / 2 + 2.8), r, z); g.add(k);
+      const band = mesh(new THREE.CylinderGeometry(r + .06, r + .06, 1.2, 48), gilt); band.rotation.z = Math.PI / 2; band.position.set(e * (L / 2 - 3.5), r, z); g.add(band); });
+  });
+  const back = new THREE.Mesh(new THREE.PlaneGeometry(width, depth), new THREE.MeshStandardMaterial({ map: leather(4, 4), side: THREE.BackSide }));
+  back.rotation.x = -Math.PI / 2; back.position.y = .04; g.add(back);
+  return g;
 }
 function cloud(x, z, s = 1) {
   const g = new THREE.Group(), m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, transparent: true, opacity: .92, flatShading: true });
@@ -291,13 +398,18 @@ function region(v) {
     // The world exports no coastline: a harbour town gets a little water off its docks, nothing more.
     const sea = seaAt.some(([sx, sz]) => Math.hypot(x - sx - 17, z - sz) < 13) && !roadNear(x, z);
     const desert = G.wild.some(w => w.kind === "desert" && v.wildFound.has(w.id) && Math.hypot(P(w.pos)[0] - x, P(w.pos)[1] - z) < 9);
-    const col = sea ? 0x4a7899 : desert ? 0xd9bd85 : ((q * 7 + r * 3) % 5 === 0 ? 0x6f9a52 : 0x86a85e);
-    m4.compose(new THREE.Vector3(x, sea ? -.3 : .5 + (((q * 13 + r * 7) % 3 + 3) % 3) * .08, z), q0, new THREE.Vector3(1, sea ? .6 : 1, 1));
+    const col = sea ? "hex/water" : desert ? "hex/sand-desert" : known ? "hex/grass"
+      : ((q * 7 + r * 3) % 5 === 0 ? "hex/grass-forest" : ((q * 5 + r * 11) % 13 === 0 ? "hex/stone-hill" : "hex/grass"));
+    // Kenney's tiles are 1 across the flats, 1.15 point to point: scaled to this board's hexes,
+    // and half height, so grass tops out level with the roads.
+    if (tileOf(col)) m4.compose(new THREE.Vector3(x, sea ? -.15 : 0, z), q0, new THREE.Vector3(HX * Math.sqrt(3) * .985, 5, HX * Math.sqrt(3) * .985));
+    else m4.compose(new THREE.Vector3(x, sea ? -.3 : .5 + (((q * 13 + r * 7) % 3 + 3) % 3) * .08, z), q0, new THREE.Vector3(1, sea ? .6 : 1, 1));
     (byCol.get(col) || byCol.set(col, []).get(col)).push(m4.clone());
     if (!known) for (let i = 0; i < 4; i++) puffs.push(new THREE.Matrix4().compose(new THREE.Vector3(x + (i - 1.5) * 1.7, 2.6 + Math.sin(i + q) * .5, z + (i % 2) * .9),
       q0, new THREE.Vector3().setScalar(2.1 * (1 - i * .15))));
   }
-  byCol.forEach((list, col) => { const im = new THREE.InstancedMesh(hexGeo, mat(col), list.length); list.forEach((m, n) => im.setMatrixAt(n, m)); im.receiveShadow = true; world.add(im); });
+  const fallback = { "hex/water": 0x4a7899, "hex/sand-desert": 0xd9bd85, "hex/grass-forest": 0x6f9a52, "hex/stone-hill": 0x9a9284, "hex/grass": 0x86a85e };
+  byCol.forEach((list, col) => { const t = tileOf(col), im = new THREE.InstancedMesh(t ? t.geo : hexGeo, t ? t.mat : mat(fallback[col]), list.length); list.forEach((m, n) => im.setMatrixAt(n, m)); im.receiveShadow = true; world.add(im); });
   if (puffs.length) { const im = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }), puffs.length);
     puffs.forEach((m, n) => im.setMatrixAt(n, m)); im.castShadow = true; world.add(im); clouds.push(Object.assign(im, { userData: { drift: 0 } })); }
   G.roads.forEach(rd => { const a = P(G.pos[rd.a]), b = P(G.pos[rd.b]), L = Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -305,7 +417,7 @@ function region(v) {
     strip.position.set((a[0] + b[0]) / 2, 1.08, (a[1] + b[1]) / 2); strip.rotation.y = -Math.atan2(b[1] - a[1], b[0] - a[0]); world.add(strip);
     for (let d = 1; d < rd.days; d++) { const t = d / rd.days, peg = mesh(new THREE.CylinderGeometry(.35, .35, .9, 8), mat(0xf3ead6));
       peg.position.set(a[0] + (b[0] - a[0]) * t, 1.4, a[1] + (b[1] - a[1]) * t); world.add(peg); } });   // a peg a day: where journey events pin
-  G.shown.forEach(i => { const [x, z] = P(G.pos[i]), o = miniature("town", { painted: v.visited.has(i) }); place(o, i, x, z, 1.5).position.y = 1.05;
+  G.shown.forEach(i => { const [x, z] = P(G.pos[i]), o = miniature("town", { painted: v.visited.has(i) }); place(o, i, x, z, KIT["hex/building-village"] ? 1 : 1.5).position.y = KIT["hex/building-village"] ? 0 : 1.05;
     o.userData.name = G.towns[i].name; o.userData.seen = !v.visited.has(i); });
   G.wild.forEach(w => { if (!v.wildFound.has(w.id)) return; const [x, z] = P(w.pos), o = miniature(w.kind === "woods" ? "trees" : w.kind, { painted: v.wildVisited.has(w.id) });
     place(o, w.id, x, z, 1.5).position.y = 1.05; o.userData.name = M.bare(w.name); o.userData.seen = !v.wildVisited.has(w.id); o.userData.down = w.kind === "cave"; });
@@ -353,7 +465,7 @@ function posOf(id) {
 function placePc() {
   const id = V.level === "town" ? V.here : V.level === "region" ? V.here : V.here;
   const p = posOf(id); if (!p) return;
-  pc.position.copy(p).add(new THREE.Vector3(V.level === "site" ? 1.5 : 3.6, 0, V.level === "site" ? 1 : 3.6)); pc.scale.setScalar(V.level === "site" ? 1.2 : 2);
+  pc.position.copy(p).add(new THREE.Vector3(V.level === "site" ? 1.5 : 3.6, 0, V.level === "site" ? 1 : 3.6)); pc.scale.setScalar(V.level === "site" ? 1.2 : V.level === "region" ? 1.2 : 2);
 }
 let routeObj = null;
 function routeLine() {
@@ -379,7 +491,7 @@ function frameCamera() {
   const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3()).length();
   controls.target.copy(c);
   const d = Math.min(Math.max(size * (V.level === "site" ? 1.25 : V.level === "region" ? 1.1 : .95), 30), 240);
-  camera.position.set(c.x - d * .05, d * .78, c.z + d * .66);
+  camera.position.set(c.x - d * .05, d * .86, c.z + d * .56);
   controls.update();
 }
 
