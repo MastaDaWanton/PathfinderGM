@@ -8,6 +8,9 @@
 <style>
   .stage canvas.gl { cursor: grab; touch-action: none; }
   .rain { pointer-events: none; }
+  /* A nation's name on the region board: spaced capitals in its ink, under the place tags. */
+  .area { position: absolute; left: 0; top: 0; white-space: nowrap; font: 600 15px/1 var(--display); letter-spacing: .32em;
+          text-shadow: 0 0 3px rgba(243, 234, 214, .95), 0 0 8px rgba(243, 234, 214, .8); opacity: .9; }
   .tag .nm { display: inline-block; max-width: 190px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }  /* a long name ends in …; the whole is on hover (title) and in the slip */
   .tag { position: absolute; left: 0; top: 0; white-space: nowrap; font: 600 13px/1 var(--body); color: #2a2019;
          background: rgba(243, 234, 214, .9); padding: 4px 8px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.45); }
