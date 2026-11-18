@@ -4,15 +4,15 @@
  "summary": "A Universal World Class any character may take regardless of their class. It levels through active use (every step at the forge), opening methods and rarer metal at levels 1 to 3. Past level 3 the levels never stop, and each one grants two perks: potency, hardening, quality or yield.",
  "grantable_at_creation": true,
  "_ruling_2026_10_03_note": "The owner's blacksmithing revamp ruling, 2026-10-03 (docs/blacksmithing-revamp-plan.md §2, §4, §7, §14), 'same as Herbalism'. Three unlock levels replace five: level 1 forge, quench, assemble and assay on common and uncommon metal, and smelt at a smithy; level 2 alloy, temper, fold, hone, strengthen and finish on rare and exotic; level 3 legendary metal and the sacred finishes. Draw merged into forge, polish into hone, flux became an ingredient of smelt and rivet became assemble; the level 4 and 5 rows, the `legendary-metal` milestone and its deed are gone. Old saves keep their level: an old Blacksmith 4 or 5 is an endless level 4 or 5 with its perk picks banked (rules/worldclass.py `migrate_blacksmith`).",
- "_thresholds_note": "Mastery to reach levels 2 and 3; every level after that is priced by `endless`. 25 and 65 are the Herbalist's numbers on purpose: the two tracks are meant to pace the same, and a second curve would be two clocks to balance instead of one.",
+ "_thresholds_note": "Mastery to reach levels 2 and 3; every level after that is priced by `endless`. 25 and 65 are the Herbalist's numbers on purpose: the two tracks are meant to pace the same, and a second curve would be two clocks to balance instead of one. Repriced by the owner's 2026-11-18 ruling: 1->2 costs 100, 2->3 costs 260, every later level a flat 400 (`endless` base 400, step 0). Earned levels are kept.",
  "thresholds": [
-  25,
-  65
+  100,
+  260
  ],
- "_endless_note": "Levels past the written table, plan §4.2 (proposed numbers, tunable here without a code change). Leaving level 3 costs `base` and each level after it `step` more (50, 60, 70...). Each endless level banks `picks_per_level` picks; the same perk may be taken twice. `perks` is what one pick is worth: potency adds to the multiplier on the bonus modifiers of everything made, hardening takes that fraction off the negative modifiers (multiplied with the per-level cut), quality raises the ceiling by that many steps, yield is the chance per Smelt or Forge of one extra ingot or blank.",
+ "_endless_note": "Levels past the written table, plan §4.2 (proposed numbers, tunable here without a code change). Leaving level 3 costs `base` and each level after it `step` more (the 2026-11-18 ruling makes that a flat 400, step 0). Each endless level banks `picks_per_level` picks; the same perk may be taken twice. `perks` is what one pick is worth: potency adds to the multiplier on the bonus modifiers of everything made, hardening takes that fraction off the negative modifiers (multiplied with the per-level cut), quality raises the ceiling by that many steps, yield is the chance per Smelt or Forge of one extra ingot or blank.",
  "endless": {
-  "base": 50,
-  "step": 10,
+  "base": 400,
+  "step": 0,
   "picks_per_level": 2,
   "perks": {
    "potency": 0.05,
@@ -226,6 +226,9 @@
   "_bars_note": "Bars a shape takes at Forge (proposed): one per 4 lb of weapon, per 10 lb of armour, per 5 lb of shield, at least one. A bar is 1 lb of worked stock (plan §8).",
   "bars_per_lb": {"weapon": 4, "armour": 10, "shield": 5},
   "reheat_minutes": 5,
+  "_in_progress_note": "The owner's ruling of 2026-11-18 (item 14): a forge step of `in_progress_after` minutes or more goes In progress. The clock moves by `hands_on_minutes` (the heat game at the anvil), the rest waits In progress: at the smithy when worked at one (collected there, as a tannery vat's hide is), carried when worked from the field kit. The smithy's rent is still the whole step's time.",
+  "in_progress_after": 60,
+  "hands_on_minutes": 10,
   "rarity_step": 0.05,
   "_traits_note": "What the working traits do at the bench (plan §5.5, proposed percentages). `band` scales every game's band; `quench_band` only Quench's; `weld_band` only Fold's and Strengthen's; `time` scales the minutes. A trait not listed here is still read where the rules name it (slaggy, malleable, pure, flawless, clean_heat, sulfurous, cleans_slag, reactive).",
   "traits": {

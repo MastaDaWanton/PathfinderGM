@@ -5,15 +5,15 @@
  "grantable_at_creation": true,
  "_namespace_note": "This is the alchemist WORLD CLASS (rules.worldclass.get / rules.alchemist), not the PF1e Alchemist character class in content/classes/ (rules.classes.get). They share a name and nothing else: a Rogue is an Alchemist here the way a Fighter is an Herbalist, by doing the work. The two namespaces never meet in code.",
  "_ruling_2026_10_05_note": "The owner's alchemy revamp rulings (docs/alchemy-questions.md, all ten rounds, and the plan's open points answered 2026-10-06; docs/alchemy-revamp-plan.md §4, §7). Three unlock levels replace five: level 1 dissolve, calcine, bottle and assay on common and uncommon material; level 2 distill, filter and react on rare and exotic; level 3 sublime and transmute on legendary. Seal became Bottle; Precipitate folded into Filter (the precipitate is Filter's solid end); Stabilize became an ingredient (any material with the `stabilizer` working trait); Catalyze became a working trait (`catalyst`, never spent). The old level 4 and 5 rows, the 25/65/50/100 curve and the `legendary-work` milestone and its deed are removed. Old saves keep their level: an old Alchemist 4 or 5 is an endless level 4 or 5 with its perk picks banked (the `alchemy_v2` migration, wave 2 lane I).",
- "_thresholds_note": "Mastery to reach levels 2 and 3, herbalism's and the forge's numbers kept equal on purpose ('the two tracks are meant to pace the same', plan §4.1); every level after that is priced by `endless`. The bench pays each successful step (1, +1 per rarity band above common, +1 at Superior, +2 at Flawless or higher; every success pays, the owner's 2026-10-05 ruling), and firsts pay 3.",
+ "_thresholds_note": "Mastery to reach levels 2 and 3, herbalism's and the forge's numbers kept equal on purpose ('the two tracks are meant to pace the same', plan §4.1); every level after that is priced by `endless`. The bench pays each successful step (1, +1 per rarity band above common, +1 at Superior, +2 at Flawless or higher; every success pays, the owner's 2026-10-05 ruling), and firsts pay 3. Repriced by the owner's 2026-11-18 ruling: 1->2 costs 100, 2->3 costs 260, every later level a flat 400 (`endless` base 400, step 0). Earned levels are kept.",
  "thresholds": [
-  25,
-  65
+  100,
+  260
  ],
  "_endless_note": "Plan §4.2: two picks a level, the same perk twice allowed, stored on Progress.perks and read live. Potency +5% to the benefits of everything made, duration +10%, quality +1 to the ceiling, yield +5% chance per Bottle of one more unit (the engine rolls it and shows the roll), containment -1 DC a pick on a volatile step and each mishap's dice one step smaller (1d6, 1d4, 1d3, 1; never below 1 point). All proposed numbers, tunable here.",
  "endless": {
-  "base": 50,
-  "step": 10,
+  "base": 400,
+  "step": 0,
   "picks_per_level": 2,
   "perks": {
    "potency": 0.05,

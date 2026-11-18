@@ -13910,15 +13910,19 @@ class Engine:
             made = roll.total >= step.dc
             self._judge(roll, made)
             verdict = "success" if made else "failure"
-            # The time passes and the forge's hours are paid either way, as at the bench.
-            self.scene.advance(step.minutes)
+            # The time passes and the forge's hours are paid either way, as at the bench,
+            # cut by a margin of 5 or more (ruling 2026-11-18, `crafting.margin_bonus`).
+            from . import crafting as _crafting
+
+            mb = _crafting.margin_bonus(roll.total - step.dc, roll.natural) if made else None
+            self.scene.advance(_crafting.bonus_minutes(step.minutes, mb))
             if step.rent_cp:
                 from . import goods
 
                 purse, ok = goods.spend(actor.purse, step.rent_cp)
                 if ok:
                     actor.purse = purse
-            report = step.settle(made, roll.total - step.dc)
+            report = step.settle(made, roll.total - step.dc, face=roll.natural)
             if step.rent_cp:
                 report["effects"].append({"ref": actor.ref, "kind": "rent", "cp":
                                           step.rent_cp, "to": step.rent_to or ""})

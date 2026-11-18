@@ -837,6 +837,13 @@ def leather_roll(request):
     # A skill check: no natural 20 or natural 1 (CRB p.180; `crafting.check_odds`).
     success = margin >= 0
     track, progress = _progress(pc)
+    # Beating the DC by 5 or more (ruling 2026-11-18, `crafting.margin_bonus`): less time
+    # now and in any wait; more units and a quality floor at the finish.
+    # The leather bench reads no yield (owner Q6.3: a hide's yield is the harvest's).
+    bonus = crafting.margin_bonus(margin, face) if success else None
+    plan.minutes = crafting.bonus_minutes(plan.minutes, bonus)
+    if plan.wait_minutes:
+        plan.wait_minutes = crafting.bonus_minutes(plan.wait_minutes, bonus)
 
     paid = []
     if rent:
@@ -849,7 +856,8 @@ def leather_roll(request):
                          "to": (where.get("tannery") or {}).get("keeper")})
     lived = bench_clock.pass_time(c, engine, pc, plan.minutes, "at the leather bench")
     roll = {"face": face, "faces": [face], "bonus": plan.bonus, "total": total,
-            "dc": plan.dc, "success": success, "margin": margin, "terms": plan.terms}
+            "dc": plan.dc, "success": success, "margin": margin, "terms": plan.terms,
+            "margin_bonus": bonus}
     out = {"roll": roll,
            "verdict": {"verdict": "success" if success else "failure", "natural": face,
                        "word": "Success" if success else "Failure"},
@@ -860,7 +868,8 @@ def leather_roll(request):
         _PENDING[c.id] = {"token": token, "plan": plan, "roll": roll, "vat": vat,
                           "where": where}
         out["token"] = token
-        out["tuning"] = lw.tuning_for(plan)
+        out["tuning"] = dict(lw.tuning_for(plan),
+                             **crafting.ladder(plan.step_ceiling, bonus))
         out["band"] = lw.band_for(plan)
     else:
         miss = -margin
@@ -950,14 +959,15 @@ def leather_finish(request):
             return _err(f"The vats want {_coins(vat)} for the wait, and you no longer "
                         f"carry it. Nothing went into the vat.", 409)
 
-    tier, score = crafting.tier_from_score(body.get("score"), plan.step_ceiling)
+    bonus = pend["roll"].get("margin_bonus")
+    tier, score = crafting.tier_from_score(body.get("score"), plan.step_ceiling, bonus)
     _PENDING.pop(c.id, None)
     now = _now(c)
     # The step settled by the rule both doors share (`leatherworker.settle_made`).
     settled = lw.settle_made(pc, progress, plan, tier,
                              [(fresh[p.key], n) for p, n in plan.consumes], now=now,
                              where=dict(pend.get("where") or {}), setup_score=score,
-                             vat_cp=vat)
+                             vat_cp=vat, margin_bonus=bonus)
     landed, paid = settled["landed"], settled["paid"]
     lines, levelled = settled["lines"], settled["levelled"]
     discoveries = settled["discoveries"]
@@ -977,7 +987,7 @@ def leather_finish(request):
             "in the pack.")
     c.transcript.append({"who": "gm", "kind": "consequence", "text": (
         f"{pc.name} works the hides: {said_what}, {tier_name} "
-        f"(d20 {r['face']}{r['bonus']:+d} = {r['total']} vs DC {r['dc']}).{tail}")})
+        f"(d20 {r['face']}{r['bonus']:+d} = {r['total']} vs DC {r['dc']}).{tail}") + (" " + str((r.get("margin_bonus") or {}).get("words") or "")).rstrip()})
     c.save()
 
     from rules import forge_items as fi

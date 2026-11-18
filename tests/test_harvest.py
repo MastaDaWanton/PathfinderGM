@@ -174,13 +174,23 @@ def test_the_skinning_kit_adds_two(monkeypatch):
     assert sum(t["value"] for t in kit) - sum(t["value"] for t in bare) == 2
 
 
-def test_a_good_roll_does_not_multiply_the_haul():
+def test_a_good_roll_adds_a_capped_share_never_multiplies_the_haul():
     """Inventory §0.3: the old excursion's `1 + margin // 5` batch made a lucky skinning
-    three hides off one wolf. One part is one part: a roll beating the DC by 20 takes the
-    wolf's one Medium unit."""
+    three hides off one wolf. The owner's ruling of 2026-11-18 gives beating the DC by 5 or
+    more a little more yield, capped at three bands: a 10% share a band, so the wolf's one
+    Medium unit is 1.5 at most (two more quarters), however far the roll beat the DC."""
     pc, wolf = _kesst(), Body("wolf")
-    got = harvest.take(pc, wolf, "hide:wolf-pelt", 36, now=100)
+    dc = _dc(pc, wolf, "hide:wolf-pelt")
+    got = harvest.take(pc, wolf, "hide:wolf-pelt", dc, now=100)
     assert got["ok"] and sum(s["units"] for s in got["stock"]) == 1.0
+    pc, wolf = _kesst(), Body("wolf")
+    got = harvest.take(pc, wolf, "hide:wolf-pelt", dc + 50, now=100)
+    assert got["ok"] and sum(s["units"] for s in got["stock"]) == 1.5
+
+
+def _dc(pc, body, key) -> int:
+    return next(r["dc"] for r in harvest.parts(body, pc, now=0, every_craft=True)
+                if r["key"] == key)
 
 
 def test_one_wolf_yields_its_pelt_once_then_taken():
@@ -226,7 +236,7 @@ def test_the_game_sets_the_grade_from_the_defect_area():
     worse a reject (scraps). A landed hide is re-graded, never duplicated."""
     assert [harvest.grade_of(d) for d in (0.0, 0.05, 0.25, 0.45, 0.8)] == [1, 2, 3, 4, 0]
     pc, wolf = _kesst(), Body("wolf")
-    got = harvest.take(pc, wolf, "hide:wolf-pelt", 30, now=0)
+    got = harvest.take(pc, wolf, "hide:wolf-pelt", _dc(pc, wolf, "hide:wolf-pelt"), now=0)
     assert got["grade"] == 3                     # the unplayed grade, until the game
     after = harvest.regrade(pc, got["game"], 0.0)
     assert after["grade"] == 1
@@ -243,10 +253,12 @@ def test_salt_carried_at_the_harvest_is_spent_one_measure_a_unit():
     spent, the hide salted; with one measure, one unit salted and one green."""
     pc = _kesst()
     pc.inventory["curing-salt"] = 3
-    got = harvest.take(pc, Body("lion"), "hide:generic-fur-hide", 30, now=0)
+    # Rolls that just make the DC: a margin of 5+ would take more hide (ruling 2026-11-18).
+    dc = _dc(pc, Body("lion"), "hide:generic-fur-hide")
+    got = harvest.take(pc, Body("lion"), "hide:generic-fur-hide", dc, now=0)
     assert got["salt_spent"] == 2 and pc.inventory["curing-salt"] == 1
     assert [s["form"] for s in got["stock"]] == ["salted"]
-    got = harvest.take(pc, Body("lion"), "hide:generic-fur-hide", 30, now=0)
+    got = harvest.take(pc, Body("lion"), "hide:generic-fur-hide", dc, now=0)
     assert got["salt_spent"] == 1 and "curing-salt" not in pc.inventory
     assert sorted((s["form"], s["units"]) for s in got["stock"]) == [("green", 1.0),
                                                                        ("salted", 1.0)]
@@ -629,3 +641,12 @@ def test_the_shocker_lizard_yields_the_hide_the_glowlizard_used_to():
     (rec,) = back["stock"].values()
     assert rec["from_materials"] == ["shocker-lizard-hide"]
     assert lw.Hide.from_tags(rec["properties"]).material == "shocker-lizard-hide"
+
+
+def test_beating_the_dc_by_5_lifts_the_grade_floor_but_leaves_grade_1_to_the_game():
+    """Ruling 2026-11-18: each 5 over makes the worst grade one better (4 -> 3 -> 2), a
+    reject included, and never better than 2: the clean grade is the knife game's own."""
+    assert harvest.graded(0, 4) == 0 and harvest.graded(4, 4) == 4
+    assert harvest.graded(4, 5) == 3 and harvest.graded(0, 5) == 3
+    assert harvest.graded(4, 15) == 2 and harvest.graded(0, 40) == 2
+    assert harvest.graded(1, 15) == 1

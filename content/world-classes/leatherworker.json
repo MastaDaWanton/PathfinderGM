@@ -4,15 +4,15 @@
  "summary": "A Universal World Class any character may take regardless of their class. It levels through active use (every step at the tanner's beam and the vat), opening methods and rarer hides at levels 1 to 3. Past level 3 the levels never stop, and each one grants two perks: potency, hardening, quality or yield.",
  "grantable_at_creation": true,
  "_ruling_2026_10_05_note": "The owner's leatherworking revamp (docs/leatherworking-questions.md, nine rounds answered 2026-10-05, and the plan's open points answered 2026-10-08; docs/leatherworking-revamp-plan.md §7, §8, §10, §11, §17). Three unlock levels replace five: level 1 is field work on common and uncommon hides (Salt, Flense, Tan by brain, by bark or as rawhide, Cut, Stitch, Harden, Assemble, Grade); level 2 the tannery's work and rare and exotic hides (alum and mineral tannages, Curry, Tool, Dye, Laminate); level 3 legendary hides and the planar tannages. Harden is a level-1 method because the owner put 'a small kettle' in the field kit (answer 3, 2026-10-08): 'plain leather armour is therefore makeable at level 1 in the field'. Skin became the cross-craft harvest (rules/harvest.py, lane C), Cure became Salt (which really takes salt), Oil folded into Curry, and Line became the lining piece at Assemble. The level 4 and 5 rows, the `legendary-hide` milestone and its deed are gone. Bark tanning moved to level 1, in the field kit, on the owner's \"sure why not\" of 2026-10-09 (docs/leatherworking-questions.md, \"Bark tanning at level 1 in the field\"). Old saves keep their level: an old Leatherworker 4 holds one pair of perk picks, an old 5 two (`worldclass.migrate_leatherworker`).",
- "_thresholds_note": "Mastery to reach levels 2 and 3; every level after that is priced by `endless`. 25 and 65 are the Herbalist's and the Blacksmith's numbers on purpose: the crafts are meant to pace the same.",
+ "_thresholds_note": "Mastery to reach levels 2 and 3; every level after that is priced by `endless`. 25 and 65 are the Herbalist's and the Blacksmith's numbers on purpose: the crafts are meant to pace the same. Repriced by the owner's 2026-11-18 ruling: 1->2 costs 100, 2->3 costs 260, every later level a flat 400 (`endless` base 400, step 0). Earned levels are kept.",
  "thresholds": [
-  25,
-  65
+  100,
+  260
  ],
- "_endless_note": "Levels past the written table (plan §17.2; the forge's four, Yield moved to the harvest, owner Q6.3). Leaving level 3 costs `base` and each level after it `step` more (50, 60, 70...). Each endless level banks `picks_per_level` picks; the same perk may be taken twice. Potency adds to the multiplier on the bonus modifiers of everything made, hardening takes that fraction off the negative modifiers (multiplied with the per-level cut), quality raises the ceiling by that many steps, and yield is read at the HARVEST (lane C): the chance per hide taken of more hide units, rolled and shown. The bench reads no yield.",
+ "_endless_note": "Levels past the written table (plan §17.2; the forge's four, Yield moved to the harvest, owner Q6.3). Leaving level 3 costs `base` and each level after it `step` more (the 2026-11-18 ruling makes that a flat 400, step 0). Each endless level banks `picks_per_level` picks; the same perk may be taken twice. Potency adds to the multiplier on the bonus modifiers of everything made, hardening takes that fraction off the negative modifiers (multiplied with the per-level cut), quality raises the ceiling by that many steps, and yield is read at the HARVEST (lane C): the chance per hide taken of more hide units, rolled and shown. The bench reads no yield.",
  "endless": {
-  "base": 50,
-  "step": 10,
+  "base": 400,
+  "step": 0,
   "picks_per_level": 2,
   "perks": {
    "potency": 0.05,

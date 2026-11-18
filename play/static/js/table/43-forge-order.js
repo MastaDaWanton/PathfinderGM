@@ -421,6 +421,8 @@
       if (paid.indexOf("learned: " + d.name) >= 0) return;
       parts.push('<p class="tr-new">New: ' + esc(d.name) + ', ' + esc(lower(d.text)) + '.</p>');
     });
+    // Work of an hour or more waits In progress (ruling 2026-11-18): said, never a Next.
+    if (made && made.waiting) parts.push('<p class="tr-note">' + esc(made.waiting) + '</p>');
     var next = made && made.next ? F.methodInfo(made.next) : null;
     if (next && !next.locked) {
       parts.push('<button type="button" class="v2-btn is-go is-small" id="forge-next" data-next="' + esc(next.id) +

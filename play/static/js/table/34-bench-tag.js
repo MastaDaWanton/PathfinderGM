@@ -203,7 +203,9 @@
     (f.discoveries || []).forEach(function (d) {
       out.push('<p class="tr-new">New: ' + esc(d.name) + ', ' + esc(lowerFirst(d.text)) + '.</p>');
     });
-    var next = f.next && f.next.method ? f.next.method : localNext();
+    // Work of an hour or more waits In progress (ruling 2026-11-18): said, never a Next.
+    if (f.waiting) out.push('<p class="tr-note">' + esc(f.waiting) + '</p>');
+    var next = f.waiting ? null : (f.next && f.next.method ? f.next.method : localNext());
     if (next) {
       var info = B.methodInfo(next);
       out.push('<button type="button" class="v2-btn is-go is-small" id="bench-next" data-next="' + esc(next) + '">Next: ' +

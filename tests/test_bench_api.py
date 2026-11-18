@@ -139,11 +139,40 @@ def _key(client, name, **want):
     raise AssertionError(f"{name} {want} not in the satchel")
 
 
-def _craft(client, method, items, batch=1, face=20, score=0.5):
-    body = {"method": method, "items": items, "batch": batch, "face": face}
-    rolled = _post(client, "/api/bench/roll", body)
+def _craft(client, method, items, batch=1, face=None, score=0.5, collect=True):
+    """One step as the page drives it. `face` None rolls the face that just makes the DC,
+    so a test that is not about the 5+ margin bands (ruling 2026-11-18) gets none of them;
+    `collect` waits out and collects a step that went In progress (an hour or more), as
+    the player would before the next step. A steep's jar is left steeping."""
+    body = {"method": method, "items": items, "batch": batch}
+    if face is None:
+        check = _post(client, "/api/bench/check", body)
+        face = max(1, min(20, int(check["dc"]) - int(check["bonus"])))
+    rolled = _post(client, "/api/bench/roll", {**body, "face": face})
     assert rolled["roll"]["success"], rolled
-    return _post(client, "/api/bench/finish", {"token": rolled["token"], "score": score})
+    done = _post(client, "/api/bench/finish", {"token": rolled["token"], "score": score})
+    if collect:
+        _wait_and_collect(client)
+    return done
+
+
+def _wait_and_collect(client, *, keep=("steeping",)):
+    """Wait out every work In progress (but `keep`'s) and collect it, through the page's
+    own route (api/works/collect)."""
+    from rules import inprogress
+
+    c = cm.current()
+    now = int(c.scene.clock_minutes or 0)
+    held = [k for k, s in c.scene.pc().stock.items()
+            if (inprogress.work_of(s, now) or {}).get("doing") not in (None,) + tuple(keep)]
+    if not held:
+        return
+    end = max(inprogress.end_of(c.scene.pc().stock[k], now) for k in held)
+    if end > now:
+        c.scene.advance(end - now)
+        c.save()
+    for k in held:
+        _post(client, "/api/works/collect", {"key": k})
 
 
 ITEM_KEYS = {"key", "name", "ingredient_id", "kind", "part", "tier", "state", "form",
@@ -314,7 +343,7 @@ def test_the_concentration_dc_climbs_two_n_at_step_n(bench):
         body = {"method": "dry", "items": [{"key": key, "count": have}]}
         d = _post(bench, "/api/bench/check", body)
         seen.append(d["dc"])
-        made = _craft(bench, "dry", body["items"], face=20)["made"]
+        made = _craft(bench, "dry", body["items"])["made"]
         name, want = made["name"], {"form": "dried"}
         assert made["tier"] == ("common", "uncommon", "rare", "exotic")[step]
     assert seen == [12, 16, 22]
@@ -679,13 +708,17 @@ def test_the_strips_live_word_and_the_finish_agree_on_every_band(bench):
     sent as the score, must finish on that band's name."""
     _carry(mint=6)
     items = [{"key": _key(bench, "Mint"), "count": 1}]
+    # The face that just makes the DC: no 5+ margin bands (ruling 2026-11-18; their ladder
+    # is pinned in tests/test_owner_crafting_2026_11_18.py).
+    chk = _post(bench, "/api/bench/check", {"method": "grind", "items": items})
+    face = max(1, min(20, chk["dc"] - chk["bonus"]))
     tuning = _post(bench, "/api/bench/roll", {"method": "grind", "items": items,
-                                              "face": 20})["tuning"]
+                                              "face": face})["tuning"]
     assert tuning["names"] == ["Crude", "Sound", "Fine"]
     assert tuning["bands"][0] == 0
     for name, low in zip(tuning["names"], tuning["bands"]):
         rolled = _post(bench, "/api/bench/roll", {"method": "grind", "items": items,
-                                                  "face": 20})
+                                                  "face": face})
         done = _post(bench, "/api/bench/finish", {"token": rolled["token"], "score": low})
         assert done["tier_name"] == name, (low, done["tier_name"])
 

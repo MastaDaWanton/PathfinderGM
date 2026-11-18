@@ -46,13 +46,14 @@ def test_levels_past_3_never_stop_and_climb_gently(herbalist):
     track that lost its `endless` block would fall back to the flat price and charge
     double for level 4 without any test noticing, so the curve is pinned to level 60."""
     assert herbalist.max_level == 3
-    assert [herbalist.to_next(n) for n in (1, 2)] == [25, 65]
+    # The owner's 2026-11-18 curve: 100 and 260, then a flat 400 forever.
+    assert [herbalist.to_next(n) for n in (1, 2)] == [100, 260]
     for level in range(3, 61):
-        assert herbalist.to_next(level) == 50 + 10 * (level - 3), level
+        assert herbalist.to_next(level) == 400, level
 
     p = _at(3, mp=10_000)
     wc.award_bonus(herbalist, p, why="test", mp=0)
-    assert p.level > 30                                    # spent, not stopped
+    assert p.level == 3 + 10_000 // 400                    # spent, not stopped
 
 
 def test_the_unlock_table_reads_cleanly_at_level_9(herbalist):
@@ -177,7 +178,7 @@ def test_the_track_summary_is_the_contract_object(herbalist):
     draws a bar that is full when it is empty."""
     got = wc.track_summary(herbalist, _at(2, mp=30))
     assert got == {"id": "herbalist", "level": 2, "mp": 30,
-                   "to_next": {"need": 65, "have": 30}, "ceiling": 3,
+                   "to_next": {"need": 260, "have": 30}, "ceiling": 3,
                    "ceiling_name": "Superior", "perks": {}, "picks_banked": 0,
                    "next_rung": "Flawless at Herbalist 3"}
     assert wc.track_summary(herbalist, _at(1))["next_rung"] == "Superior at Herbalist 2"
@@ -243,7 +244,7 @@ def test_no_step_is_beneath_an_endless_herbalist(herbalist):
 
 
 def test_firsts_and_manuals_through_award_bonus(herbalist):
-    p = _at(1, mp=20)
+    p = _at(1, mp=95)       # 100 leaves level 1 (the 2026-11-18 curve)
     got = wc.award_bonus(herbalist, p, why="first poultice", mp=wc.FIRST_MP)
     assert got["reasons"] == [{"why": "first poultice", "mp": 3}]
     got = wc.award_bonus(herbalist, p, why="read a herbal", mp=wc.MANUAL_MP)

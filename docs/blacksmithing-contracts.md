@@ -361,3 +361,18 @@ game with its heat gauge all work, and the blank glows on the anvil.
 9. **The owner's review of the house modifiers** (`docs/blacksmithing-review.md`).
 10. Not merged to master. The other session's `fix/playtest-2026-10-03` also changes
     `rules/engine.py` and `rules/sheet.py`; expect conflicts at that merge.
+
+## 16. In progress and the margin bands (owner rulings 2026-11-18)
+
+- A forge step of `in_progress_after` (60) minutes or more, worked at the forge bench, goes
+  In progress (`rules/inprogress.py`, craft `blacksmith`): the roll passes
+  `hands_on_minutes` (10), the rest is the work's own countdown. Worked at a smithy it is
+  left there (`place:<smithy>`) and collected there; from the field kit it is carried. The
+  smithy's rent is still the whole step. The rack offers nothing In progress
+  (`blacksmith._held`), and the finish names no Next for it, saying when it is ready.
+- Typed smithing and keeper commissions do not split (`plan_step(waits=False)`): they walk
+  the whole chain in one go, and a half-made piece left In progress mid-chain would stop it.
+- Beating the DC by 5 or more (`crafting.margin_bonus`, content/rules/craft-margin.json):
+  a capped 10% less time and 10% more units (Smelt and Forge, where the Yield perk lands) a
+  band, a quality floor held one under the ceiling, and a natural 20 lifting the ceiling a
+  step (`make(lift=)`). The strip's ladder is `crafting.ladder`, so the live word agrees.

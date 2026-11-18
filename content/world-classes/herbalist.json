@@ -4,15 +4,15 @@
  "summary": "A Universal World Class any character may take regardless of their class. It levels through active use (foraging, harvesting and every step at the bench), opening new methods and rarer material at levels 1 to 3. Past level 3 the levels never stop, and each one grants two perks: potency, duration, quality or yield.",
  "grantable_at_creation": true,
  "_ruling_2026_10_02_note": "The owner's herbalism revamp ruling, 2026-10-02 (docs/herbalism-revamp-plan.md §2, §4, §14). Three unlock levels replace five: level 1 grind, mix and brew on common and uncommon material; level 2 dry, reduce, extract, infuse and steep on rare and exotic; level 3 neutralize and legendary material. Distill, preserve, purify, refine and catalyst crafting are removed, with the old level 4 and 5 rows, the `legendary-catalyst` milestone and its deed. The Alchemist already has its own verbs (calcine through catalyze), so nothing moved across. Old saves keep their level: an old Herbalist 4 or 5 is an endless level 4 or 5 with its perk picks banked (rules/worldclass.py `migrate_herbalist`).",
- "_thresholds_note": "Mastery to reach levels 2 and 3; every level after that is priced by `endless`. 25 and 65 are the numbers the five-level track settled on (the author's table read 10/25, raised because 10 and 25 did not reach the author's own pacing targets), kept unchanged by the 2026-10-02 ruling. The awards behind them changed: the bench now pays each step on its own (1, +1 per rarity band above common, +1 at Superior, +2 at Flawless or higher) and firsts pay 3, so a level-1 step on common material is worth 1 and a first herb or product type 3 more. The pacing under the step awards has not yet been measured in play.",
+ "_thresholds_note": "Mastery to reach levels 2 and 3; every level after that is priced by `endless`. 25 and 65 are the numbers the five-level track settled on (the author's table read 10/25, raised because 10 and 25 did not reach the author's own pacing targets), kept unchanged by the 2026-10-02 ruling. The awards behind them changed: the bench now pays each step on its own (1, +1 per rarity band above common, +1 at Superior, +2 at Flawless or higher) and firsts pay 3, so a level-1 step on common material is worth 1 and a first herb or product type 3 more. The pacing under the step awards has not yet been measured in play. Repriced by the owner's 2026-11-18 ruling (docs/owner-bugs-plan, item 15): 1->2 costs 100, 2->3 costs 260, and every level after that a flat 400 (`endless` base 400, step 0). Levels already earned are kept; a level-up spends the mastery it costs, so nothing is recomputed from the new curve.",
  "thresholds": [
-  25,
-  65
+  100,
+  260
  ],
- "_endless_note": "Levels past the written table, plan §4.2, owner-accepted 2026-10-02. Leaving level 3 costs `base` and each level after it `step` more (50, 60, 70...), gentle on purpose because the perks are small. Each endless level banks `picks_per_level` picks; the same perk may be taken twice. `perks` is what one pick of each is worth: potency and duration add to their multipliers, quality raises the ceiling by that many steps, yield is the chance per craft of one extra dose. All proposed numbers, tunable here without a code change.",
+ "_endless_note": "Levels past the written table, plan §4.2, owner-accepted 2026-10-02. Leaving level 3 costs `base` and each level after it `step` more (the 2026-11-18 ruling makes that a flat 400, step 0), gentle on purpose because the perks are small. Each endless level banks `picks_per_level` picks; the same perk may be taken twice. `perks` is what one pick of each is worth: potency and duration add to their multipliers, quality raises the ceiling by that many steps, yield is the chance per craft of one extra dose. All proposed numbers, tunable here without a code change.",
  "endless": {
-  "base": 50,
-  "step": 10,
+  "base": 400,
+  "step": 0,
   "picks_per_level": 2,
   "perks": {
    "potency": 0.05,
