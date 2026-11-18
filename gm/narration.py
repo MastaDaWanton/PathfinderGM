@@ -1645,6 +1645,11 @@ def _respell_known(text: str, found: list[str], known) -> tuple[str, list[str]]:
     return text, keep
 
 
+# A determiner or possessive straight before a word: what follows it, with a lowercase
+# noun after, is a thing's name used as a word ("your Lucerne hammer", "a Tengu trader").
+_ATTRIBUTIVE_BEFORE = re.compile(r"\b(?:your|his|her|their|my|our|its|a|an)\s+$", re.I)
+
+
 def unname_strangers(text: str, known: set[str]) -> tuple[str, list[str]]:
     """Replace first-appearance invented people with an unnamed descriptor.
 
@@ -1780,6 +1785,13 @@ def unname_strangers(text: str, known: set[str]) -> tuple[str, list[str]]:
     for start, end, matched, poss in keep:
         if any(lo <= start < hi for lo, hi, _ in edits):
             continue                       # inside a sentence already being cut
+        if not poss and _ATTRIBUTIVE_BEFORE.search(text[:start]) \
+                and re.match(r"\s+[a-z]", text[end:]):
+            # A capitalised word between "your" and a lowercase noun is a kind of thing,
+            # not a person: owner bug 2026-11-17 #8 (frag), "your Lucerne hammer" came back
+            # "your the stranger hammer". Lowercased, never replaced.
+            edits.append((start, end, matched.lower()))
+            continue
         descriptor = _descriptor(matched)
         before = text[:start].rstrip()
         if before.endswith(","):
@@ -2650,6 +2662,36 @@ def _cut_sentences(text: str, flagged: list[str]) -> str:
 def cut_fire_from_nowhere(text: str, context: str = "") -> tuple[str, list[str]]:
     """The backstop under `fire-from-nowhere`: the sentences go. Returns (text, cut)."""
     gone = fire_from_nowhere(text, context)
+    if not gone:
+        return text, []
+    return _cut_sentences(text, gone), gone
+
+
+# A crowd, in the prose: people in numbers with no one of them a person.
+_CROWD = re.compile(
+    r"\b(?:crowd(?:s|ed|ing)?|throng(?:s|ed|ing)?|bustl(?:e|es|ing)|passers-?by|"
+    r"onlookers|bystanders|townsfolk|townspeople|villagers|hubbub|milling|jostl(?:e|es|"
+    r"ing)|press of (?:people|bodies)|sea of faces|(?:foot )?traffic)\b", re.I)
+
+
+def crowd_from_nowhere(text: str, anyone_here: bool, context: str = "") -> list[str]:
+    """Sentences that put a crowd where the map holds nobody but the party.
+
+    Owner bug 2026-11-17 #7 (jack, transcript 197): "You labor through the bustling
+    traffic of the north crossing … You scan the nearby stalls and crowds" with nobody on
+    the map. A crowd is never given bodies (the owner's call, 2026-11-18: cut the prose
+    where the map is empty, for now; a real ambient crowd is a later option), so a crowd
+    the page shows where nobody stands is the page's invention. A crowd the turn's own
+    tells name (`context`) is the engine's, and stays."""
+    if anyone_here or not text or not _CROWD.search(text) or _CROWD.search(context or ""):
+        return []
+    return [s for s in _sentences(unquoted(text)) if _CROWD.search(s)]
+
+
+def cut_crowd_from_nowhere(text: str, anyone_here: bool,
+                           context: str = "") -> tuple[str, list[str]]:
+    """The backstop for `crowd_from_nowhere`: the sentences go. Returns (text, cut)."""
+    gone = crowd_from_nowhere(text, anyone_here, context)
     if not gone:
         return text, []
     return _cut_sentences(text, gone), gone

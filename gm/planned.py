@@ -1332,8 +1332,19 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
                              for e in (getattr(o, "effects", None) or [])
                              if isinstance(e, dict) and e.get("kind") == "said")
                   if i == spoken_at else "")
+        # A dungeon room walked into: its trace and who holds it are this act's own facts
+        # to tell, so the slot is given the room's share and read back for them
+        # (`_all_told`). Owner bug 2026-11-17 #4 (frag): two of six traces and the
+        # rat-king's line never reached the page, asked into 220 characters.
+        room = [str(f) for o in act for e in (getattr(o, "effects", None) or [])
+                if isinstance(e, dict) and e.get("kind") == "room_facts"
+                for f in e.get("facts") or ()]
+        want = min(FACT_CEILING, FACT_WANT + FACT_EACH * (len(tells) - 1))
+        if room:
+            want = FACT_CEILING
+            must = list(dict.fromkeys([*must, *room]))
         slots.append({"key": f"fact{i + 1}",
-                      "want": min(FACT_CEILING, FACT_WANT + FACT_EACH * (len(tells) - 1)),
+                      "want": want,
                       "say": say, "tells": tells, **({"not_own": theirs} if theirs else {}),
                       **({"must_tell": must} if must else {}),
                       **({"verbatim": spoken, "typed": player_input}
@@ -2792,6 +2803,15 @@ def _ask(out: Planned, plan, slots, i, written, who, *, suggest: bool = False,
         raise PlanFailed(f'slot "{s["key"]}": {type(exc).__name__}: '
                          f"{str(exc)[:160]}") from exc
     text = realise(s, data, lift)
+    if s.get("max") and not (s["key"] == "reply" and s.get("speaker")):
+        # A cut is a repair, and logged as one: owner bug 2026-11-17 #4, the rat-king's
+        # line was cut from the throne room's slot by `_fit` and nothing said so. A composed
+        # reply is skipped: compose_reply books the line as said, and a second call booked
+        # it twice.
+        whole = realise({**s, "max": 0}, data, lift)
+        if len(whole) > len(text):
+            out.notes.append(f'the "{s["key"]}" slot ran past its {s["max"]} characters: '
+                             f'cut {whole[len(text):].strip()[:80]!r}')
     out.calls.append({"key": s["key"], "messages": messages, "raw": reply.text,
                       "seconds": round(reply.seconds, 1), "model": reply.model or model,
                       "note": ""})

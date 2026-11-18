@@ -122,6 +122,10 @@ def _plain(words) -> str:
     return holding.plain(words)
 
 
+def _props(scene) -> list:
+    return getattr(scene, "props", None) or []
+
+
 def addressed(scene) -> str:
     """The one person the player is dealing with, by the engine's state: engaged with,
     then in conversation (`state.talking`), then the only other person standing here.
@@ -576,7 +580,7 @@ def _take(row: Row, frame, i, scene, pc, recent=()) -> None:
                 row.missing = row.unheld = f"{pc.name} has no {_plain(thing)}"
             return
     if getattr(scene, "in_encounter", False) and not coin \
-            and not (source and holding.is_container(source)):
+            and not (source and holding.is_box(source, _props(scene))):
         # In a fight, a thing taken off a foe is 1e's Steal (CMB against CMD, the `attack`
         # op's `manoeuvre: steal`, which picks from what they really carry and refuses in
         # words what they do not — `Engine._steal_choice`). The foe is the one the words
@@ -595,12 +599,12 @@ def _take(row: Row, frame, i, scene, pc, recent=()) -> None:
             row.note = f"a steal from {actor.name}: {thing}"
             return
     params: dict = {"item": _plain(thing) or thing, "to": pc.ref}
-    amount = coin_amount(thing) if coin and not holding.is_container(source) else None
+    amount = coin_amount(thing) if coin and not holding.is_box(source, _props(scene)) else None
     if amount:
         # "ten gold" from a person or a till: a denomination and a count, as a give's is
         # (a pouch's coin keeps its own door, which empties it).
         params.update(item=amount[0], count=amount[1])
-    if source and holding.is_container(source):
+    if source and holding.is_box(source, _props(scene)):
         params["from_"] = _plain(source)
         if set(re.findall(r"[a-z]+", _plain(thing))) & _WHOLE:
             # "everything that's in the gaoler's box", "what's inside": the box emptied,
@@ -1366,13 +1370,43 @@ def _loot(row: Row, frame, i, scene, pc) -> None:
     was not down yet when the plan was read. The blow before it in the same sentence runs
     first, so a body killed by it is a body by the time the loot is resolved."""
     ref = _whose_body(frame, i, scene)
-    if not ref:
+    # Words that name no body ("search the area for more loot", "loot the room") search
+    # the room as well: every container lying here that holds something on the record is
+    # emptied (`Engine._empty_box`). Owner bug 2026-11-17 #2 (frag, turn 831): the words
+    # were read `loot: the area`, the dire rat's picked-clean body was looted again, and
+    # the 70 gp hoard on the same floor stayed unopened.
+    boxes = [] if _names_a_body(frame, i, scene) else [
+        str(r["name"]) for r in _props(scene)
+        if r.get("at") == getattr(scene, "at", None) and not r.get("held_by")
+        and ((r.get("contents") or {}).get("goods")
+             or any((r.get("contents") or {}).get("purse", {}).values()))]
+    if not ref and not boxes:
         row.note = "nobody here to loot"
         return
-    row.intents.append({"op": "loot", "actor": pc.ref, "params": {"from_": ref},
-                        "because": "the player searches the body"})
+    if ref:
+        row.intents.append({"op": "loot", "actor": pc.ref, "params": {"from_": ref},
+                            "because": "the player searches the body"})
+    for name in boxes:
+        row.intents.append({"op": "give", "actor": pc.ref,
+                            "params": {"item": "everything", "from_": name, "to": pc.ref},
+                            "because": "the player searches the room"})
     who = (getattr(scene, "actors", {}) or {}).get(ref)
-    row.note = f"a loot of {getattr(who, 'name', ref)}"
+    row.note = "; ".join(([f"a loot of {getattr(who, 'name', ref)}"] if ref else [])
+                         + [f"{n} emptied" for n in boxes])
+
+
+def _names_a_body(frame, i: int, scene) -> bool:
+    """Whether a loot's words mean one body: a person here they name, a pronoun, or the
+    target of a blow earlier in the sentence (`_whose_body`'s first three answers)."""
+    from rules import scope
+
+    acts = frame.get("actions") or []
+    words = " ".join(str(acts[i].get("target") or acts[i].get("object") or "").split())
+    if words.lower() in _PRONOUNS:
+        return True
+    if words and scope.in_the_room(scene, words) in (getattr(scene, "actors", {}) or {}):
+        return True
+    return any(p.get("act") == "attack" and p.get("target") for p in acts[:i])
 
 
 def _harvest(row: Row, frame, i, scene, pc, rows=()) -> None:
@@ -1502,13 +1536,14 @@ def _look_in(row: Row, frame, i: int, scene, rows=(), places=()) -> None:
 
     acts = frame.get("actions") or []
     said = " ".join(str(acts[i].get("object") or "").split())
-    if said and not holding.is_container(said) and (
+    boxes = getattr(scene, "props", None) or ()
+    if said and not holding.is_box(said, boxes) and (
             set(re.findall(r"[a-z]+", _plain(said))) & _WHOLE or said.lower() in _IT):
         # "what's inside", "it": the container of the deed before it.
         said = next((" ".join(str(p.get("object") or "").split())
                      for p in reversed(acts[:i])
-                     if holding.is_container(str(p.get("object") or ""))), "")
-    if not said or not holding.is_container(said):
+                     if holding.is_box(str(p.get("object") or ""), boxes)), "")
+    if not said or not holding.is_box(said, boxes):
         return
     want = holding.head_of(said)
     here = str(getattr(scene, "at", "") or "")
@@ -1990,6 +2025,20 @@ def _home_together(row: Row, ref: str, scene, pc) -> None:
                         "because": f"the player goes home with {who.name}"})
     row.ops = []
     row.note = f"home with {who.name}, who is here"
+
+
+def _a_square(frame, i: int, scene) -> bool:
+    """Whether action `i` of the reading names a square of this board (`_to_the_square`'s
+    own read: `fixtures.square_said`)."""
+    from rules import fixtures
+
+    acts = (frame or {}).get("actions") or []
+    grid = getattr(scene, "grid", None)
+    if grid is None or not 0 <= i < len(acts):
+        return False
+    a = acts[i]
+    return fixtures.square_said(grid, f"{a.get('place') or ''} {a.get('span') or ''}"
+                                .upper()) is not None
 
 
 def _to_the_square(row: Row, a: dict, scene, pc) -> bool:
@@ -3611,16 +3660,25 @@ def walk_in_place(raw, rows: list[Row], frame: dict | None, scene, places=(), *,
     if not isinstance(raw, list) or not frame or frame.get("error") or scene is None:
         return raw
     here = str(getattr(scene, "at", "") or "")
-    within = any(interpret.acting(a) and interpret.within_place(a, places, here)
-                 for a in frame.get("actions") or [])
+    acts = frame.get("actions") or []
+
+    def inside_here(k: int, a: dict) -> bool:
+        # A square of this board named by its coordinate (`_to_the_square`) is a step
+        # inside the place, whatever the reader said of it. Owner bug 2026-11-17 #5 (jack,
+        # turn 83): "I move to G3" in the woods kept a planned travel to the outskirts as
+        # well, an hour away, and the flying squirrel beside G3 was "left behind".
+        return interpret.within_place(a, places, here) or (
+            a.get("act") == "go" and _a_square(frame, k, scene))
+
+    within = any(interpret.acting(a) and inside_here(k, a) for k, a in enumerate(acts))
     built = [i for r in rows for i in r.intents if i.get("op") == "move"]
     pc = scene.pc() if hasattr(scene, "pc") else None
     if not within and not built:
         return raw
 
     inside = {" ".join(str(a.get("place") or "").lower().split())
-              for a in frame.get("actions") or []
-              if interpret.acting(a) and interpret.within_place(a, places, here)} - {""}
+              for k, a in enumerate(acts)
+              if interpret.acting(a) and inside_here(k, a)} - {""}
 
     def is_here(name: str) -> bool:
         if not name:
@@ -3634,10 +3692,9 @@ def walk_in_place(raw, rows: list[Row], frame: dict | None, scene, places=(), *,
     # venture is the player's at all. Live on the fix, 2026-11-11: "I go back down"
     # (fixture `floor`) was planned as a travel to the outskirts beside the built move;
     # `unasked_travel` stands aside for any moving act, so it walked the party out of town.
-    moving = [a for a in frame.get("actions") or []
+    moving = [(k, a) for k, a in enumerate(acts)
               if interpret.acting(a) and a.get("act") in interpret._MOVING_ACTS]
-    inside_only = within and moving and all(
-        interpret.within_place(a, places, here) for a in moving)
+    inside_only = within and moving and all(inside_here(k, a) for k, a in moving)
     out = []
     for r in raw:
         op = _op(r)

@@ -274,6 +274,19 @@ def is_container(name) -> bool:
     return head_of(name) in CONTAINERS
 
 
+def is_box(name, props=()) -> bool:
+    """A container by its noun, or a record here that holds `contents` under this name.
+    Owner bug 2026-11-17 #2: 16 of the 44 treasure containers the dungeon writes ("a hoard
+    of bright things", "a sarcophagus", "a tarred sea-chest") have no noun on the closed
+    list, so the 70 gp hoard could be neither opened nor emptied. The record decides."""
+    if is_container(name):
+        return True
+    want = head_of(name)
+    return bool(want) and any(
+        "contents" in r and (same(r.get("name"), name) or head_of(r.get("name")) == want)
+        for r in props or ())
+
+
 def is_money(name) -> bool:
     """Whether this phrase is coin with no amount and no denomination of its own: "the
     coins", "the payment", "a handful of coins", "the money". A container of coin ("a
