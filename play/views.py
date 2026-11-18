@@ -4589,8 +4589,14 @@ def _ask_the_gm(c, engine, question: str) -> str:
     agent.brief_facts = dict(report.get("facts") or {})
     # The story's own use of a word before the rulebook's, as `answer` does: handed the
     # spell *Veil* as grounding, the model answers about the spell (2026-10-03).
-    found = "\n".join(gm_answers.story_first(c, engine, question)
-                      or gm_answers.look_up(c, engine, question))
+    # A crafting question is grounded on the benches' own rules and the character's track
+    # first (owner, 2026-11-17 item 19): the rulebook's "Forge" is not the forge.
+    # They ride as the record (last, under "answer from what is above"), and the world
+    # search and town notes stay out: measured live, "how does drying work" came back
+    # with the town's "some of what the town keeps" note tacked on.
+    crafts = gm_answers.craft_facts(c, engine, question)
+    found = "" if crafts else "\n".join(gm_answers.story_first(c, engine, question)
+                                        or gm_answers.look_up(c, engine, question))
     # What the character would know (2026-09-18, item 9). Public facts are answered.
     # Rumour-grade facts ride ONE secret Knowledge (local) roll per place — DC 15, the
     # Core Rulebook's "common rumour", "Try Again: No" — recorded on the scene so
@@ -4635,18 +4641,21 @@ def _ask_the_gm(c, engine, question: str) -> str:
     # A question that names a thing the record has nothing on is answered by the code,
     # never by the model — which, told to say "unknown", does so about a third of the
     # time and answers confidently the rest.
-    hits = gm_search.search(c.world, question)
-    here = gm_search.asks_about_here(question) or gm_answers.wants_a_reading(question)
+    hits = [] if crafts else gm_search.search(c.world, question)
+    here = not crafts and (gm_search.asks_about_here(question)
+                           or gm_answers.wants_a_reading(question))
     # The place the party stands in is the default subject of a question that names
     # nobody: "who guards the gate" found a town called Dustgate; the gate meant was this
     # one. A proper name with hits is the one case the notes are left out.
     notes = (gm_search.dossier(c.world, c.location, question, allow=allow)
-             if (here or not hits or not gm_search.proper_noun(question)) else "")
-    if not hits and not found and not here:
+             if not crafts and (here or not hits or not gm_search.proper_noun(question))
+             else "")
+    if not hits and not found and not here and not crafts:
         unknown = gm_search.unfiled(c.world, question)
         if unknown:
             return gm_search.nothing_filed(question, unknown, notes)
-    record = gm_search.passages(c.world, hits, question, allow=allow)
+    record = ("\n".join(crafts) if crafts
+              else gm_search.passages(c.world, hits, question, allow=allow))
     # What was kept back, and the line that says so.
     kept: list[str] = []
     if c.location is not None and notes:
