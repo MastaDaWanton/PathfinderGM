@@ -208,7 +208,7 @@ const MapUI = (() => {
       <p>Zoom out past the region to come here; press a town for the way there.</p>
       <div class="btnrow"><button type="button" class="go quiet" data-open="region">Region map</button>${nation ? `
       <button type="button" class="go quiet" data-readmap="${e(nation)}" ${st.maps.includes(nation) ? " disabled" : ""}>${st.maps.includes(nation) ? `You have the map of ${e(W.nations[nation].name)}` : `Buy a map of ${e(W.nations[nation].name)}, 5 gp`}</button>` : ""}</div>
-      <p class="proposed">Ruling 2026-11-18: general stores sell maps for about 5 gp, one map to a nation, showing its towns and roads. Assumed here: a store sells its own nation's map. Not in the game yet.</p></div>`;
+      <p class="proposed">Ruling 2026-11-18: general stores sell maps for about 5 gp, one map to a nation, showing its towns and roads; a store sells only its own nation's map. Not in the game yet.</p></div>`;
     out += placeList(Object.keys(K.how).sort((a, b) => nm(a).localeCompare(nm(b))), nm, id => K.how[id].by !== "been");
     return out;
   }
