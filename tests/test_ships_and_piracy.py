@@ -30,8 +30,7 @@ DOCKS_NAME = "the docks"
 def held_at_quay(monkeypatch):
     """The Red Gull's case: booked at Mirabalos, a day out, taken (her people yielded),
     and sailed into port by her new owner, who is still on her deck."""
-    monkeypatch.setattr(ships, "day_at_sea", lambda dice, level: "calm")
-    monkeypatch.setattr(ontheway, "sea", lambda *a, **k: None)
+    monkeypatch.setattr(ontheway, "sea_stretches", lambda *a, **k: None)
     scene, engine, pc = _at_port()
     _journey(engine)                        # booked for Zhilvarnia: aboard at the quay
     _journey(engine, days=1)                # a day out
@@ -173,19 +172,20 @@ def test_somebody_of_hers_left_aboard_holds_her_people(held_at_quay):
 
 def test_a_cruise_meets_a_merchant_she_can_close_with_board_and_take(held_at_quay,
                                                                        monkeypatch):
-    """#8: piracy had no path. A cruise checks the sea each watch (four a day, the land's
-    Ultimate Wilderness rate); a merchant a held ship meets is a real vessel at `distant`,
-    and boarded, her people at the rail yield to a threat and she is a prize."""
+    """#8: piracy had no path. A cruise checks the sea each day at the four-watch rate
+    (the land's Ultimate Wilderness rate), day after day since travel pacing; a merchant a
+    held ship meets is a real vessel at `distant`, and boarded, her people at the rail
+    yield to a threat and she is a prize."""
     scene, engine, pc, ship = held_at_quay
-    met = iter([None, ontheway.Meeting(kind="merchant", roll=1, count=0)])
-    monkeypatch.setattr(ontheway, "sea", lambda *a, **k: next(met, None))
+    met = iter([ontheway.Meeting(kind="merchant", roll=1, count=0, day=2)])
+    monkeypatch.setattr(ontheway, "sea_stretches", lambda *a, **k: next(met, None))
     start = scene.clock_minutes
     res = engine.run(engine.validate(
         [{"op": "sea", "actor": "pc", "because": "hunt", "params": {"do": "cruise"}}],
         origin="author:test"))
     out = res.outcomes[0]
     assert out.status == "resolved", out.tell
-    assert scene.clock_minutes - start == 2 * ships.WATCH_MINUTES
+    assert scene.clock_minutes - start == 2 * ships.MINUTES_A_DAY
     assert scene.sea and not scene.sea["hostile"] and scene.sea["range"] == "distant"
     assert "merchantman" in out.tell
     for do in ("close", "close", "board"):

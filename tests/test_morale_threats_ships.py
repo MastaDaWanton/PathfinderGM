@@ -159,8 +159,7 @@ def test_a_fighter_checks_once_at_half_and_a_mindless_thing_never():
 
 @pytest.fixture
 def at_sea(monkeypatch):
-    monkeypatch.setattr(ships, "day_at_sea", lambda dice, level: "calm")
-    monkeypatch.setattr(ontheway, "sea", lambda *a, **k: None)
+    monkeypatch.setattr(ontheway, "sea_stretches", lambda *a, **k: None)
     scene, engine, pc = _at_port()
     _journey(engine)                        # booked: aboard at the quay
     _journey(engine, days=1)                # a day out

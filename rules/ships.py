@@ -672,41 +672,26 @@ def passenger_ship(port_id: str, scale: str, river: bool = False) -> "Vessel":
 
 # --- the weather at sea ------------------------------------------------------------------------
 #
-# Rolled once per day at sea, by the engine, hidden. Researched 2026-11-13:
+# Researched 2026-11-13, when it was rolled once per day at sea:
 #
 # - Ultimate Wilderness p.165ff, Table 4-28 (Wind), rolled "for the day's wind": 96–100
 #   is a windstorm. A 5% day is the storm a ship has to ride out.
 # - Core Rulebook Table 13-9 (Random Weather): 91–99 storm, 100 powerful storm (windstorm,
 #   hurricane). One storm in ten is the powerful kind, and that is the one that breaks a
-#   ship. So a wreck is 10% of storms, 0.5% of days at the published rate.
+#   ship. So a wreck is 10% of storms.
 # - Skull & Shackles' own Shackles weather table (Tempest Rising p.72) could not be
 #   read; its numbers are not used and not claimed. Stormwrack (3.5) likewise.
 #
-# The place's volatility scales the storm, as it scales every table's base chance
-# (`volatility.factor`, uneasy = 1.0 = the published rate): calm water 2.5% a day,
-# lawless water 10%.
-STORM_PCT = 5.0
+# Since 2026-11-16 (travel pacing) a storm is a band of the voyage table (content/rules/
+# journey-events.json `sea`, widened by volatility like the other danger bands), not a
+# daily roll of its own: a daily 5% beside the stretch check stopped a fortnight's passage
+# for weather half the time (1 - 0.95^14 = 51%), the day-by-day the owner asked away.
 WRECK_PCT_OF_STORMS = 10
-
-
-def storm_pct(level: int) -> float:
-    from . import volatility
-
-    return STORM_PCT * volatility.factor(level)
-
-
-def day_at_sea(dice, level: int) -> str:
-    """'calm', 'storm' or 'wreck' for one day, on the engine's hidden dice."""
-    roll = dice.roll("1d100", label="the weather at sea", visibility="hidden").total
-    if roll > storm_pct(level):
-        return "calm"
-    worst = dice.roll("1d100", label="how bad the storm is", visibility="hidden").total
-    return "wreck" if worst <= WRECK_PCT_OF_STORMS else "storm"
 
 
 def storm_wrecks(dice) -> bool:
     """Whether a storm a voyage met (the journey table's `storm` band, 2026-11-16) is the
-    powerful kind that breaks her: one in ten, as `day_at_sea` reads it."""
+    powerful kind that breaks her: one in ten (CRB Table 13-9)."""
     return dice.roll("1d100", label="how bad the storm is",
                      visibility="hidden").total <= WRECK_PCT_OF_STORMS
 

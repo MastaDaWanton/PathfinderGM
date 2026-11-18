@@ -18977,11 +18977,12 @@ class Engine:
         return tuple(sorted(out))
 
     def _sail(self, intent: Intent, ship, want: str = "") -> Outcome:
-        """The ship makes way, a day at a time, until she makes port or the weather turns.
+        """The ship makes way until she makes port or the voyage meets something.
 
-        Each day is the clock's (the ship feeds, waters and beds her passengers, as a
-        camp's night does, `survival.night`) and the weather's, rolled hidden
-        (`ships.day_at_sea`, scaled by the waters' volatility). Days already spent aboard
+        The passage is checked in stretches (`ontheway.sea_stretches`, the storm one of
+        its bands, scaled by the waters' volatility); each day sailed is the clock's (the
+        ship feeds, waters and beds her passengers, as a camp's night does,
+        `survival.night`). Days already spent aboard
         at sea — a night's rest on deck — count: the clock is the voyage's measure. `days`
         caps how many are sailed this turn."""
         from . import ships as ships_mod, volatility

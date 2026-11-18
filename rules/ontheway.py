@@ -367,7 +367,9 @@ def night(dice, hours: int, biome: str, level: int = 1, *,
 
 # --- the sea -----------------------------------------------------------------------------
 #
-# A day at sea, checked once (`Engine._sail`, after the weather), researched 2026-11-13:
+# A day at sea, checked once (`Engine._sail`, after the weather), researched 2026-11-13.
+# Superseded 2026-11-16 by the journey table (`sea_stretches`, content/rules/
+# journey-events.json); the reasoning stands, and SEA_PERCENT is still the cruise's rate:
 #
 #   How often. Ultimate Wilderness p.127 (AoN Rules ID 2388) checks the land four times a
 #   day at 20%; no Pathfinder 1e book I could read prints a rate for open water (the
@@ -392,13 +394,6 @@ def night(dice, hours: int, biome: str, level: int = 1, *,
 # The two danger bands move with the waters' volatility (`_weighed`), the merchant and the
 # patrol never do: a lawless sea is not busier, it is worse.
 SEA_PERCENT = ROAD_PERCENT
-SEA = (
-    ("merchant", 35),
-    ("naval", 50),
-    ("pirates", 70),
-    ("creature", 100),
-)
-SEA_DANGER = frozenset({"pirates", "creature"})
 
 # What the open sea stocks: a creature whose own Environment line names salt water. The
 # bestiary's `water` biome is fresh and salt together (an otter, a poison frog, a kappa),
@@ -436,36 +431,6 @@ def in_climate(row: dict, climates) -> bool:
     either is unrestricted (empty). #89: a penguin ("cold oceans") was met on a crossing."""
     own = set(row.get("climates") or ())
     return not own or not climates or bool(own & set(climates))
-
-
-def sea(dice, level: int = 1, *, apl: int | None = None,
-        danger: float = 1.0, climates=()) -> Meeting | None:
-    """One day on open water: None most days, else who or what is out there.
-
-    `danger` is the waters' (`volatility.factor` of the worse port, as the storm's is);
-    `climates` the waters' (`Engine._waters_climates`), empty when the world said nothing
-    one climate could be read from."""
-    table, top = _weighed(SEA, danger, SEA_DANGER)
-    if dice.roll("1d100", label="the sea", visibility="hidden").total \
-            > SEA_PERCENT * top / 100:
-        return None
-    r = dice.roll("1d100", label="what is on the water", visibility="hidden").total
-    kind = _weighed_band(table, top, r)
-    level = max(1, int(level or 1))
-    if kind == "creature":
-        got = _the_land(dice, "water", level, apl,
-                        keep=lambda x: open_water(x) and in_climate(x, climates))
-        if got is not None:
-            row = got.row
-            return Meeting(kind="creature", roll=r, creature=row,
-                           template=str(row.get("id") or ""), count=got.count,
-                           aggressive=comes_at_you(row))
-        kind = "merchant"           # a sea the book stocks nothing for still has ships
-    if kind == "pirates":
-        got = npcs.choose(["pirate", "sailor"], level) or {}
-        return Meeting(kind="pirates", roll=r, words=("pirate",), count=0,
-                       template=str(got.get("id") or "thug"), aggressive=True)
-    return Meeting(kind=kind, roll=r, count=0)
 
 
 # --- the long way: a journey in stretches ------------------------------------------------
@@ -557,16 +522,18 @@ def _bands(table: str, danger: float, waters: str = "") -> tuple[list, float]:
     return out, top / max(1, base)
 
 
-def _event_day(dice, days: int, chance: float, every: int | None = None) -> int:
+def _event_day(dice, days: int, chance: float, every: int | None = None,
+               label: str = "the road") -> int:
     """The day (1 = the first day out) the first event of a journey falls on, or 0 for a
     journey with none. One hidden check a stretch, its chance pro rata for a short last
-    stretch; on a hit a hidden die picks the day inside it."""
+    stretch; on a hit a hidden die picks the day inside it. `label` is the hops' own
+    ("the road", "the sea"): one name for one kind of check, whatever its span."""
     from .gathering import pick_index
 
     every = max(1, int(every or events()["stretch_days"]))
     gone = 0
     for span in stretches(days, every):
-        if dice.roll("1d100", label="the stretch ahead",
+        if dice.roll("1d100", label=label,
                      visibility="hidden").total > chance * span / every:
             gone += span
             continue
@@ -635,9 +602,11 @@ def road_stretches(dice, hours: int, biome: str, level: int = 1, *,
         return Meeting(kind=kind, roll=r, count=0, day=day, at_hours=max(1, at))
     if kind == "toll":
         got = npcs.choose(["toll", "guard", "warden"], level) or {}
+        # Its price rolled with it, as `road`'s is (playtest 2026-11-17 #21).
+        price = dice.roll(TOLL_DICE, label="the toll", visibility="hidden").total
         return Meeting(kind="toll", roll=r, words=("toll-keeper", "warden"), count=1,
                        template=str(got.get("id") or "guildhand"), day=day,
-                       at_hours=max(1, at))
+                       at_hours=max(1, at), price_cp=price)
     if kind in ("bandits", "caravan"):
         p = _people(dice, kind, level, apl)
         return Meeting(kind=kind, roll=r, words=p["words"], count=p["count"],
@@ -660,7 +629,7 @@ def sea_stretches(dice, days: int, level: int = 1, *, apl: int | None = None,
     if not bands:
         return None
     chance = (events()["sea"]["percent"] if percent is None else float(percent)) * top
-    day = _event_day(dice, days, chance, every)
+    day = _event_day(dice, days, chance, every, label="the sea")
     if not day:
         return None
     kind, r = _pick_band(dice, bands, "what is on the water")
