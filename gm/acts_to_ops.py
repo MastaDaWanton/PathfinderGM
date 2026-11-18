@@ -1181,6 +1181,8 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 _posture(row, act, pc)
             if act == "surrender" and pc is not None:
                 _surrender(row, a, scene, pc)
+            if act in ("fend", "hunt") and pc is not None:
+                _fend(row, act, pc)
         rows.append(row)
     # One commission a keeper a turn: "agree to his price and pay" is read as two deeds
     # (`sell`, `give`), and each agrees the same job (`_agreed_work`). The first stands.
@@ -1261,6 +1263,21 @@ def _out_of_the_pit(row: Row, pc) -> None:
     row.intents.append({"op": "check", "actor": pc.ref, "params": {"skill": "climb"},
                         "because": "the player climbs out of the pit"})
     row.note = "at the bottom of a pit: the climb out"
+
+
+def _fend(row: Row, act: str, pc) -> None:
+    """Living off the land (`fend`) or hunting (`hunt`), the reader's acts: the engine's
+    `live_off_land` (CRB p.107, get along in the wild) or `hunt` op, built whole.
+    Whether the ground can feed anybody is the engine's (`Engine._op_live_off_land`).
+
+    The owner's report of 2026-11-17 (#6): three searches for water in a forest built a
+    Perception check, a herb forage and a hunt for tracks, and none of them gave water."""
+    hunt = act == "hunt"
+    row.intents.append({"op": "hunt" if hunt else "live_off_land", "actor": pc.ref,
+                        "params": {},
+                        "because": "the player hunts" if hunt
+                        else "the player lives off the land"})
+    row.note = "hunting for game" if hunt else "living off the land"
 
 
 def _posture(row: Row, act: str, pc) -> None:
@@ -3313,6 +3330,7 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     posturing = any(b.get("op") == "condition" and (b.get("params") or {}).get(
         "condition") == "prone" for b in built)
     harvesting = any(b.get("op") == "harvest" for b in built)
+    fending = any(b.get("op") in _FEND_OPS for b in built)
     # A go the reading owes a journey for (`interpret.ops_for`: a town the roads reach) is
     # that journey, and the plan's own walk beside it is not: measured on the 0.2.22
     # leftovers run, "I … lead the wagons on toward Kalixiri" from a stretch of the road
@@ -3387,6 +3405,21 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
                     "manoeuvre") or "") == "grapple")):
             if notes is not None:
                 notes.append(f"the plan's {op} replaced by the reading's escape")
+            continue
+        # Living off the land or a hunt (`_fend`) is the turn's word on the hours spent
+        # looking: the plan's own forage, track, Perception or Survival check, or a wait
+        # beside it, is the same looking a second time (owner's report 2026-11-17 #6: a
+        # Perception check, a herb forage and a hunt for tracks, and no water). And its
+        # drink or meal from the pack is the need the land just met: live 2026-11-18, "I
+        # look around for a stream to drink from" carried the plan's `drink`, refused "the
+        # pack holds none, and there is no well here", and the page said so beside the
+        # stream found.
+        if fending and str((r or {}).get("actor") or pc.ref) in (pc.ref, "pc") and (
+                op in _FEND_OPS | {"forage", "track", "advance_time", "drink", "eat"}
+                or (op == "check" and str(((r or {}).get("params") or {}).get("skill")
+                                          or "").lower() in ("perception", "survival"))):
+            if notes is not None:
+                notes.append(f"the plan's {op} replaced by the reading's fend")
             continue
         # Dropping prone or standing (`_posture`) is the turn's word on the player's
         # posture: the plan's own `move` beside it walked nowhere and told "moves from near
@@ -4530,7 +4563,9 @@ def timed_rests(raw, frame: dict | None, *, notes: list | None = None) -> list:
 # (content/rules/law.json `report.minutes`), so waiting over a crime sees who comes.
 OPEN_WAIT_MINUTES = 10
 _OWN_CLOCK = frozenset({"advance_time", "rest", "travel", "venture", "journey", "forage",
-                        "prospect", "gather"})
+                        "prospect", "gather", "live_off_land", "hunt"})
+# The ops a `fend` builds (`_fend`).
+_FEND_OPS = frozenset({"live_off_land", "hunt"})
 
 
 def _open_wait(raw, wait, resting, scene, notes) -> list:

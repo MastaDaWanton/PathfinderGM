@@ -17589,6 +17589,206 @@ class Engine:
             tell=(tell + (" " + more if more else "")).strip(),
             because=intent.because)
 
+    def _open_ground(self, intent: Intent, actor, noun: str):
+        """(the biome underfoot, None), or (None, the refusal): the question every act
+        on open ground asks first — a gathering excursion (`_gather`), living off the
+        land and a hunt (`_op_live_off_land`, `_op_hunt`).
+
+        Not under a roof. Measured on the owner's 0.2.25 report (2026-11-01): a forage in
+        the shrine came back with Power leaf and a giant rot grub guarding the patch,
+        inside the building — `_gather` read the biome (urban) and never asked whether
+        the party stood indoors. Survival's foraging is "getting along in the wild"
+        (CRB p.107); a room has no ground to search. Asked of the place the party is in
+        (`places.is_indoors`), the same question the herb bench asks for its roof.
+
+        The ground underfoot, and nothing else. Foraging used to honour a `biome`
+        parameter, which meant a request could search a forest from the middle of a
+        city — the bench sent one and the GM could invent one. Where you are is a fact
+        the scene owns; `travel` is the only thing that changes it."""
+        from . import places as places_mod
+
+        try:
+            here = self.here()
+            roofed = here is not None and places_mod.is_indoors(
+                here.id, shape=getattr(here, "shape", None))
+        except Exception:  # noqa: BLE001 - an unnamed place is not known to be indoors
+            here, roofed = None, False
+        if roofed:
+            return None, self._refuse(
+                intent, f"No {noun} happens. {actor.name} is indoors, at "
+                        f"{getattr(here, 'name', '') or 'a building'}: there is no open "
+                        f"ground under a roof to search. Go outside first.")
+        biome = biomes.canonical(str(self.scene.biome or ""))
+        if biome is None:
+            return None, self._refuse(
+                intent, "The ground here has not been named, so there is nothing to "
+                        "search. Travel somewhere first.")
+        return biome, None
+
+    # Ground with no wild to live off: a town feeds nobody for nothing (its well is free,
+    # `water_at_hand`), a deck is a ship's stores, and below the surface there is nothing to
+    # drink. Everywhere else the book's DC 10 stands — the woods and the rivers included.
+    _NO_WILD: ClassVar[frozenset] = frozenset({"urban", "deck", "underwater"})
+    # How long a stationary day's living off the land takes. HOUSE: the CRB's check "may
+    # represent activity over the course of hours or a full day" (Survival, Action) and
+    # names no length for a body that is not on the march; four hours is half a working
+    # day, and Ultimate Wilderness's forager is fatigued past eight (Foraging, p.134).
+    LIVE_OFF_LAND_HOURS: ClassVar[int] = 4
+    # A hunt's hours. HOUSE: no PF1 rule prices finding game apart from getting along in
+    # the wild (CRB p.107, "hunting and foraging"); two hours on the trail of an animal.
+    HUNT_HOURS: ClassVar[int] = 2
+
+    def _wild_check(self, intent: Intent, partial: dict, actor, label: str, dc: int):
+        """The player's own Survival d20 for an act on open ground (the popup, as a
+        forage's and a track's are), or the engine's hidden one for anybody else."""
+        mods = actor.skill_modifiers("survival")
+        if actor.is_pc:
+            if "player_face" in partial:
+                face = int(partial.pop("player_face"))
+            else:
+                raise _NeedsPlayerRoll({
+                    "label": f"Survival check — {label}", "die": "1d20",
+                    "actor": actor.name, "min": 1, "max": 20,
+                    "modifier": sum(m.value for m in mods),
+                    "breakdown": [m.as_dict() for m in mods],
+                    "dc": dc, "because": intent.because, "intent_id": intent.id,
+                }, {})
+            return self.dice.given(face, mods, label=f"{actor.name} Survival ({label})")
+        return self.dice.d20(mods, label=f"{actor.name} Survival ({label})",
+                             visibility="hidden")
+
+    def _spend_wild_hours(self, actor, hours: int, biome: str):
+        """The hours on the ground, the body consulted every one (`survival.pass_hours`),
+        then the clock through its one door. Returns the toll."""
+        toll = survival.pass_hours(actor, hours, self.dice, biome=biome)
+        self.scene.advance(max(1, toll.hours) * survival.MINUTES_PER_HOUR,
+                           charge_body=False)
+        return toll
+
+    def _op_live_off_land(self, intent: Intent, partial: dict) -> Outcome:
+        """Survival's "get along in the wild" (CRB p.107, Survival, DC 10): "hunting and
+        foraging (no food or water supplies needed). You can provide food and water for
+        one other person for every 2 points by which your check result exceeds 10." The
+        check stands for a day ("once every 24 hours"), so a success is a day's food and
+        water: `survival.lived_off_land`, the same reset a meal and a drink make.
+
+        The owner's report of 2026-11-17 (#6): parched in a forest, Jack searched "for a
+        pond, spring or river", "for a source of water" and "for a river" — read as a
+        Perception check, a herb forage and a hunt for tracks — and nothing gave water,
+        because free water existed only in a settlement's well (`water_at_hand`). The
+        woods and their rivers count: anywhere but a town, a deck or under water.
+
+        Fed first is the one looking, then their companions (`encounter_budget`'s party:
+        the people bonded by `company`), one more per 2 points over 10."""
+        from . import encounter_budget as eb
+
+        who = intent.actor or (self.scene.pc().ref if self.scene.pc() else None)
+        actor = self.scene.actors.get(who) if who else None
+        if actor is None:
+            return self._refuse(intent, "There is nobody here to live off the land.")
+        if self.scene.in_encounter:
+            return self._refuse(intent, "Not in the middle of a fight: living off the "
+                                        "land takes hours.")
+        biome, refused = self._open_ground(intent, actor, "living off the land")
+        if refused is not None:
+            return refused
+        if biome in self._NO_WILD:
+            why = {"urban": "a town feeds nobody for nothing: buy food, and drink at "
+                            "the well",
+                   "deck": "a ship's deck has no wild to live off: its stores are the "
+                           "food and water here",
+                   "underwater": "there is nothing to drink below the surface"}[biome]
+            return self._refuse(intent, f"{actor.name} cannot live off the land here: "
+                                        f"{why}.")
+        dc = survival.GET_ALONG_DC
+        roll = self._wild_check(intent, partial, actor, f"living off the land ({biome})", dc)
+        hours = self.LIVE_OFF_LAND_HOURS
+        toll = self._spend_wild_hours(actor, hours, biome)
+        n = survival.fed_by_the_land(roll.total)
+        party = [actor] + [a for a in self.scene.actors.values()
+                           if a is not actor and not a.is_down
+                           and eb.companion_with(a)]
+        fed = party[:n]
+        freed = [survival.released_said(a, need, pts) for a in fed
+                 for need, pts in survival.lived_off_land(a).items() if pts]
+        span = f"{toll.hours or hours} hour{'s' if (toll.hours or hours) != 1 else ''}"
+        where = f"in the {biome}"
+        if fed:
+            others = [a.name for a in fed[1:]]
+            tell = (f"{actor.name} spends {span} living off the land "
+                    f"{where}: Survival {roll.total} against DC {dc}. What water and "
+                    f"food the ground has is found, enough for a day for {actor.name}"
+                    + (f" and {', '.join(others)}" if others else "") + ".")
+        else:
+            tell = (f"{actor.name} spends {span} trying to live off the land "
+                    f"{where}: Survival {roll.total} against DC {dc}. Not enough water "
+                    f"or food is found to live on today.")
+        if freed:
+            tell += " " + " ".join(freed)
+        if toll.checks:
+            tell += f" It cost them: {survival_note(toll)}"
+        return Outcome(
+            intent_id=intent.id, op="live_off_land", rolls=[roll],
+            dc={"value": dc, "explain": "get along in the wild"},
+            verdict="success" if fed else "failure", margin=roll.total - dc,
+            effects=[{"ref": actor.ref, "kind": "lived_off_land", "biome": biome,
+                      "fed": [a.ref for a in fed], "hours": toll.hours or hours,
+                      "toll": toll.as_dict(), "origin": "rule:survival"}],
+            tell=tell, because=intent.because)
+
+    def _op_hunt(self, intent: Intent, partial: dict) -> Outcome:
+        """Look for game: Survival against the get-along DC (CRB p.107, "hunting and
+        foraging"), and on a success an animal that lives on this ground, drawn the way a
+        forage's creature is (`gathering.draw_for`: the bestiary's own ground, the party's
+        encounter budget) and kept to animals. It comes in far off and unaware of the
+        hunter (`_inhabit`, `hostile=False`): the hunter found it first. What happens next
+        — the shot, the stalk, the fight — is the player's next turn. The owner's report of
+        2026-11-17 (#6), "no water or wildlife in the forest"."""
+        from . import gathering
+
+        who = intent.actor or (self.scene.pc().ref if self.scene.pc() else None)
+        actor = self.scene.actors.get(who) if who else None
+        if actor is None:
+            return self._refuse(intent, "There is nobody here to hunt.")
+        if self.scene.in_encounter:
+            return self._refuse(intent, "Not in the middle of a fight: a hunt takes hours.")
+        biome, refused = self._open_ground(intent, actor, "hunting")
+        if refused is not None:
+            return refused
+        if biome in self._NO_WILD:
+            return self._refuse(intent, f"There is no game to hunt here "
+                                        f"({biomes.describe(biome).lower()}).")
+        dc = survival.GET_ALONG_DC
+        roll = self._wild_check(intent, partial, actor, f"hunting ({biome})", dc)
+        toll = self._spend_wild_hours(actor, self.HUNT_HOURS, biome)
+        hours = toll.hours or self.HUNT_HOURS
+        span = f"{hours} hour{'s' if hours != 1 else ''}"
+        got = None
+        if roll.total >= dc:
+            got = gathering.draw_for(
+                biome, max(1, int(getattr(actor, "level", 1) or 1)), self.dice,
+                apl=encounter_budget.party_apl(self.scene),
+                keep=lambda r: r.get("creature_type") == "animal")
+        effects: list[dict] = [{"ref": actor.ref, "kind": "hunt", "biome": biome,
+                                "hours": hours, "origin": "rule:survival"}]
+        if got is None:
+            tell = (f"{actor.name} spends {span} hunting: Survival {roll.total} against "
+                    f"DC {dc}. No game is found.")
+        else:
+            made, _said = self._inhabit(self.here(), row=got.row, count=got.count,
+                                        hostile=False)
+            effects += made
+            tell = (f"{actor.name} spends {span} hunting: Survival {roll.total} against "
+                    f"DC {dc}, and finds game: {gathering._some(got.row['name'], got.count)}, "
+                    f"some way off and not yet aware of {actor.name}.")
+        if toll.checks:
+            tell += f" It cost them: {survival_note(toll)}"
+        return Outcome(
+            intent_id=intent.id, op="hunt", rolls=[roll],
+            dc={"value": dc, "explain": "finding game"},
+            verdict="success" if got is not None else "failure",
+            margin=roll.total - dc, effects=effects, tell=tell, because=intent.because)
+
     # The word for a refused excursion, by op: "No foraging happens."
     _GATHER_NOUN: ClassVar[dict] = {"forage": "foraging", "prospect": "prospecting"}
 
@@ -17640,35 +17840,9 @@ class Engine:
             # happens… You are with…" filed as resolved).
             return self._refuse(intent, f"No {noun} happens. {busy}")
 
-        # Not under a roof. Measured on the owner's 0.2.25 report (2026-11-01): a forage in
-        # the shrine came back with Power leaf and a giant rot grub guarding the patch,
-        # inside the building — `_gather` read the biome (urban) and never asked whether
-        # the party stood indoors. Survival's foraging is "getting along in the wild"
-        # (CRB p.107); a room has no ground to search. Asked of the place the party is in
-        # (`places.is_indoors`), the same question the herb bench asks for its roof.
-        from . import places as places_mod
-
-        try:
-            here = self.here()
-            roofed = here is not None and places_mod.is_indoors(
-                here.id, shape=getattr(here, "shape", None))
-        except Exception:  # noqa: BLE001 - an unnamed place is not known to be indoors
-            here, roofed = None, False
-        if roofed:
-            return self._refuse(
-                intent, f"No {noun} happens. {actor.name} is indoors, at "
-                        f"{getattr(here, 'name', '') or 'a building'}: there is no open "
-                        f"ground under a roof to search. Go outside first.")
-
-        # The ground underfoot, and nothing else. Foraging used to honour a `biome`
-        # parameter, which meant a request could search a forest from the middle of a
-        # city — the bench sent one and the GM could invent one. Where you are is a fact
-        # the scene owns; `travel` is the only thing that changes it.
-        biome = biomes.canonical(str(self.scene.biome or ""))
-        if biome is None:
-            return self._refuse(
-                intent, "The ground here has not been named, so there is nothing to "
-                        "search. Travel somewhere first.")
+        biome, refused = self._open_ground(intent, actor, noun)
+        if refused is not None:
+            return refused
 
         track_id = str(level_track or spec["track"]).strip().lower()
         try:
@@ -17913,21 +18087,27 @@ class Engine:
             return clause
         from . import bestiary as bestiary_mod
 
-        made = self._bring_in(enc.creature["id"], count=1,
+        # As many as the budget sent (`gathering.draw_for`, up to `encounter_budget.MOST`;
+        # the owner, 2026-11-18): the first is the one the records name.
+        made = self._bring_in(enc.creature["id"], count=max(1, int(enc.count or 1)),
                                name=bestiary_mod.kind_word(enc.creature))
-        ref = made[0]["ref"]
-        self._mark_priced([ref], "forage")
-        self.scene.zones[ref] = "far"
-        self.scene.positions.pop(ref, None)
+        refs = [m["ref"] for m in made]
+        ref = refs[0]
+        self._mark_priced(refs, "forage")
+        for r in refs:
+            self.scene.zones[r] = "far"
+            self.scene.positions.pop(r, None)
         if self.scene.grid is not None and self.scene.positions:
-            self.scene.place_by_zone([ref])
+            self.scene.place_by_zone(refs)
         # The ref travels with the record, so the excursion's scene call can find the
         # creature it is setting without matching a name against the room.
         effects[-1]["ref"] = ref
+        effects[-1]["refs"] = refs
         if enc.aggressive and enc.kind == "creature":
             effects[-1]["stance"] = clause.strip()
             if pc is not None and actor.ref == pc.ref:
                 self._ensure_encounter(pc.ref, target=ref)
+                self._enrol_the_rest(refs)
             return clause
         # Everything else that turns up stays where it is: the guardian on its find, and
         # (owner ruling D1, 2026-09-30) the creature that "has the ground you wanted" on
@@ -17944,6 +18124,9 @@ class Engine:
         booked_stock: list = []
         stance = self._hold_ground(ref, spot, f"gathering:{what}@"
                                           f"{self.scene.clock_minutes}")
+        for r in refs[1:]:
+            # The rest hold it beside the first; one stance sentence says it for them.
+            self._hold_ground(r, spot, f"gathering:{what}@{self.scene.clock_minutes}")
         clause += " " + stance
         # What the excursion's scene call is grounded in, as the engine said it.
         effects[-1].update(stance=stance, spot=spot)
@@ -17951,14 +18134,17 @@ class Engine:
             # The patch is booked as an engine record, paid by `_settle_guarded_finds`
             # once the creature is dead or gone and the player is still HERE (`at`).
             self.scene.guarded_finds.append({
-                "guard": ref, "guard_name": str(self.scene.actors[ref].name),
+                "guard": ref, "guards": refs,
+                "guard_name": str(self.scene.actors[ref].name),
                 "what": f"{what} find" if enc.kind == "guarded" else spot,
                 "found": booked_found, "stock": booked_stock, "fresh": fresh,
                 "names": dict((effects[0].get("names") or {}) if effects else {}),
                 "at": self.scene.at,
             })
             if enc.kind == "creature":
-                clause += f" The {spot} it holds is yours once it has gone."
+                clause += (f" The {spot} they hold is yours once they have gone."
+                           if len(refs) > 1 else
+                           f" The {spot} it holds is yours once it has gone.")
         return clause
 
     def _hold_ground(self, ref: str, spot: str, source: str) -> str:
@@ -20778,9 +20964,11 @@ class Engine:
         pc = self.scene.pc()
         if row is None:
             level = getattr(pc, "level", 1) if pc is not None else 1
-            row = gathering.creature_for(place.terrain, max(1, int(level)), self.dice,
-                                         guarding=guarding,
-                                         apl=encounter_budget.party_apl(self.scene))
+            got = gathering.draw_for(place.terrain, max(1, int(level)), self.dice,
+                                     guarding=guarding,
+                                     apl=encounter_budget.party_apl(self.scene))
+            # How many the budget sent with it (up to `encounter_budget.MOST`, 2026-11-18).
+            row, count = (got.row, got.count) if got is not None else (None, 1)
         if row is None:
             return [], ""
         born = self._bring_in(row["id"], count=max(1, int(count)), name=name or row["name"])
@@ -20792,24 +20980,31 @@ class Engine:
             self.scene.positions.pop(r, None)
         aggressive = (row.get("creature_type") in gathering.AGGRESSIVE if hostile is None
                       else bool(hostile))
-        tell = (f"Something lives here: {gathering._an(row['name'])}"
-                + (", and it has seen you." if aggressive else ", further in."))
+        many = len(refs) > 1
+        tell = (f"Something lives here: {gathering._some(row['name'], len(refs))}"
+                + ((", and they have seen you." if many else ", and it has seen you.")
+                   if aggressive else ", further in."))
         if aggressive and pc is not None and (by is None or by.ref == pc.ref):
             self._ensure_encounter(pc.ref, target=ref)
-            # The rest of a group fight beside the one the fight was opened on.
-            # Every one of them when the fight was already running (a pursuit brought
-            # it into this room, `_op_travel`), else the rest beside the first.
-            if self.scene.in_encounter:
-                for r in refs:
-                    if r in self.scene.actors and not any(
-                            r in side for side in self.scene.sides.values()):
-                        a = self.scene.actors[r]
-                        init = self.dice.d20(a.initiative_modifiers(),
-                                             label=f"{a.name} initiative", visibility="hidden")
-                        self.scene.enrol(r, init.total)
-                        self.scene.sides.setdefault("them", []).append(r)
+            self._enrol_the_rest(refs)
         return ([{"kind": "gathering", "encounter": "creature", "creature": name or row["name"],
                   "aggressive": aggressive, "ref": ref, "refs": refs}], tell)
+
+    def _enrol_the_rest(self, refs) -> None:
+        """The rest of a group fight beside the one the fight was opened on. Every one of
+        them when the fight was already running (a pursuit brought it into this room,
+        `_op_travel`), else the rest beside the first. A forage's group and a venture's
+        both come in this way (`_gathering_encounter`, `_inhabit`)."""
+        if not self.scene.in_encounter:
+            return
+        for r in refs:
+            if r in self.scene.actors and not any(
+                    r in side for side in self.scene.sides.values()):
+                a = self.scene.actors[r]
+                init = self.dice.d20(a.initiative_modifiers(),
+                                     label=f"{a.name} initiative", visibility="hidden")
+                self.scene.enrol(r, init.total)
+                self.scene.sides.setdefault("them", []).append(r)
 
     def _duration_rounds(self, duration, default_unit: str = "round") -> int | None:
         """A `{amount, unit}` duration in rounds, rolling the amount when it is dice, or
@@ -28731,8 +28926,11 @@ class Engine:
             if g.get("at") and g.get("at") != self.scene.at:
                 kept.append(g)
                 continue
-            guard = self.scene.actors.get(g.get("guard", ""))
-            if guard is not None and not guard.is_down and guard.hp > 0:
+            # Every guard of a group (`guards`, 2026-11-18); a booking from before it
+            # names the one.
+            guards = [self.scene.actors.get(r)
+                      for r in (g.get("guards") or [g.get("guard", "")])]
+            if any(x is not None and not x.is_down and x.hp > 0 for x in guards):
                 kept.append(g)
                 continue
             got = []
@@ -34427,8 +34625,11 @@ def survival_note(toll) -> str:
     bits = []
     if toll.nonlethal:
         bits.append(f"{toll.nonlethal} non-lethal")
-    if toll.conditions:
-        bits.append(", ".join(c for c in toll.conditions if c != "asleep"))
+    # Asleep is said below, and a list of nothing but it left an empty clause: "3
+    # non-lethal; ; they fell asleep where they stood" (live, 2026-11-18).
+    awake = ", ".join(c for c in toll.conditions or () if c != "asleep")
+    if awake:
+        bits.append(awake)
     # Three different endings since the sleep ladder (survival.py, 2026-10-05): a failed
     # save stops the work, the third drops them asleep, and non-lethal past their hit
     # points knocks them out. "They went down where they stood" was said for all three,

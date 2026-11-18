@@ -248,6 +248,12 @@ def test_walking_the_rooms_tells_each_trace_meets_the_ally_and_finds_the_leader(
         if s.in_encounter:
             s.end_encounter()
         out = _run(engine, "travel", {"place": r["id"]})
+        if s.pc().has_state("state.position.pit"):
+            # A pit trap sprung on the way (`always` makes every chance land): the climb
+            # out at the trap's own DC, as a locked door is forced below. Which rooms hold
+            # one moves with the dice (the 2026-11-18 encounter budget draws differently).
+            out = out + _run(engine, "check", {"skill": "climb", "dc": 10})
+            out = out + _run(engine, "travel", {"place": r["id"]})
         if s.at != r["id"]:
             _run(engine, "break_in", {"how": "force"})
             out = _run(engine, "travel", {"place": r["id"]})
