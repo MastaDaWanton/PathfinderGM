@@ -40,31 +40,33 @@ Five maps with a breadcrumb: **World › Continent › Region › Town › Site*
 - Maps are bought at general stores for about 5 gp, one map to a nation, its own nation only.
 - What a map teaches is never forgotten.
 
-## Decisions needed before the build starts
+## Decisions (owner, 2026-11-18)
 
-1. **Three.js as the app's first bundled third-party JavaScript.** `scene3d.js` says the app
-   "bundles no third-party JavaScript at all"; its board and dice are hand-rolled.
-   - **The tabletop needs** a real renderer (lighting, shadows, instancing, glTF loading).
-     Three.js r170 is MIT-licensed, 690 KB, and fits offline as a vendored file. Hand-rolling
-     the same is weeks of work and a worse result.
-   - **Recommendation:** adopt Three.js for this map only. Keep it out of the board and dice.
-2. **Free orbit, or fixed quarter-turns.** `scene3d.js` deliberately turns the tactical board
-   in four fixed quarter-turns, citing XCOM: a free camera disorients over a tactical map.
-   - A place map isn't tactical, and the mock orbits freely within limits.
-   - **Recommendation:** orbit, with a "reset view" button, and limits that stop the camera
-     tipping below the table.
-3. **What happens to today's Places chart** (`16-places-chart.js`, `16-tab-map.js`).
-   **Recommendation:** keep it as the fallback when WebGL is unavailable or the context is lost
-   (old GPUs, driver resets), drawn from the same data. Retire nothing until the tabletop has
-   shipped one release.
-4. **Small reaches on the Region.** A 3-mile reach (the woods) currently gets a 12-mile hex of
-   its own: right in direction, generous in distance. The alternative is to keep reaches under
-   6 miles inside the town's hex, as the outskirts are.
-5. **Retire the chart and diorama mocks.** Recommendation: yes, once phase 2 lands.
-6. **Map item details.** Its weight; whether it can be sold back; whether reading it takes game
-   time; what a second copy does.
-7. **Where cities "heard of" come from.** NPC speech only, as `heard_places` does today, or also
-   notices, books and signs?
+All seven were settled before the build.
+
+1. **Three.js: yes, and allowed elsewhere.** It becomes a normal tool the board, dice or
+   benches may use later, not a one-off for this map. Pin r170, upgrade only on purpose, and
+   record it in `docs/asset-licences.md`. `scene3d.js`'s "no third-party JavaScript" note
+   needs updating when phase 2 lands.
+2. **Camera: free orbit with a reset-view button,** within limits that stop it tipping below
+   the table. The battle board keeps its fixed quarter-turns; that was a tactical choice and
+   stays one.
+3. **Today's Places chart stays as the fallback** when WebGL is unavailable or the context is
+   lost, drawn from the same data. Revisit removing it after the tabletop has shipped one
+   release.
+4. **Near wild ground gets its own hex** beside the town, as the mock does. The label still
+   gives the real distance ("69 minutes from the gate, 3 miles").
+5. **The chart and diorama mocks are retired.** They stay in `docs/mock/place-map-v2/` as a
+   record, unchanged; the comparison page shows current against the tabletop.
+6. **The map item:**
+   - weighs 0.5 lb;
+   - can be sold back at the usual resale rate;
+   - takes about 10 minutes of game time to read;
+   - a second copy of a map already read teaches nothing (a spare to sell or give away).
+
+   Plus the earlier rulings: general stores only, about 5 gp, the store's own nation only.
+7. **Towns "heard of" come from what NPCs say only,** the rule `heard_places` already follows
+   inside a town. Notices, books and narration don't count.
 
 ## Phases
 
@@ -172,15 +174,16 @@ Replaces the Places chart's drawing, with the chart kept as the fallback.
 ### Phase 5: engine knowledge
 
 - **Towns heard of.** Extend the beat reader's "places" call with a "towns" list: the names of
-  settlements an NPC's line mentions. Code validates each against `world.of_kind("CITY")`, per
+  settlements an NPC's line mentions (NPC speech only, decision 7). Code validates each against `world.of_kind("CITY")`, per
   the owner's "models read, code validates" direction (see `gm/beat_reader.py`, schema with
   `required`/`enum`; `contains` is not enforced by Ollama). Record `{city, who, line, turn}`
   on the scene; it only grows.
 - **The map item.**
   - A `GEAR` entry in `rules/goods.py`, "map of <nation>": general stores only, about 5 gp,
     the store's own nation.
-  - Reading it adds the nation to `maps_read`.
-  - Weight and resale per decision 6.
+  - Reading it takes about 10 minutes of game time and adds the nation to `maps_read`; a
+    second copy of a map already read teaches nothing.
+  - 0.5 lb; sells back at the usual resale rate (decision 6).
   - A tell on reading, so the narrator learns of it the lawful way (states-effects-tells, law
     3). Load that skill before touching this.
 - **Direct routes between wild places.** The woods to the desert without going back through
@@ -226,11 +229,11 @@ today's chart and tab. Phases 2 and 3 are most of it.
 
 | Phase | Depends on | Rough size |
 |---|---|---|
-| 1 Atlas | the decisions | small: one module, one endpoint, tests |
-| 2 Town tabletop | 1, decisions 1–3 | large: vendoring, port, fallback, tests |
+| 1 Atlas | nothing | small: one module, one endpoint, tests |
+| 2 Town tabletop | 1 | large: vendoring, port, fallback, tests |
 | 3 Region, Continent, World | 1, 2 | large |
 | 4 Site | 1, 2 | small |
-| 5 Engine knowledge | 1; decisions 6–7 | medium: beat reader, goods, exits |
+| 5 Engine knowledge | 1 | medium: beat reader, goods, exits |
 | 6 Packaging proof | 2–5 | medium: one release cycle |
 
 Phases 4 and 5 can run beside 3. Phase 6 runs once, before the release that ships it.
@@ -239,7 +242,7 @@ Phases 4 and 5 can run beside 3. Phase 6 runs once, before the release that ship
 
 - **First bundled library.** A Three.js upgrade becomes a dependency to maintain. Pin r170;
   upgrade only on purpose.
-- **WebGL on weak or old GPUs.** The chart fallback is the answer (decision 3).
+- **WebGL on weak or old GPUs.** The chart fallback is the answer (decision 3, agreed).
 - **Stutter while the model generates or the CPU is saturated.** The mock measured hitches of
   1 to 31 s in every style, the 2D ones included, so this comes with sharing the machine, not
   with 3D. The map is mostly open between turns.
