@@ -1,0 +1,303 @@
+{
+ "founded": [
+  {
+   "id": "484fefc5e71b~underground:the-well/the-sewers",
+   "name": "the sewers",
+   "about": "sewers off the well",
+   "terrain": "underground",
+   "exits": [],
+   "described_only": false,
+   "within": "",
+   "parent": "484fefc5e71b~urban:the-well",
+   "owner": "",
+   "origin": "venture",
+   "kind": "",
+   "deeper": {
+    "kind": "sewers",
+    "feature": {
+     "name": "the bricked-up culvert",
+     "spot": "the sump",
+     "find": 20,
+     "open": null,
+     "about": "an old culvert bricked up long ago, the mortar gone to mush",
+     "sign": "one stretch of the wall is newer brick than the rest"
+    },
+    "spot": "484fefc5e71b~underground:the-well/the-sewers/the-main-channel",
+    "found": true,
+    "noticed": true,
+    "concept": {
+     "v": 1,
+     "kind": "sewers",
+     "family": "built",
+     "builders": {
+      "id": "old-drains",
+      "who": "builders of Sylvaeth",
+      "entity": "31475ff1a2b7"
+     },
+     "purpose": "the first drains, laid before the town above them was half its size",
+     "age": {
+      "id": "event:Kaudrai Canopy founded",
+      "said": "in the days the chronicles call Kaudrai Canopy founded"
+     },
+     "ruined": {
+      "id": "fire",
+      "said": "a fire that ran through it"
+     },
+     "users": {
+      "id": "refugees",
+      "who": "the Human",
+      "entity": "241dbaf570e2"
+     },
+     "inhabitants": "rats",
+     "unlooted": "cursed",
+     "attitude": "coveted",
+     "tag": "rat-king"
+    },
+    "cleared": "boss"
+   }
+  },
+  {
+   "id": "484fefc5e71b~underground:the-well/the-sewers/the-outfall",
+   "name": "the outfall",
+   "about": "where it meets the daylight",
+   "terrain": "underground",
+   "exits": [],
+   "described_only": false,
+   "within": "",
+   "parent": "484fefc5e71b~underground:the-well/the-sewers",
+   "owner": "",
+   "origin": "venture",
+   "kind": ""
+  },
+  {
+   "id": "484fefc5e71b~underground:the-well/the-sewers/the-main-channel",
+   "name": "the main channel",
+   "about": "the way the water goes",
+   "terrain": "underground",
+   "exits": [],
+   "described_only": false,
+   "within": "",
+   "parent": "484fefc5e71b~underground:the-well/the-sewers",
+   "owner": "",
+   "origin": "venture",
+   "kind": ""
+  },
+  {
+   "id": "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate",
+   "name": "the outfall gate",
+   "about": "a gate of iron bars across the old channel, rusted open",
+   "terrain": "underground",
+   "exits": [],
+   "described_only": false,
+   "within": "",
+   "parent": "484fefc5e71b~underground:the-well/the-sewers/the-main-channel",
+   "owner": "",
+   "origin": "dungeon",
+   "kind": "",
+   "dungeon": {
+    "of": "484fefc5e71b~underground:the-well/the-sewers",
+    "role": "entrance",
+    "stock": "empty",
+    "stocked": true,
+    "cache_gp": 0,
+    "trap": null,
+    "trace": "Every brick is stamped with the same mark, the mark of builders of Sylvaeth, and the newer drains above have no mark at all.",
+    "layer": "builders",
+    "door": null,
+    "traced": true
+   }
+  },
+  {
+   "id": "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate/the-settling-tank",
+   "name": "the settling tank",
+   "about": "a deep square tank, the silt in it gone hard as clay",
+   "terrain": "underground",
+   "exits": [
+    "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate/the-sluice-room/the-gnawed-passage"
+   ],
+   "described_only": false,
+   "within": "",
+   "parent": "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate",
+   "owner": "",
+   "origin": "dungeon",
+   "kind": "",
+   "dungeon": {
+    "of": "484fefc5e71b~underground:the-well/the-sewers",
+    "role": "room",
+    "stock": "special",
+    "stocked": true,
+    "cache_gp": 0,
+    "trap": null,
+    "trace": "The beams are charcoal, the plaster scorched black up one side of every room: the fire came from the way in.",
+    "layer": "builders",
+    "door": {
+     "name": "a good wooden door",
+     "state": "open"
+    },
+    "traced": true
+   }
+  },
+  {
+   "id": "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate/the-sluice-room",
+   "name": "the sluice room",
+   "about": "a room of wheels and rotten gates that once let the water through",
+   "terrain": "underground",
+   "exits": [],
+   "described_only": false,
+   "within": "",
+   "parent": "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate",
+   "owner": "",
+   "origin": "dungeon",
+   "kind": "",
+   "dungeon": {
+    "of": "484fefc5e71b~underground:the-well/the-sewers",
+    "role": "room",
+    "stock": "monster",
+    "stocked": true,
+    "cache_gp": 0,
+    "trap": null,
+    "trace": "Families hid here once: little shoes, a cooking pot, a child's scratched drawing of the sky, left by the Human.",
+    "layer": "builders",
+    "door": {
+     "name": "a good wooden door",
+     "state": "open"
+    },
+    "traced": true,
+    "foes": [
+     "c37"
+    ]
+   }
+  },
+  {
+   "id": "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate/the-sluice-room/the-gnawed-passage",
+   "name": "the gnawed passage",
+   "about": "every wooden thing gnawed to a stump",
+   "terrain": "underground",
+   "exits": [
+    "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate/the-settling-tank"
+   ],
+   "described_only": false,
+   "within": "",
+   "parent": "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate/the-sluice-room",
+   "owner": "",
+   "origin": "dungeon",
+   "kind": "",
+   "dungeon": {
+    "of": "484fefc5e71b~underground:the-well/the-sewers",
+    "role": "room",
+    "stock": "empty",
+    "stocked": true,
+    "cache_gp": 0,
+    "trap": null,
+    "trace": "Every wooden thing has been gnawed down to a stump, door-frames and all.",
+    "layer": "tag",
+    "door": {
+     "name": "a good wooden door",
+     "state": "open"
+    },
+    "traced": true
+   }
+  },
+  {
+   "id": "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate/the-sluice-room/the-gnawed-passage/the-nest-heap",
+   "name": "the nest heap",
+   "about": "rags and straw heaped higher than a man",
+   "terrain": "underground",
+   "exits": [],
+   "described_only": false,
+   "within": "",
+   "parent": "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate/the-sluice-room/the-gnawed-passage",
+   "owner": "",
+   "origin": "dungeon",
+   "kind": "",
+   "dungeon": {
+    "of": "484fefc5e71b~underground:the-well/the-sewers",
+    "role": "room",
+    "stock": "trap",
+    "stocked": true,
+    "cache_gp": 0,
+    "trap": {
+     "id": "collapsing-floor",
+     "on": "room",
+     "found": true,
+     "armed": false,
+     "sprung": true
+    },
+    "trace": "The rats' runs are worn smooth along the walls, and they all lead the same way.",
+    "layer": "tag",
+    "door": {
+     "name": "a good wooden door",
+     "state": "open",
+     "force": 16
+    },
+    "traced": true
+   }
+  },
+  {
+   "id": "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate/the-sluice-room/the-gnawed-passage/the-nest-heap/the-throne-of-refuse",
+   "name": "the throne of refuse",
+   "about": "a seat built up out of the town's rubbish",
+   "terrain": "underground",
+   "exits": [],
+   "described_only": false,
+   "within": "",
+   "parent": "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate/the-sluice-room/the-gnawed-passage/the-nest-heap",
+   "owner": "",
+   "origin": "dungeon",
+   "kind": "",
+   "dungeon": {
+    "of": "484fefc5e71b~underground:the-well/the-sewers",
+    "role": "climax",
+    "stock": "monster",
+    "stocked": true,
+    "cache_gp": 70,
+    "trap": null,
+    "trace": "The throne in the throne of refuse is built of Thornstead's refuse, and sewn into it are scraps with the names of everyone who ever turned the rat-king from their door.",
+    "layer": "lair",
+    "door": {
+     "name": "a good wooden door",
+     "state": "open"
+    },
+    "traced": true,
+    "foes": [
+     "c40"
+    ]
+   }
+  }
+ ],
+ "at": "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate/the-settling-tank",
+ "been": [
+  "484fefc5e71b~urban:the-market",
+  "484fefc5e71b~urban:the-gate",
+  "484fefc5e71b~farmland:@the-outskirts",
+  "484fefc5e71b~farmland:@the-road-to-02770c5553e5",
+  "02770c5553e5~urban:the-gate",
+  "02770c5553e5~farmland:@the-outskirts",
+  "02770c5553e5~farmland:@the-fields",
+  "02770c5553e5~forest:@the-woods",
+  "02770c5553e5~urban:the-market",
+  "02770c5553e5~farmland:@the-crossroads",
+  "02770c5553e5~farmland:@the-road-to-484fefc5e71b",
+  "02770c5553e5~urban:the-guardhouse",
+  "02770c5553e5~urban:the-inn",
+  "02770c5553e5~urban:the-inn^-1",
+  "02770c5553e5~urban:the-well",
+  "02770c5553e5~forest:@along-the-road-to-484fefc5e71b",
+  "484fefc5e71b~farmland:@the-fields",
+  "484fefc5e71b~urban:the-tavern",
+  "484fefc5e71b~urban:the-guildhall",
+  "484fefc5e71b~urban:the-well",
+  "484fefc5e71b~underground:the-well/the-sewers",
+  "484fefc5e71b~underground:the-well/the-sewers/the-outfall",
+  "484fefc5e71b~urban:the-docks",
+  "484fefc5e71b~coast:@the-shore",
+  "484fefc5e71b~urban:the-inn",
+  "484fefc5e71b~underground:the-well/the-sewers/the-main-channel",
+  "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate",
+  "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate/the-sluice-room",
+  "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate/the-sluice-room/the-gnawed-passage",
+  "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate/the-settling-tank",
+  "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate/the-sluice-room/the-gnawed-passage/the-nest-heap",
+  "484fefc5e71b~underground:the-well/the-sewers/the-main-channel/the-outfall-gate/the-sluice-room/the-gnawed-passage/the-nest-heap/the-throne-of-refuse"
+ ]
+}

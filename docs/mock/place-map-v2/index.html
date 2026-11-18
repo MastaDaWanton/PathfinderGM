@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Place Map Mocks</title>
+<link rel="stylesheet" href="shared/ui.css">
+<style>
+  body { overflow: auto; }
+  main { max-width: 1040px; margin: 0 auto; padding: 28px 16px 40px; }
+  h1 { font: 600 30px/1.2 var(--display); color: var(--gold); letter-spacing: .05em; margin: 0 0 6px; text-shadow: var(--engraved); }
+  .lede { color: var(--dim); max-width: 68ch; margin: 0 0 24px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  a.card { display: grid; grid-template-rows: auto 1fr; text-decoration: none; color: inherit; }
+  a.card:hover h2, a.card:focus-visible h2 { color: var(--candle); }
+  .card img { width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 2px; display: block; border: 1px solid #2e251a; background: #241d15; }
+  .card h2 { margin: 10px 0 4px; font: 400 18px/1.25 var(--display); color: var(--gold); letter-spacing: .04em; }
+  .card p { margin: 0; color: var(--dim); font-size: 14px; }
+  .wide { margin-top: 18px; }
+  .note { margin-top: 26px; font-size: 14px; color: var(--dim); max-width: 74ch; }
+  .note code { color: var(--ink); }
+</style>
+</head>
+<body>
+<main>
+  <h1>The place map, three ways</h1>
+  <p class="lede">Featherperch from jack's save (40 places found, 18 walked), its region, and two real sites: the cave in its woods
+    and frag's sewers. Each mock is clickable through Region › Town › Site. Press a place for the way there, then Walk there.
+    The hour slider and Rain change the light.</p>
+  <div class="grid">
+    <a class="card mapnote" href="chart.html"><img src="screens/chart-town.jpg" alt="The illustrated chart of Featherperch">
+      <div><h2>Living illustrated chart <small>(retired)</small></h2><p>Ink on the game's own chart paper, watercolour wards, fog as drifting cloud. SVG, no library.</p></div></a>
+    <a class="card mapnote" href="diorama.html"><img src="screens/diorama-town.jpg" alt="The isometric diorama of Featherperch">
+      <div><h2>Isometric diorama <small>(retired)</small></h2><p>Little houses on tiles, people on the streets, cloud lifting off what you find. Canvas 2D.</p></div></a>
+    <a class="card mapnote" href="tabletop.html"><img src="screens/tabletop-town.jpg" alt="The 3D tabletop of Featherperch">
+      <div><h2>3D tabletop <small>(chosen)</small></h2><p>Miniatures on a parchment map on a wooden table, candlelit. Three.js, vendored for the offline app.</p></div></a>
+  </div>
+  <a class="card mapnote wide" href="compare.html"><div><h2>Current against proposed</h2>
+    <p>The map as 0.4.2 draws it beside any of the three, fed the same exported chart.</p></div></a>
+  <p class="note">Data: <code>data/*.json</code>, written by <code>export.py</code> from copies of the owner's saves through
+    <code>play/places_found.chart()</code> and <code>exits.ways_from()</code>. The page replays the fog and route rules and checks
+    itself against the engine's own answer on load (see the console).</p>
+</main>
+</body>
+</html>

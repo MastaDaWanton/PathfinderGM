@@ -1,0 +1,108 @@
+{
+ "gpuName": "NVIDIA GeForce RTX 3080",
+ "ollama": [
+  "igorls/gemma-4-12B-it-heretic-GGUF:latest 7.76 GiB"
+ ],
+ "baselineMiB": 10551,
+ "baselineUtil": [
+  14,
+  14,
+  14,
+  14,
+  14
+ ],
+ "pages": [
+  {
+   "page": "tabletop.html?level=world",
+   "fps": 120,
+   "p50": 8.3,
+   "p95": 8.5,
+   "worst": 8.7,
+   "gpuMiB": 10690,
+   "deltaMiB": 55,
+   "blankMiB": [
+    10582,
+    10688
+   ],
+   "gpuUtil": 20,
+   "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 (0x0000220A) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "three": {
+    "fps": 120,
+    "geometries": 43,
+    "textures": 7,
+    "calls": 92,
+    "triangles": 14632,
+    "gl": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+   }
+  },
+  {
+   "page": "tabletop.html?worst=1",
+   "fps": 120,
+   "p50": 8.3,
+   "p95": 8.5,
+   "worst": 8.6,
+   "gpuMiB": 10935,
+   "deltaMiB": 75,
+   "blankMiB": [
+    10795,
+    10925
+   ],
+   "gpuUtil": 22,
+   "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 (0x0000220A) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "three": {
+    "fps": 120,
+    "geometries": 176,
+    "textures": 17,
+    "calls": 345,
+    "triangles": 48628,
+    "gl": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+   }
+  },
+  {
+   "page": "tabletop.html?worst=1&level=world",
+   "fps": 120,
+   "p50": 8.3,
+   "p95": 8.5,
+   "worst": 8.6,
+   "gpuMiB": 11048,
+   "deltaMiB": 70,
+   "blankMiB": [
+    10921,
+    11034
+   ],
+   "gpuUtil": 22,
+   "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 (0x0000220A) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "three": {
+    "fps": 120,
+    "geometries": 153,
+    "textures": 7,
+    "calls": 427,
+    "triangles": 80248,
+    "gl": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+   }
+  },
+  {
+   "page": "tabletop.html",
+   "fps": 120,
+   "p50": 8.3,
+   "p95": 8.5,
+   "worst": 8.6,
+   "gpuMiB": 11179,
+   "deltaMiB": 81,
+   "blankMiB": [
+    11027,
+    11170
+   ],
+   "gpuUtil": 94,
+   "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 (0x0000220A) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "three": {
+    "fps": 120,
+    "geometries": 121,
+    "textures": 17,
+    "calls": 249,
+    "triangles": 33518,
+    "gl": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+   }
+  }
+ ]
+}
