@@ -6105,7 +6105,8 @@ def inject_wait(raw_intents, player_text: str, scene) -> list:
         present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
         pc = scene.pc()
         if pc is not None and not present & {"rest", "travel", "venture", "forage",
-                                             "prospect", "gather"}:
+                                             "prospect", "gather", "live_off_land",
+                                             "hunt"}:
             return [r for r in raw_intents if not (isinstance(r, dict) and str(
                 r.get("op", "")).lower() == "narrate_only")] + [{
                 "op": "advance_time", "actor": pc.ref,
@@ -6113,7 +6114,7 @@ def inject_wait(raw_intents, player_text: str, scene) -> list:
                 "because": "the player waited until a time they named"}]
     present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
     if present & {"advance_time", "rest", "forage", "prospect", "gather", "travel",
-                  "venture"}:
+                  "venture", "live_off_land", "hunt"}:
         return raw_intents
     m = _WAITS.search(player_text)
     if not m:

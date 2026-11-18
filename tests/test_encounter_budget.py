@@ -32,13 +32,13 @@ class _Fixed:
 # --- the measured case ---------------------------------------------------------------------
 
 def test_two_cr1_guards_against_a_lone_first_level_pc_is_never_built():
-    """800 XP is a CR 3 encounter and a lone level-1 PC is APL -1: four over, epic+1. No
-    difficulty any picker can roll spends that much, and above all not "average" (135 XP,
-    the CR 1/3 rung)."""
+    """800 XP is a CR 3 encounter and a lone level-1 PC is APL 0 (the owner's 2026-11-18
+    revision; -1 before it): three over, epic. No difficulty any picker can roll spends that
+    much, and an average fight is 200 XP, the CR 1/2 rung."""
     party = eb.apl([1])
-    assert party == -1
+    assert party == 0
     assert eb.encounter_index(2 * xp.CR_AWARD[1]) == 3
-    assert eb.budget(party) == 135
+    assert eb.budget(party) == 200
     for kind, bands in eb.MIX.items():
         for name, _ in bands:
             assert not eb.fits(800, party + eb.TIERS[name]), (kind, name)
@@ -66,7 +66,7 @@ def test_the_watch_comes_for_a_lone_first_level_pc_one_at_a_time(monkeypatch):
 # --- APL --------------------------------------------------------------------------------------
 
 @pytest.mark.parametrize("levels, want", [
-    ([1], -1), ([5], 3),                 # alone: two down (the owner's ruling)
+    ([1], 0), ([5], 4),                  # alone: one down (owner, 2026-11-18; was two)
     ([3, 3], 2), ([3, 3, 3], 2),         # three or fewer: one down (CRB Step 1)
     ([4] * 4, 4), ([4] * 5, 4),          # four or five: as they are
     ([4] * 6, 5), ([4] * 8, 5),          # six or more: one up
@@ -74,6 +74,23 @@ def test_the_watch_comes_for_a_lone_first_level_pc_one_at_a_time(monkeypatch):
 ])
 def test_apl_by_party_size(levels, want):
     assert eb.apl(levels) == want
+
+
+def test_a_lone_first_level_pc_can_meet_more_than_one_cr_third_creature():
+    """The owner's report of 2026-11-17 (#9): all 8 fights in their two saves were exactly
+    one CR 1/3 creature, 135 XP — a lone PC at APL -2 and a wilderness draw of one, always
+    (`gathering`'s `most=1`). Ruled 2026-11-18: APL -1 for a lone PC, up to three in the
+    wild. Over 600 forest forages a lone level-1 now meets groups, and fights above 135."""
+    from rules import gathering
+
+    counts, totals = set(), set()
+    for seed in range(600):
+        enc = gathering.roll("forest", 1, Dice(seed=seed), apl=eb.apl([1]))
+        if enc.creature:
+            counts.add(enc.count)
+            totals.add(enc.count * eb.xp_of(enc.creature))
+    assert counts == {1, 2, 3}, counts
+    assert max(totals) > 135 and max(totals) <= eb.budget(eb.apl([1]) + 2), totals
 
 
 def test_apl_below_one_walks_the_books_progression():
@@ -97,7 +114,7 @@ def test_the_party_is_the_pc_and_the_companions_actually_with_them():
     pc.level = 3
     s.add(pc)
     e = Engine(s, Dice(seed=1))
-    assert eb.party_levels(s) == [3] and eb.party_apl(s) == 1
+    assert eb.party_levels(s) == [3] and eb.party_apl(s) == 2
     friend = instantiate("thug", scene=s)
     friend.level = 3
     s.add(friend)

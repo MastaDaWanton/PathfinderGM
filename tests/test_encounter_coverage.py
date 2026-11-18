@@ -27,6 +27,11 @@ WORLD = loader.load_cached("fixtures/pangrella-campaign.json")
 TOWN = "58b90a214ada"
 MARKET = f"{TOWN}~urban:the-market"
 SOURCE = "scheme:a-small-favour/failure"
+# A lone level-1 PC's APL. These tests were written at -1 (the 2026-11-13 ruling's solo -2,
+# 135 XP average, a hard cap of 400); the owner's 2026-11-18 revision made it 0 (200 XP
+# average, hard cap 600). What they guard is the pricing — the whole side inside the
+# budget — so they ask the budget, not a pinned number.
+L1 = eb.apl([1])
 
 
 def _wanted_table(seed: int, guards: int = 4):
@@ -69,25 +74,29 @@ def test_a_wanted_lone_first_level_pc_meets_a_budgeted_watch_not_all_four():
         them = [w for w in watch if w.ref in s.sides.get("them", ())]
         assert thug.ref in s.sides["them"], "the one the words struck is always in"
         assert len(them) < 4, (seed, s.sides)
-        assert 135 * (1 + len(them)) <= _hard_cap(-1), (seed, len(them))
+        assert 135 * (1 + len(them)) <= _hard_cap(L1), (seed, len(them))
         held = [w for w in watch if w not in them]
         tells = " ".join(o.tell or "" for o in res.outcomes)
         for w in held:
             assert w.ref in s.actors, "a held guard is still standing in the scene"
             assert w.name in tells and "shouting the alarm" in tells, tells
         joined_counts.add(len(them))
-    assert joined_counts <= {0, 1}, joined_counts
+    # At most as many as the hard cap leaves beside the thug: (600 - 135) // 135 = 3.
+    assert max(joined_counts) <= (_hard_cap(L1) - 135) // 135, joined_counts
 
 
 def test_a_struck_merchant_is_counted_against_the_watch():
     """A merchant (400 XP, CR 1) struck by a wanted lone level-1 PC already fills the
     hard tier's 400 alone: before, the watch priced only itself and one more watchman came
-    in on top (535 XP). Now the merchant is the side's one, and the watch hangs back."""
+    in on top (535 XP). Now the merchant is counted first, and only what the cap leaves
+    beside them comes: at APL 0 (2026-11-18) one watchman (535 of 600), never two."""
     for seed in range(20):
         s, e, pc, watch = _wanted_table(seed)
         merchant = s.add(instantiate("merchant", scene=s, name="a merchant"), zone="near")
         res = _swing(e, merchant.ref)
-        assert s.sides["them"] == [merchant.ref], (seed, s.sides)
+        side = s.sides["them"]
+        assert merchant.ref in side, (seed, s.sides)
+        assert 400 + 135 * (len(side) - 1) <= _hard_cap(L1), (seed, s.sides)
         tells = " ".join(o.tell or "" for o in res.outcomes)
         assert "shouting the alarm" in tells, tells
 
@@ -100,7 +109,7 @@ def test_striking_a_guard_rallies_only_what_the_budget_holds():
         _swing(e, watch[0].ref)
         them = [w for w in watch if w.ref in s.sides.get("them", ())]
         assert watch[0] in them, "the guard the words struck is always in"
-        assert len(them) * 135 <= _hard_cap(-1), (seed, len(them))
+        assert len(them) * 135 <= _hard_cap(L1), (seed, len(them))
 
 
 def _square(seed: int, template: str, n: int = 4):
@@ -124,7 +133,7 @@ def test_a_gang_rallying_to_a_struck_thug_is_priced():
         res = _swing(e, thugs[0].ref)
         side = s.sides["them"]
         assert thugs[0].ref in side
-        assert 135 * len(side) <= _hard_cap(-1), (seed, side)
+        assert 135 * len(side) <= _hard_cap(L1), (seed, side)
         tells = " ".join(o.tell or "" for o in res.outcomes)
         for t in thugs[1:]:
             if t.ref not in side:
@@ -142,7 +151,7 @@ def test_a_model_proposed_fight_cannot_sweep_the_square_in():
         res = e.run(e.validate([{"op": "begin_encounter", "because": "t", "params": {
             "sides": {"pc": ["pc"], "them": refs}}}]))
         side = s.sides["them"]
-        assert 1 <= len(side) and 135 * len(side) <= _hard_cap(-1), (seed, side)
+        assert 1 <= len(side) and 135 * len(side) <= _hard_cap(L1), (seed, side)
         held = set(refs) - set(side)
         assert not held & {r for r, _ in s.initiative}, "a held guard has no turn"
         tells = " ".join(o.tell or "" for o in res.outcomes)
@@ -252,7 +261,8 @@ def test_a_lawless_street_has_more_thieves_and_a_calm_one_fewer():
 def test_a_lawless_forage_meets_more_creatures():
     lawless, calm = gathering.bands(2.0), gathering.bands(1 / 3)
     width = lambda bands, k: next(hi - lo + 1 for lo, hi, kind in bands if kind == k)
-    assert width(lawless, "creature") == 36 and width(calm, "creature") == 6
+    # The creature band is 30 wide since 2026-11-18 (the owner's "more encounters").
+    assert width(lawless, "creature") == 60 and width(calm, "creature") == 10
     assert width(lawless, "rich") == width(calm, "rich") == 20
 
 
@@ -270,9 +280,9 @@ def test_a_schemes_hostile_bring_in_fits_the_budget():
     for seed in range(30):
         e = _scheme_engine(seed)
         n = schemes._hostile_count(e, {"count": 3, "side": "them"}, "thug", "hunter")
-        assert n * 135 <= eb.budget(-1 + eb.TIERS["challenging"]), (seed, n)
+        assert n * 135 <= eb.budget(L1 + eb.TIERS["challenging"]), (seed, n)
         g = schemes._hostile_count(e, {"count": 2, "side": "them"}, "watchman", "guard")
-        assert 1 <= g and g * 135 <= _hard_cap(-1), (seed, g)
+        assert 1 <= g and g * 135 <= _hard_cap(L1), (seed, g)
 
 
 def test_a_witness_is_not_a_fight_and_comes_as_written():

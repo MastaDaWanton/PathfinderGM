@@ -6,16 +6,18 @@ strength now (`docs/printed-attacks.md`), and the windows every picker used were
 for the fists they used to swing. A lone level-1 PC died to two CR 1 guards. Each guard
 was inside the old per-creature window (CR level-2 .. level+1), but two CR 1s are 800 XP,
 which is a CR 3 ENCOUNTER (Core Rulebook p.397, Table 12-1/12-2: "add creatures ... whose
-combined XP does not exceed the total XP budget") — and a lone level-1 PC's APL is -1 by
-the owner's ruling, so that fight was APL+4: past epic.
+combined XP does not exceed the total XP budget") — and a lone level-1 PC's APL was -1 by
+the owner's first ruling, so that fight was APL+4: past epic (APL 0 and exactly epic under
+the 2026-11-18 revision below: still over even the hard budget).
 
-The owner's ruling (2026-11-13), which this module is the one home of:
+The owner's ruling (2026-11-13, revised 2026-11-18), which this module is the one home of:
 
 1. The WHOLE encounter is priced by its total XP, never per creature.
 2. APL is the average level of the PC and the companions actually with them, rounded to
    the nearest (CRB Step 1: "one of the few exceptions to the round down rule"), then
-   adjusted for party size by Step 1 — six or more +1, three or fewer -1 — EXCEPT a lone
-   PC, who counts -2.
+   adjusted for party size by Step 1 — six or more +1, three or fewer -1. A lone PC is
+   the book's -1 too: the 2026-11-13 ruling counted them -2, and the owner revised it on
+   2026-11-18 after all 8 fights in their two saves came out one CR 1/3 creature, 135 XP.
 3. Mostly AVERAGE fights (encounter CR = APL); harder only sometimes; a guard or a lair
    may be challenging or hard; nothing epic unless a document deliberately places it.
 
@@ -23,8 +25,9 @@ Research, sources and the reasoning behind `MIX` are in docs/encounter-budget.md
 
 An APL below 1 walks down the CRB's own progression for a CR below 1 ("its CR drops one
 step on the following progression ... 1/2, 1/3, 1/4, 1/6, 1/8", Adding NPCs): APL 0 is
-the CR 1/2 rung, -1 the CR 1/3 rung, and so on. So a lone 1st-level PC's average fight is
-135 XP — one CR 1/3 creature — and their hard one 400 XP, one CR 1.
+the CR 1/2 rung, -1 the CR 1/3 rung, and so on. So a lone 1st-level PC (APL 0) has an
+average fight of 200 XP — one CR 1/2 creature, or a pair of CR 1/4s — and a hard one of
+600 XP, one CR 2.
 
 Every roll here is the engine's and hidden: which difficulty (a d100 against `MIX`) and
 which creature. No model chooses a number.
@@ -71,8 +74,6 @@ def apl(levels) -> int:
     levels = [max(1, int(lv or 1)) for lv in (levels or ())] or [1]
     n = len(levels)
     avg = int(sum(levels) / n + 0.5)
-    if n == 1:
-        return avg - 2
     if n <= 3:
         return avg - 1
     if n >= 6:
@@ -100,13 +101,22 @@ def party_levels(scene, pc_level: int | None = None) -> list[int]:
     for a in (getattr(scene, "actors", None) or {}).values():
         if a is pc or getattr(a, "is_pc", False) or a.is_down:
             continue
-        if not a.has_state(states.TRAVELS_WITH_YOU):
-            continue
-        if any(states.TRAVELS_WITH_YOU in (e.tags or ())
-               and str(e.origin or "").startswith("company:")
-               for e in (getattr(a, "effects", ()) or ())):
+        if companion_with(a):
             out.append(companion_level(a))
     return out
+
+
+def companion_with(actor) -> bool:
+    """Whether this person is one of the party: bonded by the `company` op (an effect
+    tagged `TRAVELS_WITH_YOU` whose origin is `company:<ref>`), not a horse, a job's
+    teamster or an animal companion (`party_levels` says why)."""
+    from . import states
+
+    if getattr(actor, "is_pc", False) or not actor.has_state(states.TRAVELS_WITH_YOU):
+        return False
+    return any(states.TRAVELS_WITH_YOU in (e.tags or ())
+               and str(e.origin or "").startswith("company:")
+               for e in (getattr(actor, "effects", ()) or ()))
 
 
 def companion_level(actor) -> int:

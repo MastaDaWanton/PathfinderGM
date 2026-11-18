@@ -564,6 +564,12 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Ore, not herbs: the same expedition against the blacksmith's stock list, in
     # ground that carries it — mountain, hills, underground, a bog for bog iron.
     "prospect": ((), ("actor", "hours"), "player"),
+    # Survival's "get along in the wild" (CRB p.107): a day's food and water for the one
+    # looking and one more per 2 points over DC 10. Hunting: an animal of this ground,
+    # found first. Both written only by the act->op table from the reader's `fend` act
+    # (CODE_ONLY_OPS); the ground, the hours and the DC are the engine's.
+    "live_off_land": ((), ("actor",), "player"),
+    "hunt": ((), ("actor",), "player"),
     # Looking for tracks: 1e's Survival to find tracks against the ground's DC, and what
     # the engine knows crossed it (rules/tracking.py). The ground and the trails are the
     # scene's, never the plan's. `quarry` (the player's words for what they are after) and
@@ -827,7 +833,7 @@ CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "looks_in", "defending", 
 # `craft` itself, from code.
 # `harvest` since 2026-11-01: the reader's `harvest` act, built whole (`acts_to_ops._harvest`).
 CODE_ONLY_OPS = frozenset({"job", "make", "craft", "greet", "commission", "harvest",
-                           "disguise", "surrender"})
+                           "disguise", "surrender", "live_off_land", "hunt"})
 # Ops only the author's own hand writes (`/cheat`, origin `author:`): left out of the
 # turn's op enum like the code-only ops, but offered to the cheat (`prompts.CHEAT_OPS`),
 # and refused by the engine from any other origin. `xp` since 2026-11-07 (audit #22): a

@@ -16,8 +16,14 @@ fight was APL+4, past epic.
 
 1. Price the **whole** encounter by total XP (CRB Tables 12-1/12-2), never per creature.
 2. APL is the average level of the PC plus the companions actually with them, adjusted for
-   party size by CRB Step 1 (4–5 as is; 6+ +1; 3 or fewer −1), **except a lone PC, who
-   counts −2**.
+   party size by CRB Step 1 (4–5 as is; 6+ +1; 3 or fewer −1). A lone PC counted −2
+   until the owner's **2026-11-18 revision: a lone PC counts −1** (the book's own step), and
+   **wilderness fights hold up to 3 creatures** (`gathering.draw_for`, `MOST`; it was one,
+   always). Measured before it: all 8 fights in the owner's two saves were one CR 1/3
+   creature, 135 XP. At level 1 an average fight is now 200 XP and a hard one 600; dungeon
+   tags that cannot place their leader at level 1 fell from 12 of 33 to 3
+   (ooze-in-the-works, the-guardians, fungus-garden). The forage's creature band widened
+   from 18 to 30 in 100 the same day.
 3. Mostly **average** fights (encounter CR = APL). Harder ones only sometimes. Guards and
    lairs may be challenging or hard. Nothing epic unless a document deliberately places a
    boss.

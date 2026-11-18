@@ -1208,6 +1208,30 @@ def sleep(actor, hours: int = 8, *, minutes: int | None = None) -> None:
         actor.awake_checks = 0
 
 
+# Survival's "get along in the wild" (CRB p.107, Survival): "DC 10 ... hunting and
+# foraging (no food or water supplies needed). You can provide food and water for one other
+# person for every 2 points by which your check result exceeds 10." Checked "once every 24
+# hours", the result standing until the next.
+GET_ALONG_DC = 10
+
+
+def fed_by_the_land(total: int) -> int:
+    """How many bodies a Survival result keeps fed and watered for a day: none under DC 10,
+    the one who made it at 10, and one more for every 2 points over."""
+    total = int(total)
+    return 0 if total < GET_ALONG_DC else 1 + (total - GET_ALONG_DC) // 2
+
+
+def lived_off_land(actor) -> dict:
+    """A day of the land's food and water, through the one reset a meal and a drink make
+    (`eat`, `drink`). Returns the points each need released, {"thirst": n, "hunger": n}.
+
+    The one credit function the wild uses: if a meal or a drink comes to give partial
+    credit (a waterskin is half a day's water, CRB p.158), a day off the land is still a
+    whole day, and this is where it says so."""
+    return {"thirst": drink(actor), "hunger": eat(actor)}
+
+
 def eat(actor) -> int:
     """A meal: the hunger clock and its count back to nothing, and whatever hunger held
     released to heal by the ordinary clock. Returns the points released."""

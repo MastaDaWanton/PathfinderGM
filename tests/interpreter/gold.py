@@ -232,7 +232,8 @@ GOLD = [
     G("I keep walking north until the light starts to go.",
       [A("go", place="north", time="until the light starts to go")], "script:long"),
     G("I check my things before I set off.", [A("other", object="my things")], "script:long"),
-    G("I look for water.", [A("search", object="water")], "script:long"),
+    # `fend` since 2026-11-18 (owner report 2026-11-17 #6): water in the wild is not a search.
+    G("I look for water.", [A("fend", object="water")], "script:long"),
     G("I drink and fill what I can carry.", [A("consume"), A("gather", object="what I can carry")],
       "script:long"),
     G("I forage for anything worth taking.", [A("gather", object="anything worth taking")], "script:long"),

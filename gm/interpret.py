@@ -42,8 +42,20 @@ ACTS = (
     "sell", "give", "take", "drop", "steal", "attack", "cast", "use", "consume", "wait",
     "rest", "rise", "call_on", "break_in", "stealth", "athletics", "exert", "gather",
     "follow", "request", "claim", "craft", "commission", "escape", "loot", "harvest", "prone",
-    "disguise", "threaten", "surrender", "other",
+    "disguise", "threaten", "surrender", "fend", "hunt", "other",
 )
+# `fend` since 2026-11-18, from the owner's report of 2026-11-17 (#6): parched in a
+# forest, "I search for a pond, spring or river", "I search for a source of water" and "I
+# search for a river" were read `search` three times and built a Perception check, a herb
+# forage and a hunt for tracks; nothing gave water. Living off the land is its own deed in
+# the book — Survival's "get along in the wild" (CRB p.107): DC 10, hunting and foraging
+# feeds and waters you for a day, and one more person per 2 points over — and it owes the
+# engine's `live_off_land` op, built whole (`acts_to_ops._fend`). `hunt` is the same
+# rule's hunting, an act of its own: it owes the `hunt` op, which draws an animal through
+# the forage's creature pick. It was a closed `seeks` choice on `fend` first, and live
+# 2026-11-18 "I go hunting for game in the woods" came back water-and-food three times
+# out of three (the enum's first value, with no hunt demonstration the prompt budget
+# could hold); an act's own name is the reader's strongest cue.
 # `prone` since 2026-11-15, from the playtest that day (#62, #64): "I drop to my knees, put
 # my hands behind my head" was read `go`, the engine told "Vesna Kroll moves from near to
 # near", no prone state was laid, and the sergeant's spear swung at her standing AC. Going
@@ -303,7 +315,8 @@ ACT_COSTS: dict[str, str] = {
     "look": "quick", "take": "quick", "give": "quick", "drop": "quick", "consume": "quick",
     "use": "quick", "steal": "quick", "cast": "quick", "break_in": "quick",
     "athletics": "quick", "exert": "quick", "escape": "quick", "rise": "quick",
-    "other": "quick", "prone": "free", "disguise": "takes_time",
+    "other": "quick", "prone": "free", "disguise": "takes_time", "fend": "takes_time",
+    "hunt": "takes_time",
     "journey": "takes_time", "search": "takes_time", "track": "takes_time",
     "gather": "takes_time", "craft": "takes_time", "harvest": "takes_time",
     "loot": "takes_time", "wait": "takes_time", "rest": "takes_time",
@@ -522,6 +535,8 @@ ACT_SLOTS: dict[str, tuple[str, ...]] = {
     "disguise": ("object",),
     # Who the player gives themselves up to ("the sergeant", "the city watch").
     "surrender": ("target",),
+    # What is looked for (water, a river, a deer) and where the looking is done.
+    "fend": ("object", "place"), "hunt": ("object", "place"),
     "other": ("target", "object", "place"),
 }
 
@@ -540,7 +555,7 @@ leave     walk or climb out of where you are — a building, ground gone down in
           cellar, a crypt, the sewers, a cave), or the settlement itself — with nowhere
           else named
 look      look, watch, listen, read, examine
-search    look for a THING or a PLACE (water, a way in, somewhere to sleep). `where` is
+search    look for a THING or a PLACE (a way in, somewhere to sleep). `where` is
           here for going over where you are or a part of it (a room, its walls or
           floor, a ship's hold, the ground here) for anything hidden or lost, else
           elsewhere; `take` is twenty when the words take 20 or keep searching as long
@@ -622,6 +637,8 @@ prone     drop to the ground, throw yourself flat, hit the deck, lie down in a f
 disguise  make yourself look like somebody else or like nobody anyone would know: a
           disguise, a false look, passing yourself off as another, using the Disguise
           skill; the object is who or what you mean to pass for
+fend      seek water or food in the wild
+hunt      hunt or fish for game
 surrender give yourself up: yield, lay down your arms, put your hands up to be taken,
           hand yourself in, or own up to the watch or a guard that you did a crime; the
           target is who you give yourself up to. Said in words ("I tell the sergeant I
@@ -1310,6 +1327,11 @@ _DEMOS = [
          {"span": "kneel", "act": "prone"},
          {"span": "tell the watchman I yield and will come quietly",
           "target": "the watchman", "act": "surrender"}]}),
+    # Living off the land (the owner's report 2026-11-17 #6): water, food and game are
+    # sought by `fend`, never `search`, which stays the looking-over of a room or a body.
+    ("I search for a river.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "search for a river", "object": "a river", "act": "fend"}]}),
     ("I tell the guard that I'm the one who broke into the chandler's last night.",
      {"question": False, "claims": [], "actions": [
          {"span": "tell the guard that I'm the one who broke into the chandler's last "
@@ -3096,6 +3118,7 @@ _OP_NEEDS = {
     "sell": {"sell"},
     "rest": {"rest"}, "advance_time": {"wait", "rest"}, "call_on": {"call_on"},
     "break_in": {"break_in"}, "forage": {"gather"}, "prospect": {"gather"},
+    "live_off_land": {"fend"}, "hunt": {"hunt"},
     "gather": {"gather"},
     "loot": {"take", "steal", "loot"}, "cast": {"cast"},
     "use_item": {"consume", "use"}, "drink": {"consume"}, "eat": {"consume"},

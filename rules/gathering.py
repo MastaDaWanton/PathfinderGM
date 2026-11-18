@@ -31,10 +31,13 @@ from . import bestiary
 
 # The d100 bands, low to high. Authored to Ultimate Wilderness's temper — most
 # expeditions are just work — with the guarded find rare enough to be a story.
+# The creature band was 18 in 100 (76-93) until 2026-11-18, when the owner asked for more
+# fights ("more difficulty and encounters": all 8 fights in their two saves were one CR 1/3
+# creature). Widened to 30, out of the quiet band; rich and guarded keep their width.
 BANDS = (
-    (1, 55, "quiet"),
-    (56, 75, "rich"),
-    (76, 93, "creature"),
+    (1, 43, "quiet"),
+    (44, 63, "rich"),
+    (64, 93, "creature"),
     (94, 100, "guarded"),
 )
 
@@ -60,22 +63,32 @@ class Encounter:
     creature: dict | None = None    # the bestiary row, when there is one
     aggressive: bool = False
     yield_times: int = 1
+    count: int = 1                  # how many of the creature (`encounter_budget.choose`)
     tell: str = ""
     extras: dict = field(default_factory=dict)
 
 
 def creature_for(biome: str, level: int, dice, guarding: bool = False,
                  apl: int | None = None) -> dict | None:
-    """A bestiary row that lives here and is a fair match, or None when the book has
-    nothing for this ground at the party's budget — a stone shelf where no creature is
-    tagged is quiet, and so is ground whose smallest creature is above the party.
+    """The row of `draw_for`, or None: what lives here, without how many."""
+    got = draw_for(biome, level, dice, guarding=guarding, apl=apl)
+    return got.row if got is not None else None
 
-    One creature, always: the forage's tells, the guarded find's booking and the
-    excursion's scene call all speak of "it". The budget is the party's
-    (`encounter_budget.choose`, its `apl`; without one, the trade's `level` alone, a lone
-    PC — the cautious answer), so one creature means one whose own XP fits the rolled
-    difficulty. Measured before it (2026-11-01): a first-level herbalist on a third-level
-    character met a CR 19 vishap (362 hp).
+
+def draw_for(biome: str, level: int, dice, guarding: bool = False,
+             apl: int | None = None, keep=None):
+    """A bestiary row that lives here and how many of it (`encounter_budget.Draw`), or
+    None when the book has nothing for this ground at the party's budget — a stone shelf
+    where no creature is tagged is quiet, and so is ground whose smallest creature is
+    above the party. `keep` narrows the rows further (a hunt's animals).
+
+    Up to `encounter_budget.MOST` of one kind, the whole group priced by its total XP. It
+    was one creature, always, until 2026-11-18 (`most=1`): with a lone PC at APL -2 that
+    was one CR 1/3 creature in all 8 of the owner's fights, and the owner ruled wilderness
+    fights may hold up to three. The budget is the party's (`encounter_budget.choose`, its
+    `apl`; without one, the trade's `level` alone, a lone PC — the cautious answer).
+    Measured before it (2026-11-01): a first-level herbalist on a third-level character
+    met a CR 19 vishap (362 hp).
 
     The row is checked again after it is picked: the creature the engine will bring in
     is the block `bestiary.raw_block` resolves its id to, and that block must fit the
@@ -93,19 +106,20 @@ def creature_for(biome: str, level: int, dice, guarding: bool = False,
     rows = bestiary.search(biome=biome, cr_max=eb.highest_cr(party, kind), stated=True,
                            limit=5000)
     rows = [r for r in rows if r.get("cr_value") is not None
-            and r.get("creature_type") not in ("humanoid", "outsider", "undead")]
+            and r.get("creature_type") not in ("humanoid", "outsider", "undead")
+            and (keep is None or keep(r))]
     if not rows:
         return None
     hard = dice.roll("1d100", label="how hard it is", visibility="hidden").total
     got = eb.choose(rows, party, hard, lambda n: pick_index(dice, n, "what lives here"),
-                    kind=kind, most=1)
+                    kind=kind, most=eb.MOST)
     if got is None:
         return None
     block = bestiary.raw_block(str(got.row.get("id") or "")) or got.row
     landed = eb.budget(party + eb.TIERS[got.tier])
-    if block.get("cr_value") is None or eb.xp_of(block) > landed:
+    if block.get("cr_value") is None or got.count * eb.xp_of(block) > landed:
         return None
-    return got.row
+    return got
 
 
 def pick_index(dice, n: int, label: str) -> int:
@@ -152,14 +166,15 @@ def roll(biome: str, level: int, dice, apl: int | None = None,
         return Encounter("quiet", r)
     if kind == "rich":
         return Encounter("rich", r, yield_times=RICH_YIELD)
-    row = creature_for(biome, level, dice, guarding=(kind == "guarded"), apl=apl)
+    got = draw_for(biome, level, dice, guarding=(kind == "guarded"), apl=apl)
+    row = got.row if got is not None else None
     if row is None:
         # Nothing lives here that the book prices for this level; the ground is
         # quiet, and a rich find is what a guarded one becomes with nobody on it.
         return (Encounter("rich", r, yield_times=RICH_YIELD) if kind == "guarded"
                 else Encounter("quiet", r))
     aggressive = kind == "creature" and row.get("creature_type") in AGGRESSIVE
-    return Encounter(kind, r, creature=row, aggressive=aggressive,
+    return Encounter(kind, r, creature=row, aggressive=aggressive, count=got.count,
                      yield_times=GUARDED_YIELD if kind == "guarded" else 1)
 
 
@@ -201,16 +216,20 @@ def describe(enc: Encounter, what: str, biome: str = "", *, spot: str = "",
         # parse (playtest 2026-09-30, item 8): what ground, wanted for what, after a haul
         # was already in the satchel? It says where now, and the engine's stance tell
         # (`Engine._hold_ground`) says what the creature is doing about it.
-        return (f"Something has noticed the work: {_an(name)} comes out of the "
-                f"{'rock' if dug else 'undergrowth'}, and it is coming for you."
+        many = enc.count > 1
+        return (f"Something has noticed the work: {_some(name, enc.count)} "
+                f"{'come' if many else 'comes'} out of the "
+                f"{'rock' if dug else 'undergrowth'}, and "
+                f"{'they are' if many else 'it is'} coming for you."
                 if enc.aggressive else
                 f"Making for one last {where}, "
-                f"you find {_an(name)} there before you.")
+                f"you find {_some(name, enc.count)} there before you.")
     if enc.kind == "guarded" and enc.creature:
         name = bestiary.kind_word(enc.creature)
         return (f"The find of a lifetime — {'a massive vein of' if dug else 'a whole hollow of'} "
-                f"{what}, three times any ordinary haul — and {_an(name)} sitting on it. "
-                f"It is yours when that is dead or gone.")
+                f"{what}, three times any ordinary haul — and {_some(name, enc.count)} "
+                f"sitting on it. It is yours when "
+                f"{'they are' if enc.count > 1 else 'that is'} dead or gone.")
     return ""
 
 
@@ -481,3 +500,10 @@ def mastery_steps(hourly: list[dict]) -> list[dict]:
 
 def _an(name: str) -> str:
     return f"an {name}" if name[:1].lower() in "aeiou" else f"a {name}"
+
+
+def _some(name: str, n: int) -> str:
+    """"a wolf" or "three wolves": the tell says the number the budget sent."""
+    from .openings import group_phrase
+
+    return _an(name) if int(n or 1) <= 1 else group_phrase(name, n)
