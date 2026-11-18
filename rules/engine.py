@@ -19263,6 +19263,10 @@ class Engine:
                 survival.drink(a)
                 if a.is_pc:
                     told.extend(survival.night(a, self.dice))
+        # The days cruised are spent: `_sail` counts a passage's days from `sailed_at`,
+        # and left at the cruise's start it gave the next voyage those days free (live
+        # 2026-11-18: two days cruised, then "14 days at sea" moved the clock twelve).
+        ship.sailed_at = int(self.scene.clock_minutes)
         weather = "calm"
         if met is not None and met.kind == "storm":
             weather = "wreck" if ships_mod.storm_wrecks(self.dice) else "storm"

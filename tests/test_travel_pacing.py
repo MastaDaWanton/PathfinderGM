@@ -306,3 +306,17 @@ def test_a_cruise_runs_days_until_it_meets_a_sail(held_at_quay, monkeypatch):
 
 
 from tests.test_ships_and_piracy import held_at_quay  # noqa: E402,F401  (the fixture)
+
+
+def test_days_cruised_are_not_given_back_to_the_next_voyage(held_at_quay):
+    """Live 2026-11-18: two days cruised off Mirabalos, then the Red Gull's "14 days at
+    sea" to Zhilvarnia moved the clock twelve — `_sail` counts from `sailed_at`, which the
+    cruise left at its own start. A quiet week's cruise then a fortnight is three weeks."""
+    scene, engine, pc, ship = held_at_quay
+    start = scene.clock_minutes
+    engine.run(engine.validate([{"op": "sea", "actor": "pc", "because": "t",
+                                 "params": {"do": "cruise"}}], origin="author:test"))
+    assert scene.clock_minutes - start == ships.CRUISE_DAYS * DAY
+    out = _journey(engine, to="Mirabalos")
+    days = next(e["days"] for e in out.effects if e.get("kind") == "voyage")
+    assert scene.clock_minutes - start == (ships.CRUISE_DAYS + days) * DAY, out.tell
