@@ -12,7 +12,7 @@ const MapUI = (() => {
   const M = MapModel, e = s => String(s == null ? "" : s).replace(/[&<>"]/g,
     c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const reduced = matchMedia("(prefers-reduced-motion: reduce)");
-  let D, R, T, L, SITES, st, els;
+  let D, R, T, L, SITES, st, els, FIVE = false;
 
   async function start(renderer, { styleName }) {
     R = renderer;
@@ -28,6 +28,12 @@ const MapUI = (() => {
            regionHere: D.region.here, visitedTowns, site: "sewers", minutes: T.clock_minutes || 0,
            rain: false, walking: false, worst, maps: worst ? D.world.worstMaps : [] };
     if (!st.been.has(st.here)) st.been.add(st.here);
+    // Five maps for a renderer that draws them (the tabletop): World > Continent > Region (the
+    // nation you stand in) > Town (inside the walls) > Site. The owner, 2026-11-18: "anything
+    // outside of the city should not be included in the city map but instead in the region map".
+    FIVE = (R.levels || []).includes("continent");
+    const home = D.world.cities.find(c => c.id === D.region.here) || {};
+    st.continent = home.continent; st.nation = home.nation;
     document.body.innerHTML = `<div class="app"><header class="bar">
         <ol class="crumbs" aria-label="Maps"></ol>
         <span class="style-name">${e(styleName)} · <a href="index.html">all mocks</a></span>
@@ -44,7 +50,7 @@ const MapUI = (() => {
     els.rain.addEventListener("click", () => { st.rain = !st.rain; paint(); });
     document.getElementById("worst").addEventListener("click", () => {
       const u = new URL(location.href); if (st.worst) u.searchParams.delete("worst"); else u.searchParams.set("worst", "1"); location.href = u; });
-    els.crumbs.addEventListener("click", ev => { const b = ev.target.closest("[data-level]"); if (b) open(b.dataset.level, b.dataset.site); });
+    els.crumbs.addEventListener("click", ev => { const b = ev.target.closest("[data-level]"); if (b) open(b.dataset.level, b.dataset.site || b.dataset.arg); });
     els.rail.addEventListener("click", onRail);
     document.addEventListener("keydown", ev => { if (ev.key === "Escape" && st.sel) { st.sel = null; paint(); } });
     R.init(els.stage, { pick, open, reduced: () => reduced.matches, level: () => st.level });
@@ -52,7 +58,7 @@ const MapUI = (() => {
     const q = new URLSearchParams(location.search);
     if (q.get("hour")) { st.minutes = Math.floor(st.minutes / 1440) * 1440 + Math.round(+q.get("hour") * 60); els.hour.value = st.minutes % 1440; }
     if (q.get("rain")) st.rain = true;
-    if (q.get("level")) open(q.get("level"), q.get("site") || "sewers"); else paint();
+    if (q.get("level")) open(q.get("level"), q.get("site") || q.get("arg") || "sewers"); else paint();
     if (q.get("sel")) pick(q.get("sel"));
     window.MAP_STATE = st;  // for the screenshots and the frame-rate probe
   }
@@ -73,6 +79,21 @@ const MapUI = (() => {
       const legs = st.sel && st.sel !== st.regionHere && K.how[st.sel] ? M.worldRoute(D.world, K, st.regionHere, st.sel) : null;
       return { ...base, W: D.world, WL, K, here: st.regionHere, route: legs && legs.length ? [st.regionHere, ...legs.map(l => l.to)] : null, legs };
     }
+    if (st.level === "continent" || st.level === "nation") {
+      const been = new Set([...D.world.been, ...st.visitedTowns]);
+      const WL = M.worldLayout(D.world), K = M.worldKnown(D.world, [...been], st.maps), F = M.fog(T, [...st.been], st.here);
+      const city = D.world.cities.find(c => c.id === st.sel);
+      let route = null, legs = null, walkLegs = null;
+      if (city && K.how[st.sel] && st.sel !== st.regionHere) {
+        legs = M.worldRoute(D.world, K, st.regionHere, st.sel);
+        route = legs && legs.length ? [st.regionHere, ...legs.map(l => l.to)] : null;
+      } else if (st.sel && T.settings[st.sel] === "outside" && F.found.has(st.sel) && st.sel !== st.here) {
+        walkLegs = M.route(T.ways, F.visited, st.here, st.sel);
+        route = walkLegs.legs.length ? [st.here, ...walkLegs.legs.map(l => l.to)] : null;
+      }
+      return { ...base, W: D.world, WL, K, T, L, F, continent: st.continent, nation: st.nation, here: st.regionHere,
+               at: st.here, home: D.region.here, route, legs, walkLegs };
+    }
     if (st.level === "region") {
       const G = M.regionLayout(D.region, T, st.visitedTowns);
       const F = M.fog(T, [...st.been], st.here);
@@ -92,8 +113,14 @@ const MapUI = (() => {
     els.out.textContent = M.clockWords(st.minutes % 1440);
     els.rain.setAttribute("aria-pressed", st.rain);
     const s = SITES[st.site];
-    const crumbs = [...((R.levels || []).includes("world") ? [["world", "World", true]] : []), ["region", "Region", true], ["town", "Featherperch", true],
-                    ["site", s ? M.upper(s.name) : "Site", st.level === "site"]];
+    const crumbs = FIVE
+      ? [["world", "World", true], ["continent", D.world.continents[st.continent] || "Continent", true],
+         // A nation on another continent than the one open is not this map's region: the crumb waits.
+         ["nation", (D.world.nations[st.nation] || {}).continent === st.continent ? D.world.nations[st.nation].name : "Region",
+          (D.world.nations[st.nation] || {}).continent === st.continent], ["town", "Featherperch", true],
+         ["site", s ? M.upper(s.name) : "Site", st.level === "site"]]
+      : [...((R.levels || []).includes("world") ? [["world", "World", true]] : []), ["region", "Region", true], ["town", "Featherperch", true],
+         ["site", s ? M.upper(s.name) : "Site", st.level === "site"]];
     els.crumbs.innerHTML = crumbs.map(([lv, name, on]) => `<li><button type="button" data-level="${lv}"${
       lv === "site" ? ` data-site="${st.site}"` : ""}${st.level === lv ? ' aria-current="page"' : ""}${on ? "" : " disabled"}>${e(name)}</button></li>`).join("");
     const v = view();
@@ -103,10 +130,13 @@ const MapUI = (() => {
     st.fresh = new Set();
   }
 
-  function open(level, site) {
+  function open(level, arg) {
     if (st.walking) return;
+    if (FIVE && level === "region") level = "nation";   // the old region board is the continent now; "region" means your nation
     st.level = level; st.sel = null; st.said = "";
-    if (site && SITES[site]) st.site = site;
+    if (level === "site" && arg && SITES[arg]) st.site = arg;
+    if (level === "continent" && arg && D.world.continents[arg]) st.continent = arg;
+    if (level === "nation" && arg && D.world.nations[arg]) { st.nation = arg; st.continent = D.world.nations[arg].continent; }
     paint();
   }
   function pick(id) {
@@ -129,6 +159,24 @@ const MapUI = (() => {
           st.fresh.size ? ` New on the map: ${[...st.fresh].map(x => M.bare(T.names[x])).join(", ")}.` : ""}`;
         st.sel = null; els.hour.value = st.minutes % 1440; paint();
       });
+    } else if (v.level === "continent" || v.level === "nation") {
+      const to = st.sel;
+      if (v.legs) {
+        // A journey: the miles of the roads you know, at Pathfinder's 24 miles a day on foot (speed 30).
+        const miles = v.legs.reduce((a, l) => a + (l.miles || 0), 0), days = Math.max(1, Math.ceil(miles / 24));
+        R.walk(v.route, () => {
+          const c = D.world.cities.find(x => x.id === to);
+          st.walking = false; st.minutes += days * 1440; st.regionHere = to; st.visitedTowns.add(to); st.nation = c.nation; st.continent = c.continent;
+          st.said = `You set out for ${c.name} and arrive after about ${days} ${days === 1 ? "day" : "days"} on the road${miles ? ` (${miles} miles at 24 a day)` : ""}. Journey events, another lane's work, would happen on the way.`;
+          st.sel = null; els.hour.value = st.minutes % 1440; paint();
+        });
+      } else {
+        const r = v.walkLegs;
+        R.walk(v.route, () => {
+          st.walking = false; st.minutes += r.minutes; st.here = to; st.been.add(to); st.regionHere = D.region.here;
+          st.said = `You walk out to ${T.names[to]}, ${r.minutes} minutes.`; st.sel = null; els.hour.value = st.minutes % 1440; paint();
+        });
+      }
     } else if (v.level === "region") {
       const to = st.sel, G = v.G, town = G.towns[to];
       R.walk(v.route, () => {
@@ -159,7 +207,7 @@ const MapUI = (() => {
     const b = ev.target.closest("button");
     if (!b) return;
     if (b.dataset.walk !== undefined) walk();
-    else if (b.dataset.open) open(b.dataset.open, b.dataset.site);
+    else if (b.dataset.open) open(b.dataset.open, b.dataset.site || b.dataset.arg);
     else if (b.dataset.pick) pick(b.dataset.pick);
     else if (b.dataset.readmap) {
       const n = b.dataset.readmap;
@@ -181,6 +229,8 @@ const MapUI = (() => {
     if (v.level === "town") out += townSlip(v);
     else if (v.level === "region") out += regionSlip(v);
     else if (v.level === "world") out += worldSlip(v);
+    else if (v.level === "continent") out += continentSlip(v);
+    else if (v.level === "nation") out += nationSlip(v);
     else out += siteSlip(v);
     return out;
   }
@@ -205,11 +255,63 @@ const MapUI = (() => {
     const here = city(st.regionHere), nation = here && here.nation;
     out += `<div class="mapnote"><h3>${e(nm(st.regionHere))} <small>you are here</small></h3>
       <p>${Object.keys(K.how).length} cities known: ${counts.been} stood in, ${counts.road} from road signs, ${counts.heard} heard of, ${counts.map} from maps.</p>
-      <p>Zoom out past the region to come here; press a town for the way there.</p>
-      <div class="btnrow"><button type="button" class="go quiet" data-open="region">Region map</button>${nation ? `
+      <p>${FIVE ? "Point at a continent to light it; press it, or zoom in on it, to go in." : "Zoom out past the region to come here; press a town for the way there."}</p>
+      <div class="btnrow"><button type="button" class="go quiet" data-open="${FIVE ? "continent" : "region"}"${FIVE ? ` data-arg="${e(here && here.continent)}"` : ""}>${FIVE ? e(W.continents[here && here.continent] || "Continent") : "Region map"}</button>${nation ? `
       <button type="button" class="go quiet" data-readmap="${e(nation)}" ${st.maps.includes(nation) ? " disabled" : ""}>${st.maps.includes(nation) ? `You have the map of ${e(W.nations[nation].name)}` : `Buy a map of ${e(W.nations[nation].name)}, 5 gp`}</button>` : ""}</div>
       <p class="proposed">Ruling 2026-11-18: general stores sell maps for about 5 gp, one map to a nation, showing its towns and roads; a store sells only its own nation's map. Not in the game yet.</p></div>`;
     out += placeList(Object.keys(K.how).sort((a, b) => nm(a).localeCompare(nm(b))), nm, id => K.how[id].by !== "been");
+    return out;
+  }
+  // What you know of a city, and the way there by the roads you know (continent and region).
+  function citySlip(v) {
+    const { W, K } = v, c = W.cities.find(x => x.id === st.sel), h = K.how[st.sel], nm = id => (W.cities.find(x => x.id === id) || {}).name || id;
+    const how = h.by === "been" ? "You have stood here." : h.by === "road" ? `A road out of ${e(nm(h.from))} is signed for it.`
+      : h.by === "heard" ? `Heard of in talk: “${e(h.line)}”` : `On the map of ${e(W.nations[h.nation].name)} you bought.`;
+    const miles = v.legs ? v.legs.reduce((a, l) => a + (l.miles || 0), 0) : 0;
+    return `<div class="mapnote picked"><h3>${e(c.name)}${h.by === "been" ? "" : " <small>not yet visited</small>"}</h3><p>${how}</p>
+      <p>${e(W.nations[c.nation].name)}, ${e(W.continents[c.continent])}.</p>${
+      v.legs ? `<ol class="route">${v.legs.map(l => `<li><b class="leg">${e(nm(l.to))}</b><span>${l.by === "sea" ? "by sea" : (l.miles ? l.miles + " miles" : "") + (l.by === "river" ? " by river" : "")}</span></li>`).join("")}</ol>
+        <p>About ${Math.max(1, Math.ceil(miles / 24))} days on foot${miles ? `, ${miles} miles` : ""}.</p>`
+      : st.sel === st.regionHere ? "" : `<p class="shutwhy">No road you know goes there.</p>`}
+      <div class="btnrow">${v.legs ? `<button type="button" class="go" data-walk>Set out</button>` : ""}${
+        v.level === "continent" ? `<button type="button" class="go quiet" data-open="nation" data-arg="${e(c.nation)}">Open ${e(W.nations[c.nation].name)}</button>` : ""}${
+        st.sel === v.home ? `<button type="button" class="go quiet" data-open="town">Open the town map</button>` : ""}</div></div>`;
+  }
+  function continentSlip(v) {
+    const { W, K } = v, mine = id => (W.cities.find(c => c.id === id) || {}).continent === v.continent;
+    let out = st.sel && K.how[st.sel] ? citySlip(v) : "";
+    const known = Object.keys(K.how).filter(mine);
+    const nations = [...new Set(known.map(id => W.cities.find(c => c.id === id).nation))].sort((a, b) => W.nations[a].name.localeCompare(W.nations[b].name));
+    const here = W.cities.find(c => c.id === st.regionHere);
+    out += `<div class="mapnote"><h3>${e(W.continents[v.continent])}</h3>
+      <p>${here && here.continent === v.continent ? `You are in ${e(here.name)}, ${e(W.nations[here.nation].name)}. ` : ""}${known.length} ${known.length === 1 ? "city" : "cities"} known here. Point at a nation to light it; press it, or zoom in on it, to open its region.</p>
+      <div class="btnrow">${nations.map(n => `<button type="button" class="go quiet" data-open="nation" data-arg="${e(n)}">${e(W.nations[n].name)}</button>`).join("")}</div></div>`;
+    // Sea passages: the world's own, and the ones the engine works out for a port (journey.legs_from).
+    const seaFrom = p => [...new Set([...W.routes, ...D.region.roads].filter(r => r.by === "sea" && (r.a === p || r.b === p))   /* by: the route's stated way; `sea` is also set on river legs */.map(r => r.a === p ? r.b : r.a))];
+    const ports = [...st.visitedTowns].filter(mine).map(p => [p, seaFrom(p)]).filter(x => x[1].length);
+    ports.forEach(([p, to]) => { out += `<div class="mapnote"><h3>By sea from ${e(W.cities.find(c => c.id === p).name)}</h3><p>${to.map(t => e((W.cities.find(c => c.id === t) || {}).name)).sort().join(", ")}.</p></div>`; });
+    out += placeList(known.sort((a, b) => W.cities.find(c => c.id === a).name.localeCompare(W.cities.find(c => c.id === b).name)),
+                     id => W.cities.find(c => c.id === id).name, id => K.how[id].by !== "been");
+    return out;
+  }
+  function nationSlip(v) {
+    const { W, K, F } = v, N = W.nations[v.nation], inN = id => (W.cities.find(c => c.id === id) || {}).nation === v.nation;
+    let out = "";
+    if (st.sel && K.how[st.sel]) out += citySlip(v);
+    else if (st.sel && T.settings[st.sel] === "outside" && F.found.has(st.sel) && st.sel !== st.here) {
+      const r = v.walkLegs, site = siteFor(st.sel);
+      out += `<div class="mapnote picked"><h3>${e(M.upper(T.names[st.sel]))}${F.visited.has(st.sel) ? "" : " <small>not yet visited</small>"}</h3>${
+        r.legs.length ? `${legsHtml(r.legs)}<p>About ${r.minutes} minutes on foot.</p>` : `<p class="shutwhy">${e(r.why)}</p>`}
+        <div class="btnrow">${r.legs.length ? `<button type="button" class="go" data-walk>Walk there</button>` : ""}${
+        site ? `<button type="button" class="go quiet" data-open="site" data-site="${site}">Go down ↓</button>` : ""}</div></div>`;
+    }
+    const outside = T.settings[st.here] === "outside";
+    const homeHere = (W.cities.find(c => c.id === v.home) || {}).nation === v.nation;
+    out += `<div class="mapnote"><h3>${e(N.name)}</h3>
+      <p>${homeHere ? (outside ? `You are at ${e(T.names[st.here])}, outside Featherperch's walls. ` : "You are in Featherperch. ") : ""}Each hex is about 12 miles across, some four hours on foot (Pathfinder's overland hex). Roads leaving ${e(N.name)} end in an arrow with where they go.</p>
+      <div class="btnrow">${homeHere ? `<button type="button" class="go quiet" data-open="town">Featherperch</button>` : ""}<button type="button" class="go quiet" data-open="continent" data-arg="${e(N.continent)}">${e(W.continents[N.continent])}</button></div></div>`;
+    const towns = Object.keys(K.how).filter(inN), wild = homeHere ? [...F.found].filter(i => T.settings[i] === "outside" && !/@the-road-to-/.test(i)) : [];
+    out += placeList([...towns, ...wild], id => K.how[id] ? W.cities.find(c => c.id === id).name : T.names[id], id => K.how[id] ? K.how[id].by !== "been" : !F.visited.has(id));
     return out;
   }
   function legsHtml(legs) {
@@ -239,14 +341,21 @@ const MapUI = (() => {
         ${road ? `<p>From there: ${e(M.upper(road.name))}, ${e(road.time_words)}.</p>` : ""}
         <div class="btnrow">${r.legs.length ? `<button type="button" class="go" data-walk>Walk there</button>` : ""}${
           site ? `<button type="button" class="go quiet" data-open="site" data-site="${site}">Go down ↓</button>` : ""}${
-          road ? `<button type="button" class="go quiet" data-open="region">Region map</button>` : ""}</div></div>`;
+          road ? `<button type="button" class="go quiet" data-open="region">Region map</button>` : ""}${
+          FIVE && /gate$/.test(n) ? `<button type="button" class="go quiet" data-open="nation">Out the gate: ${e((D.world.nations[st.nation] || {}).name || "the region")}</button>` : ""}</div></div>`;
     }
-    out += `<div class="mapnote"><h3>${e(M.upper(T.names[here]))} <small>you are here</small></h3>${floorsBadge(here)}
+    if (FIVE && T.settings[here] === "outside") {
+      out += `<div class="mapnote"><h3>Outside the walls <small>you are at ${e(T.names[here])}</small></h3>
+        <p>The town map shows only what is inside the walls; the land outside is on the region map.</p>
+        <button type="button" class="go quiet" data-open="nation">${e((D.world.nations[st.nation] || {}).name || "Region")}</button></div>`;
+    }
+    if (!(FIVE && T.settings[here] === "outside")) out += `<div class="mapnote"><h3>${e(M.upper(T.names[here]))} <small>you are here</small></h3>${floorsBadge(here)}
       <p>Press a place for the way there. The town is laid out by rule: the great square in the middle, the crossings at their compass points, every place in a fixed seat on its street, so nothing moves when more is found.</p></div>`;
-    out += `<div class="mapnote key"><span>${F.found.size} places found, ${F.visited.size} of them visited.</span>
+    const inWalls = i => !FIVE || T.settings[i] === "in";   // the town map counts what is inside its walls
+    out += `<div class="mapnote key"><span>${[...F.found].filter(inWalls).length} places found in the walls, ${[...F.visited].filter(inWalls).length} of them visited.</span>
       <span><i class="k-here"></i>You are here</span><span><i class="k-been"></i>Visited</span>
       <span><i class="k-seen"></i>Seen, not yet visited</span><span><i class="k-fog"></i>Not yet found</span></div>`;
-    out += placeList([...F.found].filter(i => !M.floorOf(i)).sort((a, b) => T.names[a].localeCompare(T.names[b])),
+    out += placeList([...F.found].filter(i => !M.floorOf(i) && (!FIVE || T.settings[i] === "in")).sort((a, b) => T.names[a].localeCompare(T.names[b])),
                      i => T.names[i], i => !F.visited.has(i));
     return out;
   }

@@ -52,23 +52,46 @@ function init(el, a) {
     const r = renderer.domElement.getBoundingClientRect(), ray = new THREE.Raycaster();
     ray.setFromCamera(new THREE.Vector2((ev.clientX - r.left) / r.width * 2 - 1, -(ev.clientY - r.top) / r.height * 2 + 1), camera);
     const hit = ray.intersectObjects(pick, true)[0];
-    if (hit) { let o = hit.object; while (o && !o.userData.id) o = o.parent; if (o) api.pick(o.userData.id); }
+    if (hit) { let o = hit.object; while (o && !o.userData.id) o = o.parent;
+      if (o && o.userData.open) { api.open(...o.userData.open); return; }   // an arrow out of this map
+      if (o) { api.pick(o.userData.id); return; } }
+    // Nothing pressed but the land: a lit continent or nation opens.
+    if (V && V.level === "world" && hover.continent) api.open("continent", hover.continent);
+    else if (V && V.level === "continent" && hover.nation) api.open("nation", hover.nation);
   });
-  // Zoom out past the region's furthest and the world opens; zoom in hard on the world and
-  // the region comes back. The breadcrumb does the same; this is the gesture the owner asked for.
+  // Zoom between the maps: out past a map's furthest and the one above opens; in hard and the
+  // one below opens, the continent or nation under the pointer first, else the one you are in.
+  const UP = { town: "nation", nation: "continent", continent: "world" };
   let lastLevelChange = 0;
   renderer.domElement.addEventListener("wheel", ev => {
     if (!V || performance.now() - lastLevelChange < 900) return;
-    const d = camera.position.distanceTo(controls.target);
-    if (V.level === "region" && ev.deltaY > 0 && d >= controls.maxDistance * .97) { lastLevelChange = performance.now(); api.open("world"); }
-    else if (V.level === "world" && ev.deltaY < 0 && d <= controls.minDistance * 1.05) { lastLevelChange = performance.now(); api.open("region"); }
+    const d = camera.position.distanceTo(controls.target), go = (...a) => { lastLevelChange = performance.now(); api.open(...a); };
+    if (ev.deltaY > 0 && d >= controls.maxDistance * .97 && UP[V.level]) go(UP[V.level]);
+    else if (ev.deltaY < 0 && d <= controls.minDistance * 1.05) {
+      if (V.level === "world") go("continent", hover.continent || V.continent);
+      else if (V.level === "continent") go("nation", hover.nation || V.nation);
+      else if (V.level === "nation" && (V.W.cities.find(c => c.id === V.home) || {}).nation === V.nation) go("town");
+    }
   }, { passive: true });
   // The name under the pointer always shows, even when it was culled to keep the map clear.
   renderer.domElement.addEventListener("pointermove", ev => {
     const r = renderer.domElement.getBoundingClientRect(), ray = new THREE.Raycaster();
     ray.setFromCamera(new THREE.Vector2((ev.clientX - r.left) / r.width * 2 - 1, -(ev.clientY - r.top) / r.height * 2 + 1), camera);
     const hit = ray.intersectObjects(pick, true)[0]; let o = hit && hit.object; while (o && !o.userData.id) o = o.parent;
-    hoverId = o ? o.userData.id : null; renderer.domElement.style.cursor = o ? "pointer" : "grab";
+    hoverId = o ? o.userData.id : null;
+    hover.x = ev.clientX - r.left; hover.y = ev.clientY - r.top;
+    let lit = false;
+    if (V && V.level === "world" && worldSheet && worldPaper) {
+      const h = ray.intersectObject(worldSheet)[0], g = worldPaper.grid;
+      const k = h ? Math.floor((1 - h.uv.y) * g.N) * g.N + Math.floor(h.uv.x * g.N) : -1, n = k >= 0 ? g.owner[k] : -1;
+      const cont = n >= 0 ? V.W.nations[g.nations[n]].continent : null;
+      setHover("continent", cont && g.knownConts.has(cont) ? cont : null); lit = !!hover.continent;
+    } else if (V && V.level === "continent" && board) {
+      const pt = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.1), new THREE.Vector3());
+      const hx = pt && board.hexAt(pt.x, pt.z);
+      setHover("nation", hx && board.knownNations.has(hx.nation) ? hx.nation : null); lit = !!hover.nation;
+    }
+    renderer.domElement.style.cursor = o || lit ? "pointer" : "grab";
   });
   stage.querySelector("#tilt").addEventListener("click", ev => { tiltOn = !tiltOn; ev.currentTarget.setAttribute("aria-pressed", tiltOn); });
   new ResizeObserver(resize).observe(stage); resize();
@@ -289,7 +312,7 @@ function drawPaper(c, v, half) {
   const g = c.getContext("2d"), S = c.width / (half * 2), P = ([x, y]) => [(x + half) * S, (y + half) * S];
   for (let x = 0; x < c.width; x += 720) for (let y = 0; y < c.height; y += 720) g.drawImage(paperImg, x, y, 720, 720 * paperImg.height / paperImg.width);
   const ink = (a, b, w, col = "#2a2019", dash) => { g.strokeStyle = col; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); g.moveTo(...P(a)); g.lineTo(...P(b)); g.stroke(); g.setLineDash([]); };
-  const { L, F } = v, found = [...F.found].filter(i => L.pos[i]);
+  const { L, F } = v, found = [...F.found].filter(i => L.pos[i] && v.T.settings[i] === "in");
   const gp = L.gate ? L.pos[L.gate] : [0, -385], wr = L.wall || Math.hypot(...gp);
   g.strokeStyle = "rgba(42,32,25,.6)"; g.lineWidth = 6; g.beginPath(); g.arc(...P([0, 0]), wr * S, 0, 7); g.stroke();
   Object.values(L.crossings).forEach(c2 => { if (F.found.has(c2)) { ink([0, 0], L.pos[c2], 34); ink([0, 0], L.pos[c2], 26, "#e9dcbc"); } });
@@ -297,8 +320,7 @@ function drawPaper(c, v, half) {
   found.forEach(i => { const s = L.street[i]; if (!s || ["crossing", "gate"].includes(L.kind[i])) return;
     const [x, y] = L.pos[i], [sx, sy] = L.pos[s]; const foot = sx === 0 && s !== L.square ? [0, y] : sy === 0 && s !== L.square ? [x, 0] : [sx, sy];
     ink(foot, [x, y], 5, F.visited.has(i) ? "#2a2019" : "#7d6b55", F.visited.has(i) ? null : [10, 8]); });
-  const cr = found.find(i => /crossroads$/.test(i));
-  if (cr) { ink(gp, L.pos[cr], 5, "#2a2019", [16, 10]); found.filter(i => ["roadhead", "sign"].includes(L.kind[i])).forEach(i => ink(L.pos[cr], L.pos[i], 4, "#2a2019", [14, 10])); }
+  if (L.gate && F.found.has(L.gate)) { const d = Math.hypot(...gp) || 1; ink(gp, [gp[0] + gp[0] / d * 90, gp[1] + gp[1] / d * 90], 5, "#2a2019", [16, 10]); }   // the road out, to the arrow
   // Fog: cloud everywhere but round what is found, so the paper reveals nothing it should not.
   const fog = document.createElement("canvas"); fog.width = c.width; fog.height = c.height; const f = fog.getContext("2d");
   f.fillStyle = "rgba(246,244,240,.93)"; f.fillRect(0, 0, fog.width, fog.height);
@@ -313,20 +335,22 @@ function drawPaper(c, v, half) {
 function clear() {
   if (world) { scene.remove(world); world.traverse(o => { if (o.geometry && !o.geometry.userData.keep) o.geometry.dispose(); [].concat(o.material || []).forEach(m => { if (!m.userData.keep && !m.map && m !== PRIMER && ![...MATS.values()].includes(m)) m.dispose(); }); }); }  // the scroll's roll carries an array
   if (paperTex) { paperTex.dispose(); paperTex = null; }
-  world = new THREE.Group(); scene.add(world); areas = []; pick = []; smoke = []; flags = []; clouds = []; routeObj = null;
+  world = new THREE.Group(); scene.add(world); areas = []; pick = []; board = null; worldSheet = null; hover.continent = hover.nation = null; smoke = []; flags = []; clouds = []; routeObj = null;
   candles = candles.filter(c => !c.site);  // a room's torch goes with its room
 }
-let lastKey = "", hoverId = null, areas = [], frameD = 100, worldPaper = null;
+let lastKey = "", hoverId = null, areas = [], frameD = 100, worldPaper = null, worldSheet = null, board = null;
+const hover = { continent: null, nation: null, x: 0, y: 0 };
 // Nations in muted inks, by their sorted names, so a nation keeps its colour on both maps.
 const NATION_INK = ["#8e2317", "#27406e", "#2e6b4a", "#7a5a1e", "#5b3a7a", "#7a3b55", "#2f6d75", "#6a4a2a"];
 const inkOf = (all, name) => NATION_INK[[...all].sort().indexOf(name) % NATION_INK.length];
 async function draw(v) {
   V = v;
-  const key = v.level + (v.site ? v.site.key : "");
+  const key = v.level + (v.site ? v.site.key : "") + (v.level === "continent" ? v.continent : v.level === "nation" ? v.nation : "");
   const fresh = key !== lastKey; lastKey = key;
   await Promise.all([loadPaper(), loadKit()]);
   clear();
-  if (v.level === "town") town(v); else if (v.level === "region") region(v); else if (v.level === "world") worldMap(v); else site(v);
+  if (v.level === "town") town(v); else if (v.level === "continent") continentMap(v); else if (v.level === "nation") nationMap(v);
+  else if (v.level === "world") worldMap(v); else site(v);
   pc = pcMini(); world.add(pc); placePc();
   routeLine();
   if (fresh) frameCamera();
@@ -337,7 +361,10 @@ function place(o, id, x, z, size = 1) { o.position.set(x, 0, z); o.userData.id =
 function town(v) {
   // The sheet is as big as the town: a street that has grown longer than the old sheet (the
   // worst case's sixteen-place street ran to 920 units, past a 560 half-sheet) gets more paper.
-  const { L, F, T } = v, half = Math.max(560, ...Object.values(L.pos).map(p => Math.max(Math.abs(p[0]), Math.abs(p[1])) + 130));
+  // Inside the walls only (the owner, 2026-11-18): the outskirts, crossroads, roads and wild
+  // ground are on the region map; the gate is this map's edge and its arrow leads out.
+  const { L, F, T } = v, inside = i => T.settings[i] === "in";
+  const half = Math.max(560, ...Object.entries(L.pos).filter(([i]) => inside(i)).map(([, p]) => Math.max(Math.abs(p[0]), Math.abs(p[1])) + 130));
   const c = document.createElement("canvas"); c.width = c.height = 2048; drawPaper(c, v, half);
   paperTex = new THREE.CanvasTexture(c); paperTex.colorSpace = THREE.SRGBColorSpace; paperTex.anisotropy = 8;
   const sheet = new THREE.Mesh(new THREE.PlaneGeometry(half * 2 * U, half * 2 * U), new THREE.MeshStandardMaterial({ map: paperTex, roughness: .95 }));
@@ -345,7 +372,7 @@ function town(v) {
   world.add(scroll(half * 2 * U, half * 2 * U));
   const ward = i => { if (i === L.square) return "square"; const cc = L.kind[i] === "crossing" ? i : L.street[i];
     const m = /(north|east|south|west)-crossing/.exec(cc || ""); return m ? m[1] : "square"; };
-  [...F.found].filter(i => L.pos[i]).forEach(i => {
+  [...F.found].filter(i => L.pos[i] && inside(i)).forEach(i => {
     const storeys = (L.floors[i] || []).filter(f => M.floorOf(f) > 0).length + 1;
     const k = L.kind[i] === "crossing" ? "post" : kindOf(T.names[i]);
     const o = miniature(k, { storeys, colour: WARD[ward(i)], painted: F.visited.has(i) });
@@ -355,6 +382,15 @@ function town(v) {
     o.userData.seen = !F.visited.has(i); o.userData.road = L.kind[i] === "roadhead" ? ((T.ways[i] || []).find(w => w.journey) || {}).time_words : "";
     if (v.fresh.has(i) && !v.reduced) { o.scale.setScalar(.01); o.userData.grow = performance.now(); }
   });
+  // Out the gate: an arrow past it to the region, pressable.
+  if (L.gate && F.found.has(L.gate)) {
+    const [gx, gy] = L.pos[L.gate], d = Math.hypot(gx, gy) || 1, ox = gx / d, oy = gy / d;
+    const arrow = new THREE.Group(), cone = mesh(new THREE.ConeGeometry(1.4, 3, 12), mat(0x5a3a22));
+    cone.rotation.x = Math.PI / 2; cone.rotation.z = -Math.atan2(ox, -oy); cone.position.y = 1.2; arrow.add(cone);
+    const p = townXZ([gx + ox * 70, gy + oy * 70]); place(arrow, "out-gate", p.x, p.z, 1);
+    arrow.rotation.y = Math.atan2(-ox, -oy) - Math.PI;
+    arrow.userData.name = "Out the gate"; arrow.userData.open = ["nation"];
+  }
   // Cotton-wool clouds drifting over the fogged paper at the town's edge.
   for (let n = 0; n < 10; n++) { const a = n / 10 * Math.PI * 2, r = 46 + (n % 3) * 6; cloud(Math.cos(a) * r, Math.sin(a) * r, 1 + (n % 3) * .4); }
 }
@@ -402,90 +438,194 @@ function cloud(x, z, s = 1) {
 // The region: a hex board. Every hex near a known town or road is land, field, wood, sand or
 // sea by what stands there; every other hex wears a cloud.
 const HX = 6.2;
-const hexCentre = (q, r) => [HX * Math.sqrt(3) * (q + r / 2), HX * 1.5 * r];
-function region(v) {
-  const { G } = v, R = 3.4;
-  const pts = [...G.shown].map(i => G.pos[i]).concat(G.wild.filter(w => v.wildFound.has(w.id)).map(w => w.pos));
-  const near = (x, y, d) => pts.some(p => Math.hypot(p[0] * U * R / 3.4 - x, p[1] * U * R / 3.4 - y) < d);
-  const P = p => [p[0] * U * R, p[1] * U * R];
-  const roadNear = (x, y) => G.roads.some(r => { const a = P(G.pos[r.a]), b = P(G.pos[r.b]); return segD([x, y], a, b) < 7; });
-  // Instanced: one draw per colour of hex and one for every cloud puff. As separate meshes,
-  // ~400 clouded hexes of four puffs each cost most of the frame.
-  const hexGeo = new THREE.CylinderGeometry(HX * .98, HX * .98, 1, 6), byCol = new Map(), puffs = [];
-  const seaAt = G.harbours.map(h => P(G.pos[h.id])), m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion();
-  const hexes = new Map(), townList = [...G.shown].map(i => [P(G.pos[i]), (G.towns[i].region || [])[0] || ""]);
-  const nationId = Object.fromEntries(Object.entries(v.W.nations).map(([id, n]) => [n.name, id])), wash = M.nationColours(v.W);
-  const nationAt = (x, z) => { let best = 1e9, n = ""; townList.forEach(([[tx, tz], nm]) => { const d = Math.hypot(tx - x, tz - z); if (d < best) { best = d; n = nm; } }); return n; };
-  for (let q = -18; q <= 18; q++) for (let r = -15; r <= 15; r++) {
-    const [x, z] = hexCentre(q, r); if (Math.hypot(x, z) > 132) continue;
-    const known = pts.some(p => { const [px, pz] = P(p); return Math.hypot(px - x, pz - z) < 16; }) || roadNear(x, z);
-    // The world exports no coastline: a harbour town gets a little water off its docks, nothing more.
-    const sea = seaAt.some(([sx, sz]) => Math.hypot(x - sx - 17, z - sz) < 13) && !roadNear(x, z);
-    const desert = G.wild.some(w => w.kind === "desert" && v.wildFound.has(w.id) && Math.hypot(P(w.pos)[0] - x, P(w.pos)[1] - z) < 9);
-    const col = sea ? "hex/water" : desert ? "hex/sand-desert" : known ? "hex/grass"
-      : ((q * 7 + r * 3) % 5 === 0 ? "hex/grass-forest" : ((q * 5 + r * 11) % 13 === 0 ? "hex/stone-hill" : "hex/grass"));
-    // Kenney's tiles are 1 across the flats, 1.15 point to point: scaled to this board's hexes,
-    // and half height, so grass tops out level with the roads.
-    if (tileOf(col)) m4.compose(new THREE.Vector3(x, sea ? -.15 : 0, z), q0, new THREE.Vector3(HX * Math.sqrt(3) * .985, 5, HX * Math.sqrt(3) * .985));
-    else m4.compose(new THREE.Vector3(x, sea ? -.3 : .5 + (((q * 13 + r * 7) % 3 + 3) % 3) * .08, z), q0, new THREE.Vector3(1, sea ? .6 : 1, 1));
-    (byCol.get(col) || byCol.set(col, []).get(col)).push(m4.clone());
-    const nat = sea ? "" : nationAt(x, z);
-    if (!sea) hexes.set(q + "," + r, { q, r, x, z, known, nation: nat });
-
-    if (!known) for (let i = 0; i < 4; i++) puffs.push(new THREE.Matrix4().compose(new THREE.Vector3(x + (i - 1.5) * 1.7, 2.6 + Math.sin(i + q) * .5, z + (i % 2) * .9),
-      q0, new THREE.Vector3().setScalar(2.1 * (1 - i * .15))));
-  }
-  // Borders: a raised ink strip along every hex edge where two nations meet, drawn only where
-  // a known hex touches it (the fog hides the rest); each nation's name over its known hexes.
-  const allNations = new Set(townList.map(t => t[1])), strips = [];
-  hexes.forEach(h => [[1, 0], [1, -1], [0, -1]].forEach(([dq, dr]) => {
-    const o = hexes.get((h.q + dq) + "," + (h.r + dr));
-    if (!o || o.nation === h.nation || !(h.known || o.known)) return;
-    const mx = (h.x + o.x) / 2, mz = (h.z + o.z) / 2, ang = Math.atan2(o.z - h.z, o.x - h.x);
-    strips.push(new THREE.Matrix4().compose(new THREE.Vector3(mx, 1.25, mz), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -ang + Math.PI / 2),
-      new THREE.Vector3(HX * .98, 1, 1)));
+const hexC = (q, r, h) => [h * Math.sqrt(3) * (q + r / 2), h * 1.5 * r];
+// The same land the world map paints (blots round every city), so the boards agree with it.
+function landAt(W, WL, x, y) {
+  return W.cities.some((city, n) => { const [cx, cy] = WL.pos[city.id];
+    for (let k = 0; k < 5; k++) { const a = n * 1.7 + k * 1.26, r = 70 + (n * 37 + k * 13) % 40; if (Math.hypot(x - cx - Math.cos(a) * 30, y - cy - Math.sin(a) * 30) < r) return true; }
+    return false; });
+}
+const nearestCity = (list, WL, x, y) => { let best = 1e18, c = null; list.forEach(ci => { const [cx, cy] = WL.pos[ci.id], d = (cx - x) ** 2 + (cy - y) ** 2; if (d < best) { best = d; c = ci; } }); return c; };
+// A hex board from a list of hexes {q, r, x, z, tile, plate, plateOpacity, cloud, nation, known}:
+// Kenney tiles instanced per kind, translucent nation plates, cloud puffs, border strips where
+// nations meet, each known nation's name painted flat along its longest known row.
+function hexBoard(hexes, h, wash, names) {
+  const byTile = new Map(), puffs = [], q0 = new THREE.Quaternion();
+  hexes.forEach(x => {
+    if (x.tile) (byTile.get(x.tile) || byTile.set(x.tile, []).get(x.tile)).push(new THREE.Matrix4().compose(new THREE.Vector3(x.x, x.tile === "hex/water" ? -.15 : 0, x.z), q0,
+      new THREE.Vector3(h * Math.sqrt(3) * .985, 5, h * Math.sqrt(3) * .985)));
+    if (x.cloud) for (let i = 0; i < 4; i++) puffs.push(new THREE.Matrix4().compose(new THREE.Vector3(x.x + (i - 1.5) * h * .27, 2.6 + Math.sin(i + x.q) * .5, x.z + (i % 2) * h * .15), q0, new THREE.Vector3().setScalar(h * .34 * (1 - i * .15))));
+  });
+  byTile.forEach((list, f) => { const t = tileOf(f); if (!t) return; const im = new THREE.InstancedMesh(t.geo, t.mat, list.length); list.forEach((m, n) => im.setMatrixAt(n, m)); im.receiveShadow = true; world.add(im); });
+  if (puffs.length) { const im = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }), puffs.length);
+    puffs.forEach((m, n) => im.setMatrixAt(n, m)); im.castShadow = true; world.add(im); }
+  // Nation plates: one instanced mesh per opacity; their indices kept so a hover can light a nation.
+  const plateSets = {};
+  hexes.filter(x => x.plate).forEach(x => (plateSets[x.plateOpacity] = plateSets[x.plateOpacity] || []).push(x));
+  const lit = {};
+  Object.entries(plateSets).forEach(([op, list]) => {
+    const im = new THREE.InstancedMesh(new THREE.CylinderGeometry(h * .97, h * .97, .05, 6), new THREE.MeshBasicMaterial({ transparent: true, opacity: +op, depthWrite: false }), list.length);
+    list.forEach((x, n) => { im.setMatrixAt(n, new THREE.Matrix4().makeTranslation(x.x, 1.06, x.z)); im.setColorAt(n, new THREE.Color(wash[x.nation])); (lit[x.nation] = lit[x.nation] || []).push([im, n]); });
+    im.renderOrder = 1; world.add(im); });
+  const key = (q, r) => q + "," + r, at = new Map(hexes.map(x => [key(x.q, x.r), x])), strips = [];
+  hexes.forEach(x => [[1, 0], [1, -1], [0, -1]].forEach(([dq, dr]) => {
+    const o = at.get(key(x.q + dq, x.r + dr));
+    if (!o || !o.nation || !x.nation || o.nation === x.nation || !(x.known || o.known) || o.tile === "hex/water" || x.tile === "hex/water") return;
+    strips.push(new THREE.Matrix4().compose(new THREE.Vector3((x.x + o.x) / 2, 1.25, (x.z + o.z) / 2),
+      new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -Math.atan2(o.z - x.z, o.x - x.x) + Math.PI / 2), new THREE.Vector3(h * .98, 1, 1)));
   }));
   if (strips.length) { const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, .5, .45), mat(0x5a1e14, { flatShading: false, roughness: .6 }), strips.length);
     strips.forEach((m, n) => im.setMatrixAt(n, m)); im.castShadow = true; world.add(im); }
-  // Each nation's name painted flat on its own hexes, along the longest row of hexes you know
-  // that are all that nation's, and sized to that row: lying on the board, it cannot stray
-  // over a border from any angle (a floating label could, and did).
-  allNations.forEach(nm => { if (!nm) return;
-    const rows = {};
-    hexes.forEach(h => { if (h.nation === nm && h.known) (rows[h.r] = rows[h.r] || []).push(h); });
+  // Names: along the longest row of known hexes that are all that nation's, never over a border.
+  Object.keys(names).forEach(n => {
+    const rows = {}; hexes.forEach(x => { if (x.nation === n && x.known && x.tile !== "hex/water") (rows[x.r] = rows[x.r] || []).push(x); });
     let best = null;
-    Object.values(rows).forEach(list => { list.sort((a, b) => a.q - b.q);
-      let run = [list[0]];
-      const consider = () => { if (!best || run.length > best.length) best = run.slice(); };
-      for (let i = 1; i < list.length; i++) { if (list[i].q === list[i - 1].q + 1) run.push(list[i]); else { consider(); run = [list[i]]; } }
-      consider(); });
-    if (!best) return;
-    const x = best.reduce((s, h) => s + h.x, 0) / best.length, z = best[0].z;
-    world.add(flatName(nm.toUpperCase(), M.darken(wash[nationId[nm]] || "#6a4a2a", .38), x, z, best.length * HX * Math.sqrt(3) * .92));
+    Object.values(rows).forEach(list => { list.sort((a, b) => a.q - b.q); let run = [list[0]];
+      const keep = () => { if (!best || run.length > best.length) best = run.slice(); };
+      for (let i = 1; i < list.length; i++) { if (list[i].q === list[i - 1].q + 1) run.push(list[i]); else { keep(); run = [list[i]]; } } keep(); });
+    if (best) world.add(flatName(names[n].toUpperCase(), M.darken(wash[n], .38), best.reduce((a, x) => a + x.x, 0) / best.length, best[0].z, best.length * h * Math.sqrt(3) * .92));
   });
-  const fallback = { "hex/water": 0x4a7899, "hex/sand-desert": 0xd9bd85, "hex/grass-forest": 0x6f9a52, "hex/stone-hill": 0x9a9284, "hex/grass": 0x86a85e };
-  byCol.forEach((list, col) => { const t = tileOf(col), im = new THREE.InstancedMesh(t ? t.geo : hexGeo, t ? t.mat : mat(fallback[col]), list.length);
-    list.forEach((m, n) => im.setMatrixAt(n, m)); im.receiveShadow = true; world.add(im); });
-  // Each nation's colour as a translucent plate over the hexes you know. Multiplying the colour
-  // into Kenney's green tiles (tried first) turned every nation the same muddy green.
-  const plates = [...hexes.values()].filter(h => h.known && h.nation && wash[nationId[h.nation]]);
-  if (plates.length) {
-    const im = new THREE.InstancedMesh(new THREE.CylinderGeometry(HX * .97, HX * .97, .05, 6), new THREE.MeshBasicMaterial({ transparent: true, opacity: .55, depthWrite: false }), plates.length);
-    plates.forEach((h, n) => { im.setMatrixAt(n, new THREE.Matrix4().makeTranslation(h.x, 1.06, h.z)); im.setColorAt(n, new THREE.Color(wash[nationId[h.nation]])); });
-    im.renderOrder = 1; world.add(im);
-  }
-  if (puffs.length) { const im = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }), puffs.length);
-    puffs.forEach((m, n) => im.setMatrixAt(n, m)); im.castShadow = true; world.add(im); clouds.push(Object.assign(im, { userData: { drift: 0 } })); }
-  G.roads.forEach(rd => { const a = P(G.pos[rd.a]), b = P(G.pos[rd.b]), L = Math.hypot(b[0] - a[0], b[1] - a[1]);
-    const strip = mesh(new THREE.BoxGeometry(L, .12, rd.by === "river" ? 1.6 : 1.1), mat(rd.by === "river" ? 0x4f86b0 : 0xb79b6d), false);
-    strip.position.set((a[0] + b[0]) / 2, 1.08, (a[1] + b[1]) / 2); strip.rotation.y = -Math.atan2(b[1] - a[1], b[0] - a[0]); world.add(strip);
-    for (let d = 1; d < rd.days; d++) { const t = d / rd.days, peg = mesh(new THREE.CylinderGeometry(.35, .35, .9, 8), mat(0xf3ead6));
-      peg.position.set(a[0] + (b[0] - a[0]) * t, 1.4, a[1] + (b[1] - a[1]) * t); world.add(peg); } });   // a peg a day: where journey events pin
-  G.shown.forEach(i => { const [x, z] = P(G.pos[i]), o = miniature("town", { painted: v.visited.has(i) }); place(o, i, x, z, KIT["hex/building-village"] ? 1 : 1.5).position.y = KIT["hex/building-village"] ? 0 : 1.05;
-    o.userData.name = G.towns[i].name; o.userData.seen = !v.visited.has(i); });
-  G.wild.forEach(w => { if (!v.wildFound.has(w.id)) return; const [x, z] = P(w.pos), o = miniature(w.kind === "woods" ? "trees" : w.kind, { painted: v.wildVisited.has(w.id) });
-    place(o, w.id, x, z, 1.5).position.y = 1.05; o.userData.name = M.bare(w.name); o.userData.seen = !v.wildVisited.has(w.id); o.userData.down = w.kind === "cave"; });
+  return { at, lit, hexAt: (sx, sz) => { let bestD = 1e18, bx = null; hexes.forEach(x => { const d = (x.x - sx) ** 2 + (x.z - sz) ** 2; if (d < bestD) { bestD = d; bx = x; } }); return bestD < h * h * 1.2 ? bx : null; } };
 }
+function setHover(kind, id) {
+  if (hover[kind] === id) return;
+  hover[kind] = id;
+  if (kind === "continent") return paintWorldHighlight();
+  if (!board || !board.lit) return;
+  Object.entries(board.lit).forEach(([n, list]) => list.forEach(([im, i]) => {
+    const c = new THREE.Color(board.wash[n]); if (n === id) c.lerp(new THREE.Color(1, .95, .75), .45); im.setColorAt(i, c); im.instanceColor.needsUpdate = true; }));
+}
+const dayPegs = (a, b, miles, y) => { const n = miles ? Math.ceil(miles / 24) - 1 : 0;   // a peg a day at 24 miles (speed 30)
+  for (let d = 1; d <= n; d++) { const t = d / (n + 1), peg = mesh(new THREE.CylinderGeometry(.32, .32, .9, 8), mat(0xf3ead6)); peg.position.set(a[0] + (b[0] - a[0]) * t, y, a[1] + (b[1] - a[1]) * t); world.add(peg); } };
+function roadStrip(a, b, kind, y = 1.08, w = 1.1) {
+  const L = Math.hypot(b[0] - a[0], b[1] - a[1]); if (!L) return;
+  const strip = mesh(new THREE.BoxGeometry(L, .12, kind === "river" ? w * 1.4 : w), mat(kind === "river" ? 0x4f86b0 : kind === "track" ? 0x9a8058 : 0xb79b6d), false);
+  strip.position.set((a[0] + b[0]) / 2, y, (a[1] + b[1]) / 2); strip.rotation.y = -Math.atan2(b[1] - a[1], b[0] - a[0]); world.add(strip);
+}
+
+// The continent: its nations coloured, the cities you know as villages, the roads you know with a
+// peg a day. From the world's own layout, so a town's bearing here is its bearing on the world.
+function continentMap(v) {
+  const { W, WL, K } = v, wash = M.nationColours(W), CS = .3, h = 7;
+  const cities = W.cities.filter(c => c.continent === v.continent), ctr = WL.centre[v.continent] || [0, 0];
+  const S = ([x, y]) => [(x - ctr[0]) * CS, (y - ctr[1]) * CS], inC = new Set(cities.map(c => c.id));
+  const knownIds = Object.keys(K.how).filter(id => inC.has(id)), knownPts = knownIds.map(id => WL.pos[id]);
+  const roads = K.roads.filter(r => r.by !== "sea" && inC.has(r.a) && inC.has(r.b));
+  const knownNations = new Set(knownIds.map(id => W.cities.find(c => c.id === id).nation));
+  const hexes = [];
+  for (let q = -22; q <= 22; q++) for (let r = -18; r <= 18; r++) {
+    const [sx, sz] = hexC(q, r, h), wx = sx / CS + ctr[0], wy = sz / CS + ctr[1];
+    if (Math.hypot(wx - ctr[0], wy - ctr[1]) > 420) continue;
+    const land = landAt(W, WL, wx, wy);
+    const nearLand = land || cities.some(c => Math.hypot(WL.pos[c.id][0] - wx, WL.pos[c.id][1] - wy) < 150);
+    if (!nearLand) continue;
+    const city = nearestCity(cities, WL, wx, wy), nation = land && city ? city.nation : null;
+    const known = land && (knownPts.some(([x, y]) => Math.hypot(x - wx, y - wy) < 75) || roads.some(rd => segD([wx, wy], WL.pos[rd.a], WL.pos[rd.b]) < 24));
+    const tile = !land ? "hex/water" : known ? ((q * 7 + r * 3) % 9 === 0 ? "hex/grass-forest" : "hex/grass")
+      : ((q * 7 + r * 3) % 5 === 0 ? "hex/grass-forest" : ((q * 5 + r * 11) % 13 === 0 ? "hex/stone-hill" : "hex/grass"));
+    hexes.push({ q, r, x: sx, z: sz, tile, nation, known, plate: land && known, plateOpacity: .55, cloud: land && !known });
+  }
+  const names = Object.fromEntries([...knownNations].map(n => [n, W.nations[n].name]));
+  const b = hexBoard(hexes, h, wash, names);
+  board = { ...b, wash, knownNations, pos: {} };
+  roads.forEach(rd => { const a = S(WL.pos[rd.a]), c = S(WL.pos[rd.b]); roadStrip(a, c, rd.by === "river" ? "river" : "road"); dayPegs(a, c, rd.miles, 1.4); });
+  knownIds.forEach(id => {
+    const [x, z] = S(WL.pos[id]), how = K.how[id], o = miniature("town", { painted: how.by === "been" });
+    place(o, id, x, z, .8); o.userData.name = W.cities.find(c => c.id === id).name; o.userData.seen = how.by !== "been";
+    board.pos[id] = new THREE.Vector3(x, 1.05, z);
+  });
+}
+
+// The region: the nation you stand in, at Pathfinder's 12-mile overland hex (Ultimate Campaign).
+// Its towns you know; round Featherperch, its wild ground at the walking hours the exits row
+// gives, set away from the roads; roads leaving the nation end in an arrow naming where they go.
+function nationMap(v) {
+  const { W, WL, K, T, F } = v, wash = M.nationColours(W), cont = W.nations[v.nation].continent;
+  const contCities = W.cities.filter(c => c.continent === cont), mineC = W.cities.filter(c => c.nation === v.nation);
+  // Miles to a world unit, from the roads the world measured (median), so the hex is 12 miles.
+  const ratios = W.routes.filter(r => r.miles && r.by !== "sea").map(r => r.miles / Math.hypot(WL.pos[r.a][0] - WL.pos[r.b][0], WL.pos[r.a][1] - WL.pos[r.b][1])).sort((a, b) => a - b);
+  const milesPerUnit = ratios[ratios.length >> 1] || 1, rW = 6 / milesPerUnit, h = HX, NS = h / rW;
+  const ctr = [mineC.reduce((a, c) => a + WL.pos[c.id][0], 0) / mineC.length, mineC.reduce((a, c) => a + WL.pos[c.id][1], 0) / mineC.length];
+  const S = ([x, y]) => [(x - ctr[0]) * NS, (y - ctr[1]) * NS];
+  const ofN = (wx, wy) => { if (!landAt(W, WL, wx, wy)) return null; const c = nearestCity(contCities, WL, wx, wy); return c ? c.nation : null; };
+  const homeHere = (W.cities.find(c => c.id === v.home) || {}).nation === v.nation;
+  const knownTowns = Object.keys(K.how).filter(id => mineC.some(c => c.id === id));
+  // The hexes: the nation's land, and a ring of its neighbours' land and sea for context.
+  const hexes = [], key = (q, r) => q + "," + r, grid = new Map();
+  const span = Math.ceil((Math.max(...mineC.map(c => Math.hypot(WL.pos[c.id][0] - ctr[0], WL.pos[c.id][1] - ctr[1]))) + 160) * NS / (h * 1.5));
+  for (let q = -span * 2; q <= span * 2; q++) for (let r = -span; r <= span; r++) {
+    const [sx, sz] = hexC(q, r, h), wx = sx / NS + ctr[0], wy = sz / NS + ctr[1];
+    grid.set(key(q, r), { q, r, x: sx, z: sz, wx, wy, nation: ofN(wx, wy) });
+  }
+  const DIRS = [[1, 0], [1, -1], [0, -1], [-1, 0], [-1, 1], [0, 1]];
+  const mine = [...grid.values()].filter(x => x.nation === v.nation);
+  const ring = new Set(); mine.forEach(x => DIRS.forEach(([dq, dr]) => { const o = grid.get(key(x.q + dq, x.r + dr)); if (o && o.nation !== v.nation) ring.add(o); }));
+  const hexOf = (wx, wy) => { let best = 1e18, b = null; mine.forEach(x => { const d = (x.wx - wx) ** 2 + (x.wy - wy) ** 2; if (d < best) { best = d; b = x; } }); return b; };
+  // Where things stand: towns at their own hex; Featherperch's wild ground placed by rule.
+  const pos = {}, known = new Set(), forest = new Set(), sand = new Set(), around = (x, n = 1) => { known.add(key(x.q, x.r)); if (n) DIRS.forEach(([dq, dr]) => known.add(key(x.q + dq, x.r + dr))); };
+  knownTowns.forEach(id => { const hx = hexOf(...WL.pos[id]); pos[id] = hx; around(hx); });
+  const roadsOut = [];
+  K.roads.filter(rd => rd.by !== "sea" && (mineC.some(c => c.id === rd.a) || mineC.some(c => c.id === rd.b))).forEach(rd => {
+    const from = mineC.some(c => c.id === rd.a) ? rd.a : rd.b, to = from === rd.a ? rd.b : rd.a;
+    roadsOut.push({ from, to, by: rd.by, miles: rd.miles, inside: mineC.some(c => c.id === to), bearing: Math.atan2(WL.pos[to][1] - WL.pos[from][1], WL.pos[to][0] - WL.pos[from][0]) });
+  });
+  const wild = [];
+  if (homeHere && pos[v.home]) {
+    const home = pos[v.home], gateRow = (T.ways[Object.keys(T.ways).find(i => /urban:the-gate$/.test(i))] || []);
+    const minutesTo = id => { const r = gateRow.find(w => w.id === id); return r ? r.minutes : 60; };
+    const taken = roadsOut.filter(r => r.from === v.home).map(r => r.bearing);
+    const outside = [...F.found].filter(i => T.settings[i] === "outside");
+    // Wild ground (woods, desert...): its own hex, a hex for every four hours (12 miles at 3 mph),
+    // in the free direction furthest from the roads leaving town.
+    outside.filter(i => !/@the-(outskirts|crossroads)$|@the-road-to-|^.*~underground:/.test(i)).sort().forEach(i => {
+      const hrs = minutesTo(i) / 60, n = Math.max(1, Math.round(hrs / 4));
+      const dir = DIRS.map(([dq, dr]) => { const [dx, dz] = hexC(dq, dr, 1); return [dq, dr, Math.atan2(dz, dx)]; })
+        .map(d => [d, Math.min(...taken.map(b => Math.abs(Math.atan2(Math.sin(d[2] - b), Math.cos(d[2] - b)))), Math.PI)]).sort((a, b) => b[1] - a[1])[0][0];
+      taken.push(dir[2]);
+      const hx = grid.get(key(home.q + dir[0] * n, home.r + dir[1] * n)) || home;
+      pos[i] = hx; around(hx); wild.push({ id: i, hx, kind: /woods|forest/.test(i) ? "trees" : /desert/.test(i) ? "dunes" : "trees", hours: hrs });
+      if (/woods|forest/.test(i)) { forest.add(key(hx.q, hx.r)); DIRS.slice(0, 3).forEach(([dq, dr]) => forest.add(key(hx.q + dq, hx.r + dr))); }
+      if (/desert/.test(i)) { sand.add(key(hx.q, hx.r)); sand.add(key(hx.q + 1, hx.r)); }
+    });
+    // Just outside the gate: the outskirts and the crossroads, small pieces in the town's own hex.
+    outside.filter(i => /@the-(outskirts|crossroads)$/.test(i)).sort().forEach((i, n) => { pos[i] = { ...home, x: home.x + (n ? 2.6 : -2.2), z: home.z - 4.2 }; wild.push({ id: i, hx: pos[i], kind: "post", small: true }); });
+    // The cave and anything else underground hangs off its host's piece.
+    outside.filter(i => /~underground:/.test(i)).forEach(i => { const host = outside.find(h => i.includes("/" ) && h.endsWith("@" + i.split(":")[1].split("/")[0])); if (host && pos[host]) pos[i] = pos[host]; });
+  }
+  roadsOut.forEach(rd => { if (!pos[rd.from]) return; const a = pos[rd.from];
+    for (let t = 0; t < 30; t++) { const hx = hexOf(WL.pos[rd.from][0] + Math.cos(rd.bearing) * t * rW, WL.pos[rd.from][1] + Math.sin(rd.bearing) * t * rW); if (hx) known.add(key(hx.q, hx.r)); } void a; });
+  [...mine, ...ring].forEach(x => {
+    const k = key(x.q, x.r), isMine = x.nation === v.nation, land = !!x.nation, kn = known.has(k);
+    const tile = !land ? "hex/water" : forest.has(k) ? "hex/grass-forest" : sand.has(k) ? "hex/sand-desert" : kn ? "hex/grass"
+      : ((x.q * 7 + x.r * 3) % 5 === 0 ? "hex/grass-forest" : ((x.q * 5 + x.r * 11) % 13 === 0 ? "hex/stone-hill" : "hex/grass"));
+    hexes.push({ q: x.q, r: x.r, x: x.x, z: x.z, tile, nation: x.nation, known: kn || !isMine, plate: land && (isMine ? kn : true), plateOpacity: isMine ? .55 : .25, cloud: isMine && land && !kn });
+  });
+  const b = hexBoard(hexes, h, wash, { [v.nation]: W.nations[v.nation].name });
+  board = { ...b, wash, knownNations: new Set(), pos: {} };
+  const P3 = hx => new THREE.Vector3(hx.x, 1.05, hx.z);
+  knownTowns.forEach(id => { const hx = pos[id], how = K.how[id], o = miniature("town", { painted: how.by === "been" });
+    place(o, id, hx.x, hx.z, .8).position.y = 0; o.userData.name = W.cities.find(c => c.id === id).name; o.userData.seen = how.by !== "been"; board.pos[id] = P3(hx); });
+  wild.forEach(w => { const o = miniature(w.kind, { painted: F.visited.has(w.id) });
+    place(o, w.id, w.hx.x, w.hx.z, w.small ? 1.1 : 1.8).position.y = 1.05; o.userData.name = M.bare(T.names[w.id]); o.userData.seen = !F.visited.has(w.id);
+    o.userData.down = !!MapUI.siteFor(w.id); if (!w.small) o.userData.road = (w.hours < 1.5 ? `${Math.round(w.hours * 60)} minutes` : `about ${Math.round(w.hours)} hours`) + " from the gate";
+    board.pos[w.id] = P3(w.hx);
+    if (!w.small && pos[v.home]) roadStrip([pos[v.home].x, pos[v.home].z], [w.hx.x, w.hx.z], "track", 1.09, .7); });
+  Object.keys(pos).forEach(id => { if (!board.pos[id]) board.pos[id] = P3(pos[id]); });
+  // Roads: between towns of the nation, a strip; leaving it, a strip to the border and an arrow.
+  roadsOut.forEach(rd => { const a = pos[rd.from]; if (!a) return;
+    if (rd.inside && pos[rd.to]) { roadStrip([a.x, a.z], [pos[rd.to].x, pos[rd.to].z], rd.by === "river" ? "river" : "road"); return; }
+    let last = a; for (let t = 1; t < 40; t++) { const g = grid.get(key(...(() => { const wx = WL.pos[rd.from][0] + Math.cos(rd.bearing) * t * rW * .5, wy = WL.pos[rd.from][1] + Math.sin(rd.bearing) * t * rW * .5;
+      let best = 1e18, bq = null; mine.forEach(x => { const d = (x.wx - wx) ** 2 + (x.wy - wy) ** 2; if (d < best) { best = d; bq = x; } }); return best < rW * rW ? [bq.q, bq.r] : [9999, 9999]; })()));
+      if (!g) break; last = g; }
+    const end = [last.x + Math.cos(rd.bearing) * h * 1.2, last.z + Math.sin(rd.bearing) * h * 1.2];
+    roadStrip([a.x, a.z], end, rd.by === "river" ? "river" : "road"); dayPegs([a.x, a.z], end, Math.min(rd.miles || 0, 24 * Math.round(Math.hypot(end[0] - a.x, end[1] - a.z) / (h * 1.73) / 2)), 1.4);
+    const arrow = new THREE.Group(), cone = mesh(new THREE.ConeGeometry(1.2, 2.6, 12), mat(0x5a3a22)); cone.rotation.z = -Math.PI / 2; cone.position.y = 1.6; arrow.add(cone);
+    place(arrow, "out:" + rd.to, end[0], end[1], 1); arrow.rotation.y = -rd.bearing;
+    const to = W.cities.find(c => c.id === rd.to);
+    arrow.userData.name = `to ${to.name}`; arrow.userData.road = `${W.nations[to.nation].name}${rd.miles ? `, ${rd.miles} miles` : ""}`;
+    arrow.userData.open = ["continent", cont]; });
+}
+
 // A name painted flat on the board: Cinzel capitals in the nation's dark ink with a pale
 // halo, as wide as `maxW` world units allows (never wider than its own height suggests).
 function flatName(text, ink, x, z, maxW) {
@@ -542,6 +682,7 @@ function site(v) {
 // village; one known from a road sign, talk or a map is primer grey, with a flag in the
 // colour of how it was learned.
 const WU = .07, HOW_FLAG = { been: 0x27406e, road: 0x8a6a3a, heard: 0x2e7d5b, map: 0x8e2317 };
+let gridOut = null;
 function drawWorld(c, v, half) {
   const g = c.getContext("2d"), S = c.width / (half * 2), P = ([x, y]) => [(x + half) * S, (y + half) * S];
   for (let x = 0; x < c.width; x += 720) for (let y = 0; y < c.height; y += 720) g.drawImage(paperImg, x, y, 720, 720 * paperImg.height / paperImg.width);
@@ -558,6 +699,7 @@ function drawWorld(c, v, half) {
   // ink, and a dotted line where two nations meet. Drawn on a 4 px grid of the 2048 sheet.
   const nations = Object.keys(v.W.nations), names = nations.map(n => v.W.nations[n].name);
   const N = 512, cell = c.width / N, owner = new Int16Array(N * N).fill(-1);
+  gridOut = { N, owner, nations, knownConts: new Set(Object.keys(v.K.how).map(id => (v.W.cities.find(x => x.id === id) || {}).continent)) };
   const la = l.getImageData(0, 0, c.width, c.height).data;
   const cities = v.W.cities.map(ci => { const [x, y] = P(v.WL.pos[ci.id]); return [x, y, nations.indexOf(ci.nation)]; });
   for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
@@ -663,12 +805,16 @@ function worldMap(v) {
   // and painting the nations (a nearest-city pass over 512x512 cells) blocked a press 740 ms.
   const key = Object.keys(v.K.how).sort().join() + "|" + half;
   if (!worldPaper || worldPaper.key !== key) {
-    const cv = document.createElement("canvas"); cv.width = cv.height = 2048; drawWorld(cv, v, half); worldPaper = { key, c: cv }; }
+    const cv = document.createElement("canvas"); cv.width = cv.height = 2048; drawWorld(cv, v, half); worldPaper = { key, c: cv, grid: gridOut, hl: {} }; }
   const c = worldPaper.c;
   paperTex = new THREE.CanvasTexture(c); paperTex.colorSpace = THREE.SRGBColorSpace; paperTex.anisotropy = 8;
   const size = half * 2 * WU;
   const sheet = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshStandardMaterial({ map: paperTex, roughness: .95 }));
-  sheet.rotation.x = -Math.PI / 2; sheet.position.y = .05; sheet.receiveShadow = true; world.add(sheet);
+  sheet.rotation.x = -Math.PI / 2; sheet.position.y = .05; sheet.receiveShadow = true; world.add(sheet); worldSheet = sheet;
+  // The highlight layer: a lit continent painted on a sheet just above the paper.
+  const hlC = document.createElement("canvas"); hlC.width = hlC.height = 512;
+  const hl = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(hlC), transparent: true, depthWrite: false }));
+  hl.rotation.x = -Math.PI / 2; hl.position.y = .09; hl.renderOrder = 2; world.add(hl); worldPaper.hlMesh = hl; worldPaper.hlCanvas = hlC;
   world.add(scroll(size, size));
   Object.entries(v.K.how).forEach(([id, how]) => {
     const city = v.W.cities.find(x => x.id === id), [x, z] = [v.WL.pos[id][0] * WU, v.WL.pos[id][1] * WU];
@@ -681,18 +827,36 @@ function worldMap(v) {
   });
 }
 
+// Light the continent under the pointer: its land in a warm glow with a gold edge.
+function paintWorldHighlight() {
+  if (!worldPaper || !worldPaper.hlCanvas) return;
+  const g = worldPaper.grid, c = worldPaper.hlCanvas, x = c.getContext("2d"), N = g.N;
+  x.clearRect(0, 0, c.width, c.height);
+  if (hover.continent) {
+    const inC = new Int8Array(N * N); for (let k = 0; k < N * N; k++) inC[k] = g.owner[k] >= 0 && V.W.nations[g.nations[g.owner[k]]].continent === hover.continent ? 1 : 0;
+    x.fillStyle = "rgba(255,226,150,.30)"; for (let k = 0; k < N * N; k++) if (inC[k]) x.fillRect(k % N, (k / N) | 0, 1, 1);
+    x.fillStyle = "rgba(196,140,40,.95)";
+    for (let k = N; k < N * N - N; k++) if (inC[k] && (!inC[k - 1] || !inC[k + 1] || !inC[k - N] || !inC[k + N])) x.fillRect((k % N) - .5, ((k / N) | 0) - .5, 2, 2);
+  }
+  worldPaper.hlMesh.material.map.needsUpdate = true;
+}
+
 // --- The PC, the route, the walk ----------------------------------------------------------
 function posOf(id) {
   const v = V;
-  if (v.level === "town") { const p = M.anchor(v.L, id); return p && townXZ(p); }
+  if (v.level === "town") { const p = v.T.settings[id] === "outside" ? (v.L.gate ? v.L.pos[v.L.gate] : null) : M.anchor(v.L, id); return p && townXZ(p); }   // outside the walls: at the gate
   if (v.level === "world") { const p = v.WL.pos[id]; return p && new THREE.Vector3(p[0] * WU, .1, p[1] * WU); }
-  if (v.level === "region") { const p = v.G.pos[id] || (v.G.wild.find(w => w.id === id) || {}).pos; return p && new THREE.Vector3(p[0] * U * 3.4, 1.05, p[1] * U * 3.4); }
+  if (v.level === "continent" || v.level === "nation") {
+    if (board && board.pos[id]) return board.pos[id];
+    if (v.level === "nation" && v.T.settings[id] === "in" && board && board.pos[v.home]) return board.pos[v.home];   // a walk out starts in town
+    return null;
+  }
   const p = sitePos(v, id); return new THREE.Vector3(p[0], .4, p[1]);
 }
 function placePc() {
-  const id = V.level === "town" ? V.here : V.level === "region" ? V.here : V.here;
+  const id = V.level === "nation" && V.T.settings[V.at] === "outside" && board && board.pos[V.at] ? V.at : V.here;
   const p = posOf(id); if (!p) return;
-  pc.position.copy(p).add(new THREE.Vector3(V.level === "site" ? 1.5 : V.level === "world" ? 1 : 3.6, 0, V.level === "site" ? 1 : V.level === "world" ? 1 : 3.6)); pc.scale.setScalar(V.level === "site" ? 1.2 : V.level === "region" ? 1.2 : V.level === "world" ? .45 : 2);
+  pc.position.copy(p).add(new THREE.Vector3(V.level === "site" ? 1.5 : V.level === "world" ? 1 : 3.6, 0, V.level === "site" ? 1 : V.level === "world" ? 1 : 3.6)); pc.scale.setScalar(V.level === "site" ? 1.2 : V.level === "continent" || V.level === "nation" ? 1.2 : V.level === "world" ? .45 : 2);
 }
 let routeObj = null;
 function routeLine() {
@@ -717,7 +881,7 @@ function frameCamera() {
   if (box.isEmpty()) return;
   const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3()).length();
   controls.target.copy(c);
-  const d = Math.min(Math.max(size * (V.level === "site" ? 1.25 : V.level === "region" ? 1.1 : V.level === "world" ? .9 : .95), 30), 240);
+  const d = Math.min(Math.max(size * (V.level === "site" ? 1.25 : V.level === "continent" ? 1.15 : V.level === "nation" ? 1.25 : V.level === "world" ? .9 : .95), 30), 240);
   camera.position.set(c.x - d * .05, d * .86, c.z + d * .56);
   // Room past the opening view to fade the town names out before the zoom-out gesture
   // (region -> world) fires at the furthest distance.
@@ -771,7 +935,7 @@ function labels() {
   // names come up; where you are, the place pressed, the place under the pointer and your route
   // never fade. A faded name takes no room, so it cannot push a nation's name aside.
   const dist = camera.position.distanceTo(controls.target);
-  const fade = V.level === "region" || V.level === "world" ? Math.min(1, Math.max(0, (dist - frameD) / (frameD * .4))) : 0;
+  const fade = ["region", "world", "continent", "nation"].includes(V.level) ? Math.min(1, Math.max(0, (dist - frameD) / (frameD * .4))) : 0;
   let html = "";
   // Names that cannot find room are not drawn: the place stays, pressable, and its name shows
   // on hover, when pressed, or as you zoom in and room opens up. This is how map labelling
@@ -779,11 +943,11 @@ function labels() {
   const here = V.level === "town" ? M.baseOf(V.here) : V.here;
   const rank = o => { const id = o.userData.id; return id === here ? 0 : id === V.sel ? 1 : id === hoverId ? 2 : (V.route || []).includes(id) ? 3 : o.userData.seen ? 5 : 4; };
   pick.slice().sort((a, b) => rank(a) - rank(b)).forEach(o => {
-    o.getWorldPosition(tmp); tmp.y += V && V.level === "site" ? 1 : V.level === "town" ? 7.5 : V.level === "world" ? 1.6 : 5; tmp.project(camera);  // the world's villages are small: a tag 5 up floated off them
+    o.getWorldPosition(tmp); tmp.y += V && V.level === "site" ? 1 : V.level === "town" ? 7.5 : V.level === "world" ? 1.6 : V.level === "continent" ? 3.4 : 4.2; tmp.project(camera);  // the world's villages are small: a tag 5 up floated off them
     if (tmp.z > 1) return;
     let x = (tmp.x + 1) / 2 * r.width, y = (1 - tmp.y) / 2 * r.height;
     if (x < -40 || x > r.width + 40 || y < -10 || y > r.height + 40) return;
-    const name = o.userData.name || "", w = Math.min(name.length * 7.2, 190) + 16 + (o.userData.badge ? 22 : 0) + (o.userData.down ? 22 : 0);
+    const name = o.userData.name || "", w = Math.min(Math.max(name.length * 7.2, String(o.userData.road || "").length * 6.2), 190) + 16   /* a two-line tag is as wide as its longer line */ + (o.userData.badge ? 22 : 0) + (o.userData.down ? 22 : 0);
     const h = o.userData.road ? 34 : 20;   // a road's tag has its days on a second line
     const hit = yy => placed.some(b => x - w / 2 < b[2] + 4 && x + w / 2 > b[0] - 4 && yy - h < b[3] + 2 && yy > b[1] - 2);
     const must = rank(o) <= 3;
@@ -806,7 +970,11 @@ function labels() {
     for (const dy of [0, 26, -26, 52, -52, 78, -78, 104]) if (!clash(y + dy)) { y += dy; break; }
     areaBoxes.push([x - w / 2, y - 12, x + w / 2, y + 12]);
     return `<span class="area" style="opacity:${(.8 + .2 * fade).toFixed(2)};font-size:${(15 + 5 * fade).toFixed(1)}px;color:${a.ink};transform:translate(${x.toFixed(0)}px,${y.toFixed(0)}px) translate(-50%,-50%)">${a.text}</span>`; }).join("");
-  tags.innerHTML = ar + html;
+  // What pressing the land would open, by the pointer.
+  const lit = V.level === "world" && hover.continent ? V.W.continents[hover.continent] : V.level === "continent" && hover.nation ? V.W.nations[hover.nation].name : "";
+  const hx = Math.min(hover.x + 14, r.width - lit.length * 10 - 50);   // kept on the board near the right edge
+  const hint = lit ? `<span class="hint" style="transform:translate(${hx}px,${hover.y + 10}px)">Open ${lit}</span>` : "";
+  tags.innerHTML = ar + html + hint;
 }
 let drops = [];
 function rain(t, still) {
@@ -819,4 +987,4 @@ function rain(t, still) {
   c.stroke();
 }
 
-window.TabletopRenderer = { init, draw, walk, levels: ["world"] };
+window.TabletopRenderer = { init, draw, walk, levels: ["world", "continent", "nation"] };
