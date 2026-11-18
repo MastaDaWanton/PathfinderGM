@@ -121,7 +121,7 @@ def test_a_journey_with_no_stated_distance_is_never_reported_in_miles():
 def test_a_world_that_states_miles_gets_the_arithmetic():
     """And the same leg with a length on it is answered from the table instead. Nothing
     in this module changes when an export gains `miles` — that is the point of the shape.
-    Marked `measured` (for-world-bible ask 31): unmeasured miles meet the road floor."""
+    Marked `measured` (for-world-bible ask 32): unmeasured miles meet the road floor."""
     leg = journey.Leg(to_id="x", to_name="Anywhere", miles=48, road="road",
                       crosses=("grassland",), source="exact", measured=True)
     hours, measured, how = journey.hours_for(leg, 30)

@@ -52,7 +52,7 @@ def test_no_road_is_under_three_days_and_no_crossing_under_two_weeks(world):
 
 
 def test_a_measured_route_is_taken_at_its_word():
-    """for-world-bible ask 31: a route the world marks `measured` is played at its stated
+    """for-world-bible ask 32: a route the world marks `measured` is played at its stated
     length — 48 miles is sixteen hours on a road, 192 miles four days by the CRB's sailing
     ship (Table 7-9, 48 miles a day) — and an unmeasured one meets the floor."""
     leg = journey.Leg(to_id="x", to_name="X", miles=48, road="road",
