@@ -3281,6 +3281,10 @@ class Engine:
         # the crossing the party was leaving, and the question went to whoever stood in
         # the market instead.
         intents = _introduce_after_travel(intents)
+        # A pack's food or drink used as a jar is the meal it is, and only once: jack's
+        # plan was `use_item waterskin#1` AND a bare `drink` (owner bug list 2026-11-18,
+        # item 17), which would drink two skins where he reached for one.
+        intents = self._provisions_as_meals(intents)
         # Refs an earlier intent in this same list will have created by the time a later
         # one runs. Without this, "two bravos step out of the dark and I fight them" is
         # impossible to express: the whole list is validated before any of it runs, so a
@@ -9332,6 +9336,11 @@ class Engine:
             unheld = self._improvised_unheld(actor, str(intent.params.get("item") or ""))
             if unheld:
                 return self._refuse(intent, unheld, code="not_here")
+            # Named as it is carried from here on: the tell says "the rock", and the
+            # throw takes that rock out of the pack (below), not "rock i picked up before".
+            held = self._improvised_held(actor, str(intent.params.get("item") or ""))
+            if held:
+                intent.params["item"] = held
         # A blow given or taken ends being a bystander. The one place besides
         # `join_fight` that lifts the tag, and it lifts it BEFORE the encounter forms so
         # the sides are drawn with both of them in.
@@ -10570,6 +10579,11 @@ class Engine:
                     if actor.goods[name] <= 0:
                         del actor.goods[name]
                     break
+            else:
+                # Thrown off the shelf (`_improvised_held`): it leaves the shelf too.
+                sid = holding.stock_key(actor.stock or {}, thrown_thing)
+                if sid:
+                    actor.take_stock(sid, 1)
             self.scene.place_prop(thrown_thing,
                                   owner=(rec or {}).get("owner") or actor.ref,
                                   from_=(rec or {}).get("from_", ""),
@@ -22814,6 +22828,49 @@ class Engine:
                    f"damage, which rest, the Heal skill's long-term care or a remedy that "
                    f"restores hit points mends." if wounded else ""))
 
+    def _provisions_as_meals(self, intents: list) -> list:
+        """Every `use_item` on a pack's food or drink as its `eat` or `drink`
+        (`_provision_door`), and a bare `eat` or `drink` by the same body in the same list
+        dropped as the same act written twice."""
+        out, fed = [], set()
+        for it in intents:
+            routed = self._provision_door(it)
+            if routed is not None:
+                fed.add((routed.op, routed.actor or "pc"))
+            out.append(routed or it)
+        return [it for it in out
+                if not (it.op in ("eat", "drink") and not it.params.get("item")
+                        and not _yes(it.params.get("fill"))
+                        and (it.op, it.actor or "pc") in fed)]
+
+    def _provision_door(self, intent: Intent) -> Intent | None:
+        """A `use_item` on a pack's food or drink (a gear row's `eat` or `drink`: trail
+        rations, a waterskin, a mug of ale), as the `eat` or `drink` intent it is, or None.
+
+        Owner bug list 2026-11-18, item 17 (jack, turn_log[200]): `use_item waterskin#1
+        how=drink` went to the jar door, which spends any shelf item and answers "ok" to
+        drinking a jar with no effects, so his last full skin was spent for nothing and
+        the `drink` beside it was refused for want of water. Those doors own the need's
+        clock; the jar door owns specs. Asked of the gear row, never the word used."""
+        from . import gear as gear_mod
+
+        if intent.op != "use_item" or intent.params.get("power"):
+            return None
+        how = str(intent.params.get("how", "drink")).strip().lower()
+        actor = self.scene.get(intent.actor) if intent.actor else None
+        said = str(intent.params.get("item") or "").strip()
+        if actor is None or not said or how not in ("drink", "eat"):
+            return None
+        for verb, op, find in (("drink", "drink", gear_mod.drinkable),
+                               ("eat", "eat", gear_mod.food)):
+            c = find(actor, said)
+            if c is not None and (how == verb or not c["row"].get(how)):
+                return Intent(op=op, actor=intent.actor, because=intent.because,
+                              params={"item": str(c["id"])}, visibility=intent.visibility,
+                              id=intent.id, origin=intent.origin,
+                              origin_name=intent.origin_name)
+        return None
+
     def _op_use_item(self, intent: Intent, partial: dict) -> Outcome:
         """Drink it, throw it, or put it on a blade.
 
@@ -22841,6 +22898,9 @@ class Engine:
         said = str(intent.params["item"]).strip().lower()
         how = str(intent.params.get("how", "drink")).strip().lower()
         target = intent.params.get("to") or intent.actor
+        routed = self._provision_door(intent)
+        if routed is not None:
+            return self._op_eat(routed, partial) if routed.op == "eat"                 else self._op_drink(routed, partial)
 
         # By id, by name, or by the words the player used — "my healing potion" is
         # the Healing Draught. Two jars that both fit are a question, not a guess.
@@ -22966,6 +23026,14 @@ class Engine:
         effects = [{"ref": actor.ref, "kind": "used_item", "item": use.item,
                     "how": how, "left": max(0, held.count),
                     **({"route": route, "to": target} if how == "apply" else {})}]
+        if how == "drink":
+            # A drunk jar is fluid too (owner bug list 2026-11-18, item 17): a tea a cup,
+            # a tincture or a potion a dose (`survival.jar_fluid`, house rule).
+            from . import survival
+
+            sip = survival.jar_fluid(held)
+            effects += self._released(fed, "thirst",
+                                      survival.drink(fed, sip, self.scene.biome))
 
         if how == "throw":
             # Thrown, it is an attack (contracts §7): the `attack` op's splash mode, put
@@ -29030,7 +29098,7 @@ class Engine:
         name = " ".join(str(item or "").split())
         if not name:
             return ""
-        if holding.key_in(getattr(actor, "goods", None) or {}, name):
+        if self._improvised_held(actor, name) is not None:
             return ""
         if any(r.get("held_by") == actor.ref and holding.same(r.get("name"), name)
                for r in self.scene.props):
@@ -29039,6 +29107,22 @@ class Engine:
             return ""
         return (f"{actor.name} has no {holding.plain(name) or name} to swing or throw: it is "
                 f"not in hand and none lies here. Nothing is rolled.")
+
+    @staticmethod
+    def _improvised_held(actor, name: str) -> str | None:
+        """The name the attacker carries the thing under, when the words name it: their
+        goods by `same`, then a carried name standing whole among longer words, then the
+        shelf — `unrecorded_thing`'s own fallbacks, so the pick-up and the throw cannot
+        disagree about what is in the hand. Owner bug list 2026-11-18, item 18: "throw
+        the rock i picked up before" was refused "has no rock" with a rock in jack's goods,
+        because only `key_in` was asked and the phrase is not `same` as "rock"."""
+        goods_ = getattr(actor, "goods", None) or {}
+        hit = holding.key_in(goods_, name) or holding.named_among(goods_, name)
+        if hit:
+            return hit
+        shelf = getattr(actor, "stock", None) or {}
+        sid = holding.stock_key(shelf, name) or holding.stock_among(shelf, name)
+        return str(getattr(shelf[sid], "name", "") or sid) if sid else None
 
     def _op_give(self, intent: Intent, partial: dict) -> Outcome:
         """Something changes hands.
@@ -32742,47 +32826,92 @@ class Engine:
                             + (f" In the pack: {', '.join(eats)}." if eats
                                else " Nothing in the pack is food."))
             n = int((c["row"].get("eat") or {}).get("spends", 1) or 1)
+            lb = float((c["row"].get("eat") or {}).get("lb", 1) or 0)
             left = gear_mod.spend(actor, c, n)
             was = int(getattr(actor, "fed_minutes", 0) or 0) // survival.MINUTES_PER_HOUR
-            freed = survival.eat(actor)
+            # The pound it is, at the book's pound a day (owner bug list 2026-11-18, item
+            # 17): a half-pound loaf is half a day, not "hunger back to nothing".
+            freed = survival.eat(actor, lb, self.scene.biome)
+            due = survival.hours_until_hungry(actor) - int(
+                getattr(actor, "fed_minutes", 0) or 0) // survival.MINUTES_PER_HOUR
             return Outcome(
                 intent_id=intent.id, op="eat",
                 effects=[{"ref": actor.ref, "kind": "eat", "item": c["name"], "spent": n,
-                          "left": left, "origin": f"item:{c['id']}"}]
+                          "lb": lb, "left": left, "origin": f"item:{c['id']}"}]
                         + self._released(actor, "hunger", freed),
-                tell=(f"{actor.name} eats from the {c['name']} ({left} left). "
-                      f"{was} hour{'s' if was != 1 else ''} since the last meal; hunger is "
-                      f"put back to nothing."
+                tell=(f"{actor.name} eats from the {c['name']} ({left} left), "
+                      f"{survival._amount(lb)} lb of food. {was} hour"
+                      f"{'s' if was != 1 else ''} since the last meal; hunger holds off for "
+                      f"{max(0, due)} hours more."
                       + _also(survival.released_said(actor, "hunger", freed))),
                 because=intent.because,
             )
 
     def _op_drink(self, intent: Intent, partial: dict) -> Outcome:
-        """Water: out of the pack (a waterskin's draught, `gear.provide`), else the
-        settlement's own well or cistern, free (`water_at_hand`; the owner's ruling of
-        2026-10-09: the pack first, the well "when their pack runs dry"), else refused.
+        """Water: out of the pack (one unit of a `drink` row, `gear.drinkable`: the
+        named one, else a waterskin first), else the settlement's own well or cistern,
+        free (`water_at_hand`; the owner's ruling of 2026-10-09: the pack first, the well
+        "when their pack runs dry"), else refused.
 
-        It used to reset thirst from nothing at all — "drinks." on the open road with an
-        empty pack (ponytail audit 2026-11-07, smaller findings; the owner had listed
-        "`_op_drink` free" among the survival problems to fix)."""
+        A unit is its gallons' share of a day (CRB p.444, a gallon a day; owner bug list
+        2026-11-18, item 17, answer 5): a 1/2-gallon skin is half a day, a mug of ale an
+        eighth. The well is drunk to the full. It reset thirst in full for any sip until
+        then, and before 2026-11-07 from nothing at all.
+
+        `fill`: the Fill button. Every empty vessel in the pack is filled from the water
+        at hand (`gear.refill`) and nothing is drunk; with no water here, refused."""
         from . import gear as gear_mod
         from . import survival
 
         actor = self._eater(intent)
-        # One draught: the smallest whole unit the pack's water comes in.
-        spent = gear_mod.provide(actor, "water", 1e-6)
-        well = "" if spent else self.water_at_hand()
-        if not spent and not well:
+        # A model mangles booleans ("false" is truthy): only a plain yes fills.
+        if _yes(intent.params.get("fill")):
+            well = self.water_at_hand()
+            if not well:
+                return self._refuse(
+                    intent, f"There is no water here for {actor.name} to fill anything "
+                            f"from: no well, cistern or stream.")
+            n, became = gear_mod.refill(actor)
+            if not n:
+                return self._refuse(intent, f"{actor.name} has nothing empty to fill.")
+            return Outcome(
+                intent_id=intent.id, op="drink",
+                effects=[{"ref": actor.ref, "kind": "fill", "item": became, "count": n,
+                          "at": well}],
+                tell=(f"{actor.name} fills {n} {became}{'s' if n != 1 else ''} at "
+                      f"{well}."),
+                because=intent.because)
+        said = str(intent.params.get("item") or "").strip()
+        c = gear_mod.drinkable(actor, said)
+        if c is None and said:
+            drinks = [x["name"] for x in gear_mod.carried(actor) if x["row"].get("drink")]
+            return self._refuse(
+                intent, f"{actor.name} has no {holding.thing_said(actor, said)} to drink."
+                        + (f" In the pack: {', '.join(drinks)}." if drinks
+                           else " Nothing in the pack is drink."))
+        well = "" if c is not None else self.water_at_hand()
+        if c is None and not well:
             return self._refuse(
                 intent, f"{actor.name} has no water to drink: the pack holds none, and "
                         f"there is no well here.")
-        freed = survival.drink(actor)
-        if spent:
-            what = spent[0]
-            effects = [{"ref": actor.ref, "kind": "drink", "item": what["name"],
-                        "spent": int(what["count"]), "origin": f"item:{what['item']}"}]
-            tell = f"{actor.name} drinks from the {what['name']}."
+        if c is not None:
+            row = c["row"]["drink"]
+            n = int(row.get("spends", 1) or 1)
+            gallons = float(row.get("gallons", 0) or 0)
+            left = gear_mod.spend(actor, c, n)
+            leaves = str(row.get("leaves") or "")
+            if leaves:
+                actor.goods[leaves] = int(actor.goods.get(leaves, 0) or 0) + n
+            freed = survival.drink(actor, gallons, self.scene.biome)
+            due = survival.hours_until_thirsty(actor) - int(
+                getattr(actor, "watered_minutes", 0) or 0) // survival.MINUTES_PER_HOUR
+            effects = [{"ref": actor.ref, "kind": "drink", "item": c["name"], "spent": n,
+                        "gallons": gallons, "left": left, "origin": f"item:{c['id']}"}]
+            tell = (f"{actor.name} drinks the {c['name']}, {survival._amount(gallons)} "
+                    f"gallon{'s' if gallons != 1 else ''}; thirst holds off for "
+                    f"{max(0, due)} hours more.")
         else:
+            freed = survival.drink(actor)
             effects = [{"ref": actor.ref, "kind": "drink", "at": well}]
             tell = f"{actor.name} drinks at {well}."
         return Outcome(
@@ -32850,6 +32979,12 @@ class Engine:
         # The dose first, as a jar's is: a herb that kills the taster has still been eaten.
         if not actor.spend(ing.id, 1):
             actor.take_stock(shelf, 1)
+        # About an ounce of food (owner bug list 2026-11-18, item 17; house rule,
+        # `survival.HERB_FOOD_LB`): on the clock only. A nibble is not a meal, so it
+        # neither resets the hunger checks nor releases what hunger holds.
+        from . import survival
+
+        survival._credit(actor, "food", survival.HERB_FOOD_LB, self.scene.biome)
 
         origin, because = f"item:{ing.id}", intent.because or f"tasting {ing.name}"
         anatomy = hk.anatomy(ing)
@@ -33798,6 +33933,11 @@ def _place_key(name) -> str:
     """A place's name as a plan's two ops compare it: "The Tarred Rope" is "tarred rope"."""
     text = " ".join(str(name or "").lower().split())
     return text[4:] if text.startswith("the ") else text
+
+
+def _yes(v) -> bool:
+    """A flag as a plain yes: True, 1, "true", "yes" (a model's "false" is no)."""
+    return v is True or str(v).strip().lower() in ("1", "true", "yes")
 
 
 def _found_before_travel(intents: list) -> list:

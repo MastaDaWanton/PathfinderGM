@@ -568,7 +568,8 @@ def _log(c, row: dict) -> None:
 
 
 def _held_to_the_tells(agent, ask, msgs, line: str, said: str, premises: list[str], pc,
-                       allowed: str, recent: list[str]) -> tuple[str, str, bool]:
+                       allowed: str, recent: list[str],
+                       attacked: bool | None = None) -> tuple[str, str, bool]:
     """(line, why, remade): the line read against the turn's tells and the scene, as the
     narrator's beat is (`beat_verify.against_tells`, the same first read) — and on a clash,
     asked once more with the fact it breaks named, read again, and dropped if it still
@@ -590,7 +591,7 @@ def _held_to_the_tells(agent, ask, msgs, line: str, said: str, premises: list[st
     read = beat_verify.against_tells(strip_gestures(line), premises, who=who, **route)
     if not read.clashes:
         return _nothing_past_the_facts(ask, msgs, line, said, premises, who, route,
-                                       allowed, recent)
+                                       allowed, recent, attacked)
     c0 = read.clashes[0]
     mend = (f'"{c0.words}" is not true: {c0.tell} Say it again so that it agrees with '
             f"that, and add nothing the MOMENT does not say.")
@@ -605,13 +606,13 @@ def _held_to_the_tells(agent, ask, msgs, line: str, said: str, premises: list[st
     if beat_verify.against_tells(strip_gestures(line2), premises, who=who, **route).clashes:
         return "", f"contradicts the engine twice: {c0.words}", True
     line3, why, _ = _nothing_past_the_facts(ask, msgs, line2, again, premises, who, route,
-                                            allowed, recent)
+                                            allowed, recent, attacked)
     return line3, why, True
 
 
 def _nothing_past_the_facts(ask, msgs, line: str, said: str, premises: list[str], who: str,
-                            route: dict, allowed: str, recent: list[str]
-                            ) -> tuple[str, str, bool]:
+                            route: dict, allowed: str, recent: list[str],
+                            attacked: bool | None = None) -> tuple[str, str, bool]:
     """(line, why, remade): the line read for a world fact or a deed that no tell and no
     scene fact carries (`beat_verify.beyond_tells`); on one, asked once more with the words
     named, read again, and what still adds something is cut sentence by sentence — the
@@ -622,7 +623,10 @@ def _nothing_past_the_facts(ask, msgs, line: str, said: str, premises: list[str]
     from gm import beat_verify
     from gm.client import ModelUnavailable
 
-    found = beat_verify.beyond_tells(strip_gestures(line), premises, who=who, **route)
+    # `attacked`: whether the turn rolled an attack. "Nice shot" over a pick-up with no
+    # throw (owner bug list 2026-11-18, item 18) claims one (`beyond_tells`).
+    found = beat_verify.beyond_tells(strip_gestures(line), premises, who=who,
+                                     attacked=attacked, **route)
     if not found:
         return line, "", False
     words = found[0][1]
@@ -636,7 +640,8 @@ def _nothing_past_the_facts(ask, msgs, line: str, said: str, premises: list[str]
     line2, _why = check(again, allowed, recent) if again else ("", "empty")
     if line2 and not beat_verify.against_tells(strip_gestures(line2), premises, who=who,
                                                **route).clashes:
-        still = beat_verify.beyond_tells(strip_gestures(line2), premises, who=who, **route)
+        still = beat_verify.beyond_tells(strip_gestures(line2), premises, who=who,
+                                         attacked=attacked, **route)
         if not still:
             return line2, "", True
     else:
@@ -730,9 +735,11 @@ def after_the_beat(c, agent, resolution) -> None:
                 if line and not gives_the_reason(line, facts):
                     line, why = "", "never said why it was refused"
             if line:
-                line, why, again = _held_to_the_tells(agent, ask, msgs, line, said,
-                                                      [*facts, *here, *trained], pc,
-                                                      allowed, recent)
+                line, why, again = _held_to_the_tells(
+                    agent, ask, msgs, line, said, [*facts, *here, *trained], pc, allowed,
+                    recent, attacked=any(getattr(o, "op", "") == "attack"
+                                         for o in getattr(resolution, "outcomes", None)
+                                         or ()))
                 remade = remade or again
         seconds = round(time.monotonic() - started, 1)
         _log(c, {"moments": kinds, "job": job, "said": line, "dropped": why,

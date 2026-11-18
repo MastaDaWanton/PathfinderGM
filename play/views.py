@@ -2674,12 +2674,19 @@ def write(request):
 
 
 def _gear_acts(row: dict | None, item_id: str) -> list[dict]:
-    """The Equipment row's buttons a gear row earns: Eat, for food (the `eat` op with the
-    item named, through `/api/use`). Nothing else a row says is a button: a bedroll and a
-    tent do their work when you sleep, a backpack while you carry it."""
-    if row and row.get("eat"):
-        return [{"label": "Eat", "api": "/api/use", "body": {"item": item_id, "how": "eat"}}]
-    return []
+    """The Equipment row's buttons a gear row earns, through `/api/use`: Eat for food
+    (the `eat` op with the item named), Drink for drink (`drink`, item named) and Fill
+    for an empty vessel (`drink` with fill). Nothing else a row says is a button: a
+    bedroll and a tent do their work when you sleep, a backpack while you carry it.
+    Drink and Fill came 2026-11-18 (owner bug list item 17): the waterskin had no button
+    anywhere, so the only way to drink it was a jar door that wasted it."""
+    acts = []
+    for verb, label in (("eat", "Eat"), ("drink", "Drink"), ("fills", "Fill")):
+        if row and row.get(verb):
+            acts.append({"label": label, "api": "/api/use",
+                         "body": {"item": item_id,
+                                  "how": "fill" if verb == "fills" else verb}})
+    return acts
 
 
 def _gear_note(row: dict | None) -> str:
@@ -6768,8 +6775,16 @@ def use_item(request):
     # rations reset my hunger"): it spends one and resets hunger through
     # rules/survival.py. A jar is drunk, thrown or coated by `use_item`, as before.
     power = str(body.get("power", "") or "").strip()
+    from rules import gear as gear_mod
+
+    # Drinking out of the pack and filling its skins are the `drink` op's (2026-11-18,
+    # owner bug list item 17); a jar is still `use_item`'s.
+    drinks = how == "fill" or (how == "drink" and gear_mod.drinkable(pc, item) is not None)
     raw = ({"op": "eat", "actor": "pc", "because": f"{pc.name} eats",
             "params": {"item": item}} if how == "eat" else
+           {"op": "drink", "actor": "pc",
+            "because": f"{pc.name} {'fills a skin' if how == 'fill' else 'drinks'}",
+            "params": {"fill": True} if how == "fill" else {"item": item}} if drinks else
            # A magic item's power (`use_item {item, power}`, `Engine._use_power`): the
            # Equipment row's Use for a worn ring's daily spell or a pot of war paint.
            # Before 2026-10-30 only the GM's words reached it, so a bought paint had no
@@ -7317,8 +7332,14 @@ def _food_names() -> frozenset:
     (`goods.deliver`); the gear list's food rows are how it is known for food."""
     from rules import goods
 
+    from rules import gear as gear_mod
+
+    # And every name a gear row with `eat`, `drink` or `fills` answers to: trail rations
+    # and the waterskin were filed on the gear shelf among the rope (owner bug list
+    # 2026-11-18, item 17).
     return frozenset(str(e["name"]).lower() for e in goods.GEAR.values()
-                     if e.get("category") in ("food", "provisions"))
+                     if e.get("category") in ("food", "provisions")) | frozenset(
+        n for n in gear_mod._by_name() if gear_mod.provision_row(n))
 
 
 @require_POST

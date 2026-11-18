@@ -600,10 +600,17 @@ def daily_need(actor, need: str, biome: str = "") -> float:
 
 
 def _seen_to(need: str, live: bool, water: str) -> bool:
-    """Whether a stretch sees to this need at all: a lived one sees to both (the pack, and
-    the settlement's well behind it for water); any other stretch the player spends in a
-    settlement with a well sees to water alone, at the well (the owner, 2026-10-09)."""
-    return live or (need == "water" and bool(water))
+    """Whether a stretch sees to this need at all. Every stretch the player's body is
+    awake through does, out of the pack, once the day's need is due (and at the
+    settlement's well for water, the owner, 2026-10-09).
+
+    It was the lived stretch only (a day or more) until 2026-11-18. Owner bug list item 17:
+    frag went 143 hours without eating while carrying 5 trail rations, because ordinary
+    play and the benches spend time in stretches of minutes and hours, and none of them
+    was ever long enough to reach into the pack. Due-at-a-day still keeps "I wait an
+    hour" from emptying a waterskin: nothing is drawn until a day has passed since the
+    last meal or drink."""
+    return True
 
 
 def _due(actor, toll: Toll, live: bool = True, water: str = "") -> bool:
@@ -658,8 +665,7 @@ def _provide(actor, toll: Toll, biome: str, dice=None, water: str = "",
                 or exempt(actor, rule) \
                 or int(getattr(actor, counter, 0) or 0) < DAY_MINUTES:
             continue
-        spent = (gear_mod.provide(actor, need, daily_need(actor, need, biome)) if live
-                 else None)
+        spent = gear_mod.provide(actor, need, daily_need(actor, need, biome))
         if spent is None and need == "water" and water:
             # The pack is dry (or the stretch never reaches into it): the well. The same
             # reset as a drink from the pack, `drink`, so a gallon at the well is a
@@ -670,7 +676,11 @@ def _provide(actor, toll: Toll, biome: str, dice=None, water: str = "",
                 toll.rested.append(released_said(actor, "thirst", freed))
             continue
         if spent is None:
-            toll.ran_out.append(need)
+            # Said once, on a wait the player chose to live through. A short stretch
+            # says nothing: every turn's ten minutes would repeat "no food in the pack",
+            # and the hunger checks that follow already tell it.
+            if live:
+                toll.ran_out.append(need)
             continue
         toll.meals.extend(spent)
         freed = drink(actor) if need == "water" else eat(actor)
@@ -804,7 +814,7 @@ def charge(actor, minutes: int, dice=None, biome: str = "", clock: int | None = 
         # Living through it: the meal, the drink and the night come before the hour's
         # checks, so a body that eats at the day's mark is never asked about hunger. In a
         # settlement with a well (`water`) the drink comes in any stretch, lived or not.
-        if (live or water) and _due(actor, toll, live, water) and _up(actor):
+        if _due(actor, toll, live, water) and _up(actor):
             _provide(actor, toll, biome, dice, water=water, live=live)
 
         watered = int(actor.watered_minutes)
@@ -1007,7 +1017,10 @@ def lived_said(actor, toll: Toll) -> str:
     if toll.nights:
         parts.append(f"sleeps {toll.nights} night{'s' if toll.nights != 1 else ''}")
     joined = parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + " and " + parts[-1]
-    return f"Through the wait {name} {joined}."
+    # A short stretch's meal (`_seen_to`, 2026-11-18) is no wait.
+    if toll.nights or toll.waited or toll.hours >= HOURS_PER_DAY:
+        return f"Through the wait {name} {joined}."
+    return f"{name} {joined} from the pack."
 
 
 def well_said(actor, toll: Toll) -> list[str]:
@@ -1208,17 +1221,63 @@ def sleep(actor, hours: int = 8, *, minutes: int | None = None) -> None:
         actor.awake_checks = 0
 
 
-def eat(actor) -> int:
-    """A meal: the hunger clock and its count back to nothing, and whatever hunger held
-    released to heal by the ordinary clock. Returns the points released."""
-    actor.fed_minutes = 0
+# What a drink or a bite is worth when it is not a day's provision (owner bug list
+# 2026-11-18, item 17; the owner's answer 5: "partial credit by the book's gallons").
+# The book prices fluids and food per DAY (CRB p.444: a gallon and a pound) and sizes none
+# of these, so every figure below is a HOUSE RULE, said here: a cup is 8 fl oz (1/16
+# gallon), a dose is 1 fl oz (1/128 gallon), and a raw herb eaten is about an ounce of
+# food (1/16 lb). Teas (infusions, decoctions) are a cup; tinctures, vinegars, potions
+# and every other jar drunk are a dose.
+CUP_GALLONS = 1 / 16
+DOSE_GALLONS = 1 / 128
+HERB_FOOD_LB = 1 / 16
+_CUP_FORMS = frozenset({"infusion", "decoction"})
+
+
+def jar_fluid(stock) -> float:
+    """The gallons of fluid one drunk dose of a crafted jar is (house rule, above)."""
+    form = str(getattr(stock, "form", "") or "").lower()
+    return CUP_GALLONS if form in _CUP_FORMS else DOSE_GALLONS
+
+
+def _credit(actor, need: str, amount: float | None, biome: str) -> None:
+    """Take `amount` (gallons or pounds) off the need's clock at the book's daily rate.
+
+    `None` is a full day's worth whatever it was (a camp's meal, a well, a wait's day
+    drawn from the pack): the clock goes to nothing, as it always did. A part of a day
+    takes its part: a 1/2-gallon skin is 12 hours of a medium body's day. The clock is
+    held at the grace before the credit — the hour the checks begin — so a body banks no
+    deficit past it: a gallon after three days without water is a day's relief, not a day
+    still owed with the checks rolling on. Held at the grace and not at a day, so a
+    nibble at hour 50 of hunger (grace 72) is 50 hours less an ounce, not 24."""
+    counter = PROVISIONS["water" if need == "water" else "food"][0]
+    if amount is None:
+        setattr(actor, counter, 0)
+        return
+    day = daily_need(actor, "water" if need == "water" else "food", biome)
+    took = int(round(DAY_MINUTES * float(amount) / day)) if day > 0 else DAY_MINUTES
+    grace = (hours_until_thirsty(actor) if need == "water"
+             else hours_until_hungry(actor)) * MINUTES_PER_HOUR
+    now = min(int(getattr(actor, counter, 0) or 0), grace)
+    setattr(actor, counter, max(0, now - took))
+
+
+def eat(actor, lb: float | None = None, biome: str = "") -> int:
+    """A meal: the hunger clock back by what was eaten (`_credit`; all of it when `lb`
+    is None), its count back to nothing, and whatever hunger held released to heal by the
+    ordinary clock. Returns the points released.
+
+    Any food meets the need while it is eaten (CRB p.444: the damage "cannot be
+    recovered until the character gets food"); how long it lasts is the part that is
+    partial. It reset the clock in full for a crumb until 2026-11-18 (item 17)."""
+    _credit(actor, "food", lb, biome)
     actor.hunger_checks = 0
     return _met(actor, "hunger")
 
 
-def drink(actor) -> int:
-    """Water: as `eat`, for thirst."""
-    actor.watered_minutes = 0
+def drink(actor, gallons: float | None = None, biome: str = "") -> int:
+    """Water: as `eat`, for thirst, in gallons."""
+    _credit(actor, "water", gallons, biome)
     actor.thirst_checks = 0
     return _met(actor, "thirst")
 
@@ -1250,7 +1309,7 @@ def released_said(actor, need: str, points: int) -> str:
 
 __all__ = ["AWAKE_GRACE_HOURS", "BIOME_HARDSHIP", "LIVED_MINUTES", "NO_FOOD", "NO_SLEEP",
            "NO_WATER", "SLEEP_SOURCE", "Strain", "Toll", "WITHHELD_NEEDS", "asleep",
-           "awake_dc", "charge", "daily_need", "drink", "eat", "exempt", "hardship",
+           "awake_dc", "charge", "daily_need", "drink", "eat", "jar_fluid", "exempt", "hardship",
            "hours_until_hungry", "hours_until_thirsty", "hunger_dc", "lasts", "lived_said",
            "pass_hours", "refused", "released_said", "said", "sleep", "sleep_left", "state",
            "stopped_said", "strains", "thirst_dc", "unmended", "unmended_said"]

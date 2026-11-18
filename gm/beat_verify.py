@@ -4702,7 +4702,9 @@ _BEYOND_SYSTEM = (
     "any words;\n"
     "- \"adds\" when it states something about the world, a place, a people, a person or "
     "what anyone did, that no fact says.\n"
-    "For \"adds\" copy the sentence's own words that state the new thing.")
+    "For \"adds\" copy the sentence's own words that state the new thing.\n"
+    "Also answer \"attack\": \"yes\" when the sentence speaks of, praises or reacts to "
+    "an attack, a shot, a blow or a throw (\"Nice shot\", \"Good hit\"), else \"no\".")
 _BEYOND_DEMO_USER = (
     "FACTS (the player's character is Pell Arrow):\n"
     "F1. Refused: No ferryman is here, and Dunmarsh has none the world names.\n"
@@ -4713,33 +4715,45 @@ _BEYOND_DEMO_USER = (
     "2. There's no ferryman for you to hire here.\n"
     "3. The river guild keeps every boat on the far bank.\n"
     "4. You slipped on the wet moss and scraped your knee.\n"
-    "5. You'll have to find another way across, so maybe ask around for a boat.")
+    "5. You'll have to find another way across, so maybe ask around for a boat.\n"
+    "6. Nice throw, right on target.")
 _BEYOND_DEMO_ANSWER = {
-    "1": {"verdict": "reacts", "words": ""},
-    "2": {"verdict": "from a fact", "words": ""},
-    "3": {"verdict": "adds", "words": "The river guild keeps every boat on the far bank"},
-    "4": {"verdict": "adds", "words": "You slipped on the wet moss and scraped your knee"},
-    "5": {"verdict": "reacts", "words": ""}}
+    "1": {"verdict": "reacts", "words": "", "attack": "no"},
+    "2": {"verdict": "from a fact", "words": "", "attack": "no"},
+    "3": {"verdict": "adds", "words": "The river guild keeps every boat on the far bank",
+          "attack": "no"},
+    "4": {"verdict": "adds", "words": "You slipped on the wet moss and scraped your knee",
+          "attack": "no"},
+    "5": {"verdict": "reacts", "words": "", "attack": "no"},
+    "6": {"verdict": "reacts", "words": "", "attack": "yes"}}
 
 
 def beyond_schema(n_sentences: int) -> dict:
     """One required entry per sentence (required and enum hold under Ollama's grammar)."""
     item = {"type": "object",
             "properties": {"verdict": {"type": "string", "enum": list(BEYOND_VERDICTS)},
-                           "words": {"type": "string", "maxLength": 200}},
-            "required": ["verdict", "words"]}
+                           "words": {"type": "string", "maxLength": 200},
+                           "attack": {"type": "string", "enum": ["yes", "no"]}},
+            "required": ["verdict", "words", "attack"]}
     keys = [str(i) for i in range(1, n_sentences + 1)]
     return {"type": "object", "properties": {k: item for k in keys}, "required": keys}
 
 
 def beyond_tells(text: str, premises, *, who: str = "", chat=None, model: str = "",
-                 host: str = "", provider: str = "ollama",
-                 api_key: str = "") -> list[tuple[str, str]] | None:
+                 host: str = "", provider: str = "ollama", api_key: str = "",
+                 attacked: bool | None = None) -> list[tuple[str, str]] | None:
     """[(sentence, words)] for each sentence of `text` that states a world fact or a deed
     no premise carries, its words quoted from the sentence and checked in code. [] when
     every sentence reacts or comes from a fact; None when the read failed (the caller
     leaves the line as it is, as every read back does). Premises are taken as given:
-    the table talk's are already plain (`views.plain_tell`)."""
+    the table talk's are already plain (`views.plain_tell`).
+
+    `attacked`: whether the turn resolved an attack (an `attack` outcome), when the
+    caller knows. False makes a sentence the read marks `attack: yes` an addition
+    whatever its verdict. Owner bug list 2026-11-18, item 18: over a pick-up with no
+    throw planned, the table said "Nice shot" — a reaction, so "reacts" passed it, but
+    a reaction to a shot nobody rolled is a deed claimed. The model reads; code holds it
+    to the engine's own record (docs/structured-turn.md)."""
     from . import narration as narration_mod
 
     facts = [p for p in (" ".join(str(x).split()) for x in premises or ()) if p]
@@ -4771,6 +4785,9 @@ def beyond_tells(text: str, premises, *, who: str = "", chat=None, model: str = 
     out: list[tuple[str, str]] = []
     for k, sentence in enumerate(sentences, 1):
         row = answer.get(str(k)) if isinstance(answer, dict) else None
+        if attacked is False and isinstance(row, dict) and row.get("attack") == "yes":
+            out.append((sentence, sentence))
+            continue
         if not isinstance(row, dict) or row.get("verdict") != "adds":
             continue
         words = " ".join(str(row.get("words") or "").split())
