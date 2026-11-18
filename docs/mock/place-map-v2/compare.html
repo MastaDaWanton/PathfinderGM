@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Current vs Proposed</title>
+<link rel="stylesheet" href="shared/ui.css">
+<style>
+  /* The owner's rule: polish ships only after a mock shows current against proposed. Left is
+     the map as 0.4.2 draws it (current/16-places-chart.js, a copy of the shipped file, fed the
+     same exported chart); right is one of the three proposals, live. */
+  body { overflow: auto; }
+  .cmp { display: grid; grid-template-rows: auto minmax(0, 1fr); height: 100vh; }
+  .panes { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 10px; min-height: 0; }
+  .pane { display: grid; grid-template-rows: auto minmax(0, 1fr); gap: 6px; min-height: 0; }
+  .pane h2 { margin: 0; font: 400 16px/1.3 var(--display); color: var(--gold); letter-spacing: .05em; }
+  .pane h2 small { font: italic 13px var(--body); color: var(--dim); letter-spacing: 0; margin-left: 6px; }
+  .frame { min-height: 0; border: 4px solid transparent; border-radius: 3px;
+           background: url("assets/brass-grain.jpg") border-box, linear-gradient(135deg, #f0d9a0, #b98f4e 16%, #6b4f28 42%, #3a2c17 60%, #8a6a3a) border-box; }
+  .current { background: radial-gradient(110% 90% at 28% 18%, rgba(255, 243, 212, .22), transparent 62%),
+                         url("assets/chart-paper.jpg") 40% 40% / 720px auto #e2d2ae; position: relative; overflow: hidden; height: 100%; }
+  iframe { width: 100%; height: 100%; border: 0; display: block; }
+  .picker { display: flex; gap: 6px; }
+  /* The shipped chart's own ink (table.html, .chart rules), copied so the left pane is what plays. */
+  .chart svg { display: block; width: 100%; height: 100%; }
+  .chart .edge { stroke: rgba(60, 44, 30, .62); stroke-width: calc(1.3px * var(--k)); }
+  .chart .edge.road, .chart .stub.road { stroke-dasharray: calc(5px * var(--k)) calc(4px * var(--k)); }
+  .chart .edge.shut { stroke: #8e2317; }
+  .chart .bar { stroke: #8e2317; stroke-width: calc(2.6px * var(--k)); stroke-linecap: round; }
+  .chart .stub { stroke-width: calc(1.7px * var(--k)); stroke-linecap: round; }
+  .chart .node { cursor: pointer; }
+  .chart .node circle { fill: #f3ead6; stroke: #463a2d; stroke-width: calc(1.5px * var(--k)); }
+  .chart .node text { font: 600 calc(13.5px * var(--k))/1 var(--body); fill: #2a2019; paint-order: stroke;
+                      stroke: rgba(226, 213, 184, .9); stroke-width: calc(3px * var(--k)); stroke-linejoin: round; }
+  .chart .node.seen circle { fill: rgba(243, 234, 214, .5); stroke: #7d6b55; }
+  .chart .node.seen text { font-style: italic; font-weight: 400; fill: #3d3024; }
+  .chart .node.near circle { stroke: #27406e; fill: #dde2ef; }
+  .chart .node.out circle { stroke-dasharray: calc(3px * var(--k)) calc(2px * var(--k)); }
+  .chart .node.here circle { fill: #27406e; stroke: #142457; }
+  .chart .node.here text { font-weight: 700; }
+  .chart .node.sel circle { stroke: #8e2317; stroke-width: calc(3px * var(--k)); }
+  .slip { position: absolute; right: 10px; bottom: 10px; width: 250px; max-height: 60%; overflow: auto; }
+  @media (max-width: 900px) { .panes { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; } }
+</style>
+</head>
+<body>
+<div class="cmp">
+  <header class="bar"><ol class="crumbs"><li><button type="button" aria-current="page">Current vs proposed</button></li></ol>
+    <span class="style-name"><a href="index.html">all mocks</a></span></header>
+  <div class="panes">
+    <section class="pane"><h2>Current <small>0.4.2, Featherperch from jack's save, the same data</small></h2>
+      <div class="frame"><div class="current chart" id="current"></div></div></section>
+    <section class="pane"><h2>Proposed <span class="picker">
+        <button type="button" class="toggle" data-src="chart.html" aria-pressed="true">Chart</button>
+        <button type="button" class="toggle" data-src="diorama.html" aria-pressed="false">Diorama</button>
+        <button type="button" class="toggle" data-src="tabletop.html" aria-pressed="false">Tabletop</button></span></h2>
+      <div class="frame"><iframe id="proposed" src="chart.html" title="Proposed map"></iframe></div></section>
+  </div>
+</div>
+<script src="current/16-places-chart.js"></script>
+<script>
+  // The current map, drawn the way 16-tab-map.js draws it: the scale and the frame settled together.
+  const box = document.getElementById("current");
+  let pf = null, sel = null, k = 1;
+  function paint() {
+    for (let round = 0; round < 5; round++) {
+      box.innerHTML = PlacesChart.svg(pf, { sel, k }) + `<div class="slip">${PlacesChart.slip(pf, { sel })}</div>`;
+      const svg = box.querySelector("svg"), vb = svg.viewBox.baseVal, r = svg.getBoundingClientRect();
+      if (!r.width) break;
+      const next = Math.max(vb.width / r.width, vb.height / r.height);
+      if (Math.abs(next - k) / next < .01) break;
+      k = next;
+    }
+  }
+  box.addEventListener("click", ev => { const n = ev.target.closest("[data-node]"); if (n) { sel = sel === n.dataset.node ? null : n.dataset.node; paint(); } });
+  fetch("data/town.json").then(r => r.json()).then(d => { pf = d; paint(); new ResizeObserver(paint).observe(box); });
+  document.querySelector(".picker").addEventListener("click", ev => { const b = ev.target.closest("[data-src]"); if (!b) return;
+    document.getElementById("proposed").src = b.dataset.src;
+    document.querySelectorAll(".picker button").forEach(x => x.setAttribute("aria-pressed", x === b)); });
+</script>
+</body>
+</html>

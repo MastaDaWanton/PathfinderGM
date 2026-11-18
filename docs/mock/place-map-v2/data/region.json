@@ -1,0 +1,840 @@
+{
+ "here": "86d535c37ebd",
+ "towns": [
+  {
+   "id": "86d535c37ebd",
+   "name": "Featherperch",
+   "kind": "CITY",
+   "region": [
+    "Skyreach Aerie",
+    "Sunkeep Reaches"
+   ],
+   "visited": true,
+   "current": true
+  },
+  {
+   "id": "634f5db08475",
+   "name": "Balzun",
+   "kind": "CITY",
+   "region": [
+    "Kharzun Delve",
+    "Sunkeep Reaches"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "6cff3bc578e0",
+   "name": "Ledgernook",
+   "kind": "CITY",
+   "region": [
+    "Undertide Warrens",
+    "Sunkeep Reaches"
+   ],
+   "visited": true,
+   "current": false
+  },
+  {
+   "id": "5beb4a684ab9",
+   "name": "Milldell",
+   "kind": "CITY",
+   "region": [
+    "Sandmere Shire",
+    "Sunkeep Reaches"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "8c3cc1822e7d",
+   "name": "Underrun",
+   "kind": "CITY",
+   "region": [
+    "Undertide Warrens",
+    "Sunkeep Reaches"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "6715824b59e7",
+   "name": "Blackline",
+   "kind": "CITY",
+   "region": [
+    "Ironjaw Legion",
+    "Drossakar"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "dc96df34d0a5",
+   "name": "Bogflote",
+   "kind": "CITY",
+   "region": [
+    "Mireflote Concord",
+    "Veyl Isles"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "fffcb34e546e",
+   "name": "Branford",
+   "kind": "CITY",
+   "region": [
+    "Faerholt March",
+    "Kelmoria"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "ab0e1c867532",
+   "name": "Brixwick",
+   "kind": "CITY",
+   "region": [
+    "Tinkerhome Delve",
+    "Kelmoria"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "875307f1afd4",
+   "name": "Caelholt",
+   "kind": "CITY",
+   "region": [
+    "Faerholt March",
+    "Kelmoria"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "7eb5451eb44a",
+   "name": "Croakmarsh",
+   "kind": "CITY",
+   "region": [
+    "Mireflote Concord",
+    "Veyl Isles"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "603de75061a8",
+   "name": "Drazhgash",
+   "kind": "CITY",
+   "region": [
+    "Kragmoor Horde",
+    "Drossakar"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "ac1a5f097c45",
+   "name": "Dunmarch",
+   "kind": "CITY",
+   "region": [
+    "Faerholt March",
+    "Kelmoria"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "eb775ff783c2",
+   "name": "Greyreach",
+   "kind": "CITY",
+   "region": [
+    "Skyreach Aerie",
+    "Sunkeep Reaches"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "dfbb92dd04c0",
+   "name": "Harpost",
+   "kind": "CITY",
+   "region": [
+    "Ashgate Reach",
+    "Drossakar"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "1483305a0d6b",
+   "name": "Ironjaw",
+   "kind": "CITY",
+   "region": [
+    "Ironjaw Legion",
+    "Drossakar"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "009c141fdfc9",
+   "name": "Panthcove",
+   "kind": "CITY",
+   "region": [
+    "Panthera Reef Courts",
+    "Veyl Isles"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "3c0e3da8c9b8",
+   "name": "Reedsink",
+   "kind": "CITY",
+   "region": [
+    "Mireflote Concord",
+    "Veyl Isles"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "b6e40c378717",
+   "name": "Salthaven",
+   "kind": "CITY",
+   "region": [
+    "Tidewrought Commonwealth",
+    "Veyl Isles"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "85addedc9153",
+   "name": "Scrapden",
+   "kind": "CITY",
+   "region": [
+    "Cinderwarren",
+    "Drossakar"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "8f7beeacf3d1",
+   "name": "Silkshore",
+   "kind": "CITY",
+   "region": [
+    "Panthera Reef Courts",
+    "Veyl Isles"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "82228690c356",
+   "name": "Steelline",
+   "kind": "CITY",
+   "region": [
+    "Ironjaw Legion",
+    "Drossakar"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "484fefc5e71b",
+   "name": "Thornstead",
+   "kind": "CITY",
+   "region": [
+    "Ardenhale",
+    "Kelmoria"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "079e808e41c2",
+   "name": "Greenbrook",
+   "kind": "CITY",
+   "region": [
+    "Sandmere Shire",
+    "Sunkeep Reaches"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "1cd44ed94902",
+   "name": "Grotburrow",
+   "kind": "CITY",
+   "region": [
+    "Cinderwarren",
+    "Drossakar"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "b525cf439ce3",
+   "name": "Koradin",
+   "kind": "CITY",
+   "region": [
+    "Kharzun Delve",
+    "Sunkeep Reaches"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "c82025c86b89",
+   "name": "Ledgerwarren",
+   "kind": "CITY",
+   "region": [
+    "Undertide Warrens",
+    "Sunkeep Reaches"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "f287e88ab69c",
+   "name": "Moldwarren",
+   "kind": "CITY",
+   "region": [
+    "Undertide Warrens",
+    "Sunkeep Reaches"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "6c262728c76a",
+   "name": "Honeyhill",
+   "kind": "CITY",
+   "region": [
+    "Sandmere Shire",
+    "Sunkeep Reaches"
+   ],
+   "visited": false,
+   "current": false
+  },
+  {
+   "id": "65401fc57819",
+   "name": "Korforge",
+   "kind": "CITY",
+   "region": [
+    "Kharzun Delve",
+    "Sunkeep Reaches"
+   ],
+   "visited": false,
+   "current": false
+  }
+ ],
+ "roads": [
+  {
+   "a": "86d535c37ebd",
+   "b": "634f5db08475",
+   "days": 5,
+   "miles": 96,
+   "road": "road",
+   "sea": false,
+   "by": "road"
+  },
+  {
+   "a": "86d535c37ebd",
+   "b": "6cff3bc578e0",
+   "days": 5,
+   "miles": 96,
+   "road": "road",
+   "sea": false,
+   "by": "road"
+  },
+  {
+   "a": "86d535c37ebd",
+   "b": "5beb4a684ab9",
+   "days": 5,
+   "miles": 72,
+   "road": "road",
+   "sea": false,
+   "by": "road"
+  },
+  {
+   "a": "86d535c37ebd",
+   "b": "8c3cc1822e7d",
+   "days": 5,
+   "miles": 72,
+   "road": "road",
+   "sea": false,
+   "by": "road"
+  },
+  {
+   "a": "634f5db08475",
+   "b": "6715824b59e7",
+   "days": 7,
+   "miles": 216,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "634f5db08475",
+   "b": "dc96df34d0a5",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "634f5db08475",
+   "b": "fffcb34e546e",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "634f5db08475",
+   "b": "ab0e1c867532",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "634f5db08475",
+   "b": "875307f1afd4",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "634f5db08475",
+   "b": "7eb5451eb44a",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "634f5db08475",
+   "b": "603de75061a8",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "634f5db08475",
+   "b": "ac1a5f097c45",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "634f5db08475",
+   "b": "eb775ff783c2",
+   "days": 5,
+   "miles": 96,
+   "road": "road",
+   "sea": false,
+   "by": "road"
+  },
+  {
+   "a": "634f5db08475",
+   "b": "dfbb92dd04c0",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "634f5db08475",
+   "b": "1483305a0d6b",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "634f5db08475",
+   "b": "009c141fdfc9",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "634f5db08475",
+   "b": "3c0e3da8c9b8",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "634f5db08475",
+   "b": "b6e40c378717",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "634f5db08475",
+   "b": "85addedc9153",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "634f5db08475",
+   "b": "8f7beeacf3d1",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "634f5db08475",
+   "b": "82228690c356",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "634f5db08475",
+   "b": "484fefc5e71b",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "dc96df34d0a5",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "fffcb34e546e",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "ab0e1c867532",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "875307f1afd4",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "7eb5451eb44a",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "603de75061a8",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "ac1a5f097c45",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "079e808e41c2",
+   "days": 5,
+   "miles": 72,
+   "road": "",
+   "sea": true,
+   "by": "river"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "1cd44ed94902",
+   "days": 7,
+   "miles": 216,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "dfbb92dd04c0",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "1483305a0d6b",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "b525cf439ce3",
+   "days": 5,
+   "miles": 72,
+   "road": "",
+   "sea": true,
+   "by": "river"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "c82025c86b89",
+   "days": 3,
+   "miles": 48,
+   "road": "",
+   "sea": true,
+   "by": "river"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "f287e88ab69c",
+   "days": 3,
+   "miles": 48,
+   "road": "road",
+   "sea": false,
+   "by": "road"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "009c141fdfc9",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "3c0e3da8c9b8",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "b6e40c378717",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "85addedc9153",
+   "days": 7,
+   "miles": 192,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "8f7beeacf3d1",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "82228690c356",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "6cff3bc578e0",
+   "b": "484fefc5e71b",
+   "days": 1,
+   "miles": null,
+   "road": "",
+   "sea": true,
+   "by": "sea"
+  },
+  {
+   "a": "5beb4a684ab9",
+   "b": "eb775ff783c2",
+   "days": 5,
+   "miles": 96,
+   "road": "road",
+   "sea": false,
+   "by": "road"
+  },
+  {
+   "a": "5beb4a684ab9",
+   "b": "6c262728c76a",
+   "days": 3,
+   "miles": 24,
+   "road": "road",
+   "sea": false,
+   "by": "road"
+  },
+  {
+   "a": "5beb4a684ab9",
+   "b": "c82025c86b89",
+   "days": 5,
+   "miles": 96,
+   "road": "road",
+   "sea": false,
+   "by": "road"
+  },
+  {
+   "a": "8c3cc1822e7d",
+   "b": "079e808e41c2",
+   "days": 5,
+   "miles": 96,
+   "road": "road",
+   "sea": false,
+   "by": "road"
+  },
+  {
+   "a": "8c3cc1822e7d",
+   "b": "b525cf439ce3",
+   "days": 5,
+   "miles": 96,
+   "road": "road",
+   "sea": false,
+   "by": "road"
+  },
+  {
+   "a": "8c3cc1822e7d",
+   "b": "65401fc57819",
+   "days": 5,
+   "miles": 96,
+   "road": "road",
+   "sea": false,
+   "by": "road"
+  }
+ ],
+ "wild": [
+  {
+   "id": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+   "town": "86d535c37ebd",
+   "setting": "forest",
+   "name": "the road to 634f5db08475"
+  },
+  {
+   "id": "86d535c37ebd~forest:@the-crossroads",
+   "town": "86d535c37ebd",
+   "setting": "forest",
+   "name": "the crossroads"
+  },
+  {
+   "id": "86d535c37ebd~forest:@the-outskirts",
+   "town": "86d535c37ebd",
+   "setting": "forest",
+   "name": "the outskirts"
+  },
+  {
+   "id": "86d535c37ebd~forest:@the-woods",
+   "town": "86d535c37ebd",
+   "setting": "forest",
+   "name": "the woods"
+  },
+  {
+   "id": "86d535c37ebd~underground:the-woods/the-cave",
+   "town": "86d535c37ebd",
+   "setting": "underground",
+   "name": "the cave"
+  },
+  {
+   "id": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+   "town": "86d535c37ebd",
+   "setting": "forest",
+   "name": "the road to 6cff3bc578e0"
+  },
+  {
+   "id": "86d535c37ebd~forest:@along-the-road-to-6cff3bc578e0",
+   "town": "86d535c37ebd",
+   "setting": "forest",
+   "name": "along the road to 6cff3bc578e0"
+  },
+  {
+   "id": "86d535c37ebd~mountain:@along-the-road-to-6cff3bc578e0",
+   "town": "86d535c37ebd",
+   "setting": "mountain",
+   "name": "along the road to 6cff3bc578e0"
+  },
+  {
+   "id": "6cff3bc578e0~forest:@the-outskirts",
+   "town": "6cff3bc578e0",
+   "setting": "forest",
+   "name": "the outskirts"
+  },
+  {
+   "id": "6cff3bc578e0~forest:@the-woods",
+   "town": "6cff3bc578e0",
+   "setting": "forest",
+   "name": "the woods"
+  }
+ ]
+}

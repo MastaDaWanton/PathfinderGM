@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Isometric Diorama</title>
+<link rel="stylesheet" href="shared/ui.css">
+<style>
+  .stage canvas { cursor: grab; touch-action: none; }
+  .stage canvas:active { cursor: grabbing; }
+</style>
+</head>
+<body>
+<noscript>This mock needs JavaScript.</noscript>
+<script src="shared/model.js"></script>
+<script src="shared/ui.js"></script>
+<script src="diorama.js"></script>
+<script>MapUI.start(DioramaRenderer, { styleName: "2 · Isometric diorama" }).catch(err => {
+  document.body.textContent = "Could not load the map data: " + err.message + ". Serve this folder (python -m http.server 8980).";
+});</script>
+</body>
+</html>

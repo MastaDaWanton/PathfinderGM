@@ -1,0 +1,133 @@
+{
+ "gpuName": "NVIDIA GeForce RTX 3080",
+ "ollama": [
+  "igorls/gemma-4-12B-it-heretic-GGUF:latest 7.76 GiB"
+ ],
+ "baselineMiB": 9947,
+ "baselineUtil": [
+  0,
+  0,
+  0,
+  0,
+  0
+ ],
+ "pages": [
+  {
+   "page": "chart.html",
+   "fps": 66,
+   "p50": 16.6,
+   "p95": 16.8,
+   "worst": 433.3,
+   "gpuMiB": 10024,
+   "deltaMiB": 25,
+   "blankMiB": [
+    9981,
+    10016
+   ],
+   "gpuUtil": 3,
+   "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 (0x0000220A) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "three": null
+  },
+  {
+   "page": "diorama.html",
+   "fps": 43,
+   "p50": 8.3,
+   "p95": 8.4,
+   "worst": 3550.1,
+   "gpuMiB": 10020,
+   "deltaMiB": 6,
+   "blankMiB": [
+    10012,
+    10018
+   ],
+   "gpuUtil": 0,
+   "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 (0x0000220A) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "three": null
+  },
+  {
+   "page": "tabletop.html",
+   "fps": 99,
+   "p50": 8.3,
+   "p95": 8.5,
+   "worst": 925.2,
+   "gpuMiB": 10010,
+   "deltaMiB": 1,
+   "blankMiB": [
+    10007,
+    10011
+   ],
+   "gpuUtil": 0,
+   "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 (0x0000220A) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "three": null
+  },
+  {
+   "page": "tabletop.html?level=region",
+   "fps": 62,
+   "p50": 8.3,
+   "p95": 8.4,
+   "worst": 3866.6,
+   "gpuMiB": 10000,
+   "deltaMiB": -54,
+   "blankMiB": [
+    10009,
+    10100
+   ],
+   "gpuUtil": 1,
+   "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 (0x0000220A) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "three": {
+    "fps": 0,
+    "geometries": 190,
+    "textures": 3,
+    "calls": 308,
+    "triangles": 89724,
+    "gl": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+   }
+  },
+  {
+   "page": "tabletop.html?level=site&site=sewers",
+   "fps": 47,
+   "p50": 8.3,
+   "p95": 8.5,
+   "worst": 1974.7,
+   "gpuMiB": 10178,
+   "deltaMiB": 41,
+   "blankMiB": [
+    10102,
+    10172
+   ],
+   "gpuUtil": 1,
+   "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 (0x0000220A) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "three": {
+    "fps": 118,
+    "geometries": 64,
+    "textures": 3,
+    "calls": 121,
+    "triangles": 2172,
+    "gl": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+   }
+  },
+  {
+   "page": "tabletop.html?hour=21&rain=1",
+   "fps": 17,
+   "p50": 8.3,
+   "p95": 8.4,
+   "worst": 18133.4,
+   "gpuMiB": 10224,
+   "deltaMiB": -20,
+   "blankMiB": [
+    10156,
+    10333
+   ],
+   "gpuUtil": 1,
+   "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 (0x0000220A) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "three": {
+    "fps": 2,
+    "geometries": 201,
+    "textures": 4,
+    "calls": 351,
+    "triangles": 11274,
+    "gl": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+   }
+  }
+ ]
+}

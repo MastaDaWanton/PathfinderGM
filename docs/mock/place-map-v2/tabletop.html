@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>3D Tabletop</title>
+<link rel="stylesheet" href="shared/ui.css">
+<style>
+  .stage canvas.gl { cursor: grab; touch-action: none; }
+  .rain { pointer-events: none; }
+  .tag { position: absolute; left: 0; top: 0; white-space: nowrap; font: 600 13px/1 var(--body); color: #2a2019;
+         background: rgba(243, 234, 214, .9); padding: 4px 8px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.45); }
+  .tag.seen { font-style: italic; font-weight: 400; background: rgba(243, 234, 214, .62); }
+  .tag.here { background: #27406e; color: #f3ead6; }
+  .tag.sel { background: #8e2317; color: #f3ead6; }
+  .tag b { display: inline-block; margin-left: 5px; min-width: 15px; padding: 1px 3px; border-radius: 8px; background: #2a2019; color: #f3ead6; font-size: 11px; text-align: center; }
+  .tag b.dn { background: #27406e; }
+  .tag i { display: block; font: italic 400 11px/1.2 var(--body); margin-top: 2px; text-align: center; }
+  .hud { position: absolute; right: 10px; top: 10px; display: flex; gap: 8px; align-items: center; z-index: 3; }
+  .hud span { font: 12px/1 var(--body); color: var(--ink); background: rgba(0,0,0,.45); padding: 6px 8px; border-radius: 3px; font-variant-numeric: tabular-nums; }
+</style>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.min.js" } }</script>
+</head>
+<body>
+<noscript>This mock needs JavaScript.</noscript>
+<script src="shared/model.js"></script>
+<script src="shared/ui.js"></script>
+<script type="module">
+  import "./tabletop.js";
+  MapUI.start(window.TabletopRenderer, { styleName: "3 · 3D tabletop" }).catch(err => {
+    document.body.textContent = "Could not load the map: " + err.message + ". Serve this folder (python -m http.server 8980).";
+  });
+</script>
+</body>
+</html>
