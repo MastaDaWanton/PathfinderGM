@@ -397,3 +397,80 @@ def test_the_town_talks_of_a_way_down_before_it_is_found_once(monkeypatch):
     s.founded.extend([head] + [m.as_dict() for m in made[1:]])
     dungeons.settle(engine)
     assert not cards.find(s, card.id).live
+
+
+def _climax_of(tag_id: str, seed: int):
+    """A found dungeon's climax room, entered, with its concept set to `tag_id`."""
+    s, engine, head, concept = _found(seed=seed)
+    concept["tag"] = tag_id
+    rooms = [p for p in s.founded if (p.get("dungeon") or {}).get("of") == head["id"]]
+    last = rooms[-1]
+    if s.in_encounter:
+        s.end_encounter()
+    s.move("pc", last["id"])
+    _fx, bits = dungeons.arrived(engine, places.find(engine.places(), last["id"]))
+    return s, engine, head, last, " ".join(bits)
+
+
+def test_the_rat_king_fights_with_his_rats(always):
+    """The owner, 2026-11-18: "the boss is one creature but it should not necessarily be
+    the only creature in the fight. The rat king should have at least 5 rats (or 1 swarm
+    of rats) and 2 dire rats fighting with him." Before it the climax held the leader and
+    nobody else. Now the tag's authored retinue comes as written, beside the leader, and
+    every one of them is a foe the quest's "boss" ending waits on."""
+    for seed in range(11, 20):
+        s, engine, head, last, told = _climax_of("rat-king", seed)
+        foes = last["dungeon"]["foes"]
+        kinds = [str(getattr(s.people[r], "template", "") or s.people[r].name) for r in foes]
+        names = " ".join(s.people[r].name.lower() for r in foes)
+        assert len(foes) >= 1 + 2 + 1, (seed, kinds)
+        assert names.count("dire rat") == 2, (seed, names)
+        rats = len(foes) - 1 - 2
+        assert rats in (5, 1), (seed, names)          # five rats, or one swarm
+        assert "with them" in told and "two dire rats" in told, told
+        for r in foes:
+            assert s.people[r].at == last["id"]
+        for r in foes[:1]:
+            s.people[r].hp = -20
+        assert dungeons.completion(engine, head["id"]) != "boss"   # the rats still stand
+        for r in foes:
+            s.people[r].hp = -20
+        assert dungeons.completion(engine, head["id"]) == "boss"
+
+
+def test_a_leader_with_no_authored_retinue_has_its_own_enemies_beside_it(always):
+    """Every other tag: the leader is joined by the tag's own enemies at an ordinary draw,
+    so no boss stands alone (the same ruling)."""
+    seen = 0
+    for seed in range(11, 25):
+        s, engine, head, last, told = _climax_of("restless-dead", seed)
+        foes = last["dungeon"]["foes"]
+        seen += len(foes) > 1
+    assert seen, "no seed put anybody beside the first of the dead"
+
+
+def test_a_boss_room_is_never_an_instant_fight(always):
+    """The owner, 2026-11-18: "make sure every boss room isn't an instant fight, to allow
+    the player to assess whether they can win." Before it, an undead leader and its
+    company opened initiative the moment the room was entered. Now they keep the lair and
+    watch, the tell says so, and the plan cannot have them swing first; one step closer
+    wakes every one of them into one fight, with no reaction roll and no giving way."""
+    for seed in range(11, 25):
+        s, engine, head, last, told = _climax_of("restless-dead", seed)
+        foes = [r for r in last["dungeon"]["foes"] if not s.people[r].is_down]
+        if len(foes) > 1:
+            break
+    else:
+        pytest.fail("no seed put company beside the first of the dead")
+    assert not s.in_encounter, s.sides
+    assert "does not come at you yet" in told and "they all come at you" in told, told
+    assert all(s.people[r].has_state(states.HOLDING_GROUND) for r in foes)
+    refused = engine.run(engine.validate([{"op": "attack", "actor": foes[0], "target": "pc",
+                                           "because": "t", "params": {}}],
+                                         origin="author:test")).outcomes
+    assert refused[-1].status == "refused" and not s.in_encounter
+    s.zones[foes[0]] = "near"
+    woke = engine._holding_ground_settles()
+    assert s.in_encounter and set(foes) <= set(s.sides["them"]), s.sides
+    assert not any(s.people[r].has_state(states.HOLDING_GROUND) for r in foes)
+    assert any("come at you" in o.tell for o in woke)
