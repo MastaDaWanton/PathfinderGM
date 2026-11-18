@@ -1,0 +1,55 @@
+{
+  "_about": "Travel pacing (feat/travel-pacing, 2026-11-16). The owner: 'I dont want it to go day by day when travel could be a month long but instead every few days you can roll an event'. A journey runs in stretches of `stretch_days`; each stretch rolls `percent` once (pro rata for a short last stretch); on a hit a hidden die picks the day inside the stretch and `bands` picks the event. Quiet stretches pass in one line. Read by rules/ontheway.py (`stretches`, `road_stretches`, `sea_stretches`); every number here is the app's own and stated as such, the sources it was shaped against are in that module's docstring. `danger` bands widen with the place's volatility (`ontheway._weighed`); `waters` says which open water a sea band happens on.",
+  "stretch_days": 3,
+  "road": {
+    "percent": 40,
+    "bands": [
+      {"kind": "creature", "weight": 20, "danger": true},
+      {"kind": "bandits", "weight": 15, "danger": true},
+      {"kind": "travellers", "weight": 15},
+      {"kind": "caravan", "weight": 12},
+      {"kind": "ruin", "weight": 10},
+      {"kind": "bridge", "weight": 10},
+      {"kind": "weather", "weight": 10, "danger": true},
+      {"kind": "toll", "weight": 8}
+    ]
+  },
+  "sea": {
+    "percent": 40,
+    "bands": [
+      {"kind": "pirates", "weight": 14, "danger": true, "waters": ["sea"]},
+      {"kind": "creature", "weight": 12, "danger": true, "waters": ["sea"]},
+      {"kind": "storm", "weight": 12, "danger": true, "waters": ["sea"]},
+      {"kind": "merchant", "weight": 14, "waters": ["sea", "river"]},
+      {"kind": "naval", "weight": 6, "waters": ["sea"]},
+      {"kind": "island", "weight": 10, "waters": ["sea"]},
+      {"kind": "wreck", "weight": 8, "waters": ["sea", "river"]},
+      {"kind": "survivor", "weight": 7, "waters": ["sea", "river"]},
+      {"kind": "stowaway", "weight": 6, "waters": ["sea", "river"]},
+      {"kind": "sickness", "weight": 6, "waters": ["sea", "river"]},
+      {"kind": "mutiny", "weight": 5, "waters": ["sea", "river"]}
+    ]
+  },
+  "people": {
+    "bandits": {"words": ["bandit", "highwayman", "brigand", "thug"], "count": 3, "name": "bandit"},
+    "caravan": {"words": ["merchant", "trader"], "count": 1, "name": "caravan master",
+                "guards": {"words": ["guard", "mercenary", "warrior"], "count": 2, "name": "caravan guard"}},
+    "survivor": {"words": ["sailor", "commoner", "merchant"], "count": 1, "name": "survivor"},
+    "stowaway": {"words": ["urchin", "commoner", "thief", "rogue"], "count": 1, "name": "stowaway"}
+  },
+  "places": {
+    "island": {"label": "the island", "terrain": "coast",
+               "about": "a small island off her course: surf on the reef, a strip of sand, green above it"},
+    "wreck": {"label": "the wreck", "terrain": "deck",
+              "about": "a dismasted hull wallowing low in the water, her deck awash and her hatches stove in"},
+    "ruin": {"venture": "ruins"}
+  },
+  "salvage": {
+    "_about": "What a wreck's sea chest holds: the app's own numbers, not a source's (Skull & Shackles' plunder could not be read and is not claimed). About a trader's chest of coin.",
+    "name": "a sea chest",
+    "gp": "2d6",
+    "sp": "4d10"
+  },
+  "bridge_detour_hours": 8,
+  "sickness": {"condition": "sickened", "days": 3}
+}

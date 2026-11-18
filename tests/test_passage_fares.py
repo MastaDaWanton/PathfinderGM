@@ -31,7 +31,7 @@ from world import loader
 
 PANGRELLA = loader.load_cached("fixtures/pangrella-campaign.json")
 MIRABALOS, ZHILVARNIA = "7ef5e373c993", "6953424c8a82"
-BOOK_CP = 2880   # 288 miles at 1 sp: the fare test_ships_at_sea.py measures for one head
+BOOK_CP = 6720   # 672 miles at 1 sp: a fortnight (the passage floor) at 48 miles a day
 
 
 def _at_port(gp: int = 500):
@@ -68,11 +68,11 @@ def test_the_harbourmaster_is_the_seller_and_a_stranger_pays_the_book():
 
 
 @pytest.mark.parametrize("regard,cp,said", [
-    (60, 2736, "likes you: 5% off"),
-    (80, 2592, "would do you a good turn: 10% off"),
-    (95, 2448, "would do anything for you: 15% off"),
-    (20, 3168, "does not like you: 10% over"),
-    (5, 3600, "cannot stand you: 25% over"),
+    (60, 6384, "likes you: 5% off"),
+    (80, 6048, "would do you a good turn: 10% off"),
+    (95, 5712, "would do anything for you: 15% off"),
+    (20, 7392, "does not like you: 10% over"),
+    (5, 8400, "cannot stand you: 25% over"),
 ])
 def test_the_fare_moves_with_regard_and_the_quote_is_what_is_charged(regard, cp, said):
     """A friend's price and a dearer one for somebody disliked (`pricing.REGARD_PERCENT`).
@@ -143,7 +143,7 @@ def test_talking_with_the_harbourmaster_offers_the_berths():
     assert all(r["journey"] for r in offer["rows"])
     note = views._passage_note(c)
     assert note.startswith("The harbourmaster sells berths: ")
-    assert "to Zhilvarnia, 2 days at sea" in note
+    assert "to Zhilvarnia, 14 days at sea" in note
     _book(engine)
     assert views._passage_offer(c) == {}, "aboard, nobody sells a berth"
 
@@ -185,4 +185,4 @@ def test_a_crew_name_keeps_its_own_words_beside_a_bare_descriptor():
 
 
 def test_the_book_fare_is_still_the_ships_rule():
-    assert ships.fare_cp(288) == BOOK_CP
+    assert ships.fare_cp(672) == BOOK_CP

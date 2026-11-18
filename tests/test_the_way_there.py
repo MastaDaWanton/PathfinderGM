@@ -245,7 +245,8 @@ class TestTheRoadBetweenTowns:
 
     def test_what_is_on_the_road_is_on_the_road_with_you(self):
         s, e, pc = _party()
-        e.dice = _Certain(e.dice, band=70)
+        # 45 is travellers on the journey table (content/rules/journey-events.json).
+        e.dice = _Certain(e.dice, band=45)
         before = len(s.actors)
         _journey(e, pc, ROAD_TO)
         assert len(s.actors) > before

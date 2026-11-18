@@ -40,7 +40,8 @@ def _engine(clock=10 * HOUR):
     # Vormoor and Ledgerwarren are a sea crossing apart, and since 2026-11-13 every
     # crossing is a paid passage (1 sp a mile a head) both ways. These tests are about who
     # is still there when the party comes back, not about fares: the coin is the ticket.
-    pc.purse = {"pp": 10}
+    # Two fortnight crossings (travel pacing, 2026-11-18) are some 130 gp.
+    pc.purse = {"pp": 20}
     s.clock_minutes = clock
     e = Engine(s, Dice(seed=3), world=WORLD)
     e.place_party()
@@ -75,8 +76,13 @@ def _travel(e, place):
 
 # --- leaving town is not the end of anybody ------------------------------------------------
 
-def test_somebody_met_is_the_same_person_when_you_come_back():
-    """Measured: Soren Kragnirath at regard 70 came back as Korvin Korvath at 35."""
+def test_somebody_met_is_the_same_person_when_you_come_back(monkeypatch):
+    """Measured: Soren Kragnirath at regard 70 came back as Korvin Korvath at 35. On a
+    quiet road and sea: a meeting on the way stops a journey short (travel pacing)."""
+    from rules import ontheway
+
+    monkeypatch.setattr(ontheway, "road_stretches", lambda *a, **k: None)
+    monkeypatch.setattr(ontheway, "sea_stretches", lambda *a, **k: None)
     s, e = _engine()
     rec = _person(s, "woman mending nets by the gate", "fisher")
     ref = judgement.embody_sought(s, "I talk to the woman mending nets.", WORLD)
@@ -451,18 +457,20 @@ def test_a_traveller_keeps_travelling_past_a_year_and_the_save_stays_small():
 def test_an_old_save_with_a_frozen_route_moves_again(monkeypatch):
     """A save written before #10 carries the 400 entries the old cap left and no
     `route_dropped`. It loads as it is; the next asking prunes it, walks on, and lands
-    on the very road an uncapped walk would have taken."""
+    on the very road an uncapped walk would have taken. Three thousand days: since
+    travel pacing (2026-11-18) a road is three days at least, and 500 days walked 92
+    stops."""
     s, _ = _engine()
     rec = _person(s, "a messenger with a satchel", "messenger")
     t0 = s.clock_minutes
     monkeypatch.setattr(residency, "MOST_STOPS", 10 ** 6)       # an uncapped walk
-    uncapped = residency.route(dict(rec), t0 + 500 * DAY, WORLD)
+    uncapped = residency.route(dict(rec), t0 + 3000 * DAY, WORLD)
     monkeypatch.undo()
     assert len(uncapped) > residency.MOST_STOPS, len(uncapped)
 
     old = dict(rec, route=uncapped[:residency.MOST_STOPS])    # what the old cap stored
     frozen_at = old["route"][-1]["to"]
-    stops = residency.route(old, t0 + 500 * DAY, WORLD)
-    assert stops[-1]["to"] >= t0 + 500 * DAY > frozen_at
+    stops = residency.route(old, t0 + 3000 * DAY, WORLD)
+    assert stops[-1]["to"] >= t0 + 3000 * DAY > frozen_at
     assert old["route_dropped"] > 0 and len(old["route"]) < residency.MOST_STOPS
     assert old["route"] == uncapped[old["route_dropped"]:]

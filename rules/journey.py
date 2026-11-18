@@ -46,6 +46,16 @@ from dataclasses import dataclass
 FEET_PER_MPH = 10
 HOURS_PER_DAY = 8
 
+# The shortest road between two settlements, in days on foot, when the world's miles are
+# not marked measured (`Leg.measured`). The owner, 2026-11-16: "as it is now overland
+# travel is too short it should be a few days minimum to other cities". Three days is the
+# app's reading of "a few", and it is a DISTANCE floor (72 miles at the CRB's 24 miles a
+# day on foot), so a horse still halves it as ruled (Q13). Why World Bible's miles are not
+# taken as they stand: they are derived from its containment tree and "never measured"
+# (its agent_engine/distance.py), one or two walking days for two towns of one nation; a
+# world that measures its roads says so (for-world-bible ask 32) and is taken at its word.
+ROAD_DAYS_AT_LEAST = 3
+
 # Table: Terrain and Overland Movement — (highway, road or trail, trackless).
 # Verified against aonprd.com/Rules.aspx?ID=122 and found identical to the 3.5 SRD's
 # table in every cell, which is worth knowing: Pathfinder inherited overland travel
@@ -116,6 +126,10 @@ class Leg:
     # 144 of 144, in both directions. The inference was right; it is still being replaced,
     # because being right by luck is not the same as being told.
     by: str = ""
+    # Whether the world MEASURED `miles` (for-world-bible ask 32): `measured: true` on the
+    # travel row. Unmeasured miles are a band, and the floors (`ROAD_DAYS_AT_LEAST`,
+    # `ships.PASSAGE_DAYS_AT_LEAST`) hold under them; measured ones stand as stated.
+    measured: bool = False
 
 
 def pace(biome: str, road: str = "") -> tuple[float, str, str]:
@@ -159,8 +173,7 @@ def hours_for(leg: Leg, speed_ft: int = 30) -> tuple[int, str, str]:
         # and open sea is a trader's. The vessel table already knows the difference and
         # this is the first thing to ask it.
         vessel = "keelboat" if leg.by == "river" else "sailing ship"
-        days = ships_mod.days_for(leg.miles if leg.source == "exact" else None,
-                                  vessel, leg.days_apart)
+        days = ships_mod.leg_days(leg, vessel)
         # The WHOLE day, not the eight hours a walking day is: a ship keeps watches and
         # makes way through the night, which is most of why the sea is faster than the
         # road at the same speed. The caller must not spend these as marching hours —
@@ -193,13 +206,25 @@ def hours_for(leg: Leg, speed_ft: int = 30) -> tuple[int, str, str]:
             _got, words, _how = pace("", leg.road)
         ground_rate = sum(rates) / len(rates) if rates else 1.0
         speed = max(0.1, (max(0, int(speed_ft)) / FEET_PER_MPH) * ground_rate)
-        hours = max(1, round(leg.miles / speed))
+        miles = leg.miles
+        if not leg.measured:
+            # The floor is miles, not hours: the shortest road is so many days' walk for
+            # a human (24 miles a day), and the ground and the walker's speed still pace it.
+            miles = max(miles, ROAD_DAYS_AT_LEAST * 3 * HOURS_PER_DAY)
+        hours = max(1, round(miles / speed))
+        if miles != leg.miles:
+            # Floored: the time is the app's, and the tell names no mileage — the stated 24
+            # miles would be contradicted by the days, and 72 is nobody's number.
+            return hours, words, "derived"
         return hours, f"{leg.miles} miles{', ' + words if words else ''}", "exact"
 
     # No mileage anywhere in the world file. The time comes from how far apart the two
     # sit in its containment tree, and is reported in days — never converted back into a
     # mileage, because that would be this app inventing a fact about somebody's world.
-    return max(1, leg.days_apart) * HOURS_PER_DAY, "", "derived"
+    days = max(1, leg.days_apart)
+    if not leg.measured:
+        days = max(days, ROAD_DAYS_AT_LEAST)
+    return days * HOURS_PER_DAY, "", "derived"
 
 
 def continent_of(world, entity_id: str) -> str:
@@ -322,6 +347,7 @@ def legs_from(world, here: str) -> list[Leg]:
             crosses=tuple(str(x) for x in (row.get("crosses") or ())),
             days_apart=_depth_apart(world, here, other),
             source="exact" if isinstance(miles, int) and miles > 0 else "derived",
+            measured=row.get("measured") is True,
             friction=str(row.get("friction") or ""),
             by=str(row.get("by") or ""),
             by_sea=crosses_water(world, here, other, str(row.get("road") or ""),
@@ -357,8 +383,11 @@ def coast_road(world, here: str, sea_leg: Leg, speed_ft: int = 30) -> Leg | None
     stopped road resumes (`Engine.road_to_the_coast` has the measurements)."""
     if sea_leg.from_port or sea_leg.by == "river":
         return None
+    # The derived coast is this town's own shore, not another settlement: the road floor
+    # between settlements is not its (`measured`).
     return harbour_road(world, here, speed_ft) or Leg(to_id=sea_leg.to_id,
-                                                      to_name="the coast", days_apart=1)
+                                                      to_name="the coast", days_apart=1,
+                                                      measured=True)
 
 
 # --- a ship lying off a town with no docks (owner ruling 2026-11-14) ---------------------
@@ -428,13 +457,15 @@ def _sea_days(world) -> int:
     crossings it states (`by: sea` with `miles`), or 0 when it states none. Measured on
     Pangrella the day passage shipped: the tree's depth put every unstated crossing at 7
     days (100 gp a head at the book's fare) where the world's two stated crossings are
-    192 and 216 miles — about a day and a half."""
+    192 and 216 miles. Unfloored here; the leg it becomes is floored like any other
+    (`ships.days_for`)."""
     from . import ships as ships_mod
 
     miles = sorted(int(t["miles"]) for t in (getattr(world, "play", None) or {}).get(
         "travel") or () if str(t.get("by") or "").lower() == "sea"
         and isinstance(t.get("miles"), int) and t["miles"] > 0)
-    return ships_mod.days_for(miles[len(miles) // 2], "sailing ship") if miles else 0
+    return ships_mod.days_for(miles[len(miles) // 2], "sailing ship",
+                              measured=True) if miles else 0
 
 
 _PORTS: dict[int, tuple] = {}
