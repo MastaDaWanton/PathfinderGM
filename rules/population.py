@@ -328,7 +328,8 @@ _HINT_WORK = re.compile(r"\b(?:her|his|their)\s+([a-z][a-z'-]{2,})", re.I)
 
 
 def note(scene, phrase: str, *, turn: int = 0, body: str = "", fresh: bool = False,
-         spot: str | None = None, heard_from: str = "", hint: str = "") -> dict:
+         spot: str | None = None, heard_from: str = "", hint: str = "",
+         work: str = "") -> dict:
     """Record the person this phrase describes, where the party stands; return the record.
 
     The same phrase at the same place is the same person seen again — their `last_seen`
@@ -367,9 +368,12 @@ def note(scene, phrase: str, *, turn: int = 0, body: str = "", fresh: bool = Fal
     # unless the words make her a child) and the work the speaker gave them, if any.
     said = person_words.from_words(phrase)
     rolled = person_words.roll_phrase(phrase, said)
-    work = [w for w in _HINT_WORK.findall(str(hint or "")) if lives.occupation_for(w)]
-    if work and not lives.occupation_for(rolled):
-        rolled = f"{rolled} {work[0]}"
+    # `work`: the trade the player went looking for, when this newcomer is who answers it
+    # (an introduce's `trade`, playtest 2026-11-17b #17); else what the speaker's words gave.
+    hinted = [work] if work and lives.occupation_for(work) else []
+    hinted += [w for w in _HINT_WORK.findall(str(hint or "")) if lives.occupation_for(w)]
+    if hinted and not lives.occupation_for(rolled):
+        rolled = f"{rolled} {hinted[0]}"
     used = used_frames(scene, home)
     life = None
     if heard and spot:

@@ -428,6 +428,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # for who they pass for. Written only by the act->op table from the reader's
     # `disguise` act, and by the engine for a plan's Disguise check (CODE_ONLY_OPS).
     "disguise": ((), ("actor", "as"), "hidden"),
+    # An arena's house stages a knockout bout for the player (rules/arena.py): the
+    # opponent, the purse and the fight are all the engine's. Written only by the act->op
+    # table from the reader's `challenge` act (CODE_ONLY_OPS).
+    "bout": ((), ("actor",), "player"),
     # Giving oneself up to the law (rules/trial.py `give_up`): yielding mid-fight, handing
     # oneself in, owning up to a crime. Aimed by `target` at the one yielded to; the law
     # present is the engine's. Written only by the act->op table (CODE_ONLY_OPS).
@@ -689,7 +693,9 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # prose will use (`who`). The same plan targets them as new1, new2, new3 in the
     # order introduced (`INTRODUCED_REFS`); the engine swaps in the real refs.
     # `already_here` binds to somebody the scene already holds before making anybody.
-    "introduce": (("who",), ("count", "how", "template", "zone"), "hidden"),
+    # `trade`: the work the player's words went looking for ("a sellsword"), when the
+    # newcomer is who answers it (`acts_to_ops.trade_sought`): their life is rolled to it.
+    "introduce": (("who",), ("count", "how", "template", "zone", "trade"), "hidden"),
     # The player provokes the person in `target`: an insult or a slight. Their regard
     # falls and a roll on their temper decides whether they come to blows
     # (rules/provocation.py). Nobody rolls to land an insult; the roll is the response.
@@ -826,8 +832,9 @@ CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "looks_in", "defending", 
 # `craft` act, built whole into `make`; the chain bench (play/craft_views.py) still writes
 # `craft` itself, from code.
 # `harvest` since 2026-11-01: the reader's `harvest` act, built whole (`acts_to_ops._harvest`).
+# `bout` since 2026-11-18: the reader's `challenge` act at an arena (`acts_to_ops._challenge`).
 CODE_ONLY_OPS = frozenset({"job", "make", "craft", "greet", "commission", "harvest",
-                           "disguise", "surrender"})
+                           "disguise", "surrender", "bout"})
 # Ops only the author's own hand writes (`/cheat`, origin `author:`): left out of the
 # turn's op enum like the code-only ops, but offered to the cheat (`prompts.CHEAT_OPS`),
 # and refused by the engine from any other origin. `xp` since 2026-11-07 (audit #22): a
@@ -1840,6 +1847,15 @@ def _check_params(intent: Intent, index: int) -> None:
                     f"introduce: no creature {p['template']!r}." + bestiary.suggestion(raw_t),
                     "schema", index)
             p["template"] = raw_t
+        if p.get("trade"):
+            # A trade word the occupation table knows, or none: read, never refused.
+            from . import lives
+
+            trade = " ".join(str(p["trade"]).split()).lower()[:40]
+            if lives.occupation_for(trade) is None:
+                p.pop("trade", None)
+            else:
+                p["trade"] = trade
 
     elif op in ("judge", "mend"):
         p["item"] = " ".join(str(p.get("item") or "").split())[:80]

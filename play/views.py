@@ -6065,8 +6065,14 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 # ends the fight when they are stable and lets the winners act — "the
                 # player down is not the fight over", above. A player held (paralysed,
                 # bound) has no rounds on that door, so their fight ends here as before.
-                c.transcript.append({"who": "gm", "text": lost, "kind": "consequence"})
-                if downed.state_of(scene.pc()) in ("dying", "stable"):
+                # A bout lost ends there, with its purse to the other fighter and its
+                # state off both (`Engine._settle_bout`, rules/arena.py): a knockout bout
+                # ends when one side falls, so the winner does not go on swinging at a
+                # fighter out cold (Ultimate Combat, Performance Combat).
+                bout = c.engine()._settle_bout()
+                c.transcript.append({"who": "gm", "text": lost + bout,
+                                     "kind": "consequence"})
+                if not bout and downed.state_of(scene.pc()) in ("dying", "stable"):
                     return
                 scene.end_encounter()
                 return

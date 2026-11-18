@@ -8587,6 +8587,10 @@ class Engine:
         from . import requests as requests_mod
 
         kind = requests_mod.kind_of(intent.params.get("request"))
+        if kind == requests_mod.HIRE:
+            # A hire is bought, not asked: the wage door, no roll and so no XP (playtest
+            # 2026-11-17b #21, `requests.HIRE`).
+            return self._company_hire(intent, target)
         now = int(self.scene.clock_minutes)
         what = "payment for the work" if kind == requests_mod.PAYMENT else "a favour"
         asks = f"{actor.name} asks {target.name} for {what}."
@@ -9518,6 +9522,12 @@ class Engine:
         # nothing had ever asked.
         usual = weapons_mod.lethality_of(weapon)
         lethality = str(intent.params.get("lethality") or usual)
+        # A knockout bout (rules/arena.py): every blow between its two fighters is pulled
+        # to nonlethal, at the book's -4 with a lethal weapon. The bout's state, never the
+        # plan's word, decides it.
+        if actor.has_state(states.IN_A_BOUT) and defender is not None \
+                and defender.has_state(states.IN_A_BOUT):
+            lethality = "nonlethal"
         pulled = usual == "lethal" and lethality == "nonlethal"
 
         if coup:
@@ -20157,9 +20167,105 @@ class Engine:
                       "how": "wage", "from": pc.ref, "to": who.ref,
                       "purse": dict(pc.purse)}],
             tell=(f"{pc.name} pays {who.name} {week_said}: a week's wages in advance, at "
-                  f"{day_said} a day. {who.name} is in your pay"
+                  f"{day_said} a day. {_sentence(who.name)} is in your pay"
                   + (" and comes with you from here." if joined else " from here.")),
             because=intent.because)
+
+    def _op_bout(self, intent: Intent, partial: dict) -> Outcome:
+        """`bout` — the arena's house stages a knockout bout for the player: an opponent
+        at the party's average encounter, a purse, and a real fight in which every blow
+        between the two is nonlethal (rules/arena.py carries the sources and the calls).
+        Written only by the act table from the reader's `challenge` (CODE_ONLY_OPS)."""
+        from . import arena, keepers
+        from .activeeffect import ActiveEffect
+
+        pc = self.scene.pc()
+        at = str(self.scene.at or "")
+        if pc is None or pc.is_down:
+            return self._refuse(intent, "Nobody is fit to fight a bout.")
+        if self.scene.in_encounter:
+            return self._refuse(intent, "There is a fight on already.")
+        founded = getattr(self.scene, "founded", ()) or ()
+        if keepers.kind_of(at, founded) != arena.KIND:
+            return self._refuse(
+                intent, "Nobody stages bouts here. An arena's master of the games does.")
+        master = keepers.keeper_in(self.scene, at)
+        if master is None or master.ref not in self.scene.actors \
+                or not self.scene.conscious(master.ref):
+            return self._refuse(intent, "There is nobody here to stage a bout: the master "
+                                        "of the games is not about.")
+        if not keepers.open_now(at, int(self.scene.clock_minutes), founded):
+            return self._refuse(intent, keepers.shut_line(
+                at, int(self.scene.clock_minutes), founded, master.name)
+                or f"{master.name} stages no bouts at this hour.")
+        hostile = self._will_not_deal(master)
+        if hostile:
+            return self._refuse(intent, hostile)
+        if arena.staged_today(self.scene, at):
+            return self._refuse(
+                intent, f"{master.name} has staged today's bout already. The next is "
+                        f"tomorrow.")
+        picked = arena.opponent(self.scene)
+        if picked is None:
+            return self._refuse(intent, f"{master.name} has nobody fit to put up against "
+                                        f"{pc.name} today.")
+        block, cr = picked
+        made = self._bring_in(str(block["id"]), 1, side="them")
+        if not made:
+            return self._refuse(intent, f"{master.name} has nobody to put up today.")
+        foe = self.scene.actors[made[0]["ref"]]
+        purse = arena.purse_cp(cr)
+        source = f"bout:{at}"
+        for who, other in ((pc, foe), (foe, pc)):
+            who.apply_effect(ActiveEffect(
+                name="in a bout", kind="bond", key=f"{source}:{who.ref}", source=source,
+                origin=source, duration="until-dismissed", tags=(states.IN_A_BOUT,),
+                payload={"purse_cp": purse, "house": master.ref, "against": other.ref,
+                         "at": at}))
+        arena.mark_staged(self.scene, at)
+        self._mark_priced([foe.ref], source)
+        fight = self._run_within(self.validate([{
+            "op": "begin_encounter", "because": "the house stages a bout",
+            "params": {"sides": {"party": [pc.ref], "them": [foe.ref]}}}],
+            origin=source, origin_name="the arena's bout"), partial)
+        coins = self._coins_here()
+        purse_said = goods.purse_line(goods.coins_for(purse), coins)
+        return Outcome(
+            intent_id=intent.id, op="bout", rolls=[r for o in fight for r in o.rolls],
+            effects=[{"kind": "bout", "against": foe.ref, "house": master.ref,
+                      "purse_cp": purse, "cr": cr}]
+                    + [e for o in fight for e in (o.effects or [])],
+            tell=(f"{master.name} puts {pc.name} in the next bout against {foe.name}, a "
+                  f"knockout to the first who cannot go on: every blow is pulled, and the "
+                  f"winner takes a purse of {purse_said}. "
+                  + " ".join(o.tell for o in fight if o.tell)).strip(),
+            because=intent.because)
+
+    def _settle_bout(self) -> str:
+        """The purse to a bout's winner still standing, and the bout's state off both
+        fighters (the second law: nothing outlives the bout). "" when no bout was on."""
+        fighters = [a for a in self.scene.actors.values() if a.has_state(states.IN_A_BOUT)]
+        if not fighters:
+            return ""
+        pc = self.scene.pc()
+        bond = next((e for e in (pc.effects if pc is not None else ())
+                     if states.IN_A_BOUT in (e.tags or ())), None)
+        line = ""
+        if bond is not None:
+            foe = self.scene.actors.get(str(bond.payload.get("against") or ""))
+            house = self.scene.actors.get(str(bond.payload.get("house") or ""))
+            purse = int(bond.payload.get("purse_cp") or 0)
+            if foe is not None and foe.is_down and not pc.is_down and purse:
+                pc.purse = goods.credit(pc.purse, purse)
+                line = (f" {_sentence(house.name) if house is not None else 'The house'} pays "
+                        f"{pc.name} the bout's purse: "
+                        f"{goods.purse_line(goods.coins_for(purse), self._coins_here())}.")
+            elif pc.is_down:
+                line = (f" {pc.name} lost the bout, and the purse goes to "
+                        f"{foe.name if foe is not None else 'the other fighter'}.")
+        for a in fighters:
+            a.remove_effects(match=lambda e: states.IN_A_BOUT in (e.tags or ()))
+        return line
 
     def _company_guard(self, intent: Intent, who) -> Outcome:
         """`company do: guard` — a companion keeps watch over the party's cargo or the
@@ -26845,14 +26951,17 @@ class Engine:
         from . import xp as xp_mod
 
         pc = self.scene.pc()
+        # An arena's bout is paid by its purse, and its loser keeps their own gear
+        # (rules/arena.py): settled first, whoever won, and in place of the treasure.
+        bout = self._settle_bout()
         if pc is None or pc.is_down:
-            return ""
+            return bout
         # Settled first and appended to every path out of here. Written as
         # `return line + self._settle_treasure()` on the paying branch only, a creature
         # with a treasure column and no XP price — which is most of the bestiary, since
         # 6,355 of 7,136 entries never had either filled in — dropped its purse on the
         # floor and nobody picked it up.
-        coin = self._settle_treasure() + self._recover_ammunition()
+        coin = (bout or self._settle_treasure()) + self._recover_ammunition()
         total, names = xp_mod.award_for_fallen(self.scene, pc)
         # Paid once. The routed units' debt is remembered on the scene because they are gone
         # from it (`_rout`), and a second fight in the same room must not pay for the first
@@ -26965,7 +27074,7 @@ class Engine:
                 f"({goods_mod.purse_line(pc.purse, coins)} in hand).")
 
     # The origins whose `begin_encounter` a document or the author wrote, not a model.
-    _STAGED_FIGHTS = ("start:", "scheme:", "author:")
+    _STAGED_FIGHTS = ("start:", "scheme:", "author:", "bout:")
 
     def _priced_sides(self, sides: dict) -> dict:
         """A model-proposed fight's sides, its foes priced as one encounter.
@@ -33158,7 +33267,8 @@ class Engine:
                 if rec is None and how == "already_here" and n == 1:
                     rec = population.described_here(self.scene, who)
                 if rec is None:
-                    rec = population.note(self.scene, who, fresh=True)
+                    rec = population.note(self.scene, who, fresh=True,
+                                          work=str(intent.params.get("trade") or ""))
                 actor = population.embody(self.scene, who, template, zone=zone,
                                           world=self.world, rec=rec)
                 made.append({"ref": actor.ref, "name": actor.name})

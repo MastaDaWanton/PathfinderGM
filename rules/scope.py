@@ -421,6 +421,17 @@ def look_for(world, phrase: str, scene=None, location_id: str | None = None, *,
         found = [e for e in found if getattr(e, "parent_id", "") == (location_id or "")]
         if not found:
             return {**out, "scope": "", "line": ""}
+    elif found and not indefinite and not any(w[:1].isupper() for w in whom.split()) \
+            and not set(said) & OFFICES:
+        # A title or trade with no name in it asks for whoever holds it HERE, never a
+        # character in another town who shares a word of their Role. Playtest 2026-11-17b
+        # #23: "the master of the arena", walked to with the master of the games standing
+        # there, matched "Apprentice to Xylorvotha's master craftsman" on "master" and was
+        # refused "in Xylorvotha, not here". 0.4.0's #75 made bare trades local in the
+        # population finder; this is the same rule for the world's characters. An office
+        # (the mayor, the king) is still the world's to place. Nobody here falls through
+        # to the people seen, then to UNMET, which refuses nothing.
+        found = [e for e in found if getattr(e, "parent_id", "") == (location_id or "")]
     if found:
         # A whole name said beats a word of one, as in the room (`in_the_room`); then the
         # one here in town, because "not in this room" is a shorter walk than "in another

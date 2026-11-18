@@ -55,11 +55,17 @@ from __future__ import annotations
 
 from . import states
 
-# The two kinds of request the reader can name (`interpret.REQUESTS`). A closed list, the
+# The kinds of request the reader can name (`interpret.REQUESTS`). A closed list, the
 # engine's own; anything the reader cannot place in it stays talk.
 PAYMENT = "payment"
 FAVOUR = "favour"
-KINDS = (PAYMENT, FAVOUR)
+# Asking somebody to work for the player for a wage (since 2026-11-18, playtest 2026-11-17b
+# #21): "I'll hire you for a week, to guard me. Name your price" was read a favour, rolled
+# Diplomacy, paid 150 XP and hired nobody. A hire is a purchase of service, never Make
+# Request: it rolls nothing and goes to the hirelings' door (`Engine._company_hire`), which
+# names the wage or says why they do not hire out. Not in `ROW_FOR`: no DC is ever made.
+HIRE = "hire"
+KINDS = (PAYMENT, FAVOUR, HIRE)
 
 # Core Rulebook p.93, the request modifiers, by the book's own words. Only "simple aid"
 # is used: payment and a favour are both aid the person can simply give.

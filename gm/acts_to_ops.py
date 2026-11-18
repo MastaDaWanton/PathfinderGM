@@ -1164,6 +1164,8 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 _look_in(row, frame, i, scene, rows, places)
             if act == "disguise" and pc is not None:
                 _disguise(row, a, pc)
+            if act == "challenge" and pc is not None:
+                _challenge(row, a, scene, pc)
             # Taking 10 or 20 is always on the ground at hand: nobody takes 20 on a tavern.
             if act == "search" and (a.get("where") == "here" or a.get("take"))                     and pc is not None:
                 _search(row, a, pc)
@@ -1526,6 +1528,25 @@ def _look_in(row: Row, frame, i: int, scene, rows=(), places=()) -> None:
     row.intents.append({"op": "narrate_only", "actor": pc.ref,
                         "params": {"looks_in": _plain(said)},
                         "because": "the player looks inside"})
+
+
+def _challenge(row: Row, a: dict, scene, pc) -> None:
+    """A bout asked for, built whole: the engine's `bout` op (`Engine._op_bout`), which
+    an arena's house stages and anywhere else refuses with who does. Playtest 2026-11-17b
+    #24: "Put me in the next bout" to the master of the games built nothing. A challenge to
+    somebody here by name who is not the keeper of this place is theirs to answer in
+    words, and builds nothing (a sparring match with a soldier is not built)."""
+    from rules import keepers
+
+    words = " ".join(str(a.get("target") or "").split())
+    who = person(scene, words) if words else ""
+    actor = (getattr(scene, "actors", {}) or {}).get(who) if who else None
+    if actor is not None \
+            and actor is not keepers.keeper_in(scene, str(getattr(scene, "at", "") or "")):
+        return
+    row.intents.append({"op": "bout", "actor": pc.ref, "params": {},
+                        "because": "the player asks for a bout"})
+    row.note = "a bout asked for"
 
 
 def _disguise(row: Row, a: dict, pc, what: str | None = None) -> None:
@@ -2263,6 +2284,10 @@ def _request(row: Row, a: dict, scene, pc) -> None:
     never invented."""
     kind = str(a.get("asks_for") or "")
     words = " ".join(str(a.get("target") or "").split())
+    # "you" (or "him") is the one spoken to: live 2026-11-18, "Then I'll hire you for a
+    # week" came back `target: you` and was refused "there is nobody here who is you".
+    if words.lower() in _PRONOUNS | {"you"}:
+        words = ""
     # Somebody named who is not here is not quietly swapped for whoever is.
     who = person(scene, words) if words else addressed(scene)
     actor = (getattr(scene, "actors", {}) or {}).get(who) if who else None
@@ -2275,10 +2300,13 @@ def _request(row: Row, a: dict, scene, pc) -> None:
     name = str(actor.name)
     if name[:1].islower() and not name.lower().startswith(("the ", "a ", "an ")):
         name = f"the {name}"
+    # A hire rides the same check to the engine, which takes it to the wage door and
+    # rolls nothing (`Engine._make_request`, `requests.HIRE`).
     row.intents.append({"op": "check", "actor": pc.ref, "target": who,
                         "params": {"skill": "diplomacy", "request": kind},
-                        "because": f"the player asks {name} for "
-                                   + ("payment" if kind == "payment" else "a favour")})
+                        "because": (f"the player hires {name}" if kind == "hire" else
+                                    f"the player asks {name} for "
+                                    + ("payment" if kind == "payment" else "a favour"))})
     row.note = f"a request of {name}: {kind}"
 
 
@@ -3792,6 +3820,44 @@ def company_asked(raw, frame: dict | None, scene, *, ask=None, asked: dict | Non
     return out or [{"op": "narrate_only", "because": "nothing the reading stands behind"}]
 
 
+def trade_sought(raw, frame: dict | None, *, notes: list | None = None) -> list:
+    """The one newcomer a plan introduces on a turn whose reading went looking for
+    somebody by their trade is somebody of that trade: `trade` on the introduce, so the
+    population rolls their life to it (`population.note`'s `work`).
+
+    Playtest 2026-11-17b #17/#20: "I walk to the tavern near the docks and look for a
+    sellsword for hire" was read `seek: a sellsword for hire`; the finder missed
+    (`work:caravan-guard`), the plan introduced "man in corner" with no trade, and the
+    next turn he called himself a sellsword with no rate and could never be hired
+    (`hirelings.hires_out` reads the population's work). Structure only: the reading's
+    one acting `seek` target, the occupation table's own match words for it
+    (`lives.occupation_for`), and exactly one introduce whose `who` names no trade of its
+    own. Two seeks or two newcomers are not guessed between."""
+    from rules import lives
+
+    from . import interpret
+
+    if not isinstance(raw, list) or not frame or frame.get("error"):
+        return raw
+    sought = [str(a.get("target") or "") for a in frame.get("actions") or []
+              if a.get("act") == "seek" and interpret.acting(a) and a.get("target")]
+    newcomers = [r for r in raw if _op(r) == "introduce"]
+    if len(sought) != 1 or len(newcomers) != 1:
+        return raw
+    occ = lives.occupation_for(sought[0])
+    params = dict(newcomers[0].get("params") or {})
+    if occ is None or params.get("trade") or lives.occupation_for(str(params.get("who") or "")):
+        return raw
+    # The table's own word the player used, so the newcomer's trade reads as they said it.
+    word = next((m for m in occ.get("match") or () if m in sought[0].lower()),
+                str(occ["name"]))
+    params["trade"] = word
+    newcomers[0]["params"] = params
+    if notes is not None:
+        notes.append(f"the newcomer {params.get('who')!r} is the {word} the player looked for")
+    return raw
+
+
 def orders_spoken(raw, frame: dict | None, scene, *, ask=None, asked: dict | None = None,
                   ask_what=None, notes: list | None = None) -> list:
     """A hire or a guard order the player's words make and the plan left out, added:
@@ -3832,6 +3898,10 @@ def orders_spoken(raw, frame: dict | None, scene, *, ask=None, asked: dict | Non
     planned = {(_company_who(scene, r),
                 str(((r or {}).get("params") or {}).get("do") or "join").lower())
                for r in raw if _op(r) == "company"}
+    # The reading's own hire (`_request`, a check the engine takes to the wage door).
+    planned |= {(str((r or {}).get("target") or ""), "hire") for r in raw
+                if _op(r) == "check"
+                and str(((r or {}).get("params") or {}).get("request") or "") == "hire"}
     spoken = [a for a in frame.get("actions") or [] if interpret.acting(a)
               and str(a.get("act") or "") in _HIRE_ACTS]
     if not spoken:
@@ -3906,6 +3976,49 @@ def orders_spoken(raw, frame: dict | None, scene, *, ask=None, asked: dict | Non
             if hired_now or guarded:
                 break
     return out
+
+
+# The acts a bout is asked for in, besides the reader's own `challenge`: words to the house,
+# a request, anything else.
+_BOUT_ACTS = frozenset({"talk", "request", "other"})
+
+
+def bout_spoken(raw, frame: dict | None, scene, *, ask=None, places=(),
+                notes: list | None = None) -> list:
+    """The `bout` the player's words ask the arena for, when the reading built none.
+
+    Playtest 2026-11-17b #24 and the live check of 2026-11-18: words asking the master of
+    the games for a bout came back `talk`, `other` or a bare question, never `challenge`,
+    and the house staged nothing. Detected in code (the party stands at an arena, or the
+    same plan walks there; no `bout` in the plan; an act done now), repaired by ONE closed
+    question per act (`interpret.confirm_bout`). With no question (`ask` None) nothing is
+    added; the engine still refuses a bout where no house stages one."""
+    from rules import arena, keepers
+    from rules import places as places_mod
+
+    from . import interpret
+
+    if ask is None or not isinstance(raw, list) or not frame or frame.get("error") \
+            or scene is None or any(_op(r) == "bout" for r in raw):
+        return raw
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    founded = getattr(scene, "founded", ()) or ()
+    going = [places_mod.find(places, str(((r or {}).get("params") or {}).get("place") or ""))
+             for r in raw if _op(r) == "travel"]
+    there = keepers.kind_of(str(getattr(scene, "at", "") or ""), founded) == arena.KIND \
+        or any(p is not None and keepers.kind_of(p.id, founded) == arena.KIND for p in going)
+    if pc is None or not there:
+        return raw
+    for a in frame.get("actions") or []:
+        if not interpret.acting(a) or str(a.get("act") or "") not in _BOUT_ACTS:
+            continue
+        if ask(str(a.get("span") or "")) != "bout":
+            continue
+        if notes is not None:
+            notes.append("the bout the words asked for, added")
+        return raw + [{"op": "bout", "actor": pc.ref, "params": {},
+                       "because": "the player asks for a bout"}]
+    return raw
 
 
 def sea_spoken(raw, frame: dict | None, scene, *, ask=None, notes: list | None = None) -> list:
@@ -4106,6 +4219,9 @@ def wage_not_tipped(raw, scene, *, notes: list | None = None) -> list:
         return raw
     hired = {_company_who(scene, r) for r in raw if _op(r) == "company"
              and str(((r or {}).get("params") or {}).get("do") or "").lower() == "hire"}
+    hired |= {str((r or {}).get("target") or "") for r in raw if _op(r) == "check"
+              and str(((r or {}).get("params") or {}).get("request") or "") == "hire"}
+    hired.discard("")
     if not hired:
         return raw
     pc = scene.pc() if hasattr(scene, "pc") else None
@@ -4113,6 +4229,13 @@ def wage_not_tipped(raw, scene, *, notes: list | None = None) -> list:
     out = []
     for r in raw:
         params = (r or {}).get("params") or {}
+        if _op(r) == "company" and str(params.get("do") or "join").lower() == "join" \
+                and _company_who(scene, r) in hired:
+            # The plan's own "come along" beside the hire: the hire brings them. Live
+            # 2026-11-18, it was refused beside it "is indifferent ... Talk them round".
+            if notes is not None:
+                notes.append("the plan's company struck: the hire brings them along")
+            continue
         to = intents_mod.normalise_ref(str(params.get("to") or ""))
         frm = str(params.get("from_") or params.get("from") or (r or {}).get("actor") or "")
         if (_op(r) == "give" and to in hired

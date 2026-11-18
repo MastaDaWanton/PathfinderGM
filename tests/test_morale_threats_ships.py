@@ -248,8 +248,12 @@ def test_an_indefinite_person_is_never_a_figure_of_another_town():
     zhilvarnia = "6953424c8a82"
     scene = Scene(location_id=zhilvarnia)
     scene.add(load_pc("fixtures/pc-kesst.json"))
+    # A bare trade or title, definite too, is no longer answered with a figure of another
+    # town (playtest 2026-11-17b #23: "the master of the arena" found an apprentice in
+    # Xylorvotha by the word "master"); her own name still finds her.
     named = scope.look_for(WORLD, "the merchant", scene, zhilvarnia)
-    assert "Lyraea" in named["line"], named        # a particular one is still answered
+    assert "Lyraea" not in named["line"], named
+    assert "Lyraea" in scope.look_for(WORLD, "Lyraea", scene, zhilvarnia)["line"]
     got = scope.look_for(WORLD, "a well-dressed merchant", scene, zhilvarnia)
     assert got["scope"] == "" and got["line"] == "", got
 
