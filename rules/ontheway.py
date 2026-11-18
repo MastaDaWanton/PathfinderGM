@@ -176,6 +176,16 @@ class Meeting:
     # #21, asked "How much?", the toll-keeper said "a few silver pieces" — the engine's
     # meeting carried no figure, and `TOLL_DICE` was defined and never rolled.
     price_cp: int = 0
+    # A journey's stretches (`road_stretches`, `sea_stretches`): the day it happened on
+    # (1 = the first day out), and on a road the hours on the road behind the party when
+    # it did, which `hours_walked` reads instead of `after`'s watches.
+    day: int = 0
+    at_hours: int = 0
+    # Who else comes with the people met: (template, count, name) — a caravan's guards.
+    also: tuple = ()
+    # The name the people met are minted under ("Bandit", "Survivor"), when the table
+    # gives one.
+    name: str = ""
 
 
 def _band(table, roll: int) -> str:
@@ -191,9 +201,10 @@ def _band(table, roll: int) -> str:
 # hawker, the watch, travellers, a toll — are how busy a place is, not how dangerous.
 STREET_DANGER = frozenset({"cutpurse", "trouble"})
 ROAD_DANGER = frozenset({"creature", "weather"})
+# (The journey table's own danger bands are marked in content/rules/journey-events.json.)
 # The meetings whose count the encounter budget set (`encounter_budget.choose` for a
 # creature, `most_of` for the watch): the engine marks who they bring as priced.
-PRICED = frozenset({"creature", "patrol"})
+PRICED = frozenset({"creature", "patrol", "bandits"})
 
 
 def _weighed(table, danger: float, hostile) -> tuple[list, float]:
@@ -457,6 +468,227 @@ def sea(dice, level: int = 1, *, apl: int | None = None,
     return Meeting(kind=kind, roll=r, count=0)
 
 
+# --- the long way: a journey in stretches ------------------------------------------------
+#
+# The owner, 2026-11-16: "I dont want it to go day by day when travel could be a month long
+# but instead every few days you can roll an event on the ship either an attack or you see
+# an island and a crew member wants to stop, someone spots a wreck or a survivor on the
+# water ... this concept i believe is applied to over land travel". So a journey of days is
+# cut into stretches of `stretch_days` (content/rules/journey-events.json); each stretch
+# rolls ONE check, a quiet stretch passes in a line, and a hit stops the journey on a day
+# inside the stretch (a hidden die) with an event off the table, which the engine makes a
+# real scene. Researched 2026-11-16, and what each tradition kept and dropped:
+#
+#   Oregon Trail. R. Philip Bouchard's 1985 MECC design (philipbouchard.com/oregon-trail/
+#   imagining-design.html) ran the trail on its own with a status line, and stopped only for
+#   landmarks and serious events; he measured and REJECTED both halting every day ("150
+#   halts in a typical 5-month journey") and halting every fifty miles or four days. The
+#   1971 original's two-week turns were dropped too. That is this design: no halt without
+#   an event, and the quiet days told in one line.
+#   The One Ring 2e. The Guide's marching test sets how far the company gets before the
+#   next event: 2 hexes (a day each) on a failure in spring and summer, 3 on a success,
+#   and every event is a scene with a role's roll (summaries: rancourt.substack.com/p/a-
+#   survey-of-overland-travel; theroleplayersguild.com/articles/the-one-ring-rpg/journeys-
+#   travel). 1e's per-stretch fatigue tests were dropped for the seven-event table
+#   (mephitjamesblog.wordpress.com/2022/05/10/the-one-ring-2e-part-two/). Three days a
+#   stretch is TOR 2e's successful march; unlike TOR, a stretch may pass with nothing.
+#   Pathfinder 1e. Ultimate Wilderness p.127 (aonprd Rules ID 2388) checks four times a day
+#   at 20% and says "limit random encounters to one per day", and "a short table of a half
+#   dozen or so potential encounters is enough". Its rate on a fortnight's voyage is an
+#   event most days, which is the tedium asked away; it stays the rate for the hops round
+#   a town (`road`) and a ship hunting sails (`Engine._cruise`).
+#   The Angry GM's "Tension on the Road" rolls a day's pool once at dawn and places the
+#   complication himself, having abandoned his first per-segment Time Pool as "clunky";
+#   Knave 2e's six hazard rolls a day were measured at 127 rolls for one trip and called
+#   "so heavy" (rancourt.substack.com/p/analysis-knave-2e). Hence one roll a stretch.
+#   FTL makes every beacon an event, and keeps its empty ones honest by the rebel fleet's
+#   advance (fan wiki; the developers' own view could not be sourced). Sunless Sea's
+#   real-time voyages drained fuel and supplies by the second; Failbetter called its death
+#   rules "too punishing" and gave Sunless Skies more frequent discoveries for "little
+#   downtime" (failbettergames.com/news/sunless-sea-vs-sunless-skies-death-legacies-and-
+#   repetition). Skull & Shackles' sea encounter rate could not be read and is not claimed.
+#
+# The 40% a stretch is the app's: a fortnight's passage is five stretches, so it meets two
+# things on average and passes clean 0.6^5 = 8% of the time; the shortest road (three days)
+# is one stretch, 40%. Most bands are scenes and not fights (TOR's seven events are all one
+# hero's roll, PF2e's GMG splits hits half harmless).
+_EVENTS: dict | None = None
+# The voyage bands `Engine._voyage_scene` makes into scenes (the rest are the older sea
+# table's ships and creatures, and the weather).
+VOYAGE_SCENES = frozenset({"island", "wreck", "survivor", "stowaway", "sickness", "mutiny"})
+
+
+def events() -> dict:
+    """content/rules/journey-events.json, read once."""
+    global _EVENTS
+    if _EVENTS is None:
+        import json
+        from pathlib import Path
+
+        from django.conf import settings
+
+        path = Path(settings.BASE_DIR) / "content" / "rules" / "journey-events.json"
+        _EVENTS = json.loads(path.read_text(encoding="utf-8"))
+    return _EVENTS
+
+
+def stretches(days: int, every: int | None = None) -> list[int]:
+    """A journey of `days` cut into stretches: 14 days at 3 is [3, 3, 3, 3, 2]."""
+    every = max(1, int(every or events()["stretch_days"]))
+    days = max(0, int(days))
+    out = [every] * (days // every)
+    if days % every:
+        out.append(days % every)
+    return out
+
+
+def _bands(table: str, danger: float, waters: str = "") -> tuple[list, float]:
+    """The table's bands as (kind, cumulative weight) with the danger bands widened by
+    `danger`, and the chance multiplier the widening adds (`_weighed`'s shape: each danger
+    band's own chance moves by exactly `danger`, every other band's stays). `waters`
+    keeps only the sea bands that happen on that water."""
+    rows = [b for b in events()[table]["bands"]
+            if not waters or waters in (b.get("waters") or (waters,))]
+    base = sum(int(b["weight"]) for b in events()[table]["bands"])
+    out, top = [], 0.0
+    for b in rows:
+        top += int(b["weight"]) * (float(danger) if b.get("danger") else 1.0)
+        out.append((b["kind"], top))
+    return out, top / max(1, base)
+
+
+def _event_day(dice, days: int, chance: float, every: int | None = None) -> int:
+    """The day (1 = the first day out) the first event of a journey falls on, or 0 for a
+    journey with none. One hidden check a stretch, its chance pro rata for a short last
+    stretch; on a hit a hidden die picks the day inside it."""
+    from .gathering import pick_index
+
+    every = max(1, int(every or events()["stretch_days"]))
+    gone = 0
+    for span in stretches(days, every):
+        if dice.roll("1d100", label="the stretch ahead",
+                     visibility="hidden").total > chance * span / every:
+            gone += span
+            continue
+        return gone + 1 + pick_index(dice, span, "which day of it")
+    return 0
+
+
+def _pick_band(dice, bands: list, label: str) -> tuple[str, int]:
+    r = dice.roll("1d100", label=label, visibility="hidden").total
+    want = r * bands[-1][1] / 100
+    return next((k for k, hi in bands if want <= hi), bands[-1][0]), r
+
+
+def _people(dice, kind: str, level: int, apl: int | None) -> dict:
+    """The table's people for a band: a codex template, how many, and their name."""
+    row = events()["people"][kind]
+    got = npcs.choose(list(row["words"]), max(1, int(level or 1))) or {}
+    count = int(row.get("count", 1))
+    if kind == "bandits":
+        # Priced as a road's wandering fight may be, never fewer than one: the patrol's
+        # rule (`street`), since three CR 1 bandits at a lone first-level PC is the
+        # 2026-11-13 measured death again.
+        from . import bestiary
+        from . import encounter_budget as eb
+
+        party = eb.apl([level]) if apl is None else int(apl)
+        each = eb.xp_of(bestiary.lookup(str(got.get("id") or "")) or got)
+        hard = dice.roll("1d100", label="how hard the bandits are", visibility="hidden").total
+        count = eb.most_of(each, count, party, hard)
+    also = ()
+    if row.get("guards"):
+        g = row["guards"]
+        guard = npcs.choose(list(g["words"]), max(1, int(level or 1))) or {}
+        also = ((str(guard.get("id") or "guildhand"), int(g.get("count", 1)),
+                 str(g.get("name") or "")),)
+    return {"template": str(got.get("id") or "guildhand"), "count": max(1, count),
+            "name": str(row.get("name") or ""), "words": tuple(row["words"]), "also": also}
+
+
+def road_stretches(dice, hours: int, biome: str, level: int = 1, *,
+                   apl: int | None = None, danger: float = 1.0) -> Meeting | None:
+    """A road of `hours` on the road (eight a day, `journey.HOURS_PER_DAY`) in stretches:
+    None for a quiet road, else the first thing met, its `at_hours` the hours walked when
+    it was (midday of the day the die picked, never past the road's end)."""
+    from . import journey as journey_mod
+
+    per_day = journey_mod.HOURS_PER_DAY
+    days = max(1, -(-max(1, int(hours)) // per_day))
+    bands, top = _bands("road", danger)
+    day = _event_day(dice, days, events()["road"]["percent"] * top)
+    if not day:
+        return None
+    kind, r = _pick_band(dice, bands, "what is on the road")
+    at = min(int(hours), (day - 1) * per_day + per_day // 2)
+    level = max(1, int(level or 1))
+    if kind == "creature":
+        got = _the_land(dice, biome, level, apl)
+        if got is not None:
+            row = got.row
+            return Meeting(kind="creature", roll=r, creature=row,
+                           template=str(row.get("id") or ""), count=got.count,
+                           aggressive=row.get("creature_type") in AGGRESSIVE,
+                           day=day, at_hours=max(1, at))
+        kind = "travellers"         # ground the book does not stock still has a road
+    if kind in ("weather", "ruin", "bridge"):
+        return Meeting(kind=kind, roll=r, count=0, day=day, at_hours=max(1, at))
+    if kind == "toll":
+        got = npcs.choose(["toll", "guard", "warden"], level) or {}
+        return Meeting(kind="toll", roll=r, words=("toll-keeper", "warden"), count=1,
+                       template=str(got.get("id") or "guildhand"), day=day,
+                       at_hours=max(1, at))
+    if kind in ("bandits", "caravan"):
+        p = _people(dice, kind, level, apl)
+        return Meeting(kind=kind, roll=r, words=p["words"], count=p["count"],
+                       template=p["template"], also=p["also"], name=p["name"],
+                       aggressive=(kind == "bandits"), day=day, at_hours=max(1, at))
+    got = npcs.choose(["merchant", "guard", "traveler"], level) or {}
+    return Meeting(kind="travellers", roll=r, words=("merchant", "guard"), count=2,
+                   template=str(got.get("id") or "guildhand"), day=day,
+                   at_hours=max(1, at))
+
+
+def sea_stretches(dice, days: int, level: int = 1, *, apl: int | None = None,
+                  danger: float = 1.0, climates=(), river: bool = False,
+                  every: int | None = None, percent: float | None = None
+                  ) -> Meeting | None:
+    """A passage of `days` in stretches (or, with `every=1` and `percent`, a ship hunting
+    sails day by day, `Engine._cruise`): None for a quiet one, else the first thing met,
+    its `day` the day out it was met on."""
+    bands, top = _bands("sea", danger, "river" if river else "sea")
+    if not bands:
+        return None
+    chance = (events()["sea"]["percent"] if percent is None else float(percent)) * top
+    day = _event_day(dice, days, chance, every)
+    if not day:
+        return None
+    kind, r = _pick_band(dice, bands, "what is on the water")
+    met = _sea_meeting(dice, kind, r, max(1, int(level or 1)), apl, climates)
+    return Meeting(**{**met.__dict__, "day": day})
+
+
+def _sea_meeting(dice, kind: str, r: int, level: int, apl, climates) -> Meeting:
+    if kind == "creature":
+        got = _the_land(dice, "water", level, apl,
+                        keep=lambda x: open_water(x) and in_climate(x, climates))
+        if got is not None:
+            row = got.row
+            return Meeting(kind="creature", roll=r, creature=row,
+                           template=str(row.get("id") or ""), count=got.count,
+                           aggressive=comes_at_you(row))
+        kind = "merchant"           # a sea the book stocks nothing for still has ships
+    if kind == "pirates":
+        got = npcs.choose(["pirate", "sailor"], level) or {}
+        return Meeting(kind="pirates", roll=r, words=("pirate",), count=0,
+                       template=str(got.get("id") or "thug"), aggressive=True)
+    if kind in ("survivor", "stowaway"):
+        p = _people(dice, kind, level, apl)
+        return Meeting(kind=kind, roll=r, words=p["words"], count=p["count"],
+                       template=p["template"], name=p["name"])
+    return Meeting(kind=kind, roll=r, count=0)
+
+
 def _the_land(dice, biome: str, level: int, apl: int | None, keep=None):
     """What the ground holds, at the party's budget (`encounter_budget.choose`): a creature
     and how many, or None for ground that stocks nothing the party could fairly meet.
@@ -508,6 +740,8 @@ def hours_walked(meeting: "Meeting | None", hours: int) -> int:
     twelve hours of road behind them — capped at the whole journey, since the last watch
     of a march is usually a part-watch.
     """
+    if meeting is not None and meeting.at_hours:
+        return min(int(hours), int(meeting.at_hours))
     if meeting is None or not meeting.after:
         return int(hours)
     return min(int(hours), int(meeting.after) * WATCH_HOURS)
@@ -528,6 +762,8 @@ WHY = {
     "travellers": "they have stopped where you are",
     "toll": "they want paying before you pass",
     "creature": "it is in the way",
+    "bandits": "they want what you carry",
+    "caravan": "their wagons are drawn up across the road",
 }
 
 
@@ -700,4 +936,33 @@ def _describe(meeting: Meeting, where: str = "", law: str = "") -> str:
     if meeting.kind == "toll":
         return ("Somebody is charging for this crossing, and they are standing in the "
                 "middle of it. Pay them or find another way.")
+    # The journey table's own bands (content/rules/journey-events.json).
+    if meeting.kind == "bandits":
+        return ("Somebody steps out onto the road ahead with a blade out, and more come "
+                "out of cover behind: bandits, and they have seen you.")
+    if meeting.kind == "caravan":
+        return ("A merchant caravan has stopped on the road ahead, its wagons drawn up "
+                "and its guards watching the verges.")
+    if meeting.kind == "ruin":
+        return ("Off the road stands a ruin: broken walls, and a way in. Go into the "
+                "ruins, or walk on.")
+    if meeting.kind == "bridge":
+        detour = int(events().get("bridge_detour_hours", 8))
+        return (f"The bridge ahead is down, its timbers in the water. The long way round "
+                f"costs {'a day' if detour >= 8 else f'{detour} hours'} more on the road; "
+                f"or find a way across.")
     return ""
+
+
+def quiet_days(days: int, start: str, *, sea: bool = False, further: bool = False) -> str:
+    """ "Eleven quiet days out of Mirabalos" — the stretch of a journey nothing happened
+    on, in one line (the owner's own words for it, 2026-11-16). "" for none. `further`:
+    a journey taken up again after a stop, whose quiet days are not counted from the
+    start ("two quiet days more on the road")."""
+    days = int(days)
+    if days < 1:
+        return ""
+    lead = "A quiet day" if days == 1 else f"{english.number(days).capitalize()} quiet days"
+    if further:
+        return f"{lead} more {'at sea' if sea else 'on the road'}"
+    return f"{lead} {'at sea ' if sea else 'on the road '}out of {start or 'port'}"

@@ -1593,3 +1593,33 @@ are the app's (CRB Goods and Services, "Food, Drink, and Lodging").
 
 Every settlement in an export holds an inn or tavern row of its own, `tools/check_places.py`
 reports none appended for lodging.
+
+## 31. `miles` at a journey's scale, and `measured` when they are
+
+*Asked 2026-11-16 (feat/travel-pacing). Optional: without it the app holds every unmeasured
+route to a floor, three days on foot between two settlements and a fortnight at sea
+(`journey.ROAD_DAYS_AT_LEAST`, `ships.PASSAGE_DAYS_AT_LEAST`), which is how every world plays
+today.*
+
+The owner, 2026-11-16: "overland travel is too short it should be a few days minimum to other
+cities and over water it should be a few weeks minimum." Measured on the shipped worlds the
+same day: Pangrella's roads are 48 to 96 miles and its two stated crossings 192 and 216;
+Aurvantis's roads 24 to 96 and its 38 crossings 192 to 216. Those come from
+`agent_engine/distance.py`'s bands (nation 1-2 days, continent 3-4, world 8-9, at 24 miles a
+walking day), "derived from the tree and never measured". So a sea crossing is eight or nine
+days ON FOOT, and by the Core Rulebook's sailing ship (48 miles a day, Table 7-9) four.
+
+**Shape.** No new route field beyond one boolean; the band table changes.
+
+| field | what it is |
+|---|---|
+| `miles` | as ask 6, but banded at a journey's scale: two towns of one nation 72-120 miles (three to five days on foot), one continent 120-240, a sea crossing 672-1,344 (two to four weeks under sail at 48 miles a day). The width rule in `distance.py` still holds |
+| `measured` | `true` only on a route whose `miles` an author or a map measured. Omitted on every derived one |
+
+**Rule 1 still holds.** Miles, never days or hours: how long they take depends on who goes
+and how, which is the consumer's business.
+
+### Done when
+
+An export's derived crossings are 672 miles or more, its derived roads 72 or more, and a route
+an author measured carries `measured: true` and is played at its stated length.
