@@ -4163,10 +4163,18 @@ def address_the_named(raw, frame: dict | None, scene, *,
             and str(r.get("actor") or "pc").lower() in ("pc", pc.ref.lower(), "none", "")]
     if places and len(named) > 1 and len(named) == len(says):
         return _each_to_its_own(raw, frame, scene, places, says, notes)
-    # Who is spoken to after the line's own walk is looked for where it ends (#94).
-    scene = interpret.scene_by_then(frame, scene, places) if places else scene
+    # Who is spoken to after the line's own walk is looked for where it ends (#94). A say
+    # no talk owns is looked for where its own words were said (`_said_in`, #30): "I go to
+    # the barracks and challenge one of the soldiers" speaks at the barracks.
+    owner = _said_in(raw[says[0]], frame) \
+        if says and not any(a.get("act") in interpret._ADDRESSING_ACTS
+                            for a in frame.get("actions") or []) else None
+    scene = (interpret.scene_by_then(frame, scene, places, upto=owner) if places
+             and owner is not None else
+             interpret.scene_by_then(frame, scene, places) if places else scene)
     if not named and len(says) == 1:
-        return _said_to_nobody(raw, frame, scene, says[0], notes)
+        return _said_to_nobody(raw, frame, scene, says[0], notes,
+                               moved=owner is not None and _seen_from(scene))
     if len(named) != 1 or len(says) != 1:
         return raw
     want = person(scene, named[0])
@@ -4245,7 +4253,13 @@ def _each_to_its_own(raw, frame, scene, places, says: list[int], notes) -> list:
     return out
 
 
-def _said_to_nobody(raw, frame, scene, k: int, notes) -> list:
+def _seen_from(scene) -> bool:
+    from rules.engine import SeenFrom
+
+    return isinstance(scene, SeenFrom)
+
+
+def _said_to_nobody(raw, frame, scene, k: int, notes, moved: bool = False) -> list:
     """A line the reading says nobody would answer goes to nobody the plan picked.
 
     Measured live 2026-11-15 (the table-checks lane; first seen 2026-11-07): 'I mutter
@@ -4268,8 +4282,10 @@ def _said_to_nobody(raw, frame, scene, k: int, notes) -> list:
     # at the guildhall, and the clerk, the one person there, was told "ignoring the
     # inquiry". Asked aloud in a room of one, it is asked of that one (`Engine._op_say`'s
     # own rule, which an absent `to` had switched off). `scene` is where the walk ends.
-    gone = bool(talks) and bool(was) and was not in (getattr(scene, "actors", {}) or {})
-    if not talks or (not gone and any(str(a.get("cost") or "") != "free" for a in talks)):
+    # `moved`: a say no talk owns, said after the line's walk (#30) — the same test.
+    gone = (bool(talks) or moved) and bool(was)         and was not in (getattr(scene, "actors", {}) or {})
+    if not gone and (not talks
+                     or any(str(a.get("cost") or "") != "free" for a in talks)):
         return raw
     keep = addressed(scene)
     if not was or was == keep:
@@ -4433,7 +4449,33 @@ def timed_waits(raw, frame: dict | None, scene, *, notes: list | None = None) ->
 _PLACED_BY_ACT = {"consume": ("eat", "drink", "taste", "use_item"), "athletics": ("check",)}
 
 
-def order(raw, rows: list[Row]) -> list:
+def _said_in(say: dict, frame: dict | None) -> int | None:
+    """The index of the reading's action whose words a `say` no action owns came from:
+    the one whose span shares the most content words with it, or None. Playtest
+    2026-11-17b #30: "I go to the barracks and challenge one of the soldiers to a friendly
+    sparring bout" was read `go` + `attack` (no `talk`, so no row owned the plan's say),
+    the say kept its place ahead of the walk, and the challenge went to the alchemist she
+    was leaving. Word overlap with the player's own spans, as `own_words_only` measures a
+    say's words; no meaning read."""
+    from .judgement import _content_words
+
+    if not isinstance(frame, dict) or frame.get("error"):
+        return None
+    words = _content_words(str((say.get("params") or {}).get("words") or ""))
+    best, at = 0, None
+    for k, a in enumerate(frame.get("actions") or []):
+        n = len(words & _content_words(str((a or {}).get("span") or "")))
+        if n > best:
+            best, at = n, k
+    return at
+
+
+# The acts whose deed is the speaking: within one, the words come before what the table
+# built from them (the job taken, the hire made).
+_SPOKEN_ACTS = frozenset({"talk", "request", "insult", "threaten"})
+
+
+def order(raw, rows: list[Row], frame: dict | None = None) -> list:
     """The plan's ops in the order the words do them.
 
     Each op owed by exactly one action of the reading (a built op by its row, a named op
@@ -4441,10 +4483,12 @@ def order(raw, rows: list[Row]) -> list:
     its place. Inform's DM4 §34 and adv3Lite parse and run one action at a time, because
     what the second means depends on where the first left the player: "I pick up the
     crate, then go to the market" carries the crate there, and the other way round leaves
-    it behind."""
+    it behind. A player's say no action owns goes where its words were said (`_said_in`,
+    given the reading's `frame`)."""
     if not isinstance(raw, list) or not rows:
         return raw
     by_built = {id(i): r.index for r in rows for i in r.intents}
+    acts = {r.index: r.act for r in rows}
     owners: dict[str, list[int]] = {}
     for r in rows:
         for op in (*r.ops, *(op for op in _PLACED_BY_ACT.get(r.act, ())
@@ -4455,11 +4499,19 @@ def order(raw, rows: list[Row]) -> list:
         idx = by_built.get(id(r))
         if idx is None and len(owners.get(_op(r), ())) == 1:
             idx = owners[_op(r)][0]
+        if idx is None and _op(r) == "say" and not owners.get("say") \
+                and str(r.get("actor") or "pc").lower() in ("pc", "none", ""):
+            idx = _said_in(r, frame)
         if idx is not None:
             slots.append(k)
             # Within one action, what the table built goes first: the crate a walk carries
-            # is picked up before the walk (`_carry`), not at the far end of it.
-            keyed.append((idx, 0 if id(r) in by_built else 1, k, r))
+            # is picked up before the walk (`_carry`), not at the far end of it. Except
+            # where the act IS the speaking: the words first, then the job they take.
+            # Playtest 2026-11-17b #15: "Fine. I'll take the guard work." was told after
+            # the whole week it agreed to, and after the pay for it.
+            first = (_op(r) == "say") if acts.get(idx) in _SPOKEN_ACTS \
+                else id(r) in by_built
+            keyed.append((idx, 0 if first else 1, k, r))
     if len(keyed) < 2:
         return raw
     keyed.sort(key=lambda t: t[:3])

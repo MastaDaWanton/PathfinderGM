@@ -401,7 +401,7 @@ class TestTheWalkGoesOn:
         assert out.effects[0]["met"] == "squabble"
         assert "You get no further" in out.tell
         assert "got no further than the great square" in out.tell
-        assert "At the north crossing, a hand comes out" in out.tell
+        assert "At the north crossing, a beggar holds out a hand" in out.tell
 
     def test_a_stop_at_the_destination_is_not_told_as_falling_short(self, monkeypatch):
         """24 of 71 stops in the item-9 replay fell on the last hop and said "You get no

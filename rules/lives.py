@@ -246,12 +246,16 @@ def work_class_of(work_id: str) -> str:
     return next((o["class"] for o in tables()["occupations"] if o["id"] == work_id), "")
 
 
-def roll(seed: str, *, phrase: str = "", body: str = "", used_frames=()) -> Life:
+def roll(seed: str, *, phrase: str = "", body: str = "", used_frames=(),
+         seen: dict | None = None) -> Life:
     """A whole life for the person whose id is `seed`.
 
     `phrase` is how the prose described them, read only for the work it names; `body` is
     their people's own line (what `faces` reads to decide whether there is hair to speak
-    of); `used_frames` are the quirk frames already carried by people in this settlement.
+    of); `used_frames` are the quirk frames already carried by people in this settlement;
+    `seen` is `faces.worn` of the faces the scene already holds, so a head, mark or hands
+    line is not drawn twice while another is unworn (`faces.least_worn`, playtest
+    2026-11-17b #19).
     """
     t = tables()
     rng = _rng("life", seed)
@@ -283,12 +287,13 @@ def roll(seed: str, *, phrase: str = "", body: str = "", used_frames=()) -> Life
         tags |= _YEARS_TAGS.get(years_i, set())
     bits = [years_line]
     if not faces_mod._no_hair(body or ""):
-        head = rng.choice([h for h in faces_mod.HEAD if not minor or h in _CHILD_HEADS])
+        head = rng.choice(faces_mod.least_worn(
+            [h for h in faces_mod.HEAD if not minor or h in _CHILD_HEADS], seen))
         if head not in _NO_VISIBLE_HAIR:
             tags.add("hair")
         bits.append(head)
     marks = [m for m in faces_mod.MARK if not minor or m in _CHILD_MARKS]
-    mark = rng.choice(marks)
+    mark = rng.choice(faces_mod.least_worn(marks, seen))
     tags |= _MARK_TAGS.get(mark, set())
     bits.append(mark)
 
@@ -305,7 +310,7 @@ def roll(seed: str, *, phrase: str = "", body: str = "", used_frames=()) -> Life
     hands = [h for h in faces_mod.HANDS
              if (not _HANDS_FIT.get(h) or _HANDS_FIT[h] & tags)
              and (not minor or h in _CHILD_HANDS)]
-    bits.append(rng.choice(hands))
+    bits.append(rng.choice(faces_mod.least_worn(hands, seen)))
     face = "; ".join(bits)
     face = face[0].upper() + face[1:] + "."
 

@@ -1032,7 +1032,7 @@ def _stand_up(engine, doc: dict, label: str, words, *, zone: str, row: dict | No
         actor.true_name = name
         own = names_mod.resident_appearance(world, eid)
         actor.appearance = own or names_mod.face_of(world, scene.location_id, actor,
-                                                    ref=actor.ref or eid)
+                                                    ref=actor.ref or eid, scene=scene)
         scene.arrive(actor, zone=zone, source=f"start:{doc['id']}")
         speak_for(scene, eid)
         rec = population.note(scene, label, body=actor.appearance)

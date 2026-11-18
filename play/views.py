@@ -4851,9 +4851,7 @@ def _advance(c, agent, narration, plan, player_input):
     # answer is the strongest template it sees, so the parts that must be written fresh
     # each turn are withheld from it. The full intents still reach the turn log.
     c.history.append({"role": "assistant", "content": json.dumps(
-        {"narration": narration,
-         "intents": [{"op": i.op, "actor": i.actor, "target": i.target}
-                     for i in plan.intents]}
+        {"narration": narration, "intents": [_remembered(i) for i in plan.intents]}
     )})
     _remember(c, resolution, player_input)
     _log_turn(c, plan, resolution)
@@ -4864,6 +4862,19 @@ def _advance(c, agent, narration, plan, player_input):
 
     return _finish(c, agent, resolution, narration, player_input, plan)
 
+
+
+def _remembered(i) -> dict:
+    """One intent as the history keeps it: op, actor, target — and a `say`'s words, which
+    are the player's own line (the user message just above it), so there is nothing of the
+    model's to parrot. Playtest 2026-11-17b #22: every remembered say was `{"op": "say",
+    "actor": "pc", "target": "c45"}`, a say with nothing in it, and the plans copied the
+    shape: 10 refusals of "say: missing required param(s) words" on 4 of round 5's turns,
+    seven on one."""
+    out = {"op": i.op, "actor": i.actor, "target": i.target}
+    if i.op == "say" and (i.params or {}).get("words"):
+        out["params"] = {"words": i.params["words"]}
+    return out
 
 
 def _arm_cards(agent, c) -> None:

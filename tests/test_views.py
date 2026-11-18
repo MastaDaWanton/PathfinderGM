@@ -128,13 +128,15 @@ def test_history_withholds_the_because_from_the_next_turn():
     "going over the wall while the lamp is away" on a social question, "you've got an
     opponent down" on three attacks across two scenes. A model's own last answer is the
     strongest template it sees, so what must be written fresh is withheld from history.
-    The full intents still reach the turn log."""
-    import re
-    from pathlib import Path
+    The full intents still reach the turn log. (A say keeps its words since playtest
+    2026-11-17b #22: they are the player's own line, nothing of the model's.)"""
+    from play.views import _remembered
+    from rules.intents import Intent
 
-    src = Path("play/views.py").read_text(encoding="utf-8")
-    m = re.search(r'c\.history\.append\(\{"role": "assistant", "content": json\.dumps\(\n'
-                  r"(.*?)\)\}\)", src, re.S)
-    assert m, "the assistant history append has moved; update this test"
-    assert "because" not in m.group(1)
-    assert '"op": i.op' in m.group(1)
+    kept = _remembered(Intent(op="check", actor="pc", target="c2",
+                              because="going over the wall while the lamp is away",
+                              params={"skill": "stealth"}))
+    assert kept == {"op": "check", "actor": "pc", "target": "c2"}
+    said = _remembered(Intent(op="say", actor="pc", target="c2", because="the player asks",
+                              params={"words": "Where is the well?", "to": "c2"}))
+    assert "because" not in said and said["params"] == {"words": "Where is the well?"}

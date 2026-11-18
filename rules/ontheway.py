@@ -596,8 +596,12 @@ def passing(meeting: Meeting, where: str = "", law: str = "") -> str:
         lead = "somebody decides you are buying and walks beside you a while"
         tail = "they give up, and you walk on"
     elif meeting.kind == "beggar":
-        lead = "a hand comes out, and the mouth above it knows your face is new"
-        tail = "you are past it before the asking is done"
+        # Said plainly: playtest 2026-11-17b #28, "a hand comes out, and the mouth above
+        # it knows your face is new; you are past it before the asking is done" named no
+        # beggar and no alms, and the page made it "a hand reaches out to greet you, but
+        # you pass the question before it can be finished". A tell is a fact to dress.
+        lead = "a beggar holds out a hand for a coin, seeing a stranger's face"
+        tail = "you walk on past before the begging is done"
     elif meeting.kind == "patrol":
         lead = f"the watch comes by,{_of_them(meeting.count)} looking at faces"
         tail = (f"{_looker(meeting.count).lower()} looks at yours twice, and lets you go on"

@@ -735,7 +735,10 @@ class GMAgent:
                                     # a line the map's axes.
                                     aims=self._cast_aims(player_input)
                                     if "cast" in declared else (),
-                                    skill=check_skill if "check" in declared else ""))
+                                    skill=check_skill if "check" in declared else "",
+                                    # Who may `say` here: the player, and a companion
+                                    # out of a fight (`judgement.no_npc_lines`).
+                                    speakers=self._speakers()))
             except client.ModelUnavailable as exc:
                 down.add(model)
                 # A wedged Ollama is wedged for every model it serves: the backup on the
@@ -827,6 +830,11 @@ class GMAgent:
                     raw, self.engine.scene, notes=own_words,
                     addressed_refs=companions_mod.addressed(self.engine.scene,
                                                             player_input))
+                # And nobody else's line: an NPC's answer is the reply slot's, after the
+                # dice (playtest 2026-11-17b #14, #18, #22, #25). Before `inject_say`,
+                # which stands aside for any say already in the list.
+                raw = judgement.no_npc_lines(raw, player_input, self.engine.scene,
+                                             notes=own_words)
                 raw = judgement.repair_bare_spawns(raw, player_input,
                                                    judgement._pc_level(self.engine.scene))
                 raw = judgement.normalize_attacks(raw, self.engine.scene) or raw
@@ -1157,7 +1165,7 @@ class GMAgent:
                 # injector has appended its own, and before a chip's op is put where the
                 # words put it (which then has the last word on order).
                 if not getattr(self, "attachments", ()):
-                    raw = acts_to_ops.order(raw, self.rows)
+                    raw = acts_to_ops.order(raw, self.rows, read_ok)
                 # And one walk to one place is walked once (`acts_to_ops.once_each_walk`).
                 raw = acts_to_ops.once_each_walk(raw, notes=own_words)
                 # And the attached spell or place put where the words do it, after
@@ -4983,6 +4991,19 @@ class GMAgent:
             return tuple(areas.legal_aims(scene, pc.ref, spell))
         except Exception:  # noqa: BLE001 — a schema hint must never take the turn down
             return ()
+
+    def _speakers(self) -> tuple[str, ...]:
+        """The refs a `say` in the player's plan may have as its actor: the player, and
+        out of a fight a companion (`judgement.no_npc_lines` holds the same line)."""
+        from . import companions as companions_mod
+
+        scene = self.engine.scene
+        pc = scene.pc()
+        if pc is None:
+            return ()
+        along = () if scene.in_encounter else tuple(
+            r for r, a in scene.actors.items() if companions_mod.is_companion(a))
+        return (pc.ref, *along)
 
     @staticmethod
     def _merge_declared(raw, declared, actor: str = "") -> list:

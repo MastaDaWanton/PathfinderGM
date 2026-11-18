@@ -3784,6 +3784,9 @@ def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...],
         props[name] = {"type": "boolean" if name in FLAG_PARAMS
                        else _NUMERIC_PARAMS.get(name, "string")}
     need = list(required)
+    if op == "say":
+        # The player's line: nobody else is its speaker (playtest 2026-11-17b #18).
+        props.pop("actor", None)
     if op == "travel" and places:
         props["place"] = {"type": "string", "enum": list(places)}
         need = ["place"]
@@ -3848,8 +3851,13 @@ def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...],
 def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
                 min_chars: int = 0, must_contain: tuple[str, ...] = (),
                 ops: tuple[str, ...] = (), places: tuple[str, ...] = (),
-                aims: tuple[str, ...] = (), skill: str = "") -> dict:
+                aims: tuple[str, ...] = (), skill: str = "",
+                speakers: tuple[str, ...] = ()) -> dict:
     """The JSON schema this turn's reply must satisfy.
+
+    `speakers` is who may `say` in this plan: given for the player's own turn (the player
+    and any companion), it gives `say` its own shape with words required; empty (a
+    companion's or a cheat's plan) leaves `say` like every other op.
 
     `skill` is the check skill the player's words declared, if any: a declared check is
     held to it (`_declared_op`).
@@ -3895,6 +3903,35 @@ def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
         },
         "required": ["op"],
     }
+    say_ok = "say" in intent["properties"]["op"]["enum"]
+    if speakers and say_ok:
+        # A `say` in the player's plan is spoken by the player (or a companion) and carries
+        # words; an NPC's answer is the reply slot's, after the dice. Playtest 2026-11-17b
+        # #14/#18/#22/#25: with one intent shape for every op, the actor enum offered every
+        # ref to `say`, and the model wrote the clerk's line before the Diplomacy roll, gave
+        # the player's question to the man asked it, and seven times wrote a say with no
+        # words at all. One branch for `say`, one for the rest: Ollama keeps an `anyOf` of
+        # objects and their required properties (the reader's per-act schema, 6 of 6).
+        rest = dict(intent, properties=dict(
+            intent["properties"],
+            op={"type": "string",
+                "enum": [o for o in intent["properties"]["op"]["enum"] if o != "say"]}))
+        said = {
+            "type": "object",
+            "properties": {
+                "op": {"type": "string", "enum": ["say"]},
+                "actor": {"type": "string", "enum": list(speakers)},
+                "target": intent["properties"]["target"],
+                "because": {"type": "string"},
+                "params": {"type": "object", "properties": {
+                    "words": {"type": "string", "minLength": 1},
+                    "to": intent["properties"]["target"],
+                    "quoted": {"type": "boolean"}},
+                    "required": ["words"]},
+            },
+            "required": ["op", "actor", "params"],
+        }
+        intent = {"anyOf": [said, rest]}
     intents = {"type": "array", "items": intent}
     if fighting:
         # The whole point. In a fight the list may not be empty, so "narrated the punch

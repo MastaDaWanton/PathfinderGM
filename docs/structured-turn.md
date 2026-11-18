@@ -451,6 +451,43 @@ characters-a-token any world has measured (3.2), and said at runtime by the read
 when a world tokenises worse ("the reader's prompt is N characters, over its budget").
 The interpreter bench (302 labelled lines) before and after is in the lane report.
 
+### Who speaks, and in what order (playtest 2026-11-17b, fix/speech-and-order)
+
+**The planner wrote the NPCs' lines.** Four times in round 5 (T454, T463, T467, T471), on
+0.4.2: a `say` with the NPC as its actor in the player's own plan. The clerk's answer came
+before the Diplomacy roll it depended on and invented "the private listings of the merchant
+houses"; the player's own "Are you for hire?" was given to the man she asked; and one turn
+spent seven attempts on "say: missing required param(s) words" before the fallback model
+took it. Measured on the save's turn log for round 5: 14 turns, 25 plan attempts, 3 NPC
+says resolved, 10 say-without-words refusals on 4 turns, one turn handed to the fallback.
+
+Why the model wrote them, from the code:
+- **The schema let it.** One intent shape for every op: `actor` an enum of every ref, and
+  `params` a free object, so a say could be anybody's and carry nothing. The declared say's
+  body even offered `params.actor`.
+- **The history taught it.** Each turn's plan goes into the history stripped to op, actor
+  and target (`views._remembered`; the `because` copying measured in 2026-08). Every
+  remembered say was `{"op": "say", "actor": "pc", "target": "c45"}`: a say with no words,
+  copied as the shape. Once one NPC say was in the history, the next turns copied that too
+  (T458 the clerk, T467 the man, T476 the master).
+
+What holds them now:
+- `prompts.turn_schema(speakers=…)`: on the player's plan, `say` is its own `anyOf` branch,
+  the actor an enum of the player and any companion out of a fight, `words` required with a
+  minimum length. A companion's or a cheat's plan keeps the one shape.
+- `judgement.no_npc_lines`, before `inject_say`: a non-player say whose words are the
+  player's is the player's say to that person (#18); a companion's own line is kept; any
+  other is dropped, its answer left to the reply slot (`planned.known_to`), written after
+  the dice. Inform answers an order only after the persuasion and the action are decided
+  (Writing with Inform §12.4 persuasion, §12.13 reporting what others do).
+- The history keeps a say's words, which are the player's own line.
+
+**Order.** `acts_to_ops.order` now puts a talk's words before what the table built on them
+(#15: the week of guard work and its pay were told before "Fine. I'll take the guard work"),
+and a say no action owns where its words were said (#30: "go to the barracks and challenge
+one of the soldiers" was read `go` + `attack`, so no row owned the say, and the challenge
+went to the alchemist before the walk). `address_the_named` asks who hears it from there.
+
 ## Backward: the narration (lane N)
 
 The prose call's JSON is NOT given new fields. It was cut back to one field because

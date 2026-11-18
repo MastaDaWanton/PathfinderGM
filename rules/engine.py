@@ -8041,7 +8041,8 @@ class Engine:
         # tell that quotes it hands the narrator the player's own framing to put in
         # somebody's mouth.
         said = (f'{who} says{at}: "{words}"' if intent.params.get("quoted")
-                else reported_speech(who, at, words, heard.name if heard else ""))
+                else reported_speech(who, at, words, heard.name if heard else "",
+                                     getattr(speaker, "pronouns", "")))
         effects = [{"kind": "said", "who": intent.actor or "",
                     "to": heard.ref if heard is not None else "",
                     "words": words}]
@@ -33264,7 +33265,7 @@ class Engine:
                         self.world, self.scene.location_id, actor.ref, taken)
                     if not actor.appearance:
                         actor.appearance = names_mod.face_of(
-                            self.world, self.scene.location_id, actor)
+                            self.world, self.scene.location_id, actor, scene=self.scene)
             made.append({"ref": actor.ref, "name": actor.name})
             # Someone who arrives mid-fight rolls in. Without this they were on the
             # board but not in the order, so they never took a turn and the fight could
@@ -34384,11 +34385,51 @@ _TELLS_FRAME = frozenset({"tell", "inform", "assure", "remind", "warn"})
 _ASKS_FRAME = frozenset({"ask"})
 # The speech acts that are the deed itself: "thank the priest" is told "thanks the priest",
 # never "to the effect that thank the priest" (playtest 2026-11-17 #4).
+# "challenge": the #30 replay, 2026-11-18, told "speaks, to the effect that challenge one of
+# the soldiers to a friendly sparring bout".
 _SPEECH_DEEDS = frozenset({"thank", "greet", "welcome", "congratulate", "apologise",
-                           "apologize", "salute", "bless"})
+                           "apologize", "salute", "bless", "challenge"})
 
 
-def reported_speech(who: str, at: str, words: str, heard: str = "") -> str:
+# The speaker's own first person, said of them in a third-person tell, by pronoun set.
+# Subject, object, possessive, possessive pronoun, reflexive, and the verb a contraction or
+# "I am/was/have/do" becomes. Playtest 2026-11-17b #16: "Vesna Kroll asks the clerk where I
+# could hire a sellsword". A set not listed here (a house rule's ze/hir) is left as said.
+_THIRD = {
+    "she": ("she", "her", "her", "hers", "herself", "she's", "is", "was", "has", "does"),
+    "he": ("he", "him", "his", "his", "himself", "he's", "is", "was", "has", "does"),
+    "they": ("they", "them", "their", "theirs", "themselves", "they're", "are", "were",
+             "have", "do"),
+}
+
+
+def _third_person(toks: list[str], pronouns: str) -> list[str]:
+    """`toks` with the speaker's "I", "me", "my" … said as their pronouns. Closed words
+    only: a pronoun and the four verbs that agree with it."""
+    forms = _THIRD.get(str(pronouns or "").split("/")[0].strip().lower())
+    if not forms:
+        return toks
+    subj, obj, poss, mine, refl, contracted, is_, was, has, does = forms
+    swap = {"i": subj, "me": obj, "my": poss, "mine": mine, "myself": refl,
+            "i'm": contracted, "i'll": f"{subj}'ll", "i'd": f"{subj}'d",
+            "i've": f"{subj} {has}"}
+    agree = {"am": is_, "was": was, "have": has, "do": does}
+    out: list[str] = []
+    for k, t in enumerate(toks):
+        core = t.rstrip(",.;:!?")
+        tail = t[len(core):]
+        low = core.lower().replace("’", "'")
+        if low in agree and out and out[-1] == subj and toks[k - 1].lower().strip(",") == "i":
+            out.append(agree[low] + tail)
+        elif low in swap:
+            out.append(swap[low] + tail)
+        else:
+            out.append(t)
+    return out
+
+
+def reported_speech(who: str, at: str, words: str, heard: str = "",
+                    pronouns: str = "") -> str:
     """The tell of a reported `say`. Playtest 2026-11-15 #58: the words came from their own
     verb ("tell the sergeant of the watch that I am the one…") and the tell read "speaks to
     the sergeant of the watch, to the effect that tell the sergeant of the watch that I am
@@ -34396,16 +34437,21 @@ def reported_speech(who: str, at: str, words: str, heard: str = "") -> str:
     its first words: "the sergeant" of "the sergeant of the watch"), then "that", is the
     frame, and it goes; "ask" becomes the tell's own verb ("asks the harbourmaster what
     passage costs"). Anything else is told as before. Words, not meaning: the reader has
-    already decided this is speech and whom it is to."""
+    already decided this is speech and whom it is to.
+
+    Where the tell's own verb carries the words ("asks", a deed), they are the speaker's
+    reported in the third person, so their "I" is said by `pronouns` (`_third_person`,
+    #16). "to the effect that …" keeps the words as said: "I yield" is no clause a
+    pronoun swap could make agree ("she yield")."""
     plain = f"{who} speaks{at}, to the effect that {words}"
     toks = str(words or "").split()
     verb = toks[0].lower() if toks else ""
     if verb in _SPEECH_DEEDS and len(toks) > 1:
-        return f"{who} {verb}s " + " ".join(toks[1:])
+        return f"{who} {verb}s " + " ".join(_third_person(toks[1:], pronouns))
     if len(toks) < 3:
         return plain
     if verb in _ASKS_FRAME:
-        return f"{who} asks " + " ".join(toks[1:])
+        return f"{who} asks " + " ".join(_third_person(toks[1:], pronouns))
     if verb not in _TELLS_FRAME:
         return plain
     rest = toks[1:]

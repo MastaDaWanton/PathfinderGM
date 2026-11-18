@@ -6859,6 +6859,70 @@ def _quoted_if_quoted(entry: dict, player_text: str) -> dict:
     return entry
 
 
+def no_npc_lines(raw_intents, player_text: str, scene, *, notes: list | None = None) -> list:
+    """The player's plan speaks for the player, never for the people they talk to.
+
+    Playtest 2026-11-17b #14, #18, #22, #25, four times in one session (0.4.2):
+      * T454, a `say` by the guild clerk written before the player's Diplomacy roll ("The
+        guild doesn't haggle … the private listings of the merchant houses"): the haggle
+        settled before the dice, and a world fact invented;
+      * T463, the player's own "Are you for hire?" given to the man in the corner as his
+        line (`say actor=c42`), told as "The man in corner speaks, to the effect that…";
+      * T467, seven attempts refused "say: missing required param(s) words" (a say by the
+        man with nothing in it) and the turn handed to the fallback model;
+      * T471, the master of the games' previous answer written again as his say.
+    An NPC's answer is the reply slot's (`planned.known_to` grounds it), written after the
+    dice, as Inform's persuasion and report rules answer only once the action is decided
+    (Writing with Inform §12.4, §12.13). So a non-player say here is:
+      * the player's own, when its words are the player's (#18): said BY the player TO the
+        one the plan made the speaker;
+      * kept, for a companion out of a fight (`companions.on_their_own_turn` has already
+        taken them out of one), the plan acting for them as the brief's companion line asks;
+      * otherwise dropped, its words never reaching a tell.
+    Runs before `inject_say`, which stands aside for any say already in the list: #14's
+    clerk line was why the player's own demand never became a say. Structure only: the
+    actor is a ref, and "the player's words" is `own_words_only`'s own overlap measure."""
+    if not isinstance(raw_intents, list):
+        return raw_intents
+    from . import companions as companions_mod
+
+    actors = getattr(scene, "actors", {}) or {}
+    mine = _content_words(player_text)
+    out: list = []
+    for r in raw_intents:
+        actor = str((r or {}).get("actor") or "pc").lower() if isinstance(r, dict) else "pc"
+        if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "say") \
+                or actor in ("pc", "none", "") \
+                or getattr(actors.get(actor), "is_pc", False):
+            out.append(r)
+            continue
+        params = dict(r.get("params") or {})
+        words = str(params.get("words") or "").strip()
+        theirs = _content_words(words)
+        speaker = actors.get(r.get("actor"))
+        if words and theirs and len(theirs & mine) / len(theirs) >= OWN_WORDS:
+            # The schema's ref enum (and `introduce`'s new1…) is all an actor can be, so
+            # the one the plan made speak is a real addressee or a placeholder the
+            # settle step binds.
+            params["to"] = r["actor"]
+            fixed = {k: v for k, v in r.items() if k != "actor"}
+            fixed.update(actor="pc", params=params, target=r["actor"])
+            out.append(fixed)
+            if notes is not None:
+                notes.append(f"the player's words in {r['actor']}'s mouth: said by the "
+                             f"player to {r['actor']} instead")
+            continue
+        if words and companions_mod.is_companion(speaker):
+            out.append(r)
+            continue
+        if notes is not None:
+            notes.append(f"a line for {r.get('actor')} in the plan: dropped "
+                         f"{words[:80]!r}; their answer is the narration's")
+    if not out and raw_intents:
+        out = [{"op": "narrate_only", "because": "the plan only spoke for somebody else"}]
+    return out
+
+
 def own_words_only(raw_intents, player_text: str, reading=None, *,
                    notes: list | None = None) -> list:
     """A `say` the player's character makes carries the player's words, or none.
@@ -9720,18 +9784,21 @@ def name_the_nameless(scene, world) -> list[str]:
             a.true_name = a.name
             if not a.appearance:
                 a.appearance = (names_mod.resident_appearance(world, a.world_entity_id)
-                                or names_mod.face_of(world, scene.location_id, a, ref=ref))
+                                or names_mod.face_of(world, scene.location_id, a, ref=ref,
+                                                     scene=scene))
             continue
         if not descriptor:
             a.true_name = a.name
             if not a.appearance:
-                a.appearance = names_mod.face_of(world, scene.location_id, a, ref=ref)
+                a.appearance = names_mod.face_of(world, scene.location_id, a, ref=ref,
+                                                   scene=scene)
             continue
         taken = [x.true_name for x in scene.actors.values() if getattr(x, "true_name", "")]
         taken += [x.name for x in scene.actors.values()]
         a.true_name = names_mod.true_name(world, scene.location_id, ref, taken)
         if not a.appearance:
-            a.appearance = names_mod.face_of(world, scene.location_id, a, ref=ref)
+            a.appearance = names_mod.face_of(world, scene.location_id, a, ref=ref,
+                                             scene=scene)
         done.append(ref)
     return done
 

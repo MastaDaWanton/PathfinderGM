@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 import re
 
-from . import lives
+from . import faces as faces_mod, lives
 
 
 def _norm(phrase: str) -> str:
@@ -384,14 +384,16 @@ def note(scene, phrase: str, *, turn: int = 0, body: str = "", fresh: bool = Fal
         slot = residency.slot_of(clock)
         for salt in range(12):
             cand = lives.roll(f"{home}|{pid}" + (f"|{salt}" if salt else ""),
-                              phrase=rolled, body=body, used_frames=used)
+                              phrase=rolled, body=body, used_frames=used,
+                              seen=faces_mod.seen_in(scene))
             probe = {"id": pid, "life": cand.as_dict(), "first_seen": clock}
             if cand.mobility != "resident" or \
                     residency.schedule_for(probe)[slot] == residency.WORK:
                 life = cand
                 break
     if life is None:
-        life = lives.roll(f"{home}|{pid}", phrase=rolled, body=body, used_frames=used)
+        life = lives.roll(f"{home}|{pid}", phrase=rolled, body=body, used_frames=used,
+                          seen=faces_mod.seen_in(scene))
     where = spot if heard else getattr(scene, "at", None)
     rec = {
         "id": pid, "phrase": " ".join(str(phrase).split()), "home": home,

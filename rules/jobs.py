@@ -366,7 +366,7 @@ def _mint(engine, label: str, words, place_id: str):
         taken += [a.name for a in scene.people.values()]
         actor.true_name = names_mod.true_name(world, scene.location_id, actor.ref,
                                               [t for t in taken if t])
-        actor.appearance = names_mod.face_of(world, scene.location_id, actor)
+        actor.appearance = names_mod.face_of(world, scene.location_id, actor, scene=scene)
         person_words.settle_people(scene, world, actor, words=label, template=template,
                                    place=place_id, take_grant=False, keep_name=True)
     return actor
