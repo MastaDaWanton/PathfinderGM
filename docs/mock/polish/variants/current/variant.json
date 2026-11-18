@@ -1,0 +1,12 @@
+{
+  "name": "current",
+  "title": "Current (0.2.29)",
+  "skills": [],
+  "summary": "The board exactly as the game draws it in release 0.2.29: renderMap and its helpers from 03-offers-and-map.js, mapPaint from 16-tab-map.js, the board's own controls from 04-combat-and-turns.js, scene3d.js unchanged, the board's CSS and markup from table.html, all copied verbatim, over the real theme-v2.css, textures and fonts.",
+  "changes": [],
+  "files": {
+    "markup": "board.html",
+    "styles": ["board.css"],
+    "scripts": ["scene3d.js", "map.js"]
+  }
+}

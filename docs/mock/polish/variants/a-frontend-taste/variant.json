@@ -1,0 +1,39 @@
+{
+  "name": "a-frontend-taste",
+  "title": "Proposed: clear tokens, previews in the foot",
+  "skills": ["anthropic-skills:frontend-design", "taste-skill:design-taste-frontend"],
+  "summary": "An audit-first evolution of the 0.2.29 board that keeps its colours, textures, Cinzel heads and leather frame. Its one bold move is a fixed one-line read-out under the board: point at a foe or a square, or tab to a token, and it gives your own itemised attack bonus or the move's distance and who it provokes. It never shows the target's AC. On the board, tokens become discs so creatures no longer read as floor tiles. A static candle ring marks whose turn it is. Your move gets one gold edge, squares that would provoke are hatched in --alarm and the few that don't get a gold edge, and threatened squares get a red edge. Squares out of sight are veiled, and a hunch is a dashed 30 ft ring round the PC, never a square. The room lamp takes its colour and strength from the hour, using the theme's own --candle, --ink, --ember and --player. Every mark is drawn from the same pvRead sets in both flat and 3D.",
+  "changes": [
+    {"change": "Tokens drawn as discs instead of squares, in both views (3D figures carry the same disc and letter above the head).",
+     "reason": "Terrain is squares and people are now circles, so a creature can't be mistaken for a raised tile or a crate. In 3D the old boxes said only which side someone was on: three goblins were three red boxes, and at turn 0 the PC stood behind two of them and couldn't be found. The disc and initial match the flat board, so switching views doesn't make you re-find anyone."},
+    {"change": "A static candle-coloured ring round whoever's turn it is; the turn is also named in the read-out.",
+     "reason": "Nothing on the current board says whose turn it is. --candle is the brightest colour in the palette, so the eye lands there first. A pulse was weighed and refused because a token takes focus and the pointer, and the brief forbids looping motion on controls."},
+    {"change": "Grid lines as a faint gold hairline, a stronger reach wash, and one gold outline round the whole reachable region.",
+     "reason": "Near-black lines on near-black stone and a 12% wash made 'how far can I go' a guess. The outline turns it into a shape you read at a glance, and the hairline lets you count squares across the room."},
+    {"change": "Raised ground gets a lit lip on its north and west edges and a short cast shadow on lower ground to the south and east, from the same high north-west lamp the 3D view uses.",
+     "reason": "Before, the wall-walk was only a lighter shade, which reads as a different floor rather than a higher one. The lip and the shadow make it read as raised without any new colour."},
+    {"change": "Rails drawn as one continuous line along their run, as in 3D.",
+     "reason": "A north-south rail drawn as a horizontal tick in each square looked like ladder rungs, not a balustrade, and it disagreed with the 3D view."},
+    {"change": "Squares that would provoke are hatched faintly in --alarm; the squares that don't (here, the six 5-ft steps) get a gold inner edge; threatened squares get a thin --alarm edge.",
+     "reason": "Leaving a goblin's side provokes on 80 of the 86 lit squares, and a strong hatch buried the board, the clutter Into the Breach's outside testers couldn't read. So the hatch is quiet and the six squares you can safely step to stand out. That's the decision a player is actually making."},
+    {"change": "A fixed-height read-out line under the board. On a foe it shows your own bonus per weapon, with identical weapons merged ('Rapier or dagger +5') and situational terms like flanking in --candle, plus cover and 'out of reach'. On a square it shows the distance and who the move provokes. Tokens are keyboard-focusable.",
+     "reason": "The preview sits in one place the eye learns, rather than in a tooltip that covers the board. Its height is fixed, so pointing never shifts the layout. It shows only the player's own numbers, never the target's AC or a roll needed. Focus works the same as hover, so the preview isn't mouse-only."},
+    {"change": "The spell template gets one outline round its cells, and the creatures it catches get a dashed --ember-orange ring; the read-out names them.",
+     "reason": "Twelve separately stroked squares read as twelve things; one outline reads as one cone. The ring answers 'who does this hit?' on the token itself, where the eye already is."},
+    {"change": "Squares out of the PC's line of sight get a dark veil (--sunk), in flat and as darker faces in 3D.",
+     "reason": "It follows Foundry's fog: dark enough to say 'not seen', light enough that the stone underneath still reads. The veil comes straight from Grid.line_of_sight, so it can't disagree with the rules."},
+    {"change": "A hunch is shown as a dashed --alarm ring of its notice range (30 ft) round the PC, with a key line 'Someone unseen within 30 ft'.",
+     "reason": "The engine gives a count and a distance, and the ring shows exactly that much. It never places a square, so the hidden goblin stays hidden."},
+    {"change": "The room lamp follows the hour: --ink at noon, --candle by day, --ember at dawn and dusk, --player at night, with strength from the light level. In flat it is a multiply wash under the tokens; in 3D it scales the face shading, and figures take only half of it. It is published as window.ROOM_LAMP for the dice.",
+     "reason": "Dawn reads warm, noon neutral and night cool and dimmer, with no new hues. Tokens keep their own colours at night because the wash sits below them, so the board stays readable."},
+    {"change": "A key under the board that lists only the marks currently drawn, using small copies of the marks themselves, plus the light level and hour.",
+     "reason": "Each new mark gets its meaning in plain words beside it, and a quiet board has a quiet foot."},
+    {"change": "On another floor, a token is dashed and labelled '+10' beside it instead of only fading.",
+     "reason": "At 32% opacity the goblin on the wall-walk was a faint brown smudge. Now it is still plainly 'not on this floor', and it says where it is."}
+  ],
+  "files": {
+    "markup": "board.html",
+    "styles": ["board.css"],
+    "scripts": ["preview.js", "scene3d.js", "map.js"]
+  }
+}

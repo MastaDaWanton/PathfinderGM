@@ -1,0 +1,19 @@
+<!-- VERBATIM: play/templates/play/table.html lines 3563-3580, the Map tab's board. Do not edit. -->
+  <section class="board v2-framed v2-card-leather" id="boardframe" aria-labelledby="board-name">
+    <i class="v2-rim" aria-hidden="true"></i>
+    <div class="boardhead">
+      <h2 id="board-name">The ground</h2>
+      <div class="boardctl" role="group" aria-label="How to look at it">
+        <div class="v2-recess" role="group" aria-label="The town">
+          <button type="button" class="v2-btn" id="placesbtn" aria-pressed="false"
+                  aria-controls="placeswrap"
+                  title="The places you have found, and the ways between them">Places</button>
+        </div>
+        <div class="groundctl" id="groundctl"></div>
+      </div>
+    </div>
+    <div id="mapwrap"></div>
+    <div id="placeswrap" class="placeswrap" aria-live="off" hidden></div>
+    <p class="panelempty boardempty">No ground is mapped yet. The map is drawn from wherever
+      the party is standing, as soon as they are standing somewhere.</p>
+  </section>

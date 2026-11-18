@@ -1,0 +1,260 @@
+/* c-engineering-motion: the board's CSS from play/templates/play/table.html (0.2.29), with
+   this variant's rules appended at the end (one block, every colour from the theme's own
+   tokens or the board's existing hexes). The baseline above it is unchanged. */
+
+/* table.html line 30 */
+  * { box-sizing: border-box; }
+
+/* table.html lines 175 (.sub, the legend's class) */
+  .sub { color: var(--dim); font-size: 13px; font-style: italic; margin-bottom: 12px; }
+
+/* table.html lines 189-257: the flat map, the 3D view, the tokens, the level picker */
+  /* The map: a stone relief under glass. */
+  #map { width: 100%; height: auto; display: block; background: #14110e;
+         border: 1px solid #241d15; border-radius: 3px;
+         box-shadow: inset 0 0 24px rgba(0,0,0,.55); }
+  #map .rule { stroke: #241d15; stroke-width: .5; }
+  #map .blocked { fill: #3a3128; }
+  #map .difficult { fill: #2a2416; }
+  #map .obscuring { fill: #23262b; }
+  #map .reach { fill: var(--gold); opacity: .12; }
+  /* The vertical. Raised ground reads as lighter stone the higher it goes, and a rail
+     is drawn as an edge rather than a fill, because it is a thing you shoot over and a
+     filled square would read as a wall — which is exactly the mistake the engine was
+     making before stage 5b. */
+  #map .up1 { fill: #3d3527; }
+  #map .up2 { fill: #4a4130; }
+  #map .up3 { fill: #585039; }
+  #map .rail { stroke: #7a6a44; stroke-width: 2.5; stroke-linecap: round; }
+  /* Somebody on another floor of the same room: still there, still worth seeing, and
+     plainly not who you are looking at. */
+  #map .token.offlevel { opacity: .32; }
+  #map .here { fill: none; stroke: var(--gold); stroke-width: 1.2; opacity: .5; }
+  /* The three-dimensional view. Flat shapes, no textures and no gradients: the point
+     is to be able to read the board at a glance, and shading exists only to tell one
+     face of a box from another. The two visible sides are stepped darker so a cube
+     reads as a cube without an outline round it. */
+  /* The three-dimensional view. Flat shapes, no textures and no gradients: the point is
+     to read the board at a glance.
+
+     There are no `fill` rules here on purpose, and that is the whole of the rework. Every
+     face's colour is its material multiplied by a light that belongs to the ROOM, worked
+     out in `scene3d.js` from the face's own normal and written onto the polygon — the
+     same expression and the same LIGHT vector `dice3d.js` shades brass with. The version
+     before this shaded by class (`.face-a` .72, `.face-b` .55), which welded a brightness
+     to a geometric side, so turning the board turned the light with it. A `fill` rule in
+     here would overrule the shading and put that back, because a stylesheet rule beats a
+     presentation attribute. Hover is the one deliberate exception. */
+  #view3d { width: 100%; height: auto; display: block; background: #14110e;
+            border: 1px solid #241d15; border-radius: 3px; }
+  #view3d polygon { stroke: #15120d; stroke-width: .35; stroke-linejoin: round; }
+  #view3d .lit.face-top { cursor: pointer; }
+  #view3d .lit.face-top:hover { fill: var(--gold); }
+  /* Solid things read as solid: a seam between two faces of one box says "two faces". */
+  #view3d .fig, #view3d .rail3 { stroke: none; }
+  #view3d .fig.offlevel { opacity: .38; }
+  /* A floor over your head — a gallery you are not standing on — and the rail along it.
+     Walls are never in here: a wall is a wall from every level, and drawing one through
+     would tell the player they have a shot they do not have. */
+  #view3d .above { opacity: .45; }
+  .levelpick { display: flex; gap: 4px; align-items: center; margin: 6px 0 2px; }
+  .levelpick button { padding: 1px 8px; font-size: 11px; }
+  .levelpick button.on { border-color: var(--accent); color: #f0dcae; }
+  #map .token { fill: #6b4a3a; stroke: #241d15; stroke-width: 1;
+                transition: cx .4s ease, cy .4s ease; }
+  #map .token.pc { fill: var(--gold); }
+  /* Who is in the fight and who is only standing in the room. Asked for in as many
+     words, 2026-09-06: "make the bystanders white and the enemies bright red". */
+  #map .token.foe { fill: #e0261e; stroke: #5a0c08; }
+  #map .token.ally { fill: #6fc276; stroke: #1f4a26; }
+  #map .token.bystander { fill: #f2ecdd; stroke: #7a6f5a; }
+  #map .token.down { opacity: .35; }
+  /* A crowd held as one actor (item 33). Hatched rather than solid, and dashed at the
+     edge, because a filled 3x3 block reads as one big creature — the whole point is that
+     it is many people standing together. The colour still says which side they are on. */
+  #map .token.unit { stroke-dasharray: 4 3; stroke-width: 1.5; }
+  #map .token.unit.foe { fill: url(#unithatch-foe); }
+  #map .token.unit.bystander { fill: url(#unithatch-quiet); }
+  #map text.tok { fill: #14120f; font: 700 9px var(--display); text-anchor: middle;
+                  pointer-events: none; }
+  .maplegend { margin-top: 4px; }
+
+/* table.html line 837 */
+  #map .reach, #maptrayinner .reach { cursor: crosshair; pointer-events: all; }
+
+/* table.html lines 1838-1841: the candle cursor */
+  body, a, button, select, label, summary, [role="tab"],
+  .sugg, .exitbtn, .pick, .tab, .card.pick, .prepbtn {
+    cursor: var(--cursor-candle) 24 0, auto;
+  }
+
+/* table.html lines 1901-1907: the page's root and body */
+  :root { --col-max: 880px; color-scheme: dark; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; color: var(--ink); font: 17px/1.65 var(--body);
+    display: grid; grid-template-rows: auto minmax(0, 1fr);
+    height: 100dvh; overflow: hidden;
+  }
+
+/* table.html lines 1918-1921: the shell's focus ring */
+  .v2-btn:focus-visible, .v2-tabs > button:focus-visible, .v2-recess > button:focus-visible {
+    outline: 2px solid var(--candle); outline-offset: 2px;
+  }
+  .v2-btn.is-small { letter-spacing: .06em; }
+
+/* table.html lines 1998 and 2002: the board's place and measure in the stage */
+  .book, .board { grid-area: book; }
+  .book, .board, .desk, .sheetmore { width: 100%; max-width: var(--col-max); justify-self: center; }
+
+/* table.html lines 2135-2137: the framed board's clasps and bosses */
+  .book.v2-framed::after, .board.v2-framed::after {
+    background-size: 96px auto, 96px auto, 96px auto, 96px auto, 40px auto, 40px auto,
+                     0 0, auto 40px; }
+
+/* table.html lines 2458-2488: the board */
+  /* --- Map: the board, where the book was -------------------------------------------- */
+  /* Its left padding clears the device, which hangs on this frame's left edge as it does
+     on the book's (58px, the book's own): at 26px it covered the first letter of the
+     heading. */
+  /* One grid: the head row, then the ground (#mapwrap) or the town (#placeswrap), each a
+     well over a foot line; the line for "no ground yet" only while there is none. */
+  .board { min-height: 0; display: grid; grid-template-rows: auto minmax(0, 1fr) auto;
+           gap: 10px; padding: 20px 26px 16px 58px; box-shadow: var(--emboss), var(--sh-3); }
+  .board > :not(.v2-rim) { position: relative; z-index: 1; min-width: 0; }
+  .board > #mapwrap, .board > #placeswrap { min-height: 0; display: grid;
+                                            grid-template-rows: minmax(0, 1fr) auto; gap: 10px; }
+  .board > #mapwrap:empty, .board.places > #mapwrap, .board > #placeswrap[hidden] { display: none; }
+  #mapwrap:not(:empty) ~ .boardempty, .board.places > .boardempty { display: none; }
+  .boardhead { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+               justify-content: space-between; }
+  .boardhead h2 { margin: 0; color: var(--gold); font: 400 17px/1.1 var(--display);
+                  letter-spacing: .12em; font-variant: small-caps; text-shadow: var(--engraved); }
+  .boardctl, .groundctl { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .boardctl .seglabel { padding: 0 6px 0 4px; color: var(--dim); font-size: 13px; font-style: italic; }
+  /* The board sits in a stone well sunk into the card. The old page's `#map` and `#view3d`
+     rules sized each board to its width (`height: auto`), which in a well of fixed height
+     let a tall room run off its foot: here they fill the well and keep their shape. */
+  .boardview { min-height: 0; display: grid; place-items: center; padding: 10px;
+               border-radius: 3px; background: #0f0c09; box-shadow: var(--sunken); overflow: hidden; }
+  .boardview svg, .boardview > #map, .boardview > #view3d {
+    width: 100%; height: 100%; max-height: 100%; display: block; }
+  .boardfoot { display: grid; gap: 2px; font-size: 14px; }
+  .boardfoot p { margin: 0; }
+  .boardfoot .sub { margin: 0; color: var(--dim); font-style: italic; }
+  .boardabout { color: var(--dim); font-style: italic; }
+  .boardkey { color: var(--ink); }
+
+/* table.html @media (max-width: 760px), the board's rules only: lines 3224-3226, 3268-3273, 3279 */
+@media (max-width: 760px) {
+    .book.v2-framed::after, .board.v2-framed::after {
+      background-size: 96px auto, 96px auto, 96px auto, 96px auto, 40px auto, 40px auto,
+                       auto 40px, auto 40px; }
+    .board { padding: 22px 18px 12px 26px; }
+    .boardview { min-height: 200px; padding: 6px; }
+    .boardhead { gap: 6px; }
+    .boardhead h2 { font-size: 15px; }
+    .boardctl .v2-recess > .v2-btn { min-height: 30px; padding: 4px 9px; }
+    .boardkey { font-size: 12.5px; line-height: 1.5; }
+    .board.places #groundctl { display: none; }
+}
+
+/* ===== c-engineering-motion ================================================================
+   One timing family for everything that answers the pointer or a key: 120 ms, opacity only,
+   on the strong ease-out. Nothing here moves under the pointer, loops, or staggers. */
+@property --lamp { syntax: "<color>"; inherits: true; initial-value: #ffffff; }
+.board { --e-out: cubic-bezier(.23, 1, .32, 1); transition: --lamp 300ms ease; }
+
+/* The ground: relief, lamp, what you cannot see. */
+#map .relief-sh { fill: #000; opacity: .38; pointer-events: none; }
+#map .relief-hi { stroke: rgba(255, 232, 180, .22); stroke-width: 1.2; pointer-events: none; }
+#map .lamp { fill: var(--lamp); mix-blend-mode: multiply; pointer-events: none; }
+#map .fog { fill: url(#fogx); pointer-events: none; }
+#map .reach.safe { opacity: .34; }
+
+/* Threat, the spell's reach and a hunch, as edges; a foe's zone as a fill when asked. */
+#map .zone, #view3d .zone3 { fill: var(--alarm); opacity: 0; pointer-events: none;
+  transition: opacity 120ms var(--e-out); }
+#map .zone.on { opacity: .34; }
+#view3d .zone3.on { opacity: .45; }
+#map [class^="edge-"] { pointer-events: none; stroke-linecap: butt; }
+#map .edge-threat { stroke: var(--alarm); stroke-width: 1; stroke-dasharray: 2.4 1.8; }
+#map .edge-spell { stroke: #f0a050; stroke-width: 1; }
+/* The hunch is the quietest outline: it says "something is near", which is worth knowing
+   and not worth shouting over the foes you can see. */
+#map .edge-hunch { stroke: var(--player); stroke-width: .8; stroke-dasharray: 5 3; opacity: .5; }
+#view3d .fog3, #view3d .zone3, #view3d .edge3 { stroke: none; }
+#view3d .edge-hunch { opacity: .55; }
+/* Top faces against side faces: a faint lit rim on the top of anything standing above the
+   floor, so a wall-walk reads as a slab with a top rather than as a darker patch. */
+#view3d .raised.face-top, #view3d .solid.face-top { stroke: rgba(255, 232, 180, .2); stroke-width: .6; }
+
+/* People. Rings sit just outside the token: whose turn (candle, still), caught by the
+   spell (the spell's own stroke), a provoker (alarm, only while a square that provokes it
+   is inspected). No pulse on the active ring: the owner's rule is no looping motion, and a
+   ring that never moves is found by the eye just as fast once it is the only candle ring. */
+#map text.tok.offlevel { opacity: .32; }
+#map .downmark { stroke: #14120f; stroke-width: 1.8; stroke-linecap: round; pointer-events: none; }
+#map [class^="mark-"], #view3d [class^="mark-"] { fill: none; pointer-events: none; }
+#map .mark-active { stroke: var(--candle); stroke-width: 1.3; }
+#view3d .mark-active { stroke: var(--candle); stroke-width: 1.4; }
+#map .mark-caught, #view3d .mark-caught { stroke: #f0a050; stroke-width: 1.2; stroke-dasharray: 2 1.5; }
+#map .mark-ring, #view3d .mark-ring { stroke: #f7f2e6; stroke-width: 1.4; opacity: 0;
+  transition: opacity 120ms var(--e-out); }
+#map .mark-ring.on, #view3d .mark-ring.on { opacity: 1; }
+#view3d .safe.face-top { stroke: var(--gold); stroke-opacity: .6; stroke-width: .7; }
+
+/* The inspector: the square under the pointer or the keyboard. It jumps, never glides. */
+#boardcursor { fill: none; stroke: var(--candle); stroke-width: 1; pointer-events: none; }
+#map:focus-visible #boardcursor { stroke-width: 1.8; }
+#view3d .cur { stroke: var(--candle); stroke-width: 1.3; }
+#map:focus, #view3d:focus { outline: none; }
+#map:focus-visible, #view3d:focus-visible { outline: 2px solid var(--candle); outline-offset: 2px; }
+
+.boardview { position: relative; }
+.boardcard { position: absolute; left: 0; top: 0; z-index: 2; width: max-content; max-width: 236px;
+  padding: 7px 10px 8px; border-radius: 3px; background: rgba(16, 12, 9, .94);
+  border: 1px solid var(--glass-edge); box-shadow: var(--sh-2); color: var(--ink);
+  font: 13px/1.4 var(--body); pointer-events: none; opacity: 0;
+  transition: opacity 120ms var(--e-out); }
+.boardcard.on { opacity: 1; }
+.boardcard p { margin: 0; }
+.boardcard .cardhead { margin-bottom: 3px; color: var(--gold); font: 400 13.5px/1.2 var(--display);
+  letter-spacing: .06em; font-variant: small-caps; }
+.boardcard .cardside { margin-left: 4px; color: var(--dim); font: italic 12px var(--body);
+  letter-spacing: 0; font-variant: normal; }
+.boardcard .terms, .boardcard .cardoff { color: var(--dim); font-size: 12px; }
+.boardcard .cardoff { font-style: italic; }
+.boardcard .sit, .boardcard .turn { color: var(--candle); }
+.boardcard .warn { color: color-mix(in srgb, var(--alarm) 62%, var(--ink)); }
+.boardcard .ok { color: var(--gold); }
+.boardcard .spell { color: #f0a050; }
+.boardcard .atk { margin-top: 3px; }
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%);
+  white-space: nowrap; margin: 0; }
+
+/* The key: each swatch is drawn the way the board draws the thing. */
+.boardkeyline { display: flex; flex-wrap: wrap; gap: 2px 14px; margin: 0; color: var(--dim);
+  font-size: 12.5px; line-height: 1.5; }
+.boardfoot .ki { display: inline-flex; align-items: center; gap: 6px; }
+.boardfoot .k { flex: none; width: 12px; height: 12px; border-radius: 2px; }
+.k-threat { border: 1.5px dashed var(--alarm); }
+.k-safe { background: rgba(221, 196, 142, .34); }
+.k-fog { background: repeating-linear-gradient(45deg, rgba(147, 134, 110, .3) 0 1px, #0b0908 1px 4px); }
+.k-hunch { border: 1.5px dashed var(--player); border-radius: 50% !important; }
+.k-lamp { background: var(--lamp); border: 1px solid var(--edge); border-radius: 50% !important; }
+
+/* A change of view: the new board fades in. Opacity only, so it is kept under reduced
+   motion; the turn's rotation is not (board-read/map.js jump instead). */
+.boardview > svg.enter { animation: boardin 150ms var(--e-out) both; }
+@keyframes boardin { from { opacity: 0; } }
+
+.kshort { display: none; }
+.footrow { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0 14px; }
+.lampkey { color: var(--dim); font-size: 12.5px; font-style: italic; }
+@media (max-width: 760px) {
+  .boardcard { max-width: 200px; font-size: 12.5px; }
+  .boardkeyline { font-size: 12px; gap: 0 10px; }
+  .klong { display: none; }
+  .kshort { display: inline; }
+}
