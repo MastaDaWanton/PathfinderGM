@@ -54,6 +54,22 @@ function init(el, a) {
     const hit = ray.intersectObjects(pick, true)[0];
     if (hit) { let o = hit.object; while (o && !o.userData.id) o = o.parent; if (o) api.pick(o.userData.id); }
   });
+  // Zoom out past the region's furthest and the world opens; zoom in hard on the world and
+  // the region comes back. The breadcrumb does the same; this is the gesture the owner asked for.
+  let lastLevelChange = 0;
+  renderer.domElement.addEventListener("wheel", ev => {
+    if (!V || performance.now() - lastLevelChange < 900) return;
+    const d = camera.position.distanceTo(controls.target);
+    if (V.level === "region" && ev.deltaY > 0 && d >= controls.maxDistance * .97) { lastLevelChange = performance.now(); api.open("world"); }
+    else if (V.level === "world" && ev.deltaY < 0 && d <= controls.minDistance * 1.05) { lastLevelChange = performance.now(); api.open("region"); }
+  }, { passive: true });
+  // The name under the pointer always shows, even when it was culled to keep the map clear.
+  renderer.domElement.addEventListener("pointermove", ev => {
+    const r = renderer.domElement.getBoundingClientRect(), ray = new THREE.Raycaster();
+    ray.setFromCamera(new THREE.Vector2((ev.clientX - r.left) / r.width * 2 - 1, -(ev.clientY - r.top) / r.height * 2 + 1), camera);
+    const hit = ray.intersectObjects(pick, true)[0]; let o = hit && hit.object; while (o && !o.userData.id) o = o.parent;
+    hoverId = o ? o.userData.id : null; renderer.domElement.style.cursor = o ? "pointer" : "grab";
+  });
   stage.querySelector("#tilt").addEventListener("click", ev => { tiltOn = !tiltOn; ev.currentTarget.setAttribute("aria-pressed", tiltOn); });
   new ResizeObserver(resize).observe(stage); resize();
   renderer.setAnimationLoop(frame);
@@ -274,7 +290,7 @@ function drawPaper(c, v, half) {
   for (let x = 0; x < c.width; x += 720) for (let y = 0; y < c.height; y += 720) g.drawImage(paperImg, x, y, 720, 720 * paperImg.height / paperImg.width);
   const ink = (a, b, w, col = "#2a2019", dash) => { g.strokeStyle = col; g.lineWidth = w; g.setLineDash(dash || []); g.beginPath(); g.moveTo(...P(a)); g.lineTo(...P(b)); g.stroke(); g.setLineDash([]); };
   const { L, F } = v, found = [...F.found].filter(i => L.pos[i]);
-  const gp = L.gate ? L.pos[L.gate] : [0, -385], wr = Math.hypot(...gp);
+  const gp = L.gate ? L.pos[L.gate] : [0, -385], wr = L.wall || Math.hypot(...gp);
   g.strokeStyle = "rgba(42,32,25,.6)"; g.lineWidth = 6; g.beginPath(); g.arc(...P([0, 0]), wr * S, 0, 7); g.stroke();
   Object.values(L.crossings).forEach(c2 => { if (F.found.has(c2)) { ink([0, 0], L.pos[c2], 34); ink([0, 0], L.pos[c2], 26, "#e9dcbc"); } });
   if (L.gate && F.found.has(L.gate)) { ink(L.pos[L.street[L.gate]], L.pos[L.gate], 30); ink(L.pos[L.street[L.gate]], L.pos[L.gate], 22, "#e9dcbc"); }
@@ -300,14 +316,14 @@ function clear() {
   world = new THREE.Group(); scene.add(world); pick = []; smoke = []; flags = []; clouds = []; routeObj = null;
   candles = candles.filter(c => !c.site);  // a room's torch goes with its room
 }
-let lastKey = "";
+let lastKey = "", hoverId = null;
 async function draw(v) {
   V = v;
   const key = v.level + (v.site ? v.site.key : "");
   const fresh = key !== lastKey; lastKey = key;
   await Promise.all([loadPaper(), loadKit()]);
   clear();
-  if (v.level === "town") town(v); else if (v.level === "region") region(v); else site(v);
+  if (v.level === "town") town(v); else if (v.level === "region") region(v); else if (v.level === "world") worldMap(v); else site(v);
   pc = pcMini(); world.add(pc); placePc();
   routeLine();
   if (fresh) frameCamera();
@@ -316,7 +332,9 @@ const townXZ = (p, y = 0) => new THREE.Vector3(p[0] * U, y, p[1] * U);
 function place(o, id, x, z, size = 1) { o.position.set(x, 0, z); o.userData.id = id; o.userData.size = size; o.scale.setScalar(size); world.add(o); pick.push(o); return o; }
 
 function town(v) {
-  const { L, F, T } = v, half = 560;
+  // The sheet is as big as the town: a street that has grown longer than the old sheet (the
+  // worst case's sixteen-place street ran to 920 units, past a 560 half-sheet) gets more paper.
+  const { L, F, T } = v, half = Math.max(560, ...Object.values(L.pos).map(p => Math.max(Math.abs(p[0]), Math.abs(p[1])) + 130));
   const c = document.createElement("canvas"); c.width = c.height = 2048; drawPaper(c, v, half);
   paperTex = new THREE.CanvasTexture(c); paperTex.colorSpace = THREE.SRGBColorSpace; paperTex.anisotropy = 8;
   const sheet = new THREE.Mesh(new THREE.PlaneGeometry(half * 2 * U, half * 2 * U), new THREE.MeshStandardMaterial({ map: paperTex, roughness: .95 }));
@@ -455,17 +473,71 @@ function site(v) {
   });
 }
 
+// --- The world: a second scroll, every city the PC knows of, and how --------------------
+// The land is painted for the whole world (it is the paper, not knowledge); fog covers all
+// of it but round the cities known, as the town's paper does. A city stood in is a painted
+// village; one known from a road sign, talk or a map is primer grey, with a flag in the
+// colour of how it was learned.
+const WU = .07, HOW_FLAG = { been: 0x27406e, road: 0x8a6a3a, heard: 0x2e7d5b, map: 0x8e2317 };
+function drawWorld(c, v, half) {
+  const g = c.getContext("2d"), S = c.width / (half * 2), P = ([x, y]) => [(x + half) * S, (y + half) * S];
+  for (let x = 0; x < c.width; x += 720) for (let y = 0; y < c.height; y += 720) g.drawImage(paperImg, x, y, 720, 720 * paperImg.height / paperImg.width);
+  g.fillStyle = "rgba(70,110,140,.28)"; g.fillRect(0, 0, c.width, c.height);   // the sea, a wash over the paper
+  // Land: a blot round every city, merged, with an inked coast (drawn twice: the ink, then the land over it).
+  const land = document.createElement("canvas"); land.width = c.width; land.height = c.height; const l = land.getContext("2d");
+  const blots = (ctx, grow) => v.W.cities.forEach((city, n) => { const [x, y] = P(v.WL.pos[city.id]);
+    for (let k = 0; k < 5; k++) { const a = n * 1.7 + k * 1.26, r = (70 + (n * 37 + k * 13) % 40) * S + grow; ctx.beginPath(); ctx.arc(x + Math.cos(a) * 30 * S, y + Math.sin(a) * 30 * S, r, 0, 7); ctx.fill(); } });
+  l.fillStyle = "#3b2a1c"; blots(l, 5 * S * 4); l.globalCompositeOperation = "source-over";
+  l.fillStyle = "#e8dcbc"; blots(l, 0);
+  g.globalAlpha = .9; g.drawImage(land, 0, 0); g.globalAlpha = 1;
+  // Roads you know.
+  v.K.roads.forEach(r => { const a = P(v.WL.pos[r.a]), b = P(v.WL.pos[r.b]), both = v.K.how[r.a].by === "been" && v.K.how[r.b].by === "been";
+    g.strokeStyle = r.by === "sea" ? "#2f5d7c" : r.by === "river" ? "#3d6a8a" : "#3b2a1c"; g.lineWidth = r.by === "road" ? 5 : 4;
+    g.setLineDash(r.by === "sea" ? [4, 10] : both ? [] : [16, 10]); g.beginPath(); g.moveTo(...a); g.lineTo(...b); g.stroke(); });
+  g.setLineDash([]);
+  // Fog: a sheet of cloud with a hole round every city known.
+  const fog = document.createElement("canvas"); fog.width = c.width; fog.height = c.height; const f = fog.getContext("2d");
+  f.fillStyle = "rgba(246,244,240,.94)"; f.fillRect(0, 0, fog.width, fog.height);
+  f.globalCompositeOperation = "destination-out";
+  Object.keys(v.K.how).forEach(id => { const [x, y] = P(v.WL.pos[id]), r = 150 * S; const gr = f.createRadialGradient(x, y, r * .3, x, y, r);
+    gr.addColorStop(0, "rgba(0,0,0,1)"); gr.addColorStop(1, "rgba(0,0,0,0)"); f.fillStyle = gr; f.fillRect(x - r, y - r, r * 2, r * 2); });
+  g.drawImage(fog, 0, 0);
+  // A continent's name only once a city on it is known: the paper does not name what you have not heard of.
+  g.fillStyle = "rgba(59,42,28,.55)"; g.textAlign = "center"; g.font = `italic ${Math.round(16 * S * 3)}px Palatino Linotype, Georgia, serif`;  // the worst case ran two continent names together at 46
+  const seen = new Set(Object.keys(v.K.how).map(id => (v.W.cities.find(x => x.id === id) || {}).continent));
+  Object.entries(v.WL.centre).forEach(([cid, [x, y]]) => { if (!seen.has(cid)) return; const [px, py] = P([x, y - 250]); g.fillText(v.W.continents[cid], px, py); });
+}
+function worldMap(v) {
+  const xs = Object.values(v.WL.pos), half = Math.max(...xs.map(p => Math.max(Math.abs(p[0]), Math.abs(p[1])))) + 160;
+  const c = document.createElement("canvas"); c.width = c.height = 2048; drawWorld(c, v, half);
+  paperTex = new THREE.CanvasTexture(c); paperTex.colorSpace = THREE.SRGBColorSpace; paperTex.anisotropy = 8;
+  const size = half * 2 * WU;
+  const sheet = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshStandardMaterial({ map: paperTex, roughness: .95 }));
+  sheet.rotation.x = -Math.PI / 2; sheet.position.y = .05; sheet.receiveShadow = true; world.add(sheet);
+  world.add(scroll(size, size));
+  Object.entries(v.K.how).forEach(([id, how]) => {
+    const city = v.W.cities.find(x => x.id === id), [x, z] = [v.WL.pos[id][0] * WU, v.WL.pos[id][1] * WU];
+    const o = miniature("town", { painted: how.by === "been" });
+    place(o, id, x, z, .2);
+    // A map pin by each town, coloured by how you know it (stood in, road sign, talk, map).
+    const pin = mesh(new THREE.ConeGeometry(.22, .9, 8), mat(HOW_FLAG[how.by])); pin.rotation.x = Math.PI; pin.position.set(x + 1.3, 1.6, z - .6); world.add(pin);
+    const head = mesh(new THREE.SphereGeometry(.3, 12, 8), mat(HOW_FLAG[how.by], { flatShading: false })); head.position.set(x + 1.3, 2.1, z - .6); world.add(head);
+    o.userData.name = city.name; o.userData.seen = how.by !== "been";
+  });
+}
+
 // --- The PC, the route, the walk ----------------------------------------------------------
 function posOf(id) {
   const v = V;
   if (v.level === "town") { const p = M.anchor(v.L, id); return p && townXZ(p); }
+  if (v.level === "world") { const p = v.WL.pos[id]; return p && new THREE.Vector3(p[0] * WU, .1, p[1] * WU); }
   if (v.level === "region") { const p = v.G.pos[id] || (v.G.wild.find(w => w.id === id) || {}).pos; return p && new THREE.Vector3(p[0] * U * 3.4, 1.05, p[1] * U * 3.4); }
   const p = sitePos(v, id); return new THREE.Vector3(p[0], .4, p[1]);
 }
 function placePc() {
   const id = V.level === "town" ? V.here : V.level === "region" ? V.here : V.here;
   const p = posOf(id); if (!p) return;
-  pc.position.copy(p).add(new THREE.Vector3(V.level === "site" ? 1.5 : 3.6, 0, V.level === "site" ? 1 : 3.6)); pc.scale.setScalar(V.level === "site" ? 1.2 : V.level === "region" ? 1.2 : 2);
+  pc.position.copy(p).add(new THREE.Vector3(V.level === "site" ? 1.5 : V.level === "world" ? 1 : 3.6, 0, V.level === "site" ? 1 : V.level === "world" ? 1 : 3.6)); pc.scale.setScalar(V.level === "site" ? 1.2 : V.level === "region" ? 1.2 : V.level === "world" ? .45 : 2);
 }
 let routeObj = null;
 function routeLine() {
@@ -490,7 +562,7 @@ function frameCamera() {
   if (box.isEmpty()) return;
   const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3()).length();
   controls.target.copy(c);
-  const d = Math.min(Math.max(size * (V.level === "site" ? 1.25 : V.level === "region" ? 1.1 : .95), 30), 240);
+  const d = Math.min(Math.max(size * (V.level === "site" ? 1.25 : V.level === "region" ? 1.1 : V.level === "world" ? .9 : .95), 30), 240);
   camera.position.set(c.x - d * .05, d * .86, c.z + d * .56);
   controls.update();
 }
@@ -537,15 +609,25 @@ let lastInfo = { calls: 0, triangles: 0 };
 function labels() {
   const r = stage.getBoundingClientRect(), placed = [];
   let html = "";
-  pick.slice().sort((a, b) => (a.userData.seen - b.userData.seen)).forEach(o => {
+  // Names that cannot find room are not drawn: the place stays, pressable, and its name shows
+  // on hover, when pressed, or as you zoom in and room opens up. This is how map labelling
+  // keeps a dense place readable (Mapbox and Google Maps drop colliding labels by priority).
+  const here = V.level === "town" ? M.baseOf(V.here) : V.here;
+  const rank = o => { const id = o.userData.id; return id === here ? 0 : id === V.sel ? 1 : id === hoverId ? 2 : (V.route || []).includes(id) ? 3 : o.userData.seen ? 5 : 4; };
+  pick.slice().sort((a, b) => rank(a) - rank(b)).forEach(o => {
     o.getWorldPosition(tmp); tmp.y += V && V.level === "site" ? 1 : V.level === "town" ? 7.5 : 5; tmp.project(camera);
     if (tmp.z > 1) return;
     let x = (tmp.x + 1) / 2 * r.width, y = (1 - tmp.y) / 2 * r.height;
-    const name = o.userData.name || "", w = name.length * 7.2 + 16;
-    for (let n = 0; n < 5 && placed.some(b => x - w / 2 < b[2] && x + w / 2 > b[0] && y - 20 < b[3] && y > b[1]); n++) y -= 21;
-    placed.push([x - w / 2, y - 20, x + w / 2, y]);
+    if (x < -40 || x > r.width + 40 || y < -10 || y > r.height + 40) return;
+    const name = o.userData.name || "", w = Math.min(name.length * 7.2, 190) + 16 + (o.userData.badge ? 22 : 0) + (o.userData.down ? 22 : 0);
+    const h = o.userData.road ? 34 : 20;   // a road's tag has its days on a second line
+    const hit = yy => placed.some(b => x - w / 2 < b[2] + 4 && x + w / 2 > b[0] - 4 && yy - h < b[3] + 2 && yy > b[1] - 2);
+    const must = rank(o) <= 3;
+    let n = 0; while (n < 3 && hit(y)) { y -= h + 2; n++; }
+    if (hit(y) && !must) return;
+    placed.push([x - w / 2, y - h, x + w / 2, y]);
     const id = o.userData.id, cls = (V.sel === id ? " sel" : "") + (o.userData.seen ? " seen" : "") + (V.here === id || (V.level === "town" && M.baseOf(V.here) === id) ? " here" : "");
-    html += `<span class="tag${cls}" style="transform:translate(${x.toFixed(0)}px,${y.toFixed(0)}px) translate(-50%,-100%)">${name}${
+    html += `<span class="tag${cls}" style="transform:translate(${x.toFixed(0)}px,${y.toFixed(0)}px) translate(-50%,-100%)" title="${name}"><span class="nm">${name}</span>${
       o.userData.badge ? `<b>${o.userData.badge}</b>` : ""}${o.userData.down ? `<b class="dn">↓</b>` : ""}${o.userData.road ? `<i>${String(o.userData.road).replace(/^about /, "").replace(/ on foot$/, "")}</i>` : ""}</span>`;
   });
   tags.innerHTML = html;
@@ -561,4 +643,4 @@ function rain(t, still) {
   c.stroke();
 }
 
-window.TabletopRenderer = { init, draw, walk };
+window.TabletopRenderer = { init, draw, walk, levels: ["world"] };

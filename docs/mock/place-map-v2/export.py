@@ -87,6 +87,36 @@ def main(saves: Path):
     fs = frag["scene"]
     site = {"founded": fs.get("founded"), "at": fs.get("at"), "been": fs.get("been")}
     (OUT / "site.json").write_text(json.dumps(site, indent=1), encoding="utf-8")
+
+    # --- World: every city, its nation and continent, every route the world wrote down.
+    # What jack knows of it: towns stood in (`been`), and towns an NPC named in a spoken line.
+    # MOCK ONLY: the engine keeps no record of towns heard of (heard_places is places inside
+    # a town), so "heard" here is a name match over the save's NPC lines, standing in for the
+    # beat reader's answer a real build would record.
+    import re
+    cities = world.of_kind("CITY")
+    names = {e.name: e.id for e in cities}
+    heard = {}
+    for block in c.transcript:
+        for said in (block.get("said") or []) if isinstance(block, dict) else []:
+            line = str(said.get("line") or "")
+            for n, cid in names.items():
+                if re.search(r"\b" + re.escape(n) + r"\b", line) and cid not in heard:
+                    heard[cid] = {"who": said.get("who", ""), "line": line}
+    out = {"here": fp.id, "been": sorted(been_towns), "heard": heard, "cities": [], "nations": {}, "continents": {},
+           "routes": [{"a": r["from_id"], "b": r["to_id"], "by": r.get("by", ""), "miles": r.get("miles")}
+                      for r in (world.play or {}).get("travel") or []]}
+    for e in cities:
+        nation = world.get(e.parent_id)
+        cont = world.get(nation.parent_id) if nation else None
+        out["cities"].append({"id": e.id, "name": e.name, "nation": nation.id if nation else "",
+                              "continent": cont.id if cont else "", "scale": getattr(e, "scale", "") or ""})
+        if nation:
+            out["nations"][nation.id] = {"name": nation.name, "continent": cont.id if cont else ""}
+        if cont:
+            out["continents"][cont.id] = cont.name
+    (OUT / "world.json").write_text(json.dumps(out, indent=1), encoding="utf-8")
+    print("world", len(out["cities"]), "cities;", len(out["routes"]), "routes; heard", len(heard))
     print("town", chart["found"], "found /", chart["visited"], "visited; region",
           len(region["towns"]), "towns; site keys", list((fs.get("founded") or {}))[:5])
 

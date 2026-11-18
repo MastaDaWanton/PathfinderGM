@@ -254,7 +254,7 @@ const ChartRenderer = (() => {
       return `<circle cx="${x}" cy="${y}" r="${F.visited.has(i) ? 62 : 46}" fill="${WASH[dirOf(i)]}"/>`; }).join("")}</g>`);
     // The wall: a pen ring with the gate in it, and the ditch outside it.
     const gp = L.gate ? L.pos[L.gate] : [0, -405];
-    const wr = Math.hypot(gp[0], gp[1]);
+    const wr = L.wall || Math.hypot(gp[0], gp[1]);
     out.push(`<g filter="url(#ink)" fill="none" stroke="${INK}" stroke-opacity=".55">
       <circle r="${wr}" stroke-width="${2.6 * k}" stroke-dasharray="${wr * .08} ${wr * .0001}"/>
       <circle r="${wr + 9}" stroke-width="${.8 * k}" stroke-dasharray="${3 * k} ${4 * k}"/></g>`);

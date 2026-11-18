@@ -19,8 +19,8 @@ const MapModel = (() => {
 
   async function load(root = "data/") {
     const get = f => fetch(root + f).then(r => { if (!r.ok) throw new Error(f + " " + r.status); return r.json(); });
-    const [town, region, site] = await Promise.all([get("town.json"), get("region.json"), get("site.json")]);
-    return { town, region, site };
+    const [town, region, site, world] = await Promise.all([get("town.json"), get("region.json"), get("site.json"), get("world.json")]);
+    return { town, region, site, world };
   }
 
   // --- Fog (places_found.chart, replayed) ----------------------------------------------
@@ -72,8 +72,11 @@ const MapModel = (() => {
   // the gate at the end of its street, floors as badges, the land outside beyond the gate.
   const DIRS = { north: [0, -1], east: [1, 0], south: [0, 1], west: [-1, 0] };
   const C = 190;                               // square to crossing
-  const SLOTS = [[C - 5, -1], [C - 5, 1], [C + 85, -1], [C + 85, 1], [C + 170, -1], [C + 170, 1],
-                 [C + 255, -1], [C + 255, 1]];  // [along the street, side]
+  // Seats come in pairs, one each side of the street, a row every ROW further out. A street
+  // never runs out: a ninth place is a fifth row, not a seat dealt again on top of the first
+  // (the worst case caught `k % 8` stacking places 9-16 on 1-8). Places are founded in play,
+  // so a street's length is unbounded; only the town changing can lengthen it.
+  const ROW = 85, slot = k => [C - 5 + ROW * Math.floor(k / 2), k % 2 ? 1 : -1];
   const ACROSS = 82, GATE = C + 195;
   function townLayout(T) {
     const ids = T.ids, set = new Set(ids), setting = T.settings;
@@ -99,9 +102,10 @@ const MapModel = (() => {
     Object.entries(byCrossing).forEach(([c, list]) => {
       const [dx, dy] = DIRS[dirOf[c]], nx = -dy, ny = dx;
       const gates = list.filter(i => /gate$/.test(i)), rest = list.filter(i => !gates.includes(i)).sort();
-      gates.forEach(g => { pos[g] = [dx * GATE, dy * GATE]; kind[g] = "gate"; street[g] = c; label[g] = "right"; });
+      const end = Math.max(GATE, slot(Math.max(rest.length - 1, 0))[0] + 90);  // the gate past the last row
+      gates.forEach(g => { pos[g] = [dx * end, dy * end]; kind[g] = "gate"; street[g] = c; label[g] = "right"; });
       rest.forEach((i, k) => {
-        const [a, side] = SLOTS[k % SLOTS.length];
+        const [a, side] = slot(k);
         pos[i] = [dx * a + nx * side * ACROSS, dy * a + ny * side * ACROSS];
         kind[i] = "place"; street[i] = c;
         // A name hangs away from its street: out to the side for a north/south street,
@@ -109,11 +113,19 @@ const MapModel = (() => {
         label[i] = dx === 0 ? (nx * side > 0 ? "right" : "left") : (ny * side > 0 ? "below" : "above");
       });
     });
+    // Round the square: with crossings, only on the diagonals between the four streets, a ring
+    // further out for every four; without (48 of Aurvantis's 64 towns have none), eight a ring.
+    // Measured 2026-11-18: the old ring (28 degrees round, 26 further out) put a town's tenth
+    // place 56 units from a street seat.
+    const per = Object.keys(crossings).length ? 4 : 8;
     bySquare.sort().forEach((i, k) => {
-      const a = (45 + 90 * (k % 4) + 28 * Math.floor(k / 4)) * Math.PI / 180, r = 112 + 26 * Math.floor(k / 4);
+      const ring = Math.floor(k / per), a = ((per === 4 ? 45 + 90 * (k % 4) : 22.5 + 45 * (k % 8)) + (ring % 2) * (per === 4 ? 0 : 22.5)) * Math.PI / 180;
+      const r = 112 + (per === 4 ? 62 : 72) * ring;
       pos[i] = [Math.cos(a) * r, Math.sin(a) * r]; kind[i] = "place"; street[i] = square;
       label[i] = Math.cos(a) > 0 ? "right" : "left";
     });
+    // The wall goes round every seat, however long a street has grown.
+    const wall = Math.max(GATE, ...urban.filter(i => pos[i]).map(i => Math.hypot(...pos[i]) + 50));
     ids.filter(floorOf).forEach(i => { const b = baseOf(i); if (pos[b]) (floors[b] = floors[b] || []).push(i); });
 
     // Outside the walls: beyond the first gate, the outskirts, the crossroads and the roads.
@@ -145,7 +157,7 @@ const MapModel = (() => {
         if (host) sites[host] = { id: i, rooms: ids.filter(r => r.startsWith(i)) };
       }
     });
-    return { pos, kind, street, floors, label, square, crossings, gate, sites, roadsOut };
+    return { pos, kind, street, floors, label, square, crossings, gate, sites, roadsOut, wall };
   }
   // Where a place is drawn: a floor at its building, a cave room at its host.
   function anchor(L, id) {
@@ -261,6 +273,122 @@ const MapModel = (() => {
     return out;
   }
 
+
+  // --- The world ------------------------------------------------------------------------
+  // Every city the world has, placed ONCE over the whole road graph so learning of a city
+  // never moves another. No coordinates in the export (World Bible ask), so by rule: each
+  // continent its own quadrant with sea between ("continents are separated by water"), and
+  // inside it a fixed, seeded spring pass over the land and river roads, so towns a road
+  // joins sit near each other. Deterministic: same world, same map, every time.
+  let WORLD_LAID = null;
+  function worldLayout(W) {
+    if (WORLD_LAID && WORLD_LAID.W === W) return WORLD_LAID;
+    const conts = Object.keys(W.continents).sort();
+    const centre = {}, R = 300;
+    conts.forEach((c, k) => { centre[c] = [(k % 2 ? 1 : -1) * 380, (k < 2 ? -1 : 1) * 330]; });
+    const byCont = {};
+    W.cities.forEach(c => (byCont[c.continent] = byCont[c.continent] || []).push(c));
+    const pos = {}, land = W.routes.filter(r => r.by !== "sea");
+    Object.entries(byCont).forEach(([cont, list]) => {
+      list.sort((a, b) => a.id.localeCompare(b.id));
+      const nations = [...new Set(list.map(c => c.nation))].sort();
+      const [cx, cy] = centre[cont] || [0, 0], P = {};
+      list.forEach((c, k) => {   // seed: nation sectors, cities fanned inside them
+        const n = nations.indexOf(c.nation), a = (n + .5) / nations.length * Math.PI * 2 + (k % 5) * .18;
+        const r = R * (.35 + .12 * (k % 4));
+        P[c.id] = [Math.cos(a) * r, Math.sin(a) * r];
+      });
+      const ids = list.map(c => c.id), here = new Set(ids);
+      const springs = land.filter(r => here.has(r.a) && here.has(r.b));
+      for (let it = 0; it < 300; it++) {
+        const F = Object.fromEntries(ids.map(i => [i, [0, 0]]));
+        for (let i = 0; i < ids.length; i++) for (let j = i + 1; j < ids.length; j++) {
+          const a = P[ids[i]], b = P[ids[j]], dx = a[0] - b[0], dy = a[1] - b[1], d2 = dx * dx + dy * dy + .01, d = Math.sqrt(d2);
+          const f = 2600 / d2; F[ids[i]][0] += dx / d * f; F[ids[i]][1] += dy / d * f; F[ids[j]][0] -= dx / d * f; F[ids[j]][1] -= dy / d * f;
+        }
+        springs.forEach(r => { const a = P[r.a], b = P[r.b], dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) + .01;
+          const f = (d - 70) * .03; F[r.a][0] += dx / d * f; F[r.a][1] += dy / d * f; F[r.b][0] -= dx / d * f; F[r.b][1] -= dy / d * f; });
+        ids.forEach(i => { const p = P[i], d = Math.hypot(p[0], p[1]);
+          if (d > R) { F[i][0] -= p[0] / d * (d - R) * .2; F[i][1] -= p[1] / d * (d - R) * .2; }   // stay on the continent
+          p[0] += Math.max(-6, Math.min(6, F[i][0])); p[1] += Math.max(-6, Math.min(6, F[i][1])); });
+      }
+      ids.forEach(i => { pos[i] = [cx + P[i][0], cy + P[i][1] * .8]; });
+    });
+    return (WORLD_LAID = { W, pos, centre });
+  }
+  // What the PC knows of the world, and how: stood in it; a road sign out of a town stood in
+  // (the region's own fog rule); named by someone in conversation; or read on a map.
+  // `maps` is a list of nation ids whose map was read (a proposed item: none exists yet).
+  function worldKnown(W, been, maps = []) {
+    const how = {}, city = Object.fromEntries(W.cities.map(c => [c.id, c]));
+    been.forEach(id => { if (city[id]) how[id] = { by: "been" }; });
+    W.routes.filter(r => r.by !== "sea").forEach(r => {
+      if (how[r.a] && how[r.a].by === "been" && !how[r.b]) how[r.b] = { by: "road", from: r.a };
+      if (how[r.b] && how[r.b].by === "been" && !how[r.a]) how[r.a] = { by: "road", from: r.b };
+    });
+    Object.entries(W.heard || {}).forEach(([id, h]) => { if (!how[id]) how[id] = { by: "heard", who: h.who, line: h.line }; });
+    maps.forEach(n => W.cities.filter(c => c.nation === n).forEach(c => { if (!how[c.id]) how[c.id] = { by: "map", nation: n }; }));
+    // Roads: drawn when both ends are known; a sea passage only from a port you have been to.
+    const roads = W.routes.filter(r => how[r.a] && how[r.b] && (r.by !== "sea" || how[r.a].by === "been" || how[r.b].by === "been"));
+    return { how, roads };
+  }
+  // The journey between two known cities by known roads: fewest legs, miles summed.
+  function worldRoute(W, known, from, to) {
+    const adj = {};
+    known.roads.forEach(r => { (adj[r.a] = adj[r.a] || []).push([r.b, r]); (adj[r.b] = adj[r.b] || []).push([r.a, r]); });
+    const came = new Map([[from, null]]), q = [from];
+    while (q.length) { const c = q.shift(); if (c === to) break; (adj[c] || []).forEach(([n, r]) => { if (!came.has(n)) { came.set(n, [c, r]); q.push(n); } }); }
+    if (!came.has(to)) return null;
+    const legs = []; let k = to; while (came.get(k)) { const [c, r] = came.get(k); legs.unshift({ from: c, to: k, by: r.by, miles: r.miles }); k = c; }
+    return legs;
+  }
+
+  // --- The worst case (made up) -----------------------------------------------------------
+  // Invented data shaped exactly like the export, entering at the same door (the loaded data),
+  // never by editing the drawing. Every value is one a long campaign could produce: places are
+  // founded in play (houses called on, ventures), so a street's length is unbounded; names
+  // are the world's own patterns at their longest; a map read can reveal a whole world.
+  function worstCase(D) {
+    const T = JSON.parse(JSON.stringify(D.town)), W = JSON.parse(JSON.stringify(D.world));
+    const pre = T.here.split("~")[0] + "~";
+    const north = T.ids.find(i => /north-crossing$/.test(i)), square = T.ids.find(i => /great-square$/.test(i));
+    const west = T.ids.find(i => /west-crossing$/.test(i));
+    const way = (id, name, minutes = 8, group = "next_door") => ({ id, name, group, time_words: minutes < 10 ? "a few minutes' walk" : "a quarter of an hour", blocked: "", journey: false, minutes });
+    const add = (slug, name, on, been, setting = "in") => {
+      const id = pre + (setting === "in" ? "urban:" : "forest:@") + slug;
+      T.ids.push(id); T.names[id] = name; T.settings[id] = setting;
+      T.ways[id] = on ? [way(on, T.names[on])] : [];
+      if (on) T.ways[on] = (T.ways[on] || []).concat(way(id, name));
+      if (been) T.been.push(id);
+      return id;
+    };
+    // Eleven more off the north crossing (sixteen on one street), some only seen.
+    ["the house of Aleksandra Wiśniewska-Kowalczyk", "the counting house of the Honourable Company of Lamplighters and Chandlers",
+     "Jo's", "the house of Bartholomew Fitzgerald-Montgomery III", "the chandlery", "the old customs house where the river toll was once taken",
+     "the house of Ünsal the Twice-Drowned", "the tannery", "the house of the widow Mæve", "the bathhouse", "the ropewalk"]
+      .forEach((n, k) => add("wc-north-" + k, n, north, k % 3 !== 2));
+    // Six more round the great square: nine there.
+    ["the shrine of the Lantern-Bearer of the Seventh Hour", "the stocks", "the moneychanger's", "the scriveners' hall",
+     "the house of Iolanthe Brightwater-Vey", "the cooper's"].forEach((n, k) => add("wc-square-" + k, n, square, k % 2 === 0));
+    // A tower of seven storeys and two cellars on the west street.
+    const tower = add("wc-tower", "the Tower of the Unquiet Astronomers", west, true);
+    for (let f = 1; f <= 6; f++) { const id = tower + "^" + f; T.ids.push(id); T.names[id] = "floor " + f; T.settings[id] = "in"; }
+    [-1, -2].forEach(f => { const id = tower + "^" + f; T.ids.push(id); T.names[id] = "cellar"; T.settings[id] = "in"; });
+    // Seven more roads out: eleven road heads past the gate.
+    const cross = T.ids.find(i => /@the-crossroads$/.test(i));
+    ["Saint-Aubin-de-la-Haute-Mer-sur-les-Falaises", "Ys", "Thornwick-under-Hollow", "Greywater Ford", "Kharzun-Deep",
+     "the Pilgrim Stair", "Old Vellacourt"].forEach((n, k) => {
+      const id = add("the-road-to-wc" + k, "the road to " + n, cross, k < 4, "outside");
+      T.ways[id].push({ id: "wc-town-" + k, name: "the road to " + n, group: "road", time_words: "about " + ["nine", "two", "eleven", "four", "twenty", "six", "three"][k] + " days on foot", blocked: "", journey: true, minutes: 0 });
+    });
+    T.ids.sort();
+    T.worst = true;
+    // The world: every city known by a map read, two of the names at the export's longest.
+    W.cities[3].name = "Saint-Aubin-de-la-Haute-Mer-sur-les-Falaises"; W.cities[9].name = "Ys";
+    W.worstMaps = Object.keys(W.nations);
+    return { ...D, town: T, world: W, worst: true };
+  }
+
   // --- The game clock -------------------------------------------------------------------
   // 0 at midnight; the light the maps tint by: dawn warm, day clear, dusk amber, night blue.
   function light(h) {
@@ -289,6 +417,6 @@ const MapModel = (() => {
     return errs;
   }
 
-  return { load, fog, route, townLayout, anchor, regionLayout, siteLayout, siteRoute, sites, light,
+  return { load, fog, route, townLayout, anchor, regionLayout, siteLayout, siteRoute, sites, light, worldLayout, worldKnown, worldRoute, worstCase,
            clockWords, selfCheck, bare, upper, tail, baseOf, floorOf };
 })();

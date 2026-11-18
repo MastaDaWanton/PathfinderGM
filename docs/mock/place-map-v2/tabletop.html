@@ -8,6 +8,7 @@
 <style>
   .stage canvas.gl { cursor: grab; touch-action: none; }
   .rain { pointer-events: none; }
+  .tag .nm { display: inline-block; max-width: 190px; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }  /* a long name ends in …; the whole is on hover (title) and in the slip */
   .tag { position: absolute; left: 0; top: 0; white-space: nowrap; font: 600 13px/1 var(--body); color: #2a2019;
          background: rgba(243, 234, 214, .9); padding: 4px 8px; border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,.45); }
   .tag.seen { font-style: italic; font-weight: 400; background: rgba(243, 234, 214, .62); }

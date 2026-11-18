@@ -103,3 +103,17 @@ details.list button[aria-pressed="true"] { background: rgba(207, 169, 100, .18);
   .style-name { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* The worst case (made up): a red strip and border, so no screenshot of invented data can
+   pass for the game's (the board polish mock's rule). */
+.stage.is-worst { border-color: #b0483c; background: #b0483c; }
+.worst-flag { position: absolute; left: 10px; bottom: 10px; z-index: 6; margin: 0;
+  font: 600 13px/1.2 var(--body); color: #fff; background: #8e2317; padding: 5px 12px; border-radius: 3px; pointer-events: none; }
+.worst-toggle[aria-pressed="true"] { border-color: #b0483c; color: #ffb3a6; }
+.mapnote .proposed { font-size: 12px; font-style: italic; }
+/* A heading two lines at most: the worst case's 77-character house name took five and pushed
+   Walk there out of the floating slip at 800x600. The whole name is in the title. */
+.mapnote h3 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+/* A leg's name on one line: the last leg is the place pressed, already named above. */
+.route li { grid-template-columns: 18px minmax(0, 1fr) auto; }
+.route .leg { font-weight: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

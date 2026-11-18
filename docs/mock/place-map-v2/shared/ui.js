@@ -17,12 +17,16 @@ const MapUI = (() => {
   async function start(renderer, { styleName }) {
     R = renderer;
     D = await M.load();
+    // The worst case (made up) swaps the data where it is loaded, the one door the real data
+    // uses; the drawing is never touched. It lives in the URL, so a reload keeps it.
+    const worst = new URLSearchParams(location.search).get("worst") === "1";
+    if (worst) D = M.worstCase(D);
     T = D.town; L = M.townLayout(T); SITES = M.sites(D);
-    M.selfCheck(T);
+    if (!worst) M.selfCheck(T);   // the made-up town has no chart() to agree with
     const visitedTowns = new Set(D.region.towns.filter(t => t.visited).map(t => t.id));
     st = { level: "town", here: T.here, been: new Set(T.been), sel: null, said: "", fresh: new Set(),
            regionHere: D.region.here, visitedTowns, site: "sewers", minutes: T.clock_minutes || 0,
-           rain: false, walking: false };
+           rain: false, walking: false, worst, maps: worst ? D.world.worstMaps : [] };
     if (!st.been.has(st.here)) st.been.add(st.here);
     document.body.innerHTML = `<div class="app"><header class="bar">
         <ol class="crumbs" aria-label="Maps"></ol>
@@ -30,17 +34,21 @@ const MapUI = (() => {
         <label class="hour">Hour <input type="range" min="0" max="1439" step="10" aria-label="Hour of the day">
           <output></output></label>
         <button type="button" class="toggle" id="rain" aria-pressed="false">Rain</button>
-      </header><div class="main"><div class="stage" id="stage"></div><aside class="rail" aria-live="polite"></aside></div></div>`;
+        <button type="button" class="toggle worst-toggle" id="worst" aria-pressed="${worst}">Worst case (made up)</button>
+      </header><div class="main"><div class="stage${worst ? " is-worst" : ""}" id="stage"></div><aside class="rail" aria-live="polite"></aside></div></div>`;
     els = { crumbs: document.querySelector(".crumbs"), rail: document.querySelector(".rail"),
             stage: document.getElementById("stage"), hour: document.querySelector(".hour input"),
             out: document.querySelector(".hour output"), rain: document.getElementById("rain") };
     els.hour.value = st.minutes % 1440;
     els.hour.addEventListener("input", () => { st.minutes = Math.floor(st.minutes / 1440) * 1440 + +els.hour.value; paint(); });
     els.rain.addEventListener("click", () => { st.rain = !st.rain; paint(); });
+    document.getElementById("worst").addEventListener("click", () => {
+      const u = new URL(location.href); if (st.worst) u.searchParams.delete("worst"); else u.searchParams.set("worst", "1"); location.href = u; });
     els.crumbs.addEventListener("click", ev => { const b = ev.target.closest("[data-level]"); if (b) open(b.dataset.level, b.dataset.site); });
     els.rail.addEventListener("click", onRail);
     document.addEventListener("keydown", ev => { if (ev.key === "Escape" && st.sel) { st.sel = null; paint(); } });
-    R.init(els.stage, { pick, open, reduced: () => reduced.matches });
+    R.init(els.stage, { pick, open, reduced: () => reduced.matches, level: () => st.level });
+    if (worst) els.stage.insertAdjacentHTML("beforeend", `<p class="worst-flag">Worst case (made up): invented places, names and maps, not a real save</p>`);
     const q = new URLSearchParams(location.search);
     if (q.get("hour")) { st.minutes = Math.floor(st.minutes / 1440) * 1440 + Math.round(+q.get("hour") * 60); els.hour.value = st.minutes % 1440; }
     if (q.get("rain")) st.rain = true;
@@ -58,6 +66,12 @@ const MapUI = (() => {
       const r = st.sel && st.sel !== st.here && F.found.has(st.sel) ? M.route(T.ways, F.visited, st.here, st.sel) : null;
       return { ...base, T, L, F, here: st.here, fresh: st.fresh,
                route: r && r.legs.length ? [st.here, ...r.legs.map(l => l.to)] : null };
+    }
+    if (st.level === "world") {
+      const been = new Set([...D.world.been, ...st.visitedTowns]);
+      const WL = M.worldLayout(D.world), K = M.worldKnown(D.world, [...been], st.maps);
+      const legs = st.sel && st.sel !== st.regionHere && K.how[st.sel] ? M.worldRoute(D.world, K, st.regionHere, st.sel) : null;
+      return { ...base, W: D.world, WL, K, here: st.regionHere, route: legs && legs.length ? [st.regionHere, ...legs.map(l => l.to)] : null, legs };
     }
     if (st.level === "region") {
       const G = M.regionLayout(D.region, T, st.visitedTowns);
@@ -78,12 +92,13 @@ const MapUI = (() => {
     els.out.textContent = M.clockWords(st.minutes % 1440);
     els.rain.setAttribute("aria-pressed", st.rain);
     const s = SITES[st.site];
-    const crumbs = [["region", "Region", true], ["town", "Featherperch", true],
+    const crumbs = [...((R.levels || []).includes("world") ? [["world", "World", true]] : []), ["region", "Region", true], ["town", "Featherperch", true],
                     ["site", s ? M.upper(s.name) : "Site", st.level === "site"]];
     els.crumbs.innerHTML = crumbs.map(([lv, name, on]) => `<li><button type="button" data-level="${lv}"${
       lv === "site" ? ` data-site="${st.site}"` : ""}${st.level === lv ? ' aria-current="page"' : ""}${on ? "" : " disabled"}>${e(name)}</button></li>`).join("");
     const v = view();
     els.rail.innerHTML = slip(v);
+    els.rail.querySelectorAll("h3").forEach(h => { h.title = h.textContent.trim(); });  // the clamped heading's whole name
     R.draw(v);
     st.fresh = new Set();
   }
@@ -146,6 +161,11 @@ const MapUI = (() => {
     if (b.dataset.walk !== undefined) walk();
     else if (b.dataset.open) open(b.dataset.open, b.dataset.site);
     else if (b.dataset.pick) pick(b.dataset.pick);
+    else if (b.dataset.readmap) {
+      const n = b.dataset.readmap;
+      st.maps = st.maps.includes(n) ? st.maps.filter(x => x !== n) : st.maps.concat(n);
+      st.said = st.maps.includes(n) ? `You study the map of ${D.world.nations[n].name}: its towns and roads go onto yours.` : ""; paint();
+    }
     else if (b.dataset.replay) {
       const s = SITES[st.site], S = M.siteLayout(s.rooms);
       s.been = new Set([S.root]); s.here = S.root; st.sel = null; st.said = "Replaying from the way in: rooms beyond what you have seen are blank."; paint();
@@ -158,11 +178,40 @@ const MapUI = (() => {
     let out = st.said ? `<div class="mapnote said"><p>${e(st.said)}</p></div>` : "";
     if (v.level === "town") out += townSlip(v);
     else if (v.level === "region") out += regionSlip(v);
+    else if (v.level === "world") out += worldSlip(v);
     else out += siteSlip(v);
     return out;
   }
+  // The world: what you know of each city, and how you came to know it.
+  function worldSlip(v) {
+    const { W, K } = v, city = id => W.cities.find(c => c.id === id), nm = id => (city(id) || {}).name || id;
+    const how = h => h.by === "been" ? "You have stood here."
+      : h.by === "road" ? `A road out of ${e(nm(h.from))} is signed for it.`
+      : h.by === "heard" ? `Heard of in talk: “${e(h.line)}”`
+      : `On the map of ${e(W.nations[h.nation].name)} you read.`;
+    let out = "";
+    if (st.sel && K.how[st.sel] && st.sel !== st.regionHere) {
+      const c = city(st.sel), n = W.nations[c.nation] || {};
+      out += `<div class="mapnote picked"><h3>${e(c.name)}${K.how[st.sel].by === "been" ? "" : " <small>not yet visited</small>"}</h3>
+        <p>${how(K.how[st.sel])}</p><p>${e(n.name || "")}, ${e(W.continents[c.continent] || "")}.</p>${
+        v.legs ? `<ol class="route">${v.legs.map(l => `<li>${e(nm(l.to))}<span>${l.by === "sea" ? "by sea" : (l.miles ? l.miles + " miles" : "") + (l.by === "river" ? " by river" : "")}</span></li>`).join("")}</ol>
+          <p>${v.legs.length} ${v.legs.length === 1 ? "journey" : "journeys"} by the roads you know.</p>`
+        : `<p class="shutwhy">No road you know goes there.</p>`}</div>`;
+    }
+    const counts = { been: 0, road: 0, heard: 0, map: 0 };
+    Object.values(K.how).forEach(h => counts[h.by]++);
+    const here = city(st.regionHere), nation = here && here.nation;
+    out += `<div class="mapnote"><h3>${e(nm(st.regionHere))} <small>you are here</small></h3>
+      <p>${Object.keys(K.how).length} cities known: ${counts.been} stood in, ${counts.road} from road signs, ${counts.heard} heard of, ${counts.map} from maps.</p>
+      <p>Zoom out past the region to come here; press a town for the way there.</p>
+      <div class="btnrow"><button type="button" class="go quiet" data-open="region">Region map</button>${nation ? `
+      <button type="button" class="go quiet" data-readmap="${e(nation)}" aria-pressed="${st.maps.includes(nation)}">${st.maps.includes(nation) ? "Put the map away" : `Read a map of ${e(W.nations[nation].name)}`}</button>` : ""}</div>
+      <p class="proposed">Reading a map is proposed: no map item exists in the game yet.</p></div>`;
+    out += placeList(Object.keys(K.how).sort((a, b) => nm(a).localeCompare(nm(b))), nm, id => K.how[id].by !== "been");
+    return out;
+  }
   function legsHtml(legs) {
-    return `<ol class="route">${legs.map(x => `<li>${e(M.upper(x.name))}<span>${e(MW(x.time_words))}</span></li>`).join("")}</ol>`;
+    return `<ol class="route">${legs.map(x => `<li><b class="leg" title="${e(M.upper(x.name))}">${e(M.upper(x.name))}</b><span>${e(MW(x.time_words))}</span></li>`).join("")}</ol>`;
   }
   function floorsBadge(id) {
     const f = (L.floors[M.baseOf(id)] || []).map(M.floorOf);

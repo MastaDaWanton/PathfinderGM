@@ -105,7 +105,7 @@ const DioramaRenderer = (() => {
                    road: L.kind[i] === "roadhead" ? ((T.ways[i] || []).find(w => w.journey) || {}).time_words : "" });
     });
     // The town wall, on the tiles it crosses.
-    const gp = L.gate ? L.pos[L.gate] : [0, -240], wr = Math.hypot(...gp);
+    const gp = L.gate ? L.pos[L.gate] : [0, -240], wr = L0.wall ? L0.wall * Q : Math.hypot(...gp);
     const revealed = (x, y) => found.some(i => { const [px, py] = L.pos[i]; return Math.hypot(px - x, py - y) < 62; })
       || paths.some(p => segDist([x, y], p.a, p.b) < 28);
     return { items, paths, focus, revealed, ground: (x, y) => (Math.hypot(x, y) < wr ? "town" : "field"),
