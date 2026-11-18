@@ -1175,6 +1175,24 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
                            "zone": str(step.get("zone") or "near")}}])
             refs = [a["ref"] for o in res.outcomes for e in (o.effects or [])
                     if e.get("kind") == "spawn" for a in e.get("actors") or []]
+            # A foe who is a person gets a record and its face, as `_stand_up` gives the
+            # rest of the start's company (seen-people-are-real, 2026-10-01): measured
+            # 2026-11-17, road-caravan-attack's raider c4 had none, so once the fight was
+            # over nothing could find them. A beast has no people and stays a body.
+            from . import bestiary
+            from . import names as names_mod
+            from . import population
+
+            faces: dict[str, str] = {}
+            for r in refs:
+                foe = scene.people[r]
+                if not bestiary.has_a_people(foe):
+                    continue
+                rec = population.note(scene, label, fresh=True, body=foe.appearance)
+                rec["ref"] = r
+                faces[r] = rec["life"]["face"]
+                foe.appearance = names_mod.face_of(world, scene.location_id, foe,
+                                                   own=faces[r])
             if refs and str(step.get("from") or "") == "outlaws":
                 # The world's own outlaws, when it names a people that raids: Pangrella's
                 # Nirkor ("Nomadic herders, occasional raiders"). Their people, their face
@@ -1187,7 +1205,7 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
                     for r in refs:
                         person_words.settle_people(
                             scene, world, scene.people[r], words=f"{who} {label}",
-                            template=template, take_grant=False)
+                            template=template, take_grant=False, own=faces.get(r))
             if refs:
                 slots[slot] = refs[0]
                 foes.extend(refs)
