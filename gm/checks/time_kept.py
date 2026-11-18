@@ -128,14 +128,46 @@ def _slept(ctx, text: str) -> str:
     return sentence
 
 
+def _moved(ctx) -> int:
+    """The minutes the engine passed this turn (0 when unknown)."""
+    try:
+        return max(0, int(ctx.scene.clock_minutes) - int(getattr(ctx, "was_clock", None)))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _cut(ctx, text: str, sentence: str) -> str:
+    """The page without the flagged sentence and what follows it — in its own slot only,
+    on a planned beat. jack T211 (owner's save 2026-11-17): "I wait for the innkeepers
+    response" passed ten minutes, the page's "as the minutes pass" was read as hours, and
+    the cut ran to the end of the page and took the innkeeper's reply with it; what
+    another slot wrote is not set in the morning that never came."""
+    from gm import narration, planned
+
+    slots = [s for s in getattr(ctx, "slots", ()) or ()
+             if isinstance(s, dict) and str(s.get("wrote") or "").strip()]         if getattr(ctx, "planned", False) else []
+    n = planned.slot_of(sentence, slots) if slots else None
+    if n is None:
+        return cut_from(text, sentence)
+    page = narration._sentences(text)
+    at = next((i for i, x in enumerate(page) if x == sentence.strip()), None)
+    if at is None:
+        return cut_from(text, sentence)
+    for x in page[at:]:
+        if planned.slot_of(x, slots) == n:
+            text = text.replace(x, "", 1)
+    return text.strip()
+
+
 def find(ctx) -> list:
     sentence = _slept(ctx, ctx.text)
     if not sentence:
         return []
-    from rules import residency
+    from rules import residency, sky
 
     hour = residency.time_words(int(ctx.scene.clock_minutes))
     refused = _refused_rest(ctx)
+    moved = _moved(ctx)
     if refused is not None:
         why = _refusal_line(refused)
         return [Finding(
@@ -145,6 +177,18 @@ def find(ctx) -> list:
             f"The player's character did not rest: {why} They take no room and no bed, "
             f"and do not sleep. Rewrite the sentence so it does not happen — keep "
             f"anything else it says.",
+            weight=3, sentences=(sentence,))]
+    if moved:
+        # A clock that moved is never told it stood still (jack T212: "The hour has not
+        # moved" printed beside the engine's own "10 minutes pass").
+        span = sky.span_words(moved)
+        return [Finding(
+            "time-passed-unrun",
+            f"the engine passed only {span} this turn (it is {hour}); the page has the "
+            f"player sleep or let hours go by: {sentence[:90]!r}",
+            f"Only {span} pass for the player's character this turn: it is {hour}, they "
+            f"stay awake and where they are. Rewrite the sentence so they do not fall "
+            f"asleep, wake or let hours pass — keep anything else it says.",
             weight=3, sentences=(sentence,))]
     return [Finding(
         "time-passed-unrun",
@@ -165,10 +209,13 @@ def backstop(ctx, text: str, findings) -> tuple[str, list[str]]:
     refused = _refused_rest(ctx)
     # A refused rest closes on the engine's own refusal, the one sentence the page owed
     # and did not carry; anything else on the authored lines.
+    # A clock that moved closes on nothing of ours: the engine's own time tell says how
+    # long it was, and "the hour has not moved" beside it is false.
     line = (_refusal_line(refused) if refused is not None
+            else "" if _moved(ctx)
             else POOL[narration_mod.least_recently_used(getattr(ctx.scene, "said", None),
                                                         "time-still", len(POOL))])
-    text = f"{cut_from(text, sentence)} {line}".strip()
+    text = f"{_cut(ctx, text, sentence)} {line}".strip()
     return text, [f"no time passed this turn: cut from {sentence[:60]!r}, "
                   f"wrote {line[:50]!r}"]
 

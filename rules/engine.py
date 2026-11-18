@@ -1680,7 +1680,9 @@ class Scene:
                 self._mended_said(a, mended, body)
             had = list(a.effects)
             names = a.tick_effects(rounds)
-            ended.extend(f"{a.name}: {name}" for name in names)
+            quiet = {e.ended_label for e in had if _silent_end(e)
+                     and not any(e is x for x in a.effects)}
+            ended.extend(f"{a.name}: {name}" for name in names if name not in quiet)
             if names:
                 # Which effects went, by identity, so each record carries its origin.
                 told.extend(_ended_records(a, had))
@@ -32003,7 +32005,17 @@ class Engine:
         if actor is None:
             raise IntentError("rest: nobody here to rest", "refs")
         talking = self.talking_to()
-        if talking and actor.is_pc:
+        # The house's own keeper is no bar to its bed: frag T101 (owner's save 2026-11-17),
+        # "talk to the innkeeper to get a bed so that i can get some rest" was refused
+        # "still in conversation with the innkeeper". Asking the keeper for the bed is how
+        # a bed is had; the talk ends with the night (told in front of the bill).
+        from . import keepers as _keepers
+        from . import lodging as _lodging
+
+        at_here = str(self.scene.at or "")
+        host = _keepers.keeper_in(self.scene, at_here)             if actor.is_pc and _lodging.lets_beds(self.scene, at_here) else None
+        parting = bool(talking) and host is not None and all(a is host for a in talking)
+        if talking and actor.is_pc and not parting:
             return self._refuse(
                 intent, f"You are still in conversation with "
                         f"{_and_list(a.name for a in talking)}. Take your leave first.")
@@ -32022,6 +32034,9 @@ class Engine:
         bill = self._room_bill(intent, actor) if actor.is_pc else None
         if bill is not None and bill.get("refused") is not None:
             return bill["refused"]
+        if parting and bill is not None:
+            host.remove_effects(source="talk")
+            bill["tell"] = f"You take your leave of {host.name}. {bill['tell']}"
 
         # The camp (the owner, 2026-10-01: "a tent should decrease the chance of being
         # attacked in my sleep and protect me from the elements to a degree. A bedroll
@@ -32213,9 +32228,14 @@ class Engine:
                     "effect": {"ref": actor.ref, "kind": "lodging", "place": at, "cp": 0,
                                "paid": 0, "why": "own", "origin": lodging.ORIGIN}}
         if lodging.held(actor, at):
-            return {"tell": f"{actor.name}'s room at {name} is already paid for today.",
+            # With the stay that was bought: frag T109-T111 (owner's save 2026-11-17) paid
+            # for the good room, and the night was narrated on the floor by the hearth.
+            stay = (lodging.room_held(actor) or ("", lodging.DEFAULT_STAY))[1]
+            return {"tell": f"{actor.name}'s {stay} room at {name} "
+                            f"({lodging.ABOUT[stay]}) is already paid for today.",
                     "effect": {"ref": actor.ref, "kind": "lodging", "place": at, "cp": 0,
-                               "paid": 0, "why": "held", "origin": lodging.ORIGIN}}
+                               "paid": 0, "why": "held", "stay": stay,
+                               "origin": lodging.ORIGIN}}
         keeper = keepers.keeper_in(self.scene, at)
         asks = keeper.name if keeper is not None and keeper.at == at else ""
         # The book's stay, moved by the keeper's own terms (owner, 2026-11-13: every
@@ -34152,6 +34172,14 @@ _DESTROYED_SAID = "is destroyed"
 _BROKEN_SAID = "is broken: inert, but not destroyed"
 
 
+def _silent_end(e) -> bool:
+    """An effect whose ending is bookkeeping, never news: the once-a-day mark of a full
+    night (`Engine._slept_a_night`). jack, owner's save 2026-11-17: it ran out at the end
+    of a 16-hour bench session as "a full night's rest wears off Jack", and the page had
+    him just waking up."""
+    return getattr(e, "origin", "") == "rule:rest" and getattr(e, "key", "") == "rested-tonight"
+
+
 def _ended_records(actor, had) -> list[dict]:
     """The `effect_ended` record of each effect in `had` the actor no longer carries, by
     identity, each with its origin. A carried light an item gave (`light.carried`, origin
@@ -34160,7 +34188,7 @@ def _ended_records(actor, had) -> list[dict]:
     and the page said "You strike a torch, and its flame pushes back the gloom"."""
     out = []
     for e in had:
-        if any(e is x for x in actor.effects):
+        if any(e is x for x in actor.effects) or _silent_end(e):
             continue
         rec = {"kind": "effect_ended", "ref": actor.ref, "what": e.ended_label,
                "origin": e.origin}

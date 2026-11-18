@@ -753,12 +753,40 @@ def _give(row: Row, frame, i, scene, pc, recent=(), coming=()) -> None:
         row.missing = (f"there is nobody here who is {to_words}" if to_words
                        else f"nobody here to give {thing} to")
         return
+    stay = _stay_paid_for(a, scene, to) if (amount or _is_coin(thing)) else None
+    if stay is not None:
+        # Coin handed to the house's keeper for a room is the room bought, at the book's
+        # price through the counter's own door (`Engine._buy_stay`), never the sum said:
+        # jack T205 (owner's save 2026-11-17), "I hand over 2 gold for the private room"
+        # was a plain gift, no room was held, and the night upstairs was billed again.
+        row.intents.append({"op": "buy", "actor": pc.ref,
+                            "params": {"item": stay["id"], "from_": to},
+                            "because": "the player paid the keeper for a room"})
+        row.note = f"coin for a room: the {stay['quality']} stay, at the house's price"
+        return
     if amount:
         params = {"item": amount[0], "count": amount[1], "from_": pc.ref, "to": to}
     else:
         params = {"item": key or _plain(thing), "from_": pc.ref, "to": to}
     row.intents.append({"op": "give", "actor": pc.ref, "params": params,
                         "because": "the player handed it over"})
+
+
+def _stay_paid_for(a: dict, scene, to: str) -> dict | None:
+    """The inn's stay a coin `give` pays for (`lodging.find`'s row), or None: only to the
+    keeper of the house the party stands in, where beds are let, and only when the act's
+    own place slot (else its span) names a room the house lets."""
+    from rules import keepers, lodging
+
+    at = str(getattr(scene, "at", "") or "")
+    keeper = keepers.keeper_in(scene, at) if at and lodging.lets_beds(scene, at) else None
+    if keeper is None or keeper.ref != to:
+        return None
+    for words in (a.get("place"), a.get("span")):
+        found = lodging.find(str(words or "")) if words else None
+        if found is not None:
+            return found
+    return None
 
 
 def _agreed_work(row: Row, a: dict, scene, pc) -> bool:
@@ -1068,7 +1096,7 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                         if not places or places_mod.find(places, a["place"]) is None else "")
                 if home:
                     _home_together(row, home, scene, pc)
-                else:
+                elif not _to_my_room(row, str(a["place"]), scene, places, pc):
                     _to_the_town(row, str(a["place"]), scene, places, pc)
                     _nowhere(row, a, scene, places)
             if act == "go" and a.get("fixture"):
@@ -1820,6 +1848,41 @@ def _carry_on(row: Row, scene, pc) -> None:
     row.intents.append({"op": "travel", "actor": pc.ref, "params": {"place": walk["to"]},
                         "because": f"on to {walk['name']}, where the walk was going"})
     row.note = f"the walk goes on to {walk['name']}"
+
+
+# A room the player holds at an inn, by the head nouns a bed is asked for by: the same closed
+# vocabulary shape as DWELLINGS, asked only while a room is held (`lodging.room_held`).
+_MY_ROOM_WORDS = frozenset({"room", "rooms", "bed", "bedroom", "chamber", "bedchamber",
+                            "quarters", "lodging", "lodgings"})
+
+
+def _to_my_room(row: Row, phrase: str, scene, places, pc) -> bool:
+    """A walk to the room the player paid for — "my room", "the room i paid for" — is the
+    walk up to the inn's upper floor while the room is held (its ground floor where the
+    house has none). True when it was settled here. frag T113 (owner's save 2026-11-17):
+    "go to the room i paid for" was "You don't know of anywhere called…", and the prose
+    said the only beds were the floor by the hearth, of a good room bought that night."""
+    from rules import lodging
+    from rules import places as places_mod
+
+    held = lodging.room_held(pc)
+    words = set(re.findall(r"[a-z]+", phrase.lower()))
+    if held is None or not (words & _MY_ROOM_WORDS) or places_mod.find(places, phrase):
+        return False
+    house = places_mod.base_of(held[0])
+    up = places_mod.storey_id(house, 1)
+    target = next((p for p in places or () if p.id == up), None) \
+        or next((p for p in places or () if p.id == house), None)
+    if target is None:
+        return False
+    if target.id == getattr(scene, "at", None):
+        row.note = "already in the room the player holds"
+    else:
+        row.intents.append({"op": "travel", "actor": pc.ref,
+                            "params": {"place": target.name},
+                            "because": f"to the {held[1]} room the player holds"})
+        row.note = f"{phrase}: the {held[1]} room held at {target.name}"
+    return True
 
 
 def _to_the_town(row: Row, phrase: str, scene, places, pc) -> None:
@@ -3260,6 +3323,11 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     # untrained Profession and the job taken at the list price.
     commissioned = {str((b.get("params") or {}).get("who")): b for b in built
                     if b.get("op") == "commission"}
+    from rules import lodging as _lodging
+
+    staying = {str((b.get("params") or {}).get("from_") or "") for b in built
+               if b.get("op") == "buy" and str((b.get("params") or {}).get("item") or "")
+               .startswith(_lodging.PREFIX)}
     # A take the table built as a give is that act's whole deed: when it is the only act
     # that could stand behind a take-off, the plan's take-off has none. Playtest 2026-11-17
     # #49: "I take the coin from the crew's cargo chest" was planned as take_off of
@@ -3455,6 +3523,13 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
             if notes is not None:
                 notes.append(f"the plan's {op} of {p.get('item')!r} to the keeper: the "
                              f"room is the rest's to charge, at the house's price, dropped")
+            continue
+        if _is_coin(p.get("item")) and str(p.get("to") or target or "") in staying:
+            # Coin to the keeper the table bought the room from (`_stay_paid_for`): the
+            # stay charges the house's price, so the plan's figure beside it pays twice.
+            if notes is not None:
+                notes.append("the plan's coin to the keeper: the stay bought charges its "
+                             "own price, dropped")
             continue
         if op in ("give", "sell") and _is_coin(p.get("item")) \
                 and str(p.get("to") or target or "") in commissioned:
@@ -4245,6 +4320,31 @@ def _each_to_its_own(raw, frame, scene, places, says: list[int], notes) -> list:
     return out
 
 
+def _nearest_answerer(scene) -> str:
+    """The ref of the nearest person here who would answer a question put to the room: up,
+    seen, not hostile, and not the market's master, who answers only the one who turns to
+    them (`gm/checks/master_unprompted.py`). Nearest by the board's squares, else the first.
+    "" for nobody."""
+    from rules import attitude, keepers
+
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    master = keepers.master_here(scene)
+    pos = getattr(scene, "positions", None) or {}
+    me = tuple(pos.get(getattr(pc, "ref", ""), ()) or ())[:2]
+    who = [(r, a) for r, a in (getattr(scene, "actors", {}) or {}).items()
+           if not a.is_pc and a.name and not a.is_down and not a.has_state("state.hidden")
+           and attitude.of(a) != attitude.HOSTILE
+           and (master is None or r != master.ref)]
+    if not who:
+        return ""
+
+    def far(item) -> int:
+        there = tuple(pos.get(item[0], ()) or ())[:2]
+        return max(abs(there[0] - me[0]), abs(there[1] - me[1])) if me and there else 999
+
+    return min(who, key=far)[0]
+
+
 def _said_to_nobody(raw, frame, scene, k: int, notes) -> list:
     """A line the reading says nobody would answer goes to nobody the plan picked.
 
@@ -4269,6 +4369,30 @@ def _said_to_nobody(raw, frame, scene, k: int, notes) -> list:
     # inquiry". Asked aloud in a room of one, it is asked of that one (`Engine._op_say`'s
     # own rule, which an absent `to` had switched off). `scene` is where the walk ends.
     gone = bool(talks) and bool(was) and was not in (getattr(scene, "actors", {}) or {})
+    # A question put to the room, the reader naming nobody: asked of somebody who can
+    # answer. jack T276 (owner's save 2026-11-17), "I ask how to get to the docks?" at the
+    # market: the say went to nobody, no reply was written, and the page had the master and
+    # a keeper go about their business; the player had to ask again by name. The engine
+    # reads only `to`, and fills a missing one only in a room of one. Live on this branch
+    # the plan wrote the say three ways — no `to`, `to=new1` nobody introduced, and
+    # `target` on the market's master with no `to` — and each went to nobody.
+    to = str(params.get("to") or "")
+    if talks and (not to or to not in (getattr(scene, "actors", {}) or {})) \
+            and all(interpret.cost_of(a, scene) == "addresses" for a in talks):
+        from rules import keepers
+
+        master = keepers.master_here(scene)
+        aimed = was if was in (getattr(scene, "actors", {}) or {}) \
+            and (master is None or was != master.ref) else ""
+        # The plan's own aim when it is somebody who answers; then the one the player is
+        # dealing with; then the nearest who can answer (never the master unprompted).
+        near = aimed or addressed(scene) or _nearest_answerer(scene)
+        if near:
+            out = list(raw)
+            out[k] = dict(say, params=dict(params, to=near), target=near)
+            if notes is not None:
+                notes.append(f"the say to nobody goes to {near}: the nearest who can answer")
+            return out
     if not talks or (not gone and any(str(a.get("cost") or "") != "free" for a in talks)):
         return raw
     keep = addressed(scene)
