@@ -1462,6 +1462,14 @@ def off_rack_reason(actor, key: str) -> str:
     return ""
 
 
+def _held(st) -> bool:
+    """Work In progress (rules/inprogress.py), ready or not, is not on the rack until it is
+    collected: the section is where it sits (the owner's In-progress ruling)."""
+    from . import inprogress
+
+    return inprogress.work_of(st) is not None
+
+
 def rack(actor, reserved: dict | None = None) -> list[Piece]:
     """Everything the forge can reach for: only what is carried (UI plan §6.2). Raw
     materials from `Actor.inventory` (bought, gathered), and from the shelf the forge's
@@ -1491,6 +1499,8 @@ def rack(actor, reserved: dict | None = None) -> list[Piece]:
             got = _leather_piece(actor, sid, st, reserved)
             if got is not None:
                 out.append(got)
+            continue
+        if _held(st):
             continue
         key = f"stock:{sid}"
         whole = int(st.count or 0)
@@ -1762,6 +1772,11 @@ class ForgePlan:
     need: int | None = None
     impossible: str = ""
     minutes: int = 0
+    # What waits In progress after the hands-on `minutes` (ruling 2026-11-18): 0 for a
+    # step under an hour. `where_place`: "place:<smithy>" or "carried".
+    waits: int = 0
+    where_place: str = "carried"
+    where_name: str = ""
     units: int = 0
     consumes: list = field(default_factory=list)    # (Piece, total)
     outputs: list = field(default_factory=list)     # (Work, count) before the tier
@@ -1797,7 +1812,7 @@ class ForgePlan:
         if not self.units:
             return ""
         n = sum(c for _, c in self.outputs) or self.units
-        hours, mins = divmod(int(self.minutes), 60)
+        hours, mins = divmod(int(self.minutes) + int(self.waits), 60)
         span = (f"{hours}h {mins}m" if hours and mins else f"{hours}h" if hours
                 else f"{mins}m")
         word = self.noun + ("" if n == 1 else "s")
@@ -1814,7 +1829,7 @@ def _perk_counts(progress) -> dict:
 
 def plan_step(actor, progress, method: str, slots: dict, batch: int = 1, *,
               shape: str = "", where: dict | None = None,
-              masterwork: bool = True) -> ForgePlan:
+              masterwork: bool = True, waits: bool = False) -> ForgePlan:
     """One step, worked out without changing anything.
 
     `slots` maps a slot name to (rack Piece, count per unit); the count is read only by
@@ -1924,6 +1939,21 @@ def plan_step(actor, progress, method: str, slots: dict, batch: int = 1, *,
 
     plan.need, plan.impossible = check_odds(plan.dc, plan.bonus)
     plan.step_ceiling = max(0, plan.step_ceiling)
+    # A step of an hour or more waits In progress (the owner's ruling of 2026-11-18): the
+    # clock moves by the hands-on minutes, the rest is the work's own countdown, left at
+    # the smithy it was worked at or carried from the field kit.
+    # `waits`: the bench's door (the player at the bench) asks for it. A typed chain and
+    # a keeper's commission walk every step in one go, so they keep the whole time on the
+    # clock rather than leave a half-made piece In progress mid-chain.
+    rules = bench_rules()
+    if waits and plan.minutes >= int(rules.get("in_progress_after", 60)):
+        hands = min(plan.minutes - 1, int(rules.get("hands_on_minutes", 10)))
+        plan.waits = plan.minutes - hands
+        plan.minutes = hands
+        smithy = where.get("smithy") or {}
+        if smithy.get("place"):
+            plan.where_place = f"place:{smithy['place']}"
+            plan.where_name = str(smithy.get("name") or "the smithy")
     return plan
 
 
@@ -2613,14 +2643,16 @@ _BUILD = {"smelt": _build_smelt, "alloy": _build_alloy, "forge": _build_forge,
           "strengthen": _build_strengthen}
 
 
-def make(plan: ForgePlan, tier: int, *, extra: int = 0) -> list[tuple[Work, int]]:
+def make(plan: ForgePlan, tier: int, *, extra: int = 0,
+         lift: int = 0) -> list[tuple[Work, int]]:
     """What a finished step puts on the shelf, at the tier the player's hands earned.
 
     `extra` is the Yield perk's one more ingot or blank, rolled by the caller and shown
     (plan §4.2). A Crude result over a sulfurous fuel picks up a `hot_short` flaw unless
     the fuel burns clean (plan §5.5). A Finish leaves the item's quality alone.
     """
-    tier = max(0, min(int(tier), plan.step_ceiling))
+    # `lift`: a natural 20's breakthrough past the ceiling (`crafting.margin_bonus`).
+    tier = max(0, min(int(tier), plan.step_ceiling + int(lift)))
     out = []
     for i, (template, n) in enumerate(plan.outputs):
         w = template.copy()
@@ -2655,6 +2687,37 @@ def land(actor, made: list[tuple[Work, int]]) -> list[tuple[str, Work, int]]:
                 w.name = f"{base} ({k})"
         landed.append((put(actor, w, n), w, n))
     return landed
+
+
+def _begin_waits(actor, plan: ForgePlan, landed, now: int) -> list:
+    """Each landed product of a long step put In progress on its own shelf entry
+    (`inprogress.set_apart`: never the identical stack already carried). Returns `landed`
+    re-keyed."""
+    from . import inprogress
+
+    out = []
+    for key, w, n in landed:
+        own = inprogress.set_apart(actor, key, n)
+        inprogress.begin(actor, own, craft=TRACK_ID, minutes=int(plan.waits), now=int(now),
+                         label=f"{w.name}: {plan.method}", where=plan.where_place,
+                         where_name=plan.where_name, doing=f"{plan.method}ing"
+                         if not plan.method.endswith("e") else f"{plan.method[:-1]}ing")
+        out.append((own, w, n))
+    return out
+
+
+def _collect(item, actor) -> dict:
+    """Collecting forge work: the piece is already what it will be; the section lifts it."""
+    return {"said": f"You collect the {item.name} from the forge's work."}
+
+
+def _register_in_progress() -> None:
+    from . import inprogress
+
+    inprogress.register(TRACK_ID, collect=_collect, icon="hammer", stop_words="")
+
+
+_register_in_progress()
 
 
 def failure_losses(plan: ForgePlan, miss: int) -> list[tuple[Piece, int]]:
@@ -2877,7 +2940,7 @@ def settle_miss(actor, progress, plan: ForgePlan, miss: int) -> dict:
 
 
 def settle_made(actor, progress, plan: ForgePlan, tier: int, consumes, *, dice=None,
-                now: int = 0) -> dict:
+                now: int = 0, margin_bonus: dict | None = None) -> dict:
     """A made roll at the forge, finished at `tier`: the materials in `consumes` (the
     rack's own pieces, read fresh) are spent, the product lands, the step and the firsts
     are paid, and working a material reveals its working traits (plan §9.2: "you watched
@@ -2898,9 +2961,18 @@ def settle_made(actor, progress, plan: ForgePlan, tier: int, consumes, *, dice=N
                              f"{'one more ' + plan.noun if extra else 'nothing extra'}",
                       "mp": 0}
 
+    # The margin's extra units (`crafting.margin_bonus`, ruling 2026-11-18) on a step that
+    # yields, where the Yield perk's one more lands.
+    from .crafting import bonus_units
+
+    first = int(plan.outputs[0][1]) if plan.outputs else 0
+    more = bonus_units(first, margin_bonus) if plan.yields else 0
     spend(actor, list(consumes))
-    made = make(plan, tier, extra=extra)
+    made = make(plan, tier, extra=extra + more,
+                lift=int((margin_bonus or {}).get("breakthrough") or 0))
     landed = land(actor, made)
+    if plan.waits:
+        landed = _begin_waits(actor, plan, landed, now)
 
     lines: list[dict] = []
     levelled: list[int] = []
@@ -2954,5 +3026,9 @@ def settle_made(actor, progress, plan: ForgePlan, tier: int, consumes, *, dice=N
             bonus(f"learned: {m.name}, {text}" if text else f"learned: {m.name}")
     if yield_line:
         lines.append(yield_line)
+    if more:
+        from .crafting import bonus_line
+
+        lines.append(bonus_line(more, plan.noun or "piece", margin_bonus))
     return {"landed": landed, "lines": lines, "levelled": levelled,
             "discoveries": discoveries}

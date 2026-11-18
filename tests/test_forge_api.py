@@ -85,15 +85,48 @@ def post(client, url, body):
     return client.post(url, data=json.dumps(body), content_type="application/json")
 
 
-def do_step(client, body, *, face=20, score=1.0):
-    """check, roll, finish: one step as the page drives it."""
+def do_step(client, body, *, face=None, score=1.0, collect=True):
+    """check, roll, finish: one step as the page drives it. `face` None rolls the face that
+    just makes the DC (no 5+ margin bands, ruling 2026-11-18, unless the bonus alone beats
+    it by 5); `collect` waits out a step of an hour or more that went In progress and
+    collects it, as the player would before the next step."""
+    if face is None:
+        chk = post(client, "/api/forge/check", body).json()
+        face = max(1, min(20, int(chk["dc"]) - int(chk["bonus"])))
     r = post(client, "/api/forge/roll", {**body, "face": face})
     assert r.status_code == 200, r.content[:400]
     rolled = r.json()
     assert rolled["roll"]["success"], rolled
     f = post(client, "/api/forge/finish", {"token": rolled["token"], "score": score})
     assert f.status_code == 200, f.content[:400]
-    return f.json()
+    done = f.json()
+    if collect:
+        wait_and_collect(client)
+    return done
+
+
+def wait_and_collect(client) -> None:
+    """Wait out every work In progress and collect it, where it was left (collected work
+    keeps its shelf key, so the products' keys still hold)."""
+    from rules import inprogress
+
+    c = cm.current()
+    now = int(c.scene.clock_minutes or 0)
+    held = [k for k, s in c.scene.pc().stock.items() if inprogress.work_of(s, now)]
+    if not held:
+        return
+    end = max(inprogress.end_of(c.scene.pc().stock[k], now) for k in held)
+    if end > now:
+        c.scene.advance(end - now)
+        c.save()
+    for k in held:
+        # Work left at a smithy is collected there: stand where it was left (the faked
+        # smithy's place is not the scene's spot).
+        where = str(inprogress.work_of(c.scene.pc().stock[k]).get("where") or "carried")
+        here = where.split(":", 1)[1] if where.startswith("place:") else None
+        got = inprogress.collect(c.scene.pc(), k, now=int(c.scene.clock_minutes), here=here)
+        assert got["ok"], got
+    c.save()
 
 
 def rack_key(client, form, material=None):

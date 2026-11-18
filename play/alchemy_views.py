@@ -792,6 +792,11 @@ def alchemy_roll(request):
     total = best + plan.bonus
     margin = total - plan.dc
     success = margin >= 0                      # a skill check: no naturals (CRB p.180)
+    # Beating the DC by 5 or more (ruling 2026-11-18, `crafting.margin_bonus`): less time
+    # now and in any wait; more units and a quality floor at the finish.
+    bonus = crafting.margin_bonus(margin, best) if success else None
+    plan.minutes = crafting.bonus_minutes(plan.minutes, bonus)
+    plan.waits = crafting.bonus_minutes(plan.waits, bonus)
 
     paid = []
     rent = al.rent_cp(c.scene, plan.lab, plan.minutes, _known_places(c))
@@ -806,7 +811,7 @@ def alchemy_roll(request):
     lived = bench_clock.pass_time(c, engine, pc, plan.minutes, "at the alchemy bench")
     roll = {"face": best, "faces": faces, "bonus": plan.bonus, "total": total,
             "dc": plan.dc, "success": success, "margin": margin, "terms": plan.terms,
-            "dc_terms": plan.dc_terms if not _secret(plan) else None}
+            "dc_terms": plan.dc_terms if not _secret(plan) else None, "margin_bonus": bonus}
     out = {"roll": roll,
            "verdict": {"verdict": "success" if success else "failure", "natural": best,
                        "word": "Success" if success else "Failure", "good": success},
@@ -818,7 +823,7 @@ def alchemy_roll(request):
         token = secrets.token_urlsafe(16)
         _PENDING[c.id] = {"token": token, "plan": plan, "roll": roll}
         out["token"] = token
-        out["tuning"] = al.tuning_for(plan)
+        out["tuning"] = dict(al.tuning_for(plan), **crafting.ladder(plan.ceiling, bonus))
         out["liquid"] = _liquid_view(al.liquid_for(plan))
     else:
         miss = -margin
@@ -874,7 +879,8 @@ def alchemy_finish(request):
             name = next(it.name for it, _ in plan.consumes if it.key == key)
             return _err(f"The {name} set aside for this step is gone. Nothing was made.", 409)
 
-    tier, score = crafting.tier_from_score(body.get("score"), plan.ceiling)
+    bonus = pend["roll"].get("margin_bonus")
+    tier, score = crafting.tier_from_score(body.get("score"), plan.ceiling, bonus)
     # No coin is taken at Bottle: "ingredients only" (the owner, 2026-10-07). Brewing costs
     # what goes into it and nothing more; a cheap-ingredient potion selling for far more
     # than it cost is accepted knowingly. Lane H's `pricing.coin_to_make` (the book's
@@ -897,7 +903,7 @@ def alchemy_finish(request):
     settled = al.settle_made(pc, progress, plan, tier,
                              [(fresh[it.key], n) for it, n in plan.consumes],
                              dice=engine.dice, now=now, where=_where(c, pc),
-                             after_firsts=learned)
+                             after_firsts=learned, margin_bonus=bonus)
     landed = settled["landed"]
     lines, levelled = settled["lines"], settled["levelled"]
     discoveries = settled["discoveries"]
@@ -907,7 +913,7 @@ def alchemy_finish(request):
     what = ", ".join(f"{x['record'].get('count')} {x['record'].get('name')}" for x in landed)
     c.transcript.append({"who": "gm", "kind": "consequence", "text": (
         f"{pc.name} works the alchemy bench ({plan.method}): {what}, {tier_name} "
-        f"(d20 {r['face']}{r['bonus']:+d} = {r['total']} vs DC {r['dc']}).")})
+        f"(d20 {r['face']}{r['bonus']:+d} = {r['total']} vs DC {r['dc']}).") + (" " + str((r.get("margin_bonus") or {}).get("words") or "")).rstrip()})
     c.save()
 
     products = []

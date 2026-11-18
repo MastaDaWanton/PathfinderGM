@@ -996,12 +996,33 @@ def grade_of(defects) -> int:
 
 def graded(game_grade: int, margin: int) -> int:
     """The game's grade after the roll's verdict: a near miss is one grade worse and never
-    better than `near_miss_best` (plan §5.8). A reject stays a reject."""
+    better than `near_miss_best` (plan §5.8). A reject stays a reject.
+
+    Beating the DC by 5 or more (the owner's ruling of 2026-11-18,
+    `crafting.margin_bonus`) is a floor under the game: each band makes the worst grade
+    the cut can land one better, a reject included, never better than grade 2, so the
+    best grade is always the knife game's own."""
     g = int(game_grade)
-    if margin >= 0 or g == 0:
+    if margin >= 0:
+        from .crafting import margin_bonus
+
+        floor = int(margin_bonus(margin)["floor"])
+        if floor:
+            worst = max(int(row[1]) for row in rules().get("grade_bands") or [[0, 4]])
+            limit = max(2, worst - floor)
+            return limit if g == 0 or g > limit else g
+        return g
+    if g == 0:
         return g
     r = rules()
     return min(4, max(g + 1, int(r.get("near_miss_best", 3))))
+
+
+def _margin_units(units: int, margin: int) -> int:
+    """The extra units a roll beating the DC by 5 or more adds (`crafting.bonus_units`)."""
+    from .crafting import bonus_units, margin_bonus
+
+    return bonus_units(units, margin_bonus(margin)) if margin >= 0 else 0
 
 
 def _yield_roll(actor, dice) -> bool:
@@ -1111,6 +1132,8 @@ def take(actor, creature, key: str, roll_total: int, *, now: int, scene=None, di
             if margin >= 0 and _yield_roll(actor, dice):
                 q = int(q + math.floor(q * float(r.get("yield_bonus", 0.5))))
                 out["yielded"] = True
+            # Beating the DC by 5 or more: more of the hide comes off whole (in quarters).
+            q += _margin_units(q, margin)
         if q > 0:
             # Salt costs salt (owner answer 8): one measure per hide unit, as much of the
             # hide as the pack's salt covers; the rest stays green on its 48-hour clock.
@@ -1140,15 +1163,17 @@ def take(actor, creature, key: str, roll_total: int, *, now: int, scene=None, di
             out["lost"] = f"Missed by {-margin}: the {row['name'].lower()} is ruined."
             out["fate"] = "ruined"
         else:
+            # Beating the DC by 5 or more: one more of the part (ruling 2026-11-18).
+            n = 1 + _margin_units(1, margin)
             if row["craft"] == HERBALIST:
                 # An animal part's 48-hour clock starts, and salt it through the one reader
                 # (`herbprep.preserve_on_pick`, inside `carry`) at what salting costs.
                 before = salt_measures(actor)
-                actor.carry(row["material"], 1, at_minute=int(now))
+                actor.carry(row["material"], n, at_minute=int(now))
                 out["salt_spent"] = max(0, before - salt_measures(actor))
             else:
-                actor.carry(row["material"], 1)
-            out["carried"] = [{"id": row["material"], "name": row["name"], "count": 1}]
+                actor.carry(row["material"], n)
+            out["carried"] = [{"id": row["material"], "name": row["name"], "count": n}]
             if margin < 0:
                 # The part named, never "it": "Missed by 1: it comes away, but not cleanly"
                 # after a pelt and a sinew was told as the leather torn (the 2026-11-05
@@ -1352,7 +1377,11 @@ def take_part(engine, actor, creature, key: str, *, now: int, face: int | None =
         face = engine.dice.d20(label=f"Harvest: {row['name']}", visibility="player").faces[0]
     total = int(face) + row["bonus"]
     got = take(actor, creature, key, total, now=now, scene=engine.scene, dice=engine.dice)
-    engine.scene.advance(row["minutes"])
+    # Less time for a clean cut by 5 or more (ruling 2026-11-18). No natural-20 breakthrough
+    # here: a hide's grade has no level ceiling to break (content/rules/craft-margin.json).
+    from .crafting import bonus_minutes, margin_bonus
+
+    engine.scene.advance(bonus_minutes(row["minutes"], margin_bonus(got["margin"])))
     track = worldclass.get(row["craft"])
     progress = actor.track(row["craft"])
     award = worldclass.award_step(track, progress, method="harvest",

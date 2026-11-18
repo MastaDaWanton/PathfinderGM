@@ -77,8 +77,12 @@ def post(client, url, body):
     return client.post(url, data=json.dumps(body), content_type="application/json")
 
 
-def step(client, body, *, face=20, score=1.0):
-    """roll, finish: one step as the page drives it."""
+def step(client, body, *, face=None, score=1.0):
+    """roll, finish: one step as the page drives it. `face` None rolls the face that just
+    makes the DC, so the 5+ margin bands (ruling 2026-11-18) give nothing unless asked."""
+    if face is None:
+        chk = post(client, "/api/alchemy/check", body).json()
+        face = max(1, min(20, int(chk["dc"]) - int(chk["bonus"])))
     r = post(client, "/api/alchemy/roll", {**body, "face": face})
     assert r.status_code == 200, r.content[:600]
     rolled = r.json()

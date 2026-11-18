@@ -26,45 +26,51 @@ def _brew_body(client, face=1):
             "items": [{"key": _key(client, "Glowcap"), "count": FOUR_DAYS}]}
 
 
-def test_four_days_of_brewing_with_no_food_is_refused_before_the_die(bench):
+def test_four_days_of_bench_work_with_no_food_is_refused_in_words(bench):
     """No food in the pack carries the body 72 hours (the book's three days of grace), so
-    four days of brewing is refused: 409, the reason in words, and nothing rolled, spent or
-    passed -- the clock, the herbs and the transcript are exactly as they were. The check
-    says so too, and greys Roll."""
-    _carry(glowcap=FOUR_DAYS)
+    four days at a bench is refused: the reason in words, before any die. Asked of
+    `bench_clock` directly since the owner's ruling of 2026-11-18 sends the herb bench's
+    long steps In progress (the alchemist's long steps already were), so the four days of
+    brewing below no longer hold the body there; the door is still every bench's."""
+    from play import bench_clock
+
     c = cm.current()
     pc = c.scene.pc()
     pc.goods.update({"waterskin": 20})
-    before = (c.scene.clock_minutes, pc.inventory["glowcap"], len(c.transcript))
-    checked = _post(bench, "/api/bench/check", _brew_body(bench))
-    assert checked["minutes"] == 5760 and checked["can_roll"] is False
-    assert any("cannot work 4 days" in p for p in checked["problems"]), checked["problems"]
-    said = _post(bench, "/api/bench/roll", _brew_body(bench), status=409)["error"]
+    said = bench_clock.refusal(c, pc, 5760)
     assert "cannot work 4 days" in said and "food" in said and "smaller batch" in said, said
+
+
+def test_four_days_of_brewing_now_wait_in_progress_not_at_the_bench(bench):
+    """Ruling 2026-11-18: a step of an hour or more goes In progress. 48 Glowcap decoctions
+    (5,760 minutes, which starved the brewer before the bench asked) now hold the bench 10
+    minutes, with no food carried, and the rest brews In progress."""
+    _carry(glowcap=FOUR_DAYS)
     c = cm.current()
-    pc = c.scene.pc()
-    assert (c.scene.clock_minutes, pc.inventory["glowcap"], len(c.transcript)) == before
-    assert not bench_views._PENDING
+    before = c.scene.clock_minutes
+    checked = _post(bench, "/api/bench/check", _brew_body(bench))
+    assert checked["minutes"] == 10 and checked["can_roll"], checked["problems"]
+    assert checked["product"]["ready_minutes"] == 5750
+    _post(bench, "/api/bench/roll", _brew_body(bench))
+    assert cm.current().scene.clock_minutes == before + 10
 
 
 def test_a_bench_steps_body_toll_is_told_on_the_page_not_on_the_next_turn(bench):
-    """With food and water for the stretch the same four days are worked: the body eats
-    and drinks from the pack, the stretch is one transcript consequence line naming its
-    span and the meals, the roll's JSON carries it as `lived`, and the scene's body queue
-    holds nothing of the player's for the next typed turn (`Scene._body_said`), where
-    Ansel's 9.5 days surfaced as travel."""
-    _carry(glowcap=FOUR_DAYS)
+    """With food and water for the stretch four days are worked: the body eats and drinks
+    from the pack, the stretch is one transcript consequence line naming its span and the
+    meals, and the scene's body queue holds nothing of the player's for the next typed
+    turn (`Scene._body_said`), where Ansel's 9.5 days surfaced as travel. Driven through
+    `bench_clock.pass_time`, the one door every bench's roll passes time by."""
+    from play import bench_clock
+
     c = cm.current()
     pc = c.scene.pc()
     pc.goods.update({"waterskin": 20, "trail rations": 10})
-    r = _post(bench, "/api/bench/roll", _brew_body(bench))
-    assert r["minutes"] == 5760
-    c = cm.current()
-    pc = c.scene.pc()
+    lived = bench_clock.pass_time(c, c.engine(), pc, 5760, "brewing Glowcap")
     told = [t["text"] for t in c.transcript if "works 4 days" in str(t.get("text"))]
     assert len(told) == 1, told
     assert "eats" in told[0] and "trail rations" in told[0], told[0]
-    assert r["lived"] and r["lived"][0] in told[0]
+    assert lived and lived[0] in told[0]
     assert [x for x in c.scene._body_said if str(x.get("ref")) == str(pc.ref)] == []
 
 

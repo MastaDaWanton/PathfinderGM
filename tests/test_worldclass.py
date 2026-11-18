@@ -267,7 +267,7 @@ def test_a_character_begins_a_track_by_doing_it(engine, pc):
 
 
 def test_the_engine_narrates_what_a_new_level_unlocks(engine, pc):
-    pc.track("herbalist").mp = 24
+    pc.track("herbalist").mp = 99   # 100 leaves level 1 (2026-11-18)
     res = engine.run(engine.validate([
         {"op": "craft", "actor": "pc",
          "params": {"track": "herbalist", "recipe": "aaron's rod salve",

@@ -619,14 +619,114 @@ def quality_mult(kind: str, index: int) -> float:
     return float(row[-1]) + step * over
 
 
-def tier_from_score(score, ceiling: int) -> tuple[int, float]:
+@functools.lru_cache(maxsize=None)
+def margin_rules() -> dict:
+    """content/rules/craft-margin.json, read once (shipped content, read-only)."""
+    return _rules_file("craft-margin.json")
+
+
+def margin_bonus(margin: int, natural: int | None = None) -> dict:
+    """What beating a craft or harvest check gives (the owner's ruling of 2026-11-18,
+    item 16): one band per 5 points of margin, capped; each band less time, more yield and
+    a higher quality floor. A natural 20 on a success lifts the ceiling one step.
+
+    Foraging's band shape (rules/foraging.py BANDS) and the CRB's Craft rule (p.91:
+    progress is the check result x the DC, so a better check finishes sooner). The numbers
+    are the data's (content/rules/craft-margin.json). A miss gives nothing.
+    """
+    r = margin_rules()
+    m = int(margin)
+    bands = min(int(r["max_bands"]), m // int(r["band"])) if m >= 0 else 0
+    lift = int(r["natural_breakthrough"]) if m >= 0 and natural == 20 else 0
+    return {"bands": bands, "floor": bands * int(r["floor_per_band"]),
+            "time": round(1 - float(r["time_cut_per_band"]) * bands, 4),
+            "yield": round(float(r["yield_per_band"]) * bands, 4), "breakthrough": lift,
+            "words": _bonus_words(bands, lift, r)}
+
+
+def _bonus_words(bands: int, lift: int, r: dict) -> str:
+    bits = []
+    if bands:
+        cut = int(round(float(r["time_cut_per_band"]) * bands * 100))
+        floor = bands * int(r["floor_per_band"])
+        bits.append(f"Beat the DC by {bands * int(r['band'])} or more: {cut}% less time, "
+                    f"more made where the step yields, and the quality lands no lower "
+                    f"than {floor} step{'s' if floor != 1 else ''} up")
+    if lift:
+        bits.append("Natural 20: this step can reach past your quality ceiling")
+    return ". ".join(bits) + "." if bits else ""
+
+
+def bonus_minutes(minutes, bonus: dict | None) -> int:
+    """`minutes` cut by the margin's bands; never below one minute when there was any."""
+    m = int(minutes or 0)
+    if not bonus or not bonus.get("bands") or m <= 0:
+        return m
+    return max(1, int(round(m * float(bonus["time"]))))
+
+
+def bonus_units(units, bonus: dict | None) -> int:
+    """The extra units a margin's bands add to `units` made: the fraction, rounded up, so
+    any band on a yielding step gives at least one more."""
+    n = int(units or 0)
+    if not bonus or not bonus.get("bands") or n <= 0:
+        return 0
+    return int(math.ceil(n * float(bonus["yield"]) - 1e-9))
+
+
+def bonus_line(more: int, noun: str, bonus: dict | None) -> dict:
+    """The mastery-list line that shows the margin's extra units (0 mastery: a gift of the
+    roll, not a step worked)."""
+    over = int((bonus or {}).get("bands") or 0) * int(margin_rules()["band"])
+    return {"why": f"Beat the DC by {over} or more: {more} more {noun}"
+                   f"{'' if more == 1 else 's'}", "mp": 0}
+
+
+def _floored(tier: int, ceiling: int, bonus: dict | None) -> int:
+    # Held one under the ceiling: the top rung is always the minigame's (always-play).
+    if bonus and bonus.get("floor"):
+        return max(int(tier), min(int(bonus["floor"]), max(0, int(ceiling) - 1)))
+    return int(tier)
+
+
+def tier_from_score(score, ceiling: int, bonus: dict | None = None) -> tuple[int, float]:
     """The minigame's 0..1 as a quality index, spread evenly under the crafter's ceiling.
 
     Clamped first. The page sends the score and the server decides what it is worth, so a
     hand-written `score: 7` or a forged 1.0 at Herbalist 1 lands on the ceiling and no
     higher (plan §15.1: "a tier above the ceiling is impossible"). A perfect run lands
     exactly on the ceiling and the bands below share the range equally.
+
+    `bonus` (`margin_bonus`, the roll's, kept server-side): a natural 20's breakthrough
+    lifts the ceiling for this step, and the bands' floor is the lowest tier the score can
+    land (`_floored`).
     """
+    if bonus:
+        ceiling = max(0, int(ceiling)) + int(bonus.get("breakthrough") or 0)
+    tier, s = _scored_tier(score, ceiling)
+    return _floored(tier, ceiling, bonus), s
+
+
+def ladder(ceiling: int, bonus: dict | None = None) -> dict:
+    """The strip's live ladder for a step whose roll earned `bonus`: every tier the finish
+    can land (the floor up to the ceiling, a breakthrough's included) and each one's lowest
+    score, by `tier_from_score`'s own spread, so the live word and the landed tier cannot
+    disagree. Without a bonus it is the plain ladder every bench always sent."""
+    top = max(0, int(ceiling)) + int((bonus or {}).get("breakthrough") or 0)
+    floor = _floored(0, top, bonus)
+    return {"names": [quality_name(t) for t in range(floor, top + 1)],
+            "bands": [0.0] + [t / (top + 1) for t in range(floor + 1, top + 1)]}
+
+
+def plain_tier(quality: int, ceiling: int, bonus: dict | None = None) -> int:
+    """A typed craft's tier (no minigame): `quality` under the ceiling, with the margin's
+    floor and breakthrough applied as `tier_from_score` applies them."""
+    if bonus:
+        ceiling = max(0, int(ceiling)) + int(bonus.get("breakthrough") or 0)
+    return _floored(min(int(quality), int(ceiling)), ceiling, bonus)
+
+
+def _scored_tier(score, ceiling: int) -> tuple[int, float]:
     try:
         s = float(score)
     except (TypeError, ValueError):
@@ -1103,7 +1203,21 @@ def satchel(actor, now_minute: int | None = None,
 def _collect_jar(item, actor) -> dict:
     """Collecting a steeped jar: it is the tincture or acetum it always was, so nothing is
     done beyond the section's own lift."""
-    return {"said": f"You take the {item.name} out of its steep."}
+    block = inprogress.work_of(item) or {}
+    if str(block.get("doing") or "steeping") == "steeping":
+        return {"said": f"You take the {item.name} out of its steep."}
+    return {"said": f"You collect the {item.name}: the {block.get('doing')} is done."}
+
+
+# The word In progress says while a herb step waits ("still drying"). A jar from before the
+# ruling of 2026-11-18 says "steeping", as it always did.
+_DOING = {"steep": "steeping", "dry": "drying", "reduce": "reducing", "grind": "grinding",
+          "brew": "brewing", "extract": "extracting", "infuse": "infusing", "mix": "mixing",
+          "neutralize": "neutralising"}
+
+
+def doing_word(method: str) -> str:
+    return _DOING.get(str(method or ""), "steeping")
 
 
 inprogress.register("herbalist", collect=_collect_jar, icon="steeping")
@@ -1190,7 +1304,9 @@ def fit_reason(method: str, m: Material, pot: list[Material], level: int) -> str
     # finished work sits in the section until it is collected.
     if m.work_state == "working":
         end = m.ready_at if m.ready_at is not None else (m.ready_minute or 0)
-        return f"still steeping: ready on day {int(end) // 1440 + 1}"
+        held = inprogress.work_of(m.stock) if m.stock is not None else None
+        doing = str((held or {}).get("doing") or "steeping")
+        return f"still {doing}: ready on day {int(end) // 1440 + 1}"
     if m.work_state == "ready":
         return "ready to collect: take it out of In progress first"
     if m.spoiled:
@@ -1446,7 +1562,7 @@ def _weighted(parts: list[tuple[Material, int]], kind: str) -> float:
 
 
 def plan_step(actor, progress, method: str, picks: list[tuple[Material, int]],
-              batch: int = 1, perks: dict | None = None) -> StepPlan:
+              batch: int = 1, perks: dict | None = None, *, waits: bool = False) -> StepPlan:
     """One step, worked out without changing anything.
 
     `picks` are (satchel item, count per batch unit); `batch` repeats the unit. One roll
@@ -1700,11 +1816,24 @@ def plan_step(actor, progress, method: str, picks: list[tuple[Material, int]],
         plan.batch_capacity = max(1, int(row.get("batch_doses_per_level", 1)) * level)
         plan.batches = math.ceil(plan.doses / plan.batch_capacity) if plan.doses else 0
         plan.minutes = int(row["minutes_per_batch"]) * plan.batches
-        return plan
-    per_dose = row.get("minutes_per_dose", 0)
-    if isinstance(per_dose, dict):
-        per_dose = per_dose.get(plan.form, max(per_dose.values()))
-    plan.minutes = int(per_dose) * plan.doses
+    else:
+        per_dose = row.get("minutes_per_dose", 0)
+        if isinstance(per_dose, dict):
+            per_dose = per_dose.get(plan.form, max(per_dose.values()))
+        plan.minutes = int(per_dose) * plan.doses
+    # A step of an hour or more waits In progress (the owner's ruling of 2026-11-18), the
+    # alchemist's hands-on/waiting split: only the hands-on minutes pass at the bench.
+    # Measured on frag's save: drying and reducing held the herbalist at the bench for
+    # 8 and 24 hours. Steep already waits its own `ready_minutes`.
+    # `waits`: the bench's door (the player at the bench) asks for it. A typed chain and
+    # a keeper's commission walk every step in one go, so they keep the whole time on the
+    # clock rather than leave a half-made piece In progress mid-chain.
+    rows = herbal_rules()["methods"]
+    if waits and not plan.ready_minutes \
+            and plan.minutes >= int(rows.get("in_progress_after", 60)):
+        hands = min(plan.minutes - 1, int(rows.get("hands_on_minutes", 10)))
+        plan.ready_minutes = plan.minutes - hands
+        plan.minutes = hands
     return plan
 
 
@@ -1799,9 +1928,11 @@ def make(plan: StepPlan, tier: int, now_minute: int) -> Stock:
         base_specs=[dict(x) for x in plan.base_specs],
         mults={k: round(v, 6) for k, v in s.items()},
         worked=list(plan.worked),
-        # A steep goes straight into In progress (rules/inprogress.py): made now, ready on
-        # its day, and waiting there until it is collected.
-        work=(inprogress.block(craft=TRACK_ID, label="Steeping", doing="steeping",
+        # A steep, or any step of an hour or more (ruling 2026-11-18), goes straight into
+        # In progress (rules/inprogress.py): made now, ready on its minute, and waiting
+        # there until it is collected.
+        work=(inprogress.block(craft=TRACK_ID, label=doing_word(plan.method).capitalize(),
+                               doing=doing_word(plan.method),
                                started=int(now_minute), minutes=int(plan.ready_minutes))
               if ready is not None else None),
     )
@@ -1983,7 +2114,7 @@ def first_time(progress, key: str) -> bool:
 
 
 def settle_made(actor, progress, plan: StepPlan, tier: int, consumes, *, dice=None,
-                now: int = 0) -> dict:
+                now: int = 0, margin_bonus: dict | None = None) -> dict:
     """A made roll at the herb bench, finished at `tier`: the product is made, the Yield
     perk's d100 rolled on `dice` (none, no roll), the materials in `consumes` (read fresh)
     spent, the product put in the satchel, and the step, the firsts and the discoveries
@@ -2014,8 +2145,11 @@ def settle_made(actor, progress, plan: StepPlan, tier: int, consumes, *, dice=No
         yield_line = {"why": f"Yield perk: d100 {roll.total} against {need} or less, "
                              f"{'one more dose' if extra else 'no extra dose'}", "mp": 0}
 
+    # The margin's extra doses (`margin_bonus`, ruling 2026-11-18): a gift of the roll,
+    # like the perk's, so not paid as steps worked.
+    more = bonus_units(made.count, margin_bonus)
     spend(actor, list(consumes))
-    count = int(made.count) + extra
+    count = int(made.count) + extra + more
     actor.add_stock(made, count)
 
     lines: list[dict] = []
@@ -2060,5 +2194,7 @@ def settle_made(actor, progress, plan: StepPlan, tier: int, consumes, *, dice=No
             bonus(f"learned: {ing.name}, {text}" if text else f"learned: {ing.name}")
     if yield_line:
         lines.append(yield_line)
+    if more:
+        lines.append(bonus_line(more, "dose", margin_bonus))
     return {"made": made, "count": count, "lines": lines, "levelled": levelled,
             "discoveries": discoveries}

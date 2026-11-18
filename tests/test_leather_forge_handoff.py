@@ -397,9 +397,14 @@ def test_a_base_is_studded_through_the_forge_api_and_worn(client):
     check = post(client, "/api/forge/check", body).json()
     assert check["problems"] == [] and check["gear"] == "armour"
     assert check["preview"]["card"] is not None
-    rolled = post(client, "/api/forge/roll", {**body, "face": 20}).json()
+    face = max(1, min(20, check["dc"] - check["bonus"]))  # the face that just makes the DC: no 5+ margin bands (ruling 2026-11-18)
+    rolled = post(client, "/api/forge/roll", {**body, "face": face}).json()
     assert rolled["roll"]["success"], rolled
     done = post(client, "/api/forge/finish", {"token": rolled["token"], "score": 1.0}).json()
+    # An assembly of an hour or more waits In progress (ruling 2026-11-18): wait it out.
+    from tests.test_forge_api import wait_and_collect
+
+    wait_and_collect(client)
     (product,) = done["products"]
     assert product["name"] == "Deer Studded Leather" and product["record"]["base"] == \
         "studded leather"

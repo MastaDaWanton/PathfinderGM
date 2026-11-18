@@ -45,6 +45,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Callable, ClassVar
 
+from . import crafting
 from . import worldclass as wc
 from . import words as english
 
@@ -345,7 +346,8 @@ class Blacksmith:
         if plan.need is None:
             return None, Refusal(f"No roll can make DC {plan.dc} with +{plan.bonus}: it "
                                  f"{plan.impossible}.", "beyond_skill")
-        rent = bs.rent_cp(engine.scene, where.get("smithy"), plan.minutes, known) \
+        rent = bs.rent_cp(engine.scene, where.get("smithy"), plan.minutes + plan.waits,
+                          known) \
             if plan.units else 0
         if rent and goods.in_copper(actor.purse) < rent:
             return None, Refusal(f"The smith wants {rent} cp for the hours at the forge, and "
@@ -357,12 +359,20 @@ class Blacksmith:
               doing: str) -> Step:
         from . import blacksmith as bs
 
-        def settle(made: bool, margin: int, quality: int | None = None) -> dict:
+        def settle(made: bool, margin: int, quality: int | None = None,
+                   face: int | None = None) -> dict:
+            # `face`: the player's own d20, given by the engine's make door; then the
+            # 5+ margin bands apply (ruling 2026-11-18). A keeper's commission passes
+            # none: its quality is `commission.keeper_quality`'s.
+            mb = crafting.margin_bonus(margin, face) if made and face is not None \
+                else None
             now = int(engine.scene.clock_minutes or 0)
             if made:
-                tier = min(PLAIN_QUALITY if quality is None else int(quality),plan.step_ceiling)
+                plan.waits = crafting.bonus_minutes(plan.waits, mb)
+                tier = crafting.plain_tier(PLAIN_QUALITY if quality is None else int(quality),
+                                           plan.step_ceiling, mb)
                 got = bs.settle_made(actor, progress, plan, tier, plan.consumes,
-                                     dice=engine.dice, now=now)
+                                     dice=engine.dice, now=now, margin_bonus=mb)
                 landed = got["landed"]
                 names = [w.name for _k, w, _n in landed]
                 what = ", ".join(f"{_one(w.name)}" if n == 1 else f"{n} × {w.name}"
@@ -575,13 +585,22 @@ class Herbalist:
             want = crafting.product_row(form).get("name", form)
             return Refusal(f"{crafting._lead_name(m)} makes {_a(str(got).lower())} by "
                            f"{method}, not {_a(str(want).lower())}.", "cannot_craft")
-        def settle(made: bool, margin: int, quality: int | None = None) -> dict:
+        def settle(made: bool, margin: int, quality: int | None = None,
+                   face: int | None = None) -> dict:
+            # `face`: the player's own d20, given by the engine's make door; then the
+            # 5+ margin bands apply (ruling 2026-11-18). A keeper's commission passes
+            # none: its quality is `commission.keeper_quality`'s.
+            mb = crafting.margin_bonus(margin, face) if made and face is not None \
+                else None
             now = int(engine.scene.clock_minutes or 0)
             if made:
                 ceiling = wc.ceiling_index(progress)
-                tier = min(PLAIN_QUALITY if quality is None else int(quality),ceiling)
+                if plan.ready_minutes:
+                    plan.ready_minutes = crafting.bonus_minutes(plan.ready_minutes, mb)
+                tier = crafting.plain_tier(PLAIN_QUALITY if quality is None else int(quality),
+                                           ceiling, mb)
                 got = crafting.settle_made(actor, progress, plan, tier, plan.consumes,
-                                           dice=engine.dice, now=now)
+                                           dice=engine.dice, now=now, margin_bonus=mb)
                 stock = got["made"]
                 tell = (f"{actor.name} {_VERB.get(method, method)} {crafting._lead_name(m).lower()}: "
                         f"{_a(stock.name) if got['count'] == 1 else str(got['count']) + ' × ' + stock.name}"
@@ -763,7 +782,13 @@ class Alchemist:
     def _step(self, engine, actor, progress, plan, where, *, final: bool, doing: str):
         from . import alchemist as al
 
-        def settle(made: bool, margin: int, quality: int | None = None) -> dict:
+        def settle(made: bool, margin: int, quality: int | None = None,
+                   face: int | None = None) -> dict:
+            # `face`: the player's own d20, given by the engine's make door; then the
+            # 5+ margin bands apply (ruling 2026-11-18). A keeper's commission passes
+            # none: its quality is `commission.keeper_quality`'s.
+            mb = crafting.margin_bonus(margin, face) if made and face is not None \
+                else None
             now = int(engine.scene.clock_minutes or 0)
             told_toxic = []
             if plan.toxics:
@@ -773,9 +798,11 @@ class Alchemist:
                     if getattr(o, "tell", ""):
                         told_toxic.append(str(o.tell))
             if made:
-                tier = min(PLAIN_QUALITY if quality is None else int(quality),plan.ceiling)
+                plan.waits = crafting.bonus_minutes(plan.waits, mb)
+                tier = crafting.plain_tier(PLAIN_QUALITY if quality is None else int(quality),
+                                           plan.ceiling, mb)
                 got = al.settle_made(actor, progress, plan, tier, plan.consumes,
-                                     dice=engine.dice, now=now, where=where)
+                                     dice=engine.dice, now=now, where=where, margin_bonus=mb)
                 bits, effects, names = [], [], []
                 for x in got["landed"]:
                     rec = x["record"]
@@ -1001,15 +1028,24 @@ class Leatherworker:
                            f"{actor.name} carries {goods.in_copper(actor.purse)} cp.",
                            "cannot_pay")
 
-        def settle(made: bool, margin: int, quality: int | None = None) -> dict:
+        def settle(made: bool, margin: int, quality: int | None = None,
+                   face: int | None = None) -> dict:
+            # `face`: the player's own d20, given by the engine's make door; then the
+            # 5+ margin bands apply (ruling 2026-11-18). A keeper's commission passes
+            # none: its quality is `commission.keeper_quality`'s.
+            mb = crafting.margin_bonus(margin, face) if made and face is not None \
+                else None
             now = int(scene.clock_minutes or 0)
             stop = False
             if made:
-                tier = min(PLAIN_QUALITY if quality is None else int(quality),plan.step_ceiling)
+                if plan.wait_minutes:
+                    plan.wait_minutes = crafting.bonus_minutes(plan.wait_minutes, mb)
+                tier = crafting.plain_tier(PLAIN_QUALITY if quality is None else int(quality),
+                                           plan.step_ceiling, mb)
                 ceiling = max(0, int(plan.step_ceiling))
                 got = lw.settle_made(actor, progress, plan, tier, plan.consumes, now=now,
                                      where=where, setup_score=tier / (ceiling + 1),
-                                     vat_cp=vat)
+                                     vat_cp=vat, margin_bonus=mb)
                 bits, effects, names = [], [], []
                 for row in got["landed"]:
                     rec = row.get("record")

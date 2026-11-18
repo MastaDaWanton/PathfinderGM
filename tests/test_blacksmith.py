@@ -34,8 +34,9 @@ def test_track_loads_through_the_generic_loader():
     track = tracks["blacksmith"]
     assert track.name == "Blacksmith"
     assert track.max_level == 3
-    assert track.thresholds == [25, 65], "paced as the Herbalist, on purpose"
-    assert [track.to_next(n) for n in (1, 2, 3, 4, 5)] == [25, 65, 50, 60, 70]
+    assert track.thresholds == [100, 260], "paced as the Herbalist, on purpose"
+    # The owner's 2026-11-18 curve: 100, 260, then a flat 400.
+    assert [track.to_next(n) for n in (1, 2, 3, 4, 5)] == [100, 260, 400, 400, 400]
     assert track.perks == ("potency", "hardening", "quality", "yield")
 
 
@@ -69,9 +70,9 @@ def test_no_deed_gates_a_level_any_more():
     simply Blacksmith 3's band, and an old save holding the milestone loses nothing."""
     track = wc.get("blacksmith")
     assert track.milestones == {} and track.deeds == {}
-    p = wc.Progress(track="blacksmith", level=3, mp=55, milestones=["legendary-metal"])
+    p = wc.Progress(track="blacksmith", level=3, mp=400, milestones=["legendary-metal"])
     got = wc.award_bonus(track, p, why="test", mp=0)
-    assert got["level"] == 4, "65 to leave level 3 would be wrong: endless base is 50"
+    assert got["level"] == 4, "leaving level 3 costs the endless base, 400 (2026-11-18)"
 
 
 def test_endless_levels_bank_forge_perks():
