@@ -620,6 +620,15 @@ def generate(head_id: str, kind: str, spot_id: str, terrain: str, feature: dict,
                 d["cache_gp"] = worth(0.5)
         elif stock == "empty" and r.randint(1, 6) == 1:
             d["cache_gp"] = worth(0.5)
+        elif stock == "monster" and not last and r.randint(1, 6) <= 3:
+            # B/X's treasure odds: a monster room 3 in 6, a trap room 2 in 6, an empty
+            # one 1 in 6 (Moldvay Basic's stocking table as OSE and Martin Ralya's
+            # B/X-vs-Labyrinth-Lord comparison give it; the room-type split itself is
+            # reported two ways and is not changed here). Owner bug 2026-11-17 #2: the
+            # monster rooms had no roll at all, so only the climax ever held anything.
+            # shortcut: the book uses the monster's treasure type; this is the half-share
+            # the trap and empty rooms get, until treasure types are read.
+            d["cache_gp"] = worth(0.5)
         if last:
             d["cache_gp"] = worth(1.0)
         out.append({"id": pid, "name": label, "about": about, "terrain": terrain,
@@ -770,9 +779,18 @@ def stock_room(engine, place, d: dict, concept: dict) -> tuple[list[dict], str]:
     if climax:
         lead = _spec_rows(tag["leader"])
         got = (_draw(engine, lead, kind="guarded", most=1)
-               or _draw(engine, lead, kind="guarded", most=1, hard=True)
-               or _draw(engine, _spec_rows(tag["enemies"]), kind="guarded", most=1, hard=True))
+               or _draw(engine, lead, kind="guarded", most=1, hard=True))
         title = tag["leader"]["title"]
+        if got is None:
+            # No leader the party's budget can hold: the tag's own creatures, as many as
+            # the hard budget buys, and never given the leader's title. Owner bug
+            # 2026-11-17 #3 (frag): the rat-king's CR 2 leader could not be placed for a
+            # lone level-1 PC, one 5 hp dire rat was drawn instead and announced as "the
+            # rat-king". Every tag now has a leader rung of CR 1 or less but one (the
+            # weeping ghost: the book has no ghost that small), so this is the floor.
+            got = _draw(engine, _spec_rows(tag["enemies"]), kind="guarded", most=eb.MOST,
+                        hard=True)
+            title = None
     else:
         got = _draw(engine, _spec_rows(tag["enemies"]), kind="wandering", most=eb.MOST)
         title = None
@@ -983,6 +1001,9 @@ def arrived(engine, place) -> tuple[list[dict], list[str]]:
     said, doors onward included. (effects, tell bits)."""
     fx: list[dict] = []
     bits: list[str] = []
+    # The room's own story, kept apart for the narrator (`room_facts`, below): its trace
+    # and who holds it, which a slot must tell (gm/planned.py).
+    story_said: list[str] = []
     pc = engine.scene.pc()
     hit = deeper_at(engine.scene, place.id)
     if hit is not None and pc is not None:
@@ -1019,6 +1040,7 @@ def arrived(engine, place) -> tuple[list[dict], list[str]]:
             # narrator has it and invents none (the owner's "cohesive story", shown and
             # not told).
             bits.append(d["trace"])
+            story_said.append(d["trace"])
             d["traced"] = True
     trap = d.get("trap")
     if trap and trap["armed"] and trap["on"] == "room":
@@ -1058,6 +1080,8 @@ def arrived(engine, place) -> tuple[list[dict], list[str]]:
             fx.extend(got)
             if said:
                 bits.append(said)
+                if concept is not None:
+                    story_said.append(said)
         if d["stock"] == "special" and concept is not None:
             got, said = meet_ally(engine, place, concept, head)
             fx.extend(got)
@@ -1088,6 +1112,11 @@ def arrived(engine, place) -> tuple[list[dict], list[str]]:
         dest = places_mod.find(engine.places(), far)
         bits.append(f"{_cap(door['name'])} leads to {getattr(dest, 'name', 'further in')}; "
                     f"it is {door['state']}.")
+    if story_said:
+        # Owner bug 2026-11-17 #4 (frag): every room had its trace, and two of six never
+        # reached the page — the arrival's slot was asked for 220 characters and cut back
+        # to its last whole sentence inside 253, and the rat-king's line went with them.
+        fx.append({"kind": "room_facts", "at": place.id, "facts": story_said})
     return fx, bits
 
 

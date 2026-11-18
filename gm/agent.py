@@ -2128,7 +2128,26 @@ class GMAgent:
             for sid in (list(getattr(actor, "spellbook", []) or [])
                         + list(getattr(actor, "prepared", {}) or {})):
                 names.add(str(sid).replace("-", " "))
+            # And what they carry, wield, wear and know how to do, by its own name: owner
+            # bug 2026-11-17 #8 (frag), "your Lucerne hammer" was un-named into "your the
+            # stranger hammer" — the weapon on frag's own sheet.
+            things = [*(getattr(actor, "goods", None) or {}),
+                      *(getattr(actor, "weapons", None) or ()),
+                      *(getattr(actor, "feats", None) or ()),
+                      getattr(actor, "armour", ""), getattr(actor, "shield", "")]
+            for slot in (getattr(actor, "slots", None) or {}).values():
+                things += [t for t in slot or () if isinstance(t, str) and t]
+            for thing in things:
+                said = str(thing or "").replace("-", " ").strip()
+                if said and said != "none":
+                    names |= {said, said.title(), said[:1].upper() + said[1:]}
         names |= self._engine_place_names()
+        # The rules' own words: the six abilities and the skills ("Charisma" was un-named
+        # in frag's game, #8).
+        from rules import tables
+
+        names |= set(tables.ABILITY_FULL.values())
+        names |= {k.title() for k in tables.SKILLS} | {k.split()[0].title() for k in tables.SKILLS}
         # And the coin the engine names in its tells (`goods.coins_here`, the coin-names
         # ruling). Live 2026-11-15, a sale at Zhilvarnia: "Eldrida" read as an invented
         # person and the page said "18 the stranger platinum pieces".
@@ -2371,6 +2390,14 @@ class GMAgent:
                 notes.append(f"repeated beats: cut {cut}")
         return text, notes
 
+    def _anyone_but_the_party(self) -> bool:
+        """Whether anybody stands here who is not the player or travelling with them: a
+        body of any kind on the map, the fallen too (`rules.states.TRAVELS_WITH_YOU`)."""
+        from rules import states
+
+        return any(not a.is_pc and not a.has_state(states.TRAVELS_WITH_YOU)
+                   for a in (getattr(self.engine.scene, "actors", None) or {}).values())
+
     def _groom(self, text: str, *, earlier: list[str] | None = None,
                min_chars: int = 0, max_chars: int = 0, player_input: str = "",
                brief: str = "", hand_back: bool = True, claims: bool = True,
@@ -2451,6 +2478,11 @@ class GMAgent:
         # A legacy campaign's woven-in people count as known from here down, so the
         # reviewer stops burning rewrites on Vorgath and the un-namer leaves him be.
         extra = narration_mod.established_names(earlier)
+        # The turn's own tells light what they say burned: owner bug 2026-11-17 #4 (frag,
+        # the settling tank), the room's trace "the beams are charcoal … the fire came
+        # from the way in" was written and cut as fire from nowhere — the guard read the
+        # place's brief and the earlier beats, never this turn's tells.
+        told = [str(getattr(o, "tell", "") or "") for o in outcomes or ()] + list(facts or ())
         if rewrite and whole_rewrite:
             text, p_repairs, p_attempts = self.polish(
                 text, earlier=earlier, min_chars=min_chars, max_chars=max_chars,
@@ -2460,7 +2492,7 @@ class GMAgent:
                 # What could have lit anything: the place's brief and the recent
                 # beats. None when the caller had no brief (a consequence line),
                 # and the fire finding is not judged.
-                fire_context=(" ".join([brief] + list(earlier or []))
+                fire_context=(" ".join([brief, *told] + list(earlier or []))
                               if brief else fire_context))
             repairs += p_repairs
             attempts += p_attempts
@@ -2755,11 +2787,16 @@ class GMAgent:
                            f"landed a blow before any die was rolled")
         # Fire with nothing to light it, when the rewrite left it standing: cut. Judged
         # only with a brief in hand, the same gate the finding has.
-        lit_by = (" ".join([brief] + list(earlier or [])) if brief else fire_context)
+        lit_by = (" ".join([brief, *told] + list(earlier or [])) if brief else fire_context)
         if lit_by is not None:
             text, lit = narration_mod.cut_fire_from_nowhere(text, lit_by)
             if lit:
                 repairs.append(f"fire from nowhere: cut {len(lit)} sentence(s)")
+        # A crowd where the map holds nobody but the party: cut (owner bug 2026-11-17 #7).
+        text, crowd = narration_mod.cut_crowd_from_nowhere(
+            text, self._anyone_but_the_party(), " ".join(told))
+        if crowd:
+            repairs.append(f"crowd from nowhere: cut {len(crowd)} sentence(s)")
         # Every model call above this line wrote words onto the page after the page
         # checks ran: the rewrite, the sentence repairs, the answer, the deeds, the
         # renamed and the restated. Item 19 (2026-10-03) shipped a polish with "(c1)" and

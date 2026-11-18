@@ -16209,6 +16209,7 @@ class Engine:
         met = None
         went_by: tuple[str, ...] = ()
         went_by_about: list[dict] = []
+        new_here = False
         meant_for = going_to.name
         meant_place = going_to.id
         minutes = 0
@@ -16457,6 +16458,7 @@ class Engine:
             # (item 9 (f); `Scene.pass_through`).
             for p in kept:
                 self.scene.pass_through(p.id)
+            new_here = going_to.id not in self.scene.places_been()
             if pc is not None:
                 self.scene.move(pc.ref, going_to.id)
                 # The walk's minutes, charged once (the hop sum above). This was an hour
@@ -16724,6 +16726,21 @@ class Engine:
         bits.extend(s for s in passing_said if s)
         if moved:
             bits.append(f"You are at {going_to.name} now.")
+            from . import dungeons as dungeons_mod
+
+            # The place's own words on the first visit, as the places walked through
+            # get them above: owner bug 2026-11-17 #1, the cistern ("under the street,
+            # and older than it") arrived as "You are at the cistern now" and nothing
+            # else. A dungeon room says its own (`dungeons.arrived`), and a dark place
+            # shows nothing.
+            # An entrance is skipped: it has its own inner-side sentence below, and its text
+            # ("the way in and the way out, watched by...") is what told walks to the gate
+            # as passing through it.
+            if new_here and going_to.about and dungeons_mod.room(self.scene, going_to.id) is None \
+                    and " ".join(going_to.name.split()).lower() not in places_mod.ENTRANCES \
+                    and not (pc is not None and self.scene.sees_nothing(pc)):
+                about = str(going_to.about).strip().rstrip(".")
+                bits.append(f"{going_to.name[:1].upper()}{going_to.name[1:]}: {about}.")
             from . import ships as ships_mod
 
             if " ".join(going_to.name.split()).lower() in ships_mod.PORT_PLACES:
@@ -28399,11 +28416,11 @@ class Engine:
         """The props record of a container called `name` the taker can reach: in their
         own hands, lying here, or in the hands of somebody here. A pouch carried only as
         a goods line gets its record now, empty — that is what it holds."""
-        if not holding.is_container(name):
+        if not holding.is_box(name, self.scene.props):
             return None
         want = holding.head_of(name)
         recs = [r for r in self.scene.props
-                if holding.is_container(r.get("name"))
+                if (holding.is_container(r.get("name")) or "contents" in r)
                 and (holding.same(r.get("name"), name)
                      or holding.head_of(r.get("name")) == want)]
         ref = getattr(taker, "ref", "") or ""
