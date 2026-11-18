@@ -40,6 +40,8 @@ urlpatterns = [
     path("", home_views.home, name="home"),
     path("play/", views.table, name="table"),
     path("api/state", views.state, name="state"),
+    # The world the place map draws (play/atlas.py), fetched once per campaign.
+    path("api/atlas", views.atlas_view, name="atlas"),
     # The conversation log a page at a time, for the panel's "Earlier…" (fix-interfaces
     # §2.10); `/api/state` carries only the latest entries.
     path("api/conversation", views.conversation, name="conversation"),

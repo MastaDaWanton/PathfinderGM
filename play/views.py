@@ -246,6 +246,20 @@ def _passage_note(c) -> str:
             f"berth from the offer on the screen.")
 
 
+def _known_places_state(c) -> dict:
+    """`scene.known_places` (play/atlas.py), rebuilt every state like the chart beside it;
+    {} when there is nowhere to stand. Never worth failing a turn over."""
+    from . import atlas
+
+    try:
+        return atlas.known_places(c.engine(), c.world)
+    except Exception:      # noqa: BLE001 — a map is never worth failing a turn
+        import logging
+
+        logging.getLogger("pathfindergm").exception("the known-places state failed")
+        return {}
+
+
 def _places_found_state(c) -> dict:
     """`scene.places_found`: the fog-of-war place chart (play/places_found.py), rebuilt
     from the engine every state beside the exits row it is read from. {} when there is
@@ -1178,6 +1192,11 @@ def _state(c) -> dict:
             # The harbourmaster's berths, offered while the player talks with them
             # (2026-11-13). Appended after pc_down: the key order is a contract.
             "passage_offer": _passage_offer(c, exits_now),
+            # What the player knows of the wider world, for the place map's World,
+            # Continent, Region and Site (play/atlas.py): towns stood in, heard of and
+            # mapped, and the caves and dungeons found with their known rooms. Appended
+            # last: the key order is a contract (2026-11-18).
+            "known_places": _known_places_state(c),
         },
         # The abilities this character can use right now, for the row of buttons under
         # the transcript. Sent with the state because reaching a tier changes it.
@@ -1768,6 +1787,23 @@ def state(request):
         if watcher.drain(c):
             concurrency.bump()
     return JsonResponse(_state(c))
+
+
+@require_GET
+def atlas_view(request):
+    """The world as the place map draws it (play/atlas.py): every settlement, its nation
+    and continent, the ground round it and the journeys between. Static for a campaign,
+    so the page fetches it once rather than on every state.
+
+    `no-store`: the Electron shell keeps its HTTP cache in the user data directory, which
+    outlives every reinstall (CLAUDE.md, the five-day-old stylesheet); a world re-exported
+    under the same campaign must never be drawn from a stale copy."""
+    from . import atlas
+
+    c = campaign_mod.current()
+    response = JsonResponse(atlas.atlas(c.world))
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 @require_GET
