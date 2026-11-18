@@ -76,7 +76,7 @@ const MapUI = (() => {
     if (st.level === "region") {
       const G = M.regionLayout(D.region, T, st.visitedTowns);
       const F = M.fog(T, [...st.been], st.here);
-      return { ...base, R: D.region, G, here: st.regionHere, visited: st.visitedTowns,
+      return { ...base, R: D.region, W: D.world, G, here: st.regionHere, visited: st.visitedTowns,
                wildFound: F.found, wildVisited: F.visited,
                route: st.sel && G.pos[st.sel] && st.sel !== st.regionHere ? [st.regionHere, st.sel] : null };
     }

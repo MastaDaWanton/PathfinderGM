@@ -414,6 +414,7 @@ function region(v) {
   const hexGeo = new THREE.CylinderGeometry(HX * .98, HX * .98, 1, 6), byCol = new Map(), puffs = [];
   const seaAt = G.harbours.map(h => P(G.pos[h.id])), m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion();
   const hexes = new Map(), townList = [...G.shown].map(i => [P(G.pos[i]), (G.towns[i].region || [])[0] || ""]);
+  const nationId = Object.fromEntries(Object.entries(v.W.nations).map(([id, n]) => [n.name, id])), wash = M.nationColours(v.W);
   const nationAt = (x, z) => { let best = 1e9, n = ""; townList.forEach(([[tx, tz], nm]) => { const d = Math.hypot(tx - x, tz - z); if (d < best) { best = d; n = nm; } }); return n; };
   for (let q = -18; q <= 18; q++) for (let r = -15; r <= 15; r++) {
     const [x, z] = hexCentre(q, r); if (Math.hypot(x, z) > 132) continue;
@@ -428,7 +429,9 @@ function region(v) {
     if (tileOf(col)) m4.compose(new THREE.Vector3(x, sea ? -.15 : 0, z), q0, new THREE.Vector3(HX * Math.sqrt(3) * .985, 5, HX * Math.sqrt(3) * .985));
     else m4.compose(new THREE.Vector3(x, sea ? -.3 : .5 + (((q * 13 + r * 7) % 3 + 3) % 3) * .08, z), q0, new THREE.Vector3(1, sea ? .6 : 1, 1));
     (byCol.get(col) || byCol.set(col, []).get(col)).push(m4.clone());
-    if (!sea) hexes.set(q + "," + r, { q, r, x, z, known, nation: nationAt(x, z) });
+    const nat = sea ? "" : nationAt(x, z);
+    if (!sea) hexes.set(q + "," + r, { q, r, x, z, known, nation: nat });
+
     if (!known) for (let i = 0; i < 4; i++) puffs.push(new THREE.Matrix4().compose(new THREE.Vector3(x + (i - 1.5) * 1.7, 2.6 + Math.sin(i + q) * .5, z + (i % 2) * .9),
       q0, new THREE.Vector3().setScalar(2.1 * (1 - i * .15))));
   }
@@ -444,11 +447,33 @@ function region(v) {
   }));
   if (strips.length) { const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, .5, .45), mat(0x5a1e14, { flatShading: false, roughness: .6 }), strips.length);
     strips.forEach((m, n) => im.setMatrixAt(n, m)); im.castShadow = true; world.add(im); }
+  // Each nation's name painted flat on its own hexes, along the longest row of hexes you know
+  // that are all that nation's, and sized to that row: lying on the board, it cannot stray
+  // over a border from any angle (a floating label could, and did).
   allNations.forEach(nm => { if (!nm) return;
-    const mine = [...hexes.values()].filter(h => h.nation === nm && h.known); if (!mine.length) return;
-    areas.push({ at: new THREE.Vector3(mine.reduce((s, h) => s + h.x, 0) / mine.length, 2, mine.reduce((s, h) => s + h.z, 0) / mine.length + 6), text: nm, ink: inkOf(allNations, nm) }); });
+    const rows = {};
+    hexes.forEach(h => { if (h.nation === nm && h.known) (rows[h.r] = rows[h.r] || []).push(h); });
+    let best = null;
+    Object.values(rows).forEach(list => { list.sort((a, b) => a.q - b.q);
+      let run = [list[0]];
+      const consider = () => { if (!best || run.length > best.length) best = run.slice(); };
+      for (let i = 1; i < list.length; i++) { if (list[i].q === list[i - 1].q + 1) run.push(list[i]); else { consider(); run = [list[i]]; } }
+      consider(); });
+    if (!best) return;
+    const x = best.reduce((s, h) => s + h.x, 0) / best.length, z = best[0].z;
+    world.add(flatName(nm.toUpperCase(), M.darken(wash[nationId[nm]] || "#6a4a2a", .38), x, z, best.length * HX * Math.sqrt(3) * .92));
+  });
   const fallback = { "hex/water": 0x4a7899, "hex/sand-desert": 0xd9bd85, "hex/grass-forest": 0x6f9a52, "hex/stone-hill": 0x9a9284, "hex/grass": 0x86a85e };
-  byCol.forEach((list, col) => { const t = tileOf(col), im = new THREE.InstancedMesh(t ? t.geo : hexGeo, t ? t.mat : mat(fallback[col]), list.length); list.forEach((m, n) => im.setMatrixAt(n, m)); im.receiveShadow = true; world.add(im); });
+  byCol.forEach((list, col) => { const t = tileOf(col), im = new THREE.InstancedMesh(t ? t.geo : hexGeo, t ? t.mat : mat(fallback[col]), list.length);
+    list.forEach((m, n) => im.setMatrixAt(n, m)); im.receiveShadow = true; world.add(im); });
+  // Each nation's colour as a translucent plate over the hexes you know. Multiplying the colour
+  // into Kenney's green tiles (tried first) turned every nation the same muddy green.
+  const plates = [...hexes.values()].filter(h => h.known && h.nation && wash[nationId[h.nation]]);
+  if (plates.length) {
+    const im = new THREE.InstancedMesh(new THREE.CylinderGeometry(HX * .97, HX * .97, .05, 6), new THREE.MeshBasicMaterial({ transparent: true, opacity: .55, depthWrite: false }), plates.length);
+    plates.forEach((h, n) => { im.setMatrixAt(n, new THREE.Matrix4().makeTranslation(h.x, 1.06, h.z)); im.setColorAt(n, new THREE.Color(wash[nationId[h.nation]])); });
+    im.renderOrder = 1; world.add(im);
+  }
   if (puffs.length) { const im = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }), puffs.length);
     puffs.forEach((m, n) => im.setMatrixAt(n, m)); im.castShadow = true; world.add(im); clouds.push(Object.assign(im, { userData: { drift: 0 } })); }
   G.roads.forEach(rd => { const a = P(G.pos[rd.a]), b = P(G.pos[rd.b]), L = Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -460,6 +485,23 @@ function region(v) {
     o.userData.name = G.towns[i].name; o.userData.seen = !v.visited.has(i); });
   G.wild.forEach(w => { if (!v.wildFound.has(w.id)) return; const [x, z] = P(w.pos), o = miniature(w.kind === "woods" ? "trees" : w.kind, { painted: v.wildVisited.has(w.id) });
     place(o, w.id, x, z, 1.5).position.y = 1.05; o.userData.name = M.bare(w.name); o.userData.seen = !v.wildVisited.has(w.id); o.userData.down = w.kind === "cave"; });
+}
+// A name painted flat on the board: Cinzel capitals in the nation's dark ink with a pale
+// halo, as wide as `maxW` world units allows (never wider than its own height suggests).
+function flatName(text, ink, x, z, maxW) {
+  const fs = 72, c = document.createElement("canvas"), g = c.getContext("2d");
+  const font = `600 ${fs}px Cinzel, Palatino Linotype, Georgia, serif`;
+  g.font = font; try { g.letterSpacing = "14px"; } catch (e) { /* older canvas */ }
+  c.width = Math.ceil(g.measureText(text).width + 48); c.height = Math.ceil(fs * 1.5);
+  g.font = font; try { g.letterSpacing = "14px"; } catch (e) { /* as above */ }
+  g.textAlign = "center"; g.textBaseline = "middle";
+  g.lineWidth = 12; g.strokeStyle = "rgba(244,236,214,.92)"; g.strokeText(text, c.width / 2, c.height / 2);
+  g.fillStyle = ink; g.fillText(text, c.width / 2, c.height / 2);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const w = Math.min(maxW, text.length * 3.4), h = w * c.height / c.width;
+  const plane = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+  plane.rotation.x = -Math.PI / 2; plane.position.set(x, 1.3, z); plane.renderOrder = 2;
+  return plane;
 }
 function segD(p, a, b) { const dx = b[0] - a[0], dy = b[1] - a[1], L2 = dx * dx + dy * dy || 1, t = Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / L2));
   return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy); }
@@ -525,8 +567,11 @@ function drawWorld(c, v, half) {
     for (const [cx, cy, n] of cities) { const d = (cx - x) ** 2 + (cy - y) ** 2; if (d < best) { best = d; who = n; } }
     owner[j * N + i] = who;
   }
-  g.globalAlpha = .13;
-  for (let k = 0; k < N * N; k++) if (owner[k] >= 0) { g.fillStyle = inkOf(names, names[owner[k]]); g.fillRect((k % N) * cell, Math.floor(k / N) * cell, cell + .5, cell + .5); }
+  // A clear watercolour wash per nation (it was .13 of a dark ink: the owner could not tell
+  // nations apart), in colours chosen so neighbours never match.
+  const wash = M.nationColours(v.W);
+  g.globalAlpha = .38;
+  for (let k = 0; k < N * N; k++) if (owner[k] >= 0) { g.fillStyle = wash[nations[owner[k]]]; g.fillRect((k % N) * cell, Math.floor(k / N) * cell, cell + .5, cell + .5); }
   g.globalAlpha = .85; g.fillStyle = "#4a1e14";
   for (let j = 0; j < N - 1; j++) for (let i = 0; i < N - 1; i++) {
     const a = owner[j * N + i]; if (a < 0) continue;
@@ -573,19 +618,39 @@ function drawWorld(c, v, half) {
   Object.entries(v.WL.centre).forEach(([cid, [x, y]]) => { if (!contSeen.has(cid)) return; const [px, py] = P([x, y - 250]), cw = g.measureText(v.W.continents[cid]).width, ch = 16 * S * 3;
     placedNames.push([px - cw / 2, py - ch, px + cw / 2, py + ch * .4]); });
   g.restore();
+  // Every name lies wholly inside its own nation (the owner's rule): a spot counts only if all
+  // the land under the name's box is that nation's. Deepest spots first; if none fits, the name
+  // is set a size smaller, down to a floor, before it gives up.
+  const tally = { placed: [], missed: [] };   // read by the check: a name that found no room is reported, not lost quietly
   knownNations.forEach(n => { if (!n || !v.W.nations[n]) return;
-    const me = nations.indexOf(n), text = v.W.nations[n].name.toUpperCase(), w = g.measureText(text).width, h = 9 * S * 3 * 1.2;
-    // The best few spots, deepest first; the first whose box is clear of names already placed.
+    const me = nations.indexOf(n), text = v.W.nations[n].name.toUpperCase();
     const spots = [];
-    for (let k = 0; k < N * N; k++) if (owner[k] === me && dist[k] > 2) spots.push(k);
+    for (let k = 0; k < N * N; k++) if (owner[k] === me && dist[k] > 1) spots.push(k);
     spots.sort((x, y) => dist[y] - dist[x]);
-    const free = (x, y) => !placedNames.some(b => x - w / 2 < b[2] && x + w / 2 > b[0] && y - h / 2 < b[3] && y + h / 2 > b[1]);
-    const k = spots.find(k => free(((k % N) + .5) * cell, (((k / N) | 0) + .5) * cell));
-    if (k === undefined) return;   // no clear spot: the name waits (the slip and the pins still say it)
-    const px = ((k % N) + .5) * cell, py = (((k / N) | 0) + .5) * cell;
-    placedNames.push([px - w / 2, py - h / 2, px + w / 2, py + h / 2]);
-    g.lineWidth = 6; g.strokeStyle = "rgba(240,232,212,.85)"; g.strokeText(text, px, py);
-    g.fillStyle = inkOf(names, v.W.nations[n].name); g.fillText(text, px, py); });
+    // One line at shrinking sizes; then, for a narrow nation, the name broken over two lines
+    // (Undertide Warrens' wedge held no single line even at the smallest size).
+    const words = text.split(" "), cut = Math.ceil(words.length / 2);
+    const tries = [9, 7.5, 6.2, 5, 4].map(size => [size, [text]]).concat(words.length > 1 ? [7.5, 6.2, 5, 4].map(size => [size, [words.slice(0, cut).join(" "), words.slice(cut).join(" ")]]) : []);
+    for (const [size, lines] of tries) {
+      const fs = Math.round(size * S * 3);
+      g.font = `600 ${fs}px Cinzel, Palatino Linotype, Georgia, serif`;
+      try { g.letterSpacing = `${Math.round(size * .45 * S)}px`; } catch (e) { /* older canvas */ }
+      const w = Math.max(...lines.map(x => g.measureText(x).width)) + 8, h = fs * 1.15 * lines.length, hw = Math.ceil(w / 2 / cell), hh = Math.ceil(h / 2 / cell);
+      const inside = (ci, cj) => { for (let dj = -hh; dj <= hh; dj++) for (let di = -hw; di <= hw; di += 1) {
+        const ii = ci + di, jj = cj + dj; if (ii < 0 || jj < 0 || ii >= N || jj >= N || owner[jj * N + ii] !== me) return false; } return true; };
+      const free = (x, y) => !placedNames.some(b => x - w / 2 < b[2] && x + w / 2 > b[0] && y - h / 2 < b[3] && y + h / 2 > b[1]);
+      const k = spots.find(k => dist[k] >= hh && inside(k % N, (k / N) | 0) && free(((k % N) + .5) * cell, (((k / N) | 0) + .5) * cell));
+      if (k === undefined) continue;
+      const px = ((k % N) + .5) * cell, py = (((k / N) | 0) + .5) * cell;
+      placedNames.push([px - w / 2, py - h / 2, px + w / 2, py + h / 2]);
+      g.lineWidth = Math.max(3, fs / 6); g.strokeStyle = "rgba(244,236,214,.9)"; g.fillStyle = M.darken(wash[n], .42);
+      lines.forEach((line, li) => { const ly = py + (li - (lines.length - 1) / 2) * fs * 1.1; g.strokeText(line, px, ly); g.fillText(line, px, ly); });
+      tally.placed.push(text + (lines.length > 1 ? " (2 lines)" : "") + " @" + size);
+      return;
+    }
+    tally.missed.push(text);
+  });
+  window.__nationNames = tally;
   try { g.letterSpacing = "0px"; } catch (e) { /* as above */ }
   // A continent's name only once a city on it is known: the paper does not name what you have not heard of.
   g.fillStyle = "rgba(59,42,28,.55)"; g.textAlign = "center"; g.font = `italic ${Math.round(16 * S * 3)}px Palatino Linotype, Georgia, serif`;  // the worst case ran two continent names together at 46
@@ -714,7 +779,7 @@ function labels() {
   const here = V.level === "town" ? M.baseOf(V.here) : V.here;
   const rank = o => { const id = o.userData.id; return id === here ? 0 : id === V.sel ? 1 : id === hoverId ? 2 : (V.route || []).includes(id) ? 3 : o.userData.seen ? 5 : 4; };
   pick.slice().sort((a, b) => rank(a) - rank(b)).forEach(o => {
-    o.getWorldPosition(tmp); tmp.y += V && V.level === "site" ? 1 : V.level === "town" ? 7.5 : 5; tmp.project(camera);
+    o.getWorldPosition(tmp); tmp.y += V && V.level === "site" ? 1 : V.level === "town" ? 7.5 : V.level === "world" ? 1.6 : 5; tmp.project(camera);  // the world's villages are small: a tag 5 up floated off them
     if (tmp.z > 1) return;
     let x = (tmp.x + 1) / 2 * r.width, y = (1 - tmp.y) / 2 * r.height;
     if (x < -40 || x > r.width + 40 || y < -10 || y > r.height + 40) return;

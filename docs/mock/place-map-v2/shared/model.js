@@ -299,6 +299,7 @@ const MapModel = (() => {
         P[c.id] = [Math.cos(a) * r, Math.sin(a) * r];
       });
       const ids = list.map(c => c.id), here = new Set(ids);
+      const byId = Object.fromEntries(list.map(c => [c.id, c]));
       const springs = land.filter(r => here.has(r.a) && here.has(r.b));
       for (let it = 0; it < 300; it++) {
         const F = Object.fromEntries(ids.map(i => [i, [0, 0]]));
@@ -308,6 +309,12 @@ const MapModel = (() => {
         }
         springs.forEach(r => { const a = P[r.a], b = P[r.b], dx = b[0] - a[0], dy = b[1] - a[1], d = Math.hypot(dx, dy) + .01;
           const f = (d - 70) * .03; F[r.a][0] += dx / d * f; F[r.a][1] += dy / d * f; F[r.b][0] -= dx / d * f; F[r.b][1] -= dy / d * f; });
+        // Cohesion: each town is drawn to its own nation's middle, so a nation is one block
+        // of land. Without it, roads across borders mixed the towns and the territories came
+        // out a patchwork (the owner could not tell the nations apart).
+        const mid = {};
+        ids.forEach(i => { const n = byId[i].nation, m = (mid[n] = mid[n] || [0, 0, 0]); m[0] += P[i][0]; m[1] += P[i][1]; m[2]++; });
+        ids.forEach(i => { const m = mid[byId[i].nation]; F[i][0] += (m[0] / m[2] - P[i][0]) * .06; F[i][1] += (m[1] / m[2] - P[i][1]) * .06; });
         ids.forEach(i => { const p = P[i], d = Math.hypot(p[0], p[1]);
           if (d > R) { F[i][0] -= p[0] / d * (d - R) * .2; F[i][1] -= p[1] / d * (d - R) * .2; }   // stay on the continent
           p[0] += Math.max(-6, Math.min(6, F[i][0])); p[1] += Math.max(-6, Math.min(6, F[i][1])); });
@@ -342,6 +349,31 @@ const MapModel = (() => {
     const legs = []; let k = to; while (came.get(k)) { const [c, r] = came.get(k); legs.unshift({ from: c, to: k, by: r.by, miles: r.miles }); k = c; }
     return legs;
   }
+
+  // --- Nation colours ---------------------------------------------------------------------
+  // Map colouring: each nation takes the first wash none of its neighbours has, so two nations
+  // that touch never share a colour. Neighbours are nations joined by a land or river road,
+  // or with towns close together on the same continent (where the world map's territories
+  // meet). Same answer on the region and the world, so a nation keeps its colour on both.
+  // Green last: on the region's green hexes a green nation did not show (Sandmere Shire).
+  const NATION_WASH = ["#c98a4b", "#b8606a", "#5f86bd", "#9a7cc2", "#cfa93e", "#3f9a96", "#a8704a", "#6f9f58"];
+  function nationColours(W) {
+    if (W._colours) return W._colours;
+    const L = worldLayout(W), city = Object.fromEntries(W.cities.map(c => [c.id, c]));
+    const ids = Object.keys(W.nations).sort((a, b) => W.nations[a].name.localeCompare(W.nations[b].name));
+    const adj = Object.fromEntries(ids.map(i => [i, new Set()]));
+    const link = (a, b) => { if (a && b && a !== b && adj[a] && adj[b]) { adj[a].add(b); adj[b].add(a); } };
+    W.routes.forEach(r => { if (r.by !== "sea" && city[r.a] && city[r.b]) link(city[r.a].nation, city[r.b].nation); });
+    for (let i = 0; i < W.cities.length; i++) for (let j = i + 1; j < W.cities.length; j++) {
+      const a = W.cities[i], b = W.cities[j];
+      if (a.continent === b.continent && Math.hypot(L.pos[a.id][0] - L.pos[b.id][0], L.pos[a.id][1] - L.pos[b.id][1]) < 140) link(a.nation, b.nation);
+    }
+    const k = {};
+    ids.slice().sort((a, b) => adj[b].size - adj[a].size || a.localeCompare(b)).forEach(i => {   // most-connected first (Welsh-Powell)
+      const used = new Set([...adj[i]].map(n => k[n]).filter(x => x !== undefined)); let c = 0; while (used.has(c)) c++; k[i] = c; });
+    return (W._colours = Object.fromEntries(ids.map(i => [i, NATION_WASH[k[i] % NATION_WASH.length]])));
+  }
+  const darken = (hex, f) => { const n = parseInt(hex.slice(1), 16); return "#" + [n >> 16, (n >> 8) & 255, n & 255].map(v => Math.round(v * f).toString(16).padStart(2, "0")).join(""); };
 
   // --- The worst case (made up) -----------------------------------------------------------
   // Invented data shaped exactly like the export, entering at the same door (the loaded data),
@@ -417,6 +449,6 @@ const MapModel = (() => {
     return errs;
   }
 
-  return { load, fog, route, townLayout, anchor, regionLayout, siteLayout, siteRoute, sites, light, worldLayout, worldKnown, worldRoute, worstCase,
+  return { load, fog, route, townLayout, anchor, regionLayout, siteLayout, siteRoute, sites, light, worldLayout, worldKnown, worldRoute, worstCase, nationColours, darken,
            clockWords, selfCheck, bare, upper, tail, baseOf, floorOf };
 })();
