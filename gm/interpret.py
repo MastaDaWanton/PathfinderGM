@@ -42,8 +42,15 @@ ACTS = (
     "sell", "give", "take", "drop", "steal", "attack", "cast", "use", "consume", "wait",
     "rest", "rise", "call_on", "break_in", "stealth", "athletics", "exert", "gather",
     "follow", "request", "claim", "craft", "commission", "escape", "loot", "harvest", "prone",
-    "disguise", "threaten", "surrender", "other",
+    "disguise", "threaten", "surrender", "challenge", "other",
 )
+# `challenge` since 2026-11-18 (playtest 2026-11-17b #24): "Put me in the next bout. Who do
+# I fight, and what does the winner take?" to an arena's master of the games was read
+# `other` and `talk`, owed no op, and the master gave two speeches and staged nothing.
+# Offering or asking for a bout is its own deed; at an arena it owes the engine's `bout`
+# op, built whole (`acts_to_ops._challenge`): the opponent by the encounter budget, the
+# purse, and a knockout fight (rules/arena.py). The target is who is challenged, if
+# anybody; a challenge to a person anywhere but an arena owes nothing yet (stays talk).
 # `prone` since 2026-11-15, from the playtest that day (#62, #64): "I drop to my knees, put
 # my hands behind my head" was read `go`, the engine told "Vesna Kroll moves from near to
 # near", no prone state was laid, and the sergeant's spear swung at her standing AC. Going
@@ -206,7 +213,7 @@ DAY_PARTS = frozenset({"dawn", "morning", "noon", "dusk", "midnight"})
 
 # What a `request` asks for: payment (pay, a reward, wages, compensation, money) or a
 # favour (help, aid, a service). `rules/requests.KINDS` is the engine's copy of this list.
-REQUESTS = ("payment", "favour")
+REQUESTS = ("payment", "favour", "hire")
 # `rise` and `track` since 2026-10-09, both from one live run (gemma-4-12B, Pangrella):
 #
 # * "I break camp and head back to town" was read `rest, go` — the vocabulary had a word
@@ -308,7 +315,7 @@ ACT_COSTS: dict[str, str] = {
     "gather": "takes_time", "craft": "takes_time", "harvest": "takes_time",
     "loot": "takes_time", "wait": "takes_time", "rest": "takes_time",
     "talk": "addresses", "insult": "addresses", "request": "addresses", "buy": "addresses",
-    "threaten": "addresses",
+    "threaten": "addresses", "challenge": "addresses",
     "sell": "addresses", "commission": "addresses", "call_on": "addresses",
     "attack": "addresses", "surrender": "addresses",
 }
@@ -522,6 +529,8 @@ ACT_SLOTS: dict[str, tuple[str, ...]] = {
     "disguise": ("object",),
     # Who the player gives themselves up to ("the sergeant", "the city watch").
     "surrender": ("target",),
+    # Who is challenged to a bout, if anybody ("the champion", "one of the soldiers").
+    "challenge": ("target",),
     "other": ("target", "object", "place"),
 }
 
@@ -549,14 +558,13 @@ track     look for tracks, a trail or footprints; read the ground for who passed
 seek      look for, ask around for, wave down, head for or turn to a PERSON
 talk      speak to, ask, tell, greet, thank, persuade, order, haggle with somebody;
           asking a question, for directions or for advice is talk
-request   ask somebody to pay you for your work, reward you, or do you a favour or help
-          for nothing in return; `asks_for` is payment (money owed or given to you) or
-          favour (anything else). Buying, ordering, taking a room and paying or bribing
-          somebody are never a request
+request   ask somebody to pay you, reward you, help you for nothing, or work for you for
+          a wage; `asks_for` is payment (money to you), hire (them on a wage) or favour
+          (else). Buying, ordering, taking a room, paying or bribing are never a request
 insult    mock, taunt, call names, spit at, pick a fight with words — and telling
           anybody something meant to shame somebody ("I tell the room he is a coward")
-buy       buy, order, shop for, pay for goods, take goods and pay the seller for them;
-          the object is the goods
+challenge ask for a bout or duel, or a place in an arena's bout
+buy       buy, order, shop for, browse wares, pay for goods; the object is the goods
 sell      sell, offer for sale, agree a sale, accept a price, close a deal
 give      hand over, pay a debt or a fee, buy somebody a drink
 take      pick up, take, tip or count out of a container; the target is the
@@ -688,6 +696,13 @@ _DEMOS = [
          {"span": "ask the gatekeeper to hold the gate open for me",
           "target": "the gatekeeper", "object": "to hold the gate open for me",
           "asks_for": "favour", "act": "request"}]}),
+    # A hire (2026-11-18, playtest 2026-11-17b #21), in no world's words. The prompt's
+    # budget (tests/test_playtest_2026_11_17_reader_budget.py) had room for one; a bout
+    # asked for and a browse are their glosses' (`challenge`, `buy`).
+    ("I take the drover on as my bodyguard.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "take the drover on as my bodyguard", "target": "the drover",
+          "object": "my bodyguard", "asks_for": "hire", "act": "request"}]}),
     # …and what is NOT a request, because the first cut took them: on the labelled set
     # "I order an ale" and "I pay for a room at the inn" came back `request` (they are
     # buy and rest), and "I try to bribe the gatekeeper with a silver coin" too (a give).
@@ -2377,6 +2392,82 @@ _SEA_DEMOS = [
     ("draw my sword and wait at the rail", "something else"),
     ("ask the captain who they are", "something else"),
 ]
+
+
+# Whether the player's words ask the house for a bout (`acts_to_ops.bout_spoken`), asked only
+# at an arena (or on the way to one) when the reading built none. Measured live 2026-11-18
+# on fix/hire-arena-shops, at Mirabalos's arena: "I tell the master of the games to put me in
+# the next bout." was read `talk`, and the playtest's own line (2026-11-17b #24) once `other`
+# and `talk`, once a bare question; the `challenge` gloss alone did not reach it, and the
+# reader's prompt had no room for a demonstration (its budget test). Demonstrations written
+# for this, in no world's words.
+BOUT_ANSWERS = {"asks to fight a bout": "bout", "something else": ""}
+_BOUT_DEMOS = [
+    ("sign me up for the next fight", "asks to fight a bout"),
+    ("I want to fight in the pit today. Who's my opponent?", "asks to fight a bout"),
+    ("tell the matchmaker I'll take on his champion", "asks to fight a bout"),
+    ("put my name down for a match", "asks to fight a bout"),
+    ("ask how much the last winner took home", "something else"),
+    ("I watch the fighters train", "something else"),
+    ("ask the matchmaker where the inn is", "something else"),
+]
+
+
+# Whether a `look` at something is looking over what a seller has for sale (`browsed`). Live
+# 2026-11-18 (fix/hire-arena-shops) and playtest 2026-11-17b #29: "look over what potions they
+# have for sale" came back `look` both times, beside the `buy` gloss that names browsing, so
+# no counter opened. Demonstrations written for this, in no world's words.
+BROWSE_ANSWERS = {"looks over goods for sale": "browse", "something else": ""}
+_BROWSE_DEMOS = [
+    ("look over what knives the cutler has for sale", "looks over goods for sale"),
+    ("see what the chandler has on his shelves", "looks over goods for sale"),
+    ("browse the bookseller's stock", "looks over goods for sale"),
+    ("look at the stranger's face", "something else"),
+    ("look around the room", "something else"),
+    ("examine the sword on my belt", "something else"),
+]
+
+
+def confirm_browse(span: str, *, model: str | None = None) -> str:
+    """"browse" when the words look over what a seller has for sale, else ""."""
+    system = ("In a role-playing game the character looks at something. Answer from the "
+              "words alone: is the character looking over what a seller has for sale "
+              "(their wares, stock, shelves, goods), or something else?")
+    messages = [{"role": "system", "content": system}]
+    for said, answer in _BROWSE_DEMOS:
+        messages.append({"role": "user", "content": f"The words: {said}"})
+        messages.append({"role": "assistant", "content": json.dumps({"answer": answer})})
+    messages.append({"role": "user", "content": f"The words: {span}"})
+    return BROWSE_ANSWERS.get(_closed(messages, tuple(BROWSE_ANSWERS), model), "")
+
+
+def browsed(frame: dict | None, ask=None) -> list[str]:
+    """Turn, in place, each acting `look` with an object that the closed question says is
+    looking over goods for sale into the `buy` it is, so the counter opens with what was
+    asked to see (`judgement.purchase_sought` reads this same dict). Returns the spans.
+    `ask` None (the suite, the reader off) changes nothing."""
+    if ask is None or not frame or frame.get("error"):
+        return []
+    out = []
+    for a in frame.get("actions") or []:
+        if a.get("act") == "look" and a.get("object") and acting(a) and a.get("span") \
+                and ask(a["span"]) == "browse":
+            a["act"], a["was"] = "buy", "look"
+            out.append(a["span"])
+    return out
+
+
+def confirm_bout(span: str, *, model: str | None = None) -> str:
+    """"bout" when the player's words at an arena ask to fight in one, else ""."""
+    system = ("In a role-playing game the character is at an arena where bouts are fought "
+              "for a purse. Answer from the words alone: does the character ask to fight a "
+              "bout themselves (be put in a match, take on a fighter), or something else?")
+    messages = [{"role": "system", "content": system}]
+    for said, answer in _BOUT_DEMOS:
+        messages.append({"role": "user", "content": f"The words: {said}"})
+        messages.append({"role": "assistant", "content": json.dumps({"answer": answer})})
+    messages.append({"role": "user", "content": f"The words: {span}"})
+    return BOUT_ANSWERS.get(_closed(messages, tuple(BOUT_ANSWERS), model), "")
 
 
 # Whether the player's words put a ship they hold out to cruise (`acts_to_ops.cruise_spoken`),

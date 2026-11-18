@@ -422,6 +422,11 @@ class GMAgent:
         for span in interpret.unhidden(
                 read_ok, ask=interpret.confirm_hiding if interpret.ENABLED else None):
             read_ok.setdefault("dropped", []).append(f"stealth {span!r}: a way to go")
+        # A look over a seller's wares is a browse, the counter's to open (`interpret.
+        # browsed`, playtest 2026-11-17b #29).
+        for span in interpret.browsed(
+                read_ok, ask=interpret.confirm_browse if interpret.ENABLED else None):
+            read_ok.setdefault("dropped", []).append(f"look {span!r}: a browse, the counter's")
         # The act→op table (gm/acts_to_ops.py): one row per action of the reading.
         self.rows = acts_to_ops.table(read_ok, self.engine.scene,
                                       places=self.engine.places(), sentence=player_input,
@@ -838,6 +843,9 @@ class GMAgent:
                 # The stat block a person the plan introduces walks on with, read off
                 # their words the way the prose's people always were (`template_for`).
                 raw = judgement.fill_introduce_templates(raw, self.engine.scene)
+                # And the trade the player went looking for, on the one newcomer who
+                # answers it (`acts_to_ops.trade_sought`).
+                raw = acts_to_ops.trade_sought(raw, read_ok, notes=own_words)
                 # A blow at a thing somebody holds is a blow at that somebody, and
                 # a sunder asked for is a sunder: "I strike the weapon and sunder it"
                 # died five times on "a sunder needs a target" and then spawned a
@@ -907,6 +915,12 @@ class GMAgent:
                     raw, read_ok, self.engine.scene,
                     ask=interpret.confirm_sea if interpret.ENABLED else None,
                     notes=own_words)
+                # At an arena, the bout the words asked for (`acts_to_ops.bout_spoken`),
+                # one closed question per deed.
+                raw = acts_to_ops.bout_spoken(
+                    raw, read_ok, self.engine.scene,
+                    ask=interpret.confirm_bout if interpret.ENABLED else None,
+                    places=self.engine.places(), notes=own_words)
                 # And aboard a ship the PC holds, her cruise the words gave
                 # (`acts_to_ops.cruise_spoken`), one closed question per deed.
                 raw = acts_to_ops.cruise_spoken(

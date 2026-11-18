@@ -1593,3 +1593,30 @@ are the app's (CRB Goods and Services, "Food, Drink, and Lodging").
 
 Every settlement in an export holds an inn or tavern row of its own, `tools/check_places.py`
 reports none appended for lodging.
+
+## 31. A place's `about` is the place, never one of the settlement's own facts
+
+*Asked 2026-11-18 (fix/hire-arena-shops; 29 left free for feat/travel-pacing). Optional:
+without it the app drops an authored `about` that repeats one of the settlement's facts word
+for word and uses its own line for the place's kind (`places._authored`), which is how
+every world plays today.*
+
+Playtest 2026-11-17b #27: walking through Mirabalos's market, the page described it as
+"(Patrilineal clans, Zhilakai nobility, artisan guilds)". That is the city's `Social Classes`
+fact, which Pangrella's export also wrote as the `about` of `the market` and `the guildhall`.
+A walk reads a place's `about` to say what the player passes through, so a list of the town's
+social classes reads as the market's stalls.
+
+**Shape.** No new field: `about` on every `play.places[]` row is one sentence about that
+place (what is there, what it looks like, who uses it), and is never a copy of a fact of the
+settlement it stands in.
+
+| row | `about` |
+|---|---|
+| the market | "Stalls under awnings, and the clerk's table at the well." |
+| not | "Patrilineal clans, Zhilakai nobility, artisan guilds." (the city's `Social Classes`) |
+
+### Done when
+
+No `play.places[]` row's `about` equals, ignoring case and a closing full stop, any fact
+value of the settlement it belongs to.

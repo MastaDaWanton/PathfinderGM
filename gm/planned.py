@@ -935,7 +935,25 @@ def known_to(engine, ref: str) -> list[str]:
     if notes and notes != " ".join(str(block.get("notes") or "").split()):
         out.append(f"About {name}, what they know of themselves and this place: {notes}")
     return (out + _ship_known(engine, ref, name) + _places_known(engine, name)
-            + _goods_known(engine, a, name))
+            + _goods_known(engine, a, name) + _sword_known(engine, a, name))
+
+
+def _sword_known(engine, a, name: str) -> list[str]:
+    """A sword for hire knows their own rate: the engine's wage (`hirelings.day_cp`, the
+    book's for their level, moved by their terms) and the week up front. Playtest
+    2026-11-17b #20: asked his rate, the man in the corner said "My rate depends on the
+    danger" and named none, while the engine held one. [] for anybody who does not hire
+    out, or is already in the party's pay."""
+    from rules import goods, hirelings
+
+    scene = engine.scene
+    if not hirelings.hires_out(scene, a) or hirelings.wage(a) is not None:
+        return []
+    coins = engine._coins_here()
+    day = goods.purse_line(goods.coins_for(hirelings.day_cp(scene, a)), coins)
+    week = goods.purse_line(goods.coins_for(hirelings.week_cp(scene, a)), coins)
+    return [f"{name} hires out as a sword and asks {day} a day to come along and guard, "
+            f"with a week ({week}) paid up front."]
 
 
 def _goods_known(engine, a, name: str) -> list[str]:

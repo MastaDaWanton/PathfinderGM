@@ -1490,6 +1490,19 @@ def _authored(location) -> tuple[Place, ...]:
     """
     from . import floorplan
 
+    # An `about` that is one of the settlement's own facts word for word is a line about
+    # the town, not the room. Playtest 2026-11-17b #27: the walk said the market was
+    # "(Patrilineal clans, Zhilakai nobility, artisan guilds)", Mirabalos's Social Classes
+    # fact, which the export wrote as the market's and the guildhall's `about`. Detected
+    # by comparison with the facts (never by reading the words) and replaced by the
+    # table's line for the place's kind, or nothing (World Bible ask 31).
+    def _norm(text) -> str:
+        return " ".join(str(text or "").lower().split()).strip(" .;")
+
+    town_facts = {_norm(v) for v in (getattr(location, "facts", None) or {}).values()
+                  if isinstance(v, str)} - {""}
+    table_about = {row[0]: row[1] for row in SETTLEMENT_PLACES}
+
     out: list[Place] = []
     for raw in getattr(location, "places", None) or ():
         if not isinstance(raw, dict):
@@ -1498,10 +1511,15 @@ def _authored(location) -> tuple[Place, ...]:
         ground = terrain_of(pid)
         if not pid or not ground:
             continue
+        name = str(raw.get("name") or "").strip() or pid.rsplit(":", 1)[-1]
+        about = str(raw.get("about") or "").strip()
+        if _norm(about) in town_facts:
+            kind = _authored_kind(raw.get("kind")) or kind_named(name)
+            about = table_about.get(f"the {kind}", "")
         out.append(Place(
             id=pid,
-            name=str(raw.get("name") or "").strip() or pid.rsplit(":", 1)[-1],
-            about=str(raw.get("about") or "").strip(),
+            name=name,
+            about=about,
             terrain=ground,
             exits=tuple(str(x) for x in (raw.get("exits") or []) if str(x).strip()),
             described_only=bool(raw.get("described_only")),
@@ -2384,6 +2402,54 @@ def by_locative(places, wanted: str, near: str = "") -> Place | None:
     return None
 
 
+_POSSESSIVE_END = _re.compile(r"(?:'s|’s|s'|s’)(?:\s+(?:shop|place|stall|counter))?$")
+
+
+def by_keeper(places, wanted: str, near: str = "") -> Place | None:
+    """The place a shop named by its keeper is: "the alchemist's" is the laboratory (its
+    keeper's title, `STAFFED`), "the blacksmith's" the smithy (the keeper's first word),
+    and "the general store" or "the armorer's" the market, where that counter stands
+    (content/rules/stall-lines.json). None when nothing here is kept by them.
+
+    Playtest 2026-11-17b #26: "Head to the alchemist's" founded "the alchemist's … It is
+    a laboratory" beside the city's own laboratory; 2026-11-17 #10: "I go to the general
+    store" founded a second general store off the granary while its keeper stood in the
+    market. The name was nowhere in the place list, so the plan was told to found it.
+    CircleMUD binds every shop to its keeper mob in the shop file (src/shop.c), so the
+    shop is found through who keeps it, never as a second room. Nothing here reads
+    English: the keeper titles and counter labels are the engine's own closed lists. A
+    keeper's title asks for the possessive ("the alchemist" alone is a person), a
+    counter's own label ("the general store") does not."""
+    want = " ".join(str(wanted or "").split()).lower()
+    m = _POSSESSIVE_END.search(want)
+    owner = want[:m.start()] if m else ""
+    if owner and not owner.startswith("the "):
+        owner = "the " + owner
+    if owner:
+        hits = []
+        for p in places or ():
+            title, words = keeper_of("the " + _kind_of_place(p))
+            if title and owner in (title, f"the {words[0]}" if words else title):
+                hits.append(p)
+        if hits:
+            return _nearest(hits, near)
+    try:
+        from . import market as market_mod
+
+        doc = market_mod.lines_doc()
+        counters = [*doc.get("shops", ()), doc.get("stables") or {}]
+    except Exception:  # noqa: BLE001 - no content to hand (a bare test engine): no counters
+        counters = []
+    labels = {str(c.get("label") or "").lower() for c in counters} - {""}
+    titles = {str(c.get("title") or "").lower() for c in counters} - {""}
+    # A label that is also the keeper's title ("the alchemist") names the person bare.
+    if (want in labels - titles) or (owner and owner in labels | titles):
+        markets = [p for p in places or () if _kind_of_place(p) == "market"]
+        if markets:
+            return _nearest(markets, near)
+    return None
+
+
 def _nearest(found: list, near: str):
     """The first of `found`, or the one nearest `near` when there is a choice (`find`)."""
     if near and len(found) > 1:
@@ -2452,6 +2518,9 @@ def find(places, wanted: str, near: str = "") -> Place | None:
         same = [p for p in places or () if p.name.lower().removeprefix("the ") in WORSHIP]
         if same:
             return _nearest(same, near)
+    kept = by_keeper(places, want, near)
+    if kept is not None:
+        return kept
     # The GM's own dressing of a real place: "the merchant's gate" for "the gate", "the
     # old market" for "the market". Measured at the table, 2026-09-06: the plan wrote
     # `travel` to "the merchant's gate", the exact match failed, and the turn was a 502.

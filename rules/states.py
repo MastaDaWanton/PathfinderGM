@@ -200,6 +200,10 @@ TRAVELS_WITH_YOU = "bond.travels-with-you"
 # `hirelings.GUARDS` — the state the party's cargo is defended by.
 HIRED = "bond.hired"
 GUARDING = "bond.guarding"
+# A fighter in an arena's bout (rules/arena.py): the purse, the house that pays it and the
+# other fighter ride in the payload. Blows between two who hold it are nonlethal (a
+# knockout bout); settling the fight removes it from both, so nothing outlives the bout.
+IN_A_BOUT = "bond.in-a-bout"
 # A toll-keeper met on the way (rules/ontheway.py) who has not been paid: the price in
 # copper and the place the party came from ride in the payload. Granted and lifted by the
 # engine alone (`Engine._ask_toll`, `Engine._pay_toll`).
