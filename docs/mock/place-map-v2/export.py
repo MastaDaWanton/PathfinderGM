@@ -23,7 +23,7 @@ def main(saves: Path):
     os.chdir(ROOT)  # world_source is relative to the repo
     from play.campaign import Campaign
     from play import places_found, exits as exits_mod
-    from rules import journey, places as places_mod
+    from rules import journey, places as places_mod, geography
 
     # --- Town: stand the copy of jack in Featherperch's inn, his `been` left as it is.
     c = Campaign.load(saves / "jack.json")
@@ -104,13 +104,18 @@ def main(saves: Path):
                 if re.search(r"\b" + re.escape(n) + r"\b", line) and cid not in heard:
                     heard[cid] = {"who": said.get("who", ""), "line": line}
     out = {"here": fp.id, "been": sorted(been_towns), "heard": heard, "cities": [], "nations": {}, "continents": {},
-           "routes": [{"a": r["from_id"], "b": r["to_id"], "by": r.get("by", ""), "miles": r.get("miles")}
+           "routes": [{"a": r["from_id"], "b": r["to_id"], "by": r.get("by", ""), "miles": r.get("miles"), "crosses": r.get("crosses") or []}
                       for r in (world.play or {}).get("travel") or []]}
     for e in cities:
         nation = world.get(e.parent_id)
         cont = world.get(nation.parent_id) if nation else None
+        # The ground round the town, as the engine reads it off the world (geography.land_around):
+        # the region board paints its hexes from this rather than inventing terrain.
+        land = geography.land_around(world, e.id)
         out["cities"].append({"id": e.id, "name": e.name, "nation": nation.id if nation else "",
-                              "continent": cont.id if cont else "", "scale": getattr(e, "scale", "") or ""})
+                              "continent": cont.id if cont else "", "scale": getattr(e, "scale", "") or "",
+                              "near": list(land.near), "beyond": list(land.beyond),
+                              "reaches": [{"ground": r.ground, "name": r.name, "miles": r.miles, "source": r.source} for r in land.reaches]})
         if nation:
             out["nations"][nation.id] = {"name": nation.name, "continent": cont.id if cont else ""}
         if cont:

@@ -562,42 +562,74 @@ function nationMap(v) {
   const ring = new Set(); mine.forEach(x => DIRS.forEach(([dq, dr]) => { const o = grid.get(key(x.q + dq, x.r + dr)); if (o && o.nation !== v.nation) ring.add(o); }));
   const hexOf = (wx, wy) => { let best = 1e18, b = null; mine.forEach(x => { const d = (x.wx - wx) ** 2 + (x.wy - wy) ** 2; if (d < best) { best = d; b = x; } }); return b; };
   // Where things stand: towns at their own hex; Featherperch's wild ground placed by rule.
-  const pos = {}, known = new Set(), forest = new Set(), sand = new Set(), around = (x, n = 1) => { known.add(key(x.q, x.r)); if (n) DIRS.forEach(([dq, dr]) => known.add(key(x.q + dq, x.r + dr))); };
+  const pos = {}, known = new Set(), around = (x, n = 1) => { known.add(key(x.q, x.r)); if (n) DIRS.forEach(([dq, dr]) => known.add(key(x.q + dq, x.r + dr))); };
   knownTowns.forEach(id => { const hx = hexOf(...WL.pos[id]); pos[id] = hx; around(hx); });
   const roadsOut = [];
   K.roads.filter(rd => rd.by !== "sea" && (mineC.some(c => c.id === rd.a) || mineC.some(c => c.id === rd.b))).forEach(rd => {
     const from = mineC.some(c => c.id === rd.a) ? rd.a : rd.b, to = from === rd.a ? rd.b : rd.a;
     roadsOut.push({ from, to, by: rd.by, miles: rd.miles, inside: mineC.some(c => c.id === to), bearing: Math.atan2(WL.pos[to][1] - WL.pos[from][1], WL.pos[to][0] - WL.pos[from][0]) });
   });
-  const wild = [];
+  // Terrain from the world, as the engine reads it (geography.land_around, in the export):
+  // a hex along a road takes the ground that road crosses there (Featherperch's roads all
+  // cross forest first, then underground or mountain); the hexes round a town take its near
+  // ground; a town's reaches (the desert, 7 miles out, from the land it sits in) get a patch
+  // at their miles. Places then go to the hexes of their own ground (the owner: "let the
+  // woods and desert go to the desert and forest hexes"); before, pieces were placed first
+  // and ground painted under them.
+  const TILE_OF = { forest: "hex/grass-forest", jungle: "hex/grass-forest", desert: "hex/sand-desert", mountain: "hex/stone-hill", hills: "hex/stone-hill",
+                    underground: "hex/stone-hill", tundra: "hex/grass", farmland: "hex/grass", grassland: "hex/grass", swamp: "hex/grass-forest", coast: "hex/grass" };
+  const ground = new Map(), hexMiles = 12, all = [...mine, ...ring].filter(x => x.nation);
+  const townOf = x => nearestCity(contCities, WL, x.wx, x.wy);
+  const routesOf = c => W.routes.filter(r => r.by !== "sea" && (r.a === c.id || r.b === c.id) && (r.crosses || []).length);
+  all.forEach(x => {
+    const c = townOf(x); if (!c) return;
+    const [cx, cy] = WL.pos[c.id], dHex = Math.hypot(x.wx - cx, x.wy - cy) / (rW * Math.sqrt(3));
+    let g = null;
+    routesOf(c).forEach(r => { if (g) return; const o = r.a === c.id ? r.b : r.a, [ox, oy] = WL.pos[o];
+      if (segD([x.wx, x.wy], [cx, cy], [ox, oy]) > rW * .9) return;
+      const L = Math.hypot(ox - cx, oy - cy) || 1, t = ((x.wx - cx) * (ox - cx) + (x.wy - cy) * (oy - cy)) / (L * L);
+      if (t < 0 || t > 1) return;
+      // Its own half of the road: past the middle the far town's ground begins.
+      const cr = r.a === c.id ? r.crosses : [...r.crosses].reverse(); g = cr[Math.min(cr.length - 1, Math.floor(t * cr.length))]; });   // crosses run from this town outward
+    if (!g && dHex > .5 && dHex < 1.6) { const near = (c.near || []).filter(n => n !== "desert" && n !== "coast"); g = near.length ? near[(x.q * 7 + x.r * 3 & 1023) % near.length] : null; }
+    if (!g && dHex >= 1.6) { const far = c.beyond || []; g = (x.q * 7 + x.r * 3 & 1023) % 4 === 0 && far.length ? far[(x.q + x.r & 1023) % far.length] : null; }
+    if (g) ground.set(key(x.q, x.r), g);
+  });
+  // Reaches the roads do not reach (Featherperch's desert, 'region'): a patch at their miles, in
+  // the direction furthest from every road leaving the town.
+  const wild = [], homeC = W.cities.find(c => c.id === v.home);
+  mineC.forEach(c => (c.reaches || []).filter(rc => !routesOf(c).some(r => (r.crosses || [])[0] === rc.ground)).forEach(rc => {
+    const hx0 = hexOf(...WL.pos[c.id]); if (!hx0) return;
+    const taken = routesOf(c).map(r => { const o = r.a === c.id ? r.b : r.a; return Math.atan2(WL.pos[o][1] - WL.pos[c.id][1], WL.pos[o][0] - WL.pos[c.id][0]); });
+    const n = Math.max(1, Math.round((rc.miles + 6) / hexMiles));   // from the town's middle: its own half-hex, then the reach's miles
+    const dir = DIRS.map(([dq, dr]) => { const [dx, dz] = hexC(dq, dr, 1); return [dq, dr, Math.atan2(dz, dx)]; })
+      .map(d => [d, Math.min(...taken.map(b2 => Math.abs(Math.atan2(Math.sin(d[2] - b2), Math.cos(d[2] - b2)))), Math.PI)]).sort((p1, p2) => p2[1] - p1[1])[0][0];
+    [[0, 0], [dir[0], dir[1]]].forEach(([eq, er]) => { const hx = grid.get(key(hx0.q + dir[0] * n + eq, hx0.r + dir[1] * n + er)); if (hx && hx.nation === v.nation) ground.set(key(hx.q, hx.r), rc.ground); });
+  }));
   if (homeHere && pos[v.home]) {
     const home = pos[v.home], gateRow = (T.ways[Object.keys(T.ways).find(i => /urban:the-gate$/.test(i))] || []);
     const minutesTo = id => { const r = gateRow.find(w => w.id === id); return r ? r.minutes : 60; };
-    const taken = roadsOut.filter(r => r.from === v.home).map(r => r.bearing);
     const outside = [...F.found].filter(i => T.settings[i] === "outside");
-    // Wild ground (woods, desert...): its own hex, a hex for every four hours (12 miles at 3 mph),
-    // in the free direction furthest from the roads leaving town.
+    const reachOf = i => (homeC.reaches || []).find(rc => T.names[i] === rc.name);
+    // Each wild place goes to the nearest hex of its own ground (woods to forest, desert to sand).
     outside.filter(i => !/@the-(outskirts|crossroads)$|@the-road-to-|^.*~underground:/.test(i)).sort().forEach(i => {
-      const hrs = minutesTo(i) / 60, n = Math.max(1, Math.round(hrs / 4));
-      const dir = DIRS.map(([dq, dr]) => { const [dx, dz] = hexC(dq, dr, 1); return [dq, dr, Math.atan2(dz, dx)]; })
-        .map(d => [d, Math.min(...taken.map(b => Math.abs(Math.atan2(Math.sin(d[2] - b), Math.cos(d[2] - b)))), Math.PI)]).sort((a, b) => b[1] - a[1])[0][0];
-      taken.push(dir[2]);
-      const hx = grid.get(key(home.q + dir[0] * n, home.r + dir[1] * n)) || home;
-      pos[i] = hx; around(hx); wild.push({ id: i, hx, kind: /woods|forest/.test(i) ? "trees" : /desert/.test(i) ? "dunes" : "trees", hours: hrs });
-      if (/woods|forest/.test(i)) { forest.add(key(hx.q, hx.r)); DIRS.slice(0, 3).forEach(([dq, dr]) => forest.add(key(hx.q + dq, hx.r + dr))); }
-      if (/desert/.test(i)) { sand.add(key(hx.q, hx.r)); sand.add(key(hx.q + 1, hx.r)); }
+      const rc = reachOf(i), want = rc ? rc.ground : /desert/.test(i) ? "desert" : "forest", used = new Set(wild.map(w => key(w.hx.q, w.hx.r)));
+      const cands = mine.filter(x => ground.get(key(x.q, x.r)) === want && !(x.q === home.q && x.r === home.r) && !used.has(key(x.q, x.r)))
+        .sort((p1, p2) => Math.hypot(p1.x - home.x, p1.z - home.z) - Math.hypot(p2.x - home.x, p2.z - home.z));
+      const hx = cands[0] || home;
+      pos[i] = hx; around(hx);
+      wild.push({ id: i, hx, kind: want === "desert" ? "dunes" : "trees", hours: minutesTo(i) / 60, miles: rc ? rc.miles : null });
     });
     // Just outside the gate: the outskirts and the crossroads, small pieces in the town's own hex.
-    outside.filter(i => /@the-(outskirts|crossroads)$/.test(i)).sort().forEach((i, n) => { pos[i] = { ...home, x: home.x + (n ? 2.6 : -2.2), z: home.z - 4.2 }; wild.push({ id: i, hx: pos[i], kind: "post", small: true }); });
+    outside.filter(i => /@the-(outskirts|crossroads)$/.test(i)).sort().forEach((i, n) => { pos[i] = { ...home, x: home.x + (n ? 2 : -1.8), z: home.z - 2.8 }; wild.push({ id: i, hx: pos[i], kind: "post", small: true }); });   // well inside the town's hex: at 4.2 it sat on the hex beyond
     // The cave and anything else underground hangs off its host's piece.
     outside.filter(i => /~underground:/.test(i)).forEach(i => { const host = outside.find(h => i.includes("/" ) && h.endsWith("@" + i.split(":")[1].split("/")[0])); if (host && pos[host]) pos[i] = pos[host]; });
   }
-  roadsOut.forEach(rd => { if (!pos[rd.from]) return; const a = pos[rd.from];
-    for (let t = 0; t < 30; t++) { const hx = hexOf(WL.pos[rd.from][0] + Math.cos(rd.bearing) * t * rW, WL.pos[rd.from][1] + Math.sin(rd.bearing) * t * rW); if (hx) known.add(key(hx.q, hx.r)); } void a; });
+  roadsOut.forEach(rd => { if (!pos[rd.from]) return;
+    for (let t = 0; t < 30; t++) { const hx = hexOf(WL.pos[rd.from][0] + Math.cos(rd.bearing) * t * rW, WL.pos[rd.from][1] + Math.sin(rd.bearing) * t * rW); if (hx) known.add(key(hx.q, hx.r)); } });
   [...mine, ...ring].forEach(x => {
     const k = key(x.q, x.r), isMine = x.nation === v.nation, land = !!x.nation, kn = known.has(k);
-    const tile = !land ? "hex/water" : forest.has(k) ? "hex/grass-forest" : sand.has(k) ? "hex/sand-desert" : kn ? "hex/grass"
-      : ((x.q * 7 + x.r * 3) % 5 === 0 ? "hex/grass-forest" : ((x.q * 5 + x.r * 11) % 13 === 0 ? "hex/stone-hill" : "hex/grass"));
+    const tile = !land ? "hex/water" : TILE_OF[ground.get(k)] || "hex/grass";
     hexes.push({ q: x.q, r: x.r, x: x.x, z: x.z, tile, nation: x.nation, known: kn || !isMine, plate: land && (isMine ? kn : true), plateOpacity: isMine ? .55 : .25, cloud: isMine && land && !kn });
   });
   const b = hexBoard(hexes, h, wash, { [v.nation]: W.nations[v.nation].name });
@@ -607,7 +639,7 @@ function nationMap(v) {
     place(o, id, hx.x, hx.z, .8).position.y = 0; o.userData.name = W.cities.find(c => c.id === id).name; o.userData.seen = how.by !== "been"; board.pos[id] = P3(hx); });
   wild.forEach(w => { const o = miniature(w.kind, { painted: F.visited.has(w.id) });
     place(o, w.id, w.hx.x, w.hx.z, w.small ? 1.1 : 1.8).position.y = 1.05; o.userData.name = M.bare(T.names[w.id]); o.userData.seen = !F.visited.has(w.id);
-    o.userData.down = !!MapUI.siteFor(w.id); if (!w.small) o.userData.road = (w.hours < 1.5 ? `${Math.round(w.hours * 60)} minutes` : `about ${Math.round(w.hours)} hours`) + " from the gate";
+    o.userData.down = !!MapUI.siteFor(w.id); if (!w.small) o.userData.road = (w.hours < 1.5 ? `${Math.round(w.hours * 60)} minutes` : `about ${Math.round(w.hours)} hours`) + " from the gate" + (w.miles ? `, ${w.miles} miles` : "");
     board.pos[w.id] = P3(w.hx);
     if (!w.small && pos[v.home]) roadStrip([pos[v.home].x, pos[v.home].z], [w.hx.x, w.hx.z], "track", 1.09, .7); });
   Object.keys(pos).forEach(id => { if (!board.pos[id]) board.pos[id] = P3(pos[id]); });
