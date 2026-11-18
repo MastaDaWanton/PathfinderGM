@@ -667,11 +667,11 @@ addresses   asking, offering, buying from, threatening, insulting or striking so
             here who will answer"""
 
 _DEMOS = [
-    ("I head down to the docks and ask a fisherman what he caught today.",
-     {"question": False, "claims": [], "actions": [
-         {"span": "head down to the docks", "place": "the docks", "act": "go"},
-         {"span": "ask a fisherman what he caught today", "target": "a fisherman",
-          "says": "what he caught today", "act": "talk"}]}),
+    # The walk-then-ask pair that opened this list ("I head down to the docks and ask a
+    # fisherman what he caught today") was dropped 2026-11-18 at the 0.4.3 merge to fit the
+    # window (49,492 > 49,228 chars). It was the pair `window.fit` silently cut on every
+    # reading until 0.4.1 (playtest 2026-11-16 N4), so the game had played without it;
+    # walk-then-talk is still shown by the netmaker and candle pairs.
     ("I look for the tailor who mended my cloak last week.",
      {"question": False, "claims": [], "actions": [
          {"span": "look for the tailor who mended my cloak last week",
