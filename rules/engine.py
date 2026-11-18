@@ -19448,10 +19448,12 @@ class Engine:
             if sick is None:
                 return ("Fever goes through the water casks, and nobody aboard takes "
                         "it.", [fx])
-            days = int(ontheway.events().get("sickness_days", 3))
-            sick.add_condition("sickened", rounds=days * ships_mod.MINUTES_A_DAY * 10,
+            # The condition and its days are the table's (journey-events.json `sickness`).
+            fever = ontheway.events()["sickness"]
+            sick.add_condition(fever["condition"],
+                               rounds=int(fever["days"]) * ships_mod.MINUTES_A_DAY * 10,
                                source="rule:ship-fever", origin="rule:ship-fever")
-            fx.update(ref=sick.ref, condition="sickened")
+            fx.update(ref=sick.ref, condition=fever["condition"])
             return (f"Fever below decks: {sick.name} is down with it, sickened, and the "
                     f"hands keep clear of their hammock.", [fx])
         # Mutiny: talk, not yet a rising — a real hand, and who it is against.

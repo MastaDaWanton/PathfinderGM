@@ -142,7 +142,14 @@ MILES_A_DAY: dict[str, int] = {"keelboat": 52, "longship": 72, "sailing ship": 4
 # miles a day, so its sea band of 192-216 miles is eight or nine days ON FOOT and four by
 # the book's sailing ship. for-world-bible ask 31 asks for measured miles at a voyage's
 # scale; a world that marks its miles measured is taken at its word.
+#
+# At sea the floor is a DISTANCE, a fortnight under the CRB's sailing ship (672 miles), as
+# the road's is (`journey.ROAD_DAYS_AT_LEAST`, so a horse still halves a road): a galley
+# makes it in a week and the fare is for the same miles whatever she is. As a floor in
+# days it made a faster ship's fare dearer — measured 2026-11-18, Pangrella's longship
+# asked 100 gp 8 sp for 14 days at 72 miles, over the 100 gp a test party carried.
 PASSAGE_DAYS_AT_LEAST = 14
+PASSAGE_MILES_AT_LEAST = PASSAGE_DAYS_AT_LEAST * 48     # the sailing ship's day (Table 7-9)
 
 # A cruise (`Engine._cruise`): a ship hunting sails looks each watch, four watches a day —
 # the land's rate (Ultimate Wilderness p.127: four checks a day), not a passage's one roll
@@ -452,8 +459,9 @@ def days_for(miles: int | None, kind: str, days_apart: int = 1,
     exactly as it does for a road: two settlements on one continent are nearer than two on
     different ones, whatever the miles turn out to be.
 
-    Never less than the passage floor (`PASSAGE_DAYS_AT_LEAST` at sea, the road's on a
-    river) unless the world marked its miles `measured`; never less than a day.
+    Never less than the passage floor (`PASSAGE_MILES_AT_LEAST` at sea, at her own run;
+    the road's days on a river) unless the world marked its miles `measured`; never less
+    than a day.
     """
     from . import journey as journey_mod
 
@@ -462,7 +470,9 @@ def days_for(miles: int | None, kind: str, days_apart: int = 1,
             else max(1, int(days_apart)))
     if measured:
         return days
-    return max(days, journey_mod.ROAD_DAYS_AT_LEAST if river else PASSAGE_DAYS_AT_LEAST)
+    if river:
+        return max(days, journey_mod.ROAD_DAYS_AT_LEAST)
+    return max(days, round(PASSAGE_MILES_AT_LEAST / max(1, per_day)))
 
 
 def leg_days(leg, kind: str) -> int:
