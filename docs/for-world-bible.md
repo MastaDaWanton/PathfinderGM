@@ -1596,7 +1596,7 @@ reports none appended for lodging.
 
 ## 31. `miles` at a journey's scale, and `measured` when they are
 
-*Asked 2026-11-16 (feat/travel-pacing). Optional: without it the app holds every unmeasured
+*Asked 2026-11-16 (feat/travel-pacing, built on feat/travel-pacing-2). Optional: without it the app holds every unmeasured
 route to a floor, three days on foot between two settlements and a fortnight at sea
 (`journey.ROAD_DAYS_AT_LEAST`, `ships.PASSAGE_DAYS_AT_LEAST`), which is how every world plays
 today.*
