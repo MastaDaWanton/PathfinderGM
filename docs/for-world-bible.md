@@ -1650,3 +1650,33 @@ and how, which is the consumer's business.
 
 An export's derived crossings are 672 miles or more, its derived roads 72 or more, and a route
 an author measured carries `measured: true` and is played at its stated length.
+
+## 33. Coordinates and ground on settlements and nations
+
+*Asked 2026-11-19 (feat/hex-travel, docs/hexcrawl-plan.md). Optional: without it the app lays
+the map out from road miles (`rules/hexes.py` `layout`, the place map's spring pass) and
+invents the ground between towns by rule from the world's name, which is how every world
+plays today.*
+
+The owner's hexcrawl (2026-11-18/19): the Region map is played on Pathfinder's 12-mile hex,
+one hex a move on foot and two riding, and every hex has ground and sometimes a site. The
+export says where nothing is: no settlement carries a position, and the only ground between
+towns is what a road `crosses` and a settlement's `near`/`beyond`. Measured on the shipped
+worlds the same day: by the road rule alone 350 of 417 hexes of Aurvantis's first nation came
+out grassland; the app now fills the rest in patches from each town's own ground words.
+
+**Shape.**
+
+| field | where | what it is |
+|---|---|---|
+| `at` | each settlement | `[x, y]` in miles on its continent, north up |
+| `ground` | each nation | the share of each biome over its land, `{forest: .3, hills: .2, ...}` summing to 1, in the `biomes` words |
+| `rivers` | each continent | lines of `[x, y]` points in miles |
+
+**Rule 1 still holds.** Positions and miles, never hours: how long a hex takes is the
+consumer's business (Ultimate Campaign's 5 hours on plain, 8 elsewhere, at speed 30).
+
+### Done when
+
+Every settlement in an export carries `at`, every nation `ground`, and the app's layout of a
+new campaign puts each town at its `at` (a campaign already begun keeps its stored layout).

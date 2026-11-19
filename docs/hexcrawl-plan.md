@@ -1,6 +1,6 @@
 # Hex travel on the region map: the plan
 
-Status: **plan only, nothing built.** Written 2026-11-18 from the owner's idea and rulings
+Status: **phases 0-6 built 2026-11-19 on `feat/hex-travel`** (rules/hexes.py, `Engine._op_hex_move`/`_op_hex_enter`, play/hex_views.py, the Region board). What was built differently from this plan, and why, is in the section at the end. Originally: plan only. Written 2026-11-18 from the owner's idea and rulings
 (memory `hexcrawl-region-map`). Branch `plan/hexcrawl`, off master 2963f4b9 (0.4.3).
 
 ## The idea, in the owner's words
@@ -272,3 +272,27 @@ free number:
 3. **Where open ground hangs:** off the nearest settlement (its nation, coin and law), or a
    free-standing hex location?
 4. **Phase 0:** pick the region board (the tabletop in the screenshot?) so the board can be built.
+
+## As built (2026-11-19)
+
+- **Owner calls 1-3** answered by default (the owner did not answer): explored is entered and
+  the site reached, or an hour spent where there is no site; the hazard band is "none" for now
+  (no separate roll at all: the travel door's own `ontheway.road` checks each hex's hours, the
+  one encounter roller); open ground hangs off the nearest settlement, and walking onto a hex
+  nearer another town makes that town the party's location (its nation, coin and law).
+  Call 4 was settled by the owner: the tabletop, already in the game.
+- **The encounter rate is the road's, not UC's 50%.** One check per hex at the road's measured
+  rate for the hours (20% a six-hour watch), so a hex is not a coin flip for a fight. The owner
+  ruled fights more often on 2026-11-18 through the road's own table; a second roller would
+  break law 2's one-ticker rule.
+- **Ground by rule fills patches** from each town's own `near`/`beyond` words, three hexes
+  across, because the road rule alone left 84% grassland (WB ask 33 replaces it).
+- **Sites are the venture door's four away-from-town kinds** (cave, mine, ruins, tower), not
+  the five kinds above: a camp of people and a spring need people and water rules the venture
+  door does not have; deferred, not refused. A hex site's ids carry the hex
+  (`~underground:@hex-q-r/the-cave`), because two hexes the same miles and bearing from a town
+  share a name.
+- **Risks still open:** a site's dungeon tag can repeat within a few hexes (the plan's
+  sameness risk; not yet measured over a long walk), and ruins and towers are not "sites" on
+  the Site map (their ground is `ruins`, and `play/atlas._sites` lists underground roots only,
+  as it always has for crypts).

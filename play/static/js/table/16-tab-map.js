@@ -69,7 +69,33 @@ function mapView(s) {
   const home = kp.town || "", hc = W.cities.find(c => c.id === home) || {};
   const nation = MAPV.nation || hc.nation || "";
   const continent = MAPV.continent || (W.nations[nation] || {}).continent || hc.continent || "";
-  return { W, KP: kp, home, homeNation: hc.nation || "", nation, continent, K: PlacesWorld.worldKnown(W, kp) };
+  // The Region's hexes are the engine's (`/api/hexes`), read once a nation; the board draws
+  // the old way until they land, then again.
+  const hexgrid = MAPV.level === "nation" ? placesHexes(nation, () => renderPlaces(STATE)) : null;
+  return { W, KP: kp, home, homeNation: hc.nation || "", nation, continent, K: PlacesWorld.worldKnown(W, kp), hexgrid };
+}
+
+// --- hex travel on the Region (rules/hexes.py, play/hex_views.py) -------------------------
+// A lit hex pressed on the board, or its button in the slip, calls `hexMove` / `hexEnter`
+// (16-places-world.js, the one part of the map that touches the network: this tab sends
+// nothing itself, tests/test_table_places.py).
+const HEX_COMPASS = ["east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"];
+function hexBearing(a, b) {
+  const c = (q, r) => [Math.sqrt(3) * (q + r / 2), 1.5 * r], p = c(a[0], a[1]), t = c(b[0], b[1]);
+  return HEX_COMPASS[((Math.round(Math.atan2(t[1] - p[1], t[0] - p[0]) / (Math.PI / 4)) % 8) + 8) % 8];
+}
+// The slip's travel buttons: the keyboard's way onto the hexes the board lights.
+function hexSlip(v) {
+  const HS = (v.KP && v.KP.hexes) || {};
+  if (!v.hexgrid || !HS.party || v.homeNation !== v.nation) return "";
+  const at = {}; v.hexgrid.hexes.forEach(h => { at[h.q + "," + h.r] = h; });
+  const hours = g => { const walk = g === "grassland" || g === "farmland" ? 5 : 8; return HS.rides ? Math.ceil(walk / 2) : walk; };
+  const btns = (HS.reach || []).map(([q, r]) => { const h = at[q + "," + r] || {}, far = Math.max(Math.abs(q - HS.party[0]), Math.abs(r - HS.party[1]), Math.abs(q + r - HS.party[0] - HS.party[1]));
+    const where = h.town ? ((v.W.cities.find(c => c.id === h.town) || {}).name || "a town") : h.ground || "open ground";
+    return `<button type="button" class="v2-btn" data-hexgo="${esc(q)},${esc(r)}">${esc(upFirst(hexBearing(HS.party, [q, r])))}${far > 1 ? " ×2" : ""}: ${esc(where)}, ${far > 1 ? "about " : ""}${far > 1 ? hours(h.ground) * 2 : hours(h.ground)} h</button>`; });
+  const site = HS.site_here && !HS.in_site ? `<p><button type="button" class="v2-btn" data-hexenter="1">Go into ${esc({ tower: "the tower", ruins: "the ruins", mine: "the old mine", cave: "the cave" }[HS.site_here] || "the site")}</button></p>` : "";
+  return `<div class="mapnote hextravel"><h3>Travel</h3><p>${HS.rides ? "Riding, two hexes a move" : "On foot, one hex a move"}: five hours across open plain, eight across rougher ground${HS.rides ? ", half that riding" : ""}. Where you stop you look round, and every hex the look covers clears on the map.</p>
+    <p class="hexgo">${btns.join(" ")}</p>${site}</div>`;
 }
 
 // Open a map: from the breadcrumb, an arrow on the board, a slip's button, the zoom gesture.
@@ -212,6 +238,8 @@ function renderBoard(s, wrap, pf, how) {
       statics: (window.PATHFINDER_BOOT && window.PATHFINDER_BOOT.statics) || "/static/",
       pick: id => pickPlace(id),
       open: (level, arg) => mapOpen(level, arg),
+      hexMove: (q, r) => hexMove(q, r),
+      hexEnter: () => hexEnter(),
       world: PlacesWorld,
       lost: () => { BOARD.state = "chart"; renderPlaces(STATE); },
     });
@@ -320,8 +348,9 @@ function mapSlip(v, pf) {
     // A wild place round the town is the engine's own place: its slip, its Walk there.
     if (node) return PlacesChart.slip(pf, { sel, said: MAPV.said, walking: MAPV.walk && MAPV.walk.to });
     const N = W.nations[v.nation] || {}, homeHere = v.homeNation === v.nation;
-    return said + (sel ? mapCitySlip(v, sel) : "") + `<div class="mapnote"><h3>${esc(N.name || "")}</h3>
-      <p>${homeHere ? `You are in ${esc(pf.where || "")}. ` : ""}Each hex is about 12 miles across, some four hours on foot (Pathfinder's overland hex). Roads leaving ${esc(N.name || "")} end in an arrow with where they go.</p>
+    const onHex = String(pf.here || "").includes(":@hex-");
+    return said + (sel ? mapCitySlip(v, sel) : "") + hexSlip(v) + `<div class="mapnote"><h3>${esc(N.name || "")}</h3>
+      <p>${homeHere ? (onHex ? `You are out on open ground, nearest to ${esc(pf.where || "")}. ` : `You are in ${esc(pf.where || "")}. `) : ""}Each hex is 12 miles across (Pathfinder's overland hex). Roads leaving ${esc(N.name || "")} end in an arrow with where they go.</p>
       <p>${homeHere ? `<button type="button" class="v2-btn" data-maplevel="town" data-maparg="">${esc(pf.where || "The town")}</button> ` : ""}<button type="button" class="v2-btn" data-maplevel="continent" data-maparg="${esc(N.continent || "")}">${esc(W.continents[N.continent] || "The continent")}</button></p></div>`;
   }
   if (MAPV.level === "continent") {
@@ -493,6 +522,9 @@ document.addEventListener("click", e => {
   }
   const lv = t.closest("#placeswrap [data-maplevel]");
   if (lv) { mapOpen(lv.dataset.maplevel, lv.dataset.maparg || ""); return; }
+  const hg = t.closest("#placeswrap [data-hexgo]");
+  if (hg) { const [q, r] = hg.dataset.hexgo.split(",").map(Number); hexMove(q, r); return; }
+  if (t.closest("#placeswrap [data-hexenter]")) { hexEnter(); return; }
   const go = t.closest("#placeswrap [data-walkto]");
   if (go) { walkThere(go.dataset.walkto); return; }
 });

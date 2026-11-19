@@ -34,7 +34,7 @@ from django.urls import path, re_path
 from play import (class_views, outfit_views, race_views, setup_views, spell_views,
                   craft_views, home_views, views, bench_views, herb_views, forge_views,
                   works_views, enchant_views, alchemy_views, tradecraft_views,
-                  leather_views, harvest_views, report_views)
+                  leather_views, harvest_views, report_views, hex_views)
 
 urlpatterns = [
     path("", home_views.home, name="home"),
@@ -42,6 +42,9 @@ urlpatterns = [
     path("api/state", views.state, name="state"),
     # The world the place map draws (play/atlas.py), fetched once per campaign.
     path("api/atlas", views.atlas_view, name="atlas"),
+    path("api/hexes", hex_views.hexes_region, name="hexes_region"),
+    path("api/hex/move", hex_views.hex_move, name="hex_move"),
+    path("api/hex/enter", hex_views.hex_enter, name="hex_enter"),
     # The conversation log a page at a time, for the panel's "Earlier…" (fix-interfaces
     # §2.10); `/api/state` carries only the latest entries.
     path("api/conversation", views.conversation, name="conversation"),

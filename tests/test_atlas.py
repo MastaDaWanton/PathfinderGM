@@ -250,7 +250,13 @@ def test_the_atlas_endpoint_and_the_state_key(worlds, tmp_path, monkeypatch):
             c = cm.begin_with(load_pc("fixtures/pc-thessaly.json"), world_source=str(Path(worlds.source)))
             r = Client().get("/api/atlas")
             assert r.status_code == 200 and r["Cache-Control"] == "no-store"
-            assert r.json() == atlas.atlas(c.world)
+            # The atlas, and the campaign's stored layout beside it (rules/hexes.py,
+            # 2026-11-19): the maps draw the towns where the engine's hexes put them.
+            got_atlas = r.json()
+            layout = got_atlas.pop("layout")
+            assert got_atlas == atlas.atlas(c.world)
+            assert layout == cm.current().scene.hexes["layout"]
+            assert set(layout["pos"]) == {x["id"] for x in got_atlas["cities"]}
             got = Client().get("/api/state").json()["scene"]["known_places"]
             assert got == atlas.known_places(c.engine(), c.world)
             assert got["been"] == [c.scene.location_id]

@@ -407,6 +407,8 @@ class Campaign:
             # rules/maps.py): the place maps' knowledge beyond the towns stood in.
             "heard_towns": ({k: dict(v) for k, v in self.scene.heard_towns.items()}, {}),
             "maps_read": (list(self.scene.maps_read), []),
+            # Hex travel (2026-11-19, rules/hexes.py): the stored layout and the hexes touched.
+            "hexes": (dict(self.scene.hexes), {}),
             # The trade uses spent today (2026-10-07, rules/tradecraft.py): a counter
             # talked round keeps its price, and a thing judged its look, across a save.
             "dealings": ({k: dict(v) for k, v in self.scene.dealings.items()}, {}),
@@ -545,6 +547,7 @@ class Campaign:
             heard_towns={str(k): dict(v) for k, v in (s.get("heard_towns") or {}).items()
                          if isinstance(v, dict)},
             maps_read=[str(n) for n in (s.get("maps_read") or [])],
+            hexes=dict(s.get("hexes") or {}) if isinstance(s.get("hexes"), dict) else {},
             schemes=[dict(x) for x in (s.get("schemes") or [])],
             staffed=[str(x) for x in (s.get("staffed") or [])],
             swayed={str(k): int(v) for k, v in (s.get("swayed") or {}).items()},

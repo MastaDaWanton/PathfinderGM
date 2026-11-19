@@ -152,7 +152,36 @@ def known_places(engine, world) -> dict:
              if cid in settlement_ids and isinstance(h, dict)}
     return {"town": town if town in settlement_ids else "", "been": been, "heard": heard,
             "maps": list(getattr(scene, "maps_read", None) or []),
-            "sites": _sites(engine, set(been_places))}
+            "sites": _sites(engine, set(been_places)),
+            "hexes": _hexes(engine)}
+
+
+def _hexes(engine) -> dict:
+    """The party on the region grid (rules/hexes.py): its hex, the hexes a click can move
+    it to, what it did on the hexes it touched, and the sites it spotted. Small: only
+    touched hexes are kept. `{}` with no world or off the map (aboard a ship)."""
+    try:
+        g = engine.hex_world()
+        here = engine.party_hex(g) if g is not None else None
+    except Exception:  # noqa: BLE001 - the map is a view; a failure must not lose the state
+        import logging
+
+        logging.getLogger("pathfindergm").exception("the hex grid failed")
+        return {}
+    if g is None or here is None:
+        return {}
+    from rules import hexes
+
+    held = engine.scene.hexes or {}
+    return {"party": list(here), "nation": g.cell(*here)["nation"],
+            "reach": [list(h) for h in engine.hex_reach(g)],
+            "rides": engine.party_rides(),
+            "touched": {k: {"entered": "entered" in v, "searched": "searched" in v,
+                            "explored": bool(v.get("explored"))}
+                        for k, v in (held.get("touched") or {}).items()},
+            "spotted": dict(held.get("spotted") or {}),
+            "in_site": hexes.in_site(engine.scene.at or "", here),
+            "site_here": (held.get("spotted") or {}).get(hexes.key(*here), "")}
 
 
 def _sites(engine, been: set) -> list[dict]:

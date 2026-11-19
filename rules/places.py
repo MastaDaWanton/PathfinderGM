@@ -1656,7 +1656,12 @@ def for_scene(location, at: str, terrain_hint: str = "",
     ring = tuple(ring or ())
     base = _with_ring(home, ring) if ring else home
     ids = {p.id for p in base}
-    if is_ring(at) and len(_spot_path(at)) == 1 and at not in ids:
+    # A hex of open ground (rules/hexes.py) is a minted place with its own name: standing
+    # on it, the bare "outside" stand-in below would shadow it, and a cave entered from
+    # the hex opened "off outside" (measured 2026-11-19).
+    minted_here = any((m.id if isinstance(m, Place) else str((m or {}).get("id") or "")) == at
+                      for m in (founded or ()))
+    if is_ring(at) and len(_spot_path(at)) == 1 and at not in ids and not minted_here:
         # Stood on the outside by an engine that cannot build the ring (no world to hand):
         # the place is still real, and the id says enough to stand on it. A stretch of
         # road a journey stopped on is the case that matters — `place_party` validates
@@ -1961,7 +1966,14 @@ def mint(parent: Place, label: str, about: str = "", *, terrain: str = "",
     parent's unless given. `exits` are wired by `with_founded` at read time."""
     ground = str(terrain or "").strip().lower() or parent.terrain
     pid = child_id(parent.id, label)
-    if ground and ground != parent.terrain and origin != "venture" \
+    hex_spot = "/".join(_spot_path(parent.id))
+    if ground and ground != parent.terrain and hex_spot.startswith("@hex-"):
+        # A site under a hex of open ground (rules/hexes.py, 2026-11-19): the hex's own
+        # spot, never its name. Named by miles and bearing from a town, two hexes on the
+        # same ground the same way out share a name, and `_slug(parent.name)` below would
+        # have given them one cave. New ids: no save holds a hex's site from before.
+        pid = f"{region_key(location_of(parent.id), ground)}:{hex_spot}/{_slug(label)}"
+    elif ground and ground != parent.terrain and origin != "venture" \
             and setting_of(parent.id) == "outside":
         # Other ground out past the edge: the mountain off the road to Grotburrow. The
         # head carries the new ground and the spot keeps the parent's whole path, so

@@ -580,6 +580,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # `follow` (walk where the trail leads) are written by the act→op table from the
     # reading (`acts_to_ops`); the plan's own track is replaced by the table's.
     "track": ((), ("actor", "quarry", "follow"), "player"),
+    # Hex travel on the region map (rules/hexes.py, 2026-11-19): written only by the
+    # board's click (CODE_ONLY_OPS). `hex` is the hex's [q, r]; reach, hours and the look
+    # round are the engine's. `hex_enter` goes into the site of the hex the party is in.
+    "hex_move": (("hex",), ("actor",), "player"),
+    "hex_enter": ((), ("actor",), "player"),
     # Any craft's excursion onto open ground, by the craft panel's key ("alchemist:quarry",
     # "leatherworker:gather", content/rules/gathering.json): the one gathering door
     # forage and prospect also run through (`Engine._gather`). The same hours, the same
@@ -843,7 +848,8 @@ CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "looks_in", "defending", 
 # `harvest` since 2026-11-01: the reader's `harvest` act, built whole (`acts_to_ops._harvest`).
 # `bout` since 2026-11-18: the reader's `challenge` act at an arena (`acts_to_ops._challenge`).
 CODE_ONLY_OPS = frozenset({"job", "make", "craft", "greet", "commission", "harvest",
-                           "disguise", "surrender", "bout", "live_off_land", "hunt"})
+                           "disguise", "surrender", "bout", "live_off_land", "hunt",
+                           "hex_move", "hex_enter"})
 # Ops only the author's own hand writes (`/cheat`, origin `author:`): left out of the
 # turn's op enum like the code-only ops, but offered to the cheat (`prompts.CHEAT_OPS`),
 # and refused by the engine from any other origin. `xp` since 2026-11-07 (audit #22): a

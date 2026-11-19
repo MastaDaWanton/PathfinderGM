@@ -93,17 +93,23 @@ export function init(el, a) {
     ray.setFromCamera(new THREE.Vector2((ev.clientX - r.left) / r.width * 2 - 1, -(ev.clientY - r.top) / r.height * 2 + 1), camera);
     const hit = ray.intersectObjects(pick, true)[0]; let o = hit && hit.object;
     while (o && !o.userData.id) o = o.parent;
-    return { o: o && (o.userData.pickable || o.userData.open) ? o : null, ray };
+    return { o: o && (o.userData.pickable || o.userData.open || o.userData.enter) ? o : null, ray };
   };
   canvas.addEventListener("pointerdown", ev => { down = [ev.clientX, ev.clientY]; });
   canvas.addEventListener("pointerup", ev => {
     if (!down || Math.hypot(ev.clientX - down[0], ev.clientY - down[1]) > 5) return;
-    const { o } = under(ev);
+    const { o, ray } = under(ev);
+    if (o && o.userData.enter) { api.hexEnter(); return; }   // the spotted site in the party's hex
     if (o && o.userData.open) { api.open(...o.userData.open); return; }   // an arrow out of this map
     if (o) { api.pick(o.userData.id); return; }
     // Nothing pressed but the land: a lit continent or nation opens.
     if (V && V.level === "world" && hover.continent) api.open("continent", hover.continent);
     else if (V && V.level === "continent" && hover.nation) api.open("nation", hover.nation);
+    else if (V && V.level === "nation" && board) {   // a lit hex beside the party: travel there
+      const pt = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.1), new THREE.Vector3());
+      const hx = pt && board.hexAt(pt.x, pt.z);
+      if (hx && hx.reach) api.hexMove(hx.q, hx.r);
+    }
   });
   // The name under the pointer always shows, even when it was held back to keep the map clear;
   // on the World a continent lights under it, on a Continent a nation.
@@ -120,6 +126,9 @@ export function init(el, a) {
       const pt = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.1), new THREE.Vector3());
       const hx = pt && board.hexAt(pt.x, pt.z);
       setHover("nation", hx && board.knownNations.has(hx.nation) ? hx.nation : null); lit = !!hover.nation;
+    } else if (V && V.level === "nation" && board) {
+      const pt = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.1), new THREE.Vector3());
+      const hx = pt && board.hexAt(pt.x, pt.z); lit = !!(hx && hx.reach);
     }
     canvas.style.cursor = o || lit ? "pointer" : "grab";
   });
@@ -405,7 +414,8 @@ export async function draw(v) {
   const subject = level === "nation" ? v.nation : level === "continent" ? v.continent : level === "town" ? pf.where : level === "site" ? v.site.id : "";
   const sig = level + "|" + subject + "|" + pf.where + "|" + pf.here + "|" + pf.nodes.map(n => n.id + (n.visited ? "+" : "")).join(",")
     + "|" + (mine.K ? Object.keys(mine.K.how).sort().join() : "")
-    + "|" + mine.sites.map(st => st.id + ":" + st.rooms.map(r => r.id + (r.visited ? "+" : "")).join()).join(";");
+    + "|" + mine.sites.map(st => st.id + ":" + st.rooms.map(r => r.id + (r.visited ? "+" : "")).join()).join(";")
+    + "|" + (v.hexgrid ? "hx" : "") + JSON.stringify((v.KP && v.KP.hexes) || {});
   const freshView = level + "|" + subject !== lastTown;
   if (sig !== lastSig) {
     await Promise.all([loadPaper(), loadKit()]);
@@ -518,6 +528,15 @@ function hexBoard(hexes, h, wash, names) {
   byTile.forEach((list, f) => { const t = tileOf(f); if (!t) return; const im = new THREE.InstancedMesh(t.geo, t.mat, list.length); list.forEach((m, n) => im.setMatrixAt(n, m)); im.receiveShadow = true; world.add(im); });
   if (puffs.length) { const im = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }), puffs.length);
     puffs.forEach((m, n) => im.setMatrixAt(n, m)); im.castShadow = true; world.add(im); }
+  // Ground seen but not searched: a pale haze over the tile, lighter than the clouds of the
+  // unknown (ruling 10). The hexes a click can move the party to: a gilt hexagon on each.
+  const hazy = hexes.filter(x => x.haze);
+  if (hazy.length) { const im = new THREE.InstancedMesh(new THREE.CylinderGeometry(h * .97, h * .97, .05, 6), new THREE.MeshBasicMaterial({ color: 0xf4ecd6, transparent: true, opacity: .3, depthWrite: false }), hazy.length);
+    hazy.forEach((x, n) => im.setMatrixAt(n, new THREE.Matrix4().makeTranslation(x.x, 1.14, x.z))); im.renderOrder = 1; world.add(im); }
+  const lit2 = hexes.filter(x => x.reach);
+  if (lit2.length) { const ring = new THREE.RingGeometry(h * .74, h * .9, 6, 1, Math.PI / 2); ring.rotateX(-Math.PI / 2);
+    const im = new THREE.InstancedMesh(ring, new THREE.MeshBasicMaterial({ color: 0xe8c25a, transparent: true, opacity: .9, depthWrite: false, side: THREE.DoubleSide }), lit2.length);
+    lit2.forEach((x, n) => im.setMatrixAt(n, new THREE.Matrix4().makeTranslation(x.x, 1.2, x.z))); im.renderOrder = 3; world.add(im); }
   // Nation plates: one instanced mesh per opacity, their indices kept so a hover can light a nation.
   const plateSets = {}, lit = {};
   hexes.filter(x => x.plate && wash[x.nation]).forEach(x => (plateSets[x.plateOpacity] = plateSets[x.plateOpacity] || []).push(x));
@@ -620,6 +639,9 @@ function continentMap(v) {
 const TILE_OF = { forest: "hex/grass-forest", jungle: "hex/grass-forest", desert: "hex/sand-desert", mountain: "hex/stone-hill", hills: "hex/stone-hill",
                   underground: "hex/stone-hill", tundra: "hex/grass", farmland: "hex/grass", grassland: "hex/grass", swamp: "hex/grass-forest", coast: "hex/grass" };
 const MINI_OF = { desert: "dunes", mountain: "cave", hills: "cave", underground: "cave" };
+// A hex's site (rules/hexes.py `SITES_BY_GROUND`) as a miniature, and its name on hover.
+const SITE_MINI = { tower: "steeple", ruins: "keep", mine: "cave", cave: "cave" };
+const SITE_NAME = { tower: "the tower", ruins: "the ruins", mine: "the old mine", cave: "the cave" };
 const spotOf = id => (String(id).split("~")[1] || "");
 const groundOf = id => spotOf(id).split(":")[0];
 function nationMap(v) {
@@ -629,23 +651,38 @@ function nationMap(v) {
   // Miles to a world unit, from the roads the world measured (the median), so a hex is 12 miles.
   const ratios = W.routes.filter(r => r.miles && r.by !== "sea" && WL.pos[r.a] && WL.pos[r.b])
     .map(r => r.miles / (Math.hypot(WL.pos[r.a][0] - WL.pos[r.b][0], WL.pos[r.a][1] - WL.pos[r.b][1]) || 1)).sort((a, b) => a - b);
-  const milesPerUnit = ratios[ratios.length >> 1] || 1, rW = 6 / milesPerUnit, h = HX, NS = h / rW;
+  // The engine's hex size when its grid is here (rules/hexes.py, the same median): one grid.
+  const milesPerUnit = ratios[ratios.length >> 1] || 1, rW = v.hexgrid ? v.hexgrid.size : 6 / milesPerUnit, h = HX, NS = h / rW;
   const ctr = [mineC.reduce((a, c) => a + WL.pos[c.id][0], 0) / mineC.length, mineC.reduce((a, c) => a + WL.pos[c.id][1], 0) / mineC.length];
   const ofN = (wx, wy) => { if (!P.landAt(W, WL, wx, wy)) return null; const c = P.nearestCity(contCities, WL, wx, wy); return c ? c.nation : null; };
   const homeHere = v.homeNation === v.nation;
   const knownTowns = Object.keys(K.how).filter(inMine);
   // The hexes: the nation's land, and a ring of its neighbours' land and sea round it.
   const key = (q, r) => q + "," + r, grid = new Map();
-  const span = Math.min(40, Math.ceil((Math.max(...mineC.map(c => Math.hypot(WL.pos[c.id][0] - ctr[0], WL.pos[c.id][1] - ctr[1]))) + 160) * NS / (h * 1.5)));
-  for (let q = -span * 2; q <= span * 2; q++) for (let r = -span; r <= span; r++) {
-    const [sx, sz] = hexC(q, r, h), wx = sx / NS + ctr[0], wy = sz / NS + ctr[1];
-    grid.set(key(q, r), { q, r, x: sx, z: sz, wx, wy, nation: ofN(wx, wy) });
+  if (v.hexgrid) {
+    // The engine's grid (`/api/hexes`, rules/hexes.py): one world-wide axial grid, so a hex
+    // here is the hex the engine moves the party across, and its ground the ground the
+    // engine forages and charges hours on. Drawn round the hex at the nation's middle.
+    const rf = ctr[1] / (1.5 * rW), qf = ctr[0] / (Math.sqrt(3) * rW) - rf / 2;
+    let q0 = Math.round(qf), r0 = Math.round(rf); const s0 = Math.round(-qf - rf);
+    const dq = Math.abs(q0 - qf), dr = Math.abs(r0 - rf), ds = Math.abs(s0 + qf + rf);
+    if (dq > dr && dq > ds) q0 = -r0 - s0; else if (dr > ds) r0 = -q0 - s0;
+    v.hexgrid.hexes.forEach(hx => {
+      const [wx, wy] = hexC(hx.q, hx.r, rW), [sx, sz] = hexC(hx.q - q0, hx.r - r0, h);
+      grid.set(key(hx.q, hx.r), { q: hx.q, r: hx.r, x: sx, z: sz, wx, wy, nation: hx.land ? hx.nation : null, ground: hx.ground, town: hx.town });
+    });
+  } else {
+    const span = Math.min(40, Math.ceil((Math.max(...mineC.map(c => Math.hypot(WL.pos[c.id][0] - ctr[0], WL.pos[c.id][1] - ctr[1]))) + 160) * NS / (h * 1.5)));
+    for (let q = -span * 2; q <= span * 2; q++) for (let r = -span; r <= span; r++) {
+      const [sx, sz] = hexC(q, r, h), wx = sx / NS + ctr[0], wy = sz / NS + ctr[1];
+      grid.set(key(q, r), { q, r, x: sx, z: sz, wx, wy, nation: ofN(wx, wy) });
+    }
   }
   const mine = [...grid.values()].filter(x => x.nation === v.nation);
   const ring = new Set(); mine.forEach(x => HEX_DIRS.forEach(([dq, dr]) => { const o = grid.get(key(x.q + dq, x.r + dr)); if (o && o.nation !== v.nation) ring.add(o); }));
   const hexOf = (wx, wy) => { let best = 1e18, b = null; mine.forEach(x => { const d = (x.wx - wx) ** 2 + (x.wy - wy) ** 2; if (d < best) { best = d; b = x; } }); return b; };
   const pos = {}, known = new Set(), around = (x, n = 1) => { known.add(key(x.q, x.r)); if (n) HEX_DIRS.forEach(([dq, dr]) => known.add(key(x.q + dq, x.r + dr))); };
-  knownTowns.forEach(id => { const hx = hexOf(...WL.pos[id]); if (hx) { pos[id] = hx; around(hx); } });
+  knownTowns.forEach(id => { const t = v.hexgrid && v.hexgrid.towns[id], hx = (t && grid.get(key(t[0], t[1]))) || hexOf(...WL.pos[id]); if (hx) { pos[id] = hx; around(hx); } });
   const roadsOut = [];
   K.roads.filter(rd => rd.by !== "sea" && (inMine(rd.a) || inMine(rd.b))).forEach(rd => {
     const from = inMine(rd.a) ? rd.a : rd.b, to = from === rd.a ? rd.b : rd.a;
@@ -655,7 +692,8 @@ function nationMap(v) {
   // takes the ground that road crosses there, the hexes round a town its near ground, a few
   // further out its ground beyond; a reach no road crosses gets a patch at its miles, in the
   // direction furthest from every road out.
-  const ground = new Map(), all = [...mine, ...ring].filter(x => x.nation);
+  const ground = new Map(), all = v.hexgrid ? [] : [...mine, ...ring].filter(x => x.nation);
+  if (v.hexgrid) grid.forEach(x => { if (x.nation && x.ground && x.ground !== "water") ground.set(key(x.q, x.r), x.ground); });
   const townOf = x => P.nearestCity(contCities, WL, x.wx, x.wy);
   const routesOf = c => W.routes.filter(r => r.by !== "sea" && (r.a === c.id || r.b === c.id) && (r.crosses || []).length && WL.pos[r.a] && WL.pos[r.b]);
   all.forEach(x => {
@@ -672,7 +710,7 @@ function nationMap(v) {
     if (!g && dHex >= 1.6) { const far = c.beyond || []; g = (x.q * 7 + x.r * 3 & 1023) % 4 === 0 && far.length ? far[(x.q + x.r & 1023) % far.length] : null; }
     if (g) ground.set(key(x.q, x.r), g);
   });
-  mineC.forEach(c => (c.reaches || []).filter(rc => !routesOf(c).some(r => (r.crosses || [])[0] === rc.ground)).forEach(rc => {
+  if (!v.hexgrid) mineC.forEach(c => (c.reaches || []).filter(rc => !routesOf(c).some(r => (r.crosses || [])[0] === rc.ground)).forEach(rc => {
     const hx0 = hexOf(...WL.pos[c.id]); if (!hx0) return;
     const taken = routesOf(c).map(r => { const o = r.a === c.id ? r.b : r.a; return Math.atan2(WL.pos[o][1] - WL.pos[c.id][1], WL.pos[o][0] - WL.pos[c.id][0]); });
     const n = Math.max(1, Math.round((rc.miles + 6) / 12));   // from the town's middle: its own half-hex, then the reach's miles
@@ -687,7 +725,10 @@ function nationMap(v) {
   const wild = [];
   if (homeHere && pos[v.home]) {
     const home = pos[v.home], homeC = cityOf(W, v.home) || {};
-    const outside = v.pf.nodes.filter(n => n.setting === "outside" && String(n.id).split("~")[0] === v.home);
+    // A hex of open ground (rules/hexes.py) stands on its own hex, not as a wild place of the
+    // town's: left in, each one walked was drawn as woods with a track back to the gate.
+    const outside = v.pf.nodes.filter(n => n.setting === "outside" && String(n.id).split("~")[0] === v.home
+                                         && !String(n.id).includes(":@hex-"));
     const isPost = n => /^[^:]*:@the-(outskirts|crossroads)$/.test(spotOf(n.id));
     const isRoad = n => /:@the-road-to-/.test(spotOf(n.id));
     const isUnder = n => spotOf(n.id).split(":")[1] && spotOf(n.id).split(":")[1].includes("/");
@@ -715,14 +756,45 @@ function nationMap(v) {
   }
   roadsOut.forEach(rd => { if (!pos[rd.from]) return;
     for (let t = 0; t < 30; t++) { const hx = hexOf(WL.pos[rd.from][0] + Math.cos(rd.bearing) * t * rW, WL.pos[rd.from][1] + Math.sin(rd.bearing) * t * rW); if (hx) known.add(key(hx.q, hx.r)); } });
+  // What the party did on the hexes (scene.known_places.hexes, rules/hexes.py). Three looks
+  // (the owner, 2026-11-19: "there should be a visible difference between hexes that have
+  // been perception checked"): cloud where nothing is known, a pale haze over ground seen but
+  // never searched (a hex ridden through looks like this), clear where a look covered it.
+  const HS = (v.KP && v.KP.hexes) || {}, touched = HS.touched || {};
+  const reach = new Set(v.hexgrid ? (HS.reach || []).map(([q, r]) => key(q, r)) : []);
   const hexes = [];
   [...mine, ...ring].forEach(x => {
-    const k = key(x.q, x.r), isMine = x.nation === v.nation, land = !!x.nation, kn = known.has(k);
+    const k = key(x.q, x.r), isMine = x.nation === v.nation, land = !!x.nation, t = touched[k] || {};
+    const kn = known.has(k) || !!t.entered || !!t.searched || reach.has(k);
     const tile = !land ? "hex/water" : TILE_OF[ground.get(k)] || "hex/grass";
-    hexes.push({ q: x.q, r: x.r, x: x.x, z: x.z, tile, nation: x.nation, known: kn || !isMine, plate: land && (isMine ? kn : true), plateOpacity: isMine ? .55 : .25, cloud: isMine && land && !kn });
+    hexes.push({ q: x.q, r: x.r, x: x.x, z: x.z, tile, nation: x.nation, known: kn || !isMine, plate: land && (isMine ? kn : true), plateOpacity: isMine ? .55 : .25,
+                 cloud: isMine && land && !kn, haze: !!v.hexgrid && isMine && land && kn && !t.searched, reach: reach.has(k), ground: ground.get(k) || "" });
   });
   board = { ...hexBoard(hexes, h, wash, { [v.nation]: W.nations[v.nation].name }), knownNations: new Set(), pos: {} };
   const P3 = hx => new THREE.Vector3(hx.x, 1.05, hx.z);
+  // The party out on a hex: its figure stands there, wherever it is in the hex (a site too).
+  const partyHex = HS.party && grid.get(key(HS.party[0], HS.party[1]));
+  // Only on a hex's own place (`{town}~{ground}:@hex-q-r`, and its site below it): standing in
+  // the woods off a town, the figure stays on the woods' piece as it always did.
+  if (partyHex && v.pf && String(v.pf.here || "").includes(":@hex-")) board.pos[v.pf.here] = P3(partyHex);
+  // A site's rooms hang off its hex's own place (`posOf` walks a room up to its host), so
+  // every hex place named is stood on its hex, read off the id (`hexes.slug`: m is minus).
+  [...(v.sites || []).map(st => st.host), ...((v.pf && v.pf.nodes) || []).map(n => n.id)].forEach(id => {
+    const m = /:@hex-(m?\d+)-(m?\d+)$/.exec(String(id || "")); if (!m) return;
+    const n = t => (t[0] === "m" ? -Number(t.slice(1)) : Number(t)), hx = grid.get(key(n(m[1]), n(m[2])));
+    if (hx && !board.pos[id]) board.pos[id] = P3(hx);
+  });
+  // Sites spotted from a look (ruling 3: "if you find something a model is placed on the hex"):
+  // grey primer until the party has been inside, painted after; the one in the party's own
+  // hex is pressed to go in.
+  Object.entries(HS.spotted || {}).forEach(([k, kind]) => {
+    const hx = grid.get(k); if (!hx) return;
+    const done = !!(touched[k] && touched[k].explored), ours = !!partyHex && key(partyHex.q, partyHex.r) === k;
+    const o = miniature(SITE_MINI[kind] || "keep", { painted: done });
+    place(o, "hexsite:" + k, hx.x + 1.6, hx.z - 1.4, 1.5).position.y = 1.05;
+    Object.assign(o.userData, { pickable: false, enter: ours && !HS.in_site, name: SITE_NAME[kind] || "a site",
+                                seen: !done, road: ours && !HS.in_site ? "press to go in" : "" });
+  });
   knownTowns.forEach(id => { const hx = pos[id]; if (!hx) return; const how = K.how[id], o = miniature("town", { painted: how.by === "been" });
     place(o, id, hx.x, hx.z, .8).position.y = 0;
     Object.assign(o.userData, { pickable: true, name: cityOf(W, id).name, seen: how.by !== "been" }); board.pos[id] = P3(hx); });

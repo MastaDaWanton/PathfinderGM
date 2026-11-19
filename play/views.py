@@ -1800,8 +1800,18 @@ def atlas_view(request):
     under the same campaign must never be drawn from a stale copy."""
     from . import atlas
 
+    from rules import hexes
+
     c = campaign_mod.current()
-    response = JsonResponse(atlas.atlas(c.world))
+    got = dict(atlas.atlas(c.world))
+    if got.get("cities"):
+        # The campaign's own stored layout (rules/hexes.py), so the maps draw the towns
+        # exactly where the engine's hexes put them. Stored now if this is its first look.
+        had = isinstance(c.scene.hexes.get("layout"), dict)
+        got["layout"] = hexes.held_layout(c.scene, got)
+        if not had:
+            c.save()
+    response = JsonResponse(got)
     response["Cache-Control"] = "no-store"
     return response
 

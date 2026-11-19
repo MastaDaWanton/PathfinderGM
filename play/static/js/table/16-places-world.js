@@ -26,6 +26,11 @@ const PlacesWorld = (function () {
   const LAID = new WeakMap();
   function worldLayout(W) {
     if (LAID.has(W)) return LAID.get(W);
+    // The campaign's own stored layout (rules/hexes.py, 2026-11-19): the engine's hexes are
+    // laid on it, so the board draws the towns exactly where the engine stands them, and a
+    // world re-exported under the campaign moves nothing. The pass below is the same rule,
+    // kept for a page with no layout sent (the tests, an older server).
+    if (W.layout && W.layout.pos) { const got = { pos: W.layout.pos, centre: W.layout.centre, half: W.layout.half }; LAID.set(W, got); return got; }
     const conts = Object.keys(W.continents).sort();
     const centre = {}, R = 300;
     conts.forEach((c, k) => {
@@ -253,15 +258,62 @@ const PlacesWorld = (function () {
 // 16-tab-map.js, whose walk sends nothing (the turn goes out through Say). `then` runs when
 // it lands, so the map draws again.
 const ATLAS = { data: null, loading: null, failed: false };
+// A nation's hexes for the Region map, from `/api/hexes` (play/hex_views.py): the engine's own
+// grid and ground, static for a campaign, so read once a nation. `then` draws again on landing.
+const HEXES = { by: {}, loading: {}, failed: {} };
+function placesHexes(nation, then) {
+  if (!nation) return null;
+  if (HEXES.by[nation]) return HEXES.by[nation];
+  if (!HEXES.loading[nation] && !HEXES.failed[nation]) {
+    HEXES.loading[nation] = fetch(`/api/hexes?nation=${encodeURIComponent(nation)}`, { cache: "no-store" })
+      .then(r => readJSON(r).then(got => { if (!r.ok) throw new Error(got.error || `HTTP ${r.status}`); HEXES.by[nation] = got; }))
+      .catch(err => { HEXES.failed[nation] = true; console.warn("The region's hexes did not load:", err); })
+      .finally(() => { HEXES.loading[nation] = null; then(); });
+  }
+  return null;
+}
 function placesAtlas(s, then) {
   const kp = (s && s.scene && s.scene.known_places) || {};
   const d = ATLAS.data, has = id => d && Array.isArray(d.cities) && d.cities.some(c => c.id === id);
   if (d && (kp.been || []).every(has)) return d;
   if (!ATLAS.loading && !ATLAS.failed) {
     ATLAS.loading = fetch("/api/atlas", { cache: "no-store" })
-      .then(r => readJSON(r).then(got => { if (!r.ok) throw new Error(got.error || `HTTP ${r.status}`); ATLAS.data = got; }))
+      .then(r => readJSON(r).then(got => { if (!r.ok) throw new Error(got.error || `HTTP ${r.status}`); ATLAS.data = got; HEXES.by = {}; HEXES.failed = {}; }))
       .catch(err => { ATLAS.failed = true; console.warn("The atlas did not load; the town map only:", err); })
       .finally(() => { ATLAS.loading = null; then(); });
   }
   return null;
+}
+
+// Hex travel on the Region (rules/hexes.py, play/hex_views.py): the engine's `hex_move` for a
+// lit hex pressed on the board or its button in the slip, the Perception die the player's own
+// through the same popup an excursion's uses, and the table drawn again from the state the
+// move left. `hexEnter` goes into the spotted site underfoot.
+const HEXGO = { busy: false };
+function hexMove(q, r) { return hexAct("/api/hex/move", { hex: [q, r] }); }
+function hexEnter() { return hexAct("/api/hex/enter", {}); }
+async function hexAct(url, body) {
+  if (HEXGO.busy) return;
+  HEXGO.busy = true;
+  busy(true);
+  try {
+    let d = await post(url, body);
+    if (d.roll) {
+      busy(false);
+      const p = d.roll, bd = p.breakdown || [];
+      const terms = bd.map(m => ({ label: m.source, value: sign(m.value) }));
+      if (bd.length !== 1) terms.push({ label: "your modifier", value: sign(p.modifier), total: true });
+      let face = await Dice3D.ask({ hold: true, title: p.label, why: p.because || "", sides: 20, lo: 1, hi: 20, die: "1d20", terms });
+      if (face == null) { try { face = (await post("/api/roll/face", {})).face; } catch { face = null; } }
+      const landed = face != null ? Dice3D.land({ title: p.label, why: p.because || "", die: "1d20", sides: 20, lo: 1, hi: 20, result: face, terms }) : null;
+      busy(true);
+      try { d = await post(url, { face: face == null ? "auto" : face }); }
+      catch (err) { Dice3D.close(); throw err; }
+      finally { busy(false); }
+      if (landed) await landed; else Dice3D.close();
+    }
+    render(await getState());
+  } catch (err) {
+    const e = document.getElementById("err"); if (e) e.textContent = err.message;
+  } finally { busy(false); HEXGO.busy = false; }
 }

@@ -460,6 +460,11 @@ class Scene:
     # and reading made them; both only grow.
     heard_towns: dict[str, dict] = field(default_factory=dict)
     maps_read: list[str] = field(default_factory=list)
+    # Hex travel on the region map (rules/hexes.py): the layout this campaign plays on,
+    # stored so a re-exported world never moves a hex under the party, and what the party
+    # did on each hex it touched ({"q,r": {"entered", "since", "searched", "explored"}})
+    # and the sites it has spotted ({"q,r": kind}). Stored, because play made it.
+    hexes: dict = field(default_factory=dict)
     # The schemes running in this campaign (rules/schemes.py): one instance per opened
     # scheme — its filled slots, the steps that fired and when, its outcome. Stored,
     # like `founded`, because play made it; read back through the one ticker.
@@ -20847,6 +20852,317 @@ class Engine:
             for pl in made:
                 self.scene.founded.append(pl.as_dict())
         return made[0].name
+
+    # --- hex travel on the region map (rules/hexes.py, docs/hexcrawl-plan.md) -----------------
+
+    def hex_world(self):
+        """The region grid this campaign plays on, or None with no world to lay out."""
+        if self.world is None:
+            return None
+        from play import atlas as atlas_mod
+        from . import hexes
+
+        at = atlas_mod.atlas(self.world)
+        if not at.get("cities"):
+            return None
+        return hexes.grid(at, hexes.held_layout(self.scene, at))
+
+    def party_hex(self, g=None):
+        """The hex the party stands in: a hex place's own, else its town's. None aboard a
+        ship, at sea, or with no world."""
+        from . import places as places_mod
+
+        g = g or self.hex_world()
+        if g is None or places_mod.terrain_of(self.scene.at) == "deck":
+            return None
+        return g.hex_of_place(self.scene.at or "", self.scene.location_id or "")
+
+    def party_rides(self) -> bool:
+        """Whether the whole party rides (the owner's ruling 8, 2026-11-19): a mount for
+        the PC and one for every companion who travels with them, the journey's own test
+        (`journey.MOUNTS`). One rider short and the party walks, as a journey does."""
+        from . import journey as journey_mod
+
+        mounts = [m for m in journey_mod.owned_mounts(self.scene) if not m.is_down]
+        if not mounts:
+            return False
+        walkers = [a for a in (getattr(self.scene, "people", {}) or {}).values()
+                   if not a.is_pc and not a.is_down
+                   and str(getattr(a, "from_template", "") or "") not in journey_mod.MOUNTS
+                   and (a.has_state(states.TRAVELS_WITH_YOU) or a.has_state(states.HIRED))]
+        return len(mounts) >= 1 + len(walkers)
+
+    def hex_reach(self, g=None) -> list[tuple]:
+        """The hexes a click can move the party to: each land neighbour, and, riding, each
+        land hex two away with a land hex between (plan §3)."""
+        from . import hexes
+
+        g = g or self.hex_world()
+        here = self.party_hex(g)
+        if g is None or here is None:
+            return []
+        out = [h for h in hexes.neighbours(*here) if g.cell(*h)["land"]]
+        if self.party_rides():
+            seen = set(out) | {here}
+            for m in list(out):
+                for h in hexes.neighbours(*m):
+                    if h not in seen and hexes.distance(h, here) == 2 and g.cell(*h)["land"]:
+                        seen.add(h)
+                        out.append(h)
+        return out
+
+    def _hex_touched(self, h) -> dict:
+        from . import hexes
+
+        touched = self.scene.hexes.setdefault("touched", {})
+        return touched.setdefault(hexes.key(*h), {})
+
+    def _hex_explored(self, g, h) -> str:
+        """Pay for an explored hex once (UC: 100 XP, +25 for difficult ground), or "".
+
+        Explored (owner call 1, answered by default 2026-11-19): a hex with a site once the
+        party has stood inside the site; a hex with none once they have spent an hour there.
+        Never from a model: the award is the rule's, through the one XP door."""
+        from . import hexes
+
+        rec = (self.scene.hexes.get("touched") or {}).get(hexes.key(*h))
+        if not rec or rec.get("explored") or "entered" not in rec:
+            return ""
+        site = hexes.site_of(g, *h)
+        if site is not None:
+            if not any(hexes.in_site(p, h) for p in self.scene.places_been()):
+                return ""
+        elif self.scene.clock_minutes - int(rec.get("since", rec["entered"])) \
+                < hexes.EXPLORE_MINUTES:
+            return ""
+        rec["explored"] = self.scene.clock_minutes
+        ground = g.cell(*h)["ground"]
+        xp = hexes.EXPLORED_XP + (hexes.DIFFICULT_XP if ground in hexes.DIFFICULT else 0)
+        return self.award_xp(self.scene.pc(), xp, f"exploring the {ground} hex")
+
+    def _op_hex_move(self, intent: Intent, partial: dict) -> Outcome:
+        """One hex across the region map, or two riding: the owner's hexcrawl (plan §3-6).
+
+        Written only by the board's click (`CODE_ONLY_OPS`). The move costs Ultimate
+        Campaign's hours through a hex (5 on plain, 8 on anything else; half riding, the
+        journey's own `mounted_hours`), paid through the body toll every walk pays, and it is
+        the only time that passes on its own (ruling 2). Each hex crossed is a real place
+        (`hexes.place_doc`) walked into through `travel`, so its hours are checked on the
+        road's table (`ontheway.road`) once, a meeting stops the ride where it happens, and
+        escorts, mounts and the watch behave as on any walk.
+
+        Where the party stops it looks round: the player's Perception, read against the
+        site in its own hex and the six round it (ruling 3); every hex read is searched,
+        whatever the roll (ruling 10). A hex ridden through gets no look (ruling 9)."""
+        from . import hexes, outskirts as outskirts_mod
+        from . import journey as journey_mod
+        from . import places as places_mod
+
+        pc = self.scene.pc()
+        if pc is None:
+            return self._refuse(intent, "Nobody is here to move.")
+        if self.scene.in_encounter:
+            return self._refuse(intent, "Not in the middle of a fight; end it or get clear first.")
+        g = self.hex_world()
+        here = self.party_hex(g)
+        if g is None or here is None:
+            return self._refuse(intent, "The party is not on land the region map shows.")
+        try:
+            to = tuple(int(v) for v in list(intent.params.get("hex") or ())[:2])
+            if len(to) != 2:
+                raise ValueError
+        except (TypeError, ValueError):
+            return self._refuse(intent, "hex_move needs `hex`: the hex's [q, r].")
+        dest = g.cell(*to)
+        far = hexes.distance(here, to)
+        rides = self.party_rides()
+        if far == 0:
+            return self._refuse(intent, f"{pc.name} is in that hex already.")
+        if not dest["land"]:
+            return self._refuse(intent, "That hex is open water. Crossing it waits for a ship.")
+        if far > (2 if rides else 1):
+            if rides:
+                why = "Riding, the party reaches two hexes at most."
+            elif far == 2:
+                why = ("On foot the party moves one hex at a time; with a horse for everyone "
+                       "it could make two.")
+            else:
+                why = "On foot the party moves one hex at a time."
+            return self._refuse(intent, why)
+        path = [to]
+        if far == 2:
+            between = [h for h in hexes.neighbours(*here)
+                       if hexes.distance(h, to) == 1 and g.cell(*h)["land"]]
+            if not between:
+                return self._refuse(intent, "There is no land between here and there to ride over.")
+            # The cheaper ground first (plan §3: plain before rough), the board's order after.
+            between.sort(key=lambda h: hexes.hours_through(g.cell(*h)["ground"]))
+            path = [between[0], to]
+
+        # The look round, the player's own die (the popup, as a track's is), asked before
+        # anything is spent so the re-run with the face finds everything as it was.
+        mods = pc.skill_modifiers("perception")
+        if "player_face" in partial:
+            look = self.dice.given(int(partial.pop("player_face")), mods,
+                                   label=f"{pc.name} Perception (the land around)")
+        else:
+            raise _NeedsPlayerRoll({
+                "label": "Perception check — looking over the land around you",
+                "die": "1d20", "actor": pc.name, "min": 1, "max": 20,
+                "modifier": sum(m.value for m in mods),
+                "breakdown": [m.as_dict() for m in mods],
+                "dc": None, "dc_shown": False, "because": intent.because,
+                "intent_id": intent.id,
+            }, {})
+
+        # The hex being left: explored, if it was (an hour spent, or its site reached).
+        xp_line = self._hex_explored(g, here)
+        tells: list[str] = []
+        effects: list[dict] = []
+        if hexes.in_site(self.scene.at or ""):
+            # Up out of the hex's site first, to the hex itself, the way the party went in.
+            up = hexes.place_doc(g, here[0], here[1], "")["id"]
+            walked = self._op_travel(Intent(
+                op="travel", actor=pc.ref, because=intent.because, params={"place": up},
+                visibility="hidden", id=intent.id, origin=intent.origin,
+                origin_name=intent.origin_name), {})
+            if walked.status == "refused":
+                return walked
+            tells.append(walked.tell)
+            effects.extend(walked.effects)
+            self._journeyed = ""
+        elif places_mod.setting_of(self.scene.at or "") != "outside":
+            # Out through the town's own way out first, as any walk out goes.
+            ring = self._ring(self.world.get(self.scene.location_id) if self.world else None, "")
+            out = next((p for p in ring if p.name == outskirts_mod.OUTSKIRTS), None)
+            if out is None:
+                return self._refuse(intent, "There is no way out of here onto open ground.")
+            walked = self._op_travel(Intent(
+                op="travel", actor=pc.ref, because=intent.because, params={"place": out.id},
+                visibility="hidden", id=intent.id, origin=intent.origin,
+                origin_name=intent.origin_name), {})
+            if walked.status == "refused":
+                return walked
+            tells.append(walked.tell)
+            effects.extend(walked.effects)
+            self._journeyed = ""
+        stop = here
+        hours = 0
+        for step in path:
+            cell = g.cell(*step)
+            doc = hexes.place_doc(g, step[0], step[1], parent=self.scene.at or "")
+            if cell["town"] and self.world is not None:
+                ring = self._ring(self.world.get(cell["town"]), "")
+                out = next((p for p in ring if p.name == outskirts_mod.OUTSKIRTS), None)
+                if out is not None:
+                    doc["exits"] = [out.id]
+            held = next((d for d in self.scene.founded if d.get("id") == doc["id"]), None)
+            if held is None:
+                self.scene.founded.append(doc)
+            else:
+                # Walked into from wherever the party stands now: the parent is the way back.
+                held["parent"] = doc["parent"]
+            hours = hexes.hours_through(cell["ground"])
+            if rides:
+                hours = journey_mod.mounted_hours(hours, "ride")[0]
+            toll = survival.pass_hours(pc, hours, self.dice, biome=cell["ground"])
+            self.scene.advance(max(1, toll.hours) * survival.MINUTES_PER_HOUR, charge_body=False)
+            self._hours_underway[doc["id"]] = hours
+            try:
+                moved = self._op_travel(Intent(
+                    op="travel", actor=pc.ref, because=intent.because,
+                    params={"place": doc["id"], **({"pace": "ride"} if rides else {})},
+                    visibility="hidden", id=intent.id, origin=intent.origin,
+                    origin_name=intent.origin_name), {})
+            finally:
+                self._hours_underway.pop(doc["id"], None)
+            self._journeyed = ""
+            if moved.status == "refused":
+                if stop == here:
+                    return self._refuse(intent, moved.tell)
+                break
+            tells.append(moved.tell)
+            tells.append(f"{english.number(hours).capitalize()} "
+                         f"hour{'s' if hours != 1 else ''} through the {cell['ground']}"
+                         + (", riding." if rides else " on foot."))
+            if toll.checks:
+                tells.append(f"The way cost them: {survival_note(toll)}")
+            effects.extend(moved.effects)
+            if self.scene.at != doc["id"]:
+                break
+            stop = step
+            # On the ground of the town it lies nearest: its nation, coin and law answer.
+            town = places_mod.location_of(self.scene.at or "")
+            if town and town != self.scene.location_id and self.world is not None \
+                    and self.world.get(town) is not None:
+                self.scene.location_id = town
+                self.place_party(self.scene.at)
+            rec = self._hex_touched(stop)
+            rec.setdefault("entered", self.scene.clock_minutes)
+            rec["since"] = self.scene.clock_minutes
+            effects.append({"kind": "hex", "q": stop[0], "r": stop[1], "hours": hours,
+                            "ground": cell["ground"], "origin": "rule:hex-move"})
+            if self.scene.in_encounter:
+                break
+
+        # The look round from where the party stopped, and only there (ruling 9).
+        spotted = self.scene.hexes.setdefault("spotted", {})
+        if stop != here:
+            sp = g.cell(*stop)
+            seen_lines: list[str] = []
+            for h in [stop] + hexes.neighbours(*stop):
+                self._hex_touched(h)["searched"] = self.scene.clock_minutes
+                site = hexes.site_of(g, *h)
+                if site is None:
+                    continue
+                if look.total < site["dc"] + (hexes.OWN_HEX_DC if h == stop else 0):
+                    continue
+                first = hexes.key(*h) not in spotted
+                spotted[hexes.key(*h)] = site["kind"]
+                other = g.cell(*h)
+                where = "here" if h == stop else "to the " + hexes.bearing(
+                    (sp["x"], sp["y"]), (other["x"], other["y"]))
+                seen_lines.append(f"{hexes.SEEN_FROM_AFAR[site['kind']]} {where}")
+                effects.append({"kind": "spotted", "q": h[0], "r": h[1], "site": site["kind"],
+                                "first": first, "origin": "rule:hex-look"})
+            if seen_lines:
+                tells.append(f"Looking over the land ({look.total}): "
+                             + "; ".join(seen_lines) + ".")
+            else:
+                tells.append(f"Looking over the land ({look.total}), nothing stands out.")
+        tell = " ".join(t for t in tells if t).strip() + (xp_line or "")
+        return Outcome(intent_id=intent.id, op="hex_move", rolls=[look], effects=effects,
+                       tell=tell, because=intent.because)
+
+    def _op_hex_enter(self, intent: Intent, partial: dict) -> Outcome:
+        """Into the site of the hex the party stands in, once it has been spotted: the
+        venture door (`_op_venture`), which builds the cave, the mine, the ruins or the
+        tower and their story from a seed off the hex's own place, so it is the same site
+        every time. Reaching it explores the hex (`_hex_explored`)."""
+        from . import hexes
+
+        g = self.hex_world()
+        here = self.party_hex(g)
+        if g is None or here is None or hexes.parse_place(self.scene.at or "") is None:
+            return self._refuse(intent, "The party is not out on a hex of open ground.")
+        if hexes.in_site(self.scene.at or "", here):
+            return self._refuse(intent, "The party is inside this hex's site already.")
+        site = hexes.site_of(g, *here)
+        if site is None or hexes.key(*here) not in (self.scene.hexes.get("spotted") or {}):
+            return self._refuse(intent, "Nothing has been found in this hex to go into.")
+        pc = self.scene.pc()
+        actor = intent.actor if intent.actor in self.scene.actors else (pc.ref if pc else None)
+        went = self._op_venture(Intent(
+            op="venture", actor=actor, because=intent.because,
+            params={"kind": site["kind"], "parent": self.scene.at},
+            visibility=intent.visibility, id=intent.id, origin=intent.origin,
+            origin_name=intent.origin_name), partial)
+        if went.status == "refused":
+            return went
+        line = self._hex_explored(g, here)
+        if line:
+            went.tell = (went.tell or "") + line
+        return went
 
     def _op_venture(self, intent: Intent, partial: dict) -> Outcome:
         """Ground gone into: the sewers under the town, a cave in the hills outside it.
