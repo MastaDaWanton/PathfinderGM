@@ -165,3 +165,16 @@ def test_every_map_is_reachable_from_the_breadcrumb():
     for level in ("world", "continent", "nation", "town"):
         assert f'["{level}",' in tab
     assert 'data-maplevel="${esc(lv)}"' in tab
+
+
+def test_the_keyboard_list_is_hidden_the_way_the_hit_test_reads():
+    """The board's keyboard list of places (16-tab-map.js, `.boardkeys`) was hidden by
+    clip-path alone: its buttons kept their full size under the canvas, and the release hit
+    test (tools/table_hit_test.js) reported every one covered on the packaged build, 5 to 9 a
+    map (phase 6, 2026-11-19). Collapsed to the visually-hidden 1px box until a button takes
+    the focus, it reads as unseen, and opens whole for the keyboard."""
+    html = (ROOT / "play" / "templates" / "play" / "table.html").read_text(encoding="utf-8")
+    rule = html[html.index(".board3d .boardkeys {"):html.index(".board3d .boardkeys .v2-btn")]
+    shut, opened = rule.split(":focus-within", 1)
+    assert "width: 1px; height: 1px; overflow: hidden" in shut
+    assert "width: auto; height: auto" in opened and "overflow-y: auto" in opened

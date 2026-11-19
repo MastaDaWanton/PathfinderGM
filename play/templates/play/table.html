@@ -2763,11 +2763,16 @@
                      border: 1px solid rgba(201, 160, 90, .5); }
   .board3d .hudbtn[aria-pressed="false"] { color: var(--dim); }
   .board3d .hudbtn:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+  /* For the keyboard only: out of sight until a button in it takes the focus. The standard
+     visually-hidden box (1px, overflow hidden), not clip-path alone: clipped, the buttons
+     kept their full size under the canvas, and the release hit test (tools/table_hit_test.js)
+     reported every one of them covered on the packaged 0.4.3 build (phase 6, 2026-11-19). */
   .board3d .boardkeys { position: absolute; left: 10px; top: 10px; z-index: 3; display: grid; gap: 4px;
-                        max-height: calc(100% - 20px); overflow-y: auto; padding: 8px;
+                        width: 1px; height: 1px; overflow: hidden; padding: 0;
                         background: rgba(18, 13, 9, .9); border-radius: 3px;
                         clip-path: inset(50%); }
-  .board3d .boardkeys:focus-within { clip-path: none; }
+  .board3d .boardkeys:focus-within { clip-path: none; width: auto; height: auto;
+                                     max-height: calc(100% - 20px); overflow-y: auto; padding: 8px; }
   .board3d .boardkeys .v2-btn { justify-content: start; min-height: 30px; font-size: 13px; }
   .board3d .boardkeys .v2-btn[aria-pressed="true"] { outline: 2px solid #8e2317; }
   .board3d .tag i { display: block; font: italic 400 11px/1.2 var(--body); margin-top: 2px; text-align: center; }
