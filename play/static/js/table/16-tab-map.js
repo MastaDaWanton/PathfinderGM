@@ -43,9 +43,20 @@ const MAPV = {
   k: 1,           // the chart's drawing units per screen pixel (16-places-chart.js)
   // Which map the tabletop shows (phase 3 of docs/place-map-v2-build-plan.md): the town, the
   // Region (the nation you stand in, or the one opened), the Continent, the World. A nation or
-  // continent of "" is the one the party is in.
-  level: "town", nation: "", continent: "",
+  // continent of "" is the one the party is in. Below the town, the Site (phase 4): a cave, a
+  // dungeon or the sewers, `site` its id in `scene.known_places.sites`.
+  level: "town", nation: "", continent: "", site: "",
 };
+
+// The sites known (play/atlas.py), and the one a place belongs to: its way in, or a room in it.
+function mapSites(s) { return ((s && s.scene && s.scene.known_places) || {}).sites || []; }
+function siteOfRoom(s, id) { return mapSites(s).find(st => st.rooms.some(r => r.id === id)) || null; }
+// The map a site's way up opens: the town when it lies under a place inside the walls, else the
+// Region round it (the cave off the woods).
+function siteUp(st, pf) {
+  const host = pf && pf.nodes.find(n => n.id === st.host);
+  return host && host.setting === "in" ? "town" : "nation";
+}
 
 // The world for the maps above the town: `atlasFor` (16-places-world.js) reads `/api/atlas`
 // once and draws again when it lands; this tab sends nothing itself.
@@ -63,18 +74,20 @@ function mapView(s) {
 
 // Open a map: from the breadcrumb, an arrow on the board, a slip's button, the zoom gesture.
 function mapOpen(level, arg) {
-  MAPV.level = ["town", "nation", "continent", "world"].includes(level) ? level : "town";
+  MAPV.level = ["town", "nation", "continent", "world", "site"].includes(level) ? level : "town";
   MAPV.sel = null;
   if (!MAPV.walk) MAPV.said = "";
   if (MAPV.level === "nation") {
     MAPV.nation = arg || "";
     MAPV.continent = arg && ATLAS.data && ATLAS.data.nations[arg] ? ATLAS.data.nations[arg].continent : "";
   } else if (MAPV.level === "continent") MAPV.continent = arg || MAPV.continent;
+  else if (MAPV.level === "site") MAPV.site = arg || MAPV.site;
   mapPaint();
   renderPlaces(STATE);
 }
 
 function mapTitle(pf) {
+  if (MAPV.level === "site") return upFirst(((mapSites(STATE).find(st => st.id === MAPV.site)) || {}).name || "Below");
   const v = MAPV.level === "town" ? null : mapView(STATE);
   if (!v) return (pf && pf.where) || "The town";
   if (MAPV.level === "nation") return (v.W.nations[v.nation] || {}).name || "The region";
@@ -203,9 +216,19 @@ function renderBoard(s, wrap, pf, how) {
       lost: () => { BOARD.state = "chart"; renderPlaces(STATE); },
     });
   }
-  const v = MAPV.level === "town" ? null : mapView(s);
+  // Walked into a site, the Site opens; walked out of the one shown, its way up does.
+  if (pf.here !== BOARD.here) {
+    const now = siteOfRoom(s, pf.here), was = siteOfRoom(s, BOARD.here);
+    const to = now && (!was || was.id !== now.id) ? ["site", now.id]
+      : was && !now && MAPV.level === "site" && MAPV.site === was.id ? [siteUp(was, pf), ""] : null;
+    if (to) { MAPV.level = to[0]; MAPV.site = to[1] || MAPV.site; MAPV.sel = null; mapPaint(); }
+  }
+  const site = MAPV.level === "site" ? mapSites(s).find(st => st.id === MAPV.site) : null;
+  if (MAPV.level === "site" && !site) { MAPV.level = "town"; mapPaint(); }   // a site of another town, left behind
+  const above = MAPV.level !== "town" && MAPV.level !== "site";
+  const v = above ? mapView(s) : null;
   atlasFor(s);   // fetched early, so the breadcrumb has names and the first press up is quick
-  if (MAPV.level !== "town" && !v) {   // the atlas is on its way: renderPlaces runs again when it lands
+  if (above && !v) {   // the atlas is on its way: renderPlaces runs again when it lands
     map.querySelector(".maprail").innerHTML = mapCrumbs(null, pf) + `<div class="mapnote"><p>Unrolling the map…</p></div>`;
     return;
   }
@@ -213,14 +236,16 @@ function renderBoard(s, wrap, pf, how) {
     && (document.activeElement.closest("[data-node]") || document.activeElement.closest("[data-walkto]"));
   const refocus = focused ? (focused.dataset.node ? `[data-node="${CSS.escape(focused.dataset.node)}"]`
                                                   : ".walkthere") : null;
-  map.querySelector(".maprail").innerHTML = mapCrumbs(v || mapView(s), pf) + (v ? mapSlip(v, pf)
-    : PlacesChart.slip(pf, { sel: MAPV.sel, said: MAPV.said, walking: MAPV.walk && MAPV.walk.to }));
-  wrap.querySelector("#places-about").textContent = v ? mapAbout(v) : PlacesChart.header(pf);
+  map.querySelector(".maprail").innerHTML = mapCrumbs(v || mapView(s), pf, site) + (v ? mapSlip(v, pf)
+    : site && !MAPV.sel ? siteSlip(site, pf)
+    : PlacesChart.slip(pf, { sel: MAPV.sel, said: MAPV.said, walking: MAPV.walk && MAPV.walk.to }))
+    + (MAPV.level === "town" || (MAPV.level === "nation" && v && v.homeNation === v.nation) ? waysDown(s, pf) : "");
+  wrap.querySelector("#places-about").textContent = v ? mapAbout(v) : site ? siteAbout(site) : PlacesChart.header(pf);
   // The board is drawn on a canvas, which the keyboard cannot reach, so every place found is
   // also a button: out of sight until it takes the focus, then a list over the board.
   let keys = stage.querySelector(".boardkeys");
   if (!keys) { stage.insertAdjacentHTML("beforeend", `<div class="boardkeys" aria-label="Places found"></div>`); keys = stage.querySelector(".boardkeys"); }
-  keys.innerHTML = mapKeys(v, pf).map(([id, name]) =>
+  keys.innerHTML = (site ? siteKeys(site, pf) : mapKeys(v, pf)).map(([id, name]) =>
     `<button type="button" class="v2-btn" data-node="${esc(id)}" aria-pressed="${MAPV.sel === id}">${esc(upFirst(name))}</button>`).join("");
   if (refocus) { const again = wrap.querySelector(refocus); if (again) again.focus({ preventScroll: true }); }
   if (how !== "board") return;
@@ -239,16 +264,18 @@ function renderBoard(s, wrap, pf, how) {
   const route = v && MAPV.sel && v.K.how[MAPV.sel] ? PlacesWorld.worldRoute(v.K, v.home, MAPV.sel) : null;
   BOARD.mod.draw({ level: MAPV.level, pf, sel: MAPV.sel, hour: (minutes % 1440) / 60, came, fresh,
                    reduced: matchMedia("(prefers-reduced-motion: reduce)").matches,
-                   ...(v || {}), route: route ? [v.home, ...route.map(l => l.to)] : null });
+                   ...(v || {}), route: route ? [v.home, ...route.map(l => l.to)] : null,
+                   sites: mapSites(s), site, up: site ? siteUp(site, pf) : "" });
 }
 
 // --- the slips of the maps above the town ----------------------------------------------------
-function mapCrumbs(v, pf) {
+function mapCrumbs(v, pf, site) {
   const W = v && v.W, here = MAPV.level;
   const rows = [["world", (W && W.world) || "World", ""],
                 ["continent", (W && W.continents[v.continent]) || "Continent", (v && v.continent) || ""],
                 ["nation", (W && (W.nations[v.nation] || {}).name) || "Region", (v && v.nation) || ""],
                 ["town", (pf && pf.where) || "Town", ""]];
+  if (site) rows.push(["site", upFirst(site.name), site.id]);
   return `<nav class="mapcrumbs" aria-label="Maps">${rows.map(([lv, name, arg]) =>
     `<button type="button" class="v2-btn" data-maplevel="${esc(lv)}" data-maparg="${esc(arg)}"${here === lv ? ' aria-current="page"' : ""}>${esc(name)}</button>`).join("")}</nav>`;
 }
@@ -319,6 +346,35 @@ function mapSlip(v, pf) {
     <p>${known.length} ${known.length === 1 ? "city" : "cities"} known: ${Object.entries(counts).map(([k, n]) => `${Number(n)} ${esc(HOW_WORDS[k])}`).join(", ")}.</p>
     <p>Point at a continent to light it; press it, or zoom in on it, to go in.</p>
     <p><button type="button" class="v2-btn" data-maplevel="continent" data-maparg="${esc(here.continent || "")}">${esc(W.continents[here.continent] || "Your continent")}</button></p></div>`;
+}
+
+// --- the Site --------------------------------------------------------------------------------
+// The site's own slip, when no room is pressed (a room pressed has the town's slip, with its
+// Walk there: a room is a place like any other, and the engine walks to it through rooms
+// stood in only, `places_found.route`).
+function siteSlip(st, pf) {
+  const entered = st.rooms.filter(r => r.visited).length, seen = st.rooms.length - entered;
+  const here = st.rooms.find(r => r.id === st.here), host = pf.nodes.find(n => n.id === st.host);
+  const said = MAPV.said ? `<div class="mapnote said"><p>${esc(MAPV.said)}</p></div>` : "";
+  return said + `<div class="mapnote"><h3>${esc(upFirst(st.name))}</h3>
+    ${here ? `<p>You are in ${esc(here.name)}${here.about ? `: ${esc(here.about)}` : ""}.</p>` : ""}
+    <p>${Number(entered)} ${entered === 1 ? "room" : "rooms"} entered${seen ? `, ${Number(seen)} seen and not yet entered` : ""}. Press a room for the way there.</p>
+    <p><button type="button" class="v2-btn" data-maplevel="${esc(siteUp(st, pf))}" data-maparg="">Back up${host ? ` to ${esc(host.name)}` : ""}</button></p></div>`;
+}
+function siteAbout(st) {
+  return "Rooms entered are built; rooms only seen are chalk outlines. Underground, the hour makes no difference. Zoom out past the site to go back up.";
+}
+function siteKeys(st, pf) {
+  return st.rooms.filter(r => r.id !== pf.here).map(r => [r.id, r.name]);
+}
+// On the town and the Region round it: every site known beneath a place found, to go down to.
+function waysDown(s, pf) {
+  const down = mapSites(s).filter(st => pf.nodes.some(n => n.id === st.host));
+  if (!down.length) return "";
+  return `<div class="mapnote"><h3>Below ground</h3><p>${down.map(st => {
+    const host = pf.nodes.find(n => n.id === st.host);
+    return `<button type="button" class="v2-btn" data-maplevel="site" data-maparg="${esc(st.id)}">${esc(upFirst(st.name))}</button> <small>under ${esc(host.name)}</small>`;
+  }).join("<br>")}</p></div>`;
 }
 
 // What the keyboard's list of places offers on each map: what that map's board can press.

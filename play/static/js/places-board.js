@@ -130,7 +130,8 @@ export function init(el, a) {
   canvas.addEventListener("wheel", ev => {
     if (!V || performance.now() - lastLevelChange < 900) return;
     const d = camera.position.distanceTo(controls.target), go = (...a) => { lastLevelChange = performance.now(); api.open(...a); };
-    if (ev.deltaY > 0 && d >= controls.maxDistance * .97 && UP[V.level]) go(UP[V.level]);
+    const up = V.level === "site" ? V.up : UP[V.level];
+    if (ev.deltaY > 0 && d >= controls.maxDistance * .97 && up) go(up);
     else if (ev.deltaY < 0 && d <= controls.minDistance * 1.05) {
       if (V.level === "world") go("continent", hover.continent || V.continent);
       else if (V.level === "continent") go("nation", hover.nation || V.nation);
@@ -142,8 +143,10 @@ export function init(el, a) {
   stage.querySelector('[data-board="tilt"]').addEventListener("click", ev => { tiltOn = !tiltOn; ev.currentTarget.setAttribute("aria-pressed", String(tiltOn)); });
   new ResizeObserver(resize).observe(stage); resize();
   renderer.setAnimationLoop(frame);
-  // For the checks and the frame-rate probe: the camera, the pieces on the board, the cost.
-  window.__placesBoard = { camera, controls, pieces: () => pick.map(o => ({ id: o.userData.id, name: o.userData.name || "" })),
+  // For the checks and the frame-rate probe: the camera, the pieces on the board, the route
+  // drawn, the cost.
+  window.__placesBoard = { camera, controls, pieces: () => pick.map(o => ({ id: o.userData.id, name: o.userData.name || "", seen: !!o.userData.seen, at: o.position.toArray() })),
+                           route: () => (routeObj ? routeObj.geometry.parameters.path.points.map(p => p.toArray().map(n => +n.toFixed(2))) : null),
                            perf: () => ({ ...renderer.info.memory, calls: lastInfo.calls, triangles: lastInfo.triangles }) };
   renderer.info.autoReset = false;  // the scene and the tilt-shift pass, counted together per frame
 }
@@ -376,6 +379,7 @@ function clear() {
   if (paperTex) { paperTex.dispose(); paperTex = null; }
   world = new THREE.Group(); scene.add(world); pick = []; smoke = []; flags = []; clouds = []; routeObj = null;
   board = null; worldSheet = null; hover.continent = hover.nation = null;
+  candles = candles.filter(c => !c.site);   // a room's torch goes with its room
 }
 const townXZ = (p, y = 0) => new THREE.Vector3(p[0] * U, y, p[1] * U);
 function place(o, id, x, z, size = 1) { o.position.set(x, 0, z); o.userData.id = id; o.userData.size = size; o.scale.setScalar(size); world.add(o); pick.push(o); return o; }
@@ -384,30 +388,37 @@ function place(o, id, x, z, size = 1) { o.position.set(x, 0, z); o.userData.id =
 // pf: scene.places_found, sel, hour, came: [ids] walked this turn, fresh: Set of ids found this
 // turn, reduced } and, above the town, { W: /api/atlas, KP: scene.known_places, home: the
 // settlement the party is in, homeNation, nation, continent, route: [city ids] to the city
-// pressed }. A board is rebuilt only when the map, what is known, or where the party stands
+// pressed }; on every map { sites: scene.known_places.sites }, and on the Site map { site: the
+// site shown, up: the map its way up opens }. A board is rebuilt only when the map, what is known, or where the party stands
 // changes; a press only moves the route.
 export async function draw(v) {
   const pf = v.pf || { nodes: [], here: "", where: "" }, T = pf.town || { seats: {}, wall: 385, half: 560, gate: "" };
   const level = v.level || "town";
   const drawn = pf.nodes.filter(n => n.setting === "in" && T.seats[n.id] && T.seats[n.id].drawn && T.seats[n.id].at);
-  const mine = { ...v, level, pf, town: T, drawn, at: pf.here, here: level === "town" ? pf.here : v.home };
-  if (level !== "town") { mine.WL = PW().worldLayout(v.W); mine.K = PW().worldKnown(v.W, v.KP); }
+  const mine = { ...v, level, pf, town: T, drawn, at: pf.here, here: level === "town" || level === "site" ? pf.here : v.home, sites: v.sites || [] };
+  if (level !== "town" && level !== "site") { mine.WL = PW().worldLayout(v.W); mine.K = PW().worldKnown(v.W, v.KP); }
+  // Every state is a new view, and a press only moves the route: the site's centre is worked
+  // out here, not in siteMap, or the route of a press found every room at NaN.
+  if (level === "site") { const cols = v.site.rooms.map(r => r.at[0]), rows = v.site.rooms.map(r => r.at[1]);
+    mine.siteMid = [(Math.min(...cols) + Math.max(...cols)) / 2, (Math.min(...rows) + Math.max(...rows)) / 2]; }
   V = mine;
-  const subject = level === "nation" ? v.nation : level === "continent" ? v.continent : level === "town" ? pf.where : "";
+  const subject = level === "nation" ? v.nation : level === "continent" ? v.continent : level === "town" ? pf.where : level === "site" ? v.site.id : "";
   const sig = level + "|" + subject + "|" + pf.where + "|" + pf.here + "|" + pf.nodes.map(n => n.id + (n.visited ? "+" : "")).join(",")
-    + "|" + (mine.K ? Object.keys(mine.K.how).sort().join() : "");
+    + "|" + (mine.K ? Object.keys(mine.K.how).sort().join() : "")
+    + "|" + mine.sites.map(st => st.id + ":" + st.rooms.map(r => r.id + (r.visited ? "+" : "")).join()).join(";");
   const freshView = level + "|" + subject !== lastTown;
   if (sig !== lastSig) {
     await Promise.all([loadPaper(), loadKit()]);
     if (V !== mine) return;   // a newer state or another map arrived while the models loaded
     lastSig = sig; lastTown = level + "|" + subject;
     clear();
-    if (level === "town") town(V); else if (level === "continent") continentMap(V); else if (level === "nation") nationMap(V); else worldMap(V);
+    if (level === "town") town(V); else if (level === "continent") continentMap(V); else if (level === "nation") nationMap(V);
+    else if (level === "site") siteMap(V); else worldMap(V);
     pc = pcMini(); world.add(pc); placePc();
   }
   routeLine();
   if (freshView) frameCamera();
-  if (level === "town" && v.came && v.came.length > 1) walk(v.came);
+  if ((level === "town" || level === "site") && v.came && v.came.length > 1) walk(v.came);
 }
 
 function town(v) {
@@ -435,6 +446,7 @@ function town(v) {
     arrow.rotation.y = Math.atan2(-ox, -oy);   // the cone points -z; turned to point out (ox, oy)
     Object.assign(arrow.userData, { name: "Out the gate", open: ["nation"] });
   }
+  v.sites.forEach(st => { const s = T.seats[st.host]; if (s && s.at && s.drawn) { const p = townXZ(s.at); downArrow(st, p.x - 4.2, p.z + 3.2, 1.3); } });
   // Cotton-wool clouds drifting over the fogged paper at the town's edge.
   const R = half * U * .82;
   for (let n = 0; n < 10; n++) { const a = n / 10 * Math.PI * 2, r = R + (n % 3) * 6; cloud(Math.cos(a) * r, Math.sin(a) * r, 1 + (n % 3) * .4, n); }
@@ -720,6 +732,7 @@ function nationMap(v) {
     board.pos[w.n.id] = P3(w.hx);
     if (!w.small && pos[v.home]) roadStrip([pos[v.home].x, pos[v.home].z], [w.hx.x, w.hx.z], "track", 1.09, .7); });
   Object.keys(pos).forEach(id => { if (!board.pos[id]) board.pos[id] = P3(pos[id]); });
+  v.sites.forEach(st => { const at = wild.some(w => w.n.id === st.host) && board.pos[st.host]; if (at) downArrow(st, at.x - 3, at.z + 2.4, 1).position.y = 1.05; });
   // Roads: between the nation's towns, a strip; leaving it, a strip to the border and an arrow.
   roadsOut.forEach(rd => { const a = pos[rd.from]; if (!a) return;
     if (rd.inside && pos[rd.to]) { roadStrip([a.x, a.z], [pos[rd.to].x, pos[rd.to].z], rd.by === "river" ? "river" : "road"); return; }
@@ -736,6 +749,60 @@ function nationMap(v) {
     const to = cityOf(W, rd.to) || {};
     Object.assign(arrow.userData, { name: `to ${to.name || "?"}`, road: `${(W.nations[to.nation] || {}).name || ""}${rd.miles ? `, ${rd.miles} miles` : ""}`, open: ["continent", cont] });
   });
+}
+
+// --- The Site: a dungeon's rooms as a dollhouse ------------------------------------------------
+// Each room entered is an open box, back and side walls only so the camera sees in; a room only
+// seen is a chalk outline on the table; a room not yet seen is not sent at all (play/atlas.py).
+// Seats are the server's, dealt over the whole site, so finding a room moves nothing. Darkest
+// Dungeon's corridor map: depth below the way in runs left to right.
+const SITE_COL = 15, SITE_ROW = 13;
+function siteXZ(v, at) { return [(at[0] - v.siteMid[0]) * SITE_COL, (at[1] - v.siteMid[1]) * SITE_ROW]; }
+function siteMap(v) {
+  const st = v.site, rooms = st.rooms, by = Object.fromEntries(rooms.map(r => [r.id, r]));
+  const grid = new THREE.GridHelper(160, 40, 0x6a5a40, 0x4a3a28); grid.position.y = .06;
+  grid.material.opacity = .35; grid.material.transparent = true; world.add(grid);
+  // Passages: room to the room beneath it, and the side ways; drawn when either end was entered.
+  const pairs = [];
+  rooms.forEach(r => { if (by[r.parent]) pairs.push([r.parent, r.id]); r.exits.forEach(x => { if (by[x] && x > r.id) pairs.push([r.id, x]); }); });
+  pairs.forEach(([a, b]) => { if (!by[a].visited && !by[b].visited) return;
+    const p = siteXZ(v, by[a].at), q = siteXZ(v, by[b].at), mid = (p[0] + q[0]) / 2;
+    [[p, [mid, p[1]]], [[mid, p[1]], [mid, q[1]]], [[mid, q[1]], q]].forEach(([s0, e]) => { const L = Math.hypot(e[0] - s0[0], e[1] - s0[1]); if (!L) return;
+      const f = mesh(new THREE.BoxGeometry(L + 2.2, .3, 2.2), mat(0x4a3f32)); f.position.set((s0[0] + e[0]) / 2, .15, (s0[1] + e[1]) / 2);
+      f.rotation.y = -Math.atan2(e[1] - s0[1], e[0] - s0[0]); world.add(f); }); });
+  const W = 10, D = 8, H = 4;
+  rooms.forEach(r => {
+    const [x, z] = siteXZ(v, r.at), g = new THREE.Group(), here = r.id === v.here;
+    if (r.visited) {
+      g.add(mesh(new THREE.BoxGeometry(W, .4, D), mat(here ? 0xa08c66 : 0x857458)));
+      const back = mesh(new THREE.BoxGeometry(W, H, .5), mat(0x6a5a46)); back.position.set(0, H / 2, -D / 2); g.add(back);
+      const side = mesh(new THREE.BoxGeometry(.5, H, D), mat(0x76644d)); side.position.set(-W / 2, H / 2, 0); g.add(side);
+      if (r.role === "climax") { const t = mesh(new THREE.BoxGeometry(2.4, 2, 1.6), mat(0x6a3030)); t.position.set(2, 1, -2); g.add(t); }
+      if (here) { const torch = new THREE.PointLight(0xffa850, 120, 26, 1.8); torch.position.set(-4, 3.2, -2.5); g.add(torch);
+        const fl = new THREE.Mesh(new THREE.ConeGeometry(.25, .7, 6), new THREE.MeshBasicMaterial({ color: 0xffc060 })); fl.position.copy(torch.position); g.add(fl);
+        candles.push({ light: torch, flame: fl, base: 120, site: true }); }
+    } else {
+      const edge = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(W, .2, D)), new THREE.LineDashedMaterial({ color: 0xe8dcc0, dashSize: .6, gapSize: .4 }));
+      edge.computeLineDistances(); g.add(edge);
+      g.add(new THREE.Mesh(new THREE.BoxGeometry(W, .1, D), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 })));   // something to press
+    }
+    place(g, r.id, x, z);
+    Object.assign(g.userData, { pickable: !here, name: bare(r.name), seen: !r.visited });
+  });
+  // The way up, before the way in: an arrow pointing up, to the map the site lies under.
+  const root = by[st.id];
+  if (root && v.up) { const [x, z] = siteXZ(v, root.at), a = new THREE.Group(), cone = mesh(new THREE.ConeGeometry(1.4, 3, 12), mat(0x5a3a22));
+    cone.position.y = 1.6; a.add(cone); place(a, "up:" + st.id, x - SITE_COL * .75, z, 1);
+    Object.assign(a.userData, { name: "Back up", open: [v.up] }); }
+}
+// A way down beside the piece a site lies under, on the town and the Region: pressed, the Site.
+function downArrow(st, x, z, size) {
+  const a = new THREE.Group(), cone = mesh(new THREE.ConeGeometry(1, 2.2, 12), mat(0x2a2019));
+  cone.rotation.x = Math.PI; cone.position.y = 1.4; a.add(cone);
+  const hole = mesh(new THREE.CylinderGeometry(1.3, 1.3, .12, 16), mat(0x120d09), false); hole.position.y = .08; a.add(hole);
+  place(a, "down:" + st.id, x, z, size);
+  Object.assign(a.userData, { name: "Down: " + bare(st.name), open: ["site", st.id] });
+  return a;
 }
 
 // The World: a second scroll, every city the party knows of and how. The land is the paper,
@@ -843,6 +910,10 @@ function paintWorldHighlight() {
 // --- The party's miniature, the route, the walk -----------------------------------------------
 function posOf(id) {
   if (!V) return null;
+  if (V.level === "site") { const r = V.site.rooms.find(x => x.id === id); if (!r) return null; const [x, z] = siteXZ(V, r.at); return new THREE.Vector3(x, .4, z); }
+  // Underground, on the town or the Region: the party stands at the place the site lies under.
+  const st = V.sites.find(x => x.rooms.some(r => r.id === id));
+  if (st && st.host !== id) return posOf(st.host);
   if (V.level === "town") { const s = V.town.seats[id]; return s && s.at ? townXZ(s.at) : null; }
   if (V.level === "world") { const p = V.WL.pos[id]; return p ? new THREE.Vector3(p[0] * WU, .1, p[1] * WU) : null; }
   if (board && board.pos[id]) return board.pos[id];
@@ -851,10 +922,10 @@ function posOf(id) {
   return null;
 }
 function placePc() {
-  const id = V.level === "nation" && board && board.pos[V.at] ? V.at : V.here;
+  const id = V.level === "nation" && posOf(V.at) ? V.at : V.here;
   const p = posOf(id); pc.visible = !!p; if (!p) return;
-  const off = V.level === "world" ? 1 : 3.6;
-  pc.position.copy(p).add(new THREE.Vector3(off, 0, off));
+  const off = V.level === "world" ? 1 : V.level === "site" ? 1.5 : 3.6;
+  pc.position.copy(p).add(new THREE.Vector3(off, 0, V.level === "site" ? 1 : off));
   pc.scale.setScalar(V.level === "town" ? 2 : V.level === "world" ? .45 : 1.2);
 }
 function routeLine() {
@@ -894,7 +965,14 @@ export function frameCamera() {
   // assumed a whole window, and in the table's well (about 440 by 360) it showed six of
   // Ledgernook's fourteen places. The narrower of the two angles of view decides.
   const vfov = camera.fov * Math.PI / 180, hfov = 2 * Math.atan(Math.tan(vfov / 2) * camera.aspect);
-  const d = Math.min(Math.max(size / 2 / Math.sin(Math.min(vfov, hfov) / 2) * .9, 30), 300);
+  // A site is a long, flat row of rooms: its diagonal in the narrower angle put frag's nine
+  // sewers rooms 156 away in a 382 by 249 well, rooms a dozen pixels wide and every tag stacked
+  // above the next. Its width is fitted to the wide angle and its depth (foreshortened) to the
+  // tall one.
+  const s3 = box.getSize(new THREE.Vector3());
+  const d = Math.min(Math.max(V && V.level === "site"
+    ? Math.max(s3.x / 2 / Math.tan(hfov / 2), s3.z * .7 / 2 / Math.tan(vfov / 2)) * 1.15
+    : size / 2 / Math.sin(Math.min(vfov, hfov) / 2) * .9, 30), 300);
   frameD = d;
   const dir = new THREE.Vector3(-.05, .86, .56).normalize();
   camera.position.copy(c).addScaledVector(dir, d);
@@ -922,6 +1000,11 @@ function frame() {
     candles.forEach((c, n) => { const fl = still ? 1 : .82 + .18 * Math.sin(t * 11 + n) * Math.sin(t * 7.3 + n * 2);
       c.light.intensity = c.base * fl * (L.night ? 1.6 : .55); if (c.flame) c.flame.scale.y = .8 + fl * .4; });
     if (pc) pc.userData.lamp.intensity = L.night ? 18 : 0;
+    // Underground ignores the hour: one cool, fixed light, the same at noon and midnight, with
+    // the torch in the room you stand in. The mock's .25 and .18 were tuned on a whole window;
+    // in the table's well the rooms could not be told from the table.
+    if (V.level === "site") { sun.color.setRGB(.75, .8, 1); sun.position.set(-50, 90, 40); sun.intensity = .8; hemi.intensity = .55; if (pc) pc.userData.lamp.intensity = 18;
+      candles.forEach((c, n) => { c.light.intensity = c.base * (still ? 1 : .82 + .18 * Math.sin(t * 11 + n) * Math.sin(t * 7.3 + n * 2)); }); }
     if (!still) {
       smoke.forEach(s => { if (!s.puffs) { s.puffs = [0, 1, 2].map(() => { const m = new THREE.Mesh(new THREE.SphereGeometry(.25, 6, 4), new THREE.MeshBasicMaterial({ color: 0xdedede, transparent: true, opacity: .5 })); world.add(m); return m; }); }
         s.at.getWorldPosition(tmp); s.puffs.forEach((m, n) => { const a = ((t * .35 + n / 3 + s.seed) % 1); m.position.set(tmp.x + a * .8, tmp.y + .4 + a * 3, tmp.z); m.scale.setScalar(1 + a * 3); m.material.opacity = .45 * (1 - a); }); });
@@ -950,7 +1033,7 @@ function frame() {
 // is whole in the slip.
 // Above the town, names fade as you pull back from the view the map opened at (the owner's
 // idea, 2026-11-18), and the nations' painted names carry the map; a faded name takes no room.
-const LIFT = { town: 7.5, nation: 4.2, continent: 3.4, world: 1.6 };   // the World's villages are small: a tag 5 up floated off them
+const LIFT = { town: 7.5, nation: 4.2, continent: 3.4, world: 1.6, site: 1.5 };   // the World's villages are small: a tag 5 up floated off them
 function labels() {
   const r = stage.getBoundingClientRect(), placed = [];
   const node = V.sel && V.pf.nodes.find(n => n.id === V.sel);

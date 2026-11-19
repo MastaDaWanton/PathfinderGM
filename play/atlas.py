@@ -126,10 +126,12 @@ def known_places(engine, world) -> dict:
          "maps":  [],          # phase 5: nation ids whose map was read
          "sites": [{"id", "name", "host", "here": room id | "",
                     "rooms": [{"id", "name", "parent", "exits": [...], "visited": bool,
-                               "about": str, "role": str, "door": str}]}]}
+                               "about": str, "role": str, "door": str,
+                               "at": [column, row]}]}]}
 
     A room's `about`, `role` and `door` are sent only once it has been stood in: a room
     only seen is its name and its passages, as a place only seen is on the town chart.
+    `at` is the room's seat on the Site map (`_site_seats`).
     """
     scene = engine.scene
     if not str(scene.at or ""):
@@ -177,6 +179,7 @@ def _sites(engine, been: set) -> list[dict]:
         if not visited:
             seen = {root.id}
         here = engine.scene.at if engine.scene.at in rooms else ""
+        seat = _site_seats(rooms, root.id)
         sent = []
         for pid in sorted(visited | seen):
             p, f = rooms[pid], founded.get(pid) or {}
@@ -191,6 +194,40 @@ def _sites(engine, been: set) -> list[dict]:
                 "about": p.about if entered else "",
                 "role": str(dungeon.get("role") or "") if entered else "",
                 "door": str(((dungeon.get("door") or {}).get("state")) or "") if entered else "",
+                "at": seat[pid],
             })
         out.append({"id": root.id, "name": root.name, "host": host, "here": here, "rooms": sent})
     return out
+
+
+def _site_seats(rooms: dict, root: str) -> dict[str, list]:
+    """Each room's seat on the Site map, `[column, row]`: Darkest Dungeon's corridor map as
+    the mock laid it, depth in the room tree the column and the order of the leaves the row,
+    a room with rooms beneath it centred on them. Dealt over EVERY room of the site, found
+    or not, as the town's seats are (play/town_seats.py), so finding a room never moves one
+    already drawn; the page is sent the seats of the rooms the fog lets through only."""
+    kids: dict[str, list] = {}
+    for pid, p in rooms.items():
+        if pid != root and p.parent in rooms:
+            kids.setdefault(p.parent, []).append(pid)
+    seat: dict[str, list] = {}
+    leaves = [0]
+
+    def deal(pid: str, depth: int, path: frozenset) -> float:
+        below = [k for k in sorted(kids.get(pid, ())) if k not in path]
+        if not below:
+            row = float(leaves[0])
+            leaves[0] += 1
+        else:
+            rows = [deal(k, depth + 1, path | {pid}) for k in below]
+            row = (min(rows) + max(rows)) / 2
+        seat[pid] = [depth, row]
+        return row
+
+    deal(root, 0, frozenset())
+    # A room whose parent is outside the site (none in play today) still gets a seat, below.
+    for pid in sorted(rooms):
+        if pid not in seat:
+            seat[pid] = [0, float(leaves[0])]
+            leaves[0] += 1
+    return seat
