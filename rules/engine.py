@@ -2396,6 +2396,9 @@ class Scene:
         world = {w.manifest_id for w in self.wards
                  if (w.spec or {}).get("hazard") and w.rounds_left is not None
                  and (w.spec or {}).get("at", "") == (self.at or "")}
+        # And the crowd (rules/crowds.py): the place's, not the fight's; the engine's
+        # crowd settle scatters it and brings it back.
+        world |= {m.id for m in self.manifests if m.what == "crowd"}
         for made in list(self.manifests):
             if made.id not in world:
                 self.lift(made)
@@ -4756,6 +4759,12 @@ class Engine:
                                                                    "error": str(exc)}],
                              tell="", because="")]
         resolution.outcomes.extend(self._articled(o) for o in extra)
+        # The crowd, after the clock and any fight this batch began (`_crowd_settle`).
+        said = self._crowd_settle()
+        if said:
+            resolution.outcomes.append(Outcome(
+                intent_id="", op="crowd", tell=" ".join(said), because="the hour or a fight",
+                effects=[{"kind": "crowd", "at": self.scene.at or "", "said": said}]))
         # Last, after anything the schemes brought in on a side: whoever is fighting the
         # player is hostile to them, on the track every surface reads.
         self._foes_settle()
@@ -5130,10 +5139,19 @@ class Engine:
 
         if not self.scene.has_grid or actor.ref not in self.scene.positions:
             return None
+        from . import crowds
+
+        # Standing in a crowd: "The crowds provide cover for anyone who does so, enabling a
+        # Stealth check" (CRB p.433, City Streets) — the specific rule over soft cover's
+        # general one below. House reading: not from somebody close enough to touch.
+        in_crowd = any(m.what == crowds.WHAT and m.terrain == "difficult"
+                       for m in self.scene.standing_on(actor.ref))
         for o in self._watchers(actor):
             if o.ref in ignore or o.ref not in self.scene.positions:
                 continue
             here, there = self.scene.positions[o.ref], self.scene.positions[actor.ref]
+            if in_crowd and max(abs(here[0] - there[0]), abs(here[1] - there[1])) > 1:
+                continue
             try:
                 if not self.scene.grid.line_of_sight(tuple(here), tuple(there)):
                     continue
@@ -15010,6 +15028,54 @@ class Engine:
             self.scene.grid = None
             self.scene.positions.clear()
         self.lay_the_ground()
+        self._crowd_settle(quiet=True)
+
+    def _crowd_settle(self, quiet: bool = False) -> list[str]:
+        """Lay, lift or scatter the crowd where the party stands (rules/crowds.py), and
+        say what changed. One door: arrival (`quiet`, the travel tell says it), and the end
+        of every batch, where the hour turning thins or fills it and a fight scatters it
+        ("If crowds see something obviously dangerous, they'll move away", CRB p.433).
+
+        shortcut: the book's crowd moves off at 30 ft a round; this one is gone at the end
+        of the batch the fight started in, and stays gone for that three-hour slot. Move
+        it square by square if a fight in a crowd ever needs the escape modelled."""
+        from . import crowds, keepers, places as places_mod, residency
+
+        sc = self.scene
+        at = sc.at or ""
+        now = int(sc.clock_minutes or 0) // residency.SLOT_MINUTES
+        # A crowd left at another place went with that place's map (no lift: these squares
+        # are the old map's numbers), and a scattered one returns when the slot turns.
+        # So is one whose squares are no longer on this map: the grid was replaced under it
+        # (a GM-laid battlefield), and lifting it would take the new map's own squares.
+        diff = sc.grid.difficult if sc.grid is not None else set()
+        for m in [m for m in sc.manifests if m.what == crowds.WHAT]:
+            if m.source != at or (m.terrain == "none" and m.owner != f"scattered@{now}") \
+                    or (m.terrain == "difficult" and not set(map(tuple, m.added)) <= diff):
+                sc.manifests.remove(m)
+        crowd = next((m for m in sc.manifests if m.what == crowds.WHAT), None)
+        if crowd is not None and crowd.terrain == "none":
+            return []
+        name = keepers.label_of(at) or "here"
+        if sc.in_encounter:
+            if crowd is None:
+                return []
+            sc.lift(crowd)
+            sc.place(Manifestation(what=crowds.WHAT, source=at, owner=f"scattered@{now}"))
+            return [crowds.scattered_line(name)]
+        loc = self.world.get(sc.location_id) if self.world else None
+        want = sc.grid is not None and crowds.busy(
+            at, places_mod.scale_of(loc), sc.clock_minutes, sc.founded)
+        if want and crowd is None:
+            cells = crowds.squares(sc.grid, at)
+            if cells:
+                sc.place(Manifestation(what=crowds.WHAT, terrain="difficult",
+                                       squares=cells, source=at))
+                return [] if quiet else [crowds.gathered_line(name)]
+        if not want and crowd is not None:
+            sc.lift(crowd)
+            return [] if quiet else [crowds.thinned_line(name)]
+        return []
 
     def lay_the_ground(self, even_nowhere: bool = False, place: bool = True) -> bool:
         """The map of wherever the party is standing. Laid on arrival, not on violence.
@@ -16623,6 +16689,7 @@ class Engine:
                         self.scene._end_standing(made)
                     self.scene._end_standing(w)
             self.lay_the_ground()
+            self._crowd_settle(quiet=True)
             # After every move, for the reason `settle_relations` gives.
             self.scene.settle_relations()
             # The one journey this batch is spent. Set only where the party actually
@@ -16813,6 +16880,12 @@ class Engine:
                     and not (pc is not None and self.scene.sees_nothing(pc)):
                 about = str(going_to.about).strip().rstrip(".")
                 bits.append(f"{going_to.name[:1].upper()}{going_to.name[1:]}: {about}.")
+            # The crowd arrival laid (`_crowd_settle`), said on every arrival, not only the
+            # first: it is the hour's, not the place's.
+            from . import crowds as crowds_mod
+
+            if crowds_mod.standing(self.scene, going_to.id) is not None:
+                bits.append(crowds_mod.gathered_line(going_to.name))
             from . import ships as ships_mod
 
             if " ".join(going_to.name.split()).lower() in ships_mod.PORT_PLACES:

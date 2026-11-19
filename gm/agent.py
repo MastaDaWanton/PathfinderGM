@@ -2814,9 +2814,14 @@ class GMAgent:
             text, lit = narration_mod.cut_fire_from_nowhere(text, lit_by)
             if lit:
                 repairs.append(f"fire from nowhere: cut {len(lit)} sentence(s)")
-        # A crowd where the map holds nobody but the party: cut (owner bug 2026-11-17 #7).
+        # A crowd where the map holds nobody but the party and the engine laid no crowd
+        # (rules/crowds.py): cut (owner bug 2026-11-17 #7). The engine's crowd is the half
+        # the owner asked for on 2026-11-18 — without it every market read deserted.
+        from rules import crowds as crowds_mod
+
         text, crowd = narration_mod.cut_crowd_from_nowhere(
-            text, self._anyone_but_the_party(), " ".join(told))
+            text, self._anyone_but_the_party()
+            or crowds_mod.standing(self.engine.scene) is not None, " ".join(told))
         if crowd:
             repairs.append(f"crowd from nowhere: cut {len(crowd)} sentence(s)")
         # Every model call above this line wrote words onto the page after the page
