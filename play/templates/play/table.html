@@ -2770,6 +2770,15 @@
   .board3d .boardkeys:focus-within { clip-path: none; }
   .board3d .boardkeys .v2-btn { justify-content: start; min-height: 30px; font-size: 13px; }
   .board3d .boardkeys .v2-btn[aria-pressed="true"] { outline: 2px solid #8e2317; }
+  .board3d .tag i { display: block; font: italic 400 11px/1.2 var(--body); margin-top: 2px; text-align: center; }
+  .board3d .hint { position: absolute; left: 0; top: 0; white-space: nowrap; padding: 4px 8px; border-radius: 3px;
+                   font: 600 13px/1 var(--display); letter-spacing: .06em; color: #f3ead6;
+                   background: rgba(18, 13, 9, .78); }
+  /* The maps above the town (phase 3): World, Continent, Region, Town, as a breadcrumb over the slip. */
+  .mapcrumbs { display: flex; flex-wrap: wrap; gap: 4px; }
+  .mapcrumbs .v2-btn { min-height: 28px; padding: 3px 9px; font-size: 13px; }
+  .mapcrumbs .v2-btn[aria-current="page"] { color: var(--gold); box-shadow: inset 0 -2px 0 var(--gold); }
+  .mapnote .v2-btn { min-height: 30px; padding: 4px 10px; font-size: 13px; margin: 0 4px 4px 0; }
 
   /* At 1024 the board is 390px tall: a 260px slip left the chart 330px wide, and the names
      ran into each other (the mock). The slip narrows there. */
@@ -4553,6 +4562,7 @@ window.PATHFINDER_BOOT = {
 <script src="{% asset 'js/table/14-sides.js' %}"></script>
 <script src="{% asset 'js/table/15-book.js' %}"></script>
 <script src="{% asset 'js/table/16-places-chart.js' %}"></script>
+<script src="{% asset 'js/table/16-places-world.js' %}"></script>
 <script src="{% asset 'js/table/16-tab-map.js' %}"></script>
 <script src="{% asset 'js/table/17-tab-sheet.js' %}"></script>
 <script src="{% asset 'js/table/18-tab-equipment.js' %}"></script>

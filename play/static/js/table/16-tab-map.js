@@ -41,7 +41,46 @@ const MAPV = {
   said: "",       // the line the last Walk there left in the slip
   walk: null,     // { to, name, leg: {from, to, name} } while a walk is under way
   k: 1,           // the chart's drawing units per screen pixel (16-places-chart.js)
+  // Which map the tabletop shows (phase 3 of docs/place-map-v2-build-plan.md): the town, the
+  // Region (the nation you stand in, or the one opened), the Continent, the World. A nation or
+  // continent of "" is the one the party is in.
+  level: "town", nation: "", continent: "",
 };
+
+// The world for the maps above the town: `atlasFor` (16-places-world.js) reads `/api/atlas`
+// once and draws again when it lands; this tab sends nothing itself.
+function atlasFor(s) { return placesAtlas(s, () => renderPlaces(STATE)); }
+
+// What the maps above the town are showing.
+function mapView(s) {
+  const kp = (s && s.scene && s.scene.known_places) || {}, W = atlasFor(s);
+  if (!W || !Array.isArray(W.cities)) return null;
+  const home = kp.town || "", hc = W.cities.find(c => c.id === home) || {};
+  const nation = MAPV.nation || hc.nation || "";
+  const continent = MAPV.continent || (W.nations[nation] || {}).continent || hc.continent || "";
+  return { W, KP: kp, home, homeNation: hc.nation || "", nation, continent, K: PlacesWorld.worldKnown(W, kp) };
+}
+
+// Open a map: from the breadcrumb, an arrow on the board, a slip's button, the zoom gesture.
+function mapOpen(level, arg) {
+  MAPV.level = ["town", "nation", "continent", "world"].includes(level) ? level : "town";
+  MAPV.sel = null;
+  if (!MAPV.walk) MAPV.said = "";
+  if (MAPV.level === "nation") {
+    MAPV.nation = arg || "";
+    MAPV.continent = arg && ATLAS.data && ATLAS.data.nations[arg] ? ATLAS.data.nations[arg].continent : "";
+  } else if (MAPV.level === "continent") MAPV.continent = arg || MAPV.continent;
+  mapPaint();
+  renderPlaces(STATE);
+}
+
+function mapTitle(pf) {
+  const v = MAPV.level === "town" ? null : mapView(STATE);
+  if (!v) return (pf && pf.where) || "The town";
+  if (MAPV.level === "nation") return (v.W.nations[v.nation] || {}).name || "The region";
+  if (MAPV.level === "continent") return v.W.continents[v.continent] || "The continent";
+  return v.W.world || "The world";
+}
 
 // The tabletop (js/places-board.js, the owner's choice of the 2026-11-18 mocks): an ES
 // module, imported on first use so the rest of the table never waits on Three.js. Without
@@ -96,7 +135,7 @@ function mapPaint() {
   const name = document.getElementById("board-name");
   if (name) {
     const pf = mapPlacesData(STATE);
-    name.textContent = places ? ((pf && pf.where) || "The town") : (frame.dataset.ground || "The ground");
+    name.textContent = places ? mapTitle(pf) : (frame.dataset.ground || "The ground");
   }
 }
 
@@ -111,8 +150,10 @@ function renderPlaces(s) {
       somewhere.</p>`;
     return;
   }
-  if (MAPV.sel && !pf.nodes.some(n => n.id === MAPV.sel && !n.current)) MAPV.sel = null;
   const how = boardReady();
+  if (how === "chart") MAPV.level = "town";   // the chart is of the town only
+  const isCity = id => !!(ATLAS.data && Array.isArray(ATLAS.data.cities) && ATLAS.data.cities.some(c => c.id === id));
+  if (MAPV.sel && !pf.nodes.some(n => n.id === MAPV.sel && !n.current) && !(MAPV.level !== "town" && isCity(MAPV.sel))) MAPV.sel = null;
   if (how !== "chart") { renderBoard(s, wrap, pf, how); return; }
   const focused = document.activeElement && document.activeElement.closest
     && (document.activeElement.closest("[data-node]") || document.activeElement.closest("[data-walkto]"));
@@ -157,22 +198,30 @@ function renderBoard(s, wrap, pf, how) {
     BOARD.mod.init(stage, {
       statics: (window.PATHFINDER_BOOT && window.PATHFINDER_BOOT.statics) || "/static/",
       pick: id => pickPlace(id),
+      open: (level, arg) => mapOpen(level, arg),
+      world: PlacesWorld,
       lost: () => { BOARD.state = "chart"; renderPlaces(STATE); },
     });
+  }
+  const v = MAPV.level === "town" ? null : mapView(s);
+  atlasFor(s);   // fetched early, so the breadcrumb has names and the first press up is quick
+  if (MAPV.level !== "town" && !v) {   // the atlas is on its way: renderPlaces runs again when it lands
+    map.querySelector(".maprail").innerHTML = mapCrumbs(null, pf) + `<div class="mapnote"><p>Unrolling the map…</p></div>`;
+    return;
   }
   const focused = document.activeElement && document.activeElement.closest
     && (document.activeElement.closest("[data-node]") || document.activeElement.closest("[data-walkto]"));
   const refocus = focused ? (focused.dataset.node ? `[data-node="${CSS.escape(focused.dataset.node)}"]`
                                                   : ".walkthere") : null;
-  map.querySelector(".maprail").innerHTML = PlacesChart.slip(pf, { sel: MAPV.sel, said: MAPV.said,
-    walking: MAPV.walk && MAPV.walk.to });
-  wrap.querySelector("#places-about").textContent = PlacesChart.header(pf);
+  map.querySelector(".maprail").innerHTML = mapCrumbs(v || mapView(s), pf) + (v ? mapSlip(v, pf)
+    : PlacesChart.slip(pf, { sel: MAPV.sel, said: MAPV.said, walking: MAPV.walk && MAPV.walk.to }));
+  wrap.querySelector("#places-about").textContent = v ? mapAbout(v) : PlacesChart.header(pf);
   // The board is drawn on a canvas, which the keyboard cannot reach, so every place found is
   // also a button: out of sight until it takes the focus, then a list over the board.
   let keys = stage.querySelector(".boardkeys");
   if (!keys) { stage.insertAdjacentHTML("beforeend", `<div class="boardkeys" aria-label="Places found"></div>`); keys = stage.querySelector(".boardkeys"); }
-  keys.innerHTML = pf.nodes.filter(n => !n.current).map(n =>
-    `<button type="button" class="v2-btn" data-node="${esc(n.id)}" aria-pressed="${MAPV.sel === n.id}">${esc(upFirst(n.name))}</button>`).join("");
+  keys.innerHTML = mapKeys(v, pf).map(([id, name]) =>
+    `<button type="button" class="v2-btn" data-node="${esc(id)}" aria-pressed="${MAPV.sel === id}">${esc(upFirst(name))}</button>`).join("");
   if (refocus) { const again = wrap.querySelector(refocus); if (again) again.focus({ preventScroll: true }); }
   if (how !== "board") return;
   // Where the party walked this turn, for the miniature to go the same way: the walk the
@@ -187,8 +236,103 @@ function renderBoard(s, wrap, pf, how) {
   const fresh = BOARD.ids && pf.where === BOARD.where ? new Set([...ids].filter(i => !BOARD.ids.has(i))) : new Set();
   BOARD.here = pf.here; BOARD.where = pf.where; BOARD.ids = ids;
   const minutes = Number((s.scene || {}).clock_minutes) || 0;
-  BOARD.mod.draw({ pf, sel: MAPV.sel, hour: (minutes % 1440) / 60, came, fresh,
-                   reduced: matchMedia("(prefers-reduced-motion: reduce)").matches });
+  const route = v && MAPV.sel && v.K.how[MAPV.sel] ? PlacesWorld.worldRoute(v.K, v.home, MAPV.sel) : null;
+  BOARD.mod.draw({ level: MAPV.level, pf, sel: MAPV.sel, hour: (minutes % 1440) / 60, came, fresh,
+                   reduced: matchMedia("(prefers-reduced-motion: reduce)").matches,
+                   ...(v || {}), route: route ? [v.home, ...route.map(l => l.to)] : null });
+}
+
+// --- the slips of the maps above the town ----------------------------------------------------
+function mapCrumbs(v, pf) {
+  const W = v && v.W, here = MAPV.level;
+  const rows = [["world", (W && W.world) || "World", ""],
+                ["continent", (W && W.continents[v.continent]) || "Continent", (v && v.continent) || ""],
+                ["nation", (W && (W.nations[v.nation] || {}).name) || "Region", (v && v.nation) || ""],
+                ["town", (pf && pf.where) || "Town", ""]];
+  return `<nav class="mapcrumbs" aria-label="Maps">${rows.map(([lv, name, arg]) =>
+    `<button type="button" class="v2-btn" data-maplevel="${esc(lv)}" data-maparg="${esc(arg)}"${here === lv ? ' aria-current="page"' : ""}>${esc(name)}</button>`).join("")}</nav>`;
+}
+
+function mapAbout(v) {
+  const n = Object.keys(v.K.how).length;
+  return `${n} ${n === 1 ? "city" : "cities"} known. Point at the land to light it; press it, or zoom in, to go in. Zoom out past a map to open the one above.`;
+}
+
+const HOW_WORDS = { been: "stood in", road: "from road signs", heard: "heard of", map: "from maps" };
+function mapHow(v, h) {
+  const nm = id => (v.W.cities.find(c => c.id === id) || {}).name || "";
+  return h.by === "been" ? "You have stood here."
+    : h.by === "road" ? `A road out of ${esc(nm(h.from))} is signed for it.`
+    : h.by === "heard" ? `Heard of in talk${h.who ? `, from ${esc(h.who)}` : ""}: “${esc(h.line)}”`
+    : `On the map of ${esc((v.W.nations[h.nation] || {}).name || "")} you read.`;
+}
+
+function mapCitySlip(v, id) {
+  const W = v.W, c = W.cities.find(x => x.id === id), h = v.K.how[id];
+  if (!c || !h) return "";
+  const nm = x => (W.cities.find(y => y.id === x) || {}).name || "";
+  const legs = id === v.home ? null : PlacesWorld.worldRoute(v.K, v.home, id);
+  const miles = legs ? legs.reduce((a, l) => a + (l.miles || 0), 0) : 0;
+  const way = l => (l.by === "sea" ? "by sea" : `${l.miles ? `${l.miles} miles` : ""}${l.by === "river" ? " by river" : ""}`);
+  const buttons = [
+    MAPV.level === "continent" ? `<button type="button" class="v2-btn" data-maplevel="nation" data-maparg="${esc(c.nation)}">Open ${esc((W.nations[c.nation] || {}).name || "")}</button>` : "",
+    id === v.home ? `<button type="button" class="v2-btn" data-maplevel="town" data-maparg="">Open the town map</button>` : "",
+  ].join("");
+  return `<div class="mapnote"><h3>${esc(c.name)}${id === v.home ? " <small>you are here</small>" : h.by === "been" ? "" : " <small>not yet visited</small>"}</h3>
+    <p>${mapHow(v, h)}</p><p>${esc((W.nations[c.nation] || {}).name || "")}, ${esc(W.continents[c.continent] || "")}.</p>${
+    legs ? `<ol class="route">${legs.map(l => `<li>${esc(nm(l.to))}<span>${esc(way(l))}</span></li>`).join("")}</ol>
+      <p>About ${Math.max(1, Math.ceil(miles / 24))} days ${legs.every(l => l.by !== "sea" && l.by !== "river") ? "on foot" : "of travel"}${miles ? `, ${Number(miles)} miles` : ""}, by the roads you know. Journeys set out from the road out of town.</p>`
+    : id === v.home ? "" : `<p class="shutwhy">No road you know goes there.</p>`}${buttons ? `<p>${buttons}</p>` : ""}</div>`;
+}
+
+function mapSlip(v, pf) {
+  const W = v.W, said = MAPV.said ? `<div class="mapnote said"><p>${esc(MAPV.said)}</p></div>` : "";
+  const sel = MAPV.sel, node = sel && pf.nodes.find(n => n.id === sel);
+  const known = Object.keys(v.K.how);
+  if (MAPV.level === "nation") {
+    // A wild place round the town is the engine's own place: its slip, its Walk there.
+    if (node) return PlacesChart.slip(pf, { sel, said: MAPV.said, walking: MAPV.walk && MAPV.walk.to });
+    const N = W.nations[v.nation] || {}, homeHere = v.homeNation === v.nation;
+    return said + (sel ? mapCitySlip(v, sel) : "") + `<div class="mapnote"><h3>${esc(N.name || "")}</h3>
+      <p>${homeHere ? `You are in ${esc(pf.where || "")}. ` : ""}Each hex is about 12 miles across, some four hours on foot (Pathfinder's overland hex). Roads leaving ${esc(N.name || "")} end in an arrow with where they go.</p>
+      <p>${homeHere ? `<button type="button" class="v2-btn" data-maplevel="town" data-maparg="">${esc(pf.where || "The town")}</button> ` : ""}<button type="button" class="v2-btn" data-maplevel="continent" data-maparg="${esc(N.continent || "")}">${esc(W.continents[N.continent] || "The continent")}</button></p></div>`;
+  }
+  if (MAPV.level === "continent") {
+    const inC = id => (W.cities.find(c => c.id === id) || {}).continent === v.continent;
+    const here = W.cities.find(c => c.id === v.home);
+    const mine = known.filter(inC);
+    const nations = [...new Set(mine.map(id => W.cities.find(c => c.id === id).nation))]
+      .sort((a, b) => String(W.nations[a].name).localeCompare(W.nations[b].name));
+    // Sea passages from the ports stood in: the engine's own (journey.legs_from, in the atlas).
+    const ports = (v.KP.been || []).filter(inC).map(p => [p, W.routes.filter(r => r.by === "sea" && (r.a === p || r.b === p)).map(r => (r.a === p ? r.b : r.a))])
+      .filter(x => x[1].length);
+    const nm = id => (W.cities.find(c => c.id === id) || {}).name || "";
+    return said + (sel ? mapCitySlip(v, sel) : "") + `<div class="mapnote"><h3>${esc(W.continents[v.continent] || "")}</h3>
+      <p>${here && here.continent === v.continent ? `You are in ${esc(here.name)}, ${esc((W.nations[here.nation] || {}).name || "")}. ` : ""}${mine.length} ${mine.length === 1 ? "city" : "cities"} known here. Point at a nation to light it; press it, or zoom in on it, to open its region.</p>
+      <p>${nations.map(n => `<button type="button" class="v2-btn" data-maplevel="nation" data-maparg="${esc(n)}">${esc(W.nations[n].name)}</button>`).join(" ")}</p></div>${
+      ports.map(([p, to]) => `<div class="mapnote"><h3>By sea from ${esc(nm(p))}</h3><p>${to.map(nm).sort().map(esc).join(", ")}.</p></div>`).join("")}`;
+  }
+  const counts = { been: 0, road: 0, heard: 0, map: 0 };
+  known.forEach(id => { counts[v.K.how[id].by]++; });
+  const here = W.cities.find(c => c.id === v.home) || {};
+  return said + (sel ? mapCitySlip(v, sel) : "") + `<div class="mapnote"><h3>${esc(W.world || "The world")}</h3>
+    <p>${known.length} ${known.length === 1 ? "city" : "cities"} known: ${Object.entries(counts).map(([k, n]) => `${Number(n)} ${esc(HOW_WORDS[k])}`).join(", ")}.</p>
+    <p>Point at a continent to light it; press it, or zoom in on it, to go in.</p>
+    <p><button type="button" class="v2-btn" data-maplevel="continent" data-maparg="${esc(here.continent || "")}">${esc(W.continents[here.continent] || "Your continent")}</button></p></div>`;
+}
+
+// What the keyboard's list of places offers on each map: what that map's board can press.
+function mapKeys(v, pf) {
+  if (!v) return pf.nodes.filter(n => !n.current).map(n => [n.id, n.name]);
+  const city = id => v.W.cities.find(c => c.id === id) || {};
+  let ids = Object.keys(v.K.how);
+  if (MAPV.level === "continent") ids = ids.filter(id => city(id).continent === v.continent);
+  if (MAPV.level === "nation") ids = ids.filter(id => city(id).nation === v.nation);
+  const out = ids.map(id => [id, city(id).name]).sort((a, b) => String(a[1]).localeCompare(b[1]));
+  if (MAPV.level === "nation" && v.homeNation === v.nation) {
+    pf.nodes.filter(n => n.setting === "outside" && !n.current && !/:@the-road-to-/.test(n.id)).forEach(n => out.push([n.id, n.name]));
+  }
+  return out;
 }
 
 // A place pressed, on the chart, the board, or the board's list of places.
@@ -291,6 +435,8 @@ document.addEventListener("click", e => {
     if (again) again.focus({ preventScroll: true });
     return;
   }
+  const lv = t.closest("#placeswrap [data-maplevel]");
+  if (lv) { mapOpen(lv.dataset.maplevel, lv.dataset.maparg || ""); return; }
   const go = t.closest("#placeswrap [data-walkto]");
   if (go) { walkThere(go.dataset.walkto); return; }
 });

@@ -120,7 +120,8 @@ def known_places(engine, world) -> dict:
     """What the player knows of the world, for the maps. `{}` when the party stands nowhere.
 
     Shape:
-        {"been":  [settlement ids stood in, first first],
+        {"town":  the settlement the party is in ("" when none),
+         "been":  [settlement ids stood in, first first],
          "heard": {},          # phase 5: {settlement id: {"who", "line", "turn"}}
          "maps":  [],          # phase 5: nation ids whose map was read
          "sites": [{"id", "name", "host", "here": room id | "",
@@ -140,7 +141,9 @@ def known_places(engine, world) -> dict:
         sid = _settlement_of(pid)
         if sid in settlement_ids and sid not in been:
             been.append(sid)
-    return {"been": been, "heard": {}, "maps": [], "sites": _sites(engine, set(been_places))}
+    town = str(scene.location_id or "")
+    return {"town": town if town in settlement_ids else "", "been": been, "heard": {}, "maps": [],
+            "sites": _sites(engine, set(been_places))}
 
 
 def _sites(engine, been: set) -> list[dict]:
