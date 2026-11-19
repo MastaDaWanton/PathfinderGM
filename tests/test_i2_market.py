@@ -98,7 +98,10 @@ def test_the_weapons_on_sale_are_the_weapons_the_outfit_page_sold():
         == {g.id for g in goods.table_goods("armour")}
     assert {f"shield:{s['key']}" for s in page["shields"]} \
         == {g.id for g in goods.table_goods("shields")}
-    assert {f"gear:{g['key']}" for g in page["gear"]} == {f"gear:{k}" for k in goods.GEAR}
+    # Less the nation's map: the general store's alone, named for its town (rules/maps.py),
+    # so it has no place on a page that belongs to no town.
+    assert {f"gear:{g['key']}" for g in page["gear"]} == {
+        f"gear:{k}" for k, v in goods.GEAR.items() if v.get("category") != "map"}
 
 
 # --- which shops a settlement has ----------------------------------------------------------

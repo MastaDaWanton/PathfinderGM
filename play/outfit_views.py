@@ -69,7 +69,8 @@ def catalogue() -> dict:
                for k, v in SHIELDS.items() if v.get("cost_gp")]
     gear = [{"key": k, "name": v["name"], "cost_gp": float(v["cost_gp"]),
              "unit": v.get("unit", ""), "per": v.get("per", 1)}
-            for k, v in GEAR_SORTED()]
+            # A nation's map is the general store's, named for its town (rules/maps.py).
+            for k, v in GEAR_SORTED() if v.get("category") != "map"]
     # One case on the page: the hand-written rows in rules/tables.py are lower case for
     # prose ("swings his dagger") and the 445 imported ones are not, so the list read
     # "club" beside "Baston fighting stick" (playtest 2026-11-15 #4). Display only.
@@ -98,7 +99,7 @@ def _price(kind: str, key: str) -> tuple[float, dict] | None:
             return float(s["cost_gp"]), dict(s)
     elif kind == "gear":
         g = goods.GEAR.get(key)
-        if g:
+        if g and g.get("category") != "map":
             return float(g["cost_gp"]), dict(g)
     return None
 

@@ -91,6 +91,8 @@ MAX_LINES = 12
 # has room for a few of those beside the new ones.
 MAX_PLACES = 6
 MAX_PLACED = 4
+# Towns a speaker names in one beat (the World map's "heard" pins, rules/heard_towns.py).
+MAX_TOWNS = 4
 
 
 @dataclass
@@ -138,6 +140,14 @@ class HeardPlace:
 
 
 @dataclass
+class HeardTown:
+    line: str
+    words: str                # the name as the speaker said it
+    city: str                 # the settlement it is (rules/heard_towns.match)
+    said_by: str = ""
+
+
+@dataclass
 class Placed:
     line: str
     words: str
@@ -153,6 +163,7 @@ class Reading(Attribution):
     newcomers: list[Newcomer] = field(default_factory=list)
     places: list[HeardPlace] = field(default_factory=list)
     placed: list[Placed] = field(default_factory=list)
+    towns: list[HeardTown] = field(default_factory=list)
     pronouns: dict = field(default_factory=dict)     # ref -> "he" | "she"
     names: list = field(default_factory=list)        # [{"who": ref | root id, "name"}]
     dropped: list[dict] = field(default_factory=list)
@@ -228,6 +239,8 @@ class Reading(Attribution):
             "places": [{"words": p.words, "kind": p.kind, "landmark": p.landmark}
                        for p in self.places],
             "placed": [{"words": p.words, "at": p.at} for p in self.placed],
+            **({"towns": [{"words": t.words, "city": t.city} for t in self.towns]}
+               if self.towns else {}),
             **({"pronouns": dict(self.pronouns)} if self.pronouns else {}),
             **({"names": list(self.names)} if self.names else {}),
             **({"arrived": list(self.arrived)} if self.arrived else {}),
@@ -483,8 +496,17 @@ def places_schema(line_ids: list[str], place_names: list[str]) -> dict:
                 # Varn, sits in the back corner" put him somewhere — the enum forced a
                 # place. Code drops "none".
                 "at": {"type": "string", "enum": list(place_names) + [NONE]}},
-            "required": ["line", "words", "at"]}}},
-        "required": ["places", "people"]}
+            "required": ["line", "words", "at"]}},
+        # Other settlements a speaker names (place map v2, phase 5). The name as said, free
+        # text: an enum of the world's towns would force a made-up name onto the nearest
+        # real one (constrained decoding cuts the word off at its first letters, measured
+        # on the kinds above). Code checks it is a real settlement, in the speaker's line.
+        "towns": {"type": "array", "maxItems": MAX_TOWNS, "items": {
+            "type": "object", "properties": {
+                "line": {"type": "string", "enum": line_ids},
+                "name": {"type": "string"}},
+            "required": ["line", "name"]}}},
+        "required": ["places", "people", "towns"]}
 
 
 # Whether the places call lists the town's own places too (code sorts them out) or only
@@ -524,6 +546,8 @@ _PLACES_TAIL = (
     "\"people\": each single person (not a group) a speaker says is at one of the town's "
     "places — the speaker's own words for the person (never just \"he\" or \"she\"), and "
     "the place (\"none\" when it is not one of the town's places).\n"
+    "\"towns\": each other town, city or village a speaker names by its name — the name "
+    "as the speaker says it. A town is not one of the \"places\".\n"
     "Answer with empty lists when there are none.")
 
 _PLACES_EXAMPLE_USER = (
@@ -534,7 +558,8 @@ _PLACES_EXAMPLE_USER = (
     "{q1} the ferryman: 'You'll want the salt-sheds. Follow the quay to the docks, and "
     "it's the long shed past the fish stalls. The Salt Sheds, they call it.'\n"
     "{q2} the ferryman: 'Ask the girl in the counting house, she keeps the tallies.'\n"
-    "{q3} the ferryman: 'Or try the tavern. Or my sister's cottage, out back of here.'")
+    "{q3} the ferryman: 'Or try the tavern. Or my sister's cottage, out back of here. "
+    "She came down from Easthollow last spring.'")
 _SHEDS = {"line": "q1", "words": "The Salt Sheds", "also called": "the long shed",
           "kind": "warehouses", "near": "the docks"}
 _COTTAGE = {"line": "q3", "words": "my sister's cottage", "also called": "",
@@ -549,7 +574,8 @@ def _places_example() -> str:
              "near": "none"}]
     places = ([_SHEDS, town[0], town[1], _COTTAGE] if LIST_TOWN_PLACES
               else [_SHEDS, _COTTAGE])
-    return json.dumps({"places": places, "people": _GIRL})
+    return json.dumps({"places": places, "people": _GIRL,
+                       "towns": [{"line": "q3", "name": "Easthollow"}]})
 
 
 def places_messages(lines: list[Line], names: dict, place_names: list[str],
@@ -800,8 +826,10 @@ def _read_in_one_call(reading, scene, engine, chat, model, host, provider, api_k
         reading.read = reading.labelled = True
         if town is not None:
             _apply_places(reading, {"places": ans.get("places") or [],
-                                    "people": ans.get("people placed") or []},
-                          known, here, by_name, npc_lines)
+                                    "people": ans.get("people placed") or [],
+                                    "towns": ans.get("towns") or []},
+                          known, here, by_name, npc_lines,
+                          world=getattr(engine, "world", None))
             reading.places_read = True
             _places_from_npcs(reading, scene)
     except Exception as exc:  # noqa: BLE001
@@ -830,7 +858,7 @@ def _places_from_npcs(reading: Reading, scene) -> None:
             return ""
         return who
 
-    for coll in (reading.places, reading.placed):
+    for coll in (reading.places, reading.placed, reading.towns):
         kept = []
         for p in coll:
             who = speaker(p.line)
@@ -838,8 +866,9 @@ def _places_from_npcs(reading: Reading, scene) -> None:
                 p.said_by = who
                 kept.append(p)
             else:
-                reading.dropped.append({"place" if coll is reading.places else "person":
-                                        p.words[:80], "line": p.line,
+                what = ("place" if coll is reading.places else "town" if coll is reading.towns
+                        else "person")
+                reading.dropped.append({what: p.words[:80], "line": p.line,
                                         "why": "not a line an NPC spoke"})
         coll[:] = kept
 
@@ -975,7 +1004,7 @@ def _read_places(reading: Reading, scene, engine, chat, model, host, provider,
     try:
         reply = chat(places_messages(npc_lines, names, place_names, here_name), model, host,
                      as_json=True, think=False, temperature=0.0,
-                     num_predict=60 + 60 * (MAX_PLACES + MAX_PLACED),
+                     num_predict=60 + 60 * (MAX_PLACES + MAX_PLACED) + 30 * MAX_TOWNS,
                      provider=provider, api_key=api_key,
                      schema=places_schema([ln.id for ln in npc_lines], place_names))
         ans = reply.json() or {}
@@ -986,7 +1015,8 @@ def _read_places(reading: Reading, scene, engine, chat, model, host, provider,
         reading.timings["places"] = round(time.monotonic() - started, 2)
         return
     reading.timings["places"] = round(time.monotonic() - started, 2)
-    _apply_places(reading, ans, known, here, by_name, npc_lines)
+    _apply_places(reading, ans, known, here, by_name, npc_lines,
+                  world=getattr(engine, "world", None))
 
 
 def _town_for(reading: Reading, scene, engine):
@@ -1013,8 +1043,9 @@ def _town_for(reading: Reading, scene, engine):
 
 
 def _apply_places(reading: Reading, ans: dict, known, here, by_name: dict,
-                  npc_lines: list) -> None:
+                  npc_lines: list, world=None) -> None:
     """Take the places answer's entries that pass their checks; drop the rest with why."""
+    from rules import heard_towns
     from rules import places as places_mod
 
     lines = {ln.id: ln for ln in npc_lines}
@@ -1059,6 +1090,13 @@ def _apply_places(reading: Reading, ans: dict, known, here, by_name: dict,
             entries.append(None)
             continue
         name = _place_name(words)
+        town = heard_towns.match(world, name)
+        if town:
+            # Another settlement, not a place in this one: before the towns list it was
+            # recorded as a heard-of place here, and walking there founded it in town.
+            reading.dropped.append({"place": words[:80], "why": "a town elsewhere"})
+            entries.append(None)
+            continue
         on_map = places_mod.find(known, name) or places_mod.find(known, _article_off(name))
         if on_map is not None:
             reading.dropped.append({"place": words[:80], "why": f"on the map already "
@@ -1121,6 +1159,25 @@ def _apply_places(reading: Reading, ans: dict, known, here, by_name: dict,
             continue
         reading.placed.append(Placed(line=ln.id, words=words, at=by_name[at].id,
                                      said_by=ln.speaker(reading) or ln.tag))
+    for item in ans.get("towns") or []:
+        if not isinstance(item, dict):
+            continue
+        ln = lines.get(str(item.get("line") or ""))
+        words = " ".join(str(item.get("name") or "").split()).strip(" ,.;:!?")
+        if ln is None or not words:
+            continue
+        if not on_page(words, ln.words):
+            reading.dropped.append({"town": words[:80], "line": ln.id,
+                                    "why": "the words are not the speaker's"})
+            continue
+        city = heard_towns.match(world, words)
+        if not city:
+            reading.dropped.append({"town": words[:80], "why": "no town of that name"})
+            continue
+        if any(t.city == city for t in reading.towns):
+            continue
+        reading.towns.append(HeardTown(line=ln.id, words=words, city=city,
+                                       said_by=ln.speaker(reading) or ln.tag))
 
 
 def reconcile_tags(reading: "Reading", said) -> list[dict]:

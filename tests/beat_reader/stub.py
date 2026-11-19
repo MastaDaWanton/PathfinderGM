@@ -37,14 +37,14 @@ def chat(people: dict | None = None, places: dict | None = None, *, fail: str = 
     messages) for a test that looks at the question asked."""
     def _chat(messages, model, host, *, schema=None, **_kw):
         props = set((schema or {}).get("properties") or {})
-        kind = "places" if props == {"places", "people"} else "people"
+        kind = "places" if {"places", "people"} <= props else "people"
         if calls is not None:
             calls.append((kind, schema, messages))
         if fail == kind:
             raise ConnectionError(f"stubbed: the {kind} call failed")
         answer = (places if kind == "places" else people) or {}
         if kind == "places":
-            answer = {"places": [], "people": [], **answer}
+            answer = {"places": [], "people": [], "towns": [], **answer}
         return Reply(text=json.dumps(answer), seconds=0.0, model="stub")
     return _chat
 
@@ -113,9 +113,9 @@ def people_answer(text: str, scene, *, who: dict | None = None, new=(), lines=No
     return ans
 
 
-def places_answer(text: str, *, places=(), placed=()) -> dict:
+def places_answer(text: str, *, places=(), placed=(), towns=()) -> dict:
     """The places call's JSON. `places`: (line prefix, words, kind, near[, same as]);
-    `placed`: (line prefix, words, at)."""
+    `placed`: (line prefix, words, at); `towns`: (line prefix, name as said)."""
     lines = _line_ids(text)
 
     def lid(prefix: str) -> str:
@@ -128,15 +128,17 @@ def places_answer(text: str, *, places=(), placed=()) -> dict:
     return {"places": [{"line": lid(p[0]), "words": p[1], "kind": p[2], "near": p[3],
                         "same as": p[4] if len(p) > 4 else beat_reader.FIRST}
                        for p in places],
-            "people": [{"line": lid(p[0]), "words": p[1], "at": p[2]} for p in placed]}
+            "people": [{"line": lid(p[0]), "words": p[1], "at": p[2]} for p in placed],
+            "towns": [{"line": lid(t[0]), "name": t[1]} for t in towns]}
 
 
 def read(text: str, scene, *, engine=None, said=(), who=None, new=(), lines=None,
-         names=None, pronouns=None, arrived=(), places=(), placed=(), fail: str = "",
-         calls: list | None = None, gone=()) -> beat_reader.Reading:
+         names=None, pronouns=None, arrived=(), places=(), placed=(), towns=(),
+         fail: str = "", calls: list | None = None, gone=()) -> beat_reader.Reading:
     people = people_answer(text, scene, who=who, new=new, lines=lines, names=names,
                            pronouns=pronouns, arrived=arrived, gone=gone)
-    where = places_answer(text, places=places, placed=placed) if (places or placed) else {}
+    where = (places_answer(text, places=places, placed=placed, towns=towns)
+             if (places or placed or towns) else {})
     return beat_reader.read(text, scene, engine=engine, said=said, gone=gone,
                             chat=chat(people, where, fail=fail, calls=calls))
 

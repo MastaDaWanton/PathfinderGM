@@ -731,6 +731,12 @@ function nationMap(v) {
     Object.assign(o.userData, { pickable: !w.n.current, name: bare(w.n.name), seen: !w.n.visited, road: w.small ? "" : w.road });
     board.pos[w.n.id] = P3(w.hx);
     if (!w.small && pos[v.home]) roadStrip([pos[v.home].x, pos[v.home].z], [w.hx.x, w.hx.z], "track", 1.09, .7); });
+  // Across country between two wild places, where the chart knows the way (phase 5: every
+  // reach joins every other, rules/outskirts.py): a track hex to hex, not back through town.
+  const big = new Map(wild.filter(w => !w.small).map(w => [w.n.id, w.hx]));
+  const drawnWays = new Set();
+  (v.pf.edges || []).forEach(ed => { const a = big.get(ed.from), b = big.get(ed.to), k = [ed.from, ed.to].sort().join("|");
+    if (a && b && a !== b && !drawnWays.has(k)) { drawnWays.add(k); roadStrip([a.x, a.z], [b.x, b.z], "track", 1.09, .7); } });
   Object.keys(pos).forEach(id => { if (!board.pos[id]) board.pos[id] = P3(pos[id]); });
   v.sites.forEach(st => { const at = wild.some(w => w.n.id === st.host) && board.pos[st.host]; if (at) downArrow(st, at.x - 3, at.z + 2.4, 1).position.y = 1.05; });
   // Roads: between the nation's towns, a strip; leaving it, a strip to the border and an arrow.

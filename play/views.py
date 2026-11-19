@@ -2423,6 +2423,13 @@ def _carried(pc) -> list[dict]:
             if usable and d.get(f"{how}able"):
                 acts.append({"label": label, "api": "/api/use",
                              "body": {"item": d["id"], "how": how}})
+        # A nation's map is read (rules/maps.py, `Engine._read_map`): ten minutes, and the
+        # place maps know its towns from then on.
+        from rules import maps as maps_mod
+
+        if maps_mod.is_map(d["name"]):
+            acts.append({"label": "Read", "api": "/api/use",
+                         "body": {"item": d["id"], "how": "read"}})
         # A forged weapon is held, not worn (enchanting lane U1, seen live 2026-10-06): its
         # record's slot is "hands", so this row offered Wear, which wrote the +1 flaming
         # longsword into the gloves' slot as "worn" and left the rapier in hand; nothing on

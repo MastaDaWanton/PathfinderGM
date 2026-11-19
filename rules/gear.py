@@ -387,8 +387,9 @@ VEHICLES = frozenset({"cart", "wagon"})
 def _good_weight(name: str, count: int) -> float | None:
     """A general-store good's weight for `count` of it (counted in its unit), or None."""
     from .goods import GEAR
+    from .maps import shelf_name
 
-    low = _norm(name)
+    low = _norm(shelf_name(name))
     for row in GEAR.values():
         if _norm(row["name"]) == low and row.get("lb") is not None:
             return float(row["lb"]) * int(count) / max(1, int(row.get("per", 1) or 1))

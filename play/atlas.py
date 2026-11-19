@@ -9,8 +9,8 @@ they change at different rates:
   engine offers between settlements. Served once per campaign at `/api/atlas`, never on
   `/api/state`.
 - `known_places(engine, world)` is the PLAYER'S knowledge, which grows with play: the
-  settlements stood in, those heard of and those learned from a map (both empty until
-  phase 5 records them), and the sites (caves, dungeons, sewers) found so far with the
+  settlements stood in, those an NPC named (`Scene.heard_towns`) and the nations whose map
+  was read (`Scene.maps_read`), and the sites (caves, dungeons, sewers) found so far with the
   rooms known in each. Small, the last key of `/api/state`'s scene.
 
 **Nothing here is a second reading of the world.** Every fact is an existing engine answer,
@@ -122,8 +122,8 @@ def known_places(engine, world) -> dict:
     Shape:
         {"town":  the settlement the party is in ("" when none),
          "been":  [settlement ids stood in, first first],
-         "heard": {},          # phase 5: {settlement id: {"who", "line", "turn"}}
-         "maps":  [],          # phase 5: nation ids whose map was read
+         "heard": {settlement id: {"who", "line", "turn"}},   # named by an NPC
+         "maps":  [nation ids whose map was read],
          "sites": [{"id", "name", "host", "here": room id | "",
                     "rooms": [{"id", "name", "parent", "exits": [...], "visited": bool,
                                "about": str, "role": str, "door": str,
@@ -144,7 +144,14 @@ def known_places(engine, world) -> dict:
         if sid in settlement_ids and sid not in been:
             been.append(sid)
     town = str(scene.location_id or "")
-    return {"town": town if town in settlement_ids else "", "been": been, "heard": {}, "maps": [],
+    # Told of by an NPC (rules/heard_towns.py) and read off a map (rules/maps.py). The speaker
+    # goes by name only: a ref is never put on the page.
+    heard = {cid: {"who": str(h.get("who") or ""), "line": str(h.get("line") or ""),
+                   "turn": int(h.get("turn") or 0)}
+             for cid, h in (getattr(scene, "heard_towns", None) or {}).items()
+             if cid in settlement_ids and isinstance(h, dict)}
+    return {"town": town if town in settlement_ids else "", "been": been, "heard": heard,
+            "maps": list(getattr(scene, "maps_read", None) or []),
             "sites": _sites(engine, set(been_places))}
 
 

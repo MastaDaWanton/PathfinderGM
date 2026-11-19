@@ -513,6 +513,9 @@ GEAR: dict[str, dict] = {
     "tent": {"name": "tent", "cost_gp": 10.0, "lb": 20},
     "antitoxin": {"name": "antitoxin", "cost_gp": 50.0, "lb": 0},
     "shovel": {"name": "shovel", "cost_gp": 2.0, "lb": 8},
+    # A nation's map (rules/maps.py): the general store's alone, named for the store's own
+    # nation when it is bought. Its own category, so no other counter shelves it.
+    "map": {"name": "map of the land", "cost_gp": 5.0, "lb": 0.5, "category": "map"},
     "hammer": {"name": "hammer", "cost_gp": 0.5, "lb": 2},
     "pitons": {"name": "pitons", "cost_gp": 0.1, "lb": 0.5},
     "mirror": {"name": "small steel mirror", "cost_gp": 10.0, "lb": 0.5},
@@ -602,7 +605,9 @@ def unit_price(name: str) -> float | None:
     back for 9.50 gp, a 1 cp torch for 19 cp, and 11 of 41 plain goods for more than cost.
     Looked up by name rather than stamped on at purchase so a save from before this sells
     at the book's price too."""
-    low = " ".join(str(name or "").split()).lower()
+    from .maps import shelf_name
+
+    low = " ".join(str(shelf_name(name) or "").split()).lower()
     if not low:
         return None
     from . import market
@@ -669,7 +674,7 @@ def stocked_at(counter_kind: str) -> list[str]:
         from . import market
 
         return list(market.gear_of(kind))
-    return [k for k in GEAR if _category(k) != "food"]
+    return [k for k in GEAR if _category(k) not in ("food", "map")]
 
 
 @dataclass(frozen=True)
