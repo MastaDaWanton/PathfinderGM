@@ -43,8 +43,11 @@ def test_a_fog_cloud_survives_closing_the_app(tmp_path):
         cm._LIVE.clear()
         back = cm.current(c.id)
 
-    assert len(back.scene.manifests) == 1, "the fog was deleted by the restart"
-    made = back.scene.manifests[0]
+    # The market's crowd (rules/crowds.py) stands beside it at this hour; only the fog
+    # is this test's.
+    fogs = [m for m in back.scene.manifests if m.what != "crowd"]
+    assert len(fogs) == 1, "the fog was deleted by the restart"
+    made = fogs[0]
     assert made.what == "a bank of fog" and made.rounds_left == 50
     assert set(back.scene.grid.obscuring) == squares, "its squares moved"
 
