@@ -282,8 +282,24 @@ def is_port(world, entity_id: str) -> bool:
     found = world.get(entity_id) if world is not None else None
     if found is None:
         return False
+    # Remembered per world object (held and compared by identity, as
+    # `geography.land_around` is): `home_set` is a pure function of the settlement (its id
+    # seeds the layout), but building it names every keeper's trade, and `legs_from` asks it
+    # of every neighbour on every call. Measured 2026-11-18 on Aurvantis: 32 ms a call,
+    # 4.3 s for `legs_from` over its 64 settlements, which the place map's atlas does once.
+    key = (id(world), str(entity_id))
+    held = _PORT_MEMO.get(key)
+    if held is not None and held[0] is world:
+        return held[1]
     names = {str(p.name).strip().lower() for p in places_mod.home_set(found)}
-    return bool(names & set(ships_mod.PORT_PLACES))
+    got = bool(names & set(ships_mod.PORT_PLACES))
+    if len(_PORT_MEMO) > 1024:
+        _PORT_MEMO.clear()
+    _PORT_MEMO[key] = (world, got)
+    return got
+
+
+_PORT_MEMO: dict = {}
 
 
 def _depth_apart(world, here: str, there: str) -> int:

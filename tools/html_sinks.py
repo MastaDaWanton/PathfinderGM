@@ -882,6 +882,11 @@ def load_reviewed():
 
 def sources():
     for p in sorted(JS_DIR.rglob("*.js")):
+        # Vendored libraries (Three.js, 2026-11-18) build no markup from our text. Scanned,
+        # their own parseFromString showed as a sink, and a variable of theirs named `svg`
+        # was read as 03's `svg`, since resolution is by name across the corpus.
+        if "vendor" in p.relative_to(JS_DIR).parts:
+            continue
         s = p.read_text(encoding="utf-8")
         yield p, s, [(0, len(s))]
     for p in sorted(TEMPLATES.glob("*.html")):

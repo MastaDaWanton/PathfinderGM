@@ -403,6 +403,10 @@ class Campaign:
             # Places somebody named that the town does not have yet (2026-10-03,
             # rules/heard_places.py): a conversation made them, so nothing derives them.
             "heard_places": ([dict(h) for h in self.scene.heard_places], []),
+            # Towns an NPC named and nations' maps read (2026-11-19, rules/heard_towns.py,
+            # rules/maps.py): the place maps' knowledge beyond the towns stood in.
+            "heard_towns": ({k: dict(v) for k, v in self.scene.heard_towns.items()}, {}),
+            "maps_read": (list(self.scene.maps_read), []),
             # The trade uses spent today (2026-10-07, rules/tradecraft.py): a counter
             # talked round keeps its price, and a thing judged its look, across a save.
             "dealings": ({k: dict(v) for k, v in self.scene.dealings.items()}, {}),
@@ -538,6 +542,9 @@ class Campaign:
                             for k, v in (s.get("fixtures_named") or {}).items()
                             if isinstance(v, list)},
             heard_places=[dict(h) for h in (s.get("heard_places") or [])],
+            heard_towns={str(k): dict(v) for k, v in (s.get("heard_towns") or {}).items()
+                         if isinstance(v, dict)},
+            maps_read=[str(n) for n in (s.get("maps_read") or [])],
             schemes=[dict(x) for x in (s.get("schemes") or [])],
             staffed=[str(x) for x in (s.get("staffed") or [])],
             swayed={str(k): int(v) for k, v in (s.get("swayed") or {}).items()},

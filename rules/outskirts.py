@@ -264,12 +264,21 @@ def _ring(world, location, at: str) -> tuple:
     # Domesday to von Thünen draws it — and off the outskirts where there are none.
     # Measured 2026-10-05: before this, 15 of Aurvantis's 64 settlements offered no
     # ground outside but farmland and the shore, Vormoor and Scrapden among them.
+    reach_ids = []
     for reach in land.reaches:
         slug = places_mod._slug(reach.name) or reach.ground
         about = reach.words or biomes_describe(reach.ground)
-        link(fields_id or out_id,
-             add(ring_id(sid, reach.ground, slug), reach.name, about, reach.ground,
-                 miles=reach.miles))
+        reach_ids.append(add(ring_id(sid, reach.ground, slug), reach.name, about,
+                             reach.ground, miles=reach.miles))
+        link(fields_id or out_id, reach_ids[-1])
+    # Across country from one reach to another, not back through town (the owner, 2026-11-19,
+    # place map v2 phase 5): every reach joins every other, and the way is as long as the
+    # farther one lies from town (`hop_minutes` times a hop by its farther reach). The world
+    # gives a reach's miles and no bearing, so nothing shorter can be known; the Region map's
+    # hexes are a view, and were refused as the measure.
+    for k, a in enumerate(reach_ids):
+        for b in reach_ids[k + 1:]:
+            link(a, b)
 
     # The tannery (leatherworking plan §10, contracts §8): out here, not in the street,
     # because the trade was kept outside — fifteenth-century Coventry's tanneries stood

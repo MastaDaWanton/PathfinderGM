@@ -526,8 +526,9 @@ def goods_worth(name: str) -> float:
     thing none of them lists is `UNLISTED_GP`. Never a price the fiction stated — that
     is the haggle, and `accept` can only lower what the rule gives."""
     from . import goods
+    from .maps import shelf_name
 
-    low = " ".join(str(name or "").split()).lower()
+    low = " ".join(str(shelf_name(name) or "").split()).lower()
     for key, row in goods.GEAR.items():
         if low in (key, str(row.get("name", "")).lower()):
             return float(row.get("cost_gp") or 0) or UNLISTED_GP

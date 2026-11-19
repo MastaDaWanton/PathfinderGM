@@ -20,6 +20,7 @@ from typing import Any, ClassVar
 
 from . import biomes
 from . import goods
+from . import maps as maps_mod
 from . import holding
 from . import ontheway
 from . import encounter_budget
@@ -453,6 +454,12 @@ class Scene:
     # them; each becomes a place through `found`, under the landmark the speaker gave,
     # the first time the player goes there (`judgement.go_to_heard_place`).
     heard_places: list[dict] = field(default_factory=list)
+    # Settlements an NPC named aloud (`rules/heard_towns.py`), {settlement id: {"who",
+    # "from", "line", "turn"}}, and the nations whose map the party has read (`rules/maps.py`):
+    # what the World and Continent maps know beyond the towns stood in. Stored, because talk
+    # and reading made them; both only grow.
+    heard_towns: dict[str, dict] = field(default_factory=dict)
+    maps_read: list[str] = field(default_factory=list)
     # The schemes running in this campaign (rules/schemes.py): one instance per opened
     # scheme — its filled slots, the steps that fired and when, its outcome. Stored,
     # like `founded`, because play made it; read back through the one ticker.
@@ -4113,8 +4120,11 @@ class Engine:
             item_id, _fits = (consumables.resolve_stock(actor.stock, said)
                               if actor is not None and said else (None, []))
             held = actor.stock.get(item_id) if item_id else None
-            if held is not None and held.count >= 1:
-                    how = str(intent.params.get("how", "drink")).strip().lower()
+            how = str(intent.params.get("how", "drink")).strip().lower()
+            if how == "read" and held is not None:
+                # A map is read, not drunk (`_read_map`), and what it refuses it says there.
+                pass
+            elif held is not None and held.count >= 1:
                     use = consumables.plan(held, how=how,
                                            target=intent.params.get("to") or intent.actor,
                                            because=intent.because,
@@ -23502,6 +23512,35 @@ class Engine:
                               origin_name=intent.origin_name)
         return None
 
+    def _read_map(self, intent: Intent, actor, held) -> Outcome:
+        """Read a carried nation's map (rules/maps.py): about ten minutes, and the World and
+        Continent maps know that nation's towns from then on. Not in a fight, and a map of a
+        nation already read teaches nothing. The map is kept: reading spends no copy.
+
+        The tell is how the narrator learns of it (the three laws: the narrator is fed tells
+        and nothing else about mechanics)."""
+        name = str(getattr(held, "base", "") or getattr(held, "name", "") or "")
+        if not maps_mod.is_map(name):
+            return self._refuse(intent, f"The {name} is not something to read.")
+        if self.scene.in_encounter:
+            return self._refuse(intent, f"There is no reading a map in the middle of a fight. "
+                                        f"The {name} stays folded.")
+        nation = maps_mod.nation_named(self.world, name)
+        if not nation:
+            return self._refuse(intent, f"The {name} shows nowhere {actor.name} can place.")
+        if not maps_mod.read(self.scene, nation):
+            return Outcome(intent_id=intent.id, op="use_item", effects=[],
+                           tell=f"{actor.name} looks over the {name}; it shows nothing they "
+                                f"did not already know from the copy they read before.",
+                           because=intent.because)
+        self.scene.advance(maps_mod.READ_MINUTES)
+        return Outcome(intent_id=intent.id, op="use_item",
+                       effects=[{"ref": actor.ref, "kind": "map_read", "nation": nation,
+                                 "item": name, "minutes": maps_mod.READ_MINUTES}],
+                       tell=f"{actor.name} spends about {maps_mod.READ_MINUTES} minutes over "
+                            f"the {name}, learning its towns and the roads between them.",
+                       because=intent.because)
+
     def _op_use_item(self, intent: Intent, partial: dict) -> Outcome:
         """Drink it, throw it, or put it on a blade.
 
@@ -23562,6 +23601,8 @@ class Engine:
         if target not in self.scene.actors:
             away = self._elsewhere(target)
             return self._refuse(intent, away or f"There is no {target} here to use it on.")
+        if how == "read":
+            return self._read_map(intent, actor, held)
         # In a fight a drink is the turn's standard action, and it provokes
         # (`_drink_refusal`, `_provoked_by_drinking`). A throw is a standard action too and
         # asks only the drink's record: its own attack is the attack op's.
@@ -24111,6 +24152,15 @@ class Engine:
         only_one = ""
         if count > 1 and not getattr(found, "staple", False):
             count, only_one = 1, " It was the only one on the counter."
+        # The general store's map is of its own nation (rules/maps.py): named for it as it
+        # changes hands, since the shelf does not know its town.
+        if isinstance(found, goods.Good) and found.key == maps_mod.KEY:
+            from dataclasses import replace as _replace
+
+            called = maps_mod.named(self.world, place)
+            if not called:
+                return self._refuse(intent, f"{who} has no map of these parts to sell.")
+            found = _replace(found, name=called)
 
         # The keeper's own terms and a counter talked round today (`_op_haggle`, the
         # owner's option B) move the price the shelf shows (`tradecraft.counter_terms`).
