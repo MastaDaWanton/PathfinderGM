@@ -157,6 +157,24 @@ file works as a CSS mask; the shapes themselves are unchanged.
 | `play/static/img/icons/tan.svg` | [delapouite/barrel](https://game-icons.net/1x1/delapouite/barrel.html) | Delapouite |
 | `play/static/img/icons/thread.svg` | [delapouite/sewing-string](https://game-icons.net/1x1/delapouite/sewing-string.html) | Delapouite |
 
+## Three.js r170
+
+Bundled 2026-11-18 for the Places tabletop (docs/place-map-v2-build-plan.md, phase 2), the
+first third-party JavaScript the app ships; the owner allowed it app-wide the same day.
+Licence: **MIT** (https://github.com/mrdoob/three.js/blob/r170/LICENSE), kept beside the code
+as `play/static/js/vendor/three-r170/THREE-LICENSE.txt`. Files: `three.module.min.js`, and
+the addons `OrbitControls.js`, `GLTFLoader.js` and `BufferGeometryUtils.js`, unchanged but for
+each addon's `import ... from 'three'` rewritten to the relative path, so no import map is
+needed (an inline import map would need the page's CSP nonce). Pinned: upgrade only on purpose.
+
+## Models: Kenney
+
+Downloaded 2026-11-18 by hand from kenney.nl: **Hexagon Kit** and **Fantasy Town Kit 2.0**,
+as GLB with each kit's `Textures/colormap.png`. Licence: **Creative Commons Zero** (CC0 1.0,
+https://creativecommons.org/publicdomain/zero/1.0/); credit "Kenney" is optional, and
+given here. Each kit's own `License.txt` ships beside its models in
+`play/static/models/kenney/hex/` and `play/static/models/kenney/town/`.
+
 ## Music: the owner's soundtrack
 
 Added 2026-10-02, supplied by the owner from their own Suno account (artist tag

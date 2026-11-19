@@ -4,9 +4,12 @@
  * to cast spells/use abilities (like x-com, but still text based and without fancy
  * textures. Just something you can clearly see and rotate)."
  *
- * WHY THIS IS HAND-ROLLED. The app ships as an offline executable and bundles no
- * third-party JavaScript at all, so a CDN is not available and a library would be a
- * bundling decision rather than an import. `dice3d.js` builds five Platonic solids from
+ * WHY THIS IS HAND-ROLLED. The app ships as an offline executable, so a CDN is not
+ * available and a library is a bundling decision rather than an import. When this board was
+ * written the app bundled no third-party JavaScript at all; since 2026-11-18 it bundles
+ * Three.js r170 (js/vendor/three-r170/, for the Places tabletop), and the owner allowed it
+ * elsewhere too. This board stays hand-rolled because it works, not because a library is
+ * refused. `dice3d.js` builds five Platonic solids from
  * vertex arrays with nothing behind it; this is the same bargain, and now the same
  * geometry and the same light.
  *

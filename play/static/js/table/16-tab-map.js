@@ -43,6 +43,27 @@ const MAPV = {
   k: 1,           // the chart's drawing units per screen pixel (16-places-chart.js)
 };
 
+// The tabletop (js/places-board.js, the owner's choice of the 2026-11-18 mocks): an ES
+// module, imported on first use so the rest of the table never waits on Three.js. Without
+// WebGL, if the module fails to load, or when the context is lost, Places draws the chart
+// above from the same state instead (owner decision 3: the chart stays as the fallback,
+// revisited after one release). `state`: "" not tried, "loading", "board", "chart".
+const BOARD = { state: "", mod: null, here: "", where: "", ids: null, path: null };
+
+function boardReady() {
+  if (BOARD.state === "") {
+    const url = window.PATHFINDER_BOOT && window.PATHFINDER_BOOT.placesBoard;
+    let gl = false;
+    try { gl = !!document.createElement("canvas").getContext("webgl2"); } catch (_) { gl = false; }
+    BOARD.state = url && gl ? "loading" : "chart";
+    if (BOARD.state === "loading") {
+      import(url).then(m => { BOARD.mod = m; BOARD.state = "board"; renderPlaces(STATE); })
+        .catch(err => { console.warn("The tabletop did not load; drawing the chart:", err); BOARD.state = "chart"; renderPlaces(STATE); });
+    }
+  }
+  return BOARD.state;
+}
+
 function mapShowingPlaces() { return MAPV.places; }
 
 function mapPlacesData(s) {
@@ -91,6 +112,8 @@ function renderPlaces(s) {
     return;
   }
   if (MAPV.sel && !pf.nodes.some(n => n.id === MAPV.sel && !n.current)) MAPV.sel = null;
+  const how = boardReady();
+  if (how !== "chart") { renderBoard(s, wrap, pf, how); return; }
   const focused = document.activeElement && document.activeElement.closest
     && (document.activeElement.closest("[data-node]") || document.activeElement.closest("[data-walkto]"));
   const refocus = focused ? (focused.dataset.node ? `[data-node="${CSS.escape(focused.dataset.node)}"]`
@@ -114,6 +137,65 @@ function renderPlaces(s) {
     MAPV.k = next;
   }
   if (refocus) { const again = wrap.querySelector(refocus); if (again) again.focus({ preventScroll: true }); }
+}
+
+// The tabletop's frame is built once and kept: the 3D stage lives across states, and only
+// the slip, the foot and the keyboard's list of places are written again each time.
+function renderBoard(s, wrap, pf, how) {
+  let map = wrap.querySelector(".placemap.tabletop");
+  if (!map) {
+    wrap.innerHTML = `<div class="placemap tabletop"><div class="chart board3d"></div>
+      <div class="maprail"></div></div>
+      <div class="boardfoot"><p class="boardabout" id="places-about"></p>
+      <p class="boardkey"><span class="pk been"></span>stood in, painted
+      <span class="pk seen"></span>seen, grey<span class="pk here"></span>you</p></div>`;
+    map = wrap.querySelector(".placemap.tabletop");
+  }
+  const stage = map.querySelector(".board3d");
+  if (how === "board" && !stage.dataset.live) {
+    stage.dataset.live = "1";
+    BOARD.mod.init(stage, {
+      statics: (window.PATHFINDER_BOOT && window.PATHFINDER_BOOT.statics) || "/static/",
+      pick: id => pickPlace(id),
+      lost: () => { BOARD.state = "chart"; renderPlaces(STATE); },
+    });
+  }
+  const focused = document.activeElement && document.activeElement.closest
+    && (document.activeElement.closest("[data-node]") || document.activeElement.closest("[data-walkto]"));
+  const refocus = focused ? (focused.dataset.node ? `[data-node="${CSS.escape(focused.dataset.node)}"]`
+                                                  : ".walkthere") : null;
+  map.querySelector(".maprail").innerHTML = PlacesChart.slip(pf, { sel: MAPV.sel, said: MAPV.said,
+    walking: MAPV.walk && MAPV.walk.to });
+  wrap.querySelector("#places-about").textContent = PlacesChart.header(pf);
+  // The board is drawn on a canvas, which the keyboard cannot reach, so every place found is
+  // also a button: out of sight until it takes the focus, then a list over the board.
+  let keys = stage.querySelector(".boardkeys");
+  if (!keys) { stage.insertAdjacentHTML("beforeend", `<div class="boardkeys" aria-label="Places found"></div>`); keys = stage.querySelector(".boardkeys"); }
+  keys.innerHTML = pf.nodes.filter(n => !n.current).map(n =>
+    `<button type="button" class="v2-btn" data-node="${esc(n.id)}" aria-pressed="${MAPV.sel === n.id}">${esc(upFirst(n.name))}</button>`).join("");
+  if (refocus) { const again = wrap.querySelector(refocus); if (again) again.focus({ preventScroll: true }); }
+  if (how !== "board") return;
+  // Where the party walked this turn, for the miniature to go the same way: the walk the
+  // chart attached, up to where the engine stopped it, else straight from the last place.
+  let came = null;
+  if (BOARD.here && pf.here !== BOARD.here && pf.where === BOARD.where) {
+    const path = BOARD.path || [], k = path.indexOf(pf.here);
+    came = path[0] === BOARD.here && k > 0 ? path.slice(0, k + 1) : [BOARD.here, pf.here];
+    BOARD.path = null;
+  }
+  const ids = new Set(pf.nodes.map(n => n.id));
+  const fresh = BOARD.ids && pf.where === BOARD.where ? new Set([...ids].filter(i => !BOARD.ids.has(i))) : new Set();
+  BOARD.here = pf.here; BOARD.where = pf.where; BOARD.ids = ids;
+  const minutes = Number((s.scene || {}).clock_minutes) || 0;
+  BOARD.mod.draw({ pf, sel: MAPV.sel, hour: (minutes % 1440) / 60, came, fresh,
+                   reduced: matchMedia("(prefers-reduced-motion: reduce)").matches });
+}
+
+// A place pressed, on the chart, the board, or the board's list of places.
+function pickPlace(id) {
+  MAPV.sel = id === MAPV.sel ? null : id;
+  if (!MAPV.walk) MAPV.said = "";
+  renderPlaces(STATE);
 }
 
 function mapShowPlaces(on) {
@@ -152,6 +234,7 @@ function walkThere(dest) {
   if (!got.legs) { MAPV.walk = null; mapWalkSay(got.why); renderPlaces(STATE); return; }
   const n = got.legs.length;
   MAPV.walk = { to: dest, name: got.node.name, from: (mapPlacesData(STATE) || {}).here };
+  BOARD.path = [MAPV.walk.from, ...got.legs.map(l => l.to)];
   mapWalkSay(n > 1
     ? `${upFirst(got.node.name)} is attached to your turn: the whole way, ${n} legs by the ways you know, in one turn. Press Say to go.`
     : `${upFirst(got.node.name)} is attached to your turn. Press Say to go.`);
@@ -203,9 +286,7 @@ document.addEventListener("click", e => {
   if (t.closest("#groundctl [data-mapview]") && MAPV.places) { mapShowPlaces(false); return; }
   const node = t.closest("#placeswrap [data-node]");
   if (node) {
-    MAPV.sel = node.dataset.node === MAPV.sel ? null : node.dataset.node;
-    if (!MAPV.walk) MAPV.said = "";
-    renderPlaces(STATE);
+    pickPlace(node.dataset.node);
     const again = document.querySelector(`#placeswrap [data-node="${CSS.escape(node.dataset.node)}"]`);
     if (again) again.focus({ preventScroll: true });
     return;
