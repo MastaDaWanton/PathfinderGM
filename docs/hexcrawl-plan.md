@@ -30,6 +30,9 @@ Looking at the 3D tabletop region mock (`mock/place-map-v2`, `tabletop.html?leve
 7. **Terrain by rule now, and a World Bible ask** for real terrain and coordinates.
 8. **On foot, one hex a move; on a horse, two** (2026-11-19: "if you are walking/running you
    can only move 1 hex at a time but if you have a horse you can move 2 hexes").
+9. **No Perception check for the hex ridden through** (2026-11-19).
+10. **A hex that has been Perception-checked looks different on the board** from one that has
+    not (2026-11-19).
 
 ## Prior art this stands on
 
@@ -93,9 +96,9 @@ Read 2026-11-18. Primary where it could be reached.
   under the player's feet. Stamp it with the layout's version, per CLAUDE.md's cache rule.
 - **A hex record** is derived, never authored by a model: terrain, the nation it lies in, its
   site (kind, find DC, the place it opens), and what the player has done there (`seen`,
-  `entered`, `explored`).
+  `entered`, `searched`, `explored`).
 - **Generated from a seed** of the world seed and `(q, r)`, so the same hex always holds the same
-  thing. Only touched hexes are saved: a list of `{q, r, entered, explored, spotted}`.
+  thing. Only touched hexes are saved: a list of `{q, r, entered, searched, explored, spotted}`.
 - **The fog stays a view** over these records, never world data.
 
 ### 2. Terrain by rule (ruling 7)
@@ -124,7 +127,8 @@ Read 2026-11-18. Primary where it could be reached.
   reach; the route is the straight line, or, for the six two-away hexes that sit between two
   neighbours, the cheaper of the two (land before water, plain before rough). The hex passed
   through counts as **entered** and gets its own encounter roll (UC: once per hex). It gets
-  no spotting roll: the Perception check is made where the party stops (owner call 5).
+  no Perception check (ruling 9): the check is made only where the party stops, so a hex
+  ridden through stays unsearched on the board until a check covers it.
 - **Time:** Ultimate Campaign's travel through one hex at 30 ft: plain 5 hours, anything else
   8. Mounted, each hex costs half that (the owner's Q13 ruling, `journey.PACES`: riding halves
   the time, the same multiplier for every mount), so a two-hex ride takes the hours of one
@@ -150,6 +154,11 @@ Read 2026-11-18. Primary where it could be reached.
   is seen in the tell ("smoke rises from the hills to the north-east"), and **places its model
   on that hex**.
 - **Spotted is kept.** The model stays, and a site can be spotted from several sides.
+- **Searched is kept too (ruling 10).** Every hex a check was read against is marked
+  `searched`, whatever the roll: the hex stopped in and its six neighbours. (Counting the hex
+  stopped in is our reading: the check is made from it, and otherwise a site in your own hex
+  could only be found from next door.) A hex searched with a low roll can still hide a site;
+  a later check from another side reads against it again, as the book's hidden sites allow.
 - **The town's own landmarks** (a town, a road) are seen without a roll, as the book's
   landmarks are.
 
@@ -192,6 +201,11 @@ Read 2026-11-18. Primary where it could be reached.
 - **Models:** the Kenney hex kit's buildings for sites (tower, ruin, mine for a way down,
   tents for a camp), a primer-grey miniature when spotted, painted once visited (the mock's
   existing seen/visited idiom).
+- **Searched hexes look different (ruling 10).** Three looks, from the hex record alone:
+  *fog* (never seen), *seen but unsearched* (terrain showing under a light haze; this is how
+  a hex ridden through looks), and *searched* (clear, full colour). The look must read at a
+  glance on both themes and survive the worst-case toggle; the exact treatment is a design
+  pass at build time (memory `ui-design-skills-preserve-look`: keep the board's colours).
 - **Packaged build:** must work in the desktop app, not only under runserver (CLAUDE.md).
   Hit-test the board in the packaged build (memory `release-hit-test`).
 
@@ -213,7 +227,7 @@ free number:
 | 0 | Region board in the game (owner's pick of the tabletop) | the region renders from engine data in the packaged build |
 | 1 | `rules/hexes.py`: layout stored on the campaign, terrain by rule, neighbours, travel hours | the same world and seed give the same board twice; a new town in the export moves nothing |
 | 2 | `hex_move`: time, body, one encounter roll per hex crossed, two-hex reach when mounted | a move costs 5 or 8 hours a hex on foot, half that mounted, and nothing else passes; a fight comes at the group budget |
-| 3 | Spotting: Perception against the neighbours' DCs, `spotted` kept | one roll reveals 0-6 sites; a model stays on a spotted hex across reloads |
+| 3 | Spotting: Perception against the neighbours' DCs, `spotted` and `searched` kept, searched hexes drawn apart | one roll reveals 0-6 sites; a model stays on a spotted hex across reloads; a searched hex looks unlike an unsearched one in the packaged build |
 | 4 | Sites through the existing doors | over 300 seeded hexes, ~1 in 3 has a site; every site opens a real place; no kind is more than half |
 | 5 | Explored + XP | 100 XP once per hex, never from a model |
 | 6 | WB ask 33 | the ask is in `docs/for-world-bible.md` |
@@ -224,6 +238,9 @@ free number:
   re-roll farming).
 - **No automatic time:** moving costs exactly the travel hours; standing in a hex costs nothing
   until something is done (ruling 2).
+- **Searched:** a stop marks the hex and its six neighbours searched whatever the roll; a
+  hex ridden through is entered but not searched, and the board draws the two differently
+  (rulings 9, 10).
 - **Reach:** on foot a click two hexes away is refused; a mounted party reaches it in the
   hours of one hex on foot, crosses the hex between (entered, one encounter roll), and a party
   with one member on foot is refused it (ruling 8).
@@ -255,6 +272,3 @@ free number:
 3. **Where open ground hangs:** off the nearest settlement (its nation, coin and law), or a
    free-standing hex location?
 4. **Phase 0:** pick the region board (the tabletop in the screenshot?) so the board can be built.
-5. **A ride through a hex:** proposed above, the hex passed through is entered and rolls for
-   encounters but gets no Perception check (you are riding past, not stopping). Or should it
-   spot too?
