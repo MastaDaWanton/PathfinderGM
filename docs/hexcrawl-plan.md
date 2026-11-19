@@ -28,6 +28,8 @@ Looking at the 3D tabletop region mock (`mock/place-map-v2`, `tabletop.html?leve
 5. **Hexes are 12 miles across.**
 6. **100 XP for an explored hex** (+25 for difficult terrain or a hazard: the book).
 7. **Terrain by rule now, and a World Bible ask** for real terrain and coordinates.
+8. **On foot, one hex a move; on a horse, two** (2026-11-19: "if you are walking/running you
+   can only move 1 hex at a time but if you have a horse you can move 2 hexes").
 
 ## Prior art this stands on
 
@@ -107,14 +109,28 @@ Read 2026-11-18. Primary where it could be reached.
   wilderness work already counts woods and rivers).
 - **World Bible ask 33** (next free number; see §8) replaces the rule when it lands.
 
-### 3. Moving one hex (rulings 1, 2)
+### 3. Moving one hex, or two mounted (rulings 1, 2, 8)
 
 - **New op `hex_move`** (`CODE_ONLY_OPS`: written by the map click, never by a plan), with
-  `to: [q, r]`. Refused unless the hex is a neighbour, is land (sea hexes wait for ships), and
+  `to: [q, r]`. Refused unless the hex is in reach, is land (sea hexes wait for ships), and
   the party is out of a fight.
+- **Reach (ruling 8):** a neighbour on foot; up to two hexes when the whole party rides.
+  "Rides" is the journey's existing test (`journey.MOUNTS`: a horse, pony, mule, camel or
+  riding dog owned on the sheet, bought or hired), so a mount bought at the stables counts
+  on the board as it does on the road. One rider short (a companion on foot) and the party
+  moves at the walker's pace, as a journey does. On foot, running changes nothing: the
+  book's overland run is a hustle, and the owner's ruling gives it no extra hex.
+- **A two-hex move goes through a hex.** The board shows the two-away hexes the ride can
+  reach; the route is the straight line, or, for the six two-away hexes that sit between two
+  neighbours, the cheaper of the two (land before water, plain before rough). The hex passed
+  through counts as **entered** and gets its own encounter roll (UC: once per hex). It gets
+  no spotting roll: the Perception check is made where the party stops (owner call 5).
 - **Time:** Ultimate Campaign's travel through one hex at 30 ft: plain 5 hours, anything else
-  8. Other speeds scale by the CRB's overland movement table (Table 7-8; verify the ratio at
-  build). Paid through `survival.pass_hours` and `Scene.advance`, like a forage, so thirst,
+  8. Mounted, each hex costs half that (the owner's Q13 ruling, `journey.PACES`: riding halves
+  the time, the same multiplier for every mount), so a two-hex ride takes the hours of one
+  hex on foot. The book roughly agrees (CRB Table 7-8: 30 ft is 24 miles a day, a horse's
+  50 ft is 40). A gallop (Q13's third) is not on the board; it can come later as three hexes
+  with the journey's horse fatigue. Paid through `survival.pass_hours` and `Scene.advance`, like a forage, so thirst,
   hunger and the awake clock all run. **This is the only time that passes on its own.**
 - **Encounter on the way:** one roll per hex (UC: once per hex when several are entered in a
   day). Creatures come through `ontheway._the_land` / `gathering.draw_for` at the party's
@@ -196,7 +212,7 @@ free number:
 |---|---|---|
 | 0 | Region board in the game (owner's pick of the tabletop) | the region renders from engine data in the packaged build |
 | 1 | `rules/hexes.py`: layout stored on the campaign, terrain by rule, neighbours, travel hours | the same world and seed give the same board twice; a new town in the export moves nothing |
-| 2 | `hex_move`: time, body, one encounter roll | a move costs 5 or 8 hours and nothing else passes; a fight comes at the group budget |
+| 2 | `hex_move`: time, body, one encounter roll per hex crossed, two-hex reach when mounted | a move costs 5 or 8 hours a hex on foot, half that mounted, and nothing else passes; a fight comes at the group budget |
 | 3 | Spotting: Perception against the neighbours' DCs, `spotted` kept | one roll reveals 0-6 sites; a model stays on a spotted hex across reloads |
 | 4 | Sites through the existing doors | over 300 seeded hexes, ~1 in 3 has a site; every site opens a real place; no kind is more than half |
 | 5 | Explored + XP | 100 XP once per hex, never from a model |
@@ -208,7 +224,9 @@ free number:
   re-roll farming).
 - **No automatic time:** moving costs exactly the travel hours; standing in a hex costs nothing
   until something is done (ruling 2).
-- **Neighbours only:** a click two hexes away is refused.
+- **Reach:** on foot a click two hexes away is refused; a mounted party reaches it in the
+  hours of one hex on foot, crosses the hex between (entered, one encounter roll), and a party
+  with one member on foot is refused it (ruling 8).
 - **Spotting:** a natural 1 can still spot a DC 10 tower when the modifier carries it.
   Perception below every DC reveals nothing, and the tell says nothing was seen.
 - **Grounded sites:** every site's place, people and creatures exist in the world, codex or
@@ -237,3 +255,6 @@ free number:
 3. **Where open ground hangs:** off the nearest settlement (its nation, coin and law), or a
    free-standing hex location?
 4. **Phase 0:** pick the region board (the tabletop in the screenshot?) so the board can be built.
+5. **A ride through a hex:** proposed above, the hex passed through is entered and rolls for
+   encounters but gets no Perception check (you are riding past, not stopping). Or should it
+   spot too?
