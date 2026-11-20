@@ -167,7 +167,11 @@ def worth(actor, rng=None) -> int:
     Paying this purse on top paid the printed gear twice. What the purse adds is only what
     the printed gear leaves of the value, and nothing when the gear already exceeds it."""
     kind = class_of(actor)
-    if not kind or kind == "none":
+    # "Incidental" is lair treasure, never coin on the body: "half this standard value, and
+    # then only within the confines of its lair" (Bestiary intro, Treasure), the rule
+    # `bestiary._carries_no_coin` already reads for pockets. Playtest 2026-11-20 #17: a
+    # clockwork spy ("incidental (gemstone worth 50 gp)") dropped 1 pp at the fight's end.
+    if not kind or kind in ("none", "incidental"):
         return 0
     centre = _BY_CR.get(_cr_of(actor), 0) * CLASSES[kind] * PER_CREATURE
     if centre <= 0:

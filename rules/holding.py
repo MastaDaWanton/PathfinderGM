@@ -270,8 +270,51 @@ _TOKEN_MATERIALS = frozenset("lead brass iron wooden wood bone clay tin glass st
                              "lucky strange foreign ancient old rare gaming".split())
 
 
+# Food by its kind, not its name: "the food", "some provisions". Whatever a person carries
+# that eats (`gear.food`) is what these mean (playtest 2026-11-20 #5, "I accept the food"
+# offered as "dried meat and some hard bread").
+_FOOD_WORDS = frozenset("food foods provisions victuals meal snack".split())
+
+
 def is_container(name) -> bool:
     return head_of(name) in CONTAINERS
+
+
+def carried_by(holder, item: str) -> str | None:
+    """The name, as `holder` carries it, of the thing `item` asks for — their goods
+    line, a jar on their shelf, a weapon on their list, food by its kind, or what their own
+    label puts in their hands — or None when they carry nothing it can be. The engine's own
+    lists are the vocabulary; the words are only searched for one of their names
+    (`named_among`), never trusted to name a new thing. `Engine._carried_by` and the
+    act→op table (`acts_to_ops._take`) both ask this one definition."""
+    from . import goods
+
+    key = key_in(holder.goods, item) or named_among(holder.goods, item)
+    if key:
+        return key
+    shelf = {}
+    for iid, s in (getattr(holder, "stock", None) or {}).items():
+        for n in (getattr(s, "name", ""), getattr(s, "base", ""),
+                  str(iid).split("#")[0].replace("-", " ")):
+            if n:
+                shelf.setdefault(str(n), str(getattr(s, "name", "") or n))
+    key = key_in(shelf, item) or named_among(shelf, item)
+    if key:
+        return shelf[key]
+    arms = {str(w): str(w) for w in getattr(holder, "weapons", None) or ()
+            if str(w).lower() not in ("unarmed", "improvised")}
+    canon = goods.canonical(item)
+    key = (next((w for w in arms if goods.canonical(w) == canon), None)
+           or named_among(arms, item))
+    if key:
+        return key
+    if head_of(item) in _FOOD_WORDS:
+        from . import gear
+
+        meal = gear.food(holder)
+        if meal is not None:
+            return str(meal["name"])
+    return label_carries(holder.name, item) or None
 
 
 def is_box(name, props=()) -> bool:

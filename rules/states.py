@@ -185,6 +185,11 @@ WANTED = "state.wanted"
 SUSPECTED = "state.suspected"
 GUARD = "role.guard"
 BYSTANDER = "role.bystander"
+# Sells what they carry, once each (tbaMUD's keeper selling off `keeper->carrying`): a
+# carter with a cart of goods, no counter and no shelf of its own. The trade panel opens
+# across them and lists their `goods`; `Engine._buy_carried` moves the real line. Granted by
+# an opening that loads them (`openings._load_up`, playtest 2026-11-20 #6).
+SELLS_WHAT_THEY_CARRY = "role.sells-what-they-carry"
 # Brought in by a source that already spent the party's encounter budget on them (a road
 # or forage draw, a scheme's hostile bring_in, the law admitted, an opening's foes, a
 # boarding crew). The effect's origin names the source (`budget:<source>`). Read by

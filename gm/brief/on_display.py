@@ -24,11 +24,13 @@ def _looking(reading) -> bool:
     from gm import interpret
 
     acts = (reading or {}).get("actions") or [] if isinstance(reading, dict) else []
-    return any(str(a.get("act") or "") in _LOOKS and interpret.acting(a) for a in acts)
+    # And a look turned into a browse (`interpret.browsed`: act `buy`, `was` look).
+    return any((str(a.get("act") or "") in _LOOKS or a.get("was") == "look")
+               and interpret.acting(a) for a in acts)
 
 
 def section(ctx) -> tuple[str, dict]:
-    from rules import keepers, market
+    from rules import goods, keepers, market, states
 
     scene = ctx.scene
     if not _looking(ctx.reading):
@@ -37,6 +39,16 @@ def section(ctx) -> tuple[str, dict]:
     day = market.day_of(int(getattr(scene, "clock_minutes", 0) or 0))
     lines, facts = [], {}
     for a in (getattr(scene, "actors", {}) or {}).values():
+        if not a.is_pc and not keepers.keeps_a_counter(a) \
+                and a.has_state(states.SELLS_WHAT_THEY_CARRY):
+            # What a carter's cart really carries (playtest 2026-11-20 #6: "Mostly just
+            # basic supplies", invented twice beside an empty record).
+            names = sorted(str(getattr(goods.good(k), "name", "") or k)
+                           for k, n in a.goods.items() if int(n or 0) > 0)
+            lines.append(f"  ON DISPLAY (fact): what {a.name} carries to sell: "
+                         f"{', '.join(names) or 'nothing'}; name only these goods.")
+            facts[a.ref] = names
+            continue
         if a.is_pc or not keepers.keeps_a_counter(a):
             continue
         try:

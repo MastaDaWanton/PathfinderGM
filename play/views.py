@@ -7064,7 +7064,9 @@ def _merchant_here(scene):
         # a job title, and a panel that only opens for people called "the stallholder"
         # would refuse every real shopkeeper this app builds. A temple's keeper sells its
         # castings across the same panel (rules/services.py, playtest 2026-11-16 #70).
-        if keepers.keeps_a_counter(a) or services_mod.keeps_a_temple(a):
+        # And somebody selling what they carry, a carter off a cart (playtest 2026-11-20 #6).
+        if keepers.keeps_a_counter(a) or services_mod.keeps_a_temple(a) \
+                or a.has_state(states.SELLS_WHAT_THEY_CARRY):
             found.append(a)
             continue
         if keepers.is_keeper(wid) and not keepers.counter_of(wid) \
@@ -7474,6 +7476,8 @@ def trade(request):
     refusal = _counter_refusal(c, pc, merchant)
     if refusal:
         return refusal
+    if counter is None and _sells_carried(merchant):
+        return JsonResponse(_carried_wares(c, pc, merchant, want))
 
     place, stall, day = _stall_of(c, counter, merchant, str(body.get("stall") or ""))
     kind = counter.kind if counter is not None else market.counter_kind_here(c.scene, stall)
@@ -7597,6 +7601,56 @@ def trade(request):
     })
 
 
+def _sells_carried(merchant) -> bool:
+    """Whether the panel's seller sells what they carry rather than a counter's shelf."""
+    from rules import keepers, states
+
+    return (merchant is not None and merchant.has_state(states.SELLS_WHAT_THEY_CARRY)
+            and not keepers.keeps_a_counter(merchant))
+
+
+def _carried_wares(c, pc, merchant, want: str) -> dict:
+    """The panel's answer for somebody selling what they carry (playtest 2026-11-20 #6):
+    "theirs" is their own `goods`, each line at the price `Engine._buy_carried` charges,
+    counted as they hold it; they buy nothing ("mine" empty, as a temple's) and keep no
+    till but their purse. The list IS the record — tbaMUD's `shopping_list` walks the
+    keeper's own carrying list."""
+    from rules import goods, pricing, states, tradecraft
+
+    percent, why = pricing.seller_percent(c.scene, merchant)
+    rows = []
+    for key, n in merchant.goods.items():
+        g = goods.good(key)
+        if g is None or int(n or 0) <= 0:
+            continue
+        rows.append(dict(_row(g, tradecraft.buy_price(float(g.price_gp), percent),
+                              int(n)), staple=False))
+    rows.sort(key=lambda r: -r["gp"])
+    pick, want_line = "", ""
+    if want:
+        found, _fits = goods.match_want(want, [goods.good(k) for k in merchant.goods
+                                               if goods.good(k) is not None])
+        pick = str(getattr(found, "id", "")) if found is not None else ""
+    coins = goods.coins_here(c.world, c.scene)
+    gp = round(goods.in_copper(merchant.purse) / 100, 2)
+    place = str(c.scene.location_id or "")
+    return {
+        "stall": "", "place": place, "day": 0, "pick": pick, "want_line": want_line,
+        "picks": [pick] if pick else [], "line": "", "counter": "", "lines": [],
+        "seller": {"ref": merchant.ref, "name": str(merchant.name)},
+        "till": {"gp": gp, "text": goods.purse_line(merchant.purse, coins)
+                 if gp else "no coin"},
+        "purse": goods.purse_line(pc.purse, coins),
+        "purse_gp": round(goods.in_copper(pc.purse) / 100, 2),
+        "mine": [], "theirs": rows, "haggled": 0,
+        "terms": tradecraft.terms_said(merchant, percent, why, who=str(merchant.name)),
+        "terms_percent": percent, "can_haggle": False,
+        "law": states.standing_with_the_law(pc, place),
+        "cargo": {"offers": [], "lots": [], "haul": {"lb": 0}, "carried_lb": 0,
+                  "terms": ""},
+    }
+
+
 def _cargo_block(c, pc, merchant) -> dict:
     """The counter's bulk goods: {"offers", "lots", "haul", "carried_lb", "terms"}.
 
@@ -7690,6 +7744,10 @@ def trade_do(request):
     if op == "sell" and services_mod.keeps_a_temple(merchant):
         return JsonResponse({"error": f"{merchant.name} buys nothing: a temple casts for "
                                       f"pay, and is no shop."}, status=409)
+    carried = counter is None and _sells_carried(merchant)
+    if op == "sell" and carried:
+        return JsonResponse({"error": f"{merchant.name} sells what they carry and buys "
+                                      f"nothing: there is no counter here."}, status=409)
 
     place, stall, day = _stall_of(c, counter, merchant, str(body.get("stall") or ""))
     item = str(body.get("item", "")).strip().lower()
@@ -7699,7 +7757,7 @@ def trade_do(request):
                                 hi=CARGO_COUNT_MAX if item.startswith("cargo:") else 999)}
     # At a market's counter the keeper is named, so the tell says who was paid — never
     # the master, who sells nothing (I2).
-    if counter is not None:
+    if counter is not None or carried:
         params["from_" if op == "buy" else "to"] = merchant.ref
     # The haggle, when the screen has offered a partial and the player took it. Only ever
     # lowers what is asked — see `_op_sell`.

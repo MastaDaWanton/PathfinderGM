@@ -40,13 +40,17 @@ def test_the_book_decides_what_a_body_is_worth():
     assert len(set(got)) > 1, "the same body twice is the same purse twice"
 
 
-def test_the_class_scales_it():
-    """incidental is half a standard haul, double is two, triple is three."""
-    scene, _, vine = _scene_with("assassin-vine")      # CR 3, incidental
-    assert treasure.class_of(vine) == "incidental"
-    centre = 800 * 0.5 * treasure.PER_CREATURE         # 100
-    got = [treasure.worth(vine) for _ in range(200)]
-    assert min(got) >= centre * 0.4 and max(got) <= centre * 1.6
+def test_incidental_treasure_is_the_lairs_not_the_bodys():
+    """Playtest 2026-11-20 #17: a clockwork spy, Treasure "incidental (gemstone worth
+    50 gp)", paid 1 platinum piece at the fight's end: 100 gp x 0.5 x 0.25, rolled to 10.
+    The Bestiary's "incidental" is half the standard value "and then only within the
+    confines of its lair" — nothing on the body, as `bestiary._carries_no_coin` reads it."""
+    from rules.dice import Dice
+
+    for template in ("assassin-vine", "clockwork-spy"):
+        scene, _, foe = _scene_with(template)
+        assert treasure.class_of(foe) == "incidental"
+        assert all(treasure.worth(foe, Dice(seed=i)) == 0 for i in range(20)), template
 
 
 def test_a_creature_that_says_none_carries_none():

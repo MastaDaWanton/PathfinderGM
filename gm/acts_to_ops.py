@@ -565,6 +565,18 @@ def _take(row: Row, frame, i, scene, pc, recent=()) -> None:
                      if p.get("act") in ("take", "steal")), None)
         if prev is not None and prev.get("target"):
             source = " ".join(str(prev["target"]).split())
+    # Still nobody named: a thing that is not lying here, carried by the one person the
+    # player is dealing with, comes out of their hands — so `confirm_takes` asks whether
+    # they offered it. Playtest 2026-11-20 #5: "I accept the food" named nobody, and the
+    # food offered never left the carter's pack (nothing on record held it, then).
+    held_from = ""
+    if not source and not coin:
+        ref = addressed(scene)
+        them = (getattr(scene, "actors", {}) or {}).get(ref) if ref else None
+        lying = getattr(scene, "prop_on_the_ground", None)
+        if them is not None and not them.is_pc and holding.carried_by(them, thing) \
+                and not (lying and lying(thing) is not None):
+            held_from = ref
     if source and _mine(source) and not coin and not person(scene, source):
         # Out of the player's own pack, pocket or pouch: what it holds is what they carry,
         # and taking it out moves nothing (playtest 2026-11-17 #18: "take a torch out of my
@@ -616,6 +628,8 @@ def _take(row: Row, frame, i, scene, pc, recent=()) -> None:
         who = person(scene, source) or _counter_keeper(scene)
         if who:
             params["from_"] = who
+    elif held_from:
+        params["from_"] = held_from
     if not coin and "from_" not in params and holding.key_in(pc.goods, thing):
         # Carrying what is already carried: "I take the crate to the counting house"
         # (2026-10-03, turn 73: a second crate came out of the air).

@@ -262,7 +262,10 @@ def test_a_gm_can_hand_over_a_legendary_monster_part(client):
     scene.add(load_pc("fixtures/pc-kesst.json"))
     scene.add(instantiate("thug", scene=scene, name="a wandering trader"))
     engine = Engine(scene, Dice(seed=3))
+    # The GM's own word (`origin` author:) since playtest 2026-11-20 #5: a trader with no
+    # feather on record hands none over to a model's give — nobody offers what they do
+    # not hold.
     engine.run(engine.validate([{
         "op": "give", "actor": "c1", "because": "the trader hands it over",
-        "params": {"to": "pc", "item": "Phoenix Feather", "count": 1}}]))
+        "params": {"to": "pc", "item": "Phoenix Feather", "count": 1}}], origin="author:gm"))
     assert scene.pc().inventory.get("phoenix-feather") == 1

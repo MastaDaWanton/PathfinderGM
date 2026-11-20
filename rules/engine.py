@@ -24528,6 +24528,11 @@ class Engine:
                and here_keeper.ref in self.scene.actors
                and keepers_mod.keeps_a_counter(here_keeper) else "the stallholder")
 
+        # Somebody selling what they carry (a carter's cart): their own goods, once each.
+        if seller and self.scene.actors[seller].has_state(states.SELLS_WHAT_THEY_CARRY) \
+                and not keepers_mod.keeps_a_counter(self.scene.actors[seller]):
+            return self._buy_carried(intent, actor, self.scene.actors[seller], item_id, count)
+
         place = str(self.scene.location_id or "nowhere")
         stall = self._stall_here(intent, seller, want=item_id)
         day = market_mod.day_of(self.scene.clock_minutes)
@@ -24637,6 +24642,53 @@ class Engine:
                  + arrived_tell,
             because=intent.because,
         )
+
+    def _buy_carried(self, intent: Intent, actor, seller, item_id: str, count: int) -> Outcome:
+        """Buy off somebody who sells what they carry (`states.SELLS_WHAT_THEY_CARRY`):
+        the real line moves out of their `goods` and the coin into their purse, at the
+        book's price moved by their own terms (`pricing.seller_percent`). Sold once, never
+        restocked — tbaMUD's `shopping_buy` takes a held object off the keeper with
+        `obj_from_char`, where a shop's "produced" goods are copied for ever. Playtest
+        2026-11-20 #6: the carter's cart had nothing anybody could buy."""
+        from . import pricing
+
+        want = str(item_id).removeprefix("gear:")
+        key = next((k for k, n in seller.goods.items() if int(n or 0) > 0 and (
+            str(getattr(goods.good(k), "id", "")).lower() == str(item_id).lower()
+            or holding.same(k, want))), None) or holding.carried_by(seller, want)
+        good = goods.good(key) if key else None
+        if key not in seller.goods or good is None:
+            on = ", ".join(sorted(str(getattr(goods.good(k), "name", k))
+                                  for k, n in seller.goods.items() if int(n or 0) > 0))
+            return self._refuse(intent, f"{seller.name} has no {want} to sell. Carried: "
+                                        f"{on or 'nothing'}.")
+        if self._will_not_deal(seller):
+            return self._refuse(intent, self._will_not_deal(seller))
+        count = min(max(1, count), int(seller.goods[key]))
+        percent, why = pricing.seller_percent(self.scene, seller)
+        price = tradecraft.buy_price(round(float(good.price_gp) * count, 2), percent)
+        cp = int(round(price * 100))
+        coins = self._coins_here()
+        purse, paid = goods.spend(actor.purse, cp)
+        if not paid:
+            return Outcome(intent_id=intent.id, op="buy", effects=[], because=intent.because,
+                           tell=f"{good.name} is {self._coin_text(price)} and {actor.name} "
+                                f"has {goods.purse_line(actor.purse, coins)}. Nothing "
+                                f"changes hands.")
+        actor.purse = purse
+        seller.purse = goods.credit(seller.purse, cp)
+        seller.goods[key] -= count
+        if seller.goods[key] <= 0:
+            del seller.goods[key]
+        arrived, arrived_tell = goods.deliver(self.scene, actor, good, count)
+        moved = tradecraft.terms_said(seller, percent, why, who=seller.name)
+        return Outcome(
+            intent_id=intent.id, op="buy", because=intent.because,
+            effects=[{"ref": actor.ref, "kind": "bought", "item": good.name, "count": count,
+                      "paid_cp": cp, "from": seller.ref}] + arrived,
+            tell=f"{actor.name} pays {seller.name} {self._coin_text(price)} for "
+                 f"{count}x {good.name}" + (f" ({moved})" if moved else "")
+                 + f". ({goods.purse_line(actor.purse, coins)} left.)" + arrived_tell)
 
     def _buy_spell(self, intent: Intent, actor, item_id: str, seller) -> Outcome:
         """A temple's priest casts a spell on the buyer for the book's fee (rules/services.py).
@@ -29651,31 +29703,9 @@ class Engine:
         return None
 
     def _carried_by(self, holder: Actor, item: str) -> str | None:
-        """The name, as `holder` carries it, of the thing `item` asks for — their goods
-        line, a jar on their shelf, a weapon on their list, or what their own label puts in
-        their hands — or None when they carry nothing it can be. The engine's own lists are
-        the vocabulary; the words are only searched for one of their names
-        (`holding.named_among`), never trusted to name a new thing."""
-        key = holding.key_in(holder.goods, item) or holding.named_among(holder.goods, item)
-        if key:
-            return key
-        shelf = {}
-        for iid, s in (getattr(holder, "stock", None) or {}).items():
-            for n in (getattr(s, "name", ""), getattr(s, "base", ""),
-                      str(iid).split("#")[0].replace("-", " ")):
-                if n:
-                    shelf.setdefault(str(n), str(getattr(s, "name", "") or n))
-        key = holding.key_in(shelf, item) or holding.named_among(shelf, item)
-        if key:
-            return shelf[key]
-        arms = {str(w): str(w) for w in getattr(holder, "weapons", None) or ()
-                if str(w).lower() not in ("unarmed", "improvised")}
-        canon = goods.canonical(item)
-        key = (next((w for w in arms if goods.canonical(w) == canon), None)
-               or holding.named_among(arms, item))
-        if key:
-            return key
-        return holding.label_carries(holder.name, item) or None
+        """The name, as `holder` carries it, of the thing `item` asks for, or None: the one
+        definition is `holding.carried_by`, which the act→op table asks too."""
+        return holding.carried_by(holder, item)
 
     # --- a keeper's counter and till, taken from (playtest 2026-11-15 #7, #14) ---------------
     #
@@ -30515,6 +30545,14 @@ class Engine:
                 # "brunt of the weight" in the pack (2026-10-03: the capital B missed
                 # it, and the drop handed the smith a second one instead).
                 held = giver.goods
+                if not giver.is_pc:
+                    # Their pockets made real first (a kit's claim), then what they carry
+                    # that the words mean: "the food" is the rations in their pack
+                    # (`holding.carried_by`, playtest 2026-11-20 #5).
+                    from .bestiary import collapse_kit
+
+                    collapse_kit(giver)
+                    item = self._carried_by(giver, item) or item
                 key = holding.key_in(held, item) or item
                 item = key
             moved = min(count, int(held.get(key, 0)))
@@ -30572,10 +30610,20 @@ class Engine:
                     giver.equipped = "unarmed"
             if not moved and not giver.is_pc and not denom and (
                     taker is not None or taken_from is not None):
-                # Somebody else's pockets are open the way the world is: the clerk
-                # who slides a pouch across was holding one, whether or not anything
-                # wrote it down (`bestiary.collapse_kit` is the same rule for a body).
-                # Coin is not — a number nobody counted out is not money (law 3).
+                # Nobody hands over what they do not hold: Inform's "can't give what you
+                # haven't got rule", and the owner's (playtest 2026-11-20 #5): "an NPC may
+                # only offer what they hold". Until then somebody else's pockets were
+                # open the way the world is, so the carter's "dried meat and some hard
+                # bread", offered from a pack that held nothing, would have been minted
+                # the moment it was accepted. What their own label puts in their hands
+                # ("the merchant with a heavy pack") is held, on the only record there is.
+                # A document's give (`origin` stamped: a start, the author's cheat) is the
+                # document's word, as `_picked_from_nowhere` holds it.
+                if self._carried_by(giver, item) is None \
+                        and not str(getattr(intent, "origin", "") or ""):
+                    return self._refuse(
+                        intent, f"{giver.name} has no {holding.plain(item) or item} to "
+                                f"hand over: nothing changes hands.")
                 moved = count
             if moved and taken_from is None and taker is not None and not denom:
                 # Handed over: if the giver owned it, it is the taker's now; a thing
