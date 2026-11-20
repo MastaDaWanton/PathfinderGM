@@ -34,7 +34,9 @@ def test_a_search_nothing_answered_is_the_perception_search_of_here():
         [{"op": "narrate_only", "because": "the only ops were aimed at nobody"}],
         SEARCH_AWAY, s)
     assert raw == [{"op": "check", "actor": s.pc().ref,
-                    "params": {"skill": "perception", "search": True},
+                    "params": {"skill": "perception", "search": True,
+                               # fix/hex-sites item 19: the search carries what it names.
+                               "sought": "a different way into the gallery"},
                     "because": "the player searches"}]
 
 

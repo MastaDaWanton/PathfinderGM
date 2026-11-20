@@ -1352,10 +1352,8 @@ _DEMOS = [
          {"span": "try to get loose", "commit": "tried", "way": "either",
           "act": "escape"}]}),
     # Going down on the ground (playtest 2026-11-15 #62): a deed of its own, not a walk.
-    ("I drop to my knees and put my hands behind my head.",
-     {"question": False, "claims": [], "actions": [
-         {"span": "drop to my knees", "act": "prone"},
-         {"span": "put my hands behind my head", "act": "other"}]}),
+    # "Drop to my knees" is shown in the watchman yield below (cut here 2026-11-20 to fit
+    # the reader's budget after three lanes each added a demonstration).
     ("I throw myself flat as the arrows come in, then get back up.",
      {"question": False, "claims": [], "actions": [
          {"span": "throw myself flat as the arrows come in", "act": "prone"},
@@ -1367,9 +1365,9 @@ _DEMOS = [
          {"span": "drop my sword", "object": "my sword", "act": "drop"},
          {"span": "raise my hands and surrender to the guard captain",
           "target": "the guard captain", "act": "surrender"}]}),
-    ("I kneel and tell the watchman I yield and will come quietly.",
+    ("I drop to my knees and tell the watchman I yield and will come quietly.",
      {"question": False, "claims": [], "actions": [
-         {"span": "kneel", "act": "prone"},
+         {"span": "drop to my knees", "act": "prone"},
          {"span": "tell the watchman I yield and will come quietly",
           "target": "the watchman", "act": "surrender"}]}),
     # Living off the land (the owner's report 2026-11-17 #6): water, food and game are
