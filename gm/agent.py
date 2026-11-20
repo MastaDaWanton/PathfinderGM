@@ -1060,7 +1060,12 @@ class GMAgent:
                 # After travel, load-bearing: "go to the forest and forage" must move
                 # first or the forage rolls the old ground's tables.
                 raw = judgement.inject_forage(raw, player_input, self.engine.scene)
-                raw = judgement.inject_prospect(raw, player_input, self.engine.scene)
+                # Not where the reading overruled it: live 2026-11-20, "I search the woods
+                # for my lost silver locket" had the prospect overruled (the "silver" of
+                # the locket is an ore word to `_GATHERS_ORE`), and this put it back — an
+                # hour's dig and two chunks of lead ore for a locket.
+                if "prospect" not in ((read_ok or {}).get("overruled") or ()):
+                    raw = judgement.inject_prospect(raw, player_input, self.engine.scene)
                 # A place somebody named and the player now goes to: founded under the
                 # landmark the speaker gave, then walked into (rules/heard_places.py).
                 # After the within-scene filter, so a walk across the room stays one.

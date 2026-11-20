@@ -184,6 +184,19 @@ DIVERSIONS = ("none", "bluff")
 #   `take`: twenty when the words take 20 or search for as long as it takes, ten when
 #     they take 10, else roll (Taking 10 and Taking 20, CRB p.86).
 SEARCH_WHERE = ("elsewhere", "here")
+# `seeking` since 2026-11-20, the third closed answer of a `search`: what kind of thing its
+# `object` is. The owner's ruling that day: "If I type to search for anything I should be
+# searching for that thing, not tracks. If I look for a river and it tells me there are no
+# tracks this is a bug." #28 of the playtest, "I search the woods for the cave everyone has
+# a story about", was read `where: elsewhere`, which owed no op; the plan rolled a track and
+# a secret-door check, and the page answered about footprints. The engine now answers about
+# the named thing (`Engine._sought`), with its own finders for a person, a place and a
+# thing; `water` is the one kind no finder can ground from the words (a well, a spring, a
+# stream), so the reader names it. Water sought out in the wild is still `fend` (CRB
+# p.107, the owner's 2026-11-17 #6), which waters the party; `seeking: water` is for a
+# search the reader files as one (the town's well). `anything` is a search for whatever is hidden (a
+# hatch, a way down, a trap, somebody hiding) or names nothing at all.
+SEEKING = ("anything", "a person", "a place", "a thing", "water")
 TAKES = ("roll", "ten", "twenty")
 # `until` since 2026-11-01, on `wait` and `rest`: the time of day the words wait or sleep
 # until, as a closed choice the sampler holds. The owner's report that day (Corvin): "wait
@@ -739,6 +752,10 @@ _DEMOS = [
          {"span": "smash the tavern door", "object": "the tavern door", "act": "break_in"}]}),
     ("Is it still raining?",
      {"question": True, "claims": [], "actions": []}),
+    # What a search is for, the closed `seeking` (2026-11-20), is shown on the ledger's
+    # line below; a person-search demonstration ("the charm-seller") was cut to keep the
+    # prompt inside its budget (tests/test_playtest_2026_11_17_reader_budget.py). Water
+    # sought out in the wild stays `fend` (the 2026-11-17 #6 demonstration).
     ("I find somewhere dry to shelter and sleep until first light.",
      {"question": False, "claims": [], "actions": [
          {"span": "find somewhere dry to shelter", "object": "somewhere dry to shelter",
@@ -897,7 +914,7 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "turn the whole loft over looking for the missing ledger",
           "object": "the missing ledger", "place": "the whole loft", "where": "here",
-          "act": "search"}]}),
+          "seeking": "a thing", "act": "search"}]}),
     # Taking 20 (CRB p.86), the closed `take` (2026-11-16). Not a test line.
     ("I go over the chapel floor slab by slab, as long as it takes, for a hidden hatch.",
      {"question": False, "claims": [], "actions": [
@@ -1443,7 +1460,8 @@ def per_act_schema() -> dict:
                  # Where a search is, and whether it takes 10 or 20 (`SEARCH_WHERE`,
                  # `TAKES`), after the words, as `pace`.
                  **({"where": {"type": "string", "enum": list(SEARCH_WHERE)},
-                     "take": {"type": "string", "enum": list(TAKES)}}
+                     "take": {"type": "string", "enum": list(TAKES)},
+                     "seeking": {"type": "string", "enum": list(SEEKING)}}
                     if act == "search" else {}),
                  # Until what time of day (`UNTILS`), after the time slot's own words.
                  **({"until": {"type": "string", "enum": list(UNTILS)}}
@@ -1513,7 +1531,8 @@ def _demo_reply(frame: dict) -> str:
                          "diversion": a.get("diversion") or DIVERSIONS[0]}
                         if a["act"] == "stealth" else {}),
                      **({"where": a.get("where") or SEARCH_WHERE[0],
-                         "take": a.get("take") or TAKES[0]}
+                         "take": a.get("take") or TAKES[0],
+                         "seeking": a.get("seeking") or SEEKING[0]}
                         if a["act"] == "search" else {}),
                      **({"until": a.get("until") or UNTILS[0]}
                         if a["act"] in UNTIL_ACTS else {}),
@@ -1659,6 +1678,9 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
             take = str(a.get("take") or "").strip().lower()
             if take in TAKES and take != TAKES[0]:
                 kept["take"] = take
+            seeking = str(a.get("seeking") or "").strip().lower()
+            if seeking in SEEKING and seeking != SEEKING[0]:
+                kept["seeking"] = seeking
         if kept["act"] in UNTIL_ACTS:
             # The enum's or nothing, kept only when it names something (`UNTILS`). Outside
             # it (a hosted provider, a remembered frame) the time slot's words are read

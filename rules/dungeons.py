@@ -219,20 +219,33 @@ def is_room(place) -> bool:
     return getattr(place, "origin", "") == ORIGIN
 
 
-def on_entering(world, scene, head: dict, kind: str, spot_ids: list[str]) -> dict:
+def on_entering(world, scene, head: dict, kind: str, spot_ids: list[str], *,
+                site: bool = False) -> dict:
     """The venture's roll, made on every entry and the same each time; the way down
-    marked on the head's saved record on a hit. The record of the roll (hidden)."""
+    marked on the head's saved record on a hit. The record of the roll (hidden).
+
+    A hex `site` (the ruins spotted on the Region map, `Engine._is_hex_site`) always
+    holds its dungeon, its way in at the site's own head. Playtest 2026-11-20 #1: the
+    ruins in the forest hex were this venture door's bare head and two spots, the 20%
+    way down missed, the 50% inhabitant missed, and five searches found nothing. The
+    traditions key a hex site whole: Ultimate Campaign's hex holds a site that is
+    "never 'nothing'", the Alexandrian keys one location per hex, and Kingmaker's sites
+    are written rooms and lairs; so the site IS a dungeon (rooms, its concept's
+    inhabitants, traces and treasure), seeded off the head, the same every visit. At the
+    head, because that is where the party arrives and searches: a feature in a child
+    spot the player never walks to is a site nobody finds."""
     holds = fits(kind)
     got = {"kind": "way_down", "rolled": 0, "chance": 0, "holds": False}
     if not holds:
         return got
-    got["chance"] = chance(world, head["id"], head.get("parent", ""))
+    got["chance"] = 100 if site else chance(world, head["id"], head.get("parent", ""))
     got["rolled"] = rolled(head["id"])
     got["holds"] = got["rolled"] <= got["chance"]
     if got["holds"] and "deeper" not in head:
         feat = feature_of(head["id"], kind)
         want = places_mod.child_id(head["id"], feat["spot"])
-        spot = want if want in spot_ids else (spot_ids[-1] if spot_ids else head["id"])
+        spot = (head["id"] if site else want if want in spot_ids
+                else (spot_ids[-1] if spot_ids else head["id"]))
         # The concept is chosen here, before any room exists: the owner's "cohesive
         # story/pattern" is what the rooms are then built from (`mint`).
         head["deeper"] = {"kind": kind, "feature": feat, "spot": spot,

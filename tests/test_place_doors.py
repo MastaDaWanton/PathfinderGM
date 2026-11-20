@@ -195,10 +195,15 @@ def test_venturing_moves_the_party_and_costs_the_hours():
     assert "you have been inside it before" in again.tell
 
 
-def test_an_unknown_kind_of_ground_is_refused_with_the_kinds_named():
+def test_an_unknown_kind_of_ground_is_refused_without_listing_kinds_not_here():
+    """Playtest 2026-11-20 #45: the refusal listed every kind ("The kinds are: alley,
+    cave, cellar…"), and the table voice offered "a cellar or a crawlspace" in the ruins
+    as leads that were not there. The planner's prompt holds the kinds; the page names
+    none."""
     s, engine = _room()
     out = _run(engine, "venture", {"kind": "moon"})
-    assert _refused(out) and "sewers" in out.tell
+    assert _refused(out) and "moon" in out.tell
+    assert "sewers" not in out.tell and "cellar" not in out.tell
 
 
 # --- what the player's words declare -----------------------------------------------------------

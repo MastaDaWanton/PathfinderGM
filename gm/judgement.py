@@ -6450,6 +6450,24 @@ def go_to_heard_place(raw_intents, player_text: str, scene, known=(), reading=No
     if landmark is not None:
         params["parent"] = landmark.name
     core = re.sub(r"^the\s+", "", rec["name"].lower())
+    kind = heard_places.venture_kind(rec, scene, landmark) if landmark is not None else ""
+    if kind:
+        # A rumoured way in is ground gone into off its landmark, by the venture door
+        # that seeded the rumour's own head (rules/dungeons.py `spread_rumours`): a
+        # `found` made "the old mine" a mine head building beside it, with no way down
+        # (playtest 2026-11-20 #2). The plan's own found and travel to it go.
+        out = [r for r in raw_intents if not (
+            isinstance(r, dict) and str(r.get("op", "")).lower() in ("found", "travel")
+            and core in str((r.get("params") or {}).get("name")
+                            or (r.get("params") or {}).get("place") or "").lower())]
+        if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "venture"
+               for r in out):
+            return out
+        went = {"op": "venture", "params": {"kind": kind, "parent": landmark.id},
+                "because": f"the player went to {rec['name']}, which they had heard of"}
+        if pc is not None:
+            went["actor"] = pc.ref
+        return out + [went]
     out, travelled = [], False
     for r in raw_intents:
         if not isinstance(r, dict):
