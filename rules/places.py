@@ -1856,8 +1856,17 @@ def _out_in_a_hex(founded, at: str, stepping=()) -> tuple[Place, ...]:
     if cell is None or cell.exits:
         return ()
     # Another hex is twelve miles off and reached by the map's move, never a word's walk of
-    # minutes; the ones up the chain from here stay (the way out of a site).
-    up = up_from(docs, at)
+    # minutes; the chain up from here stays (the way out of a site) as far as the hex stood
+    # in and no further: a hex is filed under the one it was walked from, and past it the
+    # forest hex twelve miles back was "a few minutes' walk" (integration check 2026-11-20).
+    parents = _parent_ids(docs)
+    up: set[str] = set()
+    pid = str(at or "")
+    while pid and pid not in up:
+        up.add(pid)
+        if pid == cell.id:
+            break
+        pid = parents.get(pid, "")
     return with_founded((), [m for m in docs if m.origin != "hex" or m.id in up
                              or m.id in stepping], at)
 

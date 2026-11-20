@@ -352,6 +352,26 @@ def test_out_and_back_leaves_no_parent_loop_and_the_site_can_be_left(worlds, qui
         assert _enter(e).status == "resolved"
 
 
+def test_the_hex_you_came_from_is_not_a_walk_of_minutes(worlds, quiet_road, monkeypatch):
+    """Integration live check 2026-11-20, the owner's save: out of the ruins to the
+    grassland hex, the exits still listed the forest hex twelve miles back as "a few
+    minutes' walk" and the ruins, gate and courtyard as a quarter and half an hour. The
+    grassland hex is filed under the forest hex, and the chain up from where the party
+    stands ran past its own hex into the last one. The chain stops at the hex stood in."""
+    s, e, pc = _party(worlds)
+    monkeypatch.setattr(e, "_inhabit", lambda *a, **k: ([], ""))
+    g = e.hex_world()
+    to = _site_beside(e, g)
+    _move(e, to, face=20)
+    assert _enter(e).status == "resolved"
+    other = next(h for h in hexes.neighbours(*to) if g.cell(*h)["land"]
+                 and not g.cell(*h)["town"])
+    assert _move(e, other).status == "resolved"
+    for p in e.places():
+        h = hexes.parse_place(p.id)
+        assert h is None or tuple(h) == tuple(other), (p.id, p.name)
+
+
 def test_a_saved_loop_is_cut_on_load_and_its_places_stay_reachable():
     """The owner's save (2026-11-20 #3) holds the loop already; the load cuts it at its
     oldest member and the chain from the site still reaches both hexes."""
