@@ -123,7 +123,11 @@
   "buildDevice::tabHref": "DEVICE_IMG_BASE + a constant file name",
   "param:brass.id": "the one call is brass(`dvbrass${g.i}`, ...): a gear's index from deviceGears()"
  },
+ "play/static/js/table/24-map-zoom.js": {
+  "turnTo::MAP_REDRAW3D()": "Scene3D.render's SVG (scene3d.js), the same board renderMap draws; every name in it goes through scene3d's own esc()"
+ },
  "play/static/js/table/03-offers-and-map.js": {
+  "renderMap::svg": "Scene3D.render's SVG (scene3d.js, every name through its own esc()) or this function's own flat board, whose interpolations the guard reads line by line",
   "renderMap::sym": "FX_SYMBOL, a constant table",
   "renderMap::turn": "a rotation in degrees from fxRot, a constant table, or 0/90",
   "renderMap::lv": "only \"dim\" or \"dark\": the loop draws only wash's own keys",

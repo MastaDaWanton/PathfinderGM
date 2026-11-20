@@ -27,7 +27,7 @@ from django.test import Client, override_settings
 
 from rules import casting
 from rules.sheet import from_dict, load_pc, to_dict
-from tests._exits_dom import PRELUDE, TABLE
+from tests._exits_dom import PRELUDE, TABLE, board_names
 
 
 # --- the server: one post, a move and a cast ---------------------------------------------
@@ -144,7 +144,7 @@ def _run_page(tmp_path, steps: str) -> dict:
     turns = turns[:turns.index("/* ---- The full character sheet")]
     spells = (TABLE / "10-spells.js").read_text(encoding="utf-8")
     f =tmp_path / "probe.js"
-    f.write_text(PRELUDE + _COMBAT_PRELUDE + turns + "\n" + spells + "\n" + steps,
+    f.write_text(PRELUDE + _COMBAT_PRELUDE + board_names() + turns + "\n" + spells + "\n" + steps,
                  encoding="utf-8")
     done = subprocess.run(["node", str(f)], capture_output=True, text=True,
                           encoding="utf-8")

@@ -27,14 +27,15 @@
  * `dice3d.js` uses against the same LIGHT vector — one ambient term, one diffuse, one
  * tight specular. Turn the board and the lit wall stays the wall facing the light.
  *
- * ROTATION IS FOUR FIXED QUARTER-TURNS, and that is a decision rather than a shortcut.
- * Firaxis chose the same for XCOM: a fixed camera with 90-degree steps, specifically
- * against the disorientation a free camera causes over a tactical map. Their own
- * postmortem records cutting visualised sight lines after months of iteration because the
- * lines became "tough for the player to determine what was going on" — legibility is what
- * kills a tactical 3D view, not frame rate. The camera is a real basis now, so free
- * rotation is three lines away; it stays refused for the reason above, not for want of
- * the maths.
+ * ROTATION IS FREE (2026-11-20), and it was four fixed quarter-turns until then. That was a
+ * decision with XCOM behind it (Firaxis's fixed steps, cut for legibility), and the owner
+ * reversed it from the table: "things standing between walls cannot be seen", and four
+ * angles do not always include one that sees between two walls (playtest 2026-11-20 #8).
+ * XCOM's own players reached for the same thing: the first mod on its Nexus is Free Camera
+ * Rotation, and it kept a fixed step beside the free one, as this does: the Turn buttons
+ * still go to the next quarter-turn, and a right-drag, a two-finger twist or Q/E turn the
+ * board to any angle (js/table/24-map-zoom.js). `turn` is a real number of quarter-turns.
+ * docs/research/2026-11-20-battle-board.md has the sources and what was refused.
  *
  * WHAT IT DRAWS AND WHAT IT REFUSES TO INVENT. Everything comes from the geometry payload
  * `play/views.py::_grid_state` already sends — blocked, difficult, obscuring, floor,
@@ -101,12 +102,15 @@
   var DOWN = [R2 * SIN, R2 * SIN, -COS];      // and up on the board is up on the screen
   var TOWARD = cross(RIGHT, DOWN);            // the viewer: above the far corner
 
-  // A quarter-turn of the board about its origin. Applied to points AND to normals, so a
-  // wall that faces the light keeps facing it while the board turns under it.
+  // The board turned `q` quarter-turns about its origin, any real q. Applied to points AND
+  // to normals, so a wall that faces the light keeps facing it while the board turns under
+  // it. At a whole q this is exactly the old swap, (a, b) to (b, -a) per turn: the sine and
+  // cosine are snapped, or a quarter-turn's 6e-17 would wobble the depth sort's ties.
   function turned(p, q) {
-    var a = p[0], b = p[1], t;
-    for (var i = 0; i < (q & 3); i++) { t = a; a = b; b = -t; }
-    return [a, b, p[2]];
+    var t = q * Math.PI / 2, c = Math.cos(t), s = Math.sin(t);
+    if (Math.abs(c) < 1e-9) c = 0;
+    if (Math.abs(s) < 1e-9) s = 0;
+    return [p[0] * c + p[1] * s, p[1] * c - p[0] * s, p[2]];
   }
 
   // A world point to screen pixels, and how near the viewer it is.
@@ -327,7 +331,7 @@
      what should read across the room.
 
      Every piece is a closed convex solid, so a face turned away from the camera is
-     hidden by its own front at every quarter-turn — marked `cull` and never drawn,
+     hidden by its own front at every angle — marked `cull` and never drawn,
      which halves what a figure costs the depth sort. Returns the figure's top. */
   function figure(out, cx, cy, z, s, form, down, mat, cls, baseCls, tip, sits) {
     var start = out.length;
@@ -823,12 +827,13 @@
   /* Draw the whole board.
    *
    * `g` is the grid payload verbatim; `actors` is the scene's actor list, each with `at`.
-   * `opts.turn` is 0-3, `opts.level` the floor being looked at, `opts.reach` whether to
+   * `opts.turn` is quarter-turns, any real number (4 is one full turn), `opts.level` the
+   * floor being looked at, `opts.reach` whether to
    * light the squares the PC can reach.
    */
   function render(g, actors, opts) {
     opts = opts || {};
-    var turn = (opts.turn || 0) & 3;
+    var turn = (((opts.turn || 0) % 4) + 4) % 4;
     var level = opts.level || 0;
     var W = g.width, H = g.height;
     ROOF = g.ceiling || null;
@@ -1323,7 +1328,7 @@
      * carrying the same `data-sq`, so a move can still be queued onto the floor behind
      * a gallery. Both are
      * worked out from the projected faces after the sort, so they hold at every
-     * quarter-turn and agree with the painter's order by construction. */
+     * angle and agree with the painter's order by construction. */
     var masses = faces.filter(function (f) {
       // A figure hides a figure behind it too (plan item 2: only walls ghosted what they
       // hid, so a goblin behind the ogre simply vanished). Its plate never hides anything.
@@ -1466,20 +1471,16 @@
       }).join("") + '"/>';
     });
 
-    // The viewBox is measured from the projected corners rather than guessed, so a map of
-    // any size at any rotation fills the frame without clipping. Measured to the board's
-    // own tallest thing, where the first version always reserved four levels of air.
-    var xs = [], ys = [];
-    [0, W].forEach(function (cx) {
-      [0, H].forEach(function (cy) {
-        [0, tallest].forEach(function (cz) {
-          var p = project([cx, cy, cz], turn); xs.push(p[0]); ys.push(p[1]);
-        });
-      });
-    });
+    // The viewBox is measured, not guessed, to the board's own tallest thing, where the
+    // first version always reserved four levels of air. Since rotation is free it is the
+    // box of the circle the board turns inside, the same size at every angle: measured from
+    // the corners, the frame (and so the Fit zoom) would grow and shrink by 41% as a square
+    // board turned from a diamond to a square. At a quarter-turn a square board's circle box
+    // is exactly the old corners' box, because the diamond's width is its diagonal.
+    var mid = project([W / 2, H / 2, 0], turn), rad = Math.sqrt(W * W + H * H) / 2 * UNIT;
     var pad = 10;
-    var x0 = Math.min.apply(null, xs) - pad, y0 = Math.min.apply(null, ys) - pad;
-    var w = Math.max.apply(null, xs) - x0 + pad, h = Math.max.apply(null, ys) - y0 + pad;
+    var x0 = mid[0] - rad - pad, y0 = mid[1] - rad * SIN - tallest * COS * UNIT - pad;
+    var w = 2 * (rad + pad), h = mid[1] + rad * SIN + pad - y0;
     return '<svg id="view3d" viewBox="' + x0.toFixed(1) + " " + y0.toFixed(1) + " " +
       w.toFixed(1) + " " + h.toFixed(1) + '" preserveAspectRatio="xMidYMid meet"><defs>' +
       Object.keys(defs).map(function (k) { return defs[k]; }).join("") +
@@ -1489,8 +1490,8 @@
 
   /* For js/table/24-map-zoom.js: a point on the board (squares, on the floor) to this
      view's SVG units, and back. Zoom keeps its centre as a point on the board, so it holds
-     the same spot through a quarter-turn and across Flat and 3D. */
-  function toUser(bx, by, q) { return project([bx, by, 0], q & 3); }
+     the same spot through any turn and across Flat and 3D. */
+  function toUser(bx, by, q) { return project([bx, by, 0], q); }
   function toBoard(u, v, q) {
     // project() at z = 0 is linear in (x, y); invert its 2 x 2 matrix.
     var o = project([0, 0, 0], q), ex = project([1, 0, 0], q), ey = project([0, 1, 0], q);

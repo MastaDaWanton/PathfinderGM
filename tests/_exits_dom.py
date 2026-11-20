@@ -78,6 +78,14 @@ function done(obj) {
 """
 
 
+def board_names() -> str:
+    """03's own `sqCol` and `sqName`, which 04 prints squares with (playtest 2026-11-20
+    #9), for a harness that loads 04 without the board."""
+    board = (TABLE / "03-offers-and-map.js").read_text(encoding="utf-8")
+    names = board[board.index("function sqCol(c)"):]
+    return names[:names.index("}\n", names.index("function sqName(")) + 2]
+
+
 def exits_state(fighting: bool, awaiting=None) -> dict:
     """An arena next door, a gate shut for the wanted, and a road that is a journey."""
     return {"awaiting": awaiting, "ended": False, "scene": {
