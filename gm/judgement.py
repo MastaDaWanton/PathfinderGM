@@ -5233,6 +5233,43 @@ def keep_movement_in_the_scene(raw_intents, player_text: str, scene, known=(),
     return out
 
 
+def out_of_the_venture(raw_intents, scene, places, location=None, reading=None) -> list:
+    """Read as leaving a venture, the walk goes out of it: the travels that stay inside it
+    become the one walk to the place it opens off (`interpret.travel_choices`, the only
+    choice its enum offers).
+
+    Playtest 2026-11-20 #3, live on the fix: "I leave the ruins" was read `leave, place:
+    the ruins` and planned as travels to the gate and then the courtyard, both inside the
+    ruins; the enum that would have held it rides in a `contains`, which the sampler does
+    not enforce (memory: ollama-schema-enforcement). The reading is the engine's, and with
+    one way out there is nothing to guess, so the travel is rewritten, not asked again."""
+    from rules import places as places_mod
+
+    from . import interpret
+
+    if not isinstance(raw_intents, list) or not isinstance(reading, dict) \
+            or "error" in reading or scene is None:
+        return raw_intents
+    if interpret._going(reading, scene, places, location) != "venture":
+        return raw_intents
+    way = interpret.travel_choices(reading, scene, places, location)
+    by_id = {p.id: p for p in places or ()}
+    head = places_mod.venture_head(places, by_id.get(getattr(scene, "at", "")))
+    if len(way) != 1 or head is None:
+        return raw_intents
+    out, done = [], False
+    for r in raw_intents:
+        if isinstance(r, dict) and str(r.get("op", "")).lower() == "travel":
+            target = places_mod.find(places, str((r.get("params") or {}).get("place") or ""))
+            if target is None or places_mod.venture_head(places, target) == head:
+                if done:
+                    continue
+                r = {**r, "params": {**(r.get("params") or {}), "place": way[0]}}
+            done = True
+        out.append(r)
+    return out
+
+
 def refuse_leaving_in_place(raw_intents, player_text: str, scene, world=None,
                             reading=None, attached=()) -> list:
     """Told to leave, the model may not name the room the party is standing in.

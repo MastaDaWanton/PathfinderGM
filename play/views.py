@@ -4712,8 +4712,16 @@ def _ask_the_gm(c, engine, question: str) -> str:
     # The place the party stands in is the default subject of a question that names
     # nobody: "who guards the gate" found a town called Dustgate; the gate meant was this
     # one. A proper name with hits is the one case the notes are left out.
+    # Out on a hex of open ground, or in its site, "here" is not the town the hex is filed
+    # under: playtest 2026-11-20 #11, in the ruins twelve miles out, the town's notes
+    # grounded the answer and its footer said "Some of what the town keeps". A question
+    # that names the town still finds it through `hits`.
+    from rules import hexes as hexes_mod
+
+    out_on_a_hex = hexes_mod.parse_place(str(c.scene.at or "")) is not None
     notes = (gm_search.dossier(c.world, c.location, question, allow=allow)
-             if not crafts and (here or not hits or not gm_search.proper_noun(question))
+             if not crafts and not out_on_a_hex
+             and (here or not hits or not gm_search.proper_noun(question))
              else "")
     if not hits and not found and not here and not crafts:
         unknown = gm_search.unfiled(c.world, question)
@@ -4726,7 +4734,11 @@ def _ask_the_gm(c, engine, question: str) -> str:
     if c.location is not None and notes:
         kept += [k for k, _t in gm_search.withheld_from(
             dict(getattr(c.location, "facts", {}) or {}), allow)]
-    for h in hits:
+    # Out on a hex, a question that names nothing is about the ground underfoot: the search's
+    # loose matches (live 2026-11-20 in the ruins: "the Salt Fever", the world itself, a
+    # stranger's secret) are not what was asked about, and their withheld facts printed the
+    # town's footer twelve miles from any town (#11).
+    for h in (hits if not out_on_a_hex or gm_search.proper_noun(question) else ()):
         kept += [k for k, _t in gm_search.withheld_from(h.facts or {}, allow)]
     withheld_note = ""
     # Only when the question was about the world: a named thing found (`hits`) or the place
@@ -4741,6 +4753,12 @@ def _ask_the_gm(c, engine, question: str) -> str:
             withheld_note = ("\n  — There is more here your character wouldn't know yet. "
                              "Say the word (\"tell me anyway\") if you want it, or find "
                              "it out in play: ask around (Diplomacy, an hour or four).")
+        elif out_on_a_hex:
+            # Gather Information is "canvassing people at local taverns, markets, and
+            # gathering places" (CRB, Diplomacy): there are none out here.
+            withheld_note = ("\n  — Some of what is known about that, your character has "
+                             "not learned. Ask around in a town: Diplomacy, an hour or "
+                             "four, and it can be tried again.")
         else:
             withheld_note = ("\n  — Some of what the town keeps, your character has not "
                              "learned. Ask around in play: Diplomacy, an hour or four, "

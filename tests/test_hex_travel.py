@@ -307,3 +307,144 @@ def test_a_spotted_site_in_your_hex_opens_through_the_venture_door(worlds, quiet
     assert hexes.in_site(s.at, to)
     assert e.party_hex(g) == to
     assert s.hexes["touched"][hexes.key(*to)].get("explored")
+
+
+# --- playtest 2026-11-20 -------------------------------------------------------------------
+
+def _site_beside(e, g):
+    to = next((h for h in e.hex_reach(g) if hexes.site_of(g, *h)), None)
+    if to is None:
+        pytest.skip("no site beside this town")
+    return to
+
+
+def _enter(e):
+    r = e.run(e.validate([{"op": "hex_enter", "actor": "pc", "params": {}}]))
+    return [o for o in r.outcomes if o.op == "venture"][0]
+
+
+def test_out_and_back_leaves_no_parent_loop_and_the_site_can_be_left(worlds, quiet_road,
+                                                                     monkeypatch):
+    """Playtest 2026-11-20 #3: out to the grassland hex and back left the forest and the
+    grassland hexes each other's parent, and seven hex moves from inside the ruins, every
+    direction, were refused "There is no <raw id> here to go to" with the town's whole list.
+    Out of the site hex and back, then into the site: every way on leaves it."""
+    from rules import places as places_mod
+
+    s, e, pc = _party(worlds)
+    monkeypatch.setattr(e, "_inhabit", lambda *a, **k: ([], ""))
+    g = e.hex_world()
+    to = _site_beside(e, g)
+    _move(e, to, face=20)
+    other = next(h for h in hexes.neighbours(*to) if g.cell(*h)["land"]
+                 and not g.cell(*h)["town"])
+    _move(e, other)
+    _move(e, to, face=20)
+    for d in s.founded:
+        assert d["id"] not in places_mod.up_from(s.founded, d.get("parent", "")), d["id"]
+    assert _enter(e).status == "resolved"
+    for h in e.hex_reach(g):
+        out = _move(e, h)
+        assert out.status == "resolved", out.tell
+        assert "~" not in out.tell and ":@" not in out.tell
+        assert e.party_hex(g) == h
+        _move(e, to, face=20)
+        assert _enter(e).status == "resolved"
+
+
+def test_a_saved_loop_is_cut_on_load_and_its_places_stay_reachable():
+    """The owner's save (2026-11-20 #3) holds the loop already; the load cuts it at its
+    oldest member and the chain from the site still reaches both hexes."""
+    from rules import places as places_mod
+
+    founded = [{"id": "t~forest:@hex-1-1", "parent": "t~grassland:@hex-2-1"},
+               {"id": "t~grassland:@hex-2-1", "parent": "t~forest:@hex-1-1"},
+               {"id": "t~ruins:@hex-1-1/the-ruins", "parent": "t~forest:@hex-1-1"}]
+    assert places_mod.break_parent_loops(founded) == ["t~forest:@hex-1-1"]
+    assert founded[0]["parent"] == "" and places_mod.break_parent_loops(founded) == []
+    assert places_mod.up_from(founded, "t~ruins:@hex-1-1/the-ruins") == {
+        "t~ruins:@hex-1-1/the-ruins", "t~forest:@hex-1-1"}
+
+
+def test_the_move_reads_as_a_day_and_says_each_find_once(worlds, quiet_road):
+    """Playtest 2026-11-20 #4: the consequence block was the place doc ("You are at the
+    forest 12 miles east of Branford now. The forest 12 miles east of Branford: Open
+    forest, ..., in Faerholt March."), the look a bare "(27)", nothing of the day, and the
+    walk back repeated "broken walls show here". Now: ground, bearing and the day's parts,
+    the roll shown as a roll, and a find said once."""
+    s, e, pc = _party(worlds)
+    g = e.hex_world()
+    to = _site_beside(e, g)
+    first = _move(e, to, face=20)
+    assert "You are at" not in first.tell
+    assert "Open " + g.cell(*to)["ground"] not in first.tell
+    assert "You set out" in first.tell and "Perception d20 20" in first.tell
+    other = next(h for h in hexes.neighbours(*to) if g.cell(*h)["land"]
+                 and not g.cell(*h)["town"])
+    _move(e, other, face=20)
+    back = _move(e, to, face=20)
+    said = hexes.SEEN_FROM_AFAR[hexes.site_of(g, *to)["kind"]]
+    assert said not in back.tell
+    assert hexes.found_before(hexes.site_of(g, *to)["kind"]) in back.tell
+
+
+def test_the_site_in_your_own_hex_is_no_hours_away(worlds, quiet_road):
+    """Playtest 2026-11-20 #10: "The ruins open off the forest ..., 2 hours away" for the
+    site in the hex the party stood in. The hex's hours were the walk to it."""
+    s, e, pc = _party(worlds)
+    g = e.hex_world()
+    to = _site_beside(e, g)
+    _move(e, to, face=20)
+    clock = s.clock_minutes
+    out = _enter(e)
+    assert out.status == "resolved" and "away" not in out.tell
+    assert s.clock_minutes - clock < 60
+
+
+def test_from_a_site_out_in_the_wild_the_town_is_not_a_minute_away(worlds, quiet_road,
+                                                                   monkeypatch):
+    """Playtest 2026-11-20 #3, live on the fix: "I leave the ruins" was planned as a travel
+    to the outskirts and walked from a hex twelve miles out to the town in "a few minutes'
+    walk"; the refusals listed the town's well and market from inside the ruins. Out in a
+    hex, the places are that hex and what hangs off it; the way out of a site is its hex."""
+    s, e, pc = _party(worlds)
+    monkeypatch.setattr(e, "_inhabit", lambda *a, **k: ([], ""))
+    g = e.hex_world()
+    to = _site_beside(e, g)
+    if g.cell(*to)["town"]:
+        pytest.skip("the site hex is a town's")
+    _move(e, to, face=20)
+    town = {p.id for p in e._ring(e.world.get(s.location_id), "")}
+    assert _enter(e).status == "resolved"
+    known = {p.id for p in e.places()}
+    assert not known & town
+    hex_id = hexes.place_doc(g, to[0], to[1], "")["id"]
+    assert hex_id in e.here().exits
+    out = e.run(e.validate([{"op": "travel", "actor": "pc",
+                             "params": {"place": hex_id}}])).outcomes[-1]
+    assert out.status == "resolved" and s.at == hex_id
+
+
+def test_leaving_a_site_by_words_walks_out_of_it_not_deeper_in(worlds, quiet_road,
+                                                                 monkeypatch):
+    """Playtest 2026-11-20 #3, live on the fix: "I leave the ruins" (read `leave, place:
+    the ruins`) was planned as travels to the gate and the courtyard, inside the ruins; the
+    place enum sits in a `contains` the sampler does not enforce. With one way out the
+    plan's travels become the one walk to the hex the site opens off."""
+    from gm import judgement
+
+    s, e, pc = _party(worlds)
+    monkeypatch.setattr(e, "_inhabit", lambda *a, **k: ([], ""))
+    g = e.hex_world()
+    to = _site_beside(e, g)
+    _move(e, to, face=20)
+    assert _enter(e).status == "resolved"
+    places = e.places()
+    head = e.here()
+    inner = [p.name for p in places if p.parent == head.id]
+    raw = [{"op": "travel", "actor": "pc", "params": {"place": n}} for n in inner[:2]]
+    frame = {"actions": [{"act": "leave", "place": head.name, "span": "leave"}]}
+    out = judgement.out_of_the_venture(raw, s, places, e.world.get(s.location_id),
+                                       reading=frame)
+    hex_name = hexes.place_doc(g, to[0], to[1], "")["name"]
+    assert [r["params"]["place"] for r in out] == [hex_name]

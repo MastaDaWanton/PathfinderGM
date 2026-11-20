@@ -1057,6 +1057,10 @@ class GMAgent:
                                                         self.engine.scene, self.world,
                                                         reading=reading,
                                                         attached=getattr(self, "attachments", ()))
+                # And a departure from a venture walks out of it, not deeper in.
+                raw = judgement.out_of_the_venture(raw, self.engine.scene,
+                                                   self.engine.places(), location,
+                                                   reading=reading)
                 # After travel, load-bearing: "go to the forest and forage" must move
                 # first or the forage rolls the old ground's tables.
                 raw = judgement.inject_forage(raw, player_input, self.engine.scene)
@@ -2509,6 +2513,9 @@ class GMAgent:
         # from the way in" was written and cut as fire from nowhere — the guard read the
         # place's brief and the earlier beats, never this turn's tells.
         told = [str(getattr(o, "tell", "") or "") for o in outcomes or ()] + list(facts or ())
+        # And any name the engine's own tells this turn used: the narrator was fed it
+        # (playtest 2026-11-20 #12, "6× Glow Mote" in the tell was un-named on the page).
+        extra = extra | narration_mod.established_names(told, minimum=1)
         if rewrite and whole_rewrite:
             text, p_repairs, p_attempts = self.polish(
                 text, earlier=earlier, min_chars=min_chars, max_chars=max_chars,

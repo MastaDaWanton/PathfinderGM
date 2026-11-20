@@ -3259,6 +3259,9 @@ class Engine:
         # tell read "You are at the cave now. The fight is left behind. Left behind:
         # wolf. The road is not empty: a wolf is on it, and it has seen you."
         self._hours_underway: dict[str, int] = {}
+        # A hex step's arrival (`_op_hex_move`): its own tell says the day, so `travel`
+        # leaves out the ground, "You are at", the place doc and the time it took.
+        self._hex_quiet: set[str] = set()
 
     # --- Checks 2 and 3 -------------------------------------------------------------
 
@@ -14935,7 +14938,8 @@ class Engine:
                                     terrain_hint=self._terrain_hint(found),
                                     founded=self.scene.founded,
                                     ring=self._ring(found, self.scene.at),
-                                    moored=self.moored_here())
+                                    moored=self.moored_here(),
+                                    stepping=tuple(getattr(self, "_hex_quiet", ())))
 
     def moored_here(self) -> tuple[str, ...]:
         """The ships lying at this town's quay that the party may simply walk aboard: one
@@ -16171,9 +16175,17 @@ class Engine:
                 # "I say I will go there now, and ask him to point the way". The
                 # legality check now names the fix at validate time, where the model
                 # can act on it; this is the floor for anything that slips past.
+                # A name, never an id (refs never on the page), and the short list from
+                # where the party stands, not every place of the town: playtest
+                # 2026-11-20 #3 printed a hex's raw id and the town's 25 places from
+                # inside the ruins 12 miles away.
+                if "~" in place or ":@" in place:
+                    rec = next((d for d in self.scene.founded if d.get("id") == place), None)
+                    place = str((rec or {}).get("name") or "that place")
+                reach = self._reachable_words()
                 return self._refuse(
-                    intent, f"There is no {place} here to go to. From here you can "
-                            f"reach {', '.join(p.name for p in known)}.")
+                    intent, f"There is no {place} here to go to."
+                            + (f" From here you can reach {reach}." if reach else ""))
             if going_to.described_only:
                 return self._refuse(
                     intent, f"{going_to.name} can be seen from here but not reached.")
@@ -16895,7 +16907,7 @@ class Engine:
                 bits.append(f"You go aboard {name}.")
             else:
                 bits.append("You step ashore.")
-        elif going_to.terrain != was_ground:
+        elif going_to.terrain != was_ground and going_to.id not in self._hex_quiet:
             bits.append(f"The ground changes: {biomes.describe(going_to.terrain).lower()}.")
         if went_by:
             # The places the walk actually crossed, said as fact. The narrator is asked
@@ -16915,7 +16927,7 @@ class Engine:
         # engine's own words: nobody was brought in, and "you walk on" is said so the
         # prose cannot make a stop of it.
         bits.extend(s for s in passing_said if s)
-        if moved:
+        if moved and going_to.id not in self._hex_quiet:
             bits.append(f"You are at {going_to.name} now.")
             from . import dungeons as dungeons_mod
 
@@ -16959,7 +16971,7 @@ class Engine:
                            if land.beyond else "")
                 bits.append(f"Past the last house the land opens: {close}{further}.")
         spent = minutes + (far_walked + walked_back) * 60
-        if moved and spent:
+        if moved and spent and going_to.id not in self._hex_quiet:
             from . import geography
 
             bits.append(f"It takes {geography.walk_words(spent)}.")
@@ -17065,9 +17077,8 @@ class Engine:
     # How many places the bare "where to?" names before it says how many more there are.
     WHERE_TO_SHOWN = 8
 
-    def _where_to(self) -> str:
-        """The refusal for a walk with nowhere in it: a short list of where to, never the
-        whole map.
+    def _reachable_words(self) -> str:
+        """Where the party can walk to, as words: a short list, never the whole map.
 
         Owner report 2026-11-01 (Corvin, turns 33 and 35): "go" and "go to the town" were
         each refused with sixty names — every upper floor and undercroft, the smithy the
@@ -17099,10 +17110,17 @@ class Engine:
         shown = [p.name for p in ordered[:self.WHERE_TO_SHOWN]]
         more = len(ordered) - len(shown)
         if not shown:
-            return "Nobody moves: there is nowhere else to go from here."
+            return ""
         tail = f", or one of {more} other places" if more > 0 else ""
-        return (f"Nobody moves: where to? From here you can reach {', '.join(shown)}{tail}. "
-                f"Name the place.")
+        return f"{', '.join(shown)}{tail}"
+
+    def _where_to(self) -> str:
+        """The refusal for a walk with nowhere in it: a short list of where to, never the
+        whole map (`_reachable_words`)."""
+        reach = self._reachable_words()
+        if not reach:
+            return "Nobody moves: there is nowhere else to go from here."
+        return f"Nobody moves: where to? From here you can reach {reach}. Name the place."
 
     def _mark_the_walk_cut(self, pc, cut: bool, meant_place: str, meant_for: str,
                            refs: list[str], kind: str) -> None:
@@ -18018,9 +18036,15 @@ class Engine:
         if spec.get("source") != "ingredients" and table_of(len(foraging.WEIGHT)).empty:
             # A refusal: no hour is spent and nothing is rolled (filed `resolved` until
             # 2026-11-01, with the forage's other refusal above).
+            # The place stood in, by its name: the ground's description read as a place
+            # ("no stones for foci in barrows, battlefields and cursed ground", playtest
+            # 2026-11-20 #12), and "holds no" spares "there are no ore".
+            here = self.here()
+            where = (here.name if here.terrain == biome
+                     else f"ground like this ({biomes.describe(biome).lower()})")
             return self._refuse(
-                intent, f"{actor.name} looks, and there are no {spec['what']} in "
-                        f"{biomes.describe(biome).lower()} to find.")
+                intent, f"{actor.name} looks, and {where} {english.verb(where, 'holds', 'hold')}"
+                        f" no {spec['what']} to find.")
 
         hours = max(1, int(intent.params.get("hours", 1) or 1))
         dc = gathering.dc_for(spec, biome)
@@ -18114,10 +18138,12 @@ class Engine:
         spoiled = [h["wrecked"] for h in result["hourly"] if h.get("wrecked")]
         if spoiled:
             many = len(spoiled) != 1
-            tell += (f" {len(spoiled)} hour{'s' if many else ''} came to nothing but a "
-                     f"spoiled {spoiled[0]}." if fresh else
-                     f" {len(spoiled)} hour{'s' if many else ''} came to nothing but "
-                     f"{spoiled[0]} broken up and lost in the getting.")
+            # One template, the name lower-cased behind "the": "came to nothing but Water
+            # broken up and lost in the getting" (playtest 2026-11-20 #12).
+            lost = str(spoiled[0]).lower()
+            tell += (f" {len(spoiled)} hour{'s' if many else ''} came to nothing: the "
+                     f"{lost} {english.verb(lost, 'was', 'were')} "
+                     + ("spoiled in the picking." if fresh else "spoiled in the getting."))
         if toll.checks:
             tell += f" It cost them: {survival_note(toll)}"
         if worked < hours:
@@ -18670,7 +18696,7 @@ class Engine:
         if parent is None:
             return self._refuse(
                 intent, f"There is no {intent.params.get('parent')} here to found it off. "
-                        f"From here you can reach {', '.join(p.name for p in known)}.")
+                        f"From here you can reach {self._reachable_words() or 'nowhere else'}.")
         there = places_mod.find(known, name)
         if there is not None:
             # Bobby's turns 6 and 7: "I walk to the nearest crossroads" planned a `found`
@@ -21140,15 +21166,21 @@ class Engine:
         tells: list[str] = []
         effects: list[dict] = []
         if hexes.in_site(self.scene.at or ""):
-            # Up out of the hex's site first, to the hex itself, the way the party went in.
+            # Up out of the hex's site first, to the hex itself, the way the party went in:
+            # said as coming out, not as a second arrival (playtest 2026-11-20 #4).
             up = hexes.place_doc(g, here[0], here[1], "")["id"]
-            walked = self._op_travel(Intent(
-                op="travel", actor=pc.ref, because=intent.because, params={"place": up},
-                visibility="hidden", id=intent.id, origin=intent.origin,
-                origin_name=intent.origin_name), {})
+            site_name = self.here().name
+            self._hex_quiet.add(up)
+            try:
+                walked = self._op_travel(Intent(
+                    op="travel", actor=pc.ref, because=intent.because, params={"place": up},
+                    visibility="hidden", id=intent.id, origin=intent.origin,
+                    origin_name=intent.origin_name), {})
+            finally:
+                self._hex_quiet.discard(up)
             if walked.status == "refused":
                 return walked
-            tells.append(walked.tell)
+            tells.append(f"You come out of {site_name}. {walked.tell}".strip())
             effects.extend(walked.effects)
             self._journeyed = ""
         elif places_mod.setting_of(self.scene.at or "") != "outside":
@@ -21157,10 +21189,16 @@ class Engine:
             out = next((p for p in ring if p.name == outskirts_mod.OUTSKIRTS), None)
             if out is None:
                 return self._refuse(intent, "There is no way out of here onto open ground.")
-            walked = self._op_travel(Intent(
-                op="travel", actor=pc.ref, because=intent.because, params={"place": out.id},
-                visibility="hidden", id=intent.id, origin=intent.origin,
-                origin_name=intent.origin_name), {})
+            # Passed through, not arrived at: no "You are at the outskirts" and its doc
+            # ahead of the day's own lines (#4).
+            self._hex_quiet.add(out.id)
+            try:
+                walked = self._op_travel(Intent(
+                    op="travel", actor=pc.ref, because=intent.because,
+                    params={"place": out.id}, visibility="hidden", id=intent.id,
+                    origin=intent.origin, origin_name=intent.origin_name), {})
+            finally:
+                self._hex_quiet.discard(out.id)
             if walked.status == "refused":
                 return walked
             tells.append(walked.tell)
@@ -21170,6 +21208,8 @@ class Engine:
         hours = 0
         for step in path:
             cell = g.cell(*step)
+            was = g.cell(*stop)
+            set_out = self.scene.clock_minutes
             doc = hexes.place_doc(g, step[0], step[1], parent=self.scene.at or "")
             if cell["town"] and self.world is not None:
                 ring = self._ring(self.world.get(cell["town"]), "")
@@ -21179,8 +21219,11 @@ class Engine:
             held = next((d for d in self.scene.founded if d.get("id") == doc["id"]), None)
             if held is None:
                 self.scene.founded.append(doc)
-            else:
+            elif doc["id"] not in places_mod.up_from(self.scene.founded, doc["parent"]):
                 # Walked into from wherever the party stands now: the parent is the way back.
+                # Never under a place that already hangs off it (playtest 2026-11-20 #3: out
+                # to the grassland and back left the two hexes each other's parent, and the
+                # party trapped in the ruins); a hex up the chain is in the set already.
                 held["parent"] = doc["parent"]
             hours = hexes.hours_through(cell["ground"])
             if rides:
@@ -21188,6 +21231,7 @@ class Engine:
             toll = survival.pass_hours(pc, hours, self.dice, biome=cell["ground"])
             self.scene.advance(max(1, toll.hours) * survival.MINUTES_PER_HOUR, charge_body=False)
             self._hours_underway[doc["id"]] = hours
+            self._hex_quiet.add(doc["id"])
             try:
                 moved = self._op_travel(Intent(
                     op="travel", actor=pc.ref, because=intent.because,
@@ -21196,17 +21240,27 @@ class Engine:
                     origin_name=intent.origin_name), {})
             finally:
                 self._hours_underway.pop(doc["id"], None)
+                self._hex_quiet.discard(doc["id"])
             self._journeyed = ""
             if moved.status == "refused":
                 if stop == here:
                     return self._refuse(intent, moved.tell)
                 break
-            tells.append(moved.tell)
+            # The day told the way a GM tells a vector of travel (the Alexandrian,
+            # "Hexcrawl Addendum: Describing Travel"): ground, distance and time first, the
+            # cost, then what was seen. The place doc `travel` would add ("Open forest, 12
+            # miles east of Branford, in Faerholt March") is left out: on the 0.4.4 page it
+            # was the whole consequence block and the narrator named the forest after the
+            # nation in it (playtest 2026-11-20 #4).
             tells.append(f"{english.number(hours).capitalize()} "
-                         f"hour{'s' if hours != 1 else ''} through the {cell['ground']}"
-                         + (", riding." if rides else " on foot."))
+                         f"hour{'s' if hours != 1 else ''} "
+                         + ("riding " if rides else "on foot ")
+                         + hexes.bearing((was["x"], was["y"]), (cell["x"], cell["y"]))
+                         + f" through the {cell['ground']}, to {doc['name']}. "
+                         + hexes.day_said(set_out, self.scene.clock_minutes))
             if toll.checks:
                 tells.append(f"The way cost them: {survival_note(toll)}")
+            tells.append(moved.tell)
             effects.extend(moved.effects)
             if self.scene.at != doc["id"]:
                 break
@@ -21230,26 +21284,40 @@ class Engine:
         if stop != here:
             sp = g.cell(*stop)
             seen_lines: list[str] = []
+            known_here = ""
             for h in [stop] + hexes.neighbours(*stop):
                 self._hex_touched(h)["searched"] = self.scene.clock_minutes
                 site = hexes.site_of(g, *h)
                 if site is None:
                     continue
+                first = hexes.key(*h) not in spotted
+                if not first and h == stop:
+                    # Found before, and it is where the party can go in: said once, short.
+                    known_here = hexes.found_before(site["kind"])
                 if look.total < site["dc"] + (hexes.OWN_HEX_DC if h == stop else 0):
                     continue
-                first = hexes.key(*h) not in spotted
                 spotted[hexes.key(*h)] = site["kind"]
-                other = g.cell(*h)
-                where = "here" if h == stop else "to the " + hexes.bearing(
-                    (sp["x"], sp["y"]), (other["x"], other["y"]))
-                seen_lines.append(f"{hexes.SEEN_FROM_AFAR[site['kind']]} {where}")
                 effects.append({"kind": "spotted", "q": h[0], "r": h[1], "site": site["kind"],
                                 "first": first, "origin": "rule:hex-look"})
+                if not first:
+                    # Seen before: the board shows it and the page does not say it again
+                    # (#4: the walk back repeated "broken walls show here" word for word).
+                    continue
+                other = g.cell(*h)
+                where = ("in this hex itself" if h == stop else "to the " + hexes.bearing(
+                    (sp["x"], sp["y"]), (other["x"], other["y"])))
+                seen_lines.append(f"{hexes.SEEN_FROM_AFAR[site['kind']]} {where}")
+            # The roll shown the way every other roll is, never a bare total (#4).
+            shown = f"Perception d20 {look.raw}{look.modifier_total:+d} = {look.total}"
             if seen_lines:
-                tells.append(f"Looking over the land ({look.total}): "
+                tells.append(f"Looking over the land ({shown}): "
                              + "; ".join(seen_lines) + ".")
+            elif spotted:
+                tells.append(f"Looking over the land ({shown}), nothing new stands out.")
             else:
-                tells.append(f"Looking over the land ({look.total}), nothing stands out.")
+                tells.append(f"Looking over the land ({shown}), nothing stands out.")
+            if known_here:
+                tells.append(known_here)
         tell = " ".join(t for t in tells if t).strip() + (xp_line or "")
         return Outcome(intent_id=intent.id, op="hex_move", rolls=[look], effects=effects,
                        tell=tell, because=intent.because)
@@ -21312,7 +21380,7 @@ class Engine:
         if parent is None:
             return self._refuse(
                 intent, f"There is no {intent.params.get('parent')} here to go in from. "
-                        f"From here you can reach {', '.join(p.name for p in known)}.")
+                        f"From here you can reach {self._reachable_words() or 'nowhere else'}.")
         # You go in from where you are standing. `_parent_place` resolves a NAME against
         # every place in the settlement, and this op then moves the party to whatever it
         # found — so a venture was a way to cross the whole town and go underground in
@@ -21370,6 +21438,13 @@ class Engine:
             fresh = False
         spec = places_mod.VENTURES[kind]
         hours = int(spec["hours"])
+        from . import hexes as hexes_mod
+
+        if hexes_mod.parse_place(parent.id) is not None and not hexes_mod.in_site(parent.id):
+            # The site in the hex the party stands in: the hex's own hours were the walk to
+            # it (UC Exploration costs travel per hex; a landmark is found on entering).
+            # Playtest 2026-11-20 #10 read "the ruins open off the forest..., 2 hours away".
+            hours = 0
         toll_note = ""
         if hours:
             toll = survival.pass_hours(actor, hours, self.dice, biome=head.terrain)
