@@ -306,8 +306,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # `demand` (2026-11-15): what a threat demands (`morale.DEMANDS`), the reader's closed
     # answer about the player's words (`acts_to_ops._threaten`); read by Intimidate's two
     # uses, Influence Attitude and Demoralize (`Engine._cowed`, `Engine._demoralize`).
+    # `wants` (2026-11-20): what a favour asks for, in the player's own words (the reader's
+    # `object`, `acts_to_ops._request`), said in the request's tell (`Engine._make_request`).
     "check": (("skill",), ("dc", "opposed_by", "circumstance", "aid", "request", "search",
-                           "pace", "diversion", "past", "demand", "take"),
+                           "pace", "diversion", "past", "demand", "take", "wants"),
               "player"),
     "save": (("save", "dc"), ("on_success", "on_failure", "breaks"), "player"),
     # `player`, because the PC rolls their own to-hit and their own damage. Defaulting
@@ -830,7 +832,7 @@ PARAM_ALIASES = {
 # printed question; `not_here` is the world's answer for a person the player looked for
 # who is not here, which the engine prints instead of anybody being created (item 29).
 CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "looks_in", "defending", "request", "job",
-                              "demand",
+                              "demand", "wants",
                               "ends_when", "pace", "diversion", "past", "together",
                               # A held player's save (`Engine.held_save_turn`) names the
                               # hold it ends; honoured only with an engine origin.

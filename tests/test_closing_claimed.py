@@ -131,7 +131,9 @@ def test_through_the_real_door_the_beat_reaches_the_page_without_the_claim(monke
     text, attempt = gm.narrate_outcome("", res.outcomes, "Clockwork Spy acts",
                                        rewrite=False, acting="Clockwork Spy")
     assert "landing right before you" not in text
-    assert text.endswith("The Clockwork Spy is still 10 feet from you.")
+    # With the walk the cut took (playtest 2026-11-20 #86: the creature's move kept).
+    assert text.endswith("The Clockwork Spy comes 30 feet closer and is still 10 feet "
+                         "from you.")
     assert "closing claimed" in attempt.note
 
 

@@ -1320,10 +1320,20 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
             # the same tell were never told — 14% of the diagnosis's baseline errors: 7 of 7
             # runs of the declared punch, 2 of 7 of the declared cruelty. Re-asked with this
             # shape, 8 of 8 carried the warrant (0 of 4 before).
-            first = ("the player squares up to them from where they stand: nobody moves, "
-                     "no blow lands and nobody is hurt yet" if not moved else
-                     "the player closes and squares up to them: no blow lands and nobody "
-                     "is hurt yet")
+            # A walk of the player's in another act of this turn has its own slot: the
+            # squaring-up says nothing of moving then. Playtest 2026-11-20 #97, "I move to
+            # A14 and strike the clockwork spy": "preparing to strike from your current
+            # position. You move across the ground…" — "nobody moves", then the move.
+            walks_later = not moved and any(
+                getattr(o, "op", "") in ("move", "travel")
+                and str(getattr(o, "actor", "") or "") in {me, "pc"} - {""}
+                for o in outcomes or ())
+            first = ("the player closes and squares up to them: no blow lands and nobody "
+                     "is hurt yet" if moved else
+                     "the player squares up to them: no blow lands and nobody is hurt yet"
+                     if walks_later else
+                     "the player squares up to them from where they stand: nobody moves, "
+                     "no blow lands and nobody is hurt yet")
             rest = [str(e["told"]) for o in act for e in (getattr(o, "effects", None) or [])
                     if isinstance(e, dict) and e.get("told")]
             moment = [first, *dict.fromkeys(rest)]
@@ -1402,10 +1412,19 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
         if room:
             want = FACT_CEILING
             must = list(dict.fromkeys([*must, *room]))
+        # What came of it, read back after the slot is written (`_came_out`): the act and not
+        # its result was the owner's complaint of 2026-11-20 (#7). Not a declared fight or a
+        # refusal (their own asks), not the player's own words (the answer is the reply's),
+        # and not a walk alone, whose arrival is the walk.
+        result = ""
+        if not declared and not refused and i != spoken_at and not all(
+                getattr(o, "op", "") in ("move", "travel", "say") for o in act):
+            result = " ".join(beat_verify.tell_premises(tells))
         slots.append({"key": f"fact{i + 1}",
                       "want": want,
                       "say": say, "tells": tells, **({"not_own": theirs} if theirs else {}),
                       **({"must_tell": must} if must else {}),
+                      **({"outcome": result} if result else {}),
                       **({"verbatim": spoken, "typed": player_input}
                          if spoken.strip() else {})})
         employer = next((e.get("employer") for o in act
@@ -2060,7 +2079,8 @@ def write(engine, *, brief: str, outcomes, player_input: str, who: tuple,
         _write_slots(out, plan, slots, who, last_plain or last_beat, lift, check, goal, job,
                      suggest=not acting and not player_dead(engine), before=before,
                      told=getattr(faith, "second", None) if faith is not None else None,
-                     known=known)
+                     known=known,
+                     came=getattr(faith, "came", None) if faith is not None else None)
     except Exception as exc:
         # The calls made before the failure, for the turn log beside the free beat.
         exc.calls = list(out.calls)
@@ -2384,6 +2404,35 @@ def _all_told(out: Planned, plan, slots, i, written, who, s: dict, text: str, to
     return text2 if better else text
 
 
+def _came_out(out: Planned, plan, slots, i, written, who, s: dict, text: str, came, *,
+              final: bool, lift) -> str:
+    """An act slot read back for whether it says how the act came out (`came(text,
+    result)`, `beat_verify.outcome_told`), and on "only the attempt" asked once more with the
+    result named. The remake stands only when it is read as telling it; otherwise the first
+    answer does — a false alarm costs one call, never a sentence.
+
+    Playtest 2026-11-20, the owner: "I had another turn that tells me what I did without
+    telling me how the world responded and asks again what do I do." An omission
+    contradicts nothing, so the tells check never sees it (docs/research/
+    2026-11-20-empty-turns.md)."""
+    result = s["outcome"]
+    told = came(text, result)
+    if told is not False:
+        if told is None:
+            out.notes.append(f'the "{s["key"]}" slot: whether it said what came of it was '
+                             f"not answered — left as written")
+        return text
+    redo = (f"You wrote: {text!r}. It shows only the attempt. Say what came of it, as the "
+            f"engine decided: {result} Write it again with the outcome told.")
+    text2, _data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
+                         core=False, redo=redo)
+    fixed = bool(text2) and came(text2, result) is True
+    out.calls[-1]["note"] = "outcome named" + ("" if fixed else " — still only the attempt")
+    out.notes.append(f'the "{s["key"]}" slot showed only the attempt — asked again, '
+                     + ("told" if fixed else "first answer kept"))
+    return text2 if fixed else text
+
+
 # A bracketed aside of an engine line: "(Escape Artist)", "(a combat manoeuvre)".
 _BRACKETED = re.compile(r"\s*\([^()]*\)")
 
@@ -2672,7 +2721,7 @@ def _opens_a_sentence(line: str) -> str:
 
 def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,
                  goal=None, job=None, *, suggest: bool = True, before: str = "",
-                 told=None, known=None) -> None:
+                 told=None, known=None, came=None) -> None:
     # `before`: what this turn already put on the page ahead of the slots (a companion's
     # wind-up), shown to every slot as written so far and never written again.
     written: list[str] = [before.strip()] if before and before.strip() else []
@@ -2767,6 +2816,9 @@ def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,
                                    final=final, lift=lift, core=core)
         if s.get("must_tell") and told is not None:
             text = _all_told(out, plan, slots, i, written, who, s, text, told,
+                             final=final, lift=lift)
+        if s.get("outcome") and came is not None:
+            text = _came_out(out, plan, slots, i, written, who, s, text, came,
                              final=final, lift=lift)
         if s.get("not_own") and goal is not None:
             text = _not_their_goal(out, plan, slots, i, written, who, s, text, goal,

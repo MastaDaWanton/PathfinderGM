@@ -4592,6 +4592,57 @@ def second_on_tell(sentence: str, tell: str, who: str = "", *, chat=None, model:
                    provider=provider, api_key=api_key)
 
 
+# --- did the passage say how it came out (playtest 2026-11-20 #7) ---------------------------
+#
+# An omission contradicts nothing, so the tells check cannot see a beat that shows the act and
+# drops its result ("You scan the surrounding ruins, searching for a different way into the
+# gallery. What do you do?"). Inform's action rules end in a report stage that "tells the
+# player what has happened" (Writing with Inform §12.2); this is that stage, checked. Probed
+# 2026-11-20 (gemma-4-12B heretic, temp 0): `second_on_tell` asked with the whole tell passed
+# 3 of 4 attempt-only passages as "tells it" — the tell's attempt half matches them; this read,
+# the result first and two answers, scored 14 of 15 labelled pairs (6 of 6 attempt-only
+# caught, one false alarm on an eat). docs/research/2026-11-20-empty-turns.md.
+OUTCOME_ANSWERS = ("says how it came out", "only the attempt")
+_OUTCOME_SYSTEM = (
+    "A game engine resolved what the player's character did and decided how it came out: "
+    "the RESULT, which is true. Read the PASSAGE that tells the turn. \"You\" is the "
+    "player's character, named in the result. Answer \"says how it came out\" when the "
+    "passage tells what came of it, in any words: it worked or failed, what was or was not "
+    "found, where they ended up, what the other person did, said or agreed. Answer \"only "
+    "the attempt\" when the passage shows them trying, setting about it, reaching for it or "
+    "on their way, and never says what came of it.")
+# Synthetic, one name nobody plays.
+_OUTCOME_DEMOS = (
+    ("RESULT (the player's character is Mira Holt): Mira Holt searches the cellar and finds "
+     "nothing.\n\nPASSAGE: You run your hands along the damp cellar walls, feeling for any "
+     "loose stone.", "only the attempt"),
+    ("RESULT (the player's character is Mira Holt): Mira Holt searches the cellar and finds "
+     "nothing.\n\nPASSAGE: You run your hands along the damp walls, but the stones are solid "
+     "and hide nothing.", "says how it came out"),
+    ("RESULT (the player's character is Mira Holt): Mira Holt asks the smith for a favour: a "
+     "look at his ledger. The smith agrees to it.\n\nPASSAGE: You lean on the counter and ask "
+     "the smith whether you might see his ledger.", "only the attempt"),
+    ("RESULT (the player's character is Mira Holt): Mira Holt moves 30 ft, up onto the loft."
+     "\n\nPASSAGE: You climb the ladder and step out onto the loft.", "says how it came out"),
+)
+
+
+def outcome_told(passage: str, result: str, who: str = "", *, chat=None, model: str = "",
+                 host: str = "", provider: str = "ollama", api_key: str = "") -> bool | None:
+    """Whether `passage` says how the engine's `result` came out (True), or shows only the
+    attempt (False); None when the read went unanswered (the caller leaves the slot)."""
+    user = ("RESULT" + (f" (the player's character is {who})" if who else "")
+            + f": {result}\n\nPASSAGE: {passage}")
+    msgs = [{"role": "system", "content": _OUTCOME_SYSTEM}]
+    for demo_user, demo_answer in _OUTCOME_DEMOS:
+        msgs += [{"role": "user", "content": demo_user},
+                 {"role": "assistant", "content": json.dumps({"answer": demo_answer})}]
+    msgs.append({"role": "user", "content": user})
+    said = _one_of(msgs, list(OUTCOME_ANSWERS), chat=chat, model=model, host=host,
+                   provider=provider, api_key=api_key)
+    return None if said is None else said == OUTCOME_ANSWERS[0]
+
+
 def against_tells(text: str, tells, *, who: str = "", only=None, chat=None,
                   model: str = "", host: str = "", provider: str = "ollama",
                   api_key: str = "", speaker: str = "") -> TellsRead:
@@ -4696,13 +4747,16 @@ _BEYOND_SYSTEM = (
     "the moment. \"You\" is the player's character, named in the facts. For EACH numbered "
     "sentence answer:\n"
     "- \"reacts\" when it only reacts: a feeling, an opinion, a joke, a question to the "
-    "player, or advice on what they might try or will have to do — it states nothing about the world or about "
-    "what anyone did;\n"
+    "player, or advice on what they might try or will have to do — it states nothing about "
+    "the world or about what anyone did, and names nothing that is not in the facts;\n"
     "- \"from a fact\" when what it states about the world or a deed is said by a fact, in "
     "any words;\n"
     "- \"adds\" when it states something about the world, a place, a people, a person or "
-    "what anyone did, that no fact says.\n"
-    "For \"adds\" copy the sentence's own words that state the new thing.\n"
+    "what anyone did, that no fact says — and when a question or a piece of advice points at "
+    "a thing, a place, a way in or something hidden that no fact says is there (\"anything "
+    "in those barrels?\", \"try the trapdoor\", \"listen for something under the "
+    "floor\").\n"
+    "For \"adds\" copy the sentence's own words that state or point at the new thing.\n"
     "Also answer \"attack\": \"yes\" when the sentence speaks of, praises or reacts to "
     "an attack, a shot, a blow or a throw (\"Nice shot\", \"Good hit\"), else \"no\".")
 _BEYOND_DEMO_USER = (
@@ -4715,8 +4769,10 @@ _BEYOND_DEMO_USER = (
     "2. There's no ferryman for you to hire here.\n"
     "3. The river guild keeps every boat on the far bank.\n"
     "4. You slipped on the wet moss and scraped your knee.\n"
-    "5. You'll have to find another way across, so maybe ask around for a boat.\n"
-    "6. Nice throw, right on target.")
+    "5. You'll have to find another way across, so maybe ask around.\n"
+    "6. Nice throw, right on target.\n"
+    "7. Anything in those sacks by the wall catch your eye?\n"
+    "8. Maybe try the cellar door instead.")
 _BEYOND_DEMO_ANSWER = {
     "1": {"verdict": "reacts", "words": "", "attack": "no"},
     "2": {"verdict": "from a fact", "words": "", "attack": "no"},
@@ -4725,7 +4781,11 @@ _BEYOND_DEMO_ANSWER = {
     "4": {"verdict": "adds", "words": "You slipped on the wet moss and scraped your knee",
           "attack": "no"},
     "5": {"verdict": "reacts", "words": "", "attack": "no"},
-    "6": {"verdict": "reacts", "words": "", "attack": "yes"}}
+    "6": {"verdict": "reacts", "words": "", "attack": "yes"},
+    # A lead posed as a question or a tip (playtest 2026-11-20 #9, #45, #48: crates that
+    # were never there, "a cellar or a crawlspace", "listening beneath the stones").
+    "7": {"verdict": "adds", "words": "those sacks by the wall", "attack": "no"},
+    "8": {"verdict": "adds", "words": "the cellar door", "attack": "no"}}
 
 
 def beyond_schema(n_sentences: int) -> dict:
