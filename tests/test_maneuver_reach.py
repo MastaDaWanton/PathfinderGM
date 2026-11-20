@@ -395,8 +395,12 @@ def test_the_panel_says_which_square_to_click_and_shows_no_json(panel):
     said = r.json()["error"]
     assert "15 ft away" in said and "Click square" in said
     assert "{" not in said and '"op"' not in said
-    got = re.search(r"Click square (\d+),(\d+)", said)
-    square = [int(got.group(1)), int(got.group(2))]
+    # The square by the board's own name (playtest 2026-11-20 #9), read back by the
+    # engine's own reader of those names.
+    from rules import fixtures
+
+    got = re.search(r"Click square ([A-Z]+[0-9]+)", said)
+    square = list(fixtures.square_said(scene.grid, got.group(1)))
     # And doing what it says works: the panel's own move-and-strike list.
     r = _post(client, [{"op": "move", "params": {"zone": "near", "square": square}},
                        {"op": "attack", "target": "c1", "params": {}}])
@@ -428,7 +432,9 @@ def test_a_move_and_strike_that_cannot_land_is_refused_before_anything_moves(pan
                        {"op": "attack", "target": "c1", "params": {}}])
     assert r.status_code == 400, r.json()
     said = r.json()["error"]
-    assert f"From square {away[0]},{away[1]}" in said and "Nothing was done" in said
+    from rules.fixtures import square_name
+
+    assert f"From square {square_name(away)}" in said and "Nothing was done" in said
     assert tuple(cm.current().scene.positions["pc"]) == start, "the move never walked"
     # A square the page was told reaches him is let through.
     near = reach["c1"][0]
