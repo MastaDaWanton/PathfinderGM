@@ -972,7 +972,29 @@ def known_to(engine, ref: str) -> list[str]:
     if notes and notes != " ".join(str(block.get("notes") or "").split()):
         out.append(f"About {name}, what they know of themselves and this place: {notes}")
     return (out + _ship_known(engine, ref, name) + _places_known(engine, name)
-            + _goods_known(engine, a, name) + _sword_known(engine, a, name))
+            + _goods_known(engine, a, name) + _sword_known(engine, a, name)
+            + _carried_known(a, name))
+
+
+def _carried_known(a, name: str) -> list[str]:
+    """What this person has on them, the engine's record, so an offer names only real
+    things: playtest 2026-11-20 #5, the carter offered "dried meat and some hard bread" from
+    a pack that held nothing, and accepting it fed the player her own rations. A keeper's
+    wares are on the counter (ON DISPLAY), so an empty pocket is not said of them; nor of a
+    body whose pockets are still a kit's claim (`bestiary.collapse_kit`)."""
+    from rules import goods, keepers
+
+    held = {k: int(n or 0) for k, n in (getattr(a, "goods", None) or {}).items()
+            if int(n or 0) > 0}
+    if held:
+        things = ", ".join(
+            (f"{n} × " if n != 1 else "") + str(getattr(goods.good(k), "name", "") or k)
+            for k, n in sorted(held.items()))
+        return [f"{name} has on them, and can offer, hand over or sell only these: "
+                f"{things}."]
+    if keepers.keeps_a_counter(a) or getattr(a, "kit_pending", None):
+        return []
+    return [f"{name} has nothing on them to offer or hand over."]
 
 
 def _sword_known(engine, a, name: str) -> list[str]:

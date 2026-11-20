@@ -582,8 +582,8 @@ challenge ask for a bout or duel, or a place in an arena's bout
 buy       buy, order, shop for, browse wares, pay for goods; the object is the goods
 sell      sell, offer for sale, agree a sale, accept a price, close a deal
 give      hand over, pay a debt or a fee, buy somebody a drink
-take      pick up, take, tip or count out of a container; the target is the
-          person or the container it comes out of
+take      pick up, take, accept a gift, tip or count out of a container;
+          the target is the person or the container it comes out of
 drop      put down, set down, drop or leave a thing behind
 steal     pick a pocket, steal, filch
 loot      loot, strip, search or go through the body or belongings of somebody or some
@@ -968,6 +968,12 @@ _DEMOS = [
           "says": "Long night, friend?", "act": "talk"}]}),
     # Things moving, the shapes the owner's items save misread. Out of a container, the
     # container is the take's target; set down is `drop`, never a give to the nearest.
+    # Accepting a thing offered is taking it from whoever offers it, never eating or using
+    # it: playtest 2026-11-20 #5, "I accept the food" (a carter's) came back `consume`, and
+    # the player ate her own trail rations. Written in no world's words.
+    ("I accept the pie.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "accept the pie", "object": "the pie", "act": "take"}]}),
     ("I shake the silver out of the sack into my purse and set the empty sack down by "
      "the door.",
      {"question": False, "claims": [], "actions": [
