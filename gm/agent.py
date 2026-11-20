@@ -1202,6 +1202,10 @@ class GMAgent:
                 # walk names (`acts_to_ops.travel_named`).
                 raw = acts_to_ops.travel_named(raw, read_ok, self.engine.places(),
                                                notes=own_words)
+                # And a search the settle left as nothing is the search of here, never a
+                # narrated attempt with no answer (playtest 2026-11-20 #50).
+                raw = acts_to_ops.search_unanswered(raw, read_ok, self.engine.scene,
+                                                    notes=own_words)
                 # A thing the plan reaches for that nothing records is asked about once,
                 # of the passages the player read here (gm/scenery.py): shown, or loose in
                 # any place of this kind, it is ledgered before the engine looks for it;
@@ -4474,6 +4478,10 @@ class GMAgent:
             # first (`planned._tells_kept`).
             faith.second = lambda sentence, tell: beat_verify.second_on_tell(
                 sentence, tell, who_pc, **route)
+            # And each act slot for whether it says what came of it (`planned._came_out`,
+            # playtest 2026-11-20 #7).
+            faith.came = lambda passage, result: beat_verify.outcome_told(
+                passage, result, who_pc, **route)
 
         try:
             beat = planned.write(

@@ -291,9 +291,12 @@ act for the player's character.
 # now handed the job of its moment, and the examples are labelled with theirs, so the
 # demonstration and the request have the same shape.
 JOBS = {
+    # "point at another way if there is an obvious one" was answered "Try looking for a
+    # different way in, like a cellar or a crawlspace" over ruins that held neither
+    # (playtest 2026-11-20 #45): only a way the moment or the scene names.
     "refused": "Something the player tried did not happen. Tell them plainly why, using "
-               "the reason in the MOMENT, and point at another way if there is an obvious "
-               "one. Do not praise the attempt.",
+               "the reason in the MOMENT, and point at another way only if the MOMENT or "
+               "THE SCENE names one. Do not praise the attempt.",
     "you_down": "The player's character is down. Make the danger felt. No jokes.",
     "bend": "You gave a bonus or a penalty for how it was done. Say why, in a few words.",
     "fight_starts": "A fight has started. Make the stakes felt in a few words.",
@@ -569,7 +572,7 @@ def _log(c, row: dict) -> None:
 
 def _held_to_the_tells(agent, ask, msgs, line: str, said: str, premises: list[str], pc,
                        allowed: str, recent: list[str],
-                       attacked: bool | None = None) -> tuple[str, str, bool]:
+                       attacked: bool | None = None, story: str = "") -> tuple[str, str, bool]:
     """(line, why, remade): the line read against the turn's tells and the scene, as the
     narrator's beat is (`beat_verify.against_tells`, the same first read) — and on a clash,
     asked once more with the fact it breaks named, read again, and dropped if it still
@@ -591,7 +594,7 @@ def _held_to_the_tells(agent, ask, msgs, line: str, said: str, premises: list[st
     read = beat_verify.against_tells(strip_gestures(line), premises, who=who, **route)
     if not read.clashes:
         return _nothing_past_the_facts(ask, msgs, line, said, premises, who, route,
-                                       allowed, recent, attacked)
+                                       allowed, recent, attacked, story)
     c0 = read.clashes[0]
     mend = (f'"{c0.words}" is not true: {c0.tell} Say it again so that it agrees with '
             f"that, and add nothing the MOMENT does not say.")
@@ -606,13 +609,14 @@ def _held_to_the_tells(agent, ask, msgs, line: str, said: str, premises: list[st
     if beat_verify.against_tells(strip_gestures(line2), premises, who=who, **route).clashes:
         return "", f"contradicts the engine twice: {c0.words}", True
     line3, why, _ = _nothing_past_the_facts(ask, msgs, line2, again, premises, who, route,
-                                            allowed, recent, attacked)
+                                            allowed, recent, attacked, story)
     return line3, why, True
 
 
 def _nothing_past_the_facts(ask, msgs, line: str, said: str, premises: list[str], who: str,
                             route: dict, allowed: str, recent: list[str],
-                            attacked: bool | None = None) -> tuple[str, str, bool]:
+                            attacked: bool | None = None,
+                            story: str = "") -> tuple[str, str, bool]:
     """(line, why, remade): the line read for a world fact or a deed that no tell and no
     scene fact carries (`beat_verify.beyond_tells`); on one, asked once more with the words
     named, read again, and what still adds something is cut sentence by sentence — the
@@ -625,6 +629,11 @@ def _nothing_past_the_facts(ask, msgs, line: str, said: str, premises: list[str]
 
     # `attacked`: whether the turn rolled an attack. "Nice shot" over a pick-up with no
     # throw (owner bug list 2026-11-18, item 18) claims one (`beyond_tells`).
+    # `story`: the beat the player just read, a source of what is there for this read only
+    # (the rubble the page described may be pointed at; crates it never held may not —
+    # playtest 2026-11-20 #9, #45, #48; probed 0 of 4 such leads caught before, 4 of 4
+    # after, no false alarm in 6 clean lines with the story given).
+    premises = [*premises, *([f"The story the player just read: {story}"] if story else [])]
     found = beat_verify.beyond_tells(strip_gestures(line), premises, who=who,
                                      attacked=attacked, **route)
     if not found:
@@ -739,7 +748,7 @@ def after_the_beat(c, agent, resolution) -> None:
                     agent, ask, msgs, line, said, [*facts, *here, *trained], pc, allowed,
                     recent, attacked=any(getattr(o, "op", "") == "attack"
                                          for o in getattr(resolution, "outcomes", None)
-                                         or ()))
+                                         or ()), story=beat)
                 remade = remade or again
         seconds = round(time.monotonic() - started, 1)
         _log(c, {"moments": kinds, "job": job, "said": line, "dropped": why,

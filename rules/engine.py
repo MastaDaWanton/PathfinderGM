@@ -8632,6 +8632,11 @@ class Engine:
             return self._company_hire(intent, target)
         now = int(self.scene.clock_minutes)
         what = "payment for the work" if kind == requests_mod.PAYMENT else "a favour"
+        # The favour as the player asked it (`wants`, their own words, `acts_to_ops._request`):
+        # playtest 2026-11-20 #14, "agrees to do Shadow the favour" said of nothing named.
+        wants = " ".join(str(intent.params.get("wants") or "").split()).rstrip(".")
+        if wants and kind == requests_mod.FAVOUR:
+            what = f"a favour: {wants}"
         asks = f"{actor.name} asks {target.name} for {what}."
         if not self.scene.conscious(target.ref):
             return Outcome(intent_id=intent.id, op="check", rolls=[], effects=[],
@@ -8668,6 +8673,12 @@ class Engine:
             if kind == requests_mod.PAYMENT:
                 line, effects, paid = self._pay_for_work(actor, target)
                 tell = f"{tell} {line}"
+            elif wants:
+                # Agreed, not done: a promise is no handover, so the answer may promise it
+                # (the carter's "I can share something from my pack" was cut beside
+                # "Nothing changes hands"), and the giving is a later deed of its own.
+                tell = (f"{tell} {target.name} agrees to it. Nothing has changed hands "
+                        f"yet.")
             else:
                 tell = (f"{tell} {target.name} agrees to do {actor.name} the favour. "
                         f"Nothing changes hands.")

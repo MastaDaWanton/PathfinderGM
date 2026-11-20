@@ -2319,6 +2319,35 @@ def nowhere_to_go(raw, rows: list[Row], *, notes: list | None = None) -> list:
                    "params": {"not_here": said[0]}}]
 
 
+def search_unanswered(raw, frame: dict | None, scene, *, notes: list | None = None) -> list:
+    """The plan, with the Perception search of where the player stands when the reading
+    holds a search and the turn is otherwise nothing (only `narrate_only`, no printed
+    answer): searching is Perception, "intentionally searching for stimulus is a move
+    action" (CRB, Perception), and a search no travel, found or venture door took is still
+    a search of here. The same "otherwise nothing" rule as `nowhere_to_go`.
+
+    Playtest 2026-11-20 #50: "Look for a different way into the gallery", in the ruins,
+    was read `search` with `where` left at elsewhere, so the table built nothing; the plan's
+    own check was aimed at a placeholder and dropped on the retry; the turn resolved only
+    `narrate_only`, and the page said "You scan the surrounding ruins, searching for a
+    different way into the gallery. What do you do?" — the act and no answer."""
+    if not isinstance(raw, list) or not isinstance(frame, dict):
+        return raw
+    acts = [a for a in frame.get("actions") or [] if isinstance(a, dict)]
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if pc is None or not any(a.get("act") == "search" for a in acts):
+        return raw
+    if any(_op(r) != "narrate_only" for r in raw) or any(
+            isinstance(r, dict) and (r.get("params") or {}).get(k)
+            for r in raw for k in ("not_here", "looks_in")):
+        return raw
+    row = Row(index=0, act="search")
+    _search(row, next(a for a in acts if a.get("act") == "search"), pc)
+    if notes is not None:
+        notes.append("a search nothing answered: the Perception search of here")
+    return [r for r in raw if _op(r) != "narrate_only"] + row.intents
+
+
 def _effort_check(r, pc) -> bool:
     """Whether a plan op is the player's own check of the body's strength — a plain
     ability check, a Strength-keyed skill (`tables.SKILLS`), or the 5e "athletics" a model
@@ -2431,8 +2460,14 @@ def _request(row: Row, a: dict, scene, pc) -> None:
         name = f"the {name}"
     # A hire rides the same check to the engine, which takes it to the wage door and
     # rolls nothing (`Engine._make_request`, `requests.HIRE`).
+    # What a favour asks for, in the player's own words: playtest 2026-11-20 #14, "I'd like
+    # an item from his pack in exchange" was told "agrees to do Shadow the favour. Nothing
+    # changes hands." — what favour? — and the carter's answer about his pack was then cut
+    # as a clash with it.
+    wants = " ".join(str(a.get("object") or "").split()) if kind == "favour" else ""
     row.intents.append({"op": "check", "actor": pc.ref, "target": who,
-                        "params": {"skill": "diplomacy", "request": kind},
+                        "params": {"skill": "diplomacy", "request": kind,
+                                   **({"wants": wants} if wants else {})},
                         "because": (f"the player hires {name}" if kind == "hire" else
                                     f"the player asks {name} for "
                                     + ("payment" if kind == "payment" else "a favour"))})

@@ -555,7 +555,7 @@ go        walk somewhere within reach (a place in town, the crossroads, the fiel
           `within_place` is true for a move inside the place you are in (across the
           room, to the hearth, a corner, the bar, the window), false for anywhere else;
           `fixture` is which fixture the walk is to (counter for a bar, bookshelf, stair,
-          barrel…; gallery for a wall-walk, landing, loft or balcony above the floor;
+          barrel…; gallery for upstairs, a landing, loft, balcony;
           floor for back down to the ground), or none. The object is what or who you
           take along: a thing carried, or a person you lead or who comes with you
 journey   take the road or a ship to another town; book or take passage, board a ship
@@ -871,6 +871,13 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "climb the steps up onto the wall-walk above the gate",
           "place": "the wall-walk", "within_place": True, "fixture": "gallery",
+          "act": "go"}]}),
+    # Going UP the stair is going to what it is the stair of (playtest 2026-11-20 #141):
+    # "I up upstairs" was read fixture `stair`, the move stood the player on the stair's
+    # foot, and the page said "You begin to ascend the stairs" with nobody up there.
+    ("I go upstairs.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "go upstairs", "within_place": True, "fixture": "gallery",
           "act": "go"}]}),
     ("I head back down to the ground.",
      {"question": False, "claims": [], "actions": [
