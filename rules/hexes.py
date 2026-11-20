@@ -567,6 +567,40 @@ SEEN_FROM_AFAR = {
     "mine": "the spoil heaps of an old mine scar the ground",
     "cave": "a cave mouth opens in the ground",
 }
+# A site already found, said once more when the party stops in its hex: it is where they
+# can go in (playtest 2026-11-20 #4 asked for the look's finds once, not every walk).
+FOUND_BEFORE = {
+    "tower": "The tower you saw before stands in this hex.",
+    "ruins": "The ruins you found before are in this hex.",
+    "mine": "The old mine you found before is in this hex.",
+    "cave": "The cave you found before opens in this hex.",
+}
+
+
+def found_before(kind: str) -> str:
+    return FOUND_BEFORE.get(kind, "")
+
+
+# The part of the day as a phrase that takes "in": `residency.day_part`'s eight words.
+_DAY_PHRASE = {"deep in the night": "the dead of night", "the small hours": "the small hours",
+               "early morning": "the early morning", "morning": "the morning",
+               "midday": "the middle of the day", "afternoon": "the afternoon",
+               "evening": "the evening", "late evening": "the late evening"}
+
+
+def day_said(set_out: int, stopped: int) -> str:
+    """When a hex's walk began and ended, from the clock, in words (no clock face): the
+    foundation of a travel description is terrain, distance and time (the Alexandrian,
+    "Hexcrawl Addendum: Describing Travel"). 0.4.4 said eight hours and nothing of the day."""
+    from .residency import day_part
+
+    a, b = day_part(set_out), day_part(stopped)
+    pa, pb = _DAY_PHRASE.get(a, a), _DAY_PHRASE.get(b, b)
+    if stopped - set_out >= 24 * 60:
+        return f"You set out in {pa} and stop a day later, in {pb}."
+    if a == b:
+        return f"You set out and stop in {pb}."
+    return f"You set out in {pa} and stop in {pb}."
 
 
 def _roll(world_name: str, q: int, r: int, what: str) -> int:

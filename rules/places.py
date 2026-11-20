@@ -1599,7 +1599,7 @@ def region_set(location_id: str, terrain: str) -> tuple[Place, ...]:
 
 
 def for_scene(location, at: str, terrain_hint: str = "",
-              founded=(), ring=(), moored=()) -> tuple[Place, ...]:
+              founded=(), ring=(), moored=(), stepping=()) -> tuple[Place, ...]:
     """Every place the party can name from where they stand: home, plus the ground
     they are on if it is not home, plus what play has minted here (`founded`).
 
@@ -1651,6 +1651,9 @@ def for_scene(location, at: str, terrain_hint: str = "",
             return with_founded(aboard, founded, at)
         others = tuple(m for m in moored if m != ships.vessel_of(at))
         return _gangplank(for_scene(location, "", terrain_hint, founded, ring, others), aboard)
+    wild = _out_in_a_hex(founded, at, stepping)
+    if wild:
+        return wild
     home = home_set(location, terrain_hint)
     ground = terrain_of(at)
     ring = tuple(ring or ())
@@ -1787,13 +1790,19 @@ def with_founded(base: tuple[Place, ...], founded, at: str = "") -> tuple[Place,
     if not minted:
         return base
     out = {p.id: p for p in base}
+    # Every place up the parent chain from where the party stands joins too: the way up out
+    # of a site is always there. Playtest 2026-11-20 #3: in the ruins off a forest hex whose
+    # parent no longer led back to the town, the forest hex was off the set and every way out
+    # was refused.
+    up = up_from(minted, at)
     changed = True
     while changed:
         changed = False
         for m in minted:
             if m.id in out:
                 continue
-            reachable = (m.parent in out) or (at and (m.id == at or str(at).startswith(m.id + "/")))
+            reachable = (m.parent in out) or m.id in up or (
+                at and (m.id == at or str(at).startswith(m.id + "/")))
             if not reachable:
                 continue
             out[m.id] = m
@@ -1824,6 +1833,78 @@ def with_founded(base: tuple[Place, ...], founded, at: str = "") -> tuple[Place,
         # made it a tavern the moment it was read back.
         result[pid] = _replace(p, exits=tuple(exits))
     return tuple(result.values())
+
+
+def _out_in_a_hex(founded, at: str, stepping=()) -> tuple[Place, ...]:
+    """Standing in a hex of open ground away from any town, or in its site: that hex and
+    what hangs off it, and nothing of the town it is filed under. () anywhere else.
+
+    Playtest 2026-11-20 #3: from the ruins twelve miles out, "I leave the ruins" walked to
+    Branford's outskirts in "a few minutes' walk", and the refusals listed the town's well
+    and market as places "you can reach". Every tradition's overland map keeps the town at
+    another scale (Ultima VI dropped the cut, `outskirts.py`); here the way between hexes is
+    the region map's move. The town's own hex keeps the town: its doc has the outskirts as
+    an exit. `stepping`: the hex the map's move is walking into this moment."""
+    from . import hexes
+
+    h = hexes.parse_place(at)
+    if h is None:
+        return ()
+    docs = [m if isinstance(m, Place) else from_dict(m) for m in (founded or ())]
+    cell = next((m for m in docs if m.origin == "hex" and hexes.parse_place(m.id) == h
+                 and not hexes.in_site(m.id)), None)
+    if cell is None or cell.exits:
+        return ()
+    # Another hex is twelve miles off and reached by the map's move, never a word's walk of
+    # minutes; the ones up the chain from here stay (the way out of a site).
+    up = up_from(docs, at)
+    return with_founded((), [m for m in docs if m.origin != "hex" or m.id in up
+                             or m.id in stepping], at)
+
+
+def _parent_ids(founded) -> dict[str, str]:
+    return {(m.id if isinstance(m, Place) else str((m or {}).get("id") or "")):
+            (m.parent if isinstance(m, Place) else str((m or {}).get("parent") or ""))
+            for m in (founded or ())}
+
+
+def up_from(founded, place_id: str) -> set[str]:
+    """`place_id` and every founded place up its parent chain, safe on a loop."""
+    parents = _parent_ids(founded)
+    out: set[str] = set()
+    pid = str(place_id or "")
+    while pid and pid not in out:
+        out.add(pid)
+        pid = parents.get(pid, "")
+    return out
+
+
+def break_parent_loops(founded: list) -> list[str]:
+    """Cut every loop in the founded places' parent chains, in place; the ids cut.
+
+    A containment tree may not hold a loop (PennMUSH's `moveit` refuses a move into
+    something the mover holds; LambdaMOO's `move()` raises E_RECMOVE). 0.4.4's hex move
+    re-parented a hex on every step, and out to the grassland and back left the forest and
+    grassland hexes each other's parent (playtest 2026-11-20 #3). The loop is cut at its
+    oldest member, first in `founded`, whose parent is cleared: `up_from` still joins it to
+    the set from anywhere below it."""
+    cut: list[str] = []
+    for doc in founded:
+        if not isinstance(doc, dict):
+            continue
+        parents = _parent_ids(founded)
+        seen: list[str] = []
+        pid = str(doc.get("id") or "")
+        while pid and pid not in seen:
+            seen.append(pid)
+            pid = parents.get(pid, "")
+        if not pid:
+            continue
+        loop = set(seen[seen.index(pid):])
+        oldest = next(d for d in founded if isinstance(d, dict) and d.get("id") in loop)
+        oldest["parent"] = ""
+        cut.append(str(oldest["id"]))
+    return cut
 
 
 def children_of(founded, parent_id: str) -> list[Place]:

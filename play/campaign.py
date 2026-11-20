@@ -632,6 +632,11 @@ class Campaign:
 
         scene.story_seed = (int(s["story_seed"]) if s.get("story_seed") is not None
                             else opening._seed_from(campaign.id))
+        # A 0.4.4 hex loop first (playtest 2026-11-20 #3: two hexes each other's parent,
+        # the party trapped in the ruins), before anything reads the places.
+        from rules import places as places_mod
+
+        places_mod.break_parent_loops(scene.founded)
         campaign._heal_places(str(s.get("biome") or ""), unplaced)
         campaign._retire_stale_masters()
         # The alchemist's half of the alchemy conversion (plan §18): what an old alchemist

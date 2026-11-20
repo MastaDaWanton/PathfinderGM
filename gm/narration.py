@@ -3930,6 +3930,7 @@ def invented_names(text: str, known: set[str]) -> list[str]:
     # 2026-09-18 on two opening drafts of five, each costing a repair call.
     allowed = {w.lower() for name in known
                for w in _WORD.findall(name.lower().replace("’", "'"))}
+    whole = {" ".join(str(name).lower().split()) for name in known}
     found: list[str] = []
     for sentence in _SENTENCE.findall(text or ""):
         tokens = re.findall(r"\b[A-Z][a-zA-Z'’-]{2,}\b", sentence)
@@ -3973,6 +3974,20 @@ def invented_names(text: str, known: set[str]) -> list[str]:
             stem = re.sub(r"['’]s$", "", low)
             if stem != low and (stem in allowed or stem in _NOT_A_NAME):
                 continue
+            # A known thing counted: the tell said "6× Glow Mote", the prose "six Glow
+            # Motes", and the plural was un-named into "collecting six the stranger"
+            # (playtest 2026-11-20 #12). Only a whole known name counted, never a known word:
+            # "the Sisters of the Veil" is an invented order, whatever "sister" is (the
+            # replay corpus, 2026-09-25-strangers).
+            if low.endswith("s"):
+                at = sentence.find(tok)
+                prev = (re.findall(r"[A-Za-z][a-zA-Z'’-]*", sentence[:at]) or [""])[-1].lower()
+                # The two-word name only: the world's single capitalised words ("Sister")
+                # are in `known` as vocabulary, and a lone plural of one proves nothing.
+                if any(f"{prev} {s}" in whole
+                       for s in (low[:-1], low[:-2] if low.endswith("es") else "")
+                       if s):
+                    continue
             # "I've", "I'll", "We're" — a capitalised contraction is not a name. Tested
             # on the head rather than a list of forms, so every contraction of a word
             # already known not to be a name is covered without enumerating them.

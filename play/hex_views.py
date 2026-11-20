@@ -59,6 +59,10 @@ def _tell(c, resolution, line: str) -> JsonResponse:
         c.transcript.append({"who": "gm", "text": closing})
     if tell:
         c.transcript.append({"who": "gm", "kind": "consequence", "text": tell})
+    if done and not closing.rstrip().endswith("?"):
+        # The endpoint framed, as every turn and the craft excursion end (playtest
+        # 2026-11-20 #4: a move ended on the look's line, with no question).
+        c.transcript.append({"who": "gm", "text": "What do you do?"})
     pc = c.scene.pc()
     c.history.append({"role": "user", "content": f"(From the region map: {line})"})
     c.history.append({"role": "assistant", "content": " ".join(x for x in (closing, tell) if x)})
