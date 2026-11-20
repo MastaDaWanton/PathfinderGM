@@ -176,7 +176,10 @@ def test_the_step_provokes_the_attack_of_opportunity_the_rules_give():
     res = _finish(engine, engine.run(engine.validate([_attack({"weapon": "unarmed"})])))
     said = [(o.op, o.tell) for o in res.outcomes]
     assert [o.op for o in res.outcomes] == ["attack", "move", "attack"], said
-    assert res.outcomes[0].tell.startswith("the other thug's attack"), said
+    # Named for what it is (playtest 2026-11-20 #114: an attack of opportunity reached the
+    # page as a bare "You strike the third lizard").
+    assert res.outcomes[0].tell.startswith(
+        "the other thug takes an attack of opportunity on Kesst Vayr: "), said
     assert res.outcomes[1].tell.startswith("Kesst Vayr closes 10 ft"), said
     assert scene.reacted.get(f"{other.ref}:attack_of_opportunity") == 1
 

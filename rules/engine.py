@@ -1737,6 +1737,30 @@ class Scene:
                     self._body_said.append(record)
             # A stable body's hourly check to come round (CRB p.190, `Actor.come_round`).
             # Not the player's: `play/downed.py` resolves theirs before they take a turn.
+            #
+            # Before it, the dying bleed on through the stretch's rounds: "A dying character
+            # loses 1 hit point every round. This continues until the character dies or
+            # becomes stable" (CRB, Injury and Death), with nothing about a fight. Only the
+            # played rounds bled anybody, so a giant cockroach left dying at the end of one
+            # fight lay dying through an hour of gathering and was reported mid-fight in the
+            # next ("giant cockroach is still down, but the bleeding has stopped", playtest
+            # 2026-11-20 #108). The same `Actor.bleed_out` the rounds use, round by round,
+            # until they are stable or dead. Not inside a fight: there the rounds do it.
+            if rounds and not a.is_pc and not self.in_encounter and self._dice is not None \
+                    and a.has_state("state.down.dying") and not states.destroyed_at_zero(a):
+                for _ in range(rounds):
+                    if not a.bleed_out(self._dice) or not a.has_state("state.down.dying"):
+                        break
+                a.apply_hp_state()
+                if not a.has_state("state.down.dying") and a.ref in self.actors:
+                    name = _sentence(_the_creature(a.name)
+                                     if getattr(a, "from_template", "") else a.name)
+                    line = (f"{name} stabilises where they lie."
+                            if a.has_state("state.down.stable") else
+                            f"{name} has bled out where they fell." if a.is_dead else
+                            f"{name} {_BROKEN_SAID}.")
+                    ended.append(line[:-1])
+                    told.append({"kind": "said", "ref": a.ref, "said": line})
             if hours and not a.is_pc and self._dice is not None \
                     and a.has_state("state.down.stable"):
                 came = a.come_round(self._dice, hours)
@@ -10658,11 +10682,18 @@ class Engine:
                   if coup_dc is not None else None)
         else:
             dc = {"value": target_ac, "explain": ac_note, "flat_footed": flat_footed}
+        # A reaction says it is one. Playtest 2026-11-20 #114: the third lizard closed on
+        # Shadow, provoked, and died to the attack of opportunity, and the page had only
+        # "You strike the third lizard" with no player action before it. The narrator is
+        # fed tells and nothing else (law three), so the tell is where the name has to be.
+        # It still opens with the attacker's name, which `_blows_from` reads.
+        lead = (f"{actor.name} takes an attack of opportunity on {defender.name}: "
+                if intent.params.get("reaction") == "attack_of_opportunity" else "")
         return Outcome(
             intent_id=intent.id, op="attack", rolls=rolls, dc=dc,
             verdict="hit" if any_hit else "miss",
             effects=effects,
-            tell=" ".join(state["tells"]) + self._hp_state_tell(crossed),
+            tell=lead + " ".join(state["tells"]) + self._hp_state_tell(crossed),
             because=intent.because,
             blows=list(state.get("blows") or []),
         )
@@ -10840,11 +10871,16 @@ class Engine:
         speed = int(getattr(actor, "speed_feet", 0) or 0)
         far = self.scene.in_encounter and speed and cost > speed
         if voice == "person":
+            # By the name the board prints (`fixtures.square_name`), never x,y: the player
+            # reads E6 on the board's edge (playtest 2026-11-20 #9).
+            from . import fixtures as _fixtures
+
+            named = _fixtures.square_name((x, y))
             if far:
-                return (f"{_sentence(fault)} The nearest square in reach, {x},{y}, is "
+                return (f"{_sentence(fault)} The nearest square in reach, {named}, is "
                         f"{cost} ft away and {actor.name} moves {speed} ft: close in "
                         f"this turn and strike on the next.")
-            return (f"{_sentence(fault)} Click square {x},{y} on the map to move there "
+            return (f"{_sentence(fault)} Click square {named} on the map to move there "
                     f"({cost} ft), then strike.")
         if far:
             return (f"{fault} The nearest square in reach, [{x}, {y}], is {cost} ft away "
@@ -27414,7 +27450,6 @@ class Engine:
             self.scene.resync_zones()
             zone = self.scene.zones.get(ref, zone)
             cost = self._move_cost(ref, from_square, tuple(square))
-            crossed = f" ({cost} ft)" if cost is not None else ""
             # The move action, spent: a body that crossed the grid in a fight has walked
             # this round, and the closing step before a blow asks (`_closing_step`).
             if self.scene.in_encounter and from_square is not None \
@@ -27422,11 +27457,13 @@ class Engine:
                 self.scene.move_spent[ref] = self.scene.round
             effect = {"ref": ref, "kind": "position", "from": from_square,
                       "to": tuple(square), "feet": cost, "zone": zone}
-            # A zone is a distance from the player, so the player's own walk has none to
-            # name: "Pip moves to near (15 ft)" was read live as near somebody (2026-11-12).
+            # The feet walked, never the zone: "Pip moves to near (15 ft)" was read live as
+            # near somebody (2026-11-12), and "The second lizard moves to near, out in open
+            # ground." went onto the page word for word (playtest 2026-11-20 #107). The zone
+            # stays on the effect for the code that reads it; how far the walk leaves
+            # somebody else from the player is said in feet, below.
             went = (f"{actor.name} moves {cost} ft" if cost is not None else
-                    f"{actor.name} moves") if actor.is_pc else \
-                f"{actor.name} moves to {zone}{crossed}"
+                    f"{actor.name} moves")
             tell = f"{went}."
             # Where in the place, when the square is a fixture's (`fixtures.where_said`).
             from . import fixtures
@@ -27442,6 +27479,11 @@ class Engine:
                                        indoors=roofed)
             if onto:
                 tell = f"{went}, {onto}."
+            pc = self.scene.pc()
+            gap = (self.scene.distance_between(ref, pc.ref)
+                   if pc is not None and not actor.is_pc else None)
+            if gap is not None:
+                tell += f" {_sentence(actor.name)} is {gap} ft from {pc.name}."
             # The step `_close_before` put in front of a blow: told as what it is, so the
             # narrator hears that the distance was closed before the swing it dresses.
             # `closing_on` is written by code only — the parser refuses it from a model.
@@ -32460,13 +32502,14 @@ class Engine:
                          amount=amount, source=str(intent.params.get("source") or
                                                    intent.because or ""))
         self.scene.pools.append(made)
+        from . import fixtures as _fixtures       # the square as the board names it
 
         return Outcome(
             intent_id=intent.id, op="blood_pool",
             effects=[{"ref": actor.ref, "kind": "blood_pool", **made.as_dict(),
                       "pools": len(self.scene.pools)}],
             tell=(f"A pool of {actor.name}'s blood spreads"
-                  + (f" at {where[0]},{where[1]}." if where else " underfoot.")),
+                  + (f" at {_fixtures.square_name(where)}." if where else " underfoot.")),
             because=intent.because,
         )
 

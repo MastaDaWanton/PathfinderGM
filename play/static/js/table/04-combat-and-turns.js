@@ -140,8 +140,11 @@ function planOrder() {
 // What one step is: its chip, its words for the transcript, and the ops it posts.
 function stepOf(key) {
   if (key === "move") {
-    const [x, y] = COMBAT.move;
-    return { label: `Move to ${x},${y}`, said: `move to (${x},${y})`,
+    // The square by the name the board prints on its edges (`sqName`), never x,y: "Move to
+    // 4,5" sat on the plan under a board labelled E6 (playtest 2026-11-20 #9). The square
+    // itself travels in `params.square`; the said line is only words for the page.
+    const at = sqName(COMBAT.move[0], COMBAT.move[1]);
+    return { label: `Move to ${at}`, said: `move to ${at}`,
              actions: [{ op: "move", params: { zone: "near", square: COMBAT.move } }] };
   }
   if (key === "standard") {
@@ -240,12 +243,13 @@ function strikeOutOfReach() {
   if (!from) return "";
   const [x, y] = from;
   if (squares.some(s => s[0] === x && s[1] === y)) return "";
+  const at = sqName(x, y);
   const f = (STATE.scene.actors || []).find(a => a.ref === blow.target);
   const who = f ? f.name : "them";
   return moveFirst
-    ? `From ${x},${y} the strike will not reach ${who}: pick a square beside them, or ` +
+    ? `From ${at} the strike will not reach ${who}: pick a square beside them, or ` +
       `strike without moving.`
-    : `The strike comes before the move, and from where you stand (${x},${y}) it will ` +
+    : `The strike comes before the move, and from where you stand (${at}) it will ` +
       `not reach ${who}: put the move first, or strike from beside them.`;
 }
 
@@ -638,7 +642,10 @@ document.addEventListener("click", async e => {
   const vw = t.closest("[data-mapview]");
   if (vw) { MAP_3D = vw.dataset.mapview === "3d"; renderMap(STATE); return; }
   const trn = t.closest("[data-mapturn]");
-  if (trn) { MAP_TURN = (MAP_TURN + Number(trn.dataset.mapturn) + 4) % 4;
+  // To the next quarter-turn that way, from wherever a free turn left the board.
+  if (trn) { const by = Number(trn.dataset.mapturn);
+             const to = by > 0 ? Math.floor(MAP_TURN + 1e-6) + 1 : Math.ceil(MAP_TURN - 1e-6) - 1;
+             MAP_TURN = ((to % 4) + 4) % 4;
              renderMap(STATE); return; }
   // Aiming a flask at a square (the map draws every square as a target while it is): this
   // click is the aim, not the move.

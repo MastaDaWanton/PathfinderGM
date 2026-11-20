@@ -64,7 +64,9 @@ let MAP_LEVEL = 0;
 // Which way the board is being looked at, and whether it is being looked at flat. Both
 // are ways of looking rather than facts about the scene, so neither belongs in STATE —
 // the server is not responsible for where the player's attention is.
-let MAP_TURN = 0, MAP_3D = false;
+// MAP_TURN is in quarter-turns and need not be whole: the 3D board turns freely (playtest
+// 2026-11-20 #8). MAP_REDRAW3D draws the 3D board again as it is now (renderMap sets it).
+let MAP_TURN = 0, MAP_3D = false, MAP_REDRAW3D = null;
 
 // Which symbol draws each fixture kind (content/rules/fixtures.json), and the symbols:
 // shapes and flat procedural texture that ARE the object, in the table's own palette —
@@ -589,7 +591,7 @@ function renderMap(s) {
     for (let c = 0; c < g.width; c++) for (let r = 0; r < g.height; r++)
       parts.push(`<rect class="aimsq" data-aimsq="${c},${r}" x="${c * CELL}" y="${r * CELL}"
         width="${CELL}" height="${CELL}" fill="transparent"><title>the north-west corner of ${
-        c},${r}</title></rect>`);
+        sqName(c, r)}</title></rect>`);
   }
 
   // A board at least twice as long one way as the other, in a box the other way about, is
@@ -607,8 +609,10 @@ function renderMap(s) {
   // The same board, drawn two ways. Both read the one geometry payload and both write
   // `data-sq`, so the combat builder cannot tell them apart — which is the whole reason
   // the flat one was built first.
-  const svg = MAP_3D
-    ? Scene3D.render(g, s.scene.actors || [],
+  // The 3D board redrawn alone, at whatever MAP_TURN is now: a drag that turns the board
+  // (24-map-zoom.js) redraws it every frame, and the whole of renderMap would replace the
+  // element the drag holds the pointer on, and the readout and the key with it.
+  MAP_REDRAW3D = MAP_3D ? () => Scene3D.render(g, s.scene.actors || [],
                      { turn: MAP_TURN, level: MAP_LEVEL, tactics: T, caught,
                        hunches: (T.hunches || []).map(h => {
                          const inside = new Set(h.squares.map(p => `${p[0]},${p[1]}`));
@@ -616,7 +620,9 @@ function renderMap(s) {
                        }),
                        fight: !!s.scene.in_encounter,
                        reach: !!(STATE.scene && STATE.scene.in_encounter),
-                       up: s.scene.in_encounter ? s.scene.turn_ref : null })
+                       up: s.scene.in_encounter ? s.scene.turn_ref : null }) : null;
+  const svg = MAP_3D
+    ? MAP_REDRAW3D()
     : `<svg id="map" viewBox="${-MARGIN} ${-MARGIN} ${turned ? `${H + MARGIN} ${W + MARGIN}`
          : `${W + MARGIN} ${H + MARGIN}`}"${
          turned ? ` class="turned" data-turned="${W}"` : ""}

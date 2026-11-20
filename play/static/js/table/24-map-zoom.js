@@ -14,7 +14,12 @@
  *     autoscroll there); the left button or one finger pans too, after 8 px of movement,
  *     so a tap is still a tap on a square;
  *   - pinch zooms and pans on a touch screen; buttons +, minus, Fit and You, and the keys
- *     + - 0 and the arrows while the board has focus.
+ *     + - 0 and the arrows while the board has focus;
+ *   - in 3D, the RIGHT button dragged sideways, a two-finger twist, or Q and E turn the board
+ *     to any angle (playtest 2026-11-20 #8: "free rotation", because figures between walls
+ *     could not be seen from any of the four quarter-turns). The right button, because the
+ *     left and middle ones already pan and the wheel zooms; Foundry's right-drag pans, which
+ *     here the middle button does. Sources: docs/research/2026-11-20-battle-board.md.
  *
  * HOW. By the SVG's own viewBox, not a CSS transform: the board stays vector, hit-testing
  * needs no correction and every data-sq / data-ref target is the element it was. The view
@@ -201,7 +206,8 @@ var MapZoom = (function () {
     Z.pc = (scene.actors || []).find(a => a.at && a.stance === "pc") || null;
     Z.view.tabIndex = 0;
     Z.view.setAttribute("aria-label",
-      "The board. The wheel or plus and minus zoom, 0 fits it, the middle button or arrows pan.");
+      `The board. The wheel or plus and minus zoom, 0 fits it, the middle button or arrows pan.${
+        is3d() ? " The right button dragged sideways, or Q and E, turn it." : ""}`);
     Z.view.insertAdjacentHTML("beforeend", `<div class="mapzoom" role="group" aria-label="Zoom">
       <button type="button" class="v2-btn" data-mapzoom="in" aria-label="Zoom in" title="Zoom in (wheel, +)">+</button>
       <button type="button" class="v2-btn" data-mapzoom="out" aria-label="Zoom out" title="Zoom out (wheel, minus)">&minus;</button>
@@ -211,17 +217,50 @@ var MapZoom = (function () {
     apply();
   }
 
+  // --- turning the 3D board --------------------------------------------------------------
+  // A quarter-turn for every 160 px dragged: a drag across a 692 px board is a little over a
+  // half-turn, enough to see round anything and slow enough to stop where you mean to.
+  const TURN_PX = 160;
+  let turnRaf = 0;
+  // Set the turn and redraw the 3D board alone, once a frame, keeping the view's centre on
+  // the same board point (apply, through toUser at the new turn).
+  function turnTo(q) {
+    if (!is3d() || typeof MAP_REDRAW3D !== "function" || !Z.svg || !Z.svg.isConnected) return;
+    MAP_TURN = ((q % 4) + 4) % 4;
+    if (turnRaf) return;
+    turnRaf = requestAnimationFrame(() => {
+      turnRaf = 0;
+      if (!Z.svg || !Z.svg.isConnected || !is3d()) return;
+      const box = document.createElement("div");
+      box.innerHTML = MAP_REDRAW3D();
+      const svg = box.firstElementChild;
+      Z.svg.replaceWith(svg);
+      Z.svg = svg;
+      Z.base = svg.getAttribute("viewBox").trim().split(/[\s,]+/).map(Number);
+      apply();
+    });
+  }
+  // The right button's menu is never wanted over a board the right button turns.
+  document.addEventListener("contextmenu", e => { if (is3d() && onBoard(e)) e.preventDefault(); });
+
   // --- pointers: tap, pan, pinch, momentum ------------------------------------------------
   const P = new Map();            // pointerId -> [x, y]
   let G = null;                   // the gesture: { panning, mid, trail, start }
   const mid = () => { const v = [...P.values()]; return v.length > 1
-    ? [(v[0][0] + v[1][0]) / 2, (v[0][1] + v[1][1]) / 2, Math.hypot(v[0][0] - v[1][0], v[0][1] - v[1][1])]
-    : [v[0][0], v[0][1], 0]; };
+    ? [(v[0][0] + v[1][0]) / 2, (v[0][1] + v[1][1]) / 2, Math.hypot(v[0][0] - v[1][0], v[0][1] - v[1][1]),
+       Math.atan2(v[1][1] - v[0][1], v[1][0] - v[0][0])]
+    : [v[0][0], v[0][1], 0, 0]; };
   const onBoard = e => Z.view && Z.view.isConnected && e.target.closest &&
     e.target.closest("#mapwrap .boardview") && !e.target.closest(".mapzoom");
 
   document.addEventListener("pointerdown", e => {
     Z.suppress = false;
+    if (onBoard(e) && e.pointerType === "mouse" && e.button === 2 && is3d()) {
+      stop();
+      G = { turning: true, start: [e.clientX, e.clientY], from: MAP_TURN, id: e.pointerId };
+      try { Z.view.setPointerCapture(e.pointerId); } catch (err) { /* gone */ }
+      return;
+    }
     if (!onBoard(e) || (e.pointerType === "mouse" && e.button !== 0 && e.button !== 1)) return;
     // The middle button: the board's own drag, never the browser's autoscroll over it.
     const middle = e.pointerType === "mouse" && e.button === 1;
@@ -234,6 +273,12 @@ var MapZoom = (function () {
   document.addEventListener("mousedown", e => { if (e.button === 1 && onBoard(e)) e.preventDefault(); });
   document.addEventListener("auxclick", e => { if (e.button === 1 && onBoard(e)) e.preventDefault(); });
   document.addEventListener("pointermove", e => {
+    if (G && G.turning && e.pointerId === G.id) {
+      // Dragged right, the near edge of the board goes right with the hand.
+      turnTo(G.from + (e.clientX - G.start[0]) / TURN_PX);
+      if (Math.abs(e.clientX - G.start[0]) >= SLOP) Z.suppress = true;
+      return;
+    }
     if (!G || !P.has(e.pointerId)) return;
     P.set(e.pointerId, [e.clientX, e.clientY]);
     const m = mid();
@@ -247,6 +292,14 @@ var MapZoom = (function () {
     try { Z.view.setPointerCapture(e.pointerId); } catch (err) { /* already released */ }
     const bx = box();
     if (P.size > 1 && G.mid[2] && m[2]) zoomAt(m[2] / G.mid[2], m[0] - bx.left, m[1] - bx.top);
+    // Two fingers twisted turn the 3D board with them: clockwise on the glass, clockwise
+    // on the board (a larger turn runs anticlockwise, seen from above).
+    if (P.size > 1 && is3d() && G.mid[2] && m[2]) {
+      let da = m[3] - G.mid[3];
+      if (da > Math.PI) da -= 2 * Math.PI;
+      if (da < -Math.PI) da += 2 * Math.PI;
+      if (da) turnTo(MAP_TURN - da * 2 / Math.PI);
+    }
     panBy(m[0] - G.mid[0], m[1] - G.mid[1]);
     G.mid = m;
     const now = performance.now();
@@ -255,6 +308,7 @@ var MapZoom = (function () {
     if (Math.hypot(e.clientX - G.start[0], e.clientY - G.start[1]) >= SLOP) Z.suppress = true;
   });
   function end(e) {
+    if (G && G.turning && e.pointerId === G.id) { G = null; return; }
     if (!P.has(e.pointerId)) return;
     P.delete(e.pointerId);
     if (!G) return;
@@ -305,8 +359,11 @@ var MapZoom = (function () {
     const keys = { "+": () => command("in"), "=": () => command("in"),
                    "-": () => command("out"), "_": () => command("out"), "0": () => command("fit"),
                    ArrowLeft: () => (stop(), panBy(pan, 0)), ArrowRight: () => (stop(), panBy(-pan, 0)),
-                   ArrowUp: () => (stop(), panBy(0, pan)), ArrowDown: () => (stop(), panBy(0, -pan)) };
-    if (!keys[e.key] || (e.key.startsWith("Arrow") && Z.k === 1)) return;
+                   ArrowUp: () => (stop(), panBy(0, pan)), ArrowDown: () => (stop(), panBy(0, -pan)),
+                   // Fifteen degrees a press, the way Turn left and Turn right go.
+                   q: () => turnTo(MAP_TURN - 1 / 6), e: () => turnTo(MAP_TURN + 1 / 6) };
+    if (!keys[e.key] || (e.key.startsWith("Arrow") && Z.k === 1) ||
+        ((e.key === "q" || e.key === "e") && !is3d())) return;
     e.preventDefault();
     keys[e.key]();
   });

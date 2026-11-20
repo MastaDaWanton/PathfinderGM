@@ -825,19 +825,22 @@ def _strike_out_of_reach(scene, pc, raw: list) -> str:
             miss = None
         if miss is None:
             continue
-        x, y = int(frm[0]), int(frm[1])
+        # The square as the board prints it (E6), not x,y (playtest 2026-11-20 #9).
+        from rules.fixtures import square_name
+
+        sq = square_name(frm)
         if before_the_move:
             why = (f"too close for a reach weapon, which strikes from {miss.reach} ft"
                    if miss.too_close else f"and you reach {miss.reach} ft")
             return (f"The strike comes before the move, so it is struck from where you "
-                    f"stand (square {x},{y}), where {foe.name} is {miss.feet} ft away, "
+                    f"stand (square {sq}), where {foe.name} is {miss.feet} ft away, "
                     f"{why}. Nothing was done: put the move first, or strike from where "
                     f"the blow lands and then move.")
         if miss.too_close:
-            return (f"From square {x},{y} {foe.name} would be {miss.feet} ft away — too "
+            return (f"From square {sq} {foe.name} would be {miss.feet} ft away — too "
                     f"close for a reach weapon, which strikes from {miss.reach} ft. Nothing "
                     f"was done: pick another square, or strike without moving.")
-        return (f"From square {x},{y} {foe.name} would be {miss.feet} ft away, and you "
+        return (f"From square {sq} {foe.name} would be {miss.feet} ft away, and you "
                 f"reach {miss.reach} ft — the blow could not land. Nothing was done: pick a "
                 f"square beside them, or strike without moving.")
     return ""
@@ -897,8 +900,10 @@ def _move_after_full_round(scene, pc, raw: list) -> str:
                     "flames": ("Putting out the flames", "step one square, or leave the "
                                                          "move for your next turn"),
                 }[whole]
+                from rules.fixtures import square_name
+
                 return (f"{what} takes the whole round, and after it the only movement "
-                        f"left is a 5-foot step; square {to[0]},{to[1]} is {feet} ft away. "
+                        f"left is a 5-foot step; square {square_name(to)} is {feet} ft away. "
                         f"Nothing was done: {fix}.")
             here = to
     return ""
@@ -6161,6 +6166,13 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
         for b in scene.bleeding:
             who = scene.get(b["ref"])
             name = who.name if who else b["ref"]
+            # A bestiary creature is a kind of thing, with its article, and every line opens
+            # with a capital: "giant cockroach is still down" (playtest 2026-11-20 #108).
+            from rules.engine import _sentence, _the_creature
+
+            if who is not None and getattr(who, "from_template", ""):
+                name = _the_creature(name)
+            name = _sentence(name)
             line = {
                 "dead": f"{name} stops moving.",
                 "stable": f"{name} is still down, but the bleeding has stopped.",
