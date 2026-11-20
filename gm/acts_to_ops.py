@@ -1096,9 +1096,16 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
             # pick-up ran at the tannery, and the engine minted a second crate there.
             if act == "go" and not row.ops and a.get("place"):
                 from rules import heard_places
+                from rules import places as places_mod
 
-                if heard_places.named_in(str(a["place"]), scene, places) is not None:
-                    row.ops = ["found", "travel"]
+                heard = heard_places.named_in(str(a["place"]), scene, places)
+                if heard is not None:
+                    # A rumoured way in is a venture (`go_to_heard_place`), not a found.
+                    mark = (places_mod.find(places, heard.get("landmark") or "")
+                            if heard.get("landmark") else None)
+                    row.ops = (["venture"] if mark is not None
+                               and heard_places.venture_kind(heard, scene, mark)
+                               else ["found", "travel"])
             if act in ("go", "seek") and a.get("here"):
                 approached = str(a["here"])
             if act == "talk" and not a.get("says") and pc is not None:
@@ -1213,7 +1220,19 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
             if act == "challenge" and pc is not None:
                 _challenge(row, a, scene, pc)
             # Taking 10 or 20 is always on the ground at hand: nobody takes 20 on a tavern.
-            if act == "search" and (a.get("where") == "here" or a.get("take"))                     and pc is not None:
+            # And a search at the landmark somebody gave for a way in they spoke of, read
+            # "elsewhere" because it looks for somewhere to go: the engine's search looks
+            # for that place there (`Engine._search_for_heard`). Playtest 2026-11-20 #2,
+            # "I search the woods for the cave everyone has a story about", standing in
+            # the woods the carter's old mine is off: it owed no op, and the plan rolled
+            # tracks and a secret-door check.
+            # And every search that names what it is for (the owner's ruling of
+            # 2026-11-20, #19: "If I type to search for anything I should be searching for
+            # that thing, not tracks"): the engine answers about that thing
+            # (`Engine._sought`). A walk the plan adds to go and find it stays.
+            if act == "search" and pc is not None and (
+                    a.get("where") == "here" or a.get("take") or a.get("object")
+                    or _heard_way_in_here(scene, places)):
                 _search(row, a, pc)
             if act == "commission" and pc is not None:
                 _commission(row, a, scene, pc)
@@ -1734,6 +1753,18 @@ def _sneak(row: Row, a: dict, scene, pc) -> None:
         "Stealth at full speed (-5)" if params.get("pace") else "Stealth at half speed")
 
 
+def _heard_way_in_here(scene, places) -> bool:
+    """Whether a heard-of way in (`heard_places.ventures_at`) has its landmark where the
+    party stands."""
+    from rules import heard_places
+    from rules import places as places_mod
+
+    if scene is None or not getattr(scene, "heard_places", None):
+        return False
+    here = places_mod.find(places or (), getattr(scene, "at", "") or "")
+    return bool(heard_places.ventures_at(scene, here, places or ()))
+
+
 def _search(row: Row, a: dict, pc) -> None:
     """A search of where the player is (`interpret.SEARCH_WHERE` here), built whole: the
     engine's Perception search, one roll against everything hidden here at its own DC
@@ -1748,6 +1779,12 @@ def _search(row: Row, a: dict, pc) -> None:
     take = {"ten": 10, "twenty": 20}.get(str(a.get("take") or ""))
     if take:
         params["take"] = take
+    # What it is for: the player's words, and the reader's closed kind of thing.
+    sought = " ".join(str(a.get("object") or "").split())
+    if sought:
+        params["sought"] = sought[:80]
+    if a.get("seeking") and a["seeking"] != "anything":
+        params["seeking"] = str(a["seeking"])
     row.intents.append({"op": "check", "actor": pc.ref, "params": params,
                         "because": "the player searches"})
     row.note = f"a Perception search, taking {take}" if take else "a Perception search"
@@ -3649,9 +3686,20 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
         if searching and str((r or {}).get("actor") or pc.ref) in (pc.ref, "pc") and (
                 (op == "track" and "track" not in acts)
                 or (op == "check" and _skill(r) == "survival" and "track" not in acts)
-                or (op == "forage" and "gather" not in acts)):
+                # A prospect too: live 2026-11-20, "I search the woods for my lost silver
+                # locket" came back with an hour's dig and two chunks of lead ore.
+                or (op in ("forage", "prospect") and "gather" not in acts)):
             if notes is not None:
                 notes.append(f"the plan's {op} replaced by the reading's search")
+            continue
+        if op == "track" and not acts & {"track", "follow"} and str(
+                (r or {}).get("actor") or pc.ref) in (pc.ref, "pc"):
+            # Tracks are looked for when the player asks for them (the owner, 2026-11-20
+            # #19). Live that day: "I look around the woods for the harbourmaster" was
+            # read `seek`, the engine said he was not here, and the plan's own track with
+            # `follow` rolled Survival and told of footprints.
+            if notes is not None:
+                notes.append("the plan's track dropped: no look for tracks was asked for")
             continue
         if exerted and _effort_check(r, pc):
             if notes is not None:

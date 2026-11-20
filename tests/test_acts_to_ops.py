@@ -512,8 +512,10 @@ def test_the_per_act_schema_offers_each_act_only_its_own_slots():
                                           # tests/test_morale_threats_ships.py).
                                           *(["demand"] if act == "threaten" else []),
                                           # And `where` and `take` on a search
-                                          # (2026-11-16, tests/test_search_and_take.py).
-                                          *(["where", "take"] if act == "search"
+                                          # (2026-11-16, tests/test_search_and_take.py),
+                                          # and `seeking` (2026-11-20,
+                                          # tests/test_search_for.py).
+                                          *(["where", "take", "seeking"] if act == "search"
                                             else [])}
         assert alt["required"] == list(alt["properties"])
         assert alt["additionalProperties"] is False

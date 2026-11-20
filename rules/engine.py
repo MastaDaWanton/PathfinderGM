@@ -5421,18 +5421,177 @@ class Engine:
             # The number to beat is whatever hides here, unknown to the searcher.
             roll = self._roll_or_suspend(intent, pc, mods, label=label, dc=0,
                                          partial=partial, dc_shown=False)
-        fx, found = self._player_finds(pc, roll.total, True)
         here = self.here()
+        sought = " ".join(str(intent.params.get("sought") or "").split())
+        seeking = str(intent.params.get("seeking") or "")
+        named = self._sought(here, sought, seeking) if sought else None
+        # A search for a named person, place, thing or water looks for THAT, not for a
+        # way down or a trap (the owner, 2026-11-20 #19: "If I look for a river and it
+        # tells me there are no tracks this is a bug"). Somebody hiding is still noticed
+        # on the roll: "Most Perception checks are reactive" (CRB p.102).
+        fx, found = self._player_finds(pc, roll.total, True, ways=named is None)
         took = (" over two minutes" if take == 20 else "")
-        if found:
-            tell = " ".join([f"{pc.name} searches {here.name}{took}.", *found])
+        # A heard way in is looked for by a search for a place or for nothing named, not
+        # by a search for the locket (live 2026-11-20: that search walked into the mine).
+        went = (self._search_for_heard(intent, pc, here, roll.total)
+                if named is None and seeking in ("", "a place") else None)
+        if went is not None:
+            return Outcome(intent_id=intent.id, op="check", rolls=[roll, *went.rolls],
+                           verdict="success", effects=[*fx, *went.effects],
+                           tell=" ".join([f"{pc.name} searches {here.name}{took}.", *found,
+                                          went.tell]).strip(),
+                           because=intent.because)
+        answer, got = (self._sought_line(pc, here, named, sought) if named is not None
+                       else ("", False))
+        if named is None and sought and not found:
+            # Nothing on the engine's record answers to the words, and nothing hidden
+            # was found: said about THAT thing, never about tracks or doors.
+            from . import holding
+
+            them = ("them" if seeking == "a person"
+                    or english.is_plural(holding.head_of(sought)) else "it")
+            tell = (f"{pc.name} searches {here.name}{took} for {sought} and does not "
+                    f"find {them} here.")
+        elif found or answer:
+            tell = " ".join([f"{pc.name} searches {here.name}{took}.", *found, answer]).strip()
         else:
             tell = f"{pc.name} searches {here.name}{took} and finds nothing."
         return Outcome(intent_id=intent.id, op="check", rolls=[roll],
-                       verdict="success" if found else "failure", effects=fx,
+                       verdict="success" if found or got else "failure", effects=fx,
                        tell=tell, because=intent.because)
 
-    def _player_finds(self, pc, total: int, searching: bool) -> tuple[list[dict], list[str]]:
+    def _sought(self, here, sought: str, seeking: str) -> "tuple | None":
+        """What a search's words name, by the engine's own finders: ("water", place or
+        None), ("person", actor), ("thing", prop record) or ("place", place); None when
+        nothing on the record answers to them (a hatch, a way down: whatever is hidden).
+        The reader's closed `seeking` (`interpret.SEEKING`) puts its kind first, and is
+        the only way to water: no finder grounds "a river" from the words."""
+        from . import holding, scope
+        from . import places as places_mod
+
+        if seeking == "water":
+            return ("water", self._water_near(here))
+        order = ["person", "thing", "place"]
+        kind = {"a person": "person", "a thing": "thing", "a place": "place"}.get(seeking)
+        if kind:
+            order.remove(kind)
+            order.insert(0, kind)
+        for k in order:
+            if k == "person":
+                ref = scope.in_the_room(self.scene, sought)
+                a = self.scene.actors.get(ref) if ref else None
+                if a is not None and not a.is_pc:
+                    return ("person", a)
+            elif k == "thing":
+                pc = self.scene.pc()
+                for rec in getattr(self.scene, "props", None) or ():
+                    if holding.same(rec.get("name"), sought) and (
+                            rec.get("at") == here.id
+                            or (pc is not None and rec.get("held_by") == pc.ref)):
+                        return ("thing", rec)
+            else:
+                p = places_mod.find(self.places(), sought, near=here.id)
+                if p is not None:
+                    return ("place", p)
+        return None
+
+    def _water_near(self, here):
+        """The water at hand: here, a step from here, or the settlement's free water
+        (`water_at_hand`) — a place a body can drink at by its kind (a well, a cistern,
+        the docks, a bridge or ford) or its wet ground. None when there is none."""
+        from . import places as places_mod
+        from . import water as water_mod
+
+        def wet(p) -> bool:
+            kind = places_mod._kind_of_place(p)
+            return (places_mod.WATER in places_mod.place_tags(p)
+                    or kind in places_mod.WATER_KINDS | places_mod._OUTSIDE_WATER
+                    or water_mod.is_wet(getattr(p, "terrain", "")))
+
+        if wet(here):
+            return here
+        by_id = {p.id: p for p in self.places()}
+        near = [by_id[x] for x in (here.exits or ()) if x in by_id]
+        hit = next((p for p in near if wet(p)), None)
+        if hit is not None:
+            return hit
+        well = self.water_at_hand()
+        return places_mod.find(self.places(), well) if well else None
+
+    def _sought_line(self, pc, here, named: tuple, sought: str) -> tuple[str, bool]:
+        """The search's answer about the thing it was for (playtest 2026-11-20 #19), and
+        whether it was found."""
+        from . import awareness
+        from . import places as places_mod
+        from .names import definite
+
+        def cap(x: str) -> str:
+            return x[:1].upper() + x[1:]
+
+        kind, obj = named
+        if kind == "water":
+            if obj is None:
+                wild = places_mod.setting_of(here.id) == "outside" or not self.water_at_hand()
+                return (f"{pc.name} finds no water at {here.name}."
+                        + (" Out here, water is found by living off the land (a Survival "
+                           "check)." if wild else ""), False)
+            if obj.id == here.id:
+                return f"There is water here, at {here.name}.", True
+            if obj.id in (here.exits or ()):
+                return f"The nearest water is {obj.name}, close by.", True
+            return f"The nearest free water in town is {obj.name}.", True
+        if kind == "person":
+            if obj.has_state(awareness.HIDDEN) and not awareness.locates(self.scene, pc, obj):
+                return f"{pc.name} does not find {sought} here.", False
+            return f"{cap(definite(obj.name))} is here.", True
+        if kind == "thing":
+            if obj.get("held_by") == pc.ref:
+                return f"{pc.name} has {obj.get('name')} already.", True
+            return f"There is {obj.get('name')} here.", True
+        if obj.id == here.id:
+            return f"{pc.name} is at {obj.name}.", True
+        if obj.id in (here.exits or ()):
+            return (f"{cap(obj.name)} is close by: the way there is open from "
+                    f"{here.name}."), True
+        return f"{cap(obj.name)} is not here, at {here.name}.", False
+
+    # A rumoured way in found at its landmark when the place has no hex DC of its own
+    # (the sewers off a street): Ultimate Campaign's own easiest hidden site, "Locating
+    # these caverns requires a successful DC 10 Perception or Survival check".
+    HEARD_FIND_DC = 10
+
+    def _search_for_heard(self, intent: Intent, pc, here, total: int) -> "Outcome | None":
+        """A search at the landmark somebody gave for a way in they spoke of — the
+        carter's "old mine off the woods" — looks for THAT place (playtest 2026-11-20 #2:
+        "I search the woods for the cave everyone has a story about" ran tracks and
+        secret doors, and the mine was never findable). Every heard-of venture whose
+        landmark is here (`heard_places.ventures_at`), whatever the player called it, at
+        the kind's hidden-site DC (`hexes.FIND_DC`, Ultimate Campaign's "a hidden site …
+        requiring the PCs to make an appropriate skill check"). Found, the party goes in
+        through the one venture door, which makes the same seeded head the town's rumour
+        was spread about, so its way down (rules/dungeons.py) is there. None when nothing
+        heard of is looked for here or the roll missed it (a miss says nothing)."""
+        from . import heard_places, hexes
+
+        if self.scene.in_encounter:
+            return None
+        for rec, kind in heard_places.ventures_at(self.scene, here, self.places()):
+            if total < hexes.FIND_DC.get(kind, self.HEARD_FIND_DC):
+                continue
+            went = self._op_venture(Intent(
+                op="venture", actor=pc.ref, because=intent.because,
+                params={"kind": kind, "parent": here.id}, visibility=intent.visibility,
+                id=intent.id, origin=intent.origin, origin_name=intent.origin_name), {})
+            lead = f"{pc.name} finds the way to {rec['name']} that was spoken of."
+            if went.status == "refused":
+                return Outcome(intent_id=intent.id, op="check", effects=[],
+                               tell=f"{lead} {went.tell}", because=intent.because)
+            went.tell = f"{lead} {went.tell}"
+            return went
+        return None
+
+    def _player_finds(self, pc, total: int, searching: bool, *,
+                      ways: bool = True) -> tuple[list[dict], list[str]]:
         """The player's own Perception result set against each creature hidden from them,
         at that creature's DC (`awareness.notice_dcs`: its Stealth result, its 10 when it
         hid with nobody watching, 20/40 for an invisible one and +20 to pinpoint), and
@@ -5457,7 +5616,10 @@ class Engine:
             if got["found"]:
                 recs.extend(got["effects"])
                 said.append(got["tell"])
-        # A way down and a dungeon's traps hide at their own DCs (rules/dungeons.py).
+        # A way down and a dungeon's traps hide at their own DCs (rules/dungeons.py);
+        # not looked for by a search for something named (`ways`, #19 of 2026-11-20).
+        if not ways:
+            return recs, said
         from . import dungeons
 
         fx, found = dungeons.searched(self, pc, total)
@@ -21368,8 +21530,10 @@ class Engine:
         kind = str(intent.params.get("kind") or "").strip().lower()
         if kind not in places_mod.VENTURES:
             return self._refuse(
-                intent, f"There is no such ground as {kind or 'that'} to go into. The "
-                        f"kinds are: {', '.join(sorted(places_mod.VENTURES))}.")
+                # No list of kinds: the table voice read "The kinds are: alley, cave,
+                # cellar…" as leads that were not here (playtest 2026-11-20 #45, "a cellar
+                # or a crawlspace"). The planner's prompt holds the kinds already.
+                intent, f"There is no {kind or 'such ground'} here to go into.")
         who = intent.actor or (self.scene.pc().ref if self.scene.pc() else None)
         actor = self.scene.actors.get(who) if who else None
         if actor is None:
@@ -21464,6 +21628,18 @@ class Engine:
         # 2026-09-22; then it rolled its own check here, at the parent, brought the
         # creature in there and opened the fight, and the travel below ended that fight
         # and shed the creature in the same tell (2026-09-23).
+        # A way deeper (rules/dungeons.py): the venture's own seeded d100, the same every
+        # time, marked on its saved record on a hit. Hidden: the feature is found, not told.
+        # Rolled before the walk in, so a hex site's way down, which lies at the site's
+        # own head, is there for the reactive look on arrival (`dungeons.arrived`).
+        rec = next((p for p in self.scene.founded if p.get("id") == head.id), None)
+        deeper = None
+        if rec is not None:
+            from . import dungeons
+
+            deeper = dungeons.on_entering(self.world, self.scene, rec, kind,
+                                          [m.id for m in made[1:]],
+                                          site=self._is_hex_site(head.id, kind))
         travel = Intent(op="travel", actor=actor.ref, because=intent.because,
                         params={"place": head.id, "with": list(intent.params.get("with") or [])},
                         visibility="hidden", id=intent.id, origin=intent.origin,
@@ -21508,16 +21684,21 @@ class Engine:
             effects.extend(got)
             if said:
                 tell += " " + said
-        # A way deeper (rules/dungeons.py): the venture's own seeded d100, the same every
-        # time, marked on its saved record on a hit. Hidden: the feature is found, not told.
-        rec = next((p for p in self.scene.founded if p.get("id") == head.id), None)
-        if rec is not None:
-            from . import dungeons
-
-            effects.append(dungeons.on_entering(self.world, self.scene, rec, kind,
-                                                [m.id for m in made[1:]]))
+        if deeper is not None:
+            effects.append(deeper)
         return Outcome(intent_id=intent.id, op="venture", effects=effects, tell=tell,
                        because=intent.because)
+
+    def _is_hex_site(self, head_id: str, kind: str) -> bool:
+        """Whether a venture's head is the site the world put in its hex
+        (`hexes.site_of`): the ruins or tower spotted on the Region map, not a cave the
+        player went looking for on ground that has none."""
+        from . import hexes
+
+        at = hexes.parse_place(head_id)
+        g = self.hex_world() if at is not None and hexes.in_site(head_id) else None
+        site = hexes.site_of(g, *at) if g is not None else None
+        return bool(site) and site["kind"] == kind
 
     def _inhabit(self, place, *, guarding: bool = False, by=None, row: dict | None = None,
                  count: int = 1, name: str | None = None,
