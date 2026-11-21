@@ -652,7 +652,8 @@ def brief(scene, recent: list[str] | None, *, turn: int = 0, secret: bool = Fals
             # live 2026-11-15, 2 of 2 walks out of Fizspark's inn ended "You emerge into
             # the lane … The lingering silence of the dining room … remains", and the
             # half-eaten bowl followed the player across the room. Said where they are.
-            at = c.place.rsplit(":", 1)[-1].replace("-", " ") if ":" in c.place else ""
+            at = (places_mod.said_name(c.place, getattr(scene, "founded", None))
+                  if ":" in c.place else "")
             head += (f" [set at {at}, " if at else " [set elsewhere, ") + (
                 "where the party is not now: its facts describe that place, not here]")
         if c.secret:
