@@ -1210,7 +1210,8 @@ def invents_loot(text: str, given, shelf, told: str = "") -> bool:
     return False
 
 
-def _narrate_outcome(c, opening: str, outcomes: list, line: str) -> str:
+def _narrate_outcome(c, opening: str, outcomes: list, line: str, *, brief: str = "",
+                     last_beat: str = "") -> str:
     """The closing, from the table's own narrator: fed the engine's tells and nothing
     else (law three), and groomed by every narrator check the spoken turns get — the
     deed, the body, the land, the means (`GMAgent.narrate_outcome` → `_groom`). The
@@ -1221,7 +1222,7 @@ def _narrate_outcome(c, opening: str, outcomes: list, line: str) -> str:
 
     try:
         text, _attempt = GMAgent(c.world, c.engine()).narrate_outcome(
-            opening, outcomes, line)
+            opening, outcomes, line, brief=brief, last_beat=last_beat)
     except Exception:  # noqa: BLE001 - a model down costs colour, never the haul
         import logging
 
@@ -1449,9 +1450,13 @@ def craft_action(request):
     # No full stop of its own: the line below adds one, and "Nothing gathered.." was
     # printed on the first live forage of 2026-09-30.
     tally = " · ".join(f"{h['name']} ×{h['count']}" for h in haul) or "nothing"
+    # The haul stays on the page; the check that won it (the d20 and the DC) rides under
+    # it as the GM's record, as the hex move's does (the owner, 2026-11-21: "all the
+    # checks should go in the GM lane"; play/hex_views.py `_tell`).
     c.transcript.append({"who": "gm", "kind": "consequence",
-                         "text": (f"{closing}\n\nGathered: {tally}. {tell}" if effects
-                                  else tell).strip()})
+                         "text": (f"{closing}\n\nGathered: {tally}." if effects
+                                  else tell).strip(),
+                         **({"record": tell} if effects and tell else {})})
     # 4. What is there, when something is: one grounded scene call, checked, with a
     # floor written from the same facts.
     scene, scene_notes = "", []

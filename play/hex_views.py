@@ -15,6 +15,7 @@ the engine's tell, a closing from the table's narrator fed those tells and nothi
 from __future__ import annotations
 
 import logging
+import re
 
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
@@ -56,6 +57,23 @@ def hexes_region(request):
     return response
 
 
+def _brief(c) -> str:
+    """THE SCENE for the move's beat, built as a typed turn builds it (`views`), so the
+    planned slots see the place the party now stands in. "" if it cannot be built: the
+    consequence call writes the beat as before."""
+    from gm import prompts
+
+    try:
+        e = c.engine()
+        return prompts.scene_brief(c.world, c.scene, c.location, here=e.here(),
+                                   known=e.places(),
+                                   recent=[b["text"] for b in c.transcript[-4:]],
+                                   turn=len(c.transcript))
+    except Exception:  # noqa: BLE001 - a brief that fails costs the colour, not the move
+        log.exception("the hex move's brief failed")
+        return ""
+
+
 def _tell(c, resolution, line: str) -> JsonResponse:
     """Write the move into the story and the history, and answer the board."""
     from .craft_views import _narrate_outcome
@@ -63,11 +81,28 @@ def _tell(c, resolution, line: str) -> JsonResponse:
     outcomes = [o for o in resolution.outcomes if o.tell]
     tell = " ".join(o.tell for o in outcomes).strip()
     done = any(o.status != "refused" for o in resolution.outcomes)
-    closing = _narrate_outcome(c, "", outcomes, line) if done and outcomes else ""
+    # The beat before, for the slot's repeat check (`planned.travel_repeats`): the last
+    # narrated GM beat, a move's closing included (it carries no kind), never the
+    # engine's lines or the hand-back.
+    last = next((b.get("text") or "" for b in reversed(c.transcript)
+                 if b.get("who") == "gm" and b.get("kind") in (None, "", "setup")
+                 and str(b.get("text") or "").strip() != "What do you do?"), "")
+    closing = (_narrate_outcome(c, "", outcomes, line, brief=_brief(c), last_beat=last)
+               if done and outcomes else "")
     c.transcript.append({"who": "player", "text": line})
     if closing:
-        c.transcript.append({"who": "gm", "text": closing})
-    if tell:
+        # The owner, 2026-11-21: "any numbers and/or game mechanics should be kept to the
+        # GM section ... all the checks should go in the GM lane and be replace by
+        # descriptions". The beat tells the move (`planned.way_slot` gives it the checks
+        # as what they meant); the engine's own lines — the look's roll, the toll's
+        # non-lethal, each forced-march check, the XP — ride under it as the GM's record,
+        # one click away (`record`, drawn by 02-state.js as table talk's is), and the
+        # rolls themselves are in the Rolls panel. Until then 0.4.4 pasted the tell as a
+        # second paragraph that said "12 miles east of Branford" three times.
+        c.transcript.append({"who": "gm", "text": closing,
+                             **({"record": tell} if tell else {})})
+    elif tell:
+        # The narrator down: the engine's lines are the page, as every door's are.
         c.transcript.append({"who": "gm", "kind": "consequence", "text": tell})
     if done and not closing.rstrip().endswith("?"):
         # The endpoint framed, as every turn and the craft excursion end (playtest

@@ -5205,7 +5205,7 @@ class GMAgent:
         return out
 
     def _narrate_turn_planned(self, windup: str, outcomes: list, acting: str, manner: str,
-                              last_beat: str):
+                              last_beat: str, *, brief: str = "", player_input: str = ""):
         """Somebody else's turn in a fight, written by the planned narrator
         (`planned.write(acting=…)`: one slot a blow, the page checks, the tells check and
         its remake) — `(text, seconds, model, raw, notes)`, or None when a slot failed, and
@@ -5234,10 +5234,15 @@ class GMAgent:
 
             faith.second = lambda sentence, tell: beat_verify.second_on_tell(
                 sentence, tell, who_pc, **route)
+            if not acting:
+                # A door's own act told for the player (the hex move): each act slot read
+                # for whether it says what came of it, as the typed turn's are.
+                faith.came = lambda passage, result: beat_verify.outcome_told(
+                    passage, result, who_pc, **route)
         try:
             beat = planned.write(
-                self.engine, brief=getattr(self, "last_brief", "") or "",
-                outcomes=outcomes, player_input="",
+                self.engine, brief=brief or getattr(self, "last_brief", "") or "",
+                outcomes=outcomes, player_input=player_input,
                 who=(self.prose_model, self.prose_host, self.prose_provider, self.prose_key),
                 last_beat=str(last_beat or "")[-900:],
                 scene_now=prompts.scene_now(self.engine.scene),
@@ -5279,7 +5284,8 @@ class GMAgent:
     @surfaces_a_stall
     def narrate_outcome(self, narration: str, outcomes: list, player_input: str,
                         rewrite: bool = True, acting: str = "",
-                        manner: str = "", last_beat: str = "") -> tuple[str, Attempt]:
+                        manner: str = "", last_beat: str = "",
+                        brief: str = "") -> tuple[str, Attempt]:
         """Say the facts the engine handed back.
 
         Fed only `player_visible()` outcomes, so a hidden roll's number is not in the
@@ -5301,8 +5307,16 @@ class GMAgent:
 
         from rules import houserules
 
-        if acting and houserules.narration() == "planned" and self.engine.scene.in_encounter:
-            done = self._narrate_turn_planned(narration, outcomes, acting, manner, last_beat)
+        # A door's own act with THE SCENE given (`brief`): the region map's hex move, told
+        # the planned way as a typed turn is — its slots, THE WAY (`planned.way_slot`), the
+        # tells check — rather than by the two-sentence consequence call, which saw no
+        # land at all (2026-11-21, docs/research/2026-11-21-travel-prose.md).
+        door_beat = bool(brief) and not acting
+        if houserules.narration() == "planned" and (
+                door_beat or (acting and self.engine.scene.in_encounter)):
+            done = self._narrate_turn_planned(
+                narration, outcomes, acting, manner, last_beat, brief=brief,
+                player_input=player_input if door_beat else "")
             if done is not None:
                 text, seconds, model, raw, notes = done
                 return self._groom_outcome(text, outcomes, player_input, tells,
