@@ -1680,3 +1680,34 @@ consumer's business (Ultimate Campaign's 5 hours on plain, 8 elsewhere, at speed
 
 Every settlement in an export carries `at`, every nation `ground`, and the app's layout of a
 new campaign puts each town at its `at` (a campaign already begun keeps its stored layout).
+
+## 34. The world's moons as data
+
+*Asked 2026-11-21 (fix/moonlight; docs/research/2026-11-21-moonlight.md). Optional: without
+it the app keeps no moon, says none to the narrator, and takes out any moon the narration
+claims (`beat_verify`, playtest 2026-11-20 #22). That is how every world plays today.*
+
+Playtest 2026-11-20 #22: one move ended in "a moonless night" and the next beat said "the
+dim, moonlit gloom". The moon is a rule in Pathfinder, not colour. The CRB's dim light is
+"outside at night with a moon in the sky, bright starlight", and its darkness is "outside on
+a cloudy, moonless night". The export only says a world's moons in free text. Aurvantis's
+premise has "twin moons (Aurel and Vantis)" with "opposed cycles". Other worlds hold
+new-moon rites and full-moon dances in their cultures, with no moon to hang them on. The
+app cannot work out a phase from either, and will not make up an Earth moon for a world
+that is not Earth (the owner's ruling for the day's phases, 2026-10-05).
+
+**Shape.** A list at `world.sky.moons`, empty for a world with none. Phases come from the
+day count, the way Morrowind's engine does it (OpenMW `MoonModel::phase`).
+
+| field | what it is |
+|---|---|
+| `name` | the moon's name as the world's people say it |
+| `cycle_days` | days from one full moon to the next, a whole number ≥ 2 |
+| `full_on_day` | a day (1 = the campaign's first) on which it is full |
+| `about` | one sentence on how it looks (colour, size), optional |
+
+### Done when
+
+Every export carries `world.sky.moons`, with at least `name`, `cycle_days` and
+`full_on_day` on each moon, and the fixture worlds' prose agrees with it (Aurvantis: two
+moons).

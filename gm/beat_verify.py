@@ -920,7 +920,7 @@ _SYSTEM = (
     "arrived / left: somebody who comes into, or goes out of, the place during the "
     "passage, or whom it says is no longer there. Not the player.\n"
     "time_of_day: EVERY sentence in which the narrator says what time of day it is NOW "
-    "— the light, the sky, the hour — one entry per sentence, even when two sentences "
+    "— the light, the sky, the moon or its absence, the hour — one entry per sentence, even when two sentences "
     "say different hours. Empty when it never says; never a time somebody mentions or "
     "plans for.")
 
@@ -2080,6 +2080,10 @@ _SKY_WORD = re.compile(r"\b(?:air|sky|skies|sun|suns|sunlit|sunlight|sunrise|sun
                        r"daylight|breeze|wind|winds|horizon|clouds?|stars?|starlight|moon\w*)\b")
 
 
+# A moon on the page (`diff`'s hour judgement): the engine keeps none. Not "moonstone".
+_MOON_WORD = re.compile(r"\bmoon(?:s|lit|light|less|rise|set)?\b")
+
+
 def _underground_only(facts) -> bool:
     """The whole beat is underground: every kind of place it may be set in is under the
     ground or a room (`places.settings_for` of a cave, a sewer, a dungeon's rooms)."""
@@ -3108,6 +3112,18 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
                     "contradiction", "hour",
                     "The player is underground: no sky, sun, daylight or open air reaches "
                     "them there. Say the hour, if at all, without them.", c.sentence, "", c))
+            elif _MOON_WORD.search(_norm(c.quote)) and not _hour_told(c, facts):
+                # A moon, shining or absent, the engine does not keep: playtest 2026-11-20
+                # #22, "a moonless night" one move and "the dim, moonlit gloom" the next.
+                # In PF1e it is a light level (dim "with a moon in the sky", darkness "on a
+                # cloudy, moonless night"), so the page's moon is a model authoring one.
+                # Until World Bible exports moons (docs/for-world-bible.md #34) there is
+                # none to hold it to. docs/research/2026-11-21-moonlight.md.
+                out.append(Discrepancy(
+                    "contradiction", "hour",
+                    "This world's moon is not known here: say nothing of a moon, neither "
+                    "moonlight nor a moonless sky. Tell the night by its dark and its "
+                    "stars.", c.sentence, "", c))
 
     out += _omissions(claims, facts, text)
     return out
