@@ -456,6 +456,23 @@ def land_around(world, settlement) -> Land:
     return _land_around(world, entity, settlement)
 
 
+def climates_at(world, *place_ids: str) -> tuple[str, ...]:
+    """The climate bands (`biomes.CLIMATES`) of the land `place_ids` stand in: each one's
+    settlement's Climate fact (`land_around`, read up its ancestors), every band any of
+    them names. A road takes both ends, a land of "hot days, cold nights" both bands:
+    the creature drawn lives in one of them. Empty when nothing says, which keeps every
+    creature in (`bestiary.in_climate`)."""
+    from . import places as places_mod
+
+    out: set[str] = set()
+    for pid in place_ids:
+        loc = places_mod.location_of(str(pid or "")) if pid else ""
+        if world is None or not loc or world.get(loc) is None:
+            continue
+        out |= set(biomes_mod.climates_in(land_around(world, loc).climate))
+    return tuple(c for c in biomes_mod.CLIMATES if c in out)
+
+
 _LAND_MEMO: dict = {}
 
 

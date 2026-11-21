@@ -76,11 +76,12 @@ def creature_for(biome: str, level: int, dice, guarding: bool = False,
 
 
 def draw_for(biome: str, level: int, dice, guarding: bool = False,
-             apl: int | None = None, keep=None):
+             apl: int | None = None, keep=None, climates=()):
     """A bestiary row that lives here and how many of it (`encounter_budget.Draw`), or
     None when the book has nothing for this ground at the party's budget — a stone shelf
     where no creature is tagged is quiet, and so is ground whose smallest creature is
-    above the party. `keep` narrows the rows further (a hunt's animals).
+    above the party. `keep` narrows the rows further (a hunt's animals), and `climates`
+    (`geography.climates_at`) last, through `bestiary.of_the_climate`.
 
     Up to `encounter_budget.MOST` of one kind, the whole group priced by its total XP. It
     was one creature, always, until 2026-11-18 (`most=1`): with a lone PC at APL -2 that
@@ -108,6 +109,7 @@ def draw_for(biome: str, level: int, dice, guarding: bool = False,
     rows = [r for r in rows if r.get("cr_value") is not None
             and r.get("creature_type") not in ("humanoid", "outsider", "undead")
             and (keep is None or keep(r))]
+    rows = bestiary.of_the_climate(rows, climates)
     if not rows:
         return None
     hard = dice.roll("1d100", label="how hard it is", visibility="hidden").total
@@ -153,7 +155,7 @@ def bands(danger: float = 1.0) -> tuple:
 
 
 def roll(biome: str, level: int, dice, apl: int | None = None,
-         danger: float = 1.0) -> Encounter:
+         danger: float = 1.0, climates=()) -> Encounter:
     """Once per expedition. The d100 is the engine's, hidden, like every other roll a
     player could not have known the number of. `apl` is the party's
     (`encounter_budget.party_apl`), the budget the creature is priced against; `danger`
@@ -166,7 +168,8 @@ def roll(biome: str, level: int, dice, apl: int | None = None,
         return Encounter("quiet", r)
     if kind == "rich":
         return Encounter("rich", r, yield_times=RICH_YIELD)
-    got = draw_for(biome, level, dice, guarding=(kind == "guarded"), apl=apl)
+    got = draw_for(biome, level, dice, guarding=(kind == "guarded"), apl=apl,
+                   climates=climates)
     row = got.row if got is not None else None
     if row is None:
         # Nothing lives here that the book prices for this level; the ground is

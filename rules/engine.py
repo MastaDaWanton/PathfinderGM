@@ -15713,7 +15713,8 @@ class Engine:
             int(getattr(pc, "level", 1) or 1) if pc is not None else 1,
             apl=encounter_budget.party_apl(self.scene),
             # The road is as dangerous as its worse end (`volatility.scale`).
-            danger=volatility.scale(self.world, self.scene.at, leg.to_id))
+            danger=volatility.scale(self.world, self.scene.at, leg.to_id),
+            climates=self._climates(self.scene.at, leg.to_id))
         if met is not None:
             progress = ontheway.hours_walked(met, hours)
             hours = progress
@@ -16697,6 +16698,7 @@ class Engine:
                     met = ontheway.road(self.dice, step_hours or 1, hop.terrain, level,
                                         apl=encounter_budget.party_apl(self.scene),
                                         danger=volatility.scale(self.world, hop.id),
+                                        climates=self._climates(hop.id),
                                         **({} if step_hours else {"minutes": step}))
                 minutes += step
                 if met is not None and pc is not None:
@@ -18099,7 +18101,8 @@ class Engine:
             got = gathering.draw_for(
                 biome, max(1, int(getattr(actor, "level", 1) or 1)), self.dice,
                 apl=encounter_budget.party_apl(self.scene),
-                keep=lambda r: r.get("creature_type") == "animal")
+                keep=lambda r: r.get("creature_type") == "animal",
+                climates=self._climates(self.scene.at))
         effects: list[dict] = [{"ref": actor.ref, "kind": "hunt", "biome": biome,
                                 "hours": hours, "origin": "rule:survival"}]
         if got is None:
@@ -18412,7 +18415,8 @@ class Engine:
         enc = gathering.roll(biome, max(1, int(level)), self.dice,
                              apl=encounter_budget.party_apl(
                                  self.scene, pc_level=min(body, max(1, int(level)))),
-                             danger=volatility.scale(self.world, self.scene.at))
+                             danger=volatility.scale(self.world, self.scene.at),
+                             climates=self._climates(self.scene.at))
         if enc.kind == "quiet":
             return ""
         clause = " " + gathering.describe(enc, what, biome, spot=spot, dug=dug)
@@ -19548,6 +19552,14 @@ class Engine:
 
         return ships_mod.her_waters(self.world, ship)
 
+    def _climates(self, *place_ids: str) -> tuple[str, ...]:
+        """The climate bands of the land `place_ids` stand in (`geography.climates_at`),
+        handed to every wild draw so the ground's creatures are the climate's too
+        (playtest 2026-11-20 #20: pyraustas, "any warm", on temperate Branford's road)."""
+        from . import geography
+
+        return geography.climates_at(self.world, *place_ids)
+
     def _waters_climates(self, ship) -> tuple[str, ...]:
         """The climate of the waters between the ports she sails from and to, as
         `biomes.CLIMATES` words: each port's own Climate fact (`geography.land_around`), read
@@ -19562,9 +19574,7 @@ class Engine:
             town = self.world.get(pid) if self.world is not None and pid else None
             if town is None:
                 continue
-            said = str(geography.land_around(self.world, town).climate or "").lower()
-            named = {c for w, c in biomes._CLIMATE_WORDS.items()
-                     if re.search(rf"\b{w}\b", said)}
+            named = set(biomes.climates_in(geography.land_around(self.world, town).climate))
             if len(named) == 1:
                 out |= named
         return tuple(sorted(out))
@@ -21720,7 +21730,8 @@ class Engine:
             level = getattr(pc, "level", 1) if pc is not None else 1
             got = gathering.draw_for(place.terrain, max(1, int(level)), self.dice,
                                      guarding=guarding,
-                                     apl=encounter_budget.party_apl(self.scene))
+                                     apl=encounter_budget.party_apl(self.scene),
+                                     climates=self._climates(place.id))
             # How many the budget sent with it (up to `encounter_budget.MOST`, 2026-11-18).
             row, count = (got.row, got.count) if got is not None else (None, 1)
         if row is None:
@@ -33921,7 +33932,8 @@ class Engine:
             night = ontheway.night(self.dice, hours, ground or "grassland",
                                    int(getattr(actor, "level", 1) or 1), scale=scale,
                                    apl=encounter_budget.party_apl(self.scene),
-                                   danger=volatility.scale(self.world, self.scene.at))
+                                   danger=volatility.scale(self.world, self.scene.at),
+                                   climates=self._climates(self.scene.at))
         return {"hours": hours, "minutes": minutes, "setting": setting, "ground": ground,
                 "night": night, "scale": scale, "scaled_by": by, "before": before,
                 "short": short, "until": until if wake is not None else ""}
