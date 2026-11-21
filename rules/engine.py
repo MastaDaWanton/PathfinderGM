@@ -19933,8 +19933,12 @@ class Engine:
             return ("A sail on the horizon: a merchantman on her own course, who dips her "
                     "flag and holds on.", [fx])
         if met.kind == "naval":
-            return ("A warship on patrol comes down on her, looks her over from a "
-                    "cable off, and lets her go.", [fx])
+            said = self._navy_met(ship, fx)
+            if said is not None:
+                return said, [fx]
+            # No nation in the world to fly the flag (never invented): a passing sail.
+            return self._met_at_sea(ship, ontheway.Meeting(**{**met.__dict__,
+                                                              "kind": "merchant"}))
         if met.kind == "pirates":
             pick = self.dice.roll("1d2", label="what the pirates sail", visibility="hidden")
             kind = ("sailing ship", "longship")[pick.total - 1]
@@ -19981,6 +19985,57 @@ class Engine:
                     f"alongside her, at the rail.", [fx])
         return (f"{_sentence(what)} {'come' if many else 'comes'} up out of the water and "
                 f"over the rail.", [fx])
+
+    def _navy_met(self, ship, fx: dict) -> str | None:
+        """A warship of a real nation on patrol (owner ruling 2026-11-21), or None when
+        neither of her ports lies in a nation the world names. The flag is the nation of
+        the port she sailed from or is bound for (`maps.nation_of`), so these are its
+        waters; two different ones are picked between by a hidden die.
+
+        What she does is the smallest version that plays, from the research in
+        docs/research/2026-11-21-wild-draws.md (AC IV's wanted ladder and Skull and
+        Bones' faction hostility both send a nation's ships at a captain that nation
+        wants; a ship it does not want is left alone): a party wanted in any town of that
+        nation, or aboard a ship the PC holds whose seizure was sworn in one of its towns
+        (`Vessel.sworn`), is run down as pirates are: the ship-to-ship bands, `hostile`,
+        her marines over the rail alongside (`_defenders`). Anybody else is hailed and let
+        go. No inspection: the engine holds no contraband to find."""
+        from . import maps, ships as ships_mod
+
+        nations = list(dict.fromkeys(
+            n for n in (maps.nation_of(self.world, p) for p in (ship.came_from, ship.bound_for))
+            if n and self.world.get(n) is not None))
+        if not nations:
+            return None
+        from .gathering import pick_index
+
+        nation = nations[pick_index(self.dice, len(nations), "whose patrol")]
+        flag = str(self.world.get(nation).name)
+        pc = self.scene.pc()
+        towns = [str(r.get("id") or "") for r in (self.world.play or {}).get("settlements") or ()
+                 if maps.nation_of(self.world, str(r.get("id") or "")) == nation]
+        wanted = pc is not None and any(states.standing_with_the_law(pc, t) == "wanted"
+                                        for t in towns)
+        prize = bool(ship.held_by and ship.sworn
+                     and maps.nation_of(self.world, ship.sworn) == nation)
+        vid = ships_mod.vessel_id(f"navy|{nation}|{ship.id}", "warship",
+                                  int(self.scene.clock_minutes))
+        row = ships_mod.VESSELS["warship"]
+        theirs = ships_mod.Vessel(id=vid, name=ships_mod.name_for(vid), kind="warship",
+                                  hp=int(row["hp"]), crew=int(row["crew"][0]))
+        self._keep_vessel(theirs)
+        fx.update(vessel=theirs.id, nation=nation, flag=flag)
+        if not (wanted or prize):
+            fx["hostile"] = False
+            return (f"A warship flying the colours of {flag}, {theirs.name}, comes down on "
+                    f"her on patrol, hails her from a cable off, and lets her go.")
+        self.scene.sea = {"ours": ship.id, "theirs": theirs.id, "range": "distant",
+                          "grappled": False, "hostile": True, "foes": [], "navy": nation}
+        fx.update(hostile=True, range="distant", why="wanted" if wanted else "prize")
+        why = (f"{pc.name} is wanted in {flag}" if wanted
+               else f"{ship.name} was sworn taken in {flag}")
+        return (f"A warship flying the colours of {flag}, {theirs.name}, comes about to "
+                f"run her down: {why}. Sheer off and run, or close with her.")
 
     def _voyage_scene(self, ship, met, fx: dict) -> tuple[str, list[dict]]:
         """The voyage table's scenes (content/rules/journey-events.json, the owner's list of
@@ -20613,9 +20668,13 @@ class Engine:
         level = int(getattr(pc, "level", 1) or 1)
         sea = self.scene.sea or {}
         # A pirate ship's people are pirates (`ontheway.sea`'s band); anybody else's sail.
-        pirates = bool(sea.get("hostile")) and sea.get("theirs") == vessel.id
-        row = npcs.choose(["pirate", "sailor"] if pirates else ["sailor", "pirate"],
-                          level) or {}
+        hostile = bool(sea.get("hostile")) and sea.get("theirs") == vessel.id
+        # A navy's people are its marines (`_navy_met`), hostile or not.
+        navy = bool(sea.get("navy")) and sea.get("theirs") == vessel.id
+        pirates = hostile and not navy
+        words = (["soldier", "guard", "sailor"] if navy else
+                 ["pirate", "sailor"] if pirates else ["sailor", "pirate"])
+        row = npcs.choose(words, level) or {}
         template = str(row.get("id") or "thug")
         # Priced by the party's XP budget (rules/encounter_budget.py, owner 2026-11-13).
         # The GUARDED mix: a crew on her own deck is defending it, the ruling's "guards
@@ -20629,7 +20688,9 @@ class Engine:
             encounter_budget.party_apl(self.scene), roll, kind=mix)
         # Named apart, because the brief lists people by name beside their ref and three
         # actors all called "a hand" is a narrator writing about one person three times.
-        called = (("a pirate", "a second pirate", "a third pirate", "a fourth pirate")
+        called = (("a marine", "a second marine", "a third marine", "a fourth marine")
+                  if navy else
+                  ("a pirate", "a second pirate", "a third pirate", "a fourth pirate")
                   if pirates else ("a hand", "a second hand", "a third hand", "a fourth hand"))
         out = []
         for i in range(how_many):
@@ -20644,7 +20705,7 @@ class Engine:
             out.append(who)
         # Priced, so a model's begin_encounter round them does not roll their count again:
         # "sea" for a pirate crew met on the water, "boarding" for anybody else's rail.
-        self._mark_priced([w.ref for w in out], "sea" if pirates else "boarding")
+        self._mark_priced([w.ref for w in out], "sea" if hostile else "boarding")
         return out
 
     # --- in conversation -----------------------------------------------------------------

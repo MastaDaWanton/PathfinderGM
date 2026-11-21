@@ -82,3 +82,89 @@ the land) — called `bestiary.search(biome=...)` with no climate. Only the sea
 - **Filtering dungeon-tag stock by climate** (`dungeons._spec_rows`): those are authored
   per concept, not drawn from the land, and the book's Underground list has no climate
   split. Left alone.
+
+---
+
+# At sea, only aquatic creatures and ships (owner ruling 2026-11-21)
+
+## Part 1: what may be met at sea
+
+**Defect, measured on the shipped book.** The sea's creature band (`ontheway._sea_meeting`,
+the one path for a voyage's stretches and a held ship's cruise) drew from the `water` biome
+kept by `open_water`, which read the Environment line alone: 74 creatures. One of them,
+the living mirage ("any deserts or oceans", fly 20 ft., no swim speed), is not a sea
+creature at all. Seven of the sea's own were left out because their line says "aquatic"
+rather than "ocean": the dragon turtle ("temperate aquatic"), elasmosaurus and tylosaurus
+("warm aquatic"), locathah, skum, charda, shoggoth.
+
+**Sources.**
+- PF1e Bestiary, Monsters by Terrain (legacy.aonprd.com/bestiary/monstersByTerrain.html,
+  read in part 0 above): Ocean is its own terrain, split by climate band.
+- PF1e aquatic subtype (aonprd.com/MonsterSubtypes.aspx?ItemName=Aquatic, seen as a
+  search snippet on the second pass, page not opened): aquatic creatures "always have swim
+  speeds" and breathe water. So the subtype implies the swim speed; the converse does not
+  hold (a whale has a swim speed and no subtype).
+
+**Chosen: line AND body.** A creature is met at sea when its Environment line puts it in
+salt water (ocean, sea, saltwater, or "aquatic" not named beside a marsh, swamp, lake,
+river or pond) and its stat block puts its body in the water (a swim speed in its movement
+line, or the aquatic subtype). After it: 80 creatures; the mirage is out, the seven are
+in, and the poison and giant frogs ("marshes and aquatic") stay out.
+
+**Rejected.** The aquatic subtype alone: whales, dolphins and orcas carry no subtype, so
+it empties much of the sea. A swim speed alone: every otter, frog and
+crocodile swims. The line alone: the defect.
+
+**Every sea draw path, grepped.** The voyage's stretches and the cruise both go through
+`ontheway.sea_stretches` → `_sea_meeting` → `_the_land(keep=open_water, climates=...)`, so
+the fix is `open_water`, once. The climate filter and its next-door fallback run after it,
+inside the aquatic set. When nothing aquatic fits, `_sea_meeting` already turns the band
+into a merchant: a ship, never a land creature. The shore, the coast and an island are
+land (`coast` ground, the book's Coastline terrain): their draws are the land's and stay
+so. Swimming out to a ship lying off (`Engine._swim_out`) draws no creature at all.
+
+## Part 2: the navy patrol
+
+**Sources (second pass marks what was read and what was a search summary).**
+- Skull and Bones, faction hostility (wccftech.com/how-to/skull-and-bones-guide-faction-
+  hostility/, read): attacking a faction's ships in view of others, or pillaging its
+  settlements, raises a four-level hostility; at low levels its ships turn red only if
+  you linger, at high levels they attack on sight; it falls by staying out of their sight.
+  Rogue ships attack regardless.
+- Assassin's Creed IV: Black Flag (Prima eGuide "The Wanted System" and dotesports, both
+  refused a fetch; search summary only): the wanted level climbs one step per ship sunk,
+  each step sends heavier hunter ships after the player, and bribing an officer clears it.
+  An incognito ship is left alone. Not confirmed from the pages themselves.
+- Sid Meier's Pirates! (search summaries only): a letter of marque lets you take a
+  hostile nation's ships without becoming universally wanted; in the later eras navy
+  warships patrol and governors grow less tolerant. How a nation's ship treats a ship it
+  is at war with could not be confirmed.
+- Sunless Sea (sunlesssea.fandom.com, search summary): most ships are hostile; neutral
+  ships are rare, retaliate if attacked and are otherwise unresponsive; attacking them is
+  piracy.
+- Pathfinder (pathfinderwiki.com Chelish Navy, search summary): the Chelish Navy has "no
+  tolerance for pirates" and runs pirate-hunting flotillas. Whether it inspects passing
+  ships at the Arch of Aroden is, per the Paizo forum thread, never stated in canon. No
+  PF1e rule for a patrol's treatment of a passing ship was found.
+- UNCLOS Art. 110 (a warship's right of visit on suspicion of piracy) was going to anchor
+  the inspection step; un.org refused the fetch and it is not claimed.
+
+**Chosen: hail and pass, or run her down.** The common shape across the games is a
+nation's ships ignoring a ship it does not want and hunting one it does. So the patrol:
+- flies the flag of the nation of the port she sailed from or is bound for
+  (`maps.nation_of`, a hidden die between two), a real name from the world, never
+  invented; with no such nation the band is a merchant instead;
+- is a real `warship` vessel record (`_keep_vessel`), named like every ship;
+- hails and lets her go, unless the PC is wanted in any town of that nation, or the PC
+  holds a ship whose seizure was sworn in one of its towns (`Vessel.sworn`, the existing
+  "a master swore she was taken" record): then she comes about hostile, through the
+  pirates' own machinery (`Scene.sea` with `hostile`, the chase, `_pirates_come_aboard`),
+  and the people who come over the rail are marines from the codex (soldier, guard,
+  sailor words), instantiated by `_defenders` as every crew is, not a number.
+
+**Rejected or deferred.** An inspection step: the engine holds no contraband concept to
+find, so an inspection would have nothing true to discover; that waits on a contraband
+ruling. A notoriety ladder (AC IV's escalating hunters, Skull and Bones' four levels): the
+engine's one standing with the law is per-town wanted or suspected, and a second scale of
+it would be a parallel store. "Suspected" alone does not bring the navy down, by the same
+reading the town watch gives it.

@@ -398,13 +398,33 @@ SEA_PERCENT = ROAD_PERCENT
 # What the open sea stocks: a creature whose own Environment line names salt water. The
 # bestiary's `water` biome is fresh and salt together (an otter, a poison frog, a kappa),
 # and a river-boat's creatures have no business at a ship's rail in mid-ocean.
-_SALT = re.compile(r"\b(oceans?|seas?|saltwater|any aquatic)\b")
+_SALT = re.compile(r"\b(oceans?|seas?|saltwater)\b")
 _FRESH_ONLY = re.compile(r"\b(fresh ?water|plane of)\b")
+# "Aquatic" alone is the book's water terrain, salt or fresh: the dragon turtle's
+# "temperate aquatic" and the elasmosaurus's "warm aquatic" are the sea's, the poison
+# frog's "warm marshes and aquatic" is a pond's. Named beside inland water, it is inland.
+_AQUATIC = re.compile(r"\baquatic\b")
+_INLAND = re.compile(r"\b(marsh(?:es)?|swamps?|lakes?|rivers?|ponds?)\b")
+# A swim speed in the stat block's movement line ("10 ft., swim 40 ft.").
+_SWIMS = re.compile(r"\bswim\s+\d")
 
 
 def open_water(row: dict) -> bool:
+    """Whether a creature can be met at sea (owner ruling 2026-11-21: "at sea, only
+    aquatic creatures and ships"): its Environment line puts it in salt water (an ocean
+    or sea, or "aquatic" with no inland water beside it), AND its body is in the water:
+    a swim speed or the aquatic subtype. Either half alone is wrong, measured on the
+    shipped book: by the line alone the living mirage ("any deserts or oceans", fly 20
+    ft., no swim) was one of the 74 creatures the sea could draw; by the body alone,
+    every otter, frog and crocodile with a swim speed would be."""
     env = str(row.get("environment") or "").lower()
-    return bool(_SALT.search(env)) and not _FRESH_ONLY.search(env)
+    if _FRESH_ONLY.search(env):
+        return False
+    salt = bool(_SALT.search(env)) or (bool(_AQUATIC.search(env))
+                                        and not _INLAND.search(env))
+    moves = " ".join(str(row.get(k) or "") for k in ("speed_note", "speed")).lower()
+    body = bool(_SWIMS.search(moves)) or "aquatic" in str(row.get("subtype") or "").lower()
+    return salt and body
 
 
 # Sizes a creature may be and still come at a Medium traveller on its own deck: the same
