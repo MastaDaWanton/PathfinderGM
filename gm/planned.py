@@ -1419,6 +1419,89 @@ def _goods_known(engine, a, name: str) -> list[str]:
     return out
 
 
+# --- a town's trouble, shown (2026-11-21) -----------------------------------------------
+#
+# The owner: "please tell me what is happening that creates this tension instead of the
+# general dilemma or the overarching problem." Measured on the owner's saves: 20 of 964 GM
+# beats said a tension hung, lingered or was palpable in the air; the matter slot wrote 14
+# of the planned ones and the "still" slot carried 10 more forward. The slot was handed
+# World Bible's strain ("Ongoing friction over grazing land. Simmering, not yet at open
+# conflict.") and asked for "something seen or heard here", with nothing seen or heard to
+# give, so it gave the abstraction back (docs/research/2026-11-21-matter-shown.md).
+#
+# Dungeon World's move is "show signs of an approaching threat"; the Alexandrian's city
+# is "stuff happening all the time and just out of sight", restocked as it is used up. So
+# the slot shows ONE thing here — an object, a trace, a notice, a sound, or a person who
+# is here at it — by demonstration (three synthetic examples, turned over), and code
+# reads what came back: the mood stated (`told_not_shown`) or a showing repeated
+# (`copied_from` against `Card.shown`) is asked once more with it named, then dropped.
+_SHOWN_DEMOS = (
+    "TROUBLE: Ongoing friction over who may draw from the weir. WHERE: a lane by the mill, "
+    "in the morning; nobody else here.\n"
+    "PROSE: A new padlock and chain hold the weir's sluice wheel fast, and somebody has cut "
+    "a row of tally marks into the post beside it, one for every bucket drawn.",
+    "TROUBLE: A guild quarrel over who works the dye vats first. WHERE: inside a cookshop, "
+    "in the evening; the cook is here.\n"
+    "PROSE: Through the back wall comes a shout about whose turn it is at the vats, then "
+    "the bang of a door, and the cook goes on stirring as if she hears it every night.",
+    "TROUBLE: Friction between two villages over a wayside shrine. WHERE: the square, at "
+    "midday; nobody else here.\n"
+    "PROSE: Two colours of ribbon are tied to the posts of the shrine, and every blue one "
+    "has been cut through and left lying in the dust beneath.",
+)
+# Each demonstration's own words (`demo_leak`), never an ordinary one.
+_DEMO_WORDS_SHOWN = ("weir", "sluice", "tally marks", "dye", "vats", "ribbon")
+
+
+def shown_slot(title: str, fact: str, shown=()) -> dict:
+    """The matter slot for a trouble of this place with nobody of its own (`cards.ambient`):
+    one thing of it seen or heard here, now, never the trouble as a mood. `shown` is what
+    earlier beats showed of it (`Card.shown`); the demonstration turns over with it."""
+    shown = [_one_line(x, 200) for x in shown if str(x).strip()]
+    about = title + (f" ({fact.rstrip('.')})" if fact else "")
+    demo = _SHOWN_DEMOS[len(shown) % len(_SHOWN_DEMOS)]
+    say = (f"A trouble of this place, not a task of the player's: {about}. In one sentence, "
+           "show ONE thing of it that the player sees or hears right where they are now: an "
+           "object, a mark or trace left behind, a notice, a sound, or somebody from PEOPLE "
+           "HERE NOW at it. Say what it is, where it is and what it looks or sounds like, "
+           "and let the trouble be what it is about. Nobody who is not in PEOPLE HERE NOW "
+           "is seen; they may be heard, or have left a trace. Nothing that settles it, and "
+           "nothing the player does or wants."
+           + (" Already shown here on earlier visits, so show a different thing: "
+              + " | ".join(shown[-3:]) if shown else "")
+           + "\n\nHOW A TROUBLE IS SHOWN (an example from another place; nothing in it is "
+             "here):\n" + demo)
+    return {"key": "matter", "want": MATTER_WANT, "not_own": title, "shows": True,
+            "shown": shown, "demo_words": _DEMO_WORDS_SHOWN, "say": say}
+
+
+# The trouble stated as a mood instead of shown: an abstract noun with the stock words
+# that hang it in the air. A closed list of our own output's tics, read in code as
+# `TRAVEL_TICS` is; never a reading of the player's words. Measured on the owner's saves:
+# "The tension over the control of a trade toll lingers in the air like the heavy mist",
+# "Local tension over a heretical splinter cult hangs heavy in the air", "the underlying
+# tension over disputed grazing lands remains a simmering fact", "Signs of strained
+# tensions over smuggling routes are visible". A reply is never read: a person saying
+# tempers are short is talk, and talk is how a trouble is heard.
+_MOOD = (r"(?:tensions?|frictions?|unrest|strife|unease|discord|animosity|hostility|"
+         r"resentments?|rivalr(?:y|ies)|disputes?|conflicts?|quarrels?)")
+_MOOD_AFTER = re.compile(
+    r"\b" + _MOOD + r"\b[^.!?]{0,90}?\b(?:in the air|palpable|hang\w* (?:heavy|thick|in|"
+    r"like|over (?:the|everything|it all|you|them))|linger\w*|simmer\w*|thicken\w*|"
+    r"undercurrent|like a (?:heavy )?(?:mist|fog|shadow|cloud|pall)|can be felt|is felt|"
+    r"you can feel|are visible|is visible|remains? (?:a|an|unresolved|unsettled))", re.I)
+_MOOD_BEFORE = re.compile(
+    r"\b(?:palpable|thick|heavy|simmering|lingering|underlying|mounting|growing|"
+    r"strained|unspoken|quiet|silent|signs of)\s+(?:\w+\s+)?" + _MOOD + r"\b", re.I)
+
+
+def told_not_shown(text: str) -> list[str]:
+    """The sentences of `text` that state a trouble as a mood in the air (`_MOOD_AFTER`,
+    `_MOOD_BEFORE`) instead of showing anything of it."""
+    return [x for x in narration_mod._sentences(text or "")
+            if _MOOD_AFTER.search(x) or _MOOD_BEFORE.search(x)]
+
+
 def matter_slot(pull) -> dict | None:
     """The "matter" slot for the open matter the engine picked (`cards.thread_to_pull`), or
     None. Its words come from the pull's facts and never its `text`, which is the free
@@ -1472,6 +1555,8 @@ def matter_slot(pull) -> dict | None:
                        "is talk about that place, which is somewhere else, not here. It is "
                        "not the player's goal: never write that they seek it, pursue it or "
                        "keep it in mind. Do not resolve it."}
+    if stands == "situation" and pull.get("ambient"):
+        return shown_slot(title, fact, pull.get("shown") or ())
     if stands == "situation":
         return {"key": "matter", "want": MATTER_WANT, "not_own": title,
                 "say": f"A matter of the world here, not a task of the player's: {what}. Let "
@@ -2621,6 +2706,54 @@ def _matter_is_its_own(out: Planned, plan, slots, i, written, who, s: dict, text
     return None
 
 
+def _shown_faults(s: dict, text: str) -> tuple[list[str], list[str]]:
+    """(the mood sentences, the runs repeated from an earlier showing) of one slot."""
+    again = copied_from(text, " ".join(s.get("shown") or ())) if s.get("shows") else []
+    return told_not_shown(text), again
+
+
+def _shown_not_told(out: Planned, plan, slots, i, written, who, s: dict, text: str,
+                    data: dict, *, final: bool, lift, core: bool):
+    """A slot that states a trouble as a mood (`told_not_shown`), or a town trouble's
+    showing that repeats an earlier one (`Card.shown`), asked once more with the sentence
+    named. Still there: the trouble's own slot is dropped (nothing on the page beats a
+    mood on it, the owner's report of 2026-11-21); any other slot loses that sentence,
+    or is dropped if it was nothing else and is not core. (None, data) when dropped."""
+    mood, again = _shown_faults(s, text)
+    if not mood and not again:
+        return text, data
+    if mood:
+        redo = (f"You wrote: {text!r}. The sentence {mood[0]!r} says a trouble is in the "
+                "air instead of showing anything. Write it again with that sentence "
+                "replaced by one thing the player sees or hears right here, or left out.")
+    else:
+        redo = (f"You wrote: {text!r}. That was already shown here (" + "; ".join(
+            f'"{x}"' for x in again[:3]) + "). Show a different thing, in new words.")
+    text2, data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
+                        core=core and not s.get("shows"), redo=redo)
+    mood2, again2 = _shown_faults(s, text2) if text2 else (["(nothing)"], [])
+    out.calls[-1]["note"] = ("mood named" if mood else "showing repeated") + (
+        " — still there" if (mood2 or again2) else "")
+    if text2 and not mood2 and not again2:
+        out.notes.append(f'the "{s["key"]}" slot: ' + ("a mood in the air" if mood else
+                         "an earlier showing repeated") + " — asked again, fixed")
+        return text2, (data2 if final else data)
+    if s.get("shows"):
+        out.notes.append(f'the "{s["key"]}" slot told the trouble instead of showing it '
+                         f'twice: dropped ({text[:80]!r})')
+        return None, data
+    kept = narration_mod._cut_sentences(text, mood).strip()
+    if narration_mod._sentences(kept):
+        out.notes.append(f'the "{s["key"]}" slot: a mood in the air twice — cut '
+                         f'{mood[0][:80]!r}')
+        return kept, data
+    if not core:
+        out.notes.append(f'the "{s["key"]}" slot was only a mood in the air: dropped')
+        return None, data
+    out.notes.append(f'the "{s["key"]}" slot: a mood in the air twice — kept, it is the act')
+    return text, data
+
+
 def _name_words(names) -> list[str]:
     """The words a person here is told by: "a deckhand" -> deckhand, "the Korvu
     harbourmaster" -> korvu, harbourmaster. Our own names, never the page's English."""
@@ -3197,6 +3330,12 @@ def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,
                 cut, _gone = narration_mod.trim_unfinished(cut)
                 text = cut or text
                 out.notes.append(f'the "{s["key"]}" slot: {fault} — cut to whole sentences')
+        if s["key"] != "reply":
+            text, data = _shown_not_told(out, plan, slots, i, written, who, s, text, data,
+                                         final=final, lift=lift, core=core)
+            if text is None:
+                out.slots.append({**s, "wrote": "", "dropped": True})
+                continue
         if s.get("way"):
             # The travel act's repeats (`travel_repeats`): asked once more with them named,
             # then kept either way — a colour slot is never cut for a stale phrase.
@@ -3254,7 +3393,9 @@ def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,
             out.calls[-1]["note"] = "fault named" + (" — still there" if again else "")
             out.notes.append(f'the "{s["key"]}" slot: {wrong} — asked again'
                              + (", still there" if again else ", fixed"))
-        if s["key"] == "matter" and s.get("keys"):
+        if s["key"] == "matter" and s.get("keys") and not s.get("shows"):
+            # A trouble shown well shares no word with its title (a lock on the cistern,
+            # for "Ongoing friction over water rights"): `_shown_not_told` reads that slot.
             text = _matter_is_its_own(out, plan, slots, i, written, who, s, text,
                                       final=final, lift=lift)
             if text is None:

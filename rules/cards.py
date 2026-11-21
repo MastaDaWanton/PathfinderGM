@@ -103,6 +103,14 @@ KNOWN = ("unheard", "heard", "offered", "taken")
 #   situation  everything else: a town's strain, a place, a fact of the world — never a
 #              task of the player's
 OWN, OFFERED, HEARD, UNHEARD, SITUATION = "own", "offered", "heard", "unheard", "situation"
+# A trouble's fact that only says how strained things are ("Simmering, not yet at open
+# conflict", "Tension in Ashwatch currently sits at a simmer"): the world's own level words,
+# read in code as `identity_keys` reads titles; never the player's words.
+_MOOD_WORD = re.compile(r"\b(?:tensions?|frictions?|simmer\w*|conflicts?|volatil\w*|unrest|"
+                        r"strife|rivalr(?:y|ies))\b", re.I)
+# `Card.shown`'s stamp, and how many showings a card remembers.
+SHOWN_VERSION = 1
+SHOWN_KEPT = 6
 
 _STOP = {"the", "and", "that", "with", "from", "this", "here", "there", "their", "which",
          "have", "been", "were", "your", "into", "over", "under", "than", "them", "they",
@@ -169,6 +177,12 @@ class Card:
     # theirs whose tell named one of its people (`touch_from_outcomes`). Zero until it ever
     # has. What `took_part` asks before a story award pays. Written only when set.
     worked: int = 0
+    # What the beat has already shown of a world trouble (`note_shown`): the matter
+    # sentences as written, newest last, so the next showing is a different incident
+    # ("Running the City": scenic encounters are restocked "as they get used up").
+    # Derived from model output and kept in the save, so stamped (`SHOWN_VERSION`): a
+    # bump forgets them. Written only when there are some.
+    shown: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict:
         out = {
@@ -193,6 +207,9 @@ class Card:
             out["job"] = copy.deepcopy(self.job)
         if self.worked:
             out["worked"] = self.worked
+        if self.shown:
+            out["shown"] = list(self.shown)
+            out["shown_v"] = SHOWN_VERSION
         return out
 
     @classmethod
@@ -225,6 +242,8 @@ class Card:
             known=(str(d.get("known")) if str(d.get("known") or "") in KNOWN else ""),
             job=(copy.deepcopy(d["job"]) if isinstance(d.get("job"), dict) else {}),
             worked=int(d.get("worked", 0) or 0),
+            shown=([str(x) for x in d.get("shown") or []]
+                   if d.get("shown_v") == SHOWN_VERSION else []),
         )
 
     def is_(self, query: str) -> bool:
@@ -292,6 +311,30 @@ def standing(card: Card) -> str:
 
 def is_own(card: Card) -> bool:
     return standing(card) == OWN
+
+
+def ambient(card: Card) -> bool:
+    """A trouble of the world with nobody of its own: a town's strain, a faction's aim, as
+    World Bible ships them (`TAG_WORLD`). Nobody carries it, so it reaches the page only as
+    something seen or heard where the party stands (docs/research/2026-11-21-matter-shown.md),
+    and only inside its own settlement."""
+    return (card.is_(TAG_WORLD) and not card.people and card.kind not in TASKS
+            and not card.is_(TAG_RUMOUR) and standing(card) == SITUATION)
+
+
+def note_shown(scene, card_id: str, text: str, turn: int = 0) -> None:
+    """The beat showed this much of a world trouble (`ambient`): kept on the card, newest
+    last, `SHOWN_KEPT` of them, and the card rests from here. Its rest started only when the
+    beat repeated the card's own words (`note_mentions`), and an incident shown well (a lock
+    on the cistern) shares none with "Ongoing friction over water rights"."""
+    text = " ".join(str(text or "").split())
+    cards = load(scene)
+    card = next((c for c in cards if c.id == card_id), None)
+    if card is None or not text:
+        return
+    card.shown = (list(card.shown) + [text])[-SHOWN_KEPT:]
+    card.mentioned = int(turn)
+    save(scene, cards)
 
 
 def took_part(card: Card) -> bool:
@@ -1003,7 +1046,12 @@ def salience(scene, *, recent, player_text: str = "", tells=(),
             why.append("here")
         if present:
             why.append("present")
-        if _hits(c, now) >= 2 or _names_in(names, now):
+        # A world trouble is spoken of by its own words, not by two of its forty-odd
+        # loose keys: "trade" and "local" in a market tell had grazing land pulled on
+        # beats 8, 39, 55, 73 and 79 of one owner save (2026-11-21). `identity_keys`
+        # made the same narrowing for "recent" after the sixty-turn run.
+        if ((_identity_hits(ident, now) if ambient(c) else _hits(c, now)) >= 2
+                or _names_in(names, now)):
             why.append("spoken")
         if _identity_hits(ident, window) >= 2 or _names_in(names, window):
             why.append("recent")
@@ -1040,6 +1088,13 @@ def salience(scene, *, recent, player_text: str = "", tells=(),
             # square"; in Mirabalos's sewers it wrote Xylorvotha's and Kalimnar's. The
             # word "merchant" in the tells was enough to make it "spoken". A matter of the
             # player's own still goes where they go.
+            continue
+        if ambient(c) and (places_mod.setting_of(here) != "in" or (
+                c.place and places_mod.location_of(c.place) != places_mod.location_of(here))):
+            # A world trouble is seen or heard in its own streets, never in the wood,
+            # on the ridgeline or in the next town. The prose-gold writers (2026-11-20)
+            # found 6 of 19 matter slots pulled where nobody was, "an invitation to
+            # invent", and the shipped pages did ("a heavy fog", "dry, cracked earth").
             continue
         if c.is_(TAG_RUMOUR) and ships_mod.vessel_of(c.place):
             # A ship is no settlement and has no ways down (`dungeons.spread_rumours`).
@@ -1173,6 +1228,13 @@ def _head(c: Card, why, fact: str, stands: str, giver_name: str = "") -> str:
         return ("STILL OPEN, NEAREST TO HAND (one matter the engine keeps — a fact to let "
                 f"show where it fits, never to resolve for the player): {c.title}"
                 + (f" — {fact}" if fact else "") + "." + quiet)
+    if stands == SITUATION and ambient(c):
+        # Shown as one thing here, never as a mood: the owner, 2026-11-21, "please tell me
+        # what is happening that creates this tension instead of the general dilemma".
+        return ("STILL OPEN, NEAREST TO HAND (a trouble of this place, not a task of the "
+                "player's — if it fits, show ONE thing of it seen or heard right here, "
+                "an object, a mark or a sound, never a feeling in the air, and never "
+                f"resolve it): {c.title}" + (f" — {fact}" if fact else "") + "." + quiet)
     if stands == SITUATION:
         return ("STILL OPEN, NEAREST TO HAND (a matter of the world here, not a task of the "
                 "player's — let it show where it fits as something seen or heard, never as "
@@ -1232,11 +1294,24 @@ def _pull_one(scene, c: Card, why, *, player_text: str, turn: int, world) -> dic
                                        if not _names_the_pc(scene, f)), "")
         if not fact and c.facts:
             return None
+        if ambient(c):
+            # The world's own words for it, its earliest fact that says more than the
+            # title, never the newest: a tell that hits two loose keys lands on the card
+            # (`touch_from_outcomes`), and 7 of the prose-gold's 19 matter slots were a
+            # travel tell pasted in as the town's trouble ("You leave Reedsink behind.").
+            # And one that names a cause rather than a mood: the slot's ask becomes its
+            # answer, and "Tension in Fizspark currently sits at a simmer" handed to it is
+            # the owner's sentence half-written. The first fact when every one is a mood.
+            title = " ".join(c.title.lower().split()).rstrip(".")
+            more = [f for f in c.facts if " ".join(f.lower().split()).rstrip(".") != title]
+            fact = next((f for f in more if not _MOOD_WORD.search(f)), more[0] if more else "")
     since = int(turn) - int(c.mentioned or c.touched or 0)
     out = {"id": c.id, "title": c.title, "kind": c.kind, "fact": fact,
            "keys": identity_keys(c, names), "people": names, "since": since,
            "urgent": "urgent" in why and stands == OWN, "why": why, "standing": stands,
            "text": _head(c, why, fact, stands)}
+    if ambient(c):
+        out.update(ambient=True, shown=list(c.shown))
     from . import hooks
     from . import residency
 

@@ -5487,6 +5487,14 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             if not _matter_told(agent):
                 carried = []
             cards_mod.note_heard(c.scene, pull, carried, turn=len(c.transcript))
+            # A town's trouble shown: what this beat showed of it is kept on its card, so
+            # the next showing is another incident, and it rests from here (`note_shown`).
+            if pull and pull.get("ambient"):
+                shown = next((sl.get("wrote") for sl in getattr(agent, "last_prose_slots",
+                                                                None) or ()
+                              if sl.get("key") == "matter" and sl.get("wrote")), "")
+                if shown and getattr(agent, "last_narration", "") == "planned":
+                    cards_mod.note_shown(c.scene, pull["id"], shown, turn=len(c.transcript))
             # And whoever the beat says stopped watching is in the fight, with their
             # kind: "the second guard draws" is a second guard on the initiative.
             for ref, side in judgement.joiners(c.scene, text):
