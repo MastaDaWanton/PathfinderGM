@@ -102,6 +102,21 @@ def test_ground_that_is_not_there_is_found_and_cut():
     assert "pine" not in cut and "farmland" in cut and notes
 
 
+def test_an_everyday_word_is_not_ground():
+    """Owner's save, 2026-11-21 (the rich-narration live check): "waiting until the sun
+    reaches its peak at midday", in a ruins hex with no mountain, was read as mountain
+    ground and cut by the backstop, and the page lost the hour's wait. Only a word that can
+    mean nothing but land cover is judged; the trees by name stay judged."""
+    for ordinary in ("You sit among the broken walls, waiting until the sun reaches its "
+                     "peak at midday.",
+                     "Frost rims the cup in your hand.",
+                     "A lone tree stands by the gate.",
+                     "You moor the boat and climb out."):
+        assert land_described._ground_of(ordinary) == set(), ordinary
+    assert land_described._ground_of("the trees grow denser, dark with pine") == {"forest"}
+    assert land_described._ground_of("The mountains rise to the west.") == {"mountain"}
+
+
 def test_in_town_trees_are_not_judged():
     """A green has trees. (b) judges only a beat outside or walking out, so the market's
     prose is never cut for a tree."""

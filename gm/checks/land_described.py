@@ -48,7 +48,26 @@ _STOP = frozenset("the and with that this from into over under few some where th
 # Biome-table words that are also building stuff or a preposition. "it tastes of salt and
 # old timber" (Bobby's turn 5, in a village of driftwood stilts) is a material, not a
 # wood; "a heavy timber post" is a post. Measured: two false forests in one beat.
-_NOT_LAND = frozenset({"timber", "wood", "down", "plain", "bank"})
+#
+# And every table word with an everyday sense that is not land cover: the cut only fires on
+# a word that can mean nothing but the ground. Owner's save, 2026-11-21 (the richer-prose
+# lane's live check): "waiting until the sun reaches its peak at midday" in a ruins hex was
+# read as mountain ground and cut, and the page lost the hour's wait. The same family: a
+# sun's summit, a cliff of a man, frost on a cup, snow-white hair, an arid joke, mooring a
+# boat, a single tree or grove in farmland, a volcanic temper. What stays judged is the
+# land nouns themselves (forest, swamp, desert, tundra, glacier, hills, mountain, volcano,
+# crag …) and the trees by name below, Bobby's measured case.
+#
+# Narrowed rather than moved to the read-back (`beat_verify`: a model quotes the claim,
+# code checks it against a closed list, as the underground-sky and setting checks do): a
+# ground slot in the read is a new field in a call whose fields compete (CLAUDE.md, N
+# things in parallel; docs/beat-verify.md measured recall drop when slots were added), and
+# needs its own bench. This is still a word list over English: precision only, never meaning.
+_NOT_LAND = frozenset({"timber", "wood", "down", "plain", "bank",
+                       "peak", "summit", "cliff", "plateau", "alpine", "volcanic",
+                       "frost", "frozen", "icy", "snow", "polar", "arctic",
+                       "northern climate", "arid", "oasis", "tropic", "moor",
+                       "tree", "grove", "glade", "copse", "thicket"})
 
 
 def _patterns():
