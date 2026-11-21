@@ -313,7 +313,7 @@ def test_a_journey_asks_before_it_spends_days(worlds, table):
     c = table["stand"](loc, spot)
     # The first way out may be a passage, a paid crossing since 2026-11-13 (1 sp a mile
     # a head): the coin is the ticket, and this test is about the confirmation.
-    c.scene.pc().purse = {"pp": 10}
+    c.scene.pc().purse = {"pp": 20}     # three weeks at sea is 100 gp 8 sp a head
     c.save()
     x = next(v for v in _state()["scene"]["exits"] if v["journey"])
     assert x["group"] == "road"
@@ -332,7 +332,7 @@ def test_a_journey_asks_before_it_spends_days(worlds, table):
     if ships.vessel_of(c.scene.at):
         # A passage: the confirmed click buys the berth and goes aboard; the days are
         # the sailing's, which the deck's own row confirms the same way.
-        assert c.scene.pc().purse != {"pp": 10}, "the fare was not paid"
+        assert c.scene.pc().purse != {"pp": 20}, "the fare was not paid"
         sail = next(v for v in _state()["scene"]["exits"] if v["journey"])
         r = _say({"text": f"We sail for {sail['name']}.",
                   "attachments": [{"kind": "place", "id": sail["id"], "confirmed": True}]})

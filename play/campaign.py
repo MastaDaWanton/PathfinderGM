@@ -1267,12 +1267,14 @@ def _begin(campaign_id: str, character=None) -> Campaign:
 def _mend_hexes(data: dict) -> None:
     """A save played on an older hex scale, re-keyed onto this build's grid before the
     scene is read (`hexes.mend_save`, 2026-11-21: the board was rescaled so walking the
-    hexes never beats the road). A world that will not load is left as it was, unstamped,
+    hexes never beats the road), and onto its coast (the channels down to the sea,
+    feat/sea-hexes). A world that will not load is left as it was, unstamped,
     to be mended by the load that can read it."""
     from rules import hexes
 
     hx = (data.get("scene") or {}).get("hexes")
-    if not isinstance(hx, dict) or hx.get("grid") == hexes.GRID_VERSION:
+    if not isinstance(hx, dict) or (hx.get("grid") == hexes.GRID_VERSION
+                                    and hx.get("coast") == hexes.COAST_VERSION):
         return
     try:
         world = load_cached(_resolve_world_source(data.get("world_source") or ""))

@@ -34,7 +34,7 @@ writes the map down; places_found.py cites the same refusal). There is no forget
 """
 from __future__ import annotations
 
-from rules import geography, journey
+from rules import geography, journey, ships
 
 _MEMO: dict = {}
 
@@ -103,7 +103,14 @@ def atlas(world) -> dict:
                            # The road's hours on foot at 30 ft, the journey's own figure
                            # (floors and all); 0 for a crossing by water. The board is
                            # scaled so no walk across its hexes beats it (`hexes.Grid._fit`).
-                           "walk": hours if how != "sea" else 0})
+                           "walk": hours if how != "sea" else 0,
+                           # A crossing's miles as its passage is reckoned (the world's
+                           # miles or the three-week floor, `ships.leg_days`, at a sailing
+                           # ship's 48 a day); 0 for a road or a river. No crossing by the
+                           # sea's hexes beats it (`hexes.sea_hex_miles`).
+                           "sail": (ships.leg_days(leg, "sailing ship")
+                                    * ships.miles_a_day("sailing ship"))
+                           if how == "sea" and leg.by != "river" else 0})
     got = {"world": getattr(world, "name", ""), "cities": cities, "nations": nations,
            "continents": continents, "routes": routes}
     if len(_MEMO) > 8:
@@ -178,7 +185,23 @@ def _hexes(engine) -> dict:
     from rules import hexes
 
     held = engine.scene.hexes or {}
-    return {"party": list(here), "nation": g.cell(*here)["nation"],
+    cell = g.cell(*here)
+    how, ship = engine.afloat(g)
+    # The ways onto the water beside the party (feat/sea-hexes): {"q,r": ["boat", "swim"]},
+    # for the slip's buttons; a swim is offered there and never lit on the board.
+    ways = {hexes.key(*h): w for h in hexes.neighbours(*here)
+            for w in [engine.water_ways(g, here, h)] if w}
+    return {"party": list(here),
+            # Out on the water a hex has no nation: the map is its nearest town's.
+            "nation": cell["nation"] or (g.city.get(cell["near"]) or {}).get("nation", ""),
+            "afloat": how, "ship": getattr(ship, "name", "") if ship is not None else "",
+            "ways": ways, "swim": engine.swim_words(g) if ways else "",
+            "sea_miles": round(g.sea_miles, 2),
+            # Hours a water hex takes each way the party has (rules/hexes.py), for the slip.
+            "way_hours": {
+                "boat": round(hexes.row_minutes(g.sea_miles) / 60),
+                **({"ship": round(hexes.ship_minutes(mine.kind, g.sea_miles) / 60)}
+                   if (mine := engine._ship_held_here()) is not None else {})},
             "reach": [list(h) for h in engine.hex_reach(g)],
             "rides": engine.party_rides(),
             # Hours on the way since the last rest, against the day's eight: past them

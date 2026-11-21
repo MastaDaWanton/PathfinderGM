@@ -69,12 +69,13 @@ def test_a_measured_route_is_taken_at_its_word():
 
 def test_the_fare_is_for_the_days_she_sails():
     """1 sp a mile (Ultimate Equipment's passage), the miles her day's run over the
-    floored days: a fortnight on a sailing ship is 672 miles, 67 gp 2 sp a head."""
+    floored days: three weeks on a sailing ship is 1,008 miles, 100 gp 8 sp a head (the
+    floor was a fortnight, 672 miles, until the owner raised it on 2026-11-21)."""
     scene, engine, pc = _at_port(gp=500)
     _journey(engine)
     assert engine.aboard().days_total == ships.PASSAGE_DAYS_AT_LEAST
     assert 500 * 100 - sum(v * {"gp": 100, "sp": 10, "cp": 1, "pp": 1000}[k]
-                           for k, v in pc.purse.items()) == 6720
+                           for k, v in pc.purse.items()) == 10080
 
 
 # --- the table ------------------------------------------------------------------------------
@@ -220,7 +221,7 @@ def test_a_quiet_passage_arrives_after_the_whole_fortnight(monkeypatch):
     out = _journey(engine)
     assert scene.location_id == ZHILVARNIA, out.tell
     assert scene.clock_minutes - start == ships.PASSAGE_DAYS_AT_LEAST * DAY
-    assert "14 days at sea" in out.tell
+    assert "21 days at sea" in out.tell
 
 
 # --- the road ---------------------------------------------------------------------------------

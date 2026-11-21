@@ -30,7 +30,8 @@ log = logging.getLogger("pathfindergm")
 
 @require_GET
 def hexes_region(request):
-    """{"size", "hexes": [{"q", "r", "land", "nation", "ground", "town"}], "towns": {id: [q, r]}}
+    """{"size", "hexes": [{"q", "r", "land", "nation", "ground", "town", "sea"}],
+    "towns": {id: [q, r]}}
     for one nation's Region map. `no-store`, for the reason `/api/atlas` is."""
     c = campaign_mod.current()
     e = c.engine()
@@ -38,8 +39,17 @@ def hexes_region(request):
     nation = str(request.GET.get("nation") or "")
     if g is None or nation not in g.nations:
         return JsonResponse({"error": "no such nation on this world's map"}, status=404)
+    from rules import hexes as hexes_mod
+
+    # The water the party has been on and stands on, wherever it lies (feat/sea-hexes): a
+    # ship far out is still on the map of the waters it sailed from.
+    here = e.party_hex(g)
+    also = [hexes_mod.unkey(k) for k, v in ((c.scene.hexes or {}).get("touched") or {}).items()
+            if "searched" in v and not g.cell(*hexes_mod.unkey(k))["land"]]
+    also += [here] if here is not None else []
     hexes = [{"q": h["q"], "r": h["r"], "land": h["land"], "nation": h["nation"],
-              "ground": h["ground"], "town": h["town"]} for h in g.region(nation)]
+              "ground": h["ground"], "town": h["town"], "sea": h.get("sea", "")}
+             for h in g.region(nation, also=also)]
     response = JsonResponse({"size": g.size, "hexes": hexes,
                              "towns": {k: list(v) for k, v in g.town_hex.items()}})
     response["Cache-Control"] = "no-store"
@@ -120,6 +130,9 @@ def hex_move(request):
         q, r = (int(v) for v in list(body.get("hex") or ())[:2])
     except (TypeError, ValueError):
         return JsonResponse({"error": "hex must be [q, r]"}, status=400)
+    how = str(body.get("how") or "").strip().lower()
+    if how and how not in ("ship", "boat", "swim"):
+        return JsonResponse({"error": "how must be ship, boat or swim"}, status=400)
     e = c.engine()
     g = e.hex_world()
     here = e.party_hex(g) if g is not None else None
@@ -128,14 +141,22 @@ def hex_move(request):
         from rules import hexes
 
         a, b = g.cell(*here), g.cell(q, r)
-        line = (f"I set out {hexes.bearing((a['x'], a['y']), (b['x'], b['y']))} "
-                f"across the {b['ground']}.")
+        way = hexes.bearing((a['x'], a['y']), (b['x'], b['y']))
+        if how == "swim":
+            line = f"I swim {way}."
+        elif not b["land"]:
+            line = f"I set out {way} across the water."
+        elif not a["land"] or e.afloat(g)[0]:
+            line = f"I make for the shore to the {way}."
+        else:
+            line = f"I set out {way} across the {b['ground']}."
     try:
         resolution = e.run(e.validate([{"op": "hex_move", "actor": "pc",
                                          "because": line,
-                                         "params": {"hex": [q, r], **(
-                                             {"march": True} if body.get("march") is True
-                                             else {})}}]))
+                                         "params": {"hex": [q, r],
+                                                    **({"march": True} if body.get("march") is True
+                                                       else {}),
+                                                    **({"how": how} if how else {})}}]))
     except IntentError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
     if resolution.awaiting:

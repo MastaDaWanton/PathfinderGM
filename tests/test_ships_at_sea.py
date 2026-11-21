@@ -67,7 +67,7 @@ def test_the_two_continents_are_a_passage_apart_both_ways():
     assert there[ZHILVARNIA].from_port and there[ZHILVARNIA].source == "derived"
     # As wide as the world's own stated crossings (192 and 216 miles), not the tree's
     # seven days: at the CRB's sailing ship (48 miles a day) that is four. The passage
-    # floor then holds the voyage to a fortnight (`ships.PASSAGE_DAYS_AT_LEAST`).
+    # floor then holds the voyage to three weeks (`ships.PASSAGE_DAYS_AT_LEAST`).
     assert there[ZHILVARNIA].days_apart == 4
     back = {l.to_id for l in journey.legs_from(PANGRELLA, ZHILVARNIA)}
     assert MIRABALOS in back
@@ -119,8 +119,8 @@ def test_the_exits_row_offers_the_passage_and_then_the_voyage(monkeypatch):
     assert passage["journey"] and not passage["blocked"]
     # Days at sea and the fare the booking will charge, never a road's "how far, nobody
     # has written down" (what the row said until 2026-11-13).
-    assert passage["time_words"] == "14 days at sea, 6 Kaldrimia platinum pieces, " \
-        "7 Kaldrimia gold pieces, 2 Kaldrimia silver pieces passage", passage
+    assert passage["time_words"] == "21 days at sea, 10 Kaldrimia platinum pieces, " \
+        "8 Kaldrimia silver pieces passage", passage
     _journey(engine, to=passage["id"])
     rows = exits.exits(engine, PANGRELLA)
     # A ship's rooms are next door to each other, not "Outside" an hour away.

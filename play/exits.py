@@ -148,6 +148,10 @@ def exits(engine, world) -> list[dict]:
     pc = scene.pc()
     down = (f"{pc.name} cannot get up and go anywhere."
             if pc is not None and not pc.can_act() else "")
+    if not down and engine.afloat()[0] in ("boat", "swim"):
+        # Out on a water hex: no road or walk starts on the water (feat/sea-hexes); the
+        # way off it is landfall on the Region map.
+        down = "Out on the water: make landfall on the Region map first."
     return [{k: v for k, v in dict(row, **({"blocked": down} if down else {})).items()
              if k != "minutes"} for row in rows]
 

@@ -293,8 +293,9 @@ function placesAtlas(s, then) {
 // the next move only, then disarmed (a forced march is the player's choice, never a
 // click's accident: owner 2026-11-21).
 const HEXGO = { busy: false, march: false };
-function hexMove(q, r) {
+function hexMove(q, r, how) {
   const body = { hex: [q, r] };
+  if (how) body.how = how;
   if (HEXGO.march) { body.march = true; HEXGO.march = false; }
   return hexAct("/api/hex/move", body);
 }

@@ -588,7 +588,8 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # round are the engine's. `hex_enter` goes into the site of the hex the party is in.
     # `march`: the player chose to go on past the day's eight hours (a forced march,
     # asked by the board, owner 2026-11-21); without it a spent day is refused.
-    "hex_move": (("hex",), ("actor", "march"), "player"),
+    # `how` (feat/sea-hexes) is ship / boat / swim when water is in the step.
+    "hex_move": (("hex",), ("actor", "march", "how"), "player"),
     "hex_enter": ((), ("actor",), "player"),
     # Any craft's excursion onto open ground, by the craft panel's key ("alchemist:quarry",
     # "leatherworker:gather", content/rules/gathering.json): the one gathering door

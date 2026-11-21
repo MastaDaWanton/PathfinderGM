@@ -40,8 +40,8 @@ def _engine(clock=10 * HOUR):
     # Vormoor and Ledgerwarren are a sea crossing apart, and since 2026-11-13 every
     # crossing is a paid passage (1 sp a mile a head) both ways. These tests are about who
     # is still there when the party comes back, not about fares: the coin is the ticket.
-    # Two fortnight crossings (travel pacing, 2026-11-18) are some 130 gp.
-    pc.purse = {"pp": 20}
+    # Two three-week crossings (the floor since 2026-11-21) are some 200 gp.
+    pc.purse = {"pp": 30}
     s.clock_minutes = clock
     e = Engine(s, Dice(seed=3), world=WORLD)
     e.place_party()
@@ -457,20 +457,20 @@ def test_a_traveller_keeps_travelling_past_a_year_and_the_save_stays_small():
 def test_an_old_save_with_a_frozen_route_moves_again(monkeypatch):
     """A save written before #10 carries the 400 entries the old cap left and no
     `route_dropped`. It loads as it is; the next asking prunes it, walks on, and lands
-    on the very road an uncapped walk would have taken. Three thousand days: since
+    on the very road an uncapped walk would have taken. Four thousand days: since
     travel pacing (2026-11-18) a road is three days at least, and 500 days walked 92
-    stops."""
+    stops; since the three-week sea floor (2026-11-21) 3,000 days walked only 360."""
     s, _ = _engine()
     rec = _person(s, "a messenger with a satchel", "messenger")
     t0 = s.clock_minutes
     monkeypatch.setattr(residency, "MOST_STOPS", 10 ** 6)       # an uncapped walk
-    uncapped = residency.route(dict(rec), t0 + 3000 * DAY, WORLD)
+    uncapped = residency.route(dict(rec), t0 + 4000 * DAY, WORLD)
     monkeypatch.undo()
     assert len(uncapped) > residency.MOST_STOPS, len(uncapped)
 
     old = dict(rec, route=uncapped[:residency.MOST_STOPS])    # what the old cap stored
     frozen_at = old["route"][-1]["to"]
-    stops = residency.route(old, t0 + 3000 * DAY, WORLD)
-    assert stops[-1]["to"] >= t0 + 3000 * DAY > frozen_at
+    stops = residency.route(old, t0 + 4000 * DAY, WORLD)
+    assert stops[-1]["to"] >= t0 + 4000 * DAY > frozen_at
     assert old["route_dropped"] > 0 and len(old["route"]) < residency.MOST_STOPS
     assert old["route"] == uncapped[old["route_dropped"]:]

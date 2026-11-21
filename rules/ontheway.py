@@ -495,8 +495,9 @@ def in_climate(row: dict, climates) -> bool:
 #   downtime" (failbettergames.com/news/sunless-sea-vs-sunless-skies-death-legacies-and-
 #   repetition). Skull & Shackles' sea encounter rate could not be read and is not claimed.
 #
-# The 40% a stretch is the app's: a fortnight's passage is five stretches, so it meets two
-# things on average and passes clean 0.6^5 = 8% of the time; the shortest road (three days)
+# The 40% a stretch is the app's: a three-week passage (the floor since 2026-11-21) is seven
+# stretches, so it meets one thing (a voyage stops at the first) on all but 0.6^7 = 3% of
+# them; a fortnight's, five, passed clean 8% of the time; the shortest road (three days)
 # is one stretch, 40%. Most bands are scenes and not fights (TOR's seven events are all one
 # hero's roll, PF2e's GMG splits hits half harmless).
 _EVENTS: dict | None = None

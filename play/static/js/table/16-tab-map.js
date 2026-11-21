@@ -67,12 +67,13 @@ function mapView(s) {
   const kp = (s && s.scene && s.scene.known_places) || {}, W = atlasFor(s);
   if (!W || !Array.isArray(W.cities)) return null;
   const home = kp.town || "", hc = W.cities.find(c => c.id === home) || {};
-  const nation = MAPV.nation || hc.nation || "";
+  // Out on the water a hex has no nation: the map is the nearest town's (play/atlas.py `_hexes`).
+  const nation = MAPV.nation || hc.nation || ((kp.hexes || {}).nation) || "";
   const continent = MAPV.continent || (W.nations[nation] || {}).continent || hc.continent || "";
   // The Region's hexes are the engine's (`/api/hexes`), read once a nation; the board draws
   // the old way until they land, then again.
   const hexgrid = MAPV.level === "nation" ? placesHexes(nation, () => renderPlaces(STATE)) : null;
-  return { W, KP: kp, home, homeNation: hc.nation || "", nation, continent, K: PlacesWorld.worldKnown(W, kp), hexgrid };
+  return { W, KP: kp, home, homeNation: hc.nation || ((kp.hexes || {}).nation) || "", nation, continent, K: PlacesWorld.worldKnown(W, kp), hexgrid };
 }
 
 // --- hex travel on the Region (rules/hexes.py, play/hex_views.py) -------------------------
@@ -91,9 +92,23 @@ function hexSlip(v) {
   if (!v.hexgrid || !HS.party || v.homeNation !== v.nation) return "";
   const at = {}; v.hexgrid.hexes.forEach(h => { at[h.q + "," + h.r] = h; });
   const hours = g => { const walk = g === "grassland" || g === "farmland" ? 5 : 8; return HS.rides ? Math.ceil(walk / 2) : walk; };
-  const btns = (HS.reach || []).map(([q, r]) => { const h = at[q + "," + r] || {}, far = hexDistance(HS.party, [q, r]);
-    const where = h.town ? ((v.W.cities.find(c => c.id === h.town) || {}).name || "a town") : h.ground || "open ground";
-    return `<button type="button" class="v2-btn" data-hexgo="${esc(q)},${esc(r)}">${esc(upFirst(hexBearing(HS.party, [q, r])))}${far > 1 ? " ×2" : ""}: ${esc(where)}, ${far > 1 ? "about " : ""}${far > 1 ? hours(h.ground) * 2 : hours(h.ground)} h</button>`; });
+  const ways = HS.ways || {}, wayHours = w => (HS.way_hours || {})[w] || 0;
+  const btns = (HS.reach || []).map(([q, r]) => { const h = at[q + "," + r] || {}, far = Math.max(Math.abs(q - HS.party[0]), Math.abs(r - HS.party[1]), Math.abs(q + r - HS.party[0] - HS.party[1]));
+    const where = h.town ? ((v.W.cities.find(c => c.id === h.town) || {}).name || "a town") : h.land === false ? (h.sea === "open" ? "open sea" : "coastal water") : h.ground || "open ground";
+    // Water in the step: the way it goes (HS.ways) and its hours (rules/hexes.py), landfall at the land's own.
+    const w = (HS.ways || {})[q + "," + r], by = w && w.find(x => x !== "swim"), wet = h.land === false;
+    const hrs = wet && by ? wayHours(by) : hours(h.ground);
+    const label = by && wet ? (by === "ship" ? "sail" : "row") + " " : by && h.land !== false && HS.afloat ? "land " : "";
+    return `<button type="button" class="v2-btn" data-hexgo="${esc(q)},${esc(r)}">${esc(label)}${esc(label ? hexBearing(HS.party, [q, r]) : upFirst(hexBearing(HS.party, [q, r])))}${far > 1 ? " ×2" : ""}: ${esc(where)}, ${far > 1 ? "about " : ""}${esc(far > 1 ? hrs * 2 : hrs)} h</button>`; });
+  // The water beside the party (feat/sea-hexes, rules/engine.py `water_ways`): a ship of yours, a
+  // hired boat, or a swim. A swim is never lit on the board; it is a button that says its price.
+  const water = Object.entries(ways).filter(([, w]) => w.includes("swim") && !HS.afloat).map(([k]) => {
+    const [q, r] = k.split(",").map(Number), h = at[k] || {};
+    return `<button type="button" class="v2-btn" data-hexgo="${esc(q)},${esc(r)}" data-hexhow="swim">Swim ${esc(hexBearing(HS.party, [q, r]))}: ${esc(h.sea === "open" ? "open sea" : "coastal water")}</button>`; });
+  const afloatNote = HS.afloat === "ship" ? `Aboard ${HS.ship || "your ship"}, a hex a move under sail: about ${wayHours("ship")} hours a hex. Land beside her is reached in her boat, or she ties up at a port.`
+    : HS.afloat === "boat" ? `In a hired rowboat, a hex a move at the oars: about ${wayHours("boat")} hours a hex. Land beside you is a landfall.`
+    : HS.afloat === "swim" ? `In the water. ${HS.swim || ""}. Land beside you is a landfall.` : "";
+  const swimNote = water.length ? `<p>${esc(HS.swim || "")}.</p><p class="hexgo">${water.join(" ")}</p>` : "";
   // Click-to-travel's chips (owner 2026-11-21): each spotted site further than a move, walked
   // to a hex at a time; any other seen hex is pressed on the board.
   const SITE_IS = { tower: "the tower", ruins: "the ruins", mine: "the old mine", cave: "the cave" };
@@ -110,8 +125,10 @@ function hexSlip(v) {
     ? `<p class="hexmarch"><strong>Forced march:</strong> press where to go. <button type="button" class="v2-btn" data-hexmarch="0">Stop for the day</button></p>`
     : `<p class="hexmarch">${esc(HS.today)} hours on the way since you last rested: the day's travelling is done. Going on is a forced march, a Constitution check every hour past eight (DC 10, 2 more each hour), 1d6 non-lethal and fatigued on a failure. <button type="button" class="v2-btn" data-hexmarch="1">Push on (forced march)</button></p>`;
   const site = HS.site_here && !HS.in_site ? `<p><button type="button" class="v2-btn" data-hexenter="1">Go into ${esc({ tower: "the tower", ruins: "the ruins", mine: "the old mine", cave: "the cave" }[HS.site_here] || "the site")}</button></p>` : "";
+  if (HS.afloat) return `<div class="mapnote hextravel"><h3>Travel</h3><p>${esc(afloatNote)}</p>
+    <p class="hexgo">${btns.join(" ")}</p></div>`;
   return `<div class="mapnote hextravel"><h3>Travel</h3><p>${HS.rides ? "Riding, two hexes a move" : "On foot, one hex a move"}: five hours across open plain, eight across rougher ground${HS.rides ? ", half that riding" : ""}. Where you stop you look round, and every hex the look covers clears on the map. Press any hex you have seen to walk there a hex at a time: a meeting, something new in sight or the day's end stops you on the way.</p>
-    ${march}<p class="hexgo">${btns.join(" ")}</p>${site}</div>`;
+    ${march}<p class="hexgo">${btns.join(" ")}</p>${swimNote}${site}</div>`;
 }
 
 // Open a map: from the breadcrumb, an arrow on the board, a slip's button, the zoom gesture.
@@ -539,7 +556,7 @@ document.addEventListener("click", e => {
   const lv = t.closest("#placeswrap [data-maplevel]");
   if (lv) { mapOpen(lv.dataset.maplevel, lv.dataset.maparg || ""); return; }
   const hg = t.closest("#placeswrap [data-hexgo]");
-  if (hg) { const [q, r] = hg.dataset.hexgo.split(",").map(Number); hexMove(q, r); return; }
+  if (hg) { const [q, r] = hg.dataset.hexgo.split(",").map(Number); hexMove(q, r, hg.dataset.hexhow || ""); return; }
   const hm = t.closest("#placeswrap [data-hexmarch]");
   if (hm) { hexMarch(hm.dataset.hexmarch === "1"); return; }
   if (t.closest("#placeswrap [data-hexenter]")) { hexEnter(); return; }

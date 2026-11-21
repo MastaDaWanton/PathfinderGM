@@ -183,7 +183,8 @@ def test_a_save_that_never_stood_on_a_hex_is_only_stamped(worlds):
     a, _lay = _grid(worlds)
     data = {"scene": {"location_id": "x", "at": "x~urban:the-gate", "hexes": {}}}
     assert not hexes.mend_save(data, a)
-    assert data["scene"]["hexes"] == {"grid": hexes.GRID_VERSION}
+    assert data["scene"]["hexes"] == {"grid": hexes.GRID_VERSION,
+                                      "coast": hexes.COAST_VERSION}
 
 
 def test_the_way_up_from_a_site_to_its_own_hex_is_still_minutes(worlds, quiet):
