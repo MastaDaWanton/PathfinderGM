@@ -831,8 +831,8 @@ def encounter_cr(total_xp: int) -> float:
     return float(max(reached)) if reached else 0.0
 
 
-def foes_from_the_land(biome: str, party: int, most: int,
-                       rng: random.Random) -> tuple[dict, int] | None:
+def foes_from_the_land(biome: str, party: int, most: int, rng: random.Random,
+                       climates=()) -> tuple[dict, int] | None:
     """(bestiary row, how many) for a fight the ground itself supplies, or None.
 
     The bestiary by the ground's biome, only the kinds that come at travellers
@@ -864,6 +864,8 @@ def foes_from_the_land(biome: str, party: int, most: int,
             if r.get("cr_value") is not None and not r.get("biomes_any")
             and r.get("creature_type") in RAIDER_TYPES
             and str(r.get("size") or "").lower() not in TOO_SMALL]
+    # The land's climate too (`bestiary.of_the_climate`, playtest 2026-11-20 #20).
+    rows = bestiary.of_the_climate(rows, climates)
     got = eb.choose(rows, party, rng.randint(1, 100), rng.randrange, kind="opening",
                     most=max(1, int(most)))
     return (got.row, got.count) if got else None
@@ -1203,12 +1205,15 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
             party = encounter_budget.party_apl(scene)
             label, count, template = str(step.get("label")), count_of(step), ""
             if str(step.get("from") or "") == "land":
+                from . import geography
+
                 # What this ground holds, at the party's level (`foes_from_the_land`):
                 # the owner's caravan under attack is attacked by the land it crosses.
                 ground = (str(getattr(spot, "terrain", "") or "")
                           or places_mod.terrain_of(scene.at or ""))
-                got_land = foes_from_the_land(ground, party, count,
-                                              rng_for(story_seed, f"foes:{slot}"))
+                got_land = foes_from_the_land(
+                    ground, party, count, rng_for(story_seed, f"foes:{slot}"),
+                    climates=geography.climates_at(world, scene.at or scene.location_id))
                 if got_land is not None:
                     row, count = got_land
                     template = str(row.get("id") or "")

@@ -201,6 +201,16 @@ _CLIMATE_WORDS: dict[str, str] = {
     "subtropical": "warm", "equatorial": "warm",
 }
 
+
+def climates_in(text: str) -> tuple[str, ...]:
+    """Every `CLIMATES` band a world's Climate prose names, in `CLIMATES` order: "hot
+    days, cold nights" is warm and cold. Empty when it names none ("mild and wet",
+    "variable with latitude"), which is unrestricted, never all three."""
+    low = str(text or "").lower()
+    named = {c for w, c in _CLIMATE_WORDS.items() if re.search(rf"\b{w}\b", low)}
+    return tuple(c for c in CLIMATES if c in named)
+
+
 # "any land" and "any" are different claims and 213 stat blocks make one or the other.
 # Land excludes the sea and the caves; "any" excludes only the planes, because a devil's
 # line reads "any (Hell)" rather than "any".

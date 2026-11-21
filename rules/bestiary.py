@@ -1386,6 +1386,39 @@ def search(text: str = "", creature_type: str = "", size: str = "",
     return out[:limit]
 
 
+# The book's crossover between climate bands (Bestiary, "Monsters by Terrain": behirs of
+# the warm deserts can turn up in temperate ones, "much less likely" in cold ones). Only
+# next-door bands, and only when the land's own band holds nothing.
+NEIGHBOUR_CLIMATES = {"cold": ("temperate",), "temperate": ("cold", "warm"),
+                      "warm": ("temperate",)}
+
+
+def in_climate(row: dict, climates) -> bool:
+    """Whether a creature lives in this climate: its Environment line's `climates` meet
+    `climates`, or either is unrestricted (empty) — "any forests", or a land whose
+    Climate fact names no band."""
+    own = set(row.get("climates") or ())
+    return not own or not climates or bool(own & set(climates))
+
+
+def of_the_climate(rows: list[dict], climates) -> list[dict]:
+    """`rows` that live in `climates` (`in_climate`): every wild draw's last filter.
+
+    Playtest 2026-11-20 #20: the road out of temperate Branford met two pyraustas
+    (Bestiary 5, "any warm"), because the land draws read the ground and never the
+    climate. When the land's own band (with the unrestricted creatures) leaves nothing,
+    the next-door bands are tried (`NEIGHBOUR_CLIMATES`, the book's own crossover), and
+    after that nothing: the caller's ground-the-book-does-not-stock answer (a quiet
+    watch, travellers on the road) is the honest one, never a creature of the far band."""
+    if not climates:
+        return list(rows)
+    own = [r for r in rows if in_climate(r, climates)]
+    if own:
+        return own
+    near = {n for c in climates for n in NEIGHBOUR_CLIMATES.get(c, ())} - set(climates)
+    return [r for r in rows if in_climate(r, near)] if near else []
+
+
 def vocabularies() -> dict:
     """What a filter can be built from, counted so an empty option is visible first.
 

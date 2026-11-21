@@ -265,7 +265,7 @@ def street(dice, level: int = 1, *, apl: int | None = None,
 
 def road(dice, hours: int, biome: str, level: int = 1, *,
          minutes: int | None = None, apl: int | None = None,
-         danger: float = 1.0) -> Meeting | None:
+         danger: float = 1.0, climates=()) -> Meeting | None:
     """The march, checked once a watch until something happens or the road runs out.
 
     Stops rolling at the first hit, as asked, which is also what the published procedure
@@ -298,7 +298,7 @@ def road(dice, hours: int, biome: str, level: int = 1, *,
         r = dice.roll("1d100", label="what is on the road", visibility="hidden").total
         kind = _weighed_band(table, top, r)
         if kind == "creature":
-            got = _the_land(dice, biome, level, apl)
+            got = _the_land(dice, biome, level, apl, climates=climates)
             if got is not None:
                 row = got.row
                 return Meeting(kind="creature", roll=r, creature=row,
@@ -330,7 +330,7 @@ def road(dice, hours: int, biome: str, level: int = 1, *,
 
 def night(dice, hours: int, biome: str, level: int = 1, *,
           scale: float = 1.0, apl: int | None = None,
-          danger: float = 1.0) -> Meeting | None:
+          danger: float = 1.0, climates=()) -> Meeting | None:
     """The camp's check, watch by watch over the hours slept: the road's own procedure
     ("four times per day ... with a 20% chance of an encounter each time"), because a
     night in the open is the sixteen hours this module's road check leaves to the camp.
@@ -355,7 +355,7 @@ def night(dice, hours: int, biome: str, level: int = 1, *,
     for w, chance in enumerate(shares, start=1):
         if dice.roll("1d100", label="the night", visibility="hidden").total > chance:
             continue
-        got = _the_land(dice, biome, level, apl)
+        got = _the_land(dice, biome, level, apl, climates=climates)
         if got is None:
             return None
         row = got.row
@@ -398,13 +398,33 @@ SEA_PERCENT = ROAD_PERCENT
 # What the open sea stocks: a creature whose own Environment line names salt water. The
 # bestiary's `water` biome is fresh and salt together (an otter, a poison frog, a kappa),
 # and a river-boat's creatures have no business at a ship's rail in mid-ocean.
-_SALT = re.compile(r"\b(oceans?|seas?|saltwater|any aquatic)\b")
+_SALT = re.compile(r"\b(oceans?|seas?|saltwater)\b")
 _FRESH_ONLY = re.compile(r"\b(fresh ?water|plane of)\b")
+# "Aquatic" alone is the book's water terrain, salt or fresh: the dragon turtle's
+# "temperate aquatic" and the elasmosaurus's "warm aquatic" are the sea's, the poison
+# frog's "warm marshes and aquatic" is a pond's. Named beside inland water, it is inland.
+_AQUATIC = re.compile(r"\baquatic\b")
+_INLAND = re.compile(r"\b(marsh(?:es)?|swamps?|lakes?|rivers?|ponds?)\b")
+# A swim speed in the stat block's movement line ("10 ft., swim 40 ft.").
+_SWIMS = re.compile(r"\bswim\s+\d")
 
 
 def open_water(row: dict) -> bool:
+    """Whether a creature can be met at sea (owner ruling 2026-11-21: "at sea, only
+    aquatic creatures and ships"): its Environment line puts it in salt water (an ocean
+    or sea, or "aquatic" with no inland water beside it), AND its body is in the water:
+    a swim speed or the aquatic subtype. Either half alone is wrong, measured on the
+    shipped book: by the line alone the living mirage ("any deserts or oceans", fly 20
+    ft., no swim) was one of the 74 creatures the sea could draw; by the body alone,
+    every otter, frog and crocodile with a swim speed would be."""
     env = str(row.get("environment") or "").lower()
-    return bool(_SALT.search(env)) and not _FRESH_ONLY.search(env)
+    if _FRESH_ONLY.search(env):
+        return False
+    salt = bool(_SALT.search(env)) or (bool(_AQUATIC.search(env))
+                                        and not _INLAND.search(env))
+    moves = " ".join(str(row.get(k) or "") for k in ("speed_note", "speed")).lower()
+    body = bool(_SWIMS.search(moves)) or "aquatic" in str(row.get("subtype") or "").lower()
+    return salt and body
 
 
 # Sizes a creature may be and still come at a Medium traveller on its own deck: the same
@@ -428,9 +448,11 @@ def comes_at_you(row: dict) -> bool:
 def in_climate(row: dict, climates) -> bool:
     """Whether a creature lives in waters of this climate: its stat block's `climates`
     (parsed from its Environment line, `biomes.parse_environment`) meet the waters', or
-    either is unrestricted (empty). #89: a penguin ("cold oceans") was met on a crossing."""
-    own = set(row.get("climates") or ())
-    return not own or not climates or bool(own & set(climates))
+    either is unrestricted (empty). #89: a penguin ("cold oceans") was met on a crossing.
+    The one test is `bestiary.in_climate`, which every wild draw now uses."""
+    from . import bestiary
+
+    return bestiary.in_climate(row, climates)
 
 
 # --- the long way: a journey in stretches ------------------------------------------------
@@ -574,7 +596,8 @@ def _people(dice, kind: str, level: int, apl: int | None) -> dict:
 
 
 def road_stretches(dice, hours: int, biome: str, level: int = 1, *,
-                   apl: int | None = None, danger: float = 1.0) -> Meeting | None:
+                   apl: int | None = None, danger: float = 1.0,
+                   climates=()) -> Meeting | None:
     """A road of `hours` on the road (eight a day, `journey.HOURS_PER_DAY`) in stretches:
     None for a quiet road, else the first thing met, its `at_hours` the hours walked when
     it was (midday of the day the die picked, never past the road's end)."""
@@ -590,7 +613,7 @@ def road_stretches(dice, hours: int, biome: str, level: int = 1, *,
     at = min(int(hours), (day - 1) * per_day + per_day // 2)
     level = max(1, int(level or 1))
     if kind == "creature":
-        got = _the_land(dice, biome, level, apl)
+        got = _the_land(dice, biome, level, apl, climates=climates)
         if got is not None:
             row = got.row
             return Meeting(kind="creature", roll=r, creature=row,
@@ -639,8 +662,7 @@ def sea_stretches(dice, days: int, level: int = 1, *, apl: int | None = None,
 
 def _sea_meeting(dice, kind: str, r: int, level: int, apl, climates) -> Meeting:
     if kind == "creature":
-        got = _the_land(dice, "water", level, apl,
-                        keep=lambda x: open_water(x) and in_climate(x, climates))
+        got = _the_land(dice, "water", level, apl, keep=open_water, climates=climates)
         if got is not None:
             row = got.row
             return Meeting(kind="creature", roll=r, creature=row,
@@ -658,7 +680,7 @@ def _sea_meeting(dice, kind: str, r: int, level: int, apl, climates) -> Meeting:
     return Meeting(kind=kind, roll=r, count=0)
 
 
-def _the_land(dice, biome: str, level: int, apl: int | None, keep=None):
+def _the_land(dice, biome: str, level: int, apl: int | None, keep=None, climates=()):
     """What the ground holds, at the party's budget (`encounter_budget.choose`): a creature
     and how many, or None for ground that stocks nothing the party could fairly meet.
 
@@ -666,7 +688,7 @@ def _the_land(dice, biome: str, level: int, apl: int | None, keep=None):
     be alone at `level`, which is the cautious answer — a lone PC's APL is the lowest one.
     Only the ground's own creatures (`bestiary.ground_stated`), never an adventure's named
     somebody whose ground was guessed for them. `keep` narrows the rows further (the sea's
-    `open_water`)."""
+    `open_water`), and `climates` last (`bestiary.of_the_climate`, the land's bands)."""
     from . import bestiary
     from . import encounter_budget as eb
     from .gathering import pick_index
@@ -675,6 +697,7 @@ def _the_land(dice, biome: str, level: int, apl: int | None, keep=None):
     rows = [x for x in bestiary.search(biome=biome, cr_max=eb.highest_cr(party),
                                        stated=True, limit=5000)
             if x.get("cr_value") is not None and (keep is None or keep(x))]
+    rows = bestiary.of_the_climate(rows, climates)
     if not rows:
         return None
     hard = dice.roll("1d100", label="how hard it is", visibility="hidden").total
