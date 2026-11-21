@@ -53,10 +53,84 @@ function light(h) {
   return { r: c[0] | 0, g: c[1] | 0, b: c[2] | 0, night: h < 6 || h >= 19.5 };
 }
 
+// --- Grain: a little texture on the hex maps (owner, 2026-11-21: "too smooth"; clarified the
+// same day: the Continent and the Region, the 12-mile hex map, which is the "nation" level
+// here). World, Town and Site stay exactly as they were. -------------------------------------
+// One small tiling noise tile, made once in code (the packaged app fetches nothing), sampled
+// in WORLD space on the three planes and blended by the face's own normal (triplanar), so a
+// box, a cone and a Kenney hex carry the same grain at the same scale with no UVs and no seam
+// where two pieces meet. It only multiplies the lit colour by a few percent: every colour
+// stays its own. Rejected: per-face vertex-colour jitter (Kenney's tiles share one palette
+// texture and would need their geometry rewritten, and it reads as facets, not grain); noise
+// computed in the shader (three fetches of a 128px tile are cheaper than three octaves of
+// hash noise on a weak GPU, and the tile gets mipmaps, so far hexes average to no change
+// instead of shimmering). The cloud puffs over the unknown, the haze over hexes seen but not
+// searched, the reach rings and the names are never grained, so what is known and what can be
+// pressed read as before.
+// The painted, primer and Kenney materials are shared by every level (a Kenney house is a
+// town miniature and a hex village alike), so the levels are told apart by one shared uniform,
+// GRAIN_ON, set as each board is drawn, not by separate materials: one program per material
+// kind, and the other levels skip the fetches behind a uniform branch.
+// One tile per 4 table units: a miniature (about 3 across) shows a few blotches; at 7 it sat
+// inside one and looked as smooth as before. About ±7% of the colour at one sigma.
+const GRAIN_N = 128, GRAIN_SCALE = 1 / 4, GRAIN_AMOUNT = .25;
+// Tileable value-noise fbm, 0..255, the same every time. Self-contained (tests run it in node).
+function grainData(n) {
+  let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const out = new Float32Array(n * n), octaves = [[4, .5], [8, .3], [16, .2], [32, .14], [64, .1]];
+  octaves.forEach(([cells, amp]) => {
+    const lat = Array.from({ length: cells * cells }, rnd), at = (i, j) => lat[((j % cells + cells) % cells) * cells + ((i % cells + cells) % cells)];
+    for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) {
+      const fx = x / n * cells, fy = y / n * cells, i = Math.floor(fx), j = Math.floor(fy);
+      const sx = (fx - i) * (fx - i) * (3 - 2 * (fx - i)), sy = (fy - j) * (fy - j) * (3 - 2 * (fy - j));
+      const a = at(i, j) + (at(i + 1, j) - at(i, j)) * sx, b = at(i, j + 1) + (at(i + 1, j + 1) - at(i, j + 1)) * sx;
+      out[y * n + x] += (a + (b - a) * sy - .5) * amp;
+    } });
+  // Centred on its own mean: sixteen lattice values do not average .5, and an off-centre tile
+  // darkens every board a little (it was 120 of 128 before this line).
+  const px = new Uint8Array(n * n), mean = out.reduce((s, v) => s + v, 0) / out.length;
+  out.forEach((v, k) => { px[k] = Math.max(0, Math.min(255, Math.round(128 + (v - mean) * 255))); });
+  return px;
+}
+let GRAIN = null;
+const GRAIN_ON = { value: 0 }, GRAIN_LEVELS = new Set(["nation", "continent"]);
+function grainTexture() {
+  if (GRAIN) return GRAIN;   // made once for every board; a rebuilt board reuses it
+  GRAIN = new THREE.DataTexture(grainData(GRAIN_N), GRAIN_N, GRAIN_N, THREE.RedFormat, THREE.UnsignedByteType);
+  GRAIN.wrapS = GRAIN.wrapT = THREE.RepeatWrapping; GRAIN.magFilter = THREE.LinearFilter;
+  GRAIN.minFilter = THREE.LinearMipmapLinearFilter; GRAIN.generateMipmaps = true; GRAIN.needsUpdate = true;
+  return GRAIN;
+}
+function grained(m) {
+  if (m.userData.grained) return m;
+  m.userData.grained = true;
+  m.onBeforeCompile = sh => {
+    sh.uniforms.grainMap = { value: grainTexture() }; sh.uniforms.grainOn = GRAIN_ON;
+    sh.vertexShader = sh.vertexShader.replace("#include <common>", "#include <common>\nvarying vec3 vGrainW;")
+      .replace("#include <project_vertex>", `#include <project_vertex>
+        vec4 grainP = vec4(transformed, 1.);
+        #ifdef USE_INSTANCING
+          grainP = instanceMatrix * grainP;
+        #endif
+        vGrainW = (modelMatrix * grainP).xyz;`);
+    sh.fragmentShader = sh.fragmentShader.replace("#include <common>", "#include <common>\nuniform sampler2D grainMap; uniform float grainOn; varying vec3 vGrainW;")
+      .replace("#include <color_fragment>", `#include <color_fragment>
+        if (grainOn > .5) {
+          vec3 grainN = normalize(cross(dFdx(vGrainW), dFdy(vGrainW)));   // the face's own normal
+          vec3 grainB = pow(abs(grainN), vec3(4.)); grainB /= grainB.x + grainB.y + grainB.z;
+          vec3 grainU = vGrainW * ${GRAIN_SCALE.toFixed(5)};
+          float grain = texture2D(grainMap, grainU.zy).r * grainB.x + texture2D(grainMap, grainU.xz).r * grainB.y + texture2D(grainMap, grainU.xy).r * grainB.z;
+          diffuseColor.rgb *= 1. + (grain - .5) * ${GRAIN_AMOUNT.toFixed(3)} * 2.;
+        }`);
+  };
+  m.customProgramCacheKey = () => "grain";   // every grained material shares its programs
+  return m;
+}
+
 // --- Materials ------------------------------------------------------------------------------
 const MATS = new Map();
-const mat = (c, o = {}) => { const k = c + JSON.stringify(o); if (!MATS.has(k)) MATS.set(k, new THREE.MeshStandardMaterial({ color: c, roughness: .82, flatShading: true, ...o })); return MATS.get(k); };
-const PRIMER = new THREE.MeshStandardMaterial({ color: 0x8d8f93, roughness: 1, flatShading: true });
+const mat = (c, o = {}) => { const k = c + JSON.stringify(o); if (!MATS.has(k)) MATS.set(k, grained(new THREE.MeshStandardMaterial({ color: c, roughness: .82, flatShading: true, ...o }))); return MATS.get(k); };
+const PRIMER = grained(new THREE.MeshStandardMaterial({ color: 0x8d8f93, roughness: 1, flatShading: true }));
 const WARD = { north: 0xc98f4b, east: 0x6f9a5e, south: 0xb9645a, west: 0x5f7fa6, square: 0xc9a64f };
 
 export function init(el, a) {
@@ -259,7 +333,8 @@ function loadKit() {
     const o = g.scene;
     o.traverse(m => { if (m.isMesh) { m.castShadow = m.receiveShadow = true; m.geometry.userData.keep = true; m.material.userData.keep = true;
       // Kenney's hex palette is mint; warmed a touch toward the game's parchment and leather.
-      if (f.startsWith("hex/")) m.material.color.setRGB(.92, .9, .74); } });
+      if (f.startsWith("hex/")) m.material.color.setRGB(.92, .9, .74);
+      grained(m.material); } });
     const size = new THREE.Box3().setFromObject(o).getSize(new THREE.Vector3());
     KIT[f] = { o, w: Math.max(size.x, size.z), h: size.y };
   }).catch(err => console.warn("Kenney model missing, using the primitive:", f, err && err.message))));
@@ -422,6 +497,7 @@ export async function draw(v) {
     if (V !== mine) return;   // a newer state or another map arrived while the models loaded
     lastSig = sig; lastTown = level + "|" + subject;
     clear();
+    GRAIN_ON.value = GRAIN_LEVELS.has(level) ? 1 : 0;   // with the board it belongs to, never before
     if (level === "town") town(V); else if (level === "continent") continentMap(V); else if (level === "nation") nationMap(V);
     else if (level === "site") siteMap(V); else worldMap(V);
     pc = pcMini(); world.add(pc); placePc();
@@ -541,7 +617,9 @@ function hexBoard(hexes, h, wash, names) {
   const plateSets = {}, lit = {};
   hexes.filter(x => x.plate && wash[x.nation]).forEach(x => (plateSets[x.plateOpacity] = plateSets[x.plateOpacity] || []).push(x));
   Object.entries(plateSets).forEach(([op, list]) => {
-    const im = new THREE.InstancedMesh(new THREE.CylinderGeometry(h * .97, h * .97, .05, 6), new THREE.MeshBasicMaterial({ transparent: true, opacity: +op, depthWrite: false }), list.length);
+    // Grained too: the plates are most of what the Region and Continent show, and a flat wash
+    // over grained tiles still read smooth. The haze, clouds and rings above stay plain.
+    const im = new THREE.InstancedMesh(new THREE.CylinderGeometry(h * .97, h * .97, .05, 6), grained(new THREE.MeshBasicMaterial({ transparent: true, opacity: +op, depthWrite: false })), list.length);
     list.forEach((x, n) => { im.setMatrixAt(n, new THREE.Matrix4().makeTranslation(x.x, 1.06, x.z)); im.setColorAt(n, new THREE.Color(wash[x.nation])); (lit[x.nation] = lit[x.nation] || []).push([im, n]); });
     im.renderOrder = 1; world.add(im); });
   const key = (q, r) => q + "," + r, at = new Map(hexes.map(x => [key(x.q, x.r), x])), strips = [];
