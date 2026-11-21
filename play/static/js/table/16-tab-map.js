@@ -103,9 +103,15 @@ function hexSlip(v) {
     if (far < 1 || reachK.has(k)) return;
     btns.push(`<button type="button" class="v2-btn" data-hexgo="${esc(q)},${esc(r)}">Walk to ${esc(SITE_IS[kind] || "the site")}: ${esc(far)} hexes ${esc(hexBearing(HS.party, [q, r]))}</button>`);
   });
+  // The day since the last rest (rules: Engine.travelled_today). Spent, a move is refused
+  // unless the player pushes on: the button arms one forced march for the next press.
+  const spent = (HS.today || 0) >= 8;
+  const march = !spent ? "" : HEXGO.march
+    ? `<p class="hexmarch"><strong>Forced march:</strong> press where to go. <button type="button" class="v2-btn" data-hexmarch="0">Stop for the day</button></p>`
+    : `<p class="hexmarch">${esc(HS.today)} hours on the way since you last rested: the day's travelling is done. Going on is a forced march, a Constitution check every hour past eight (DC 10, 2 more each hour), 1d6 non-lethal and fatigued on a failure. <button type="button" class="v2-btn" data-hexmarch="1">Push on (forced march)</button></p>`;
   const site = HS.site_here && !HS.in_site ? `<p><button type="button" class="v2-btn" data-hexenter="1">Go into ${esc({ tower: "the tower", ruins: "the ruins", mine: "the old mine", cave: "the cave" }[HS.site_here] || "the site")}</button></p>` : "";
   return `<div class="mapnote hextravel"><h3>Travel</h3><p>${HS.rides ? "Riding, two hexes a move" : "On foot, one hex a move"}: five hours across open plain, eight across rougher ground${HS.rides ? ", half that riding" : ""}. Where you stop you look round, and every hex the look covers clears on the map. Press any hex you have seen to walk there a hex at a time: a meeting, something new in sight or the day's end stops you on the way.</p>
-    <p class="hexgo">${btns.join(" ")}</p>${site}</div>`;
+    ${march}<p class="hexgo">${btns.join(" ")}</p>${site}</div>`;
 }
 
 // Open a map: from the breadcrumb, an arrow on the board, a slip's button, the zoom gesture.
@@ -534,6 +540,8 @@ document.addEventListener("click", e => {
   if (lv) { mapOpen(lv.dataset.maplevel, lv.dataset.maparg || ""); return; }
   const hg = t.closest("#placeswrap [data-hexgo]");
   if (hg) { const [q, r] = hg.dataset.hexgo.split(",").map(Number); hexMove(q, r); return; }
+  const hm = t.closest("#placeswrap [data-hexmarch]");
+  if (hm) { hexMarch(hm.dataset.hexmarch === "1"); return; }
   if (t.closest("#placeswrap [data-hexenter]")) { hexEnter(); return; }
   const go = t.closest("#placeswrap [data-walkto]");
   if (go) { walkThere(go.dataset.walkto); return; }

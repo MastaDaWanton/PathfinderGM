@@ -53,6 +53,10 @@ def test_a_far_hex_is_walked_in_one_click_every_hex_a_real_step(worlds, quiet_ro
         assert "entered" in touched[hexes.key(*h)] and "searched" in touched[hexes.key(*h)]
     assert out.tell.count("Looking over the land") == 3
     assert len(out.rolls) == 3
+    looks = [x for x in out.effects if x.get("kind") == "hex_look"]
+    assert [(x["q"], x["r"]) for x in looks] == route
+    assert all(x["skill"] == "perception" and x["rolled"]["faces"] and "found" in x
+               for x in looks)
     assert "The walk stops" not in out.tell
 
 
@@ -81,7 +85,7 @@ def test_the_travel_day_ends_the_walk_and_says_so(worlds, quiet_road, monkeypatc
     monkeypatch.setattr(pc, "skill_modifiers", lambda skill: [])
     g = e.hex_world()
     to, route = _far(e, g)
-    out = _move(e, to, face=1)
+    out = _move(e, to, face=1, fresh_day=False)
     walked = [x["hours"] for x in out.effects if x.get("kind") == "hex"]
     assert sum(walked) >= journey.HOURS_PER_DAY and sum(walked[:-1]) < journey.HOURS_PER_DAY
     assert e.party_hex(g) == route[len(walked) - 1] != to
@@ -195,3 +199,114 @@ def test_the_map_caption_names_a_hex_site_never_its_id():
     assert places.said_name(site + "/the-gate") == "the gate"
     for pid in (site, "x~forest:@hex-m52-35", site + "/the-gate"):
         assert "@hex" not in places.said_name(pid) and "m52" not in places.said_name(pid)
+
+
+# --- the travel day and the forced march (owner ruling 2026-11-21: "add forced march") ---
+
+def _walk_until_day_spent(e, g, to):
+    for _ in range(4):
+        if e.travelled_today() >= journey.HOURS_PER_DAY:
+            return
+        _move(e, to, face=1, fresh_day=False)
+    raise AssertionError("never spent the day")
+
+
+def test_a_second_click_cannot_walk_a_second_day_unasked(worlds, quiet_road, monkeypatch):
+    """The per-click loophole: two clicks walked 16 hours with no Constitution check,
+    because each click had its own eight hours. The day is now the day since the last
+    rest; with it spent, a click is refused, says it would be a forced march, and spends
+    nothing."""
+    s, e, pc = _party(worlds)
+    monkeypatch.setattr(hexes, "site_of", lambda *a, **k: None)
+    g = e.hex_world()
+    to, route = _far(e, g)
+    _walk_until_day_spent(e, g, to)
+    if e.party_hex(g) == to:
+        pytest.skip("the day reached the destination")
+    t0, at = s.clock_minutes, e.party_hex(g)
+    out = _move(e, to, face=1, fresh_day=False)
+    assert out.status == "refused" and "forced march" in out.tell
+    assert s.clock_minutes == t0 and e.party_hex(g) == at
+
+
+def test_pushing_on_is_a_forced_march_with_its_checks(worlds, quiet_road, monkeypatch):
+    """Chosen (`march`), the walk goes on, and every hour past eight is a Constitution
+    check at DC 10, +2 an hour, named in the tell; the hours keep counting."""
+    s, e, pc = _party(worlds)
+    monkeypatch.setattr(hexes, "site_of", lambda *a, **k: None)
+    g = e.hex_world()
+    to, route = _far(e, g)
+    _walk_until_day_spent(e, g, to)
+    if e.party_hex(g) == to:
+        pytest.skip("the day reached the destination")
+    before = e.travelled_today()
+    r = e.run(e.validate([{"op": "hex_move", "actor": "pc",
+                           "params": {"hex": list(to), "march": True}}]))
+    out = [o for o in (e.resume(1) if r.awaiting else r).outcomes if o.op == "hex_move"][0]
+    assert out.status == "resolved", out.tell
+    assert e.travelled_today() > before
+    import re
+
+    dcs = [int(x) for x in re.findall(r"vs DC (\d+)", out.tell)]
+    assert "a forced march" in out.tell and dcs
+    # Hour n past eight is DC 10 + 2(n-1): the first hour marched here is hour before+1.
+    assert min(dcs) == 10 + 2 * (max(before, journey.HOURS_PER_DAY) + 1
+                                 - journey.HOURS_PER_DAY - 1)
+    # As data, not only English (owner ruling 2026-11-21: the numbers go to the GM's
+    # section, routed by structure): one record a check, with its roll and its toll.
+    marched = [x for x in out.effects if x.get("kind") == "forced_march"]
+    assert marched and sorted({x["dc"] for x in marched}) == sorted(set(dcs))
+    for x in marched:
+        assert x["ability"] == "con" and x["who"] and isinstance(x["passed"], bool)
+        assert x["hour"] > journey.HOURS_PER_DAY and x["rolled"]["faces"]
+        assert {"nonlethal", "lethal", "conditions"} <= set(x)
+
+
+def test_a_failed_march_check_hurts_and_tires_and_mending_lifts_the_fatigue(worlds):
+    """CRB Forced March: a failure is 1d6 non-lethal and fatigued, and "eliminating the
+    nonlethal damage also eliminates the fatigue". Through the actor's own doors: the
+    fatigue is a condition effect (law 2) and the check a real d20 with its modifiers."""
+    from rules import survival
+    from rules.dice import Dice
+
+    s, e, pc = _party(worlds)
+    for _ in range(50):
+        toll, said = survival.forced_march(pc, 30, Dice(seed=1))   # DC 68: always fails
+        if toll.nonlethal:
+            break
+    assert pc.nonlethal > 0 and pc.has_state("state.impaired.fatigued"), said
+    assert "fails" in said and "vs DC 68" in said
+    pc.heal_nonlethal(pc.nonlethal)
+    assert not pc.has_state("state.impaired.fatigued")
+
+
+def test_a_mount_fails_its_march_check_and_takes_it_as_wounds(worlds):
+    """CRB Mounted Movement: a mount "can be ridden in a forced march, but its
+    Constitution checks automatically fail, and the damage it takes is lethal"."""
+    from rules import survival
+    from rules.dice import Dice
+
+    s, e, pc = _party(worlds)
+    horse = _horse(s)
+    hp = horse.hp
+    toll, said = survival.forced_march(horse, 1, Dice(seed=2), mount=True)
+    assert not toll.checks and horse.hp < hp and toll.lethal == hp - horse.hp
+    assert horse.nonlethal == 0
+    # Ridden through the walk, the engine lands the mount's fatigue (the gallop's rule).
+    s.hexes["day"] = {"woke": e._woke_at(), "hours": 8}
+    _lines, fx = e._forced_march(8, 1, rides=True)
+    assert horse.has_state("state.impaired.fatigued")
+    assert any(x["mount"] and not x["passed"] and x["lethal"] for x in fx)
+
+
+def test_a_night_s_rest_starts_a_new_travel_day(worlds, quiet_road, monkeypatch):
+    """Today is since the last rest of eight hours or more: the awake clock, reset by
+    sleep, is the one clock read (no second clock). A two-hour nap is not a new day."""
+    s, e, pc = _party(worlds)
+    s.hexes["day"] = {"woke": e._woke_at(), "hours": 9}
+    assert e.travelled_today() == 9
+    s.clock_minutes += 120
+    assert e.travelled_today() == 9            # a nap: awake clock paused, clock ran
+    s.clock_minutes += 8 * 60
+    pc.awake_minutes = 0                       # slept the night
+    assert e.travelled_today() == 0

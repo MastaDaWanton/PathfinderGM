@@ -40,7 +40,11 @@ def _horse(s, name="Bess"):
     return horse
 
 
-def _move(e, to, face=10):
+def _move(e, to, face=10, fresh_day=True):
+    if fresh_day:
+        # These tests are about one move each; the travel day since the last rest
+        # (`Engine.travelled_today`, tests/test_hex_travel_to.py) is not what they measure.
+        e.scene.hexes.pop("day", None)
     r = e.run(e.validate([{"op": "hex_move", "actor": "pc", "params": {"hex": list(to)}}]))
     if r.awaiting:
         r = e.resume(face)

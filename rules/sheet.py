@@ -4955,6 +4955,11 @@ class Actor:
         held = sum(self.withheld_nonlethal().values())
         back = min(max(0, self.nonlethal - held), max(0, int(amount)))
         self.nonlethal -= back
+        if self.nonlethal <= 0:
+            # CRB Forced March: "Eliminating the nonlethal damage also eliminates the
+            # fatigue." shortcut: lifted when ALL non-lethal is gone, not the march's own
+            # points; upgrade if a march's fatigue must outlast other bruises' healing.
+            self.remove_effects(kind="condition", source="forced march")
         return back
 
     def withheld_nonlethal(self) -> dict[str, int]:

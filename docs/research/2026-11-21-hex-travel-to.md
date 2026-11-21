@@ -104,6 +104,37 @@ was click-to-travel: pick a seen hex and walk to it, one real hex at a time.
   (`places-board.js`: roads, wild places, touched hexes). The server checks land and a
   land route. The board offers only hexes not under cloud.
 
+## Forced march (owner ruling 2026-11-21: "add forced march")
+
+- **The rule.** aonprd.com Rules ID=50, Overland Movement, fetched 2026-11-21:
+  - "For each hour of marching beyond 8 hours, a Constitution check (DC 10, +2 per extra
+    hour) is required." A failure is 1d6 nonlethal and fatigued. Eliminating the
+    nonlethal damage also eliminates the fatigue.
+  - Mounted Movement: a mount can be ridden in a forced march, but its Constitution
+    checks automatically fail and its damage is lethal. Mounts become fatigued when they
+    take damage from hustling or forced marches.
+  - aonprd's quote limit kept me to short excerpts; the wording above is paraphrased
+    except where quoted.
+- **What the engine already had.**
+  - No forced march anywhere in rules/.
+  - The journey's gallop is the hustle rule (`journey.mounted_hours`, the mounts'
+    `MOUNT_FATIGUE` for `FATIGUE_ROUNDS`). Reused for a mount's march fatigue.
+  - `survival._check`, `_harm`, `_tire` land a need's Con check, its 1d6 and its
+    fatigue. Reused.
+  - Endurance's +4 reaches the check through the roll context `against: forced_march`,
+    added to `effectspec.AGAINST` and to the feat's document.
+- **"Today".** It runs from the last rest, read off the awake clock (`awake_minutes`,
+  reset by a night's sleep). No second clock.
+  - The scene keeps `hexes["day"] = {woke, hours}`.
+  - A waking minute that moved on by 8 hours or more is a new day, so a nap is not.
+  - An old save has no record and starts at 0. Nothing else needs mending.
+- **The ask, option 1.** With the day spent, the slip says so and offers "Push on (forced
+  march)". It arms one forced march for the next press, then disarms. A press without it
+  is refused by the engine, with the forced march spelled out, and spends nothing.
+- **Kept from before, an owner call.** A walk that does not march still finishes the hex
+  it began inside the day, up to 2 hours over. Those hours count toward the day, and the
+  next march's DCs climb from them, but they carry no check of their own.
+
 ## Second pass (re-read of the sources against the claims above)
 
 - **UC "once per hex"**: confirmed verbatim on the page.

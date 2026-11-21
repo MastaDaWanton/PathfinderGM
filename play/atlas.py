@@ -181,6 +181,9 @@ def _hexes(engine) -> dict:
     return {"party": list(here), "nation": g.cell(*here)["nation"],
             "reach": [list(h) for h in engine.hex_reach(g)],
             "rides": engine.party_rides(),
+            # Hours on the way since the last rest, against the day's eight: past them
+            # the slip offers a forced march (owner 2026-11-21).
+            "today": engine.travelled_today(),
             "touched": {k: {"entered": "entered" in v, "searched": "searched" in v,
                             "explored": bool(v.get("explored"))}
                         for k, v in (held.get("touched") or {}).items()},

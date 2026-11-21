@@ -1331,7 +1331,51 @@ def released_said(actor, need: str, points: int) -> str:
     return f"The {need} damage on {name} ({points}) can mend now."
 
 
-__all__ = ["AWAKE_GRACE_HOURS", "BIOME_HARDSHIP", "LIVED_MINUTES", "NO_FOOD", "NO_SLEEP",
+# CRB, Overland Movement, Forced March (aonprd.com Rules ID=50): "For each hour of
+# marching beyond 8 hours, a Constitution check (DC 10, +2 per extra hour) is required."
+# A failure is 1d6 nonlethal and fatigued, and "eliminating the nonlethal damage also
+# eliminates the fatigue" (`Actor.heal_nonlethal` lifts it, by this source). A mount
+# "can be ridden in a forced march, but its Constitution checks automatically fail, and
+# the damage it takes is lethal damage".
+FORCED_MARCH = "forced march"
+FORCED_MARCH_DAMAGE = "1d6"
+
+
+def forced_march_dc(extra_hour: int) -> int:
+    """The check for the `extra_hour`-th hour past the day's eight: 10, 12, 14…"""
+    return 10 + 2 * (max(1, int(extra_hour)) - 1)
+
+
+def forced_march(actor, extra_hour: int, dice, mount: bool = False) -> tuple[Toll, str]:
+    """One hour marched past the day's eight: the check, and on a failure the damage and
+    the fatigue, through the actor's own doors (`_harm`, `_tire`: the condition is an
+    effect, law 2). Returns the toll and its sentence for the tell."""
+    toll = Toll()
+    dc = forced_march_dc(extra_hour)
+    name = getattr(actor, "name", "") or "They"
+    if mount:
+        said = f"{name} (a mount fails the check, DC {dc})"
+    else:
+        got = _check(actor, "Forced march", dc, dice, against="forced_march")
+        toll.checks.append(got)
+        said = f"{name} Constitution {got['total']} vs DC {dc}"
+        if got["passed"]:
+            return toll, said + ", holds up"
+    hurt = dice.roll(FORCED_MARCH_DAMAGE, label=f"{name}: forced march",
+                     visibility="player").total
+    if mount:
+        # Lethal; the mount's fatigue is the caller's, by the journey's own hustle rule
+        # (`journey.MOUNT_FATIGUE` for `FATIGUE_ROUNDS`), as the gallop lands it.
+        actor.take_damage(hurt)
+        toll.lethal += hurt
+        return toll, said + f": {hurt} damage, fatigued"
+    _harm(actor, hurt, toll)
+    _tire(actor, toll, FORCED_MARCH, ladder=False)
+    return toll, said + f", fails: {hurt} non-lethal, fatigued"
+
+
+__all__ = ["AWAKE_GRACE_HOURS", "BIOME_HARDSHIP", "FORCED_MARCH", "forced_march",
+           "forced_march_dc", "LIVED_MINUTES", "NO_FOOD", "NO_SLEEP",
            "NO_WATER", "SLEEP_SOURCE", "Strain", "Toll", "WITHHELD_NEEDS", "asleep",
            "awake_dc", "charge", "daily_need", "drink", "eat", "jar_fluid", "exempt", "hardship",
            "hours_until_hungry", "hours_until_thirsty", "hunger_dc", "lasts", "lived_said",

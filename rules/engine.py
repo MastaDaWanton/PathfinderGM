@@ -21476,6 +21476,87 @@ class Engine:
                    and (a.has_state(states.TRAVELS_WITH_YOU) or a.has_state(states.HIRED))]
         return len(mounts) >= 1 + len(walkers)
 
+    def _woke_at(self) -> int:
+        """The clock minute the PC last woke: the awake clock (`awake_minutes`, reset by
+        a night's sleep, `survival.sleep`) read back from now. No second clock. A body
+        that never sleeps counts its day from midnight."""
+        pc = self.scene.pc()
+        now = int(self.scene.clock_minutes)
+        if pc is None or survival.exempt(pc, survival.NO_SLEEP):
+            return now - now % (24 * 60)
+        return now - int(getattr(pc, "awake_minutes", 0) or 0)
+
+    def travelled_today(self) -> int:
+        """Hours travelled across the region map since the party last rested, kept on the
+        scene (`hexes["day"]`, so a reload keeps it; a save without one has travelled
+        nothing). A rest of eight hours or more moves the waking minute on by at least
+        eight hours and starts a new day; a shorter nap only pauses the awake clock.
+        Before this (owner ruling 2026-11-21, "add forced march") every click had a
+        fresh eight hours: two clicks walked sixteen with no Constitution check."""
+        rec = (self.scene.hexes or {}).get("day") or {}
+        if not rec or self._woke_at() - int(rec.get("woke", 0)) >= 8 * 60:
+            return 0
+        return int(rec.get("hours") or 0)
+
+    def _travelled(self, hours: int) -> int:
+        """Add `hours` to today's travel; returns the day's total."""
+        rec = (self.scene.hexes or {}).get("day") or {}
+        total = self.travelled_today() + int(hours)
+        woke = int(rec["woke"]) if total > hours else self._woke_at()
+        self.scene.hexes["day"] = {"woke": woke, "hours": total}
+        return total
+
+    def _forced_march(self, day_before: int, hours: int,
+                      rides: bool) -> tuple[list[str], list[dict]]:
+        """The hours of this step past the day's eight, each a forced march for everyone
+        travelling (`survival.forced_march`): the PC, the companions and hirelings who
+        travel with them, and the mounts when the party rides. The sentences for the
+        tell, and one `forced_march` effect a check carrying its result as data (owner
+        ruling 2026-11-21: numbers go to the GM's section, routed by structure, never
+        parsed out of the sentence)."""
+        from . import journey as journey_mod
+
+        day = journey_mod.HOURS_PER_DAY
+        first = max(day_before, day) + 1
+        last = day_before + hours
+        if last < first:
+            return [], []
+        walkers = [a for a in self.scene.people.values()
+                   if not a.is_down and (a.is_pc or (
+                       str(getattr(a, "from_template", "") or "") not in journey_mod.MOUNTS
+                       and (a.has_state(states.TRAVELS_WITH_YOU) or a.has_state(states.HIRED))))]
+        mounts = [m for m in journey_mod.owned_mounts(self.scene) if not m.is_down] \
+            if rides else []
+        out, fx = [], []
+        for hour in range(first, last + 1):
+            said = []
+            for a in walkers + mounts:
+                if a.is_down:
+                    continue
+                mount = a in mounts
+                toll, line = survival.forced_march(a, hour - day, self.dice, mount=mount)
+                if mount:
+                    # "Mounts also become fatigued when they take any damage from
+                    # hustling or forced marches": the gallop's condition, as it lands it.
+                    a.add_condition(journey_mod.MOUNT_FATIGUE,
+                                    rounds=journey_mod.FATIGUE_ROUNDS,
+                                    source="forced march (mount)")
+                said.append(line)
+                got = toll.checks[0] if toll.checks else {}
+                fx.append({"kind": "forced_march", "ref": a.ref, "who": a.name,
+                           "ability": "con", "hour": hour, "extra_hour": hour - day,
+                           "dc": survival.forced_march_dc(hour - day),
+                           "total": got.get("total"), "rolled": got.get("rolled"),
+                           "passed": bool(got.get("passed")) and not mount,
+                           "mount": mount, "nonlethal": toll.nonlethal,
+                           "lethal": toll.lethal,
+                           "conditions": [*toll.conditions,
+                                          *([journey_mod.MOUNT_FATIGUE] if mount else [])],
+                           "origin": "rule:forced-march"})
+            out.append(f"Hour {english.number(hour)} on the way, a forced march: "
+                       + "; ".join(said) + ".")
+        return out, fx
+
     def hex_reach(self, g=None) -> list[tuple]:
         """The hexes a click can move the party to: each land neighbour, and, riding, each
         land hex two away with a land hex between (plan §3)."""
@@ -21578,6 +21659,16 @@ class Engine:
         # Each move is what one click made before: one hex on foot, two riding (ruling 8),
         # with its look only where the move ends (ruling 9).
         legs = [route[i:i + (2 if rides else 1)] for i in range(0, len(route), 2 if rides else 1)]
+        # The travel day is the day since the last rest, not the click (owner ruling
+        # 2026-11-21, "add forced march"): with it spent, going on is the player's own
+        # choice (`march`, asked by the board), never a click's accident.
+        march = bool(intent.params.get("march"))
+        if not march and self.travelled_today() >= journey_mod.HOURS_PER_DAY:
+            return self._refuse(intent, (
+                f"The day's travelling is done: {english.number(self.travelled_today())} "
+                "hours on the way since the party last rested. Going on is a forced march: a "
+                "Constitution check for every hour past eight (DC 10, and 2 more each hour), "
+                "1d6 non-lethal and fatigued on a failure."))
 
         # The look round, the player's own die (the popup, as a track's is), asked before
         # anything is spent so the re-run with the face finds everything as it was.
@@ -21676,9 +21767,14 @@ class Engine:
                 hours = hexes.hours_through(cell["ground"], pc.speed_feet)
                 if rides:
                     hours = journey_mod.mounted_hours(hours, "ride")[0]
+                day_before = self.travelled_today()
                 toll = survival.pass_hours(pc, hours, self.dice, biome=cell["ground"])
                 self.scene.advance(max(1, toll.hours) * survival.MINUTES_PER_HOUR,
                                    charge_body=False)
+                day_total = self._travelled(hours)
+                # Past the day's eight only when the player chose to go on (`march`).
+                marched, march_fx = (self._forced_march(day_before, hours, rides)
+                                     if march else ([], []))
                 self._hours_underway[doc["id"]] = hours
                 self._hex_quiet.add(doc["id"])
                 try:
@@ -21710,6 +21806,8 @@ class Engine:
                              + hexes.day_said(set_out, self.scene.clock_minutes))
                 if toll.checks:
                     tells.append(f"The way cost them: {survival_note(toll)}")
+                tells.extend(marched)
+                effects.extend(march_fx)
                 tells.append(moved.tell)
                 effects.extend(moved.effects)
                 if self.scene.at != doc["id"]:
@@ -21739,14 +21837,16 @@ class Engine:
                 # The body gave out on the way (a failed save against sleep, asleep, out
                 # cold): live 2026-11-21, a walk through the night went on past "they
                 # could not keep going".
-                if toll.collapsed or toll.fell_asleep or toll.knocked_out:
+                if toll.collapsed or toll.fell_asleep or toll.knocked_out or pc.is_down:
                     why, cut = "spent", "they could not keep going"
                     break
                 # The travel day: CRB overland, eight hours a day (`journey.HOURS_PER_DAY`;
                 # past it is a forced march). A hex begun inside the day is finished, so on
                 # foot two plain hexes make the day, the CRB's 24 miles at 30 ft.
-                if on_the_way >= journey_mod.HOURS_PER_DAY and step != to:
-                    why, cut = "day", "the day's travelling is done"
+                # The day counts every hour walked since the last rest (`travelled_today`).
+                if not march and day_total >= journey_mod.HOURS_PER_DAY and step != to:
+                    why, cut = "day", ("the day's travelling is done; going on would be a "
+                                       "forced march")
                     break
 
             # The look round from where the move stopped, and only there (ruling 9).
@@ -21754,6 +21854,7 @@ class Engine:
                 break
             sp = g.cell(*stop)
             seen_lines: list[str] = []
+            found_here: list[dict] = []
             known_here = ""
             for h in [stop] + hexes.neighbours(*stop):
                 self._hex_touched(h)["searched"] = self.scene.clock_minutes
@@ -21769,6 +21870,9 @@ class Engine:
                 spotted[hexes.key(*h)] = site["kind"]
                 effects.append({"kind": "spotted", "q": h[0], "r": h[1], "site": site["kind"],
                                 "first": first, "origin": "rule:hex-look"})
+                found_here.append({"q": h[0], "r": h[1], "site": site["kind"],
+                                   "dc": site["dc"] + (hexes.OWN_HEX_DC if h == stop else 0),
+                                   "first": first})
                 if not first:
                     # Seen before: the board shows it and the page does not say it again
                     # (#4: the walk back repeated "broken walls show here" word for word).
@@ -21777,6 +21881,14 @@ class Engine:
                 where = ("in this hex itself" if h == stop else "to the " + hexes.bearing(
                     (sp["x"], sp["y"]), (other["x"], other["y"])))
                 seen_lines.append(f"{hexes.SEEN_FROM_AFAR[site['kind']]} {where}")
+            # The look as data (owner ruling 2026-11-21: the GM's section routes it by
+            # structure): who, the skill, the roll, what it was read against and found.
+            effects.append({"kind": "hex_look", "q": stop[0], "r": stop[1], "ref": pc.ref,
+                            "who": pc.name, "skill": "perception", "total": look.total,
+                            "rolled": look.as_dict(),
+                            "read": [list(h) for h in [stop] + hexes.neighbours(*stop)],
+                            "found": found_here,
+                            "origin": "rule:hex-look"})
             # The roll shown the way every other roll is, never a bare total (#4).
             shown = f"Perception d20 {look.raw}{look.modifier_total:+d} = {look.total}"
             if seen_lines:
