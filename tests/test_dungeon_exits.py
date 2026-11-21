@@ -25,11 +25,17 @@ def quiet_road(monkeypatch):
     monkeypatch.setattr(ontheway, "road", lambda *a, **k: None)
 
 
-def _at_a_site(world, seed=3):
+def _at_a_site(world, seed=3, sheet=False):
     s = Scene(location_id=world.play["settlements"][0]["id"])
-    pc = instantiate("guildhand", scene=s, name="PC")
-    pc.kind = "pc"
-    pc.hp = pc.hp_base = 60
+    if sheet:
+        # A real character sheet, so the campaign saves and loads (`Campaign.load`).
+        from rules.sheet import load_pc
+
+        pc = load_pc("fixtures/pc-kesst.json")
+    else:
+        pc = instantiate("guildhand", scene=s, name="PC")
+        pc.kind = "pc"
+        pc.hp = pc.hp_base = 60
     s.add(pc)
     e = Engine(s, Dice(seed=seed), world=world)
     e.place_party("")
@@ -106,3 +112,55 @@ def test_a_shut_door_on_the_way_stops_the_walk_offered_across_the_ring(worlds, q
     s.been.append(deep["id"])
     entrance["dungeon"]["door"] = {"name": "the trapdoor", "state": "stuck", "force": 16}
     assert deep["id"] not in {r["id"] for r in exits_mod.exits(e, worlds)}
+
+
+# --- the quest names no room (owner ruling 2026-11-21 on #21) ---------------------------
+
+def _room_words(tag: dict) -> set[str]:
+    """Every room name a dungeon of this tag can hold, without "the": the tag's own places
+    and every builder's rooms (any builder can pair with any tag)."""
+    st = dungeons.story()
+    rows = [x for fam in tag["places"].values() for x in fam]
+    rows += [x for b in st["builders"].values() for fam in b["rooms"].values() for x in fam]
+    return {str(r[0]).lower().removeprefix("the ") for r in rows}
+
+
+def test_no_quest_title_names_a_room_of_its_own_dungeon():
+    """Owner ruling 2026-11-21 on playtest 2026-11-20 #21: finding the trapdoor opened "Burn
+    the plague pit below the ruins...", and "the plague pit" is that dungeon's deepest room,
+    named before the party had seen a step of it. Measured over content/dungeons/tags.json:
+    three of 33 quests named one of their own rooms (the plague pit, the poachers' hold, the
+    roost). A quest names the place gone into and the goal, never a room inside."""
+    import re
+
+    bad = []
+    for tid, tag in dungeons.story()["tags"].items():
+        said = tag["quest"].lower()
+        bad += [(tid, n) for n in _room_words(tag)
+                if re.search(r"\b" + re.escape(n) + r"\b", said)]
+    assert not bad, bad
+
+
+def test_an_old_save_s_spoiling_quest_title_is_mended_on_load(worlds, quiet_road, tmp_path,
+                                                              request):
+    """A save written before the fix keeps the spoiling title on its quest card (the
+    owner's shadow save, live: "Burn the plague pit below the ruins off the forest...").
+    The journal, the quest list, the map mark and the narrator's brief all read the card,
+    so loading mends the card in place, once."""
+    from django.test import override_settings
+
+    from play.campaign import Campaign
+    from rules import cards as cards_mod
+
+    s, e, head, rooms, entrance = _at_a_site(worlds, sheet=True)
+    card = dungeons.quest_of(s, head["id"])
+    good = card.title
+    card.title = "Burn the plague pit below the ruins"
+    cards_mod._store(s, card)
+    with override_settings(CAMPAIGN_DIR=str(tmp_path)):
+        c = Campaign(id="old-quest", world_source=request.node.callspec.params["worlds"],
+                     scene=s, seed=7)
+        back = Campaign.load(c.save())
+    mended = dungeons.quest_of(back.scene, head["id"])
+    assert mended.title == good
+    assert "plague" not in " ".join(mended.keys)

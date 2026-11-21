@@ -639,6 +639,15 @@ class Campaign:
         places_mod.break_parent_loops(scene.founded)
         campaign._heal_places(str(s.get("biome") or ""), unplaced)
         campaign._retire_stale_masters()
+        # A dungeon quest titled after a room the party has not reached (#21, 2026-11-21).
+        try:
+            engine = campaign.engine()
+        except Exception:  # noqa: BLE001 — a world that will not load is reported elsewhere
+            engine = None
+        if engine is not None:
+            from rules import dungeons
+
+            dungeons.mend_quest_words(engine)
         # The alchemist's half of the alchemy conversion (plan §18): what an old alchemist
         # now knows, the one-time notice, and the old chain recipes dropped. Needs the
         # campaign's recipes beside the character, which is why it is here and not in

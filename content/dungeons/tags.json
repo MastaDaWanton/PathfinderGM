@@ -316,7 +316,7 @@
                  "The roof moves: thousands of small bodies, hanging and shifting."],
       "revelation": "Under the great roost lie a buried sack and the bones of the digger who hid it, the one {town} said ran off with the guild's money.",
       "rumour": "the bats come out thicker every dusk, and they have taken to biting",
-      "quest": "Clear the roost below {where}"
+      "quest": "Drive out what roosts below {where}"
     },
     "drowned-works": {
       "situation": "it has flooded, and something big lives in the water",
@@ -731,7 +731,7 @@
                  "Snares hang in bundles, waxed and ready."],
       "revelation": "The tally in {lair} shows a buyer in {town} who takes every skin they bring and pays above the market for it.",
       "rumour": "the game has gone from the woods above {town}, but there is always venison on the market",
-      "quest": "Find the poachers' hold below {where}"
+      "quest": "Find where the poachers hide below {where}"
     },
     "plague-pit": {
       "situation": "the plague dead were buried here unburned, and they do not lie still",
@@ -755,7 +755,7 @@
                  "Bodies lie in rows wrapped in sacking, and some of the sacking is torn from inside."],
       "revelation": "In {lair} the first of the dead lies in a fine coat with the seal of a merchant house of {town}: the sickness came in with his cargo.",
       "rumour": "the plague years are spoken of in {town} only in whispers, and the pits were never marked",
-      "quest": "Burn the plague pit below {where}"
+      "quest": "Burn out the plague dead below {where}"
     },
     "vault-wards": {
       "situation": "an old house's wards still guard its locked fortune",

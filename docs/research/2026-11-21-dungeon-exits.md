@@ -76,3 +76,48 @@ it: the rooms and their doors are `Scene.founded`, where the party has been is `
 
 Second pass: re-read the SMAUG quote (gammon thread 2914) and the Errant page against the
 claims above; the OSE claim is marked as read through a summary only.
+
+## Part 2: the quest names no room (owner ruling 2026-11-21)
+
+**The defect.** Finding the way down opens the dungeon's quest (owner ruling 2026-11-16:
+the quest, the mark on the chart, done when the boss is beaten or every trial is cleared).
+Its title is the ruin tag's `quest` sentence (content/dungeons/tags.json). Three of the 33
+named one of that tag's own rooms: "Burn the plague pit below…" (the climax room is "the
+plague pit"), "Find the poachers' hold below…" (the climax room), "Clear the roost below…"
+(a room is "the roost"). In the owner's save, live: "Shadow takes it on: Burn the plague pit
+below the ruins off the forest…", the deepest room named before a step of it was seen. The
+card's title is what the journal, the quest list, the map mark and the narrator's brief all
+read (`dungeons.quest_words` is the one place the words are made; `cards` carries them).
+
+**Sources.**
+- *Skyrim's radiant clears* (UESP, Skyrim:Trouble in Skyrim and Skyrim:Cleansing Light;
+  UESP answered 403 and the Fandom mirror 402 on 2026-11-21, so read only through the
+  search summary): the objective is a template naming the dungeon and its leader by role,
+  "Kill the leader of [dungeon]", never a room inside it. Cleansing Light names a boss
+  placeholder "at [dungeon]". Not confirmed against the game's own strings.
+- *The Alexandrian, rumour tables* (https://thealexandrian.net/wordpress/48539/roleplaying-games/hexcrawl-tool-rumor-tables):
+  a rumour points the players at a keyed location so they go and explore it; the keyed
+  contents are what exploring finds.
+- *Quest-log spoilers*: a search turned up player complaints of journals updating with
+  later-area information (Beamdog forum #6617, Baldur's Gate Underdark quest log spoilers,
+  read by title only) but no design essay; I could not source a stated rule beyond the
+  practice.
+- The dungeon-quest ruling itself asks only for the goal and the mark, not a room.
+
+**Chosen.** The three sentences reworded to name the goal, not a room: "Drive out what
+roosts below {where}", "Find where the poachers hide below {where}", "Burn out the plague
+dead below {where}". A test reads every tag's quest against every room name that tag and
+any builder can produce, so a new tag cannot bring it back. Old saves are mended on load
+(`dungeons.mend_quest_words`, from `Campaign.load`): the card's title and keys re-made by
+`quest_words`, a no-op on a save that needs none. The transcript line already shown is
+history and is left as it was.
+
+**Reveal on reaching the deepest room: refused.** The title stays as it was opened. Skyrim's
+objectives keep naming the leader by role to the end, and the room names itself on arrival
+(`dungeons.arrived` tells "<room>: <about>"), so the journal would only repeat what the page
+already said, while a title that changes mid-quest changes the thing the player tracks.
+Done-ness is untouched: `completion` still reads the climax room's foes and every room's
+trials.
+
+Second pass: re-checked the claims above against what was actually fetched; the Skyrim
+wording is marked as read through a search summary, the Beamdog thread by title only.

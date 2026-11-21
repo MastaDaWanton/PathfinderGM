@@ -1507,6 +1507,27 @@ def open_quest(engine, head: dict) -> tuple[list[dict], str]:
             f"back to.")
 
 
+def mend_quest_words(engine) -> None:
+    """Every dungeon quest's title as `quest_words` makes it now. Owner ruling 2026-11-21
+    on playtest 2026-11-20 #21: three tags' quests named their own deepest room ("Burn the
+    plague pit below the ruins"), and a save written before the wording changed keeps that
+    title on its card, which the journal, the quest list, the map mark and the narrator's
+    brief all read. Asked on load (`Campaign.load`); a no-op on a save that needs none."""
+    from . import cards as cards_mod
+
+    for head in engine.scene.founded:
+        if not (head.get("deeper") or {}).get("found"):
+            continue
+        card = quest_of(engine.scene, head["id"])
+        if card is None:
+            continue
+        title, _fact = quest_words(engine, head)
+        if title != card.title:
+            card.title = title
+            card.keys = cards_mod.keys_from(title, *[o["text"] for o in card.objectives])
+            cards_mod._store(engine.scene, card)
+
+
 def settle(engine) -> list:
     """Once a batch: every found way down has its quest (opened the batch it is found, or
     the first batch after an older save loads), and an open one is finished the moment the
