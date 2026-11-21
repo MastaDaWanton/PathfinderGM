@@ -510,6 +510,9 @@ _LEFT = {
     "shaken": ("hurting from it", "rattled", "blinking it away"),
     "reeling": ("reeling", "the beating telling on them", "close to dropping"),
     "staggering": ("staggering, all but out", "barely upright", "one more and they drop"),
+    # Exactly 0 hit points: the condition tell's own words ("disabled: still standing",
+    # `rules.engine` CONDITION_TELLS), never "down" beside it (playtest 2026-11-20 #24).
+    "disabled": ("disabled: still standing, but any real effort now costs blood",),
     "down": ("down",),
     "dead": ("dead",),
 }
@@ -1299,7 +1302,8 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
                      "number.")
             slots.append({"key": f"fact{i + 1}",
                           "want": min(FACT_CEILING, BLOW_WANT + BLOW_EACH * (len(blows) - 1)),
-                          "say": say, "tells": tells})
+                          "say": say, "tells": tells,
+                          "blow": _struck([b for o in act for b in _blows_of(o)], engine)})
             continue
         # What the player's line may add to an act: how they go about what the engine
         # decided, and only on the act their words led to. Not on their own `say` — its tell
@@ -1652,6 +1656,7 @@ def turn_plan(engine, outcomes, said=None) -> list[dict]:
                           "say": f"The engine decided this: {decided} {_AS_IT_HAPPENS}",
                           "tells": tells})
             continue
+        raw = [x for o in act for x in _blows_of(o)]
         for k, b in enumerate(blows):
             head = (f"The engine decided this: {decided}\n" if k == 0 else
                     "The same act goes on: its next blow.\n")
@@ -1663,8 +1668,53 @@ def turn_plan(engine, outcomes, said=None) -> list[dict]:
                         "how it is struck, how it lands or misses, and how the one struck is "
                         "left. Nothing the facts and THE SCENE do not give, and never a "
                         "number. " + blow_opening(said)),
-                "tells": tells if k == 0 else []})
+                "tells": tells if k == 0 else [],
+                "blow": _struck(raw[k:k + 1], engine)})
     return slots
+
+
+def _blows_of(o) -> list[dict]:
+    """An outcome's blows that `blow_facts` tells, in its order: the hits and the misses."""
+    return [b for b in getattr(o, "blows", None) or [] if b.get("result") in ("hit", "miss")]
+
+
+def _struck(blows: list[dict], engine) -> list[str]:
+    """Who these blows HIT, by the name the plan calls them; a miss changes nobody. Truthy
+    on a slot only when its blow changes somebody, which is what `NOT_YET` is about."""
+    scene = engine.scene
+    out = []
+    for b in blows:
+        who = scene.actors.get(b.get("ref")) if b.get("result") == "hit" else None
+        if who is not None:
+            name = "you" if who.is_pc else narration_mod.definite(str(who.name))
+            if name not in out:
+                out.append(name)
+    return out
+
+
+# A3 (pgm-work/richer-prose-paths.md; playtest 2026-11-20, shadow-0097): every slot shares
+# one prefix, kept byte-identical so Ollama reuses its cache, and that prefix is the END of
+# the turn: PEOPLE HERE NOW had the clockwork spy "broken, on the ground" for the
+# squaring-up slot, and the plan's own blow slot says so. So a slot that comes before a
+# blow is told, in its own ask, that the blow has not landed: a MUD's combat message is
+# sent at its event with that moment's state (tbaMUD `dam_message`), never the end state.
+# Not a second PEOPLE HERE per slot: the engine keeps no snapshot of the bands before the
+# turn (docs/research/2026-11-20-narration-inputs.md, section 4).
+NOT_YET = ("This slot comes before the blow in slot {n}: that blow has not landed yet. {who} "
+           "{be} not yet struck by it, and nobody is hurt, down, broken or dying from it in "
+           "this slot. PEOPLE HERE NOW and THE SCENE AS IT STANDS NOW tell how things stand "
+           "after the whole turn, not at this moment.")
+
+
+def _not_yet(slots: list[dict], i: int) -> str:
+    """`NOT_YET` for slot `i`, naming the next slot whose blow changes somebody, or ""."""
+    later = next((n for n in range(i + 1, len(slots)) if slots[n].get("blow")), None)
+    if later is None:
+        return ""
+    who = list(slots[later]["blow"])
+    who[0] = who[0][:1].upper() + who[0][1:]
+    return NOT_YET.format(n=later + 1, who=_and(who),
+                          be="are" if len(who) > 1 or who == ["You"] else "is")
 
 
 def turn_block(engine, outcomes, acting: str, manner: str = "") -> str:
@@ -1830,6 +1880,7 @@ def slot_messages(plan: list[dict], slots: list[dict], i: int, written: list[str
            + (f"\n\n{s['knows_said']}" if s.get("knows_said") else "")
            + f'\n\nNow write slot {i + 1}, "{s["key"]}", and only that slot: {s["say"]}'
            + size
+           + (f"\n{_not_yet(slots, i)}" if _not_yet(slots, i) else "")
            + (f"\n\n{redo}" if redo else "")
            + "\n" + shape)
     return [plan[0], {"role": "user", "content": ask}]

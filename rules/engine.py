@@ -35938,11 +35938,19 @@ def left_after(defender) -> str:
     # upright" because the unconscious tag landed after. CRB p.191: non-lethal damage
     # greater than current hit points is unconscious; at or below 0 hit points is
     # disabled or dying; dead at the negative of Constitution.
-    con = int(((getattr(defender, "abilities", None) or {}).get("con", 10)) or 10)
-    if defender.has_state("state.down.dead") or hp <= -con:
+    #
+    # The rungs are the ladder's own (`Actor.apply_hp_state`), never a second copy of it.
+    # Playtest 2026-11-20 #24, shadow-0073: a ghoran left on exactly 0 was banded "down"
+    # while the condition tell beside it said "disabled: still standing" - 0 is disabled
+    # (CRB "Disabled (0 Hit Points)": staggered, one move or standard action a turn), not
+    # down. And an undead or a troop at 0 is destroyed (`death_floor` 0), not "down".
+    # TempusMUD PR #493 was the same bug: the message chose its words before the state.
+    if defender.has_state("state.down.dead") or hp <= defender.death_floor():
         return "dead"
-    if defender.is_down or hp <= 0 or bruised > hp:
+    if defender.is_down or bruised > hp or (hp == 0 and states.breaks_below_zero(defender)):
         return "down"
+    if hp == 0:
+        return "disabled"
     if bruised and hp > 0:
         dazed = bruised / hp
         return "shaken" if dazed < 0.5 else "reeling" if dazed < 1 else "staggering"

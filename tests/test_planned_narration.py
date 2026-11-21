@@ -840,6 +840,43 @@ def test_a_blow_that_drops_them_is_banded_down_before_the_state_lands():
     assert eng.left_after(smith) == "dead"
 
 
+def test_a_blow_that_leaves_them_on_nothing_says_disabled_as_the_condition_line_does():
+    """Playtest 2026-11-20 #24, shadow-0073: the blow said "the ghoran after it: down" beside
+    the condition line "disabled: still standing". The band read its own ladder (`hp <= 0`
+    is down) while `Actor.apply_hp_state` wrote `disabled` at exactly 0 (CRB, Disabled (0
+    Hit Points): staggered, one move or standard action a turn — not down)."""
+    from rules import engine as eng
+
+    s, engine = _scene(fighting=True)
+    smith = next(a for a in s.actors.values() if not a.is_pc)
+    smith.hp_max, smith.hp = 10, 0
+    left = eng.left_after(smith)
+    assert left == "disabled"
+    smith.apply_hp_state()
+    assert smith.has_condition("disabled") and not smith.is_down
+    hit = Outcome(intent_id="i1", op="attack", actor="pc",
+                  blows=[{"result": "hit", "ref": smith.ref, "weapon": "unarmed strike",
+                          "type": "bludgeoning", "severity": "brutal", "left": left}])
+    line = planned.blow_facts([hit], engine)[0]
+    assert "after it: disabled: still standing" in line and "after it: down" not in line
+    smith.hp = -1
+    assert eng.left_after(smith) == "down"
+
+
+def test_a_body_destroyed_at_zero_is_banded_dead_at_zero():
+    """The same second ladder read dead at -Con alone: an undead or a troop at 0 is
+    destroyed (`Actor.death_floor` 0), and was banded "down"."""
+    from rules import engine as eng
+    from rules.bestiary import instantiate
+
+    s, _ = _scene(fighting=True)
+    bones = instantiate("skeleton", scene=s)
+    s.add(bones)
+    assert bones.death_floor() == 0
+    bones.hp = 0
+    assert eng.left_after(bones) == "dead"
+
+
 def test_a_miss_names_the_weapon_and_the_wind_up_does_not_reach_the_page(rules_dir):
     """Measured on the planned fight bench, 2026-10-16: the creature's plan call wound up by
     drawing a weapon it did not have on 6 of 7 of its turns ("pulls a heavy crossbow" — it

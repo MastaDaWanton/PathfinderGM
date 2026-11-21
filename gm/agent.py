@@ -3332,7 +3332,7 @@ class GMAgent:
                 # What the crowd just saw, out of fights only: in a fight the NPC
                 # turns are the reaction.
                 heat=(None if self.engine.scene.in_encounter
-                      else (getattr(self.engine.scene, "heat", None) or None)),
+                      else (judgement.heat_seen(self.engine.scene) or None)),
             )
 
         review = _review(text)

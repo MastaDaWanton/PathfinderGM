@@ -1476,7 +1476,9 @@ def test_a_public_killing_heats_the_scene_and_bodies_age_out():
 
     s = Scene(); s.add(load_pc("fixtures/pc-kesst.json"))
     victim = instantiate("guildhand", scene=s, name="merchant"); s.add(victim)
-    s.cast.append({"who": "an old priestess", "turn": 1})
+    # A witness is a person here (`judgement.witnesses`): the cast ledger of prose-people
+    # names nobody the engine can find, and stopped counting 2026-11-20 (#23).
+    s.add(instantiate("guildhand", scene=s, name="old priestess"))
     fake = Outcome(intent_id="i1", op="attack", effects=[
         {"ref": victim.ref, "kind": "condition", "condition": "dead"}])
     victim.hp = -20; victim.apply_hp_state()

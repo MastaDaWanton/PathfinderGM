@@ -2049,8 +2049,9 @@ def scene_now(scene, was_clock: int | None = None, outcomes=None, gone=()) -> st
     if gone:
         facts.append(f"GONE from here since the last passage, and taking no part in this "
                      f"one: {', '.join(gone)}")
-    heat = getattr(scene, "heat", None) or {}
-    if heat.get("note"):
+    # Only while somebody who saw it is here (`judgement.heat_seen`, playtest 2026-11-20 #23).
+    heat = _judgement.heat_seen(scene)
+    if heat:
         facts.append(f"what the crowd just saw: {heat['note']}")
     # What lies at this spot, whose it is and what it was — the props ledger, so a
     # sundered club's pieces stay the challenger's pieces of a club and never become

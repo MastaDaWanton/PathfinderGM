@@ -30,8 +30,14 @@ def section(ctx) -> tuple[str, dict]:
             continue
         if actor.has_state("state.hidden"):
             continue
+        # Only a sentence that still describes somebody: a save from before 2026-11-20
+        # keeps "You square your shoulders and face the clockwork spy" as the spy's
+        # (shadow-0105 on; `narration._NOT_THEIR_BODY`).
+        from gm.narration import _describes
+
         said = [" ".join(str(s).split()) for s in (getattr(actor, "described_as", None)
-                                                   or []) if str(s).strip()]
+                                                   or []) if str(s).strip()
+                and _describes(str(s))]
         face = " ".join(str(getattr(actor, "appearance", "") or "").split())
         if not said and not face:
             continue

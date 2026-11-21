@@ -1013,6 +1013,15 @@ def _apply_cards(c, p: dict) -> bool:
             c.turn_log.append({"kind": "watcher", "did": "card", "action": "refused",
                                "title": new["title"],
                                "why": "a new card names nobody present"})
+        elif _the_fight(c.scene, people):
+            # A fight is the engine's own matter, kept by the encounter: playtest
+            # 2026-11-20 #25 opened "The Hollow's Toll" on the three lizards being fought,
+            # then advanced it with "Shadow has collected the essence from the fallen
+            # lizard", and the matter slot told the player's own deed back as the world's.
+            # Blades in the Dark: "Not every situation and obstacle requires a clock".
+            c.turn_log.append({"kind": "watcher", "did": "card", "action": "refused",
+                               "title": new["title"],
+                               "why": "a new card names only the foes of the running fight"})
         elif new["title"].lower() not in existing:
             n = sum(1 for k in cards_mod.load(c.scene) if k.id.startswith("play-")) + 1
             cards_mod.open_card(c.scene, cards_mod.Card(
@@ -1033,6 +1042,16 @@ def _apply_cards(c, p: dict) -> bool:
         c.transcript.append({"who": "gm", "text": line, "kind": "consequence"})
         c.turn_log.append({"kind": "watcher", "did": "story_award", "line": line})
     return changed
+
+
+def _the_fight(scene, people: list[str]) -> bool:
+    """Whether these people are all foes in the fight now running: on a side the player is
+    not on."""
+    if not getattr(scene, "in_encounter", False):
+        return False
+    theirs = {r for refs in (getattr(scene, "sides", None) or {}).values()
+              if "pc" not in (refs or ()) for r in refs or ()}
+    return bool(people) and all(r in theirs for r in people)
 
 
 def _schemes_own(card) -> bool:

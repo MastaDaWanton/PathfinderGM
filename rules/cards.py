@@ -1189,6 +1189,15 @@ def _head(c: Card, why, fact: str, stands: str, giver_name: str = "") -> str:
             f"mind or set out to do): {c.title}.")
 
 
+def _names_the_pc(scene, fact: str) -> bool:
+    """Whether a card's fact names the player's character, by the sheet's own name (any
+    word of it, whole words): the player's doing, never the world's matter (#25)."""
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    words = [w for w in re.findall(r"[A-Za-z][A-Za-z'-]+", str(getattr(pc, "name", "") or ""))
+             if len(w) >= 3]
+    return any(re.search(rf"\b{re.escape(w)}\b", str(fact or "")) for w in words)
+
+
 def _pull_one(scene, c: Card, why, *, player_text: str, turn: int, world) -> dict | None:
     """The pull for one card, or None when it cannot reach the player here.
 
@@ -1206,6 +1215,22 @@ def _pull_one(scene, c: Card, why, *, player_text: str, turn: int, world) -> dic
     fact = open_objective or (c.facts[-1] if c.facts else "")
     if stands in (OFFERED, HEARD, UNHEARD):
         fact = ""
+    if stands == SITUATION:
+        # A matter of the world is never the player's own deed told back. Playtest
+        # 2026-11-20 #25, shadow-0141/0144: the watcher's card for the lizard fight ("The
+        # Hollow's Toll") ended on "Shadow has collected the essence from the fallen
+        # lizard", and the slot told it twice as a matter of the world. A card born in
+        # play is a matter only while one of its people is here and up to carry it
+        # (Blades' faction clocks are a faction's goal, not a record of the crew's
+        # score), and a fact naming the player's character is theirs, not the world's.
+        if c.is_(TAG_PLAY) and not any(
+                (a := (getattr(scene, "actors", {}) or {}).get(r)) is not None
+                and not a.is_down for r in c.people):
+            return None
+        fact = open_objective or next((f for f in reversed(c.facts)
+                                       if not _names_the_pc(scene, f)), "")
+        if not fact and c.facts:
+            return None
     since = int(turn) - int(c.mentioned or c.touched or 0)
     out = {"id": c.id, "title": c.title, "kind": c.kind, "fact": fact,
            "keys": identity_keys(c, names), "people": names, "since": since,

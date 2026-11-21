@@ -17,8 +17,15 @@ sent back with the people named.
 """
 from __future__ import annotations
 
-from gm import judgement, narration
+from gm import interpret, judgement, narration
 from rules.engine import Outcome, Scene
+
+
+def _read(text, *actions):
+    """The reader's reading of the player's line, as the turn would have cached it."""
+    interpret.remember(text, {"question": False, "claims": [],
+                              "actions": [dict(a) for a in actions]})
+    return text
 
 
 class _Body:
@@ -44,24 +51,29 @@ SILENT = ("The steel of your blade bites into the air. The sword meets the wood 
 
 def test_a_sword_through_the_crates_is_heat_of_its_own_kind():
     s = _scene("stranger", "merchant")
-    judgement.note_heat(s, [], "i swing the longsword at the crates in front of me")
+    said = _read("i swing the longsword at the crates in front of me",
+                 {"act": "attack", "target": "the crates"})
+    judgement.note_heat(s, [], said)
     assert s.heat["kind"] == "property" and s.heat["age"] == 0
     assert "goods" in s.heat["note"] and "onlookers" in s.heat["note"]
     brief = judgement.heat_brief(s)
     assert "WHAT THE CROWD JUST SAW" in brief and "objects out loud" in brief
 
 
-def test_a_drawn_blade_and_a_shout_are_heat_too():
+def test_a_threat_is_heat_and_the_words_alone_are_none():
+    """The reader's `threaten` is a threat the crowd sees. A drawn blade and a shout made
+    heat by regex over the player's words until 2026-11-20 (against the owner's ruling
+    that models read and code validates); the reader has no closed reading for either
+    yet, so the words alone make none, whatever they say."""
     s = _scene("guard")
-    judgement.note_heat(s, [], "I draw my sword and hold it low.")
+    judgement.note_heat(s, [], _read("Back off or I gut you.",
+                                     {"act": "threaten", "target": "the guard"}))
     assert s.heat["kind"] == "threat"
-    s = _scene("guard")
-    judgement.note_heat(s, [], "I shout at the top of my voice for everyone to get back.")
-    assert s.heat["kind"] == "threat"
-    # Shouting INSIDE speech is a character's line, not the player shouting.
-    s = _scene("guard")
-    judgement.note_heat(s, [], 'I tell him quietly, "if you shout, they will hear you."')
-    assert not s.heat
+    for words in ("I draw my sword and hold it low.",
+                  "I shout at the top of my voice for everyone to get back."):
+        s = _scene("guard")
+        judgement.note_heat(s, [], _read(words, {"act": "talk"}))
+        assert not s.heat
 
 
 def test_an_attack_that_landed_is_violence_and_a_kill_is_still_a_killing():
@@ -81,13 +93,57 @@ def test_an_attack_that_landed_is_violence_and_a_kill_is_still_a_killing():
 def test_with_nobody_watching_there_is_no_heat():
     s = Scene()
     s.people = {"pc": _Body("pc", "Kesst", pc=True)}
-    judgement.note_heat(s, [], "I smash the crates to splinters.")
+    judgement.note_heat(s, [], _read("I smash the crates to splinters.",
+                                     {"act": "attack", "target": "the crates"}))
     assert not s.heat
+
+
+class _Foe(_Body):
+    def has_state(self, tag):
+        return tag == "attitude.hostile"
+
+
+def test_the_foe_being_fought_is_no_crowd():
+    """Playtest 2026-11-20 #23, shadow-0073: in the empty ruins the brief said "WHAT THE
+    CROWD JUST SAW ... The people here react to it NOW" with only the ghoran being fought
+    in PEOPLE HERE NOW — the foe counted as an onlooker of its own fight."""
+    s = _scene()
+    s.people["c3"] = _Foe("c3", "ghoran")
+    hit = Outcome(intent_id="i1", op="attack",
+                  effects=[{"ref": "c3", "kind": "damage", "amount": 12}])
+    judgement.note_heat(s, [hit], "I strike the ghoran.")
+    assert not s.heat and judgement.heat_brief(s) == ""
+
+
+def test_the_line_goes_to_who_saw_it_and_goes_with_them():
+    """The reaction is the witnesses' own, named; when they are gone, so is the line —
+    the owner's ruins kept "killed second lizard in front of onlookers" six beats on with
+    nobody but a broken construct there."""
+    s = _scene("merchant")
+    s.people["c3"] = _Foe("c3", "thug")
+    hit = Outcome(intent_id="i1", op="attack",
+                  effects=[{"ref": "c3", "kind": "damage", "amount": 4}])
+    judgement.note_heat(s, [hit], "I hit the thug.")
+    assert s.heat["seen_by"] == ["c1"]
+    brief = judgement.heat_brief(s)
+    assert "Seen by: merchant, and nobody else" in brief
+    del s.people["c1"]          # the merchant runs off
+    assert judgement.heat_brief(s) == "" and judgement.heat_seen(s) == {}
+    s.people["c1"] = _Body("c1", "merchant", down=True)
+    assert judgement.heat_brief(s) == ""
+
+
+def test_a_heat_from_before_witnesses_were_kept_carries_to_nobody():
+    s = _scene("merchant")
+    s.heat = {"note": "the player just killed second lizard in front of onlookers",
+              "age": 6, "kind": "killing"}
+    assert judgement.heat_brief(s) == ""
 
 
 def test_heat_cools_and_the_note_ages():
     s = _scene("guard")
-    judgement.note_heat(s, [], "I kick the barrel over.")
+    judgement.note_heat(s, [], _read("I kick the barrel over.",
+                                     {"act": "attack", "target": "the barrel"}))
     for _ in range(judgement.HEAT_TURNS):
         judgement.note_heat(s, [], "I wait.")
     assert s.heat.get("age") == judgement.HEAT_TURNS

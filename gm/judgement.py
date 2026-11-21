@@ -8675,22 +8675,13 @@ def clear_cast(scene) -> None:
 # and nothing else, so nothing carried "he just attacked somebody's goods" into the
 # next beat, and the model — which continues what is in front of it — wrote the crowd
 # as it had been: watching.
-_HEAT_PROPERTY = re.compile(
-    r"\b(?:strike|strikes|hit|hits|smash|smashes|kick|kicks|hack|hacks|break|breaks|"
-    r"shatter|shatters|implode|implodes|topple|topples|burn|burns|cut|cuts|slash|"
-    r"slashes|stab|stabs|overturn|overturns|knock|knocks|split|splits|destroy|destroys|"
-    r"swing|swings|swung|bring|brings|drive|drives|slam|slams|hurl|hurls)"
-    r"\b[^.!?]{0,40}?\b(?:crates?|box(?:es)?|barrels?|stalls?|carts?|wagons?|doors?|"
-    r"tables?|walls?|signs?|windows?|shutters?|posts?|beams?|ropes?|sacks?|goods|wares|"
-    r"awnings?|benches?|counters?|shelves|shelf|jars?|pots?)\b", re.I)
-_HEAT_BRANDISH = re.compile(
-    r"\b(?:draw|draws|unsheathe|unsheathes|brandish|brandishes|level|levels)\s+"
-    r"(?:my\s+|the\s+)?(?:sword|blade|longsword|axe|dagger|knife|weapon|spear|mace|"
-    r"hammer|bow|crossbow)\b"
-    r"|\bswing\w*\s+(?:my\s+|the\s+)?(?:sword|blade|longsword|axe|hammer|weapon|mace)\b",
-    re.I)
-_HEAT_SHOUT = re.compile(r"\b(?:shout|shouts|scream|screams|yell|yells|bellow|bellows|"
-                         r"roar|roars|howl|howls)\b", re.I)
+#
+# Read off the reader's closed reading since 2026-11-20, never the player's English: the
+# three regexes that were here (property, brandish, shout) read the words, against the
+# owner's ruling of 2026-10-03 (docs/structured-turn.md). The reader already says an
+# attack at something that is nobody, a door forced, a threat. A drawn blade and a shout
+# have no closed reading yet (a shout is read `talk`; there is no `draw` act), so they
+# make no heat until the reader carries them — a reader field to bench, not a regex.
 HEAT_TURNS = 8
 
 
@@ -8715,9 +8706,8 @@ def note_heat(scene, outcomes, player_text: str = "") -> None:
     if heat:
         heat["age"] = int(heat.get("age", 0)) + 1
         scene.heat = {} if heat["age"] > HEAT_TURNS else heat
-    watchers = bool(scene.cast) or any(
-        not a.is_pc and not a.is_down for a in scene.actors.values())
-    if not watchers:
+    seen_by = witnesses(scene)
+    if not seen_by:
         return
     killed, struck = [], []
     for o in outcomes or []:
@@ -8738,11 +8728,13 @@ def note_heat(scene, outcomes, player_text: str = "") -> None:
                 struck.append(a.name)
     if killed:
         scene.heat = {"note": f"the player just killed {', '.join(killed)} in "
-                              f"front of onlookers", "age": 0, "kind": "killing"}
+                              f"front of onlookers", "age": 0, "kind": "killing",
+                      "seen_by": seen_by}
         return
     if struck:
         scene.heat = {"note": f"the player just attacked {', '.join(sorted(set(struck)))} "
-                              f"in front of onlookers", "age": 0, "kind": "violence"}
+                              f"in front of onlookers", "age": 0, "kind": "violence",
+                      "seen_by": seen_by}
         return
     said = str(player_text or "")
     # A claim about what they are, made out loud, that the sheet holds false: the
@@ -8768,23 +8760,76 @@ def note_heat(scene, outcomes, player_text: str = "") -> None:
                               f"onlookers, that they {claim} — and nothing happened"
                               + ("; the claim half-took with some of them" if took
                                  else "; nobody believed a word of it"),
-                      "age": 0, "kind": "delusion"}
+                      "age": 0, "kind": "delusion", "seen_by": seen_by}
         return
-    m = _HEAT_PROPERTY.search(said)
-    if m:
-        scene.heat = {"note": f"the player just went at somebody's goods in the open "
-                              f"— {' '.join(m.group(0).split())} — in front of "
-                              f"onlookers", "age": 0, "kind": "property"}
-        return
-    m = _HEAT_BRANDISH.search(said)
-    if m:
-        scene.heat = {"note": f"the player just drew a weapon in the open — "
-                              f"{' '.join(m.group(0).split())} — in front of onlookers",
-                      "age": 0, "kind": "threat"}
-        return
-    if _HEAT_SHOUT.search(redact_speech(said)):
-        scene.heat = {"note": "the player just shouted in the open, in front of "
-                              "onlookers", "age": 0, "kind": "threat"}
+    kind = _reading_heat(scene, said)
+    if kind == "property":
+        scene.heat = {"note": "the player just went at somebody's goods in the open, in "
+                              "front of onlookers", "age": 0, "kind": "property",
+                      "seen_by": seen_by}
+    elif kind == "threat":
+        scene.heat = {"note": "the player just threatened somebody in the open, in front "
+                              "of onlookers", "age": 0, "kind": "threat",
+                      "seen_by": seen_by}
+
+
+def _reading_heat(scene, said: str) -> str:
+    """What the reader's closed reading of the player's words makes of them for the crowd:
+    "property" for an attack at something that is nobody here (a crate, a stall) or a door
+    forced, "threat" for a threat, else "". The reading is this turn's, a cache lookup."""
+    from . import interpret
+    from .acts_to_ops import person
+
+    reading = interpret.reading_of(said) if said else None
+    if not isinstance(reading, dict) or reading.get("error"):
+        return ""
+    for a in reading.get("actions") or ():
+        act = str(a.get("act") or "")
+        if act == "break_in" or (act == "attack" and a.get("target")
+                                 and not person(scene, a["target"])):
+            return "property"
+        if act == "threaten":
+            return "threat"
+    return ""
+
+
+def witnesses(scene) -> list[str]:
+    """Who here could have seen what the player just did, as refs: a person present, up
+    and not hidden, who is not the party's own and not a foe fighting the player.
+
+    Playtest 2026-11-20 #23: in the empty ruins every beat carried "WHAT THE CROWD JUST
+    SAW ... The people here react to it NOW — flinching, backing off, somebody going for
+    the watch" with only the ghoran being fought in PEOPLE HERE NOW: the foe counted as an
+    onlooker of its own fight, and a model told a crowd reacts writes one. A witness is
+    somebody who saw (Skyrim's crime: "Anyone that sees you commit a crime will become a
+    witness"); somebody fighting you is not the crowd, and their reaction is their own turn.
+    The prose's cast ledger no longer counts: it names nobody the engine can find."""
+    from rules import states as states_mod
+
+    came = set(getattr(scene, "came_along", ()) or ())
+    out = []
+    for ref, a in (getattr(scene, "actors", {}) or {}).items():
+        if getattr(a, "is_pc", False) or getattr(a, "is_down", False) or ref in came:
+            continue
+        has = getattr(a, "has_state", None)
+        if has is not None and (has("state.hidden")
+                                or states_mod.attitude_of(a) == "hostile"):
+            continue
+        out.append(ref)
+    return out
+
+
+def heat_seen(scene) -> dict:
+    """The heat, while somebody who saw it is still here to react, else {}: the line goes
+    with its witnesses (they walked off, or the player did, or they are down), as a
+    bounty in Skyrim goes with the last witness. A heat written before witnesses were
+    kept names nobody, and carries to nobody."""
+    t = getattr(scene, "heat", None) or {}
+    if not t.get("note"):
+        return {}
+    here = set(witnesses(scene))
+    seen = [r for r in t.get("seen_by") or () if r in here]
+    return dict(t, seen_by=seen) if seen else {}
 
 
 _HEAT_REACTS = {
@@ -8809,11 +8854,15 @@ _HEAT_REACTS = {
 
 
 def heat_brief(scene) -> str:
-    t = getattr(scene, "heat", None) or {}
-    if not t.get("note"):
+    t = heat_seen(scene)
+    if not t:
         return ""
     react = _HEAT_REACTS.get(str(t.get("kind") or "killing"), _HEAT_REACTS["killing"])
-    return f"WHAT THE CROWD JUST SAW (fact): {t['note']}. {react}"
+    actors = getattr(scene, "actors", {}) or {}
+    who = ", ".join(str(actors[r].name) for r in t["seen_by"])
+    # Who saw it, by name: the reaction is theirs and nobody else's (#23).
+    return (f"WHAT THE CROWD JUST SAW (fact): {t['note']}. Seen by: {who}, and nobody "
+            f"else. {react}")
 
 
 # --- Company: the person the player addresses must exist ------------------------------
@@ -9900,7 +9949,7 @@ def settle_descriptions(scene, beat: str, player_text: str = "",
     were first described (`gm/brief/faces.py`, item 16.7).
     """
     from .checks._people import name_words
-    from .narration import describing_sentences, faceless
+    from .narration import _describes, describing_sentences, faceless
 
     if scene is None or not beat:
         return []
@@ -9910,6 +9959,13 @@ def settle_descriptions(scene, beat: str, player_text: str = "",
     addressed = _name_words(redact_speech(player_text or ""))
     owed: list[str] = []
     for ref, a in (getattr(scene, "actors", {}) or {}).items():
+        kept = getattr(a, "described_as", None) or []
+        if (not a.is_pc and getattr(a, "described", False) and kept
+                and not any(_describes(str(s)) for s in kept)):
+            # Marked described by a sentence that described nobody (a save from before
+            # 2026-11-20: "You square your shoulders and face the clockwork spy",
+            # shadow-0105): owed a real face again.
+            a.described, a.described_as = False, []
         if a.is_pc or getattr(a, "described", False):
             continue
         name = str(a.name or "")

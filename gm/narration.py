@@ -1580,12 +1580,21 @@ _GESTURE = re.compile(
     r"\b(?:eyes?|hands?|gaze)\s+(?:\w+ly\s+)?(?:\w+(?:s|ed|ing)|narrow|widen|fixed|rest|"
     r"meet|lock|dart|flick|drift|settle|linger|land|flash|stay|go|move|find|follow|"
     r"trace|scan|sweep|shift|drop|fall|close|open|glint|gleam|light|burn)\b", re.I)
+# A body word that is nobody's looks (playtest 2026-11-20, shadow-0105 on): "You square
+# your shoulders and FACE the clockwork spy" was kept as the spy's first description and
+# shown every beat after as "the page said:", because "face" the verb counted as a face.
+# The verb takes its object straight after it; and what follows "your" is the player's own
+# body, which describes the player, not the person the sentence names.
+_NOT_THEIR_BODY = re.compile(
+    r"\bfac(?:e|es|ed|ing)\s+(?:the|a|an|you|him|her|them|it|me|us|his|their|its|your|"
+    r"down|off|up|away|forward|each)\b|\byour\s+(?:\w+\s+)?\w+", re.I)
 
 
 def _describes(sentence: str) -> bool:
     """Whether one sentence carries what somebody looks like: a body word that is not
     a gaze or a gesture, or two different things they wear."""
     gestures = [m.span() for m in _GESTURE.finditer(sentence)]
+    gestures += [m.span() for m in _NOT_THEIR_BODY.finditer(sentence)]
     worn: set[str] = set()
     for m in _APPEARANCE.finditer(sentence):
         if any(a <= m.start() < b for a, b in gestures):
