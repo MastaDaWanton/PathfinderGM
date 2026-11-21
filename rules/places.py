@@ -2573,6 +2573,20 @@ def _nearest(found: list, near: str):
     return found[0]
 
 
+def said_name(place_id: str, founded=()) -> str:
+    """The words a place id goes by where a person reads them (the map's caption, a card
+    set elsewhere): a minted place's own name, else the id's last part humanised. Never
+    the hex grammar (`hexes.slug`): the 0.4.8 hit test put "The ground · @hex m113
+    76/the ruins" on the owner's Map tab (ruling 2026-09-28: refs never on the page)."""
+    pid = str(place_id or "")
+    doc = next((d for d in founded or () if isinstance(d, dict) and d.get("id") == pid), None)
+    if doc and doc.get("name"):
+        return str(doc["name"])
+    tail = _re.sub(r"@hex-m?\d+-m?\d+/?", "", pid.rsplit(":", 1)[-1])
+    tail = tail.rsplit("/", 1)[-1].replace("-", " ").strip()
+    return tail or f"the {terrain_of(pid) or 'open ground'}"
+
+
 def find(places, wanted: str, near: str = "") -> Place | None:
     """The place the GM means, by id or by name, or None.
 

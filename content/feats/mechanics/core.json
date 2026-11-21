@@ -119,6 +119,15 @@
         }
       },
       {
+        "type": "combat_mod",
+        "target": "con_check",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "forced_march"
+        }
+      },
+      {
         "type": "save_mod",
         "target": "fort",
         "amount": 4,

@@ -133,7 +133,9 @@ def hex_move(request):
     try:
         resolution = e.run(e.validate([{"op": "hex_move", "actor": "pc",
                                          "because": line,
-                                         "params": {"hex": [q, r]}}]))
+                                         "params": {"hex": [q, r], **(
+                                             {"march": True} if body.get("march") is True
+                                             else {})}}]))
     except IntentError as exc:
         return JsonResponse({"error": str(exc)}, status=400)
     if resolution.awaiting:

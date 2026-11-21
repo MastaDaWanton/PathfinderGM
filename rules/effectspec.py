@@ -2404,6 +2404,8 @@ AGAINST: dict[str, str] = {
     "thirst": "the hourly Constitution check without water (survival.charge)",
     "starvation": "the daily Constitution check without food (survival.charge)",
     "breath": "the Constitution check to keep holding one's breath (Engine.breathe)",
+    "forced_march": "the hourly Constitution check past eight hours of travel a day "
+                    "(survival.forced_march)",
     "spell_resistance": "the caster level check to overcome spell resistance "
                         "(Engine._resists)",
 }

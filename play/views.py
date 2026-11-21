@@ -54,9 +54,10 @@ def _where_the_ground_is(scene) -> tuple[str, str]:
     at = str(getattr(scene, "at", "") or "")
     if not at:
         return "", ""
-    name = at.rsplit(":", 1)[-1].replace("-", " ").strip()
+    founded = getattr(scene, "founded", None) or ()
+    name = places_mod.said_name(at, founded)
     try:
-        here = places_mod.find(places_mod.for_scene(None, at), at)
+        here = places_mod.find(places_mod.for_scene(None, at, founded=founded), at)
         if here is not None and getattr(here, "name", ""):
             name = str(here.name)
     except Exception:      # noqa: BLE001 — a caption is never worth failing a turn over

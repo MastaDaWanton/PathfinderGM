@@ -289,8 +289,16 @@ function placesAtlas(s, then) {
 // lit hex pressed on the board or its button in the slip, the Perception die the player's own
 // through the same popup an excursion's uses, and the table drawn again from the state the
 // move left. `hexEnter` goes into the spotted site underfoot.
-const HEXGO = { busy: false };
-function hexMove(q, r) { return hexAct("/api/hex/move", { hex: [q, r] }); }
+// `march`: armed by the slip's "Push on" once the day's eight hours are spent, sent with
+// the next move only, then disarmed (a forced march is the player's choice, never a
+// click's accident: owner 2026-11-21).
+const HEXGO = { busy: false, march: false };
+function hexMove(q, r) {
+  const body = { hex: [q, r] };
+  if (HEXGO.march) { body.march = true; HEXGO.march = false; }
+  return hexAct("/api/hex/move", body);
+}
+function hexMarch(on) { HEXGO.march = !!on; if (typeof renderPlaces === "function") renderPlaces(STATE); }
 function hexEnter() { return hexAct("/api/hex/enter", {}); }
 async function hexAct(url, body) {
   if (HEXGO.busy) return;

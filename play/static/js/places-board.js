@@ -182,7 +182,7 @@ export function init(el, a) {
     else if (V && V.level === "nation" && board) {   // a lit hex beside the party: travel there
       const pt = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.1), new THREE.Vector3());
       const hx = pt && board.hexAt(pt.x, pt.z);
-      if (hx && hx.reach) api.hexMove(hx.q, hx.r);
+      if (hx && (hx.reach || hx.go)) api.hexMove(hx.q, hx.r);
     }
   });
   // The name under the pointer always shows, even when it was held back to keep the map clear;
@@ -202,7 +202,7 @@ export function init(el, a) {
       setHover("nation", hx && board.knownNations.has(hx.nation) ? hx.nation : null); lit = !!hover.nation;
     } else if (V && V.level === "nation" && board) {
       const pt = ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0, 1, 0), -1.1), new THREE.Vector3());
-      const hx = pt && board.hexAt(pt.x, pt.z); lit = !!(hx && hx.reach);
+      const hx = pt && board.hexAt(pt.x, pt.z); lit = !!(hx && (hx.reach || hx.go));
     }
     canvas.style.cursor = o || lit ? "pointer" : "grab";
   });
@@ -840,13 +840,16 @@ function nationMap(v) {
   // never searched (a hex ridden through looks like this), clear where a look covered it.
   const HS = (v.KP && v.KP.hexes) || {}, touched = HS.touched || {};
   const reach = new Set(v.hexgrid ? (HS.reach || []).map(([q, r]) => key(q, r)) : []);
-  const hexes = [];
+  const hexes = [], partyK = HS.party ? key(HS.party[0], HS.party[1]) : "";
   [...mine, ...ring].forEach(x => {
     const k = key(x.q, x.r), isMine = x.nation === v.nation, land = !!x.nation, t = touched[k] || {};
     const kn = known.has(k) || !!t.entered || !!t.searched || reach.has(k);
     const tile = !land ? "hex/water" : TILE_OF[ground.get(k)] || "hex/grass";
     hexes.push({ q: x.q, r: x.r, x: x.x, z: x.z, tile, nation: x.nation, known: kn || !isMine, plate: land && (isMine ? kn : true), plateOpacity: isMine ? .55 : .25,
-                 cloud: isMine && land && !kn, haze: !!v.hexgrid && isMine && land && kn && !t.searched, reach: reach.has(k), ground: ground.get(k) || "" });
+                 cloud: isMine && land && !kn, haze: !!v.hexgrid && isMine && land && kn && !t.searched, reach: reach.has(k), ground: ground.get(k) || "",
+                 // Click-to-travel (owner 2026-11-21): any seen land hex past a move's reach is a
+                 // destination; the engine walks the way there a hex at a time (`hex_move`).
+                 go: !!v.hexgrid && !!partyK && land && kn && !reach.has(k) && k !== partyK });
   });
   board = { ...hexBoard(hexes, h, wash, { [v.nation]: W.nations[v.nation].name }), knownNations: new Set(), pos: {} };
   const P3 = hx => new THREE.Vector3(hx.x, 1.05, hx.z);
