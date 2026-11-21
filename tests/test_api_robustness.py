@@ -229,7 +229,7 @@ def test_every_resolution_door_catches_the_same_failures():
             f"Django as a 500 with a traceback")
 
 
-def test_a_refused_turn_leaves_no_creatures_standing():
+def test_a_refused_turn_leaves_no_creatures_standing(monkeypatch):
     """A 502 must undo the half of the turn that already resolved.
 
     Read out of a live save on 2026-09-01. The server log shows
@@ -257,10 +257,10 @@ def test_a_refused_turn_leaves_no_creatures_standing():
 
     # A list that PASSES validation and raises at RESOLUTION — the only kind that
     # can half-apply. Stage 7 made every refusal validate can foresee a validate-time
-    # one and every other a printed sentence, so the list has to change under itself
-    # to reach a raise at all: the spawn projects four refs the attack may name, the
-    # travel then walks the party out of their room, and the attack finds its target
-    # "not on the board at resolution time" — the one floor validate cannot see past.
+    # one and every other a printed sentence. Until 2026-11-21 the probe was a travel
+    # between the spawn and the attack, so the attack's target was "not on the board at
+    # resolution time"; that is a printed refusal now (`Engine._left_behind`,
+    # tests/test_road_ghost.py), so that refusal is made to raise here instead.
     #
     # Four rather than ten since 2026-09-19: a spawn of five or more now arrives as ONE
     # troop with the combined hit points of its members (item 33, `rules/troops.py`), so a
@@ -271,6 +271,11 @@ def test_a_refused_turn_leaves_no_creatures_standing():
             "params": {"template": "thug", "count": 4, "zone": "engaged"}},
            {"op": "travel", "because": "away", "params": {"place": other.name}},
            {"op": "attack", "actor": "pc", "target": "c1", "because": "the swing"}]
+
+    def _raises(self, intent, name):
+        raise IntentError("attack: forced resolution-time raise", "refs")
+
+    monkeypatch.setattr(Engine, "_left_behind", _raises)
     with pytest.raises((IntentError, ValueError, KeyError)):
         engine.run(engine.validate(raw))
     # The four thugs and the player. Whoever keeps the room the travel walked into is

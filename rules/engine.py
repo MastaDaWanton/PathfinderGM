@@ -5887,6 +5887,8 @@ class Engine:
         # Who everybody was before the suspended act, kept through the player's d20
         # (`deeds.before`): taken out here so no op ever sees it among its own keys.
         held_before = partial.pop("deeds_before", None) if partial else None
+        # Whoever a walk earlier in this list left behind, ref -> name (`_left_behind`).
+        left: dict[str, str] = {}
         while queue:
             raw = queue[0]
             # A creature's move toward somebody, with no square named, is given the
@@ -5943,6 +5945,13 @@ class Engine:
             if deeds.watches(self, intent):
                 snap = held_before if held_before is not None else deeds.before(self)
             held_before = None
+            gone = [r for r in (intent.actor, *intent.targets()) if r in left]
+            if gone and not partial:
+                queue.pop(0)
+                outcomes.append(self._left_behind(intent, left[gone[0]]))
+                continue
+            here_before = {r: a.name for r, a in self.scene.actors.items()}
+            at_before = self.scene.at
             try:
                 outcome = self._resolve_one(intent, partial)
             except _NeedsPlayerRoll as suspend:
@@ -5964,6 +5973,9 @@ class Engine:
                 continue
             queue.pop(0)
             partial = {}
+            if self.scene.at != at_before:
+                left.update({r: n for r, n in here_before.items()
+                             if r not in self.scene.actors})
             # A poison's save has just been decided: whatever it gates that belongs to
             # the other verdict leaves the queue now. Here, in the loop, and not inside
             # `_op_save`, because this is the one place that sees the verdict and the
@@ -6168,6 +6180,19 @@ class Engine:
             outcome.tell = (f"{outcome.tell} {name} gets no further, and the way on is "
                             f"still to go.").strip()
         return kept
+
+    def _left_behind(self, intent: Intent, name: str) -> Outcome:
+        """An act on (or by) somebody a walk earlier in the same list left behind, refused
+        in a sentence rather than raised. Bench 2026-11-21 road-jason#1: "I keep walking
+        toward Caelholt" planned [journey, move, attack c17]; the journey walked on past
+        the poltergeist met on the road, which stayed where it was (site bound, 120 ft),
+        and the attack hit "'c17' is not on the board at resolution time" — an
+        IntentError that refused the player's whole turn, walk and all, twice running.
+        Inform's scope rule: a thing left in another room is "You can't see any such
+        thing", never an error (docs/research/2026-11-21-road-ghost.md)."""
+        return self._refuse(
+            intent, f"{_sentence(name)} is not here any more: the way on left them "
+                    f"behind, so the {intent.op.replace('_', ' ')} does not happen.")
 
     def _held_by_stopped_walk(self, walk: Intent, outcome: Outcome,
                               queue: list[dict]) -> list[dict]:
