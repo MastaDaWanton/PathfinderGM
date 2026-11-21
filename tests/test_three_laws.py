@@ -797,6 +797,13 @@ _READS_MECHANICS = {
         "it. Measured on the 2026-11-05 final rerun: the commission's request told after "
         "the work it asked for on 7 of 7 runs. Refs and the player's own words; nothing "
         "read here reaches the narrator — each act still reaches it as its tell.",
+    "gm/planned.py:way_lines":
+        "reads WHERE the travel act went, never how it went: the hex effect's ground word "
+        "and the journey effect's two settlement ids (and whether it ran past a day), to "
+        "look up the world's own words for that ground and the land's name (THE WAY, "
+        "2026-11-21). Place ids and biome words, not a mechanic: no roll, no DC, no "
+        "number is read, and the act's checks reach the narrator only as its tell "
+        "(a forced march as `rules.march_said`'s one sentence).",
     "gm/agent.py:said_by_its_slot":
         "decides whether the deeds backstop (a repair that runs AFTER the prose) may write "
         "a speech deed again: whether a kept act slot carries the player's own `say` tell, "

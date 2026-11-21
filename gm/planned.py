@@ -654,6 +654,259 @@ def see_slot(slots: list[dict], brief: str, engine) -> None:
     first["want"] = min(FACT_CEILING, first["want"] + SEE_EACH * len(lines))
 
 
+# --- the way travelled (2026-11-21) ----------------------------------------------------
+#
+# The owner: "take a look at the narration that comes out after travelling I think we can
+# afford to increase the amount of fluff". Measured on 0.4.8 (docs/research/2026-11-21-
+# travel-prose.md): a region-map hex move was two sentences from the consequence call,
+# which saw the tells and nothing of the land, and seven days at sea were one sentence.
+# Sparse input invites invention (Kasner & Dušek, ACL 2024: unverifiable additions far
+# outnumber wrong ones on thin inputs), so the room is bought with held facts: the ground
+# crossed in the world's own words, the land's name, the hour the walk ends, who walks
+# with the party, and what the body carries. The Alexandrian's layers for a vector of
+# travel ("Hexcrawl Addendum: Describing Travel"): terrain, distance and time first, then
+# texture, then a companion's part, then where you are.
+#
+# Consecutive moves read as one skeleton on 0.4.4 ("silent monuments" twice in three
+# turns). Instructions do not fix that (CLAUDE.md), so the material itself turns over:
+# the ground line always, and the rest least recently used, as `see_lines` does; and the
+# demonstration turns over between two shapes. What still repeats is caught in code
+# (`travel_repeats`) and the slot asked once more with it named.
+TRAVEL_OPS = frozenset({"hex_move", "journey"})
+# What a travel act may grow to, and how much it grows a line; a road of days a little
+# more than a hex walked in a day (A7: length follows the facts given).
+TRAVEL_CEILING = 620
+WAY_EACH = 70
+
+_WAY_DEMOS = (
+    ("HOW A WALK IS WRITTEN FROM THE WAY (an example from another land; nothing in it is "
+     "here):\n"
+     "FACTS: Six hours on foot north through the moorland, to the moor 18 miles north of "
+     "Hollin. You set out in the morning and stop in the afternoon. Looking over the land: "
+     "a cairn shows to the west.\n"
+     "THE WAY: the ground crossed: moorland, in the land's own words: peat hags and "
+     "cotton-grass; the land: Vessary; with you: Odo; the hour you stop: afternoon.\n"
+     "PROSE: Six hours north, the moorland of Vessary goes soft underfoot, all peat hags "
+     "and pale cotton-grass, and Odo picks the drier tussocks a step ahead of you. By the "
+     "afternoon you stand on the moor eighteen miles north of Hollin, and off to the west "
+     "a cairn breaks the line of the land."),
+    ("HOW A WALK IS WRITTEN FROM THE WAY (an example from another land; nothing in it is "
+     "here):\n"
+     "FACTS: Five hours on foot south-west through the grassland, to the grassland 30 miles "
+     "south-west of Merrow. You set out at midday and stop in the evening. Looking over the "
+     "land, nothing stands out.\n"
+     "THE WAY: the ground crossed: grassland, in the land's own words: wind-combed steppe; "
+     "the hour you stop: evening; the body: parched, a day without water.\n"
+     "PROSE: Evening finds you thirty miles south-west of Merrow, five hours of wind-combed "
+     "steppe behind you since midday. Your mouth is dry from a day without water, and for "
+     "all your looking, nothing stands out in the grass."),
+)
+_WAY_DEMO_ROAD = (
+    "HOW A ROAD IS WRITTEN FROM THE WAY (an example from another land; nothing in it is "
+    "here):\n"
+    "FACTS: Four days on the road, and Carrow is ahead of you.\n"
+    "THE WAY: the ground crossed: farmland, then hills, in the land's own words: terraced "
+    "barley; chalk downs; the hour you stop: evening; the body: fatigued, heavy-limbed and "
+    "slow.\n"
+    "PROSE: For four days the road runs through terraced barley and then climbs onto the "
+    "chalk downs, and every mile of it settles into your legs until they drag. In the "
+    "evening of the fourth day Carrow is ahead of you.")
+_WAY_DEMO_SEA = (
+    "HOW A VOYAGE IS WRITTEN FROM THE WAY (an example from another sea; nothing in it is "
+    "here):\n"
+    "FACTS: The Gannet casts off and makes way: five quiet days at sea, and Tollmouth is "
+    "two days on.\n"
+    "THE WAY: aboard: the Gannet; the hour: dawn; with you: Odo.\n"
+    "PROSE: The Gannet casts off at dawn and stands out to sea, and Odo watches the quay "
+    "go small behind her. Five quiet days follow, each much like the last, and Tollmouth "
+    "is still two days on.")
+# Only each demonstration's own words (`demo_leak`), never an ordinary one.
+_DEMO_WORDS_WAY = ("Hollin", "Vessary", "Odo", "cotton-grass", "peat", "cairn", "Merrow",
+                   "wind-combed", "Carrow", "barley", "chalk", "Gannet", "Tollmouth")
+
+# Stock phrases of the travel beat, measured on the owner's 0.4.4 game and the 0.4.8
+# baseline: "silent monuments" twice in three moves, "stands sentinel" on a shabti the
+# tell only said was near the way. A closed list of our own output's tics, read in code
+# as `copied_from` reads shared runs; never a reading of the player's words.
+TRAVEL_TICS = ("silent monument", "stand sentinel", "stands sentinel", "standing sentinel",
+               "testament to", "forgotten history", "forgotten past", "looms before you",
+               "stretches out before you", "stretching out before you",
+               "secrets of the land", "the journey ahead", "whispers of")
+
+
+def _travel_act(outcomes) -> object | None:
+    """The outcome that moved the party across country this turn, or None."""
+    return next((o for o in outcomes or [] if getattr(o, "op", "") in TRAVEL_OPS
+                 and getattr(o, "status", "") != "refused"), None)
+
+
+def _world_words(world, settlements, grounds) -> list[str]:
+    """The world's own phrases for the ground crossed, from the land facts of the
+    settlements either end (`geography.land_around`): each comma part that names one of
+    `grounds`, so the forest is "old-growth deciduous forest" and never a phrase about the
+    river towns. The app's biome gloss only when the world wrote nothing."""
+    from rules import biomes, geography
+
+    out: list[str] = []
+    for sid in settlements:
+        if not sid or world is None or world.get(sid) is None:
+            continue
+        try:
+            land = geography.land_around(world, sid)
+        except Exception:  # noqa: BLE001 — no land facts, no world words
+            continue
+        for _who, words in land.words:
+            for part in str(words).replace(";", ",").split(","):
+                part = " ".join(part.split()).strip(" .")
+                if part and part.lower() not in (p.lower() for p in out) \
+                        and set(geography.ground_in(part)) & set(grounds):
+                    out.append(part)
+    if not out:
+        out = [biomes.describe(g).split(",")[0].lower() for g in grounds if g]
+    return out
+
+
+def _land_name(world, settlements) -> str:
+    """The wider land's own name, as THE LAND AROUND names it (`Land.words`' whose)."""
+    from rules import geography
+
+    for sid in settlements:
+        if not sid or world is None or world.get(sid) is None:
+            continue
+        try:
+            land = geography.land_around(world, sid)
+        except Exception:  # noqa: BLE001
+            continue
+        own = str(getattr(world.get(sid), "name", "") or "")
+        for who, _words in land.words:
+            if who and who != own:
+                return str(who)
+    return ""
+
+
+def way_lines(outcomes, engine, said=None) -> list[str]:
+    """THE WAY: engine-held facts about the country crossed this turn, for the travel
+    act's slot. Read off the outcome's effects and the world, never the tell's words.
+    The ground line first, always (the foundation of a vector of travel); then up to
+    two more of the rest (three on a road of days), least recently used, so two moves in
+    a row are shown different material; companions whenever any walk with the party."""
+    from rules import residency, survival
+
+    act = _travel_act(outcomes)
+    if act is None:
+        return []
+    scene, world = engine.scene, getattr(engine, "world", None)
+    fx = [e for e in (getattr(act, "effects", None) or []) if isinstance(e, dict)]
+    grounds: list[str] = []
+    ends: list[str] = [str(getattr(scene, "location_id", "") or "")]
+    days = False
+    sea = False
+    for e in fx:
+        if e.get("kind") == "hex" and e.get("ground") and e["ground"] not in grounds:
+            grounds.append(str(e["ground"]))
+        if e.get("kind") == "journey":
+            from rules import journey as journey_mod
+
+            start = str(e.get("from_id") or "")
+            ends.insert(0, start)
+            leg = next((g for g in journey_mod.legs_from(world, start)
+                        if g.to_id == e.get("to")), None) if world is not None else None
+            if leg is not None:
+                sea = leg.by_sea or leg.by == "sea"
+                if not sea:
+                    grounds += [g for g in leg.crosses if g not in grounds]
+            days = int(e.get("hours") or 0) > journey_mod.HOURS_PER_DAY
+    lines: list[str] = []
+    if grounds:
+        phrases = _world_words(world, ends, grounds)
+        if len(phrases) > 2:
+            start = narration_mod.least_recently_used(said, "planned.way.words", len(phrases))
+            phrases = [phrases[(start + k) % len(phrases)] for k in range(2)]
+        lines.append(f"the ground crossed: {', then '.join(grounds)}"
+                     + (f", in the land's own words: {'; '.join(phrases)}" if phrases else ""))
+    rest: list[str] = []
+    land = _land_name(world, ends)
+    if land and not sea:
+        rest.append(f"the land: {land}")
+    rest.append(f"the hour you stop: {residency.day_part(scene.clock_minutes)}")
+    if sea:
+        here = engine.here() if hasattr(engine, "here") else None
+        if here is not None and getattr(here, "name", ""):
+            rest.append(f"aboard: {here.name}")
+    keep = 3 if days else 2
+    if len(rest) > keep:
+        start = narration_mod.least_recently_used(said, "planned.way", len(rest))
+        rest = [rest[(start + k) % len(rest)] for k in range(keep)]
+    lines += rest
+    # The toll is what the checks of the way meant (the owner, 2026-11-21: the checks go
+    # to the GM's record, the story says what they represent), so it is never turned
+    # over: a body fatigued by the walk is said on the beat it happened. A forced march's
+    # hourly checks reach the slot as the engine's own one-sentence tell
+    # (`rules.march_said`), never read here off its effects (law three).
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    body = [s.words for s in survival.strains(pc)] if pc is not None else []
+    if body:
+        lines.append(f"the body: {'; '.join(body)}")
+    from .confide import party
+
+    with_you = [scene.actors[r].name for r in party(scene) if r in scene.actors
+                and not scene.actors[r].is_pc]
+    if with_you:
+        lines.append(f"with you: {', '.join(with_you)}")
+    return lines
+
+
+def way_slot(slots: list[dict], outcomes, engine) -> bool:
+    """THE WAY and a travel demonstration on the travel act's slot, in place of WHAT IS
+    HERE TO SEE (whose `close by` is the nearest town's, which a hex 48 miles out is not
+    near). The slot grows by `WAY_EACH` a line, to `TRAVEL_CEILING`. True when placed."""
+    act = _travel_act(outcomes)
+    if act is None:
+        return False
+    slot = next((s for s in slots if s["key"].startswith("fact")
+                 and getattr(act, "tell", "") in (s.get("tells") or [])), None) \
+        or next((s for s in slots if s["key"].startswith("fact")), None)
+    said = getattr(engine.scene, "said", None)
+    lines = way_lines(outcomes, engine, said)
+    if slot is None or not lines:
+        return False
+    if getattr(act, "op", "") != "journey":
+        demo = _WAY_DEMOS[narration_mod.least_recently_used(said, "planned.way.demo",
+                                                             len(_WAY_DEMOS))]
+    elif any(x.startswith("aboard:") for x in lines):
+        demo = _WAY_DEMO_SEA
+    else:
+        demo = _WAY_DEMO_ROAD
+    slot["see"] = ("THE WAY (engine facts about the country crossed; work two or three of "
+                   "them into the act, in your own words, only as they are; nothing beyond "
+                   "them, and no person, building or creature they do not name):\n"
+                   + "\n".join(f"- {x}" for x in lines) + "\n\n" + demo)
+    slot["demo_words"] = _DEMO_WORDS_WAY
+    slot["way"] = True
+    slot["want"] = min(TRAVEL_CEILING, max(slot["want"], FACT_WANT) + WAY_EACH * len(lines))
+    return True
+
+
+def travel_repeats(text: str, last_beat: str) -> list[str]:
+    """What a travel act repeats, in code: a stock phrase of `TRAVEL_TICS`, a four-word
+    phrase the last beat already used (`narration._phrase_grams`: names and function-word
+    runs excluded), or the last beat's opening three words. Measured on the 0.4.8
+    baseline's consecutive hex moves (docs/research/2026-11-21-travel-prose.md)."""
+    low = " ".join(str(text or "").lower().split())
+    found = [t for t in TRAVEL_TICS if t in low]
+    if last_beat:
+        shared = narration_mod._phrase_grams(text, 4) & narration_mod._phrase_grams(
+            last_beat, 4)
+        found += sorted(" ".join(g) for g in shared)
+
+        def opening(t: str) -> tuple:
+            return tuple(re.findall(r"[a-z']+", str(t or "").lower())[:3])
+
+        if opening(text) and opening(text) == opening(last_beat):
+            found.append(" ".join(opening(text)) + " (the last beat's opening)")
+    return found
+
+
 def blow_facts(outcomes, engine, said=None) -> list[str]:
     """Each blow an act struck or missed, as facts the engine holds — never a number.
 
@@ -1978,7 +2231,8 @@ def slot_messages(plan: list[dict], slots: list[dict], i: int, written: list[str
     so_far = " ".join(w for w in written if w)
     s = slots[i]
     size = (f" About {s['max']} characters at most: "
-            + ("one to three sentences." if s.get("see") else "one or two sentences.")
+            + ("three to five sentences." if s.get("way") else
+               "one to three sentences." if s.get("see") else "one or two sentences.")
             if s.get("max") else "")
     shape = (_reply_ask(s) if s["key"] == "reply"
              else 'Reply with a JSON object: {"text": "..."}.')
@@ -2230,7 +2484,7 @@ def write(engine, *, brief: str, outcomes, player_input: str, who: tuple,
     built = (turn_plan(engine, outcomes, said) if acting else
              build_plan(engine, player_input, outcomes, pull=pull, last_beat=last_beat,
                         reading=reading))
-    if not acting:
+    if not acting and not way_slot(built, outcomes, engine):
         see_slot(built, brief, engine)
     slots, dropped = allocate(built, budget)
     people = present(engine)
@@ -2943,6 +3197,25 @@ def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,
                 cut, _gone = narration_mod.trim_unfinished(cut)
                 text = cut or text
                 out.notes.append(f'the "{s["key"]}" slot: {fault} — cut to whole sentences')
+        if s.get("way"):
+            # The travel act's repeats (`travel_repeats`): asked once more with them named,
+            # then kept either way — a colour slot is never cut for a stale phrase.
+            stale = travel_repeats(text, last)
+            if stale:
+                named = "; ".join(f'"{x}"' for x in stale[:4])
+                text2, data2 = _ask(out, plan, slots, i, written, who, suggest=final,
+                                    lift=lift, core=core,
+                                    redo=f"You wrote: {text!r}. It repeats {named}, which "
+                                         "the last beat or every travel beat already said. "
+                                         "Write it again in fresh words and a different "
+                                         "shape, from the same facts.")
+                again = travel_repeats(text2, last) if text2 else stale
+                out.calls[-1]["note"] = "travel repeat named" + (" - still there" if again
+                                                                 else "")
+                if text2 and len(again) < len(stale):
+                    text, data = text2, (data2 if final else data)
+                out.notes.append(f'the "{s["key"]}" slot: travel repeat {named} - asked '
+                                 "again" + (", still there" if again else ", fixed"))
         if s.get("demo_words"):
             # The demonstration's own words (`see_slot`): asked once more with them named,
             # then kept with a note. On the bench this never reached a page (0 of 105).
