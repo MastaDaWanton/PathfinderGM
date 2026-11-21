@@ -41,7 +41,9 @@ def _move(e, to, face=20):
 
 
 def _to_a_site(world, seed=3):
-    s, e, pc = _party(world, seed=seed)
+    from tests.test_hex_travel import _site_town
+
+    s, e, pc = _party(world, _site_town(world), seed=seed)
     g = e.hex_world()
     to = next((h for h in e.hex_reach(g) if hexes.site_of(g, *h)), None)
     if to is None:

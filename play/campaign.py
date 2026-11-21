@@ -473,6 +473,7 @@ class Campaign:
                 f"{SAVE_VERSION}. The campaign was saved by a newer version of "
                 f"Pathfinder GM — update the app to open it."
             )
+        _mend_hexes(data)
         s = data["scene"]
         scene = Scene(
             location_id=s.get("location_id"),
@@ -1261,6 +1262,25 @@ def _begin(campaign_id: str, character=None) -> Campaign:
     open_the_story(c, written=False)
     c.save()
     return c
+
+
+def _mend_hexes(data: dict) -> None:
+    """A save played on an older hex scale, re-keyed onto this build's grid before the
+    scene is read (`hexes.mend_save`, 2026-11-21: the board was rescaled so walking the
+    hexes never beats the road). A world that will not load is left as it was, unstamped,
+    to be mended by the load that can read it."""
+    from rules import hexes
+
+    hx = (data.get("scene") or {}).get("hexes")
+    if not isinstance(hx, dict) or hx.get("grid") == hexes.GRID_VERSION:
+        return
+    try:
+        world = load_cached(_resolve_world_source(data.get("world_source") or ""))
+    except Exception:  # noqa: BLE001 - reported by the load that needs the world
+        return
+    from . import atlas as atlas_mod
+
+    hexes.mend_save(data, atlas_mod.atlas(world))
 
 
 def _heal_minted_goods(scene) -> None:

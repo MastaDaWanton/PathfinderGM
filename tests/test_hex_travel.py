@@ -199,14 +199,21 @@ def test_one_companion_on_foot_and_the_party_walks(worlds, quiet_road):
 
 
 def test_open_water_is_not_walked_onto(worlds, quiet_road):
-    """Sea hexes wait for ships (plan §3)."""
+    """Sea hexes wait for ships (plan §3). Stood on the nearest shore hex: since the
+    rescale (2026-11-21) no town's own hex touches the sea."""
     s, e, pc = _party(worlds)
     g = e.hex_world()
+    shore = next((h for h in hexes._spiral(e.party_hex(g), 30) if g.cell(*h)["land"]
+                  and not g.cell(*h)["town"]
+                  and any(not g.cell(*n)["land"] for n in hexes.neighbours(*h))), None)
+    if shore is None:
+        pytest.skip("no sea near this town")
+    doc = hexes.place_doc(g, *shore, parent=s.at)
+    s.founded.append(doc)
+    e.place_party(doc["id"])
     here = e.party_hex(g)
-    wet = next((h for h in hexes._spiral(here, 8) if not g.cell(*h)["land"]
-                and hexes.distance(h, here) == 1), None)
-    if wet is None:
-        pytest.skip("no sea beside this town")
+    assert here == shore
+    wet = next(h for h in hexes.neighbours(*here) if not g.cell(*h)["land"])
     assert wet not in e.hex_reach(g)
     assert _move(e, wet).status == "refused"
 
@@ -294,7 +301,7 @@ def test_a_spotted_site_in_your_hex_opens_through_the_venture_door(worlds, quiet
     """Every site opens a real place (plan §4): the venture door builds it from a seed off
     the hex's own place, so it is the same cave every time, and reaching it explores the
     hex (UC's 100 XP)."""
-    s, e, pc = _party(worlds)
+    s, e, pc = _party(worlds, _site_town(worlds))
     g = e.hex_world()
     to = next((h for h in e.hex_reach(g) if hexes.site_of(g, *h)), None)
     if to is None:
@@ -310,6 +317,22 @@ def test_a_spotted_site_in_your_hex_opens_through_the_venture_door(worlds, quiet
 
 
 # --- playtest 2026-11-20 -------------------------------------------------------------------
+
+def _town_where(world, good):
+    """The first settlement whose own hex passes `good(g, town_hex)`, else the first.
+    Since the board was rescaled (2026-11-21, hexes.Grid._fit) the first settlement of an
+    export is not always beside a site or the sea; the tests ask for one that is."""
+    s, e, _pc = _party(world)
+    g = e.hex_world()
+    rows = world.play["settlements"]
+    return next((r["id"] for r in rows if r["id"] in g.town_hex
+                 and good(g, g.town_hex[r["id"]])), rows[0]["id"])
+
+
+def _site_town(world):
+    return _town_where(world, lambda g, h: any(
+        hexes.site_of(g, *n) and g.cell(*n)["land"] for n in hexes.neighbours(*h)))
+
 
 def _site_beside(e, g):
     to = next((h for h in e.hex_reach(g) if hexes.site_of(g, *h)), None)
@@ -331,7 +354,7 @@ def test_out_and_back_leaves_no_parent_loop_and_the_site_can_be_left(worlds, qui
     Out of the site hex and back, then into the site: every way on leaves it."""
     from rules import places as places_mod
 
-    s, e, pc = _party(worlds)
+    s, e, pc = _party(worlds, _site_town(worlds))
     monkeypatch.setattr(e, "_inhabit", lambda *a, **k: ([], ""))
     g = e.hex_world()
     to = _site_beside(e, g)
@@ -358,7 +381,7 @@ def test_the_hex_you_came_from_is_not_a_walk_of_minutes(worlds, quiet_road, monk
     minutes' walk" and the ruins, gate and courtyard as a quarter and half an hour. The
     grassland hex is filed under the forest hex, and the chain up from where the party
     stands ran past its own hex into the last one. The chain stops at the hex stood in."""
-    s, e, pc = _party(worlds)
+    s, e, pc = _party(worlds, _site_town(worlds))
     monkeypatch.setattr(e, "_inhabit", lambda *a, **k: ([], ""))
     g = e.hex_world()
     to = _site_beside(e, g)
@@ -392,7 +415,7 @@ def test_the_move_reads_as_a_day_and_says_each_find_once(worlds, quiet_road):
     forest, ..., in Faerholt March."), the look a bare "(27)", nothing of the day, and the
     walk back repeated "broken walls show here". Now: ground, bearing and the day's parts,
     the roll shown as a roll, and a find said once."""
-    s, e, pc = _party(worlds)
+    s, e, pc = _party(worlds, _site_town(worlds))
     g = e.hex_world()
     to = _site_beside(e, g)
     first = _move(e, to, face=20)
@@ -411,7 +434,7 @@ def test_the_move_reads_as_a_day_and_says_each_find_once(worlds, quiet_road):
 def test_the_site_in_your_own_hex_is_no_hours_away(worlds, quiet_road):
     """Playtest 2026-11-20 #10: "The ruins open off the forest ..., 2 hours away" for the
     site in the hex the party stood in. The hex's hours were the walk to it."""
-    s, e, pc = _party(worlds)
+    s, e, pc = _party(worlds, _site_town(worlds))
     g = e.hex_world()
     to = _site_beside(e, g)
     _move(e, to, face=20)
@@ -427,7 +450,7 @@ def test_from_a_site_out_in_the_wild_the_town_is_not_a_minute_away(worlds, quiet
     to the outskirts and walked from a hex twelve miles out to the town in "a few minutes'
     walk"; the refusals listed the town's well and market from inside the ruins. Out in a
     hex, the places are that hex and what hangs off it; the way out of a site is its hex."""
-    s, e, pc = _party(worlds)
+    s, e, pc = _party(worlds, _site_town(worlds))
     monkeypatch.setattr(e, "_inhabit", lambda *a, **k: ([], ""))
     g = e.hex_world()
     to = _site_beside(e, g)
@@ -453,7 +476,7 @@ def test_leaving_a_site_by_words_walks_out_of_it_not_deeper_in(worlds, quiet_roa
     plan's travels become the one walk to the hex the site opens off."""
     from gm import judgement
 
-    s, e, pc = _party(worlds)
+    s, e, pc = _party(worlds, _site_town(worlds))
     monkeypatch.setattr(e, "_inhabit", lambda *a, **k: ([], ""))
     g = e.hex_world()
     to = _site_beside(e, g)

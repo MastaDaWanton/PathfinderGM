@@ -96,9 +96,14 @@ def atlas(world) -> dict:
             if pair in seen_pairs or world.get(leg.to_id) is None:
                 continue
             seen_pairs.add(pair)
+            hours, _words, how = journey.hours_for(leg, 30)
             routes.append({"a": entity.id, "b": leg.to_id, "by": leg.by or "",
                            "miles": leg.miles, "days": leg.days_apart,
-                           "crosses": list(leg.crosses)})
+                           "crosses": list(leg.crosses),
+                           # The road's hours on foot at 30 ft, the journey's own figure
+                           # (floors and all); 0 for a crossing by water. The board is
+                           # scaled so no walk across its hexes beats it (`hexes.Grid._fit`).
+                           "walk": hours if how != "sea" else 0})
     got = {"world": getattr(world, "name", ""), "cities": cities, "nations": nations,
            "continents": continents, "routes": routes}
     if len(_MEMO) > 8:
