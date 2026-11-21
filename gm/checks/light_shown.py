@@ -193,7 +193,10 @@ def sight(scene) -> dict | None:
     elif ambient == "dark":
         why = "nothing lit"
     else:
-        why = "night under the open sky, starlight and moonlight only"
+        # No moon: the engine keeps none (`Scene.ambient_light`), and "starlight and
+        # moonlight only" here put one in the brief — playtest 2026-11-20 #22, "the dim,
+        # moonlit gloom" in a night fight (docs/research/2026-11-21-moonlight.md).
+        why = "night under the open sky"
     lights = []
     for _sq, _r, _rr, name in (scene.lights() if hasattr(scene, "lights") else ()):
         lights.append(name)
