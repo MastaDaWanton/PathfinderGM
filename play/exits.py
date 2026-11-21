@@ -274,12 +274,24 @@ def _rows_from(engine, here, known, pc, loc, scale, speed, clock,
     on_ring = places_mod.is_ring(here.id)
     at_a_way_out = any(p is not None and places_mod.is_ring(p.id) for p in adjacent)
     if on_ring or at_a_way_out:
+        from rules import dungeons
+
         further = []
         for p in known:
             if p.id in seen or not places_mod.is_ring(p.id) or outskirts.is_along(p.id):
                 continue
+            # Playtest 2026-11-20 #21: a hex site's rooms sit under its `@hex` root, so
+            # they read as "the ring", and the row named every room below, the climax's
+            # too, before the stuck trapdoor was forced. A dungeon room is a step from the
+            # room beside it (the next_door rows above, its door shut with the rule's
+            # sentence); from across the ring only once the party has stood in it, and
+            # never by a walk through a shut door (Diku/Inform list a room's own exits;
+            # Brogue and the OSR keep the rest dark until walked into: the research note).
+            if dungeons.is_room(p) and p.id not in scene.been:
+                continue
             path = places_mod.route(known, here.id, p.id)
-            if path:
+            hops = list(zip((here.id, *path), path))
+            if path and not any(dungeons.door_between(scene, a, b) for a, b in hops):
                 further.append((_minutes(known, (here.id, *path), scale, speed), p, path))
         for _m, p, path in sorted(further, key=lambda t: t[0]):
             add(p, "outside", (here.id, *path))
