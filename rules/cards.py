@@ -103,6 +103,11 @@ KNOWN = ("unheard", "heard", "offered", "taken")
 #   situation  everything else: a town's strain, a place, a fact of the world — never a
 #              task of the player's
 OWN, OFFERED, HEARD, UNHEARD, SITUATION = "own", "offered", "heard", "unheard", "situation"
+# A trouble's fact that only says how strained things are ("Simmering, not yet at open
+# conflict", "Tension in Ashwatch currently sits at a simmer"): the world's own level words,
+# read in code as `identity_keys` reads titles; never the player's words.
+_MOOD_WORD = re.compile(r"\b(?:tensions?|frictions?|simmer\w*|conflicts?|volatil\w*|unrest|"
+                        r"strife|rivalr(?:y|ies))\b", re.I)
 # `Card.shown`'s stamp, and how many showings a card remembers.
 SHOWN_VERSION = 1
 SHOWN_KEPT = 6
@@ -1294,9 +1299,12 @@ def _pull_one(scene, c: Card, why, *, player_text: str, turn: int, world) -> dic
             # title, never the newest: a tell that hits two loose keys lands on the card
             # (`touch_from_outcomes`), and 7 of the prose-gold's 19 matter slots were a
             # travel tell pasted in as the town's trouble ("You leave Reedsink behind.").
+            # And one that names a cause rather than a mood: the slot's ask becomes its
+            # answer, and "Tension in Fizspark currently sits at a simmer" handed to it is
+            # the owner's sentence half-written. The first fact when every one is a mood.
             title = " ".join(c.title.lower().split()).rstrip(".")
-            fact = next((f for f in c.facts
-                         if " ".join(f.lower().split()).rstrip(".") != title), "")
+            more = [f for f in c.facts if " ".join(f.lower().split()).rstrip(".") != title]
+            fact = next((f for f in more if not _MOOD_WORD.search(f)), more[0] if more else "")
     since = int(turn) - int(c.mentioned or c.touched or 0)
     out = {"id": c.id, "title": c.title, "kind": c.kind, "fact": fact,
            "keys": identity_keys(c, names), "people": names, "since": since,

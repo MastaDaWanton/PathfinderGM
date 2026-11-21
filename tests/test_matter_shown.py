@@ -147,6 +147,23 @@ def test_two_loose_keys_in_a_tell_do_not_raise_a_town_trouble():
     assert asked["fact"] == facts[1], "the world's own words, never the newest tell"
 
 
+def test_the_slot_is_handed_a_cause_never_the_worlds_own_mood_line():
+    """The bench's first after-arm run handed the slot "Tension in Fizspark currently sits
+    at a simmer" (Aurvantis's second fact) — the owner's sentence half-written in the ask
+    itself. The first of the world's facts that names a cause goes instead."""
+    s = Scene(location_id="t1")
+    s.add(load_pc("fixtures/pc-kesst.json"))
+    s.at = "t1~urban:the-market"
+    facts = ["Ongoing friction over grazing land.", "Simmering, not yet at open conflict.",
+             "Tension in Harforge currently sits at a simmer.",
+             "The root of Harforge's trouble is grazing land, a dispute old enough that most "
+             "residents have simply learned to live around it."]
+    cards.open_card(s, cards.Card(id="h-strain", title="Ongoing friction over grazing land",
+                                  facts=facts, tags=(cards.TAG_WORLD,), place="t1"))
+    got = cards.thread_to_pull(s, recent=[], player_text="the grazing land friction", turn=40)
+    assert got["fact"] == facts[3]
+
+
 # --- the slot, written ------------------------------------------------------------------
 
 class _Reply:
