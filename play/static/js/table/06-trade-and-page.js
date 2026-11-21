@@ -857,30 +857,44 @@ const title = s => s.replace(/\b\w/g, c => c.toUpperCase());
 
 // The carried flame. Position comes from the pointer; intensity comes from noise —
 // three sine waves at irrational frequency ratios plus a bounded random walk, which
-// never falls into a rhythm a person can catch. Everything lands in CSS variables on
-// the root, so the shade and the light read one source and the browser only ever
-// composites transforms and opacity. Under prefers-reduced-motion the loop never
-// starts and the flame holds a steady mid value.
+// never falls into a rhythm a person can catch. Under prefers-reduced-motion the loop
+// never starts and the flame holds a steady mid value.
+//
+// The variables are written on the elements that read them, never on the root. Measured
+// 2026-11-21 (fix/board-fps): one custom property set on <html> restyled the whole
+// document, 12.8 ms a write on the owner's save (1,738 nodes, 2,276 rules, 962 var()
+// uses), and the flame wrote three a frame: the table ran at 28-40 fps with nothing on
+// it moving, 96-117 with the writes stopped, and the Region board's 3D map (about 2 ms
+// a frame of its own) ran at 28-35 fps (0.4.8 and 0.4.9 alike, 1520x1060). Written on #cursorshade and #cursorlight (and, ten times a second, on the
+// handful of lit materials), the same flame costs about 0.3 ms
+// and the Region and Continent draw at the display's 120 fps.
 {
-  const root = document.documentElement.style;
+  const fastEls = () => ["cursorshade", "cursorlight"].map(id => document.getElementById(id)).filter(Boolean);
+  // Everything in table.html that reads --flicks/--sdx/--sdy (the slow channel's materials).
+  const LIT = ".framed, .card, .slot, .popup, .deathpanel, .bignum, .cell span, .dieface, .row.danger span:last-child";
+  const slowVars = { "--sdx": "0px", "--sdy": "6px" };
+  const put = (els, vars) => els.forEach(el => Object.entries(vars).forEach(([k, v]) => el.style.setProperty(k, v)));
+  const paintSlow = () => put(document.querySelectorAll(LIT), slowVars);
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
   document.addEventListener("pointermove", e => {
-    root.setProperty("--cx", `${e.clientX}px`);
-    root.setProperty("--cy", `${e.clientY}px`);
+    put(fastEls(), { "--cx": `${e.clientX}px`, "--cy": `${e.clientY}px` });
     // Shadow direction: away from the light. One global vector — the panels
     // to the candle's right lean their shadows right — which is the cheap
     // approximation of per-panel geometry, and at room scale it reads true.
     const dx = (innerWidth / 2 - e.clientX) / innerWidth;
     const dy = (innerHeight / 2 - e.clientY) / innerHeight;
-    root.setProperty("--sdx", `${(dx * 10).toFixed(1)}px`);
-    root.setProperty("--sdy", `${(4 + dy * 8).toFixed(1)}px`);
+    slowVars["--sdx"] = `${(dx * 10).toFixed(1)}px`;
+    slowVars["--sdy"] = `${(4 + dy * 8).toFixed(1)}px`;
+    if (still) paintSlow();   // with the flame burning, the tick lays them on, ten times a second
   }, { passive: true });
 
-  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) {
+  if (!still) {
     // Two channels from one flame. --flick updates every frame and feeds only
     // compositor-cheap properties (opacity, transform). --flicks is the same
     // signal quantised to ~10Hz and a minimum step, and it feeds the expensive
     // consumers — box-shadows and text-shadows repaint what they touch, and
     // sixty repaints a second of every card is how a laptop grows a fan noise.
+    // The slow write also lands the current values on a card drawn since the last.
     let walk = 0, slow = 0.8, slowAt = 0;
     const tick = now => {
       const t = now / 1000;
@@ -890,18 +904,17 @@ const title = s => s.replace(/\b\w/g, c => c.toUpperCase());
         + 0.09 * Math.sin(t * 4.3 + 1.3)
         + 0.05 * Math.sin(t * 9.1 + 4.1)
         + 0.12 * walk;
-      root.setProperty("--flick", flick.toFixed(3));
-      root.setProperty("--jx", `${(Math.sin(t * 2.9) * 1.2).toFixed(2)}px`);
-      root.setProperty("--jy", `${(Math.sin(t * 3.7 + 2) * 0.9).toFixed(2)}px`);
-      if (now - slowAt > 100 && Math.abs(flick - slow) > 0.04) {
-        slow = flick; slowAt = now;
-        root.setProperty("--flicks", flick.toFixed(3));
+      put(fastEls(), { "--flick": flick.toFixed(3), "--jx": `${(Math.sin(t * 2.9) * 1.2).toFixed(2)}px`,
+                       "--jy": `${(Math.sin(t * 3.7 + 2) * 0.9).toFixed(2)}px` });
+      if (now - slowAt > 100) {
+        if (Math.abs(flick - slow) > 0.04) { slow = flick; slowVars["--flicks"] = flick.toFixed(3); }
+        slowAt = now; paintSlow();
       }
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
   } else {
-    root.setProperty("--flick", "0.8");
+    document.documentElement.style.setProperty("--flick", "0.8");
   }
 }
 
