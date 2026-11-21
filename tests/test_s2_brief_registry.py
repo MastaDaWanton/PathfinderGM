@@ -160,7 +160,12 @@ def test_the_place_slot_is_the_old_inline_block_byte_for_byte(worlds, only_the_m
     Lane B retired this promise for HERE and ROADS OUT on purpose (2026-09-28): the HERE
     line now says outside when the party is (item 20.1) and ROADS OUT carries each road's
     facts (items 17.4, 19), and `tests/test_b_brief_space.py` pins those instead. What
-    stays byte-for-byte is the fact-key member, which nobody has changed yet."""
+    stays byte-for-byte is the fact-key member, which nobody has changed yet.
+
+    One part of that retired on purpose too (2026-11-21, the owner's save): stood in the
+    forest, past the settlement's streets (`places.off_its_streets`), the keys that say what
+    the town LOOKS like (`place_facts.LOOKS_KEYS`) are left out, since "Architecture: coral
+    and driftwood stilts" reached a ruins hex. Every other key stays byte for byte."""
     real = brief.registered
     monkeypatch.setattr(brief, "registered", lambda slot=None: tuple(
         m for m in real(slot) if brief.short_name(m) == "place_facts"))
@@ -179,6 +184,11 @@ def test_the_place_slot_is_the_old_inline_block_byte_for_byte(worlds, only_the_m
                 "Urban Life", "Social Classes", "Architecture", "Governance",
                 "Formal Power", "Shadow Power", "Tension", "Daily Norms",
                 "Daily Life", "Customs", "Conflict", "Landscape")}
+            from gm.brief import place_facts
+            from rules import places as places_mod
+
+            if places_mod.off_its_streets(location, getattr(scene, "at", "") or ""):
+                keys -= {geography.display_key(k) for k in place_facts.LOOKS_KEYS}
             want = "\n".join(ln for ln in old.split("\n")
                              if any(ln.startswith(f"  {k}: ") for k in keys))
             got, _facts = brief.run("place", _ctx(worlds, scene, location, **kw))

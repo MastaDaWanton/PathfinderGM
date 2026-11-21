@@ -797,6 +797,17 @@ def terrain_of(place_id: str) -> str:
     return head.rsplit(SEP, 1)[1].strip().lower()
 
 
+def off_its_streets(location, place_id: str) -> bool:
+    """Whether the party stands out past a settlement's streets on ground it files under
+    itself: its fields, a road, a hex of the region map or the site in one. What the
+    settlement's own words say it looks like is not here then (owner's save, 2026-11-21:
+    "Branford runs on priest-scribes", "Architecture: coral and driftwood stilts" in a
+    ruins hex). A wild site the world wrote is its own location, not filed under a town:
+    never off its streets. An old save's empty place id is in town, as it always was."""
+    ground = terrain_of(place_id)
+    return ground not in ("", URBAN) and _settled(location, ground)
+
+
 def location_of(place_id: str) -> str:
     head = str(place_id or "").split(":", 1)[0]
     return head.rsplit(SEP, 1)[0] if SEP in head else head

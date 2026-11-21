@@ -162,3 +162,24 @@ def test_here_says_outside_when_the_party_is(worlds):
     assert f"\nHERE: outside {e0.name}, " in outside
     assert f"The party is at the outskirts, outside {e0.name}, and not anywhere else" \
         in outside
+
+
+def test_the_towns_own_words_stay_in_the_town():
+    """Owner's save, 2026-11-21 (the rich-narration live check): standing in a ruins hex of
+    the region map, the brief said THE PLACE, IN ITS OWN WORDS "Branford runs on
+    priest-scribes …", the home town's paragraph, and the planned see block put it beside
+    the slot's ask. A hex is filed under its nearest town, but the town's words describe
+    the town's streets: out past them there are none to give."""
+    s, e = _stand(AURVANTIS, VORMOOR)
+    assert "THE PLACE, IN ITS OWN WORDS: Vormoor runs on" in _brief(AURVANTIS, s, e)
+    town = _brief(AURVANTIS, s, e)
+    s.at = f"{VORMOOR}~ruins:@hex-m2-3/the-ruins"
+    ruins = _brief(AURVANTIS, s, e)
+    assert "IN ITS OWN WORDS" not in ruins
+    # Nor the fact keys that say what the town looks like; its law and its people's
+    # standing still hold out there.
+    for key in ("Architecture:", "Daily life:"):
+        assert key in town and key not in ruins
+    assert any(k in town and k in ruins for k in ("Governance:", "Social Classes:"))
+    s.at = f"{VORMOOR}~farmland:@the-fields"
+    assert "IN ITS OWN WORDS" not in _brief(AURVANTIS, s, e)

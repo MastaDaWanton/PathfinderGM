@@ -333,7 +333,7 @@ def _planned_record(out, kw) -> dict:
         return {"key": s.get("key"), "say": s.get("say", ""), "tells": s.get("tells") or [],
                 "max": s.get("max"), "speaker": s.get("speaker_name", ""),
                 "wrote": s.get("wrote", ""), "dropped": bool(s.get("dropped")),
-                "reply": s.get("reply", ""),
+                "reply": s.get("reply", ""), "see": s.get("see", ""),
                 "ask": (msgs[-1]["content"] if msgs else "")}
 
     return {"text": out.text, "slots": [slot_row(s) for s in out.slots],

@@ -630,11 +630,11 @@ def test_a_slot_the_page_checks_find_broken_is_asked_once_then_dropped(monkeypat
 
 def test_the_beat_is_held_to_a_budget_by_priority_never_mid_sentence():
     """Rough edge 4, live 2026-10-10: the gate beat ran to 900 characters across six
-    slots. The beat has a budget (650, or the free narrator's own fight ceiling in a
-    fight); the acts and the answer are written, then the state, the matter and an aside
+    slots. The beat has a budget (850 since the richer-prose bench of 2026-11-21, or the
+    free narrator's own fight ceiling in a fight); the acts and the answer are written, then the state, the matter and an aside
     as they fit, and a slot that does not fit goes whole — no sentence is cut mid-way."""
     s, engine = _scene()
-    assert planned.budget_for(engine) == planned.BEAT_BUDGET == 650
+    assert planned.budget_for(engine) == planned.BEAT_BUDGET == 850
     s2, fight = _scene(fighting=True)
     from gm import narration
 
