@@ -276,8 +276,11 @@
 <script nonce="{{ request.csp_nonce }}">
 // The flame, same two channels as home: --cx/--cy from the pointer, --flick from
 // summed irrational sines plus a bounded walk. See home.html for the reasoning.
+// Written on the two elements that read them, never on the root: a custom property on
+// <html> restyles the whole document, three times a frame (js/table/06-trade-and-page.js).
 {
-  const root = document.documentElement.style;
+  const els = ["cursorshade", "cursorlight"].map(id => document.getElementById(id)).filter(Boolean);
+  const root = { setProperty: (k, v) => els.forEach(el => el.style.setProperty(k, v)) };
   document.addEventListener("pointermove", e => {
     root.setProperty("--cx", `${e.clientX}px`);
     root.setProperty("--cy", `${e.clientY}px`);
@@ -296,7 +299,7 @@
     };
     requestAnimationFrame(tick);
   } else {
-    root.setProperty("--flick", "0.8");
+    document.documentElement.style.setProperty("--flick", "0.8");
   }
 }
 
