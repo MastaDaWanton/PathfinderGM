@@ -51,8 +51,14 @@ def home(request):
     who is actually trying to play, which is the half that must keep refusing.
     """
     unreadable = ""
+    # A first run has no game to continue, and the shelf no longer begins one: `current()`
+    # would `_begin` a default campaign for a character nobody chose, and read its opening
+    # through the narrator's model on this request. Measured 2026-11-21 on empty data: the
+    # first "/" took 8.4 s with the models already loaded, two of them waiting on Ollama, and
+    # a cold model is a 60-100 s load (gm/client.py); the packaged proof's 30 s first GET
+    # failed twice on 0.4.9. The player picks somebody on the shelf, as `begin_with` expects.
     try:
-        active = campaign_mod.current()
+        active = campaign_mod.current() if campaign_mod.begun() else None
     except campaign_mod.UnreadableSave as exc:
         active, unreadable = None, str(exc)
     pc = active.scene.pc() if active else None

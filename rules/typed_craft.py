@@ -1139,7 +1139,7 @@ def _names_in(craft: str, item: str) -> bool:
     if craft == "alchemist":
         from . import formulae
 
-        names = {n for r in formulae.all().values()
+        names = {n for r in formulae.table().values()
                  for n in (str(r.get("name") or "").lower(),
                            str(r.get("id") or "").replace("-", " ").lower())}
         return any(s in names for s in spans)

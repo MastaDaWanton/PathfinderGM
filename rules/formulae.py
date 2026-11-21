@@ -757,6 +757,15 @@ def all() -> dict[str, dict]:  # noqa: A001 - the contract's name
     return {k: copy.deepcopy(v) for k, v in _rows().items()}
 
 
+def table() -> dict[str, dict]:
+    """The same table as `all()`, uncopied: READ ONLY, for a caller that only looks. Measured
+    2026-11-21 on the owner's save: the home page called `all()` 153 times through the old-save
+    migration's name lookup (`alchemy_migration._bought_formula`), 5.8M deepcopy calls: 14 s
+    of a 33 s first request and 11.6 s of a 12.6 s second one (cProfile, bytecode compiling
+    included in the first; the lane brief's 25 s of 49 s was the same cost unprofiled)."""
+    return _rows()
+
+
 def get(fid: str) -> dict | None:
     row = _rows().get(str(fid or "").strip().lower())
     return copy.deepcopy(row) if row is not None else None

@@ -504,7 +504,7 @@ def _pocket(actor, key: str) -> None:
     if key.startswith("mi-") and materials.recipe(key) is not None:
         actor.add_stock(magicitem.finished(key, how="found"), 1)
         return
-    book = formulae.all()
+    book = formulae.table()
     slug = re.sub(r"[^a-z0-9]+", "-", key).strip("-")
     # The classics by the shop's own ids ("acid" is `acid-flask`, `goods.CLASSIC_GEAR`).
     fid = (key if key in book else slug if slug in book

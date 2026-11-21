@@ -118,13 +118,17 @@ class Entry:
             "hp": f"{a.hp}/{a.hp_max}",
         }
 
-    def playable(self) -> bool:
+    def playable(self, summary: dict | None = None) -> bool:
         """Whether a game can be started from this character at all.
 
         Computed here because it was computed in two views with the same expression and
-        neither of them knew about the third reason: dead, and now unreadable.
+        neither of them knew about the third reason: dead, and now unreadable. A caller
+        that already holds `summary()` passes it: each one builds the whole Actor, and the
+        home page built every living character twice (measured 2026-11-21, half of a 12 s
+        second request on the owner's save).
         """
-        return self.status != DEAD and not self.summary()["unreadable"]
+        summary = summary if summary is not None else self.summary()
+        return self.status != DEAD and not summary["unreadable"]
 
 
 def path_for(character_id: str) -> Path:

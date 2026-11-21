@@ -199,7 +199,7 @@ def item(printed: str) -> dict:
     # (40 blocks) unread. "potions of" and "tanglefoot bags" are the one and the many.
     from . import formulae
 
-    book = formulae.all()
+    book = formulae.table()
     if of and of.group(1).lower() in ("potion", "oil", "elixir"):
         rest = _slug(low[of.end():])
         lead = of.group(1).lower()

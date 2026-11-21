@@ -1667,9 +1667,8 @@ def characters(request):
     return JsonResponse({
         "playing": c.character_id,
         "ended": c.ended,
-        "roster": [{**e.summary(), "playable": e.playable(),
-                    "current": e.id == c.character_id}
-                   for e in roster.everyone()],
+        "roster": [{**s, "playable": e.playable(s), "current": e.id == c.character_id}
+                   for e in roster.everyone() for s in (e.summary(),)],
         "choices": roster.pregens(),
     })
 
