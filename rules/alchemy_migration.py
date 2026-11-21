@@ -148,7 +148,7 @@ def _bought_formula(d) -> str | None:
     fid = goods.CLASSIC_GEAR.get(name)
     if fid:
         return fid
-    for fid, row in formulae.all().items():
+    for fid, row in formulae.table().items():
         if not row.get("authored", True) or not row.get("brewable", True):
             continue
         if row.get("kind") in ("classic", "spell") and _norm(row.get("name")) == name:
@@ -308,7 +308,7 @@ def _formula_named(name: str) -> str | None:
     from . import formulae
 
     n = _norm(name)
-    for fid, row in formulae.all().items():
+    for fid, row in formulae.table().items():
         if row.get("authored", True) and _norm(row.get("name")) == n:
             return fid
     return None

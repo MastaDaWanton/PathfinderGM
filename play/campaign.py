@@ -1155,6 +1155,13 @@ def _save_path(campaign_id: str) -> Path:
     return Campaign(id=campaign_id, world_source="", scene=Scene()).path()
 
 
+def begun(campaign_id: str | None = None) -> bool:
+    """Whether `current()` would resume a game rather than begin one: it is in memory, or
+    it has a save on disk."""
+    campaign_id = campaign_id or active_id()
+    return campaign_id in _LIVE or _save_path(campaign_id).exists()
+
+
 def current(campaign_id: str | None = None) -> Campaign:
     """The campaign in play, resumed from disk if it is not already in memory.
 

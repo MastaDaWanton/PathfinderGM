@@ -289,7 +289,7 @@ def recent_characters(limit: int = 12) -> list[dict]:
         summary = entry.summary()
         summary["world"] = where.get(entry.id, "")
         summary["active"] = entry.campaign_id == active
-        summary["playable"] = entry.playable()
+        summary["playable"] = entry.playable(summary)
         # The outfit page is for creation only (owner, 2026-09-28): once a campaign has
         # begun, the card offers no way back to it (`outfit_views.begun`).
         summary["begun"] = bool(entry.campaign_id)

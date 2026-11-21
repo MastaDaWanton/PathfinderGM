@@ -26,6 +26,7 @@ the life, and when the player last met them.
 """
 from __future__ import annotations
 
+import functools
 import logging
 import re
 
@@ -599,6 +600,9 @@ _IRREGULAR = {
 }
 
 
+# Pure on the word. Measured 2026-11-21: 314,721 calls on the owner's first home page
+# (`lives.occupation_for` re-stemming the whole occupation table per keeper title), 1.5 s.
+@functools.lru_cache(maxsize=8192)
 def _stem(w: str) -> str:
     w = w.lower().strip("'-")
     if w in _IRREGULAR:

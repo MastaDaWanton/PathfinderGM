@@ -183,9 +183,32 @@ def _pick(rows: list[dict], rng: random.Random, tags: set[str], work_class: str,
     return rng.choices(legal, weights=weights, k=1)[0]
 
 
+_OCCUPATION_MEMO: dict = {"tables": None, "by": {}}
+
+
 def occupation_for(phrase: str) -> dict | None:
-    """The work a described phrase names outright — "the smith", "a fishwife" — or None."""
-    words = f" {str(phrase or '').lower()} "
+    """The work a described phrase names outright — "the smith", "a fishwife" — or None.
+    Remembered per phrase for as long as the shipped tables are the same object: measured
+    2026-11-21, the owner's first home page asked it 2,772 times (every place's keeper
+    title, `places.place_tags`) for 1.9 s, almost all of them the same few titles."""
+    key = str(phrase or "").lower()
+    memo = _OCCUPATION_MEMO
+    if memo["tables"] is not tables():
+        memo.update(tables=tables(), by={})
+    by = memo["by"]
+    # One read and a local, never `in` then `[]`: another thread may clear the memo between.
+    found = by.get(key, by)
+    if found is not by:
+        return found
+    found = _occupation_for(key)
+    if len(by) > 4096:  # phrases come from play too; never grow without bound
+        by.clear()
+    by[key] = found
+    return found
+
+
+def _occupation_for(phrase: str) -> dict | None:
+    words = f" {phrase} "
     best = None
     # A word for WHAT they sell beats a word for selling: "bread seller" is a baker, and
     # "seller" alone is a stallholder (live, 2026-09-27).
