@@ -41,10 +41,16 @@ from __future__ import annotations
 
 import hashlib
 import math
+import re
 
 from . import biomes
 
 LAYOUT_VERSION = 1
+# The grid's scale. 1: a hex is twelve of the world's raw road miles (0.4.4-0.4.6). 2: the
+# board is drawn no smaller than the roads' own journey times (`Grid._fit`), so walking
+# the hexes between two towns is never quicker than the road (docs/research/2026-11-21-
+# hex-scale.md). A save of an older scale is re-keyed on load (`mend_save`).
+GRID_VERSION = 2
 HEX_MILES = 12
 SQRT3 = math.sqrt(3)
 # The six neighbours, in the board's order (places-board.js `HEX_DIRS`).
@@ -54,6 +60,11 @@ DIRS = ((1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1))
 # 8 on anything else. Grassland and farmland are the plain.
 PLAIN = frozenset({"grassland", "farmland"})
 HOURS_PLAIN, HOURS_ROUGH = 5, 8
+# The same table's other speeds (Ultimate Campaign Table 3-2, aonprd Rules ID 1376, read
+# 2026-11-21): (speed, plain, all other). The party's speed is its slowest member's; a
+# speed between rows takes the slower row. Until 2026-11-21 every speed walked a hex in
+# the 30-foot hours, so a 20-foot party crossed the board faster than its road.
+HOURS_BY_SPEED = ((15, 11, 16), (20, 8, 12), (30, 5, 8), (40, 4, 6), (50, 3, 5))
 # +25 XP for difficult terrain (UC). Our reading of "difficult": the ground the CRB's
 # overland table slows (Table 7-8: forest, jungle, swamp, mountain).
 DIFFICULT = frozenset({"forest", "jungle", "swamp", "mountain"})
@@ -158,6 +169,9 @@ def held_layout(scene, atlas: dict) -> dict:
     else:
         got = {"v": LAYOUT_VERSION, **fresh}
     if isinstance(getattr(scene, "hexes", None), dict):
+        if not held:
+            # Laid out for the first time: nothing is keyed to an older grid.
+            scene.hexes.setdefault("grid", GRID_VERSION)
         scene.hexes["layout"] = got
     return got
 
@@ -231,10 +245,19 @@ def _seg_d(p, a, b) -> float:
     return math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy)
 
 
+def _miles_per_unit(routes, pos) -> float:
+    """Miles to a layout unit from the roads the world measured (the median): the scale
+    of GRID_VERSION 1, and where `Grid._fit` starts from."""
+    ratios = sorted(r["miles"] / (math.hypot(pos[r["a"]][0] - pos[r["b"]][0],
+                                             pos[r["a"]][1] - pos[r["b"]][1]) or 1)
+                    for r in routes if r.get("miles"))
+    return ratios[len(ratios) >> 1] if ratios else 1.0
+
+
 class Grid:
     """One world's hexes on one layout. Built once and remembered (`grid`)."""
 
-    def __init__(self, atlas: dict, lay: dict):
+    def __init__(self, atlas: dict, lay: dict, size: float | None = None):
         self.atlas = atlas
         self.pos = lay["pos"]
         self.cities = [c for c in atlas.get("cities") or [] if c["id"] in self.pos]
@@ -244,11 +267,8 @@ class Grid:
                        if r.get("by") != "sea" and r["a"] in self.pos and r["b"] in self.pos]
         # Miles to a layout unit, from the roads the world measured (the median), so a hex
         # is twelve miles (places-board.js `nationMap`, which this replaces).
-        ratios = sorted(r["miles"] / (math.hypot(self.pos[r["a"]][0] - self.pos[r["b"]][0],
-                                                 self.pos[r["a"]][1] - self.pos[r["b"]][1]) or 1)
-                        for r in self.routes if r.get("miles"))
-        self.miles_per_unit = ratios[len(ratios) >> 1] if ratios else 1.0
-        self.size = (HEX_MILES / 2) / self.miles_per_unit
+        self.miles_per_unit = _miles_per_unit(self.routes, self.pos)
+        self.size = (HEX_MILES / 2) / self.miles_per_unit if size is None else float(size)
         # The land: `landAt`'s five discs round every city, in the atlas's city order.
         self.discs = []
         for n, c in enumerate(atlas.get("cities") or []):
@@ -262,13 +282,51 @@ class Grid:
         self._routes_of = {c["id"]: [r for r in self.routes
                                      if (r["a"] == c["id"] or r["b"] == c["id"]) and r.get("crosses")]
                            for c in self.cities}
+        self._place_towns()
+        if size is None:
+            self._fit()
+        self.patches = self._patches()
+
+    def _place_towns(self) -> None:
         self.town_hex: dict[str, tuple] = {}
         self.towns_at: dict[tuple, list] = {}
         for c in sorted(self.cities, key=lambda c: c["id"]):
             h = self._town_hex(c)
             self.town_hex[c["id"]] = h
             self.towns_at.setdefault(h, []).append(c["id"])
-        self.patches = self._patches()
+
+    def _short(self) -> float:
+        """How many times too few hexes the worst road has: its journey hours on foot at
+        30 ft (`walk`, from `journey.hours_for` via the atlas) over the hours of the hexes
+        between its towns at the quickest a hex goes (plain, 30 ft). 1 or less is fit."""
+        worst = 0.0
+        for r in self.routes:
+            walk = float(r.get("walk") or 0)
+            if walk <= 0:
+                continue
+            n = distance(self.town_hex[r["a"]], self.town_hex[r["b"]])
+            worst = max(worst, walk / (HOURS_PLAIN * n) if n else walk / HOURS_PLAIN + 1)
+        return worst
+
+    def _fit(self) -> None:
+        """Shrink the hex until walking the hexes between any two towns takes at least as
+        long as their road (the owner, 2026-11-21: never quicker than the journey floor).
+
+        The board's scale came from the world's raw road miles alone, so a 48-mile road
+        the journey floors at three days was four hexes (20 hours) on plain: 56 of 190 land
+        legs on the three exports were quicker by the hexes. Measured against the road's
+        own hours, not its miles, so a floored road, a measured one and slow ground are all
+        covered; only ever smaller, so no town is nearer than it was, and a save's hexes
+        map one to one onto the new grid (`mend_save`). Plain at 30 ft is the quickest a
+        hex goes (Table 3-2's ratios between speeds match the road's), so one check holds
+        for every party."""
+        for _ in range(60):
+            short = self._short()
+            if short <= 1:
+                return
+            self.size /= max(1.02, short * 1.01)
+            self._cells.clear()
+            self._place_towns()
 
     # The bare facts of a hex, before ground: land, the nearest town, its nation.
     def _base(self, q: int, r: int) -> tuple:
@@ -554,11 +612,16 @@ def place_doc(g: Grid, q: int, r: int, parent: str, world=None) -> dict:
     about = f"{where[:1].upper()}{where[1:]}" + (f", in {nation}" if nation else "") + "."
     return {"id": outskirts_mod.ring_id(c["near"], c["ground"], slug(q, r)),
             "name": name, "about": about, "terrain": c["ground"], "exits": [],
-            "parent": parent, "owner": "", "origin": "hex", "kind": ""}
+            "parent": parent, "owner": "", "origin": "hex", "kind": "",
+            # How far out of its town the hex lies (0 for the town's own): what a walk
+            # between it and the town's places costs (`outskirts.hop_minutes`).
+            "miles": distance(th, (q, r)) * HEX_MILES}
 
 
-def hours_through(ground: str) -> int:
-    return HOURS_PLAIN if ground in PLAIN else HOURS_ROUGH
+def hours_through(ground: str, speed_ft: int = 30) -> int:
+    row = next((r for r in reversed(HOURS_BY_SPEED) if int(speed_ft or 30) >= r[0]),
+               HOURS_BY_SPEED[0])
+    return row[1] if ground in PLAIN else row[2]
 
 
 # --- what a hex holds ---------------------------------------------------------------------
@@ -626,14 +689,92 @@ def _roll(world_name: str, q: int, r: int, what: str) -> int:
     return int.from_bytes(h[:4], "big")
 
 
-def site_of(g: Grid, q: int, r: int) -> dict | None:
-    """The site in hex (q, r), or None: {"kind", "dc"}. Fixed by the world and the hex."""
+def site_of(g: Grid, q: int, r: int, kept: dict | None = None) -> dict | None:
+    """The site in hex (q, r), or None: {"kind", "dc"}. Fixed by the world and the hex,
+    except a site a save already found on an older grid (`kept`, `Scene.hexes["sites"]`,
+    written by `mend_save`): the ruins a party stands in stay ruins after a rescale."""
     c = g.cell(q, r)
     if not c["land"] or c["town"]:
         return None
-    name = str(g.atlas.get("world") or "")
-    if _roll(name, q, r, "site") % SITE_ONE_IN:
-        return None
-    kinds = SITES_BY_GROUND.get(c["ground"]) or ("ruins", "tower")
-    kind = kinds[_roll(name, q, r, "kind") % len(kinds)]
+    kind = (kept or {}).get(key(q, r))
+    if not kind:
+        name = str(g.atlas.get("world") or "")
+        if _roll(name, q, r, "site") % SITE_ONE_IN:
+            return None
+        kinds = SITES_BY_GROUND.get(c["ground"]) or ("ruins", "tower")
+        kind = kinds[_roll(name, q, r, "kind") % len(kinds)]
     return {"kind": kind, "dc": FIND_DC[kind] + (2 if c["ground"] in COVER else 0)}
+
+
+# --- a save from an older scale -----------------------------------------------------------
+
+_HEX_ID = re.compile(r"([A-Za-z0-9_.-]+)~([a-z_-]+):@hex-(m?[0-9]+)-(m?[0-9]+)")
+
+
+def _num(v: str) -> int:
+    return -int(v[1:]) if v.startswith("m") else int(v)
+
+
+def mend_save(data: dict, atlas: dict) -> bool:
+    """Re-key a save's hexes from the grid it was played on to this build's
+    (`GRID_VERSION`), in place, before the scene is read. True when anything changed.
+
+    Every hex of the old grid is mapped to the new hex its middle falls in. The new hexes
+    are only ever smaller (`Grid._fit`), so no two old hexes land on one new one. What
+    moves with it: hex place ids wherever they are written in the scene, the ledger and
+    the model's history (the party's place, everyone's place, founded hex places and the
+    sites and rooms under them, props, cards, quests, roads, the places been); the
+    `touched` and `spotted` records; and the founded hex places' own names and miles,
+    re-made for the new hex. A hex place's head is re-made from its new hex (the nearest
+    town and the ground); a site's head keeps its own ground. A site already spotted is
+    kept as found (`Scene.hexes["sites"]`, read by `site_of`), whatever the new hex rolls.
+    Sources: docs/research/2026-11-21-hex-scale.md."""
+    import json
+    from types import SimpleNamespace
+
+    s = data.get("scene")
+    hx = s.get("hexes") if isinstance(s, dict) else None
+    if not isinstance(hx, dict) or hx.get("grid") == GRID_VERSION:
+        return False
+    lay = hx.get("layout")
+    if not isinstance(lay, dict) or not atlas.get("cities"):
+        # Never laid out: no hex was ever stood in, so nothing is keyed to a grid.
+        hx["grid"] = GRID_VERSION
+        return False
+    lay = held_layout(SimpleNamespace(hexes=hx), atlas)
+    routes = [r for r in atlas.get("routes") or []
+              if r.get("by") != "sea" and r["a"] in lay["pos"] and r["b"] in lay["pos"]]
+    old = Grid(atlas, lay, size=(HEX_MILES / 2) / _miles_per_unit(routes, lay["pos"]))
+    new = grid(atlas, lay)
+
+    def moved(q: int, r: int) -> tuple[int, int]:
+        return hex_at(*centre(q, r, old.size), new.size)
+
+    def rekey(m) -> str:
+        near, ground, q, r = m.group(1), m.group(2), _num(m.group(3)), _num(m.group(4))
+        h = moved(q, r)
+        cell = new.cell(*h)
+        if ground == old.cell(q, r)["ground"]:
+            ground = cell["ground"]                 # the hex itself: its new ground
+        return f"{cell['near'] or near}~{ground}:@{slug(*h)}"
+
+    for part in ("scene", "ledger", "history"):
+        if data.get(part) is not None:
+            data[part] = json.loads(_HEX_ID.sub(rekey, json.dumps(data[part])))
+    s = data["scene"]
+    hx = s["hexes"]
+    for k in ("touched", "spotted"):
+        if isinstance(hx.get(k), dict):
+            hx[k] = {key(*moved(*unkey(x))): v for x, v in hx[k].items()}
+    hx["sites"] = {**dict(hx.get("spotted") or {}), **dict(hx.get("sites") or {})}
+    for doc in s.get("founded") or []:
+        h = parse_place(str(doc.get("id") or ""))
+        if h is not None and doc.get("origin") == "hex":
+            fresh = place_doc(new, h[0], h[1], str(doc.get("parent") or ""))
+            doc.update({k: fresh[k] for k in ("name", "about", "terrain", "miles")})
+    at = str(s.get("at") or "")
+    if parse_place(at) is not None:
+        # Out on a hex, the party's town is the one that hex now lies nearest.
+        s["location_id"] = at.split(":", 1)[0].rsplit("~", 1)[0]
+    hx["grid"] = GRID_VERSION
+    return True

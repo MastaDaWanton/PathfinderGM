@@ -268,6 +268,11 @@ free number:
   and the far town (`Engine.road_share_left`), so ground already walked is never charged or
   rolled twice. A journey stopped on the road stands on the hex that far along the line
   between its towns (`Engine.party_hex`, `hexes.along`).
+- **The board's scale** (owner ruling 2026-11-21; docs/research/2026-11-21-hex-scale.md).
+  The hex is no longer twelve of the world's raw road miles. It is shrunk until no walk
+  across the hexes between two towns beats their road's journey (`hexes.Grid._fit`,
+  `GRID_VERSION` 2). Hexes take Ultimate Campaign Table 3-2's hours by speed. A save of the
+  old scale is re-keyed on load (`hexes.mend_save`).
 - **Sea hexes** wait for ships on the board.
 
 ## Owner calls still open
