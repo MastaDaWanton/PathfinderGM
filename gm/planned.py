@@ -95,7 +95,14 @@ from . import narration as narration_mod
 # the two narrators share one sense of how long a fight beat is. Out of fights, 650: the
 # bench's planned beats that read best ran 380-580 (2026-10-09), and an arrival or a
 # question answered needs a little more than a blow.
-BEAT_BUDGET = 650
+#
+# 850 since 2026-11-21 (the owner's ruling on the richer-prose bench's Rich-N arm,
+# pgm-work richer-prose-results.md): with WHAT IS HERE TO SEE beside the first act
+# (`see_lines`), 105 paired non-fight beats ran 406 -> 478 characters (+71, CI +56..+87)
+# at the same errors/beat (0.067 both, three blind scorers) and the same invented-scene
+# rate (0.34 / 0.35). The budget alone changes nothing (beats sat well under 650, and
+# 1800 -> 1400 changed nothing in 2026-10-09): it is the room the see block's facts need.
+BEAT_BUDGET = 850
 # What each kind of slot is asked to fill, and the least it is worth writing at all. An act
 # grows by `FACT_EACH` for each further tell in it, to `FACT_CEILING`.
 FACT_WANT = 220
@@ -541,6 +548,110 @@ _MISS = {
 
 def _pick(said, key: str, pool) -> str:
     return pool[narration_mod.least_recently_used(said, key, len(pool))]
+
+
+# --- what is here to see (out of fights, 2026-11-21) -----------------------------------
+#
+# The owner: "slightly longer prose outside combat", with nothing added to the scene. The
+# research (pgm-work richer-prose-paths.md, A5-A7) found the place's own facts already in
+# the brief but buried mid-prompt (Liu et al., "Lost in the Middle", TACL 2024: the middle
+# of a long context is used least), and the planned prompt holding no demonstration at all
+# (CLAUDE.md: instruction volume loses to demonstration volume). So the beat's first act
+# slot is shown a few of those facts beside its own ask (SillyTavern's Author's Note rule:
+# the nearer the bottom, the more impact), with one synthetic demonstration. Measured on
+# the 2026-11-20/21 bench (richer-prose-results.md): +71 characters a beat, errors and
+# invented-scene content unchanged, prose 2.96 -> 3.02 (not significant), no added
+# seconds. Fights keep their own shape: the fight arm waits on a verb fix and a monster
+# bench.
+#
+# The demonstration is synthetic, from no world the game holds, with its own closed list
+# of distinctive words: grown examples were copied as furniture once ("the heavy oak desk
+# you just searched", narration.py MIN_SCENE_CHARS' note), so a word of it on the page
+# that the scene does not hold is a leak, and the slot is asked again (`demo_leak`).
+_ACT_DEMO = (
+    "HOW AN ACT IS WRITTEN WITH WHAT IS HERE TO SEE (an example from another place; "
+    "nothing in it is here):\n"
+    "FACTS: The engine decided this: you ask the ferry-keeper when the crossing goes. "
+    "WHAT IS HERE TO SEE: underfoot: tarred planks, wet with spray; the hour: early "
+    "evening; the place in its own words: a landing where the river runs wide and brown.\n"
+    "PROSE: On the tarred planks of the landing, still wet with spray, you ask the "
+    "ferry-keeper when the crossing goes. Behind them the river runs wide and brown in "
+    "the early evening.")
+# Only the demonstration's own words, never an ordinary one: "landing", "crossing" and
+# "planks" were in the bench's list, and "landing" matched 3 base beats that held no
+# demonstration at all (the stairs' landing).
+_DEMO_WORDS_ACT = ("ferry-keeper", "ferry", "tarred")
+
+
+def demo_leak(text: str, words, context: str) -> list[str]:
+    """The demonstration's own words on the page that the scene does not hold: each of
+    `words` written in `text` and absent from `context` (the plan, what is already
+    written). Code over a closed list, as `copied_from` is."""
+    def has(hay: str, w: str) -> bool:
+        return re.search(r"(?<![a-z-])" + re.escape(w) + r"(?:e?s)?(?![a-z-])",
+                         hay.lower()) is not None
+
+    return [w for w in words if has(text, w) and not has(context, w)]
+
+
+# Which brief lines are things to see, by the brief's own headings (gm/brief/here.py,
+# gm/brief/land_around.py, `prompts.scene_brief`): our structure, read as structure.
+_SEE_HEADS = (("underfoot", re.compile(r"^\s*UNDERFOOT at [^:]*?\):\s*(.+)$", re.M)),
+              ("the place in its own words",
+               re.compile(r"^\s*THE PLACE, IN ITS OWN WORDS:\s*(.+)$", re.M)),
+              ("close by", re.compile(r"^\s*close by:\s*(.+)$", re.M)),
+              ("the ground here", re.compile(r"^\s*underfoot here:\s*(.+)$", re.M)),
+              ("the hour", re.compile(r"^WHEN \(fact\):\s*(.+)$", re.M)))
+# What an act slot grows by for each line it is shown (A7: length follows facts).
+SEE_EACH = 70
+
+
+def see_lines(brief: str, engine, said=None) -> list[str]:
+    """WHAT IS HERE TO SEE: two of the brief's own place facts, least recently used first
+    (the ground slot's rule: a place's one phrase said every beat is a formula), the
+    light when the engine says it is poor (`light_shown.sight`, which the page is held
+    to), and the hour. Each capped to one line.
+
+    The hour without its day number: on the bench, a wait's slot shown "day 4, evening"
+    wrote "the early morning light of day five" beside a tell saying "the next day" (2 of
+    the arm's 7 tells-check remakes). The day is the tell's to say."""
+    found = []
+    for label, rx in _SEE_HEADS:
+        m = rx.search(brief or "")
+        if m:
+            found.append(f"{label}: {_one_line(m.group(1), 220)}")
+    hour = [re.sub(r"^the hour: day \d+,\s*", "the hour: ", f) for f in found
+            if f.startswith("the hour:")]
+    rest = [f for f in found if not f.startswith("the hour:")]
+    if len(rest) > 2:
+        start = narration_mod.least_recently_used(said, "planned.see", len(rest))
+        rest = [rest[(start + k) % len(rest)] for k in range(2)]
+    try:
+        from .checks import light_shown
+
+        seen = light_shown.sight(engine.scene)
+    except Exception:  # noqa: BLE001 — no light reading, no light line
+        seen = None
+    light = [f"the light: {seen['level']} ({seen['why']})"] if seen else []
+    return rest + light + hour
+
+
+def see_slot(slots: list[dict], brief: str, engine) -> None:
+    """WHAT IS HERE TO SEE and its demonstration on the beat's first act slot, in place,
+    out of a fight; the slot grows by `SEE_EACH` a line, to `FACT_CEILING`."""
+    if getattr(engine.scene, "in_encounter", False):
+        return
+    first = next((s for s in slots if s["key"].startswith("fact")
+                  or s["key"] in ("doing", "keeps")), None)
+    lines = see_lines(brief, engine, getattr(engine.scene, "said", None))
+    if first is None or not lines:
+        return
+    first["see"] = ("WHAT IS HERE TO SEE (engine facts about this place now; work one or "
+                    "two of them into the act, in your own words, only as they are; nothing "
+                    "beyond them):\n" + "\n".join(f"- {x}" for x in lines)
+                    + "\n\n" + _ACT_DEMO)
+    first["demo_words"] = _DEMO_WORDS_ACT
+    first["want"] = min(FACT_CEILING, first["want"] + SEE_EACH * len(lines))
 
 
 def blow_facts(outcomes, engine, said=None) -> list[str]:
@@ -1866,7 +1977,8 @@ def slot_messages(plan: list[dict], slots: list[dict], i: int, written: list[str
     """The call for slot `i`: the plan, what is already written, and this slot alone."""
     so_far = " ".join(w for w in written if w)
     s = slots[i]
-    size = (f" About {s['max']} characters at most: one or two sentences."
+    size = (f" About {s['max']} characters at most: "
+            + ("one to three sentences." if s.get("see") else "one or two sentences.")
             if s.get("max") else "")
     shape = (_reply_ask(s) if s["key"] == "reply"
              else 'Reply with a JSON object: {"text": "..."}.')
@@ -1878,6 +1990,7 @@ def slot_messages(plan: list[dict], slots: list[dict], i: int, written: list[str
            + ("\n\nWRITTEN SO FAR (do not repeat any of it; carry straight on from it):\n"
               + so_far if so_far else "")
            + (f"\n\n{s['knows_said']}" if s.get("knows_said") else "")
+           + (f"\n\n{s['see']}" if s.get("see") else "")
            + f'\n\nNow write slot {i + 1}, "{s["key"]}", and only that slot: {s["say"]}'
            + size
            + (f"\n{_not_yet(slots, i)}" if _not_yet(slots, i) else "")
@@ -2117,6 +2230,8 @@ def write(engine, *, brief: str, outcomes, player_input: str, who: tuple,
     built = (turn_plan(engine, outcomes, said) if acting else
              build_plan(engine, player_input, outcomes, pull=pull, last_beat=last_beat,
                         reading=reading))
+    if not acting:
+        see_slot(built, brief, engine)
     slots, dropped = allocate(built, budget)
     people = present(engine)
     plan = plan_messages(brief, slots, people, _place(engine), last_beat=last_beat,
@@ -2828,6 +2943,25 @@ def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,
                 cut, _gone = narration_mod.trim_unfinished(cut)
                 text = cut or text
                 out.notes.append(f'the "{s["key"]}" slot: {fault} — cut to whole sentences')
+        if s.get("demo_words"):
+            # The demonstration's own words (`see_slot`): asked once more with them named,
+            # then kept with a note. On the bench this never reached a page (0 of 105).
+            context = " ".join([plan[0]["content"], plan[1]["content"], *written])
+            leaked = demo_leak(text, s["demo_words"], context)
+            if leaked:
+                named = ", ".join(f'"{w}"' for w in leaked)
+                text2, data2 = _ask(out, plan, slots, i, written, who, suggest=final,
+                                    lift=lift, core=core,
+                                    redo=f"You wrote: {text!r}. The words {named} come from "
+                                         "the example, not from this scene. Write it again "
+                                         "from this scene's facts only.")
+                again = demo_leak(text2, s["demo_words"], context) if text2 else leaked
+                out.calls[-1]["note"] = "demo leak named" + (" - still there" if again
+                                                             else "")
+                if text2:
+                    text, data = text2, (data2 if final else data)
+                out.notes.append(f'the "{s["key"]}" slot: demo leak {named} - asked again'
+                                 + (", still there" if again else ", fixed"))
         if s.get("verbatim"):
             text = _quoted_as_said(out, plan, slots, i, written, who, s, text,
                                    final=final, lift=lift, core=core)
