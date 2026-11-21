@@ -68,7 +68,9 @@ def quiet_road(monkeypatch):
         asked.append(hours)
         return None
 
-    monkeypatch.setattr(ontheway, "road", road)
+    # The journey's stretch check (travel pacing), and a quiet sea for the crossings.
+    monkeypatch.setattr(ontheway, "road_stretches", road)
+    monkeypatch.setattr(ontheway, "sea_stretches", lambda *a, **k: None)
     return asked
 
 
@@ -190,11 +192,12 @@ def test_a_crossing_to_an_inland_town_lands_at_its_harbour_and_walks_up(quiet_ro
 # --- 3. the road-stop tell ------------------------------------------------------------------
 
 def test_a_road_stopped_twice_says_the_whole_road_so_far(monkeypatch):
-    """Weather stops the road on both turns; the second tell counts both."""
+    """A meeting stops the road on both turns; the second tell counts both. (Weather
+    stopped it until travel pacing, which walks on through weather.)"""
     scene, engine, pc = _at_vormoor(CALL + 1)
-    met = iter([ontheway.Meeting(kind="weather", roll=1, after=1),
-                ontheway.Meeting(kind="weather", roll=1, after=1)])
-    monkeypatch.setattr(ontheway, "road", lambda *a, **k: next(met))
+    met = iter([ontheway.Meeting(kind="travellers", roll=1, count=0, after=1),
+                ontheway.Meeting(kind="travellers", roll=1, count=0, after=1)])
+    monkeypatch.setattr(ontheway, "road_stretches", lambda *a, **k: next(met))
     _journey(engine, to="Scrapden")
     first = int(scene.road["walked"])
     out = _journey(engine, to="Scrapden")

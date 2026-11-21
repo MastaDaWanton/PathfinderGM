@@ -167,6 +167,17 @@ def _subject(actor) -> str:
     return _the_creature(name) if getattr(actor, "from_template", "") else name
 
 
+def says_feet(text: str, feet: int) -> bool:
+    """Whether the page already gives this distance, in digits or in words ("20 feet",
+    "twenty feet", "twenty-foot", "20 ft"). Not the tail of a bigger number: "five feet"
+    is not in "twenty-five feet", nor "ten feet" in "a hundred and ten feet"."""
+    from rules.words import number
+
+    said = "|".join(re.escape(w) for w in {str(int(feet)), number(int(feet))})
+    return re.search(rf"(?i)(?<![\w-])(?<!and )(?:{said})[\s-]+(?:feet|foot|ft)\b",
+                     text or "") is not None
+
+
 def find(ctx) -> list:
     measured = _gap(ctx)
     if measured is None:
@@ -211,6 +222,22 @@ def backstop(ctx, text: str, findings) -> tuple[str, list[str]]:
     if not flagged:
         return text, []
     kept = cut(text, flagged)
-    line = f"{_subject(actor)} is still {feet} feet from you."
+    # Said once. Playtest 2026-11-20 #71: the kept text already read "It stops twenty feet
+    # away from you", and the backstop added "The ghoran is still 20 feet from you." The
+    # engine's number checked against the page, never the player's words.
+    # The walk it made, from the engine's own position effect, when the cut took it: playtest
+    # 2026-11-20 #86, "scuttles across the rubble, closing the distance by thirty feet until
+    # it stands twenty-five feet away" was cut, and the page kept only "The giant cockroach
+    # is still 25 feet from you." — the creature's whole answer to the player's move gone.
+    walked = sum(int(e.get("feet") or 0) for o in getattr(ctx, "outcomes", None) or ()
+                 if str(getattr(o, "actor", "") or "") == actor.ref
+                 for e in getattr(o, "effects", None) or ()
+                 if isinstance(e, dict) and e.get("kind") == "position"
+                 and e.get("ref") == actor.ref
+                 and e.get("toward") == getattr(ctx.scene.pc(), "ref", "pc"))
+    line = (f"{_subject(actor)} comes {walked} feet closer and is still {feet} feet from you."
+            if walked else f"{_subject(actor)} is still {feet} feet from you.")
+    if says_feet(kept, feet):
+        line = ""
     return f"{kept} {line}".strip(), [f"closing claimed: cut {len(flagged)} sentence(s) "
                                       f"putting {actor.name} at the player, {feet} ft off"]

@@ -283,7 +283,13 @@ def test_a_map_survives_a_save(tmp_path, settings):
     back = campaign_mod.Campaign.load(c.path())
     assert back.scene.grid.width == 12 and back.scene.grid.height == 14
     assert back.scene.grid.blocked == {(3, 3)}
-    assert back.scene.grid.difficult == {(4, 4), (5, 4)}
+    # The ground's own difficult squares, without a crowd's (rules/crowds.py, 2026-11-19).
+    # Kesst's campaign opens in a busy place by day, so loading lays a crowd on this map
+    # and its squares join `difficult` as every manifestation's do (CRB p.433: a crowd is
+    # difficult squares). Measured at the crowds merge: 6 of 6 runs failed the bare
+    # equality with the crowd's squares in the set.
+    crowd = {tuple(p) for m in back.scene.manifests if m.what == "crowd" for p in m.added}
+    assert back.scene.grid.difficult - crowd == {(4, 4), (5, 4)}
     assert back.scene.positions["pc"] == (2, 2)
     # The operation that raises if the squares came back as lists.
     assert back.scene.grid.passable((0, 0))

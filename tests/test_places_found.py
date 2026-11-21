@@ -158,9 +158,14 @@ def test_a_refused_move_is_not_a_place_been(worlds):
     assert s.been == [s.at]
 
 
-def test_a_journey_adds_the_place_it_arrives_at(worlds):
+def test_a_journey_adds_the_place_it_arrives_at(worlds, monkeypatch):
     """A journey is an arrival like any other: the far town's way in joins the record,
-    and the places of the town left behind stay on it."""
+    and the places of the town left behind stay on it. On a quiet road and sea: an event
+    on the way stops a journey short (travel pacing), which is not this test's matter."""
+    from rules import ontheway
+
+    monkeypatch.setattr(ontheway, "road_stretches", lambda *a, **k: None)
+    monkeypatch.setattr(ontheway, "sea_stretches", lambda *a, **k: None)
     for loc in _settled(worlds):
         s, e, pc = _party(worlds, loc.id)
         for p in e.places():

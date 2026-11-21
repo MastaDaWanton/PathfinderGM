@@ -123,10 +123,21 @@ def step(ctx) -> list[dict]:
             population.seen(scene, theirs)
         rows.append({"kind": "seen-people", "made": "", "same_as": ref, "walked_in": True})
     claimed: set[str] = set()       # the records this beat's newcomers already are
+    here_by_name = {_bare(a.name): r for r, a in (getattr(scene, "actors", {}) or {}).items()
+                    if not getattr(a, "is_pc", False) and _bare(a.name)}
     for n in reading.newcomers:
         if not still_said(n.mentions):
             rows.append({"kind": "seen-people", "made": "", "phrase": n.words,
                          "why": "the sentences that showed them were taken off the page"})
+            continue
+        same = here_by_name.get(_bare(n.words))
+        if same:
+            # A "newcomer" with a present actor's name, articles aside, is that actor.
+            # Owner bug 2026-11-17 #4 (frag): "lost urchin" was made a second person
+            # beside "the lost urchin" (c38), and two urchins followed the party about.
+            rows.append({"kind": "seen-people", "made": "", "phrase": n.words,
+                         "same_as": same, "why": "already here, by name"})
+            n.ref = same
             continue
         if judgement._plural_role(n.words):
             # A group is no one person with one life (`record_people`'s rule, measured
@@ -189,6 +200,15 @@ def step(ctx) -> list[dict]:
             n.ref = rec["ref"]
     rows += name_them(ctx, reading)
     return rows
+
+
+def _bare(words) -> str:
+    """A name with its article off, folded: "The lost urchin" and "lost urchin" are one."""
+    w = " ".join(str(words or "").lower().split())
+    for art in ("the ", "a ", "an "):
+        if w.startswith(art):
+            return w[len(art):]
+    return w
 
 
 def _key_of(mention) -> str:

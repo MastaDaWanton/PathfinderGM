@@ -1,5 +1,5 @@
 {
-  "_about": "Sample traps from the PF1e Core Rulebook p.420 (aonprd.com/Traps.aspx), the stat block as printed. Mechanical traps: Perception to find, Disable Device to disarm (a difficult device, 2d4 rounds; failing by 5 or more springs it, CRB p.94). `effect` is either an attack (bonus, dice, crit) or a pit (depth, Reflex DC to avoid; the fall rolls the hazards.json `falling` row). Read by rules/dungeons.py; nothing here is a number a model writes.",
+  "_about": "Sample traps from the PF1e Core Rulebook p.420 (aonprd.com/Traps.aspx), the stat block as printed. Mechanical traps: Perception to find, Disable Device to disarm (a difficult device, 2d4 rounds; failing by 5 or more springs it, CRB p.94). `effect` is either an attack (bonus, dice, crit) or a pit (depth, Reflex DC to avoid; the fall rolls the hazards.json `falling` row; `climb` is the Climb DC out of it, which the printed block omits: the Climb table, CRB p.90, DC 15 for a surface with adequate handholds, DC 20 for the camouflaged pit's dressed walls, a typical dungeon wall). Read by rules/dungeons.py; nothing here is a number a model writes.",
   "arrow-trap": {"name": "an arrow trap", "cr": 1, "perception": 20, "disable": 20,
                  "trigger": "touch", "reset": "none", "source": "CRB p.420",
                  "effect": {"attack": 15, "against": "ranged", "dice": "1d8+1", "crit": 3,
@@ -10,12 +10,22 @@
                                    "type": "slashing", "multiple": true}},
   "pit-trap": {"name": "a pit trap", "cr": 1, "perception": 20, "disable": 20,
                "trigger": "location", "reset": "manual", "source": "CRB p.420",
-               "effect": {"pit_ft": 20, "reflex": 20, "multiple": true}},
+               "effect": {"pit_ft": 20, "reflex": 20, "climb": 15, "multiple": true}},
   "javelin-trap": {"name": "a javelin trap", "cr": 2, "perception": 20, "disable": 20,
                    "trigger": "location", "reset": "none", "source": "CRB p.420",
                    "effect": {"attack": 15, "against": "ranged", "dice": "1d6+6", "crit": 2,
                               "type": "piercing"}},
   "camouflaged-pit-trap": {"name": "a camouflaged pit trap", "cr": 3, "perception": 25, "disable": 20,
                            "trigger": "location", "reset": "manual", "source": "CRB p.420",
-                           "effect": {"pit_ft": 30, "reflex": 20, "multiple": true}}
+                           "effect": {"pit_ft": 30, "reflex": 20, "climb": 20, "multiple": true}},
+  "_more": "Two rows past the CRB's own (feat/dungeon-story, 2026-11-16), so a dungeon's traps can fit its builders: a drain's rotten floor, a tomb's sealing portcullis. Each is a Paizo stat block as d20pfsrd.com prints it, cited on the row (Adventure Path sources, not the CRB: an owner call). A `drop` effect is a falling weight: a Reflex save at `reflex` avoids it, else the `drop` dice; `seals` is the Strength DC that lifts what fell, and until it is lifted the way back out of the room is shut.",
+  "collapsing-floor": {"name": "a collapsing floor", "cr": 1, "perception": 20, "disable": 25,
+                       "trigger": "location", "reset": "repair",
+                       "source": "Pathfinder #2 The Skinsaw Murders, via d20pfsrd.com 'Collapsing Floor (CR 1)': 10-foot fall (1d6), all in a 10-ft. area, DC 15 Reflex avoids",
+                       "effect": {"pit_ft": 10, "reflex": 15, "climb": 15, "multiple": true}},
+  "falling-portcullis": {"name": "a falling portcullis", "cr": 4, "perception": 25, "disable": 25,
+                         "trigger": "location", "reset": "manual",
+                         "source": "Pathfinder #34, via d20pfsrd.com 'Falling Portcullis Trap (CR 4)': 6d6, DC 20 Reflex avoids; once sprung, a DC 25 Strength check lifts it",
+                         "effect": {"drop": "6d6", "type": "bludgeoning", "reflex": 20, "seals": 25,
+                                    "multiple": true}}
 }

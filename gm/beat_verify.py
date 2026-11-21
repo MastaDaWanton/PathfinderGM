@@ -180,6 +180,10 @@ class Facts:
     # Not an intimate beat: an intimate scene between adults is not read for the body's
     # conditions (its own words are the scene's, `GMAgent._repair_state_claims` likewise).
     intimate: bool = False
+    # The turn opened the counter's screen for a typed purchase or offer (the brief's AT THE
+    # COUNTER fact, `play.views._buying_note`): the screen is where coin moves, so a page
+    # that pays or sells is judged as a trade the engine holds a side of (N8).
+    counter_open: bool = False
     # The kinds of place (`places.SETTINGS`) the beat may truthfully put the party in: the
     # union of where it began, where it ends and what its walk passed through
     # (`places.settings_for`). Empty when the engine cannot say, and then no `setting`
@@ -472,6 +476,7 @@ def facts_from(ctx) -> Facts:
                  outcomes=outcomes, in_fight=bool(getattr(scene, "in_encounter", False)),
                  pc_ref=str(getattr(pc, "ref", "pc") or "pc"),
                  intimate=bool(getattr(ctx, "intimate", False)),
+                 counter_open="AT THE COUNTER (fact)" in str(getattr(ctx, "brief", "") or ""),
                  settings=tuple(sorted(settings)),
                  **_blows_of(ctx, outcomes, pc),
                  **_foe_blows_of(ctx, outcomes, scene),
@@ -1596,7 +1601,8 @@ _SET_HERE = (
     ("a town street, square or market", "in the open air of the town"),
     ("underground", "underground"),
     ("open country", "out in open country"),
-    ("aboard a ship or boat", "by the water"),
+    # Reached only aboard: the docks are a street too, the coast open country.
+    ("aboard a ship or boat", "aboard a ship"),
 )
 
 
@@ -2069,6 +2075,18 @@ _HOUR_WORD = re.compile(
     r"night\w*|midnight|moon\w*|stars?|starlight|starlit|first light|daylight|day)\b")
 
 
+# What an hour's quote says of the open sky: a cellar has no morning air and no sunlight.
+_SKY_WORD = re.compile(r"\b(?:air|sky|skies|sun|suns|sunlit|sunlight|sunrise|sunset|"
+                       r"daylight|breeze|wind|winds|horizon|clouds?|stars?|starlight|moon\w*)\b")
+
+
+def _underground_only(facts) -> bool:
+    """The whole beat is underground: every kind of place it may be set in is under the
+    ground or a room (`places.settings_for` of a cave, a sewer, a dungeon's rooms)."""
+    kinds = set(facts.settings or ())
+    return "underground" in kinds and kinds <= {"underground", "inside a building"}
+
+
 def place_quote(quote: str, sentences: list[tuple[str, str]]) -> str:
     """The page sentence a quote stands in — narration only — or "" when it is nowhere on
     the page's narration. A quote across two sentences belongs to the first."""
@@ -2432,6 +2450,24 @@ def _hour(facts: Facts) -> int | None:
     return None if facts.clock is None else (int(facts.clock) % (24 * 60)) // 60
 
 
+def _before_the_walk(p: Person, c: Claim, claims: list[Claim], facts: Facts,
+                     text: str) -> bool:
+    """Whether the page shows somebody this turn's own walk left behind, in a sentence
+    before the walk: where the player stood when the beat began, they were there. Playtest
+    2026-11-17 #26: "The Toll-Keeper watches you intently … your movements remain fully
+    visible" was the refused hide's own tell, told before the walk to the turnkey's room;
+    read as an absent man shown here, it was rewritten "The Toll-Keeper is no longer here
+    … your movements are completely unobserved", against the tell."""
+    left = {str(n).lower() for o in _resolved(facts) for e in _effects(o)
+            if e.get("kind") == "biome" for n in e.get("left") or ()}
+    if str(p.name).lower() not in left or not text or not c.sentence:
+        return False
+    walks = [text.find(m.sentence) for m in claims
+             if m.valid and m.category == "move" and m.sentence and m.sentence in text]
+    at = text.find(c.sentence)
+    return at >= 0 and any(w > at for w in walks)
+
+
 def _not_here(p: Person, c: Claim) -> Discrepancy:
     """The page has somebody the engine holds elsewhere here: hurt, arriving or in a fight.
     The fact the repair names is where they are not, and that nothing brought them back —
@@ -2639,11 +2675,18 @@ def _struck_unrolled(c: Claim, facts: Facts) -> Discrepancy | None:
     if p is None or p.pc or not p.here or who in facts.struck_by:
         return None
     name = _name(facts, who)
+    Name = name[:1].upper() + name[1:]
+    # A pursuer is the half that is true: it came after the player, and its blow waits for
+    # its turn. Playtest 2026-11-16 N1: the pursuing dire rat's lunge was cut as an
+    # unrolled blow, and with it the only sentence saying the rat had followed at all.
+    chased = any(who in (e.get("pursued_by") or ()) for o in _resolved(facts)
+                 for e in _effects(o) if e.get("kind") == "biome")
     return Discrepancy(
         "contradiction", "at_you",
-        f"{name[:1].upper() + name[1:]} has not struck at you (the player) this turn: no blow "
+        f"{Name} has not struck at you (the player) this turn: no blow "
         f"of theirs was thrown, so none whistled past you and none landed. Their turn comes "
-        f"after yours.", c.sentence, "", c, ref=who)
+        f"after yours." + (f" {Name} has come after you, and is here." if chased else ""),
+        c.sentence, f"{Name} comes after you." if chased else "", c, ref=who)
 
 
 def _aimed_words(facts: Facts, pairs) -> str:
@@ -2755,10 +2798,14 @@ def _setting_wrong(c: Claim, facts: Facts) -> Discrepancy | None:
             return None
     here = next((said for k, said in _SET_HERE if k in facts.settings), "here")
     where = facts.end or "this place"
+    absent = _SET_ABSENT.get(kind, "none of that")
+    if set(facts.settings) == {"aboard a ship or boat"} and kind == "inside a building":
+        # Below decks has walls and a roof: the ship's (playtest 2026-11-16 #98).
+        absent = "no building: the walls and the roof round them are the ship's own timbers"
     return Discrepancy(
         "contradiction", "setting",
         f"The player is at {where}, {here} — not {_SET_IN.get(kind, kind)}. There is "
-        f"{_SET_ABSENT.get(kind, 'none of that')} here.", c.sentence, "", c)
+        f"{absent} here.", c.sentence, "", c)
 
 
 # The engine's records of somebody coming or going this turn: a `presence` claim about them
@@ -2911,7 +2958,7 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             # A commission too since 2026-11-03: a price agreed for work already paid is
             # refused ("pays nothing more"), and the page that hands the coins over again
             # is a payment the engine never took.
-            if item == OTHER_THING and not any(
+            if item == OTHER_THING and not facts.counter_open and not any(
                     o.get("op") in (*_TRADE_OPS, "haggle", "rest", "commission")
                     for o in facts.outcomes):
                 continue
@@ -2983,7 +3030,7 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
             # departed raiders' lunges (2026-10-09). Somebody here, listed by the reader
             # all the same, is not judged — the slot offers every code (`schema`).
             gone = facts.absent(str(s["who"]))
-            if gone is not None:
+            if gone is not None and not _before_the_walk(gone, c, claims, facts, text):
                 out.append(_not_here(gone, c))
         elif c.category in ("arrived", "left"):
             who = str(s["who"])
@@ -3052,6 +3099,15 @@ def diff(claims: list[Claim], facts: Facts, text: str = "") -> list[Discrepancy]
                     "contradiction", "hour",
                     f"It is {residency.time_words(int(facts.clock))}, not "
                     f"{s['part']}: the engine keeps the clock.", c.sentence, "", c))
+            elif (_underground_only(facts) and _SKY_WORD.search(_norm(c.quote))
+                  and not _hour_told(c, facts)):
+                # The hour right, its weather wrong: no sky reaches a cell under the
+                # sewers. Playtest 2026-11-16 #62: "You wake stiff and heavy-limbed, the
+                # morning air making your muscles ache" in a burnt-out prison below them.
+                out.append(Discrepancy(
+                    "contradiction", "hour",
+                    "The player is underground: no sky, sun, daylight or open air reaches "
+                    "them there. Say the hour, if at all, without them.", c.sentence, "", c))
 
     out += _omissions(claims, facts, text)
     return out
@@ -3530,9 +3586,11 @@ _JOB_SYSTEM = (
     "number of the sentence in which the speaker puts a PARTICULAR piece of work to the "
     "player: what the job is (escorting, carrying, guarding, delivering, fetching or the "
     "like, named), who or what it is for, where it is done or goes, when it starts, papers "
-    "to sign for it, or a sum of pay. Saying only that work or hands are wanted, asking "
-    "what the player can do, or taking their name is NOT. A price for goods or a room is "
-    "NOT. Answer \"none\" when no sentence does.")
+    "to sign for it, or a sum of pay. Openings or contracts said to be posted, listed or "
+    "written up somewhere for the player to read (a board, a list, a ledger) ARE. Saying "
+    "only that work or hands are wanted, asking what the player can do, or taking their "
+    "name is NOT. A price for goods or a room is NOT. Answer \"none\" when no sentence "
+    "does.")
 _JOB_DEMO_USER = (
     "The speaker: the ferry master\n\n"
     "1. \"Hands are wanted on the crossings this month.\"\n2. \"What can you do?\"")
@@ -3542,6 +3600,14 @@ _JOB_DEMO_USER_2 = (
     "1. \"Good.\"\n2. \"You'll ride the salt barge down to the weir at dawn and keep the "
     "river rats off it.\"")
 _JOB_DEMO_ANSWER_2 = {"sentence": "2"}
+# Playtest 2026-11-17b #12/#13: the guild clerk, holding no job, said "several openings for
+# escort and caravan work ... posted on the notice board", read as only "work is wanted",
+# and the player's next turn went to read a board that did not exist.
+_JOB_DEMO_USER_3 = (
+    "The speaker: the clerk of the guild\n\n"
+    "1. \"The guild always needs hands.\"\n2. \"There are several openings for caravan "
+    "work; the contracts are pinned on the board by the door.\"")
+_JOB_DEMO_ANSWER_3 = {"sentence": "2"}
 
 
 # With real jobs (rules/jobs.py, 2026-10-27) a speaker who holds work is read against it: the
@@ -3681,6 +3747,8 @@ def invented_job_sentence(text: str, speaker: str, *, held: str = "", chat=None,
                 {"role": "assistant", "content": json.dumps(_JOB_DEMO_ANSWER)},
                 {"role": "user", "content": _JOB_DEMO_USER_2},
                 {"role": "assistant", "content": json.dumps(_JOB_DEMO_ANSWER_2)},
+                {"role": "user", "content": _JOB_DEMO_USER_3},
+                {"role": "assistant", "content": json.dumps(_JOB_DEMO_ANSWER_3)},
                 {"role": "user", "content": user}]
     if bare_template(model):
         msgs = _raw_prompt(msgs)
@@ -4429,6 +4497,77 @@ def tells_messages(sentences: list[str], premises: list[str], who: str = "") -> 
             {"role": "user", "content": user}]
 
 
+# A reply read against what its speaker knows (`planned.known_to`): the same read, the
+# speaker's facts as its premises, with its own instruction and demonstrations — the tells'
+# demonstrations are deeds, and "a person's words contradict a fact only where they state
+# what the engine decided" lets "I do not know of any temples" through beside a cathedral
+# the speaker knows (playtest 2026-11-16 #66). Synthetic demonstrations, no world's names.
+_KNOWN_SYSTEM = (
+    "You check what one person in a story says against the FACTS of what that person "
+    "knows. The facts are true, and the person knows every one of them. For EACH numbered "
+    "sentence of what they say answer:\n"
+    "- \"contradicts\" when the sentence cannot be true if a fact is true: it denies, "
+    "changes or gets wrong what a fact says (another place, thing, person, cause, outcome "
+    "or way), or the person says there is none of what a fact says there is, or says they "
+    "do not know what a fact says they know;\n"
+    "- \"agrees\" when it says what a fact says, in any words;\n"
+    "- \"not about it\" when no fact speaks of it: a feeling, a warning, a question back, "
+    "a refusal to say, or anything else.\n"
+    "Leaving a fact out is not contradicting it. Name the fact (\"none\" when not about "
+    "it), and for \"contradicts\" copy the sentence's own words that clash.")
+_KNOWN_DEMO_USER = (
+    "FACTS (what the ferryman knows):\n"
+    "F1. About the ferryman, what they know of themselves and this place: rows the crossing "
+    "for the mill; says the miller's son drowned at the weir last spring.\n"
+    "F2. The ferryman knows these places of Thornby (faith and the dead): the chapel, the "
+    "way by the green; the graveyard, next door.\n\n"
+    "SENTENCES:\n"
+    "1. I wouldn't know of any priests or shrines, I only mind the boat.\n"
+    "2. The miller's boy went under at the weir, spring last.\n"
+    "3. Mind the current on the way back.\n"
+    "4. Nobody's drowned here in my time.\n"
+    "5. There's no chapel in Thornby.")
+# Sentence 1 is the shape of #66: ignorance professed of a place the speaker knows, asked of
+# by another word for its kind (shrines, for a chapel).
+_KNOWN_DEMO_ANSWER = {
+    "1": {"verdict": "contradicts", "fact": "F2",
+          "words": "I wouldn't know of any priests or shrines"},
+    "2": {"verdict": "agrees", "fact": "F1", "words": ""},
+    "3": {"verdict": "not about it", "fact": "none", "words": ""},
+    "4": {"verdict": "contradicts", "fact": "F1", "words": "Nobody's drowned here in my time"},
+    "5": {"verdict": "contradicts", "fact": "F2", "words": "There's no chapel in Thornby"}}
+_KNOWN_DEMO_USER_2 = (
+    "FACTS (what the bosun knows):\n"
+    "F1. The bosun knows the Grey Hen's hold: she carries no cargo at all; her hold is "
+    "empty, and she was carrying none.\n"
+    "F2. About the bosun, what they know of themselves and this place: hid in the cable "
+    "tier with the ship's papers when she was boarded, and has them still.\n\n"
+    "SENTENCES:\n"
+    "1. We had forty barrels of salt fish below for the merchants' hall.\n"
+    "2. I don't know who you people are.\n"
+    "3. The papers went over the side when you came aboard.\n"
+    "4. I kept the papers, if that's what you're after.")
+_KNOWN_DEMO_ANSWER_2 = {
+    "1": {"verdict": "contradicts", "fact": "F1",
+          "words": "We had forty barrels of salt fish below"},
+    "2": {"verdict": "not about it", "fact": "none", "words": ""},
+    "3": {"verdict": "contradicts", "fact": "F2", "words": "The papers went over the side"},
+    "4": {"verdict": "agrees", "fact": "F2", "words": ""}}
+
+
+def known_messages(sentences: list[str], premises: list[str], speaker: str) -> list[dict]:
+    user = (f"FACTS (what {speaker} knows):\n"
+            + "\n".join(f"F{i}. {t}" for i, t in enumerate(premises, 1))
+            + "\n\nSENTENCES:\n"
+            + "\n".join(f"{i}. {s}" for i, s in enumerate(sentences, 1)))
+    return [{"role": "system", "content": _KNOWN_SYSTEM},
+            {"role": "user", "content": _KNOWN_DEMO_USER},
+            {"role": "assistant", "content": json.dumps(_KNOWN_DEMO_ANSWER)},
+            {"role": "user", "content": _KNOWN_DEMO_USER_2},
+            {"role": "assistant", "content": json.dumps(_KNOWN_DEMO_ANSWER_2)},
+            {"role": "user", "content": user}]
+
+
 def _clash_quoted(words: str, sentence: str) -> bool:
     """The clashing words are the sentence's own (folded as quotes are, `_norm`), and at
     least `MIN_CLASH_WORDS` of them: the grounding a verdict needs before it costs a
@@ -4453,9 +4592,60 @@ def second_on_tell(sentence: str, tell: str, who: str = "", *, chat=None, model:
                    provider=provider, api_key=api_key)
 
 
+# --- did the passage say how it came out (playtest 2026-11-20 #7) ---------------------------
+#
+# An omission contradicts nothing, so the tells check cannot see a beat that shows the act and
+# drops its result ("You scan the surrounding ruins, searching for a different way into the
+# gallery. What do you do?"). Inform's action rules end in a report stage that "tells the
+# player what has happened" (Writing with Inform §12.2); this is that stage, checked. Probed
+# 2026-11-20 (gemma-4-12B heretic, temp 0): `second_on_tell` asked with the whole tell passed
+# 3 of 4 attempt-only passages as "tells it" — the tell's attempt half matches them; this read,
+# the result first and two answers, scored 14 of 15 labelled pairs (6 of 6 attempt-only
+# caught, one false alarm on an eat). docs/research/2026-11-20-empty-turns.md.
+OUTCOME_ANSWERS = ("says how it came out", "only the attempt")
+_OUTCOME_SYSTEM = (
+    "A game engine resolved what the player's character did and decided how it came out: "
+    "the RESULT, which is true. Read the PASSAGE that tells the turn. \"You\" is the "
+    "player's character, named in the result. Answer \"says how it came out\" when the "
+    "passage tells what came of it, in any words: it worked or failed, what was or was not "
+    "found, where they ended up, what the other person did, said or agreed. Answer \"only "
+    "the attempt\" when the passage shows them trying, setting about it, reaching for it or "
+    "on their way, and never says what came of it.")
+# Synthetic, one name nobody plays.
+_OUTCOME_DEMOS = (
+    ("RESULT (the player's character is Mira Holt): Mira Holt searches the cellar and finds "
+     "nothing.\n\nPASSAGE: You run your hands along the damp cellar walls, feeling for any "
+     "loose stone.", "only the attempt"),
+    ("RESULT (the player's character is Mira Holt): Mira Holt searches the cellar and finds "
+     "nothing.\n\nPASSAGE: You run your hands along the damp walls, but the stones are solid "
+     "and hide nothing.", "says how it came out"),
+    ("RESULT (the player's character is Mira Holt): Mira Holt asks the smith for a favour: a "
+     "look at his ledger. The smith agrees to it.\n\nPASSAGE: You lean on the counter and ask "
+     "the smith whether you might see his ledger.", "only the attempt"),
+    ("RESULT (the player's character is Mira Holt): Mira Holt moves 30 ft, up onto the loft."
+     "\n\nPASSAGE: You climb the ladder and step out onto the loft.", "says how it came out"),
+)
+
+
+def outcome_told(passage: str, result: str, who: str = "", *, chat=None, model: str = "",
+                 host: str = "", provider: str = "ollama", api_key: str = "") -> bool | None:
+    """Whether `passage` says how the engine's `result` came out (True), or shows only the
+    attempt (False); None when the read went unanswered (the caller leaves the slot)."""
+    user = ("RESULT" + (f" (the player's character is {who})" if who else "")
+            + f": {result}\n\nPASSAGE: {passage}")
+    msgs = [{"role": "system", "content": _OUTCOME_SYSTEM}]
+    for demo_user, demo_answer in _OUTCOME_DEMOS:
+        msgs += [{"role": "user", "content": demo_user},
+                 {"role": "assistant", "content": json.dumps({"answer": demo_answer})}]
+    msgs.append({"role": "user", "content": user})
+    said = _one_of(msgs, list(OUTCOME_ANSWERS), chat=chat, model=model, host=host,
+                   provider=provider, api_key=api_key)
+    return None if said is None else said == OUTCOME_ANSWERS[0]
+
+
 def against_tells(text: str, tells, *, who: str = "", only=None, chat=None,
                   model: str = "", host: str = "", provider: str = "ollama",
-                  api_key: str = "") -> TellsRead:
+                  api_key: str = "", speaker: str = "") -> TellsRead:
     """Every sentence of `text` (speech kept: a reply's words are what the narrator made the
     speaker say) read against the beat's tells (`tell_premises`), each contradiction named
     by its tell and the words it clashes on, validated in code (`_clash_quoted`, the fact on
@@ -4463,7 +4653,8 @@ def against_tells(text: str, tells, *, who: str = "", only=None, chat=None,
     be true" — unless `tells_veto` lets no read refuse it, or not the second read on a clash
     that echoes its tell. `only` limits the read to those sentences (a remade slot's). A first read that
     fails judges nothing (`error`): the caller leaves the text as it is, as every read back
-    does."""
+    does. With `speaker`, `tells` are what that speaker knows (`planned.known_to`) and the
+    read is `known_messages`'."""
     from . import narration as narration_mod
 
     out = TellsRead()
@@ -4479,7 +4670,8 @@ def against_tells(text: str, tells, *, who: str = "", only=None, chat=None,
         from . import client
 
         chat = client.chat
-    msgs = tells_messages(sentences, premises, who)
+    msgs = (known_messages(sentences, premises, speaker) if speaker
+            else tells_messages(sentences, premises, who))
     if bare_template(model):
         msgs = _raw_prompt(msgs)
     started = time.monotonic()
@@ -4526,4 +4718,139 @@ def against_tells(text: str, tells, *, who: str = "", only=None, chat=None,
         c.confirmed = said in (None, "cannot both be true")
         (out.clashes if c.confirmed else out.refused).append(c)
     out.seconds = time.monotonic() - started
+    return out
+
+
+# --- the GM at the table: nothing past the facts (2026-11-16) -----------------------------------
+#
+# `against_tells` above licenses "not about it" for the NARRATOR, whose job is colour. The GM
+# talking across the table has no such licence: its job is a reaction to the moment and the
+# ruling's reason, and every world fact or deed it states is one more thing the player takes
+# as settled. Playtest 2026-11-16 #71: over the refusal "No Father is here, and Mirabalos has
+# none the world names" it said "Mirabalos doesn't have any healers in this order"; #93: over
+# a natural one on a search that found nothing it said "You tripped over your own feet while
+# looking" (no tell said so, and 1e has no fumble on a skill check, `dice.d20_succeeds`). The
+# tells check passed both: neither CONTRADICTS a fact, each only adds one.
+#
+# So the question for a table line is attribution, not contradiction: AIS (Rashkin et al.,
+# "Measuring Attribution in Natural Language Generation Models", Computational Linguistics
+# 49(4), 2023) first sets aside what shares no information about the world, then asks of the
+# rest "according to the source, is this true?". Here the first answer is "reacts" (a feeling,
+# an opinion, a question or advice to the player) and the second splits "from a fact" from
+# "adds". As in `against_tells` the verdict must quote the sentence's own words before code
+# acts on it (`_clash_quoted`), and every slot is a closed enum keyed by sentence.
+
+BEYOND_VERDICTS = ("reacts", "from a fact", "adds")
+
+_BEYOND_SYSTEM = (
+    "You check what a game master says to a player across the table against the FACTS of "
+    "the moment. \"You\" is the player's character, named in the facts. For EACH numbered "
+    "sentence answer:\n"
+    "- \"reacts\" when it only reacts: a feeling, an opinion, a joke, a question to the "
+    "player, or advice on what they might try or will have to do — it states nothing about "
+    "the world or about what anyone did, and names nothing that is not in the facts;\n"
+    "- \"from a fact\" when what it states about the world or a deed is said by a fact, in "
+    "any words;\n"
+    "- \"adds\" when it states something about the world, a place, a people, a person or "
+    "what anyone did, that no fact says — and when a question or a piece of advice points at "
+    "a thing, a place, a way in or something hidden that no fact says is there (\"anything "
+    "in those barrels?\", \"try the trapdoor\", \"listen for something under the "
+    "floor\").\n"
+    "For \"adds\" copy the sentence's own words that state or point at the new thing.\n"
+    "Also answer \"attack\": \"yes\" when the sentence speaks of, praises or reacts to "
+    "an attack, a shot, a blow or a throw (\"Nice shot\", \"Good hit\"), else \"no\".")
+_BEYOND_DEMO_USER = (
+    "FACTS (the player's character is Pell Arrow):\n"
+    "F1. Refused: No ferryman is here, and Dunmarsh has none the world names.\n"
+    "F2. The die showed a natural one on the Climb check.\n"
+    "F3. Pell Arrow climbs the wall and fails.\n\n"
+    "SENTENCES:\n"
+    "1. Ouch, that die hates you tonight.\n"
+    "2. There's no ferryman for you to hire here.\n"
+    "3. The river guild keeps every boat on the far bank.\n"
+    "4. You slipped on the wet moss and scraped your knee.\n"
+    "5. You'll have to find another way across, so maybe ask around.\n"
+    "6. Nice throw, right on target.\n"
+    "7. Anything in those sacks by the wall catch your eye?\n"
+    "8. Maybe try the cellar door instead.")
+_BEYOND_DEMO_ANSWER = {
+    "1": {"verdict": "reacts", "words": "", "attack": "no"},
+    "2": {"verdict": "from a fact", "words": "", "attack": "no"},
+    "3": {"verdict": "adds", "words": "The river guild keeps every boat on the far bank",
+          "attack": "no"},
+    "4": {"verdict": "adds", "words": "You slipped on the wet moss and scraped your knee",
+          "attack": "no"},
+    "5": {"verdict": "reacts", "words": "", "attack": "no"},
+    "6": {"verdict": "reacts", "words": "", "attack": "yes"},
+    # A lead posed as a question or a tip (playtest 2026-11-20 #9, #45, #48: crates that
+    # were never there, "a cellar or a crawlspace", "listening beneath the stones").
+    "7": {"verdict": "adds", "words": "those sacks by the wall", "attack": "no"},
+    "8": {"verdict": "adds", "words": "the cellar door", "attack": "no"}}
+
+
+def beyond_schema(n_sentences: int) -> dict:
+    """One required entry per sentence (required and enum hold under Ollama's grammar)."""
+    item = {"type": "object",
+            "properties": {"verdict": {"type": "string", "enum": list(BEYOND_VERDICTS)},
+                           "words": {"type": "string", "maxLength": 200},
+                           "attack": {"type": "string", "enum": ["yes", "no"]}},
+            "required": ["verdict", "words", "attack"]}
+    keys = [str(i) for i in range(1, n_sentences + 1)]
+    return {"type": "object", "properties": {k: item for k in keys}, "required": keys}
+
+
+def beyond_tells(text: str, premises, *, who: str = "", chat=None, model: str = "",
+                 host: str = "", provider: str = "ollama", api_key: str = "",
+                 attacked: bool | None = None) -> list[tuple[str, str]] | None:
+    """[(sentence, words)] for each sentence of `text` that states a world fact or a deed
+    no premise carries, its words quoted from the sentence and checked in code. [] when
+    every sentence reacts or comes from a fact; None when the read failed (the caller
+    leaves the line as it is, as every read back does). Premises are taken as given:
+    the table talk's are already plain (`views.plain_tell`).
+
+    `attacked`: whether the turn resolved an attack (an `attack` outcome), when the
+    caller knows. False makes a sentence the read marks `attack: yes` an addition
+    whatever its verdict. Owner bug list 2026-11-18, item 18: over a pick-up with no
+    throw planned, the table said "Nice shot" — a reaction, so "reacts" passed it, but
+    a reaction to a shot nobody rolled is a deed claimed. The model reads; code holds it
+    to the engine's own record (docs/structured-turn.md)."""
+    from . import narration as narration_mod
+
+    facts = [p for p in (" ".join(str(x).split()) for x in premises or ()) if p]
+    sentences = [" ".join(s.split()) for s in narration_mod._sentences(text)
+                 if re.search(r"[A-Za-z]{2,}", s)]
+    if not sentences:
+        return []
+    if chat is None:
+        from . import client
+
+        chat = client.chat
+    user = ("FACTS" + (f" (the player's character is {who})" if who else "") + ":\n"
+            + ("\n".join(f"F{i}. {t}" for i, t in enumerate(facts, 1)) or "F1. Nothing.")
+            + "\n\nSENTENCES:\n"
+            + "\n".join(f"{i}. {s}" for i, s in enumerate(sentences, 1)))
+    msgs = [{"role": "system", "content": _BEYOND_SYSTEM},
+            {"role": "user", "content": _BEYOND_DEMO_USER},
+            {"role": "assistant", "content": json.dumps(_BEYOND_DEMO_ANSWER)},
+            {"role": "user", "content": user}]
+    if bare_template(model):
+        msgs = _raw_prompt(msgs)
+    try:
+        reply = chat(msgs, model, host, as_json=True, think=False, temperature=0.0,
+                     num_predict=40 + 50 * len(sentences), provider=provider,
+                     api_key=api_key, schema=beyond_schema(len(sentences)))
+        answer = reply.json() or {}
+    except Exception:  # noqa: BLE001 — unread: nothing judged
+        return None
+    out: list[tuple[str, str]] = []
+    for k, sentence in enumerate(sentences, 1):
+        row = answer.get(str(k)) if isinstance(answer, dict) else None
+        if attacked is False and isinstance(row, dict) and row.get("attack") == "yes":
+            out.append((sentence, sentence))
+            continue
+        if not isinstance(row, dict) or row.get("verdict") != "adds":
+            continue
+        words = " ".join(str(row.get("words") or "").split())
+        if _clash_quoted(words, sentence):
+            out.append((sentence, words))
     return out

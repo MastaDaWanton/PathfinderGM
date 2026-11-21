@@ -32,6 +32,16 @@ def _outcomes(e, raws):
     return e.run(e.validate(raws, origin="author:test")).outcomes
 
 
+def _force(monkeypatch, kind: str, day: int):
+    """The journey's stretch check (`ontheway.road_stretches`) made to hit on `day` with
+    the table's band `kind`, once; the meeting made by the real function."""
+    left = [kind]
+    real_pick = ontheway._pick_band
+    monkeypatch.setattr(ontheway, "_event_day", lambda *a, **k: day if left else 0)
+    monkeypatch.setattr(ontheway, "_pick_band", lambda dice, bands, label:
+                        (left.pop(), 50) if left else real_pick(dice, bands, label))
+
+
 class _HitOn(_Quiet):
     """Dice that make the n-th d100 hit and send the table to one band."""
 
@@ -174,7 +184,8 @@ class TestTheWayInHasAHandleOnTheInside:
         from test_authored_places import _ent, _place
 
         got = places_mod.home_set(_ent(places=[_place()]))
-        assert [p.name for p in got] == ["the market", "the way in"]
+        # And the inn after it (playtest 2026-11-17b #8), attached the same way.
+        assert [p.name for p in got] == ["the market", "the way in", "the inn"]
         assert got[1].id in got[0].exits
         assert got[0].id in got[1].exits
 
@@ -184,12 +195,21 @@ class TestTheRoadRemembersProgressAndNotWeather:
     added to it: a ten-hour road held up by weather on its second watch recorded twelve
     hours walked."""
 
-    def test_the_hours_sat_out_are_not_hours_walked(self):
+    def test_the_hours_sat_out_are_not_hours_walked(self, monkeypatch):
+        """Since travel pacing (2026-11-18) weather on a days-long road is sat out and
+        walked on: the hours cost the clock and the body, and the road is still walked
+        to its end — never a stop with nobody to play."""
+        from rules import journey as journey_mod
+
         s, e, pc = _party()
-        e.dice = _Certain(e.dice, band=80)          # watch one: weather
-        _journey(e, pc, ROAD_TO)
-        assert s.location_id == ROAD_FROM
-        assert s.road["walked"] == ontheway.WATCH_HOURS, s.road
+        leg = journey_mod.find(journey_mod.legs_from(e.world, ROAD_FROM), ROAD_TO)
+        hours = journey_mod.hours_for(leg, pc.speed_feet)[0]
+        _force(monkeypatch, "weather", 1)
+        start = s.clock_minutes
+        tell = " ".join(o.tell for o in _journey(e, pc, ROAD_TO).outcomes)
+        assert s.location_id != ROAD_FROM and s.road == {}, tell
+        days = -(-hours // journey_mod.HOURS_PER_DAY)
+        assert s.clock_minutes - start > (days - 1) * 24 * 60 + hours % 8 * 60, tell
 
 
 class TestAMeetingOnTheLastWatchIsAnArrival:
@@ -198,16 +218,20 @@ class TestAMeetingOnTheLastWatchIsAnArrival:
     eight hours walked of eight and stood the party in the fields outside the town they
     had LEFT, with the next attempt costing one hour."""
 
-    def test_they_arrive_and_what_they_met_is_with_them(self):
+    def test_they_arrive_and_what_they_met_is_with_them(self, monkeypatch):
+        """Since travel pacing an event falls at midday of its day, capped at the road's
+        end (`ontheway.road_stretches`); one that falls AT the end is an arrival, and
+        the travellers met are there with the party."""
         s, e, pc = _party()
         from rules import journey as journey_mod
 
         leg = journey_mod.find(journey_mod.legs_from(e.world, ROAD_FROM), ROAD_TO)
         hours = journey_mod.hours_for(leg, pc.speed_feet)[0]
-        full, rest = divmod(hours, ontheway.WATCH_HOURS)
-        checks = full + (1 if rest else 0)
         before = len(s.actors)
-        e.dice = _HitOn(e.dice, n=checks, band=70)   # the last watch: travellers
+        monkeypatch.setattr(ontheway, "road_stretches", lambda dice, h, *a, **k:
+                            ontheway.Meeting(kind="travellers", roll=50, count=2,
+                                             template="guildhand", words=("merchant", "guard"),
+                                             day=-(-h // 8), at_hours=h))
         tell = " ".join(o.tell for o in _journey(e, pc, ROAD_TO).outcomes)
         assert s.location_id != ROAD_FROM, tell
         assert s.road == {}

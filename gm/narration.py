@@ -636,7 +636,14 @@ def mend_orphan_close(text: str) -> str:
             start = max([0] + [m.end() for m in re.finditer(r"[.!?…]['’\"”]?\s+|\n\n",
                                                             head)])
         mark = "‘" if text[orphan] == "’" else "'"
-        text = text[:start] + mark + text[start:]
+        mended = text[:start] + mark + text[start:]
+        # Kept only when the new mark opens the line the orphan closes. Playtest
+        # 2026-11-17 #6: a possessive ("the Burrowers' Guild") had already paired with
+        # the line's opening, so the new mark never paired, and each of the four passes
+        # put in another ("''''We work for", the bench's "''''''''").
+        if not any(a == start and b == orphan + 2 for a, b in speech.spans(mended)):
+            return text
+        text = mended
     return text
 
 
@@ -1461,8 +1468,8 @@ _CLAUSE_OPENS = re.compile(
 
 
 def creature_nouns_for_pc(text: str, pc_name: str, others_are_people: bool,
-                          acting: str = "", whose=None, pc_ref: str = "pc"
-                          ) -> tuple[str, list[str]]:
+                          acting: str = "", whose=None, pc_ref: str = "pc",
+                          grounded: str = "") -> tuple[str, list[str]]:
     """"The beast" for the player's character becomes their name.
 
     Measured 2026-09-18 (a homebrew asura at 70 hp with a blank body line): the NPC
@@ -1488,10 +1495,17 @@ def creature_nouns_for_pc(text: str, pc_name: str, others_are_people: bool,
     `whose(sentence, words)` is gm/mentions.py's answer to who the noun means. When it
     has one it decides: the noun is swapped only when it means the player — the two
     guards above were guesses at exactly that question.
+
+    `grounded` is the engine's own words for the beat (its tells). A creature noun
+    they use names something the engine knows, never the player — the engine calls the
+    player by name. Playtest 2026-11-17 #37: the tell read "a door leads to the beast's
+    pool", the dungeon's boss two rooms away, so nobody in the scene was a creature; the
+    page read "two stuck wooden doors lead to your pool" and "The roar of you in the pool".
     """
     if not text or not pc_name or not others_are_people:
         return text, []
     swapped: list[str] = []
+    named = {m.group(2).lower() for m in _CREATURE_NOUNS.finditer(grounded or "")}
 
     def _swapper(run: str):
         def _swap(m):
@@ -1500,6 +1514,8 @@ def creature_nouns_for_pc(text: str, pc_name: str, others_are_people: bool,
             ends = [i for i in (run.find(".", m.end()), run.find("!", m.end()),
                                 run.find("?", m.end())) if i >= 0]
             sentence = run[lo:(min(ends) + 1) if ends else len(run)]
+            if m.group(2).lower() in named:
+                return m.group(0)
             meant = whose(sentence, m.group(0)) if whose else None
             if meant is not None:
                 if meant != pc_ref:
@@ -1564,12 +1580,21 @@ _GESTURE = re.compile(
     r"\b(?:eyes?|hands?|gaze)\s+(?:\w+ly\s+)?(?:\w+(?:s|ed|ing)|narrow|widen|fixed|rest|"
     r"meet|lock|dart|flick|drift|settle|linger|land|flash|stay|go|move|find|follow|"
     r"trace|scan|sweep|shift|drop|fall|close|open|glint|gleam|light|burn)\b", re.I)
+# A body word that is nobody's looks (playtest 2026-11-20, shadow-0105 on): "You square
+# your shoulders and FACE the clockwork spy" was kept as the spy's first description and
+# shown every beat after as "the page said:", because "face" the verb counted as a face.
+# The verb takes its object straight after it; and what follows "your" is the player's own
+# body, which describes the player, not the person the sentence names.
+_NOT_THEIR_BODY = re.compile(
+    r"\bfac(?:e|es|ed|ing)\s+(?:the|a|an|you|him|her|them|it|me|us|his|their|its|your|"
+    r"down|off|up|away|forward|each)\b|\byour\s+(?:\w+\s+)?\w+", re.I)
 
 
 def _describes(sentence: str) -> bool:
     """Whether one sentence carries what somebody looks like: a body word that is not
     a gaze or a gesture, or two different things they wear."""
     gestures = [m.span() for m in _GESTURE.finditer(sentence)]
+    gestures += [m.span() for m in _NOT_THEIR_BODY.finditer(sentence)]
     worn: set[str] = set()
     for m in _APPEARANCE.finditer(sentence):
         if any(a <= m.start() < b for a, b in gestures):
@@ -1627,6 +1652,11 @@ def _respell_known(text: str, found: list[str], known) -> tuple[str, list[str]]:
         else:
             keep.append(n)
     return text, keep
+
+
+# A determiner or possessive straight before a word: what follows it, with a lowercase
+# noun after, is a thing's name used as a word ("your Lucerne hammer", "a Tengu trader").
+_ATTRIBUTIVE_BEFORE = re.compile(r"\b(?:your|his|her|their|my|our|its|a|an)\s+$", re.I)
 
 
 def unname_strangers(text: str, known: set[str]) -> tuple[str, list[str]]:
@@ -1764,6 +1794,13 @@ def unname_strangers(text: str, known: set[str]) -> tuple[str, list[str]]:
     for start, end, matched, poss in keep:
         if any(lo <= start < hi for lo, hi, _ in edits):
             continue                       # inside a sentence already being cut
+        if not poss and _ATTRIBUTIVE_BEFORE.search(text[:start]) \
+                and re.match(r"\s+[a-z]", text[end:]):
+            # A capitalised word between "your" and a lowercase noun is a kind of thing,
+            # not a person: owner bug 2026-11-17 #8 (frag), "your Lucerne hammer" came back
+            # "your the stranger hammer". Lowercased, never replaced.
+            edits.append((start, end, matched.lower()))
+            continue
         descriptor = _descriptor(matched)
         before = text[:start].rstrip()
         if before.endswith(","):
@@ -2634,6 +2671,36 @@ def _cut_sentences(text: str, flagged: list[str]) -> str:
 def cut_fire_from_nowhere(text: str, context: str = "") -> tuple[str, list[str]]:
     """The backstop under `fire-from-nowhere`: the sentences go. Returns (text, cut)."""
     gone = fire_from_nowhere(text, context)
+    if not gone:
+        return text, []
+    return _cut_sentences(text, gone), gone
+
+
+# A crowd, in the prose: people in numbers with no one of them a person.
+_CROWD = re.compile(
+    r"\b(?:crowd(?:s|ed|ing)?|throng(?:s|ed|ing)?|bustl(?:e|es|ing)|passers-?by|"
+    r"onlookers|bystanders|townsfolk|townspeople|villagers|hubbub|milling|jostl(?:e|es|"
+    r"ing)|press of (?:people|bodies)|sea of faces|(?:foot )?traffic)\b", re.I)
+
+
+def crowd_from_nowhere(text: str, anyone_here: bool, context: str = "") -> list[str]:
+    """Sentences that put a crowd where the map holds nobody but the party.
+
+    Owner bug 2026-11-17 #7 (jack, transcript 197): "You labor through the bustling
+    traffic of the north crossing … You scan the nearby stalls and crowds" with nobody on
+    the map. A crowd is never given bodies (the owner's call, 2026-11-18: cut the prose
+    where the map is empty, for now; a real ambient crowd is a later option), so a crowd
+    the page shows where nobody stands is the page's invention. A crowd the turn's own
+    tells name (`context`) is the engine's, and stays."""
+    if anyone_here or not text or not _CROWD.search(text) or _CROWD.search(context or ""):
+        return []
+    return [s for s in _sentences(unquoted(text)) if _CROWD.search(s)]
+
+
+def cut_crowd_from_nowhere(text: str, anyone_here: bool,
+                           context: str = "") -> tuple[str, list[str]]:
+    """The backstop for `crowd_from_nowhere`: the sentences go. Returns (text, cut)."""
+    gone = crowd_from_nowhere(text, anyone_here, context)
     if not gone:
         return text, []
     return _cut_sentences(text, gone), gone
@@ -3872,6 +3939,7 @@ def invented_names(text: str, known: set[str]) -> list[str]:
     # 2026-09-18 on two opening drafts of five, each costing a repair call.
     allowed = {w.lower() for name in known
                for w in _WORD.findall(name.lower().replace("’", "'"))}
+    whole = {" ".join(str(name).lower().split()) for name in known}
     found: list[str] = []
     for sentence in _SENTENCE.findall(text or ""):
         tokens = re.findall(r"\b[A-Z][a-zA-Z'’-]{2,}\b", sentence)
@@ -3915,6 +3983,20 @@ def invented_names(text: str, known: set[str]) -> list[str]:
             stem = re.sub(r"['’]s$", "", low)
             if stem != low and (stem in allowed or stem in _NOT_A_NAME):
                 continue
+            # A known thing counted: the tell said "6× Glow Mote", the prose "six Glow
+            # Motes", and the plural was un-named into "collecting six the stranger"
+            # (playtest 2026-11-20 #12). Only a whole known name counted, never a known word:
+            # "the Sisters of the Veil" is an invented order, whatever "sister" is (the
+            # replay corpus, 2026-09-25-strangers).
+            if low.endswith("s"):
+                at = sentence.find(tok)
+                prev = (re.findall(r"[A-Za-z][a-zA-Z'’-]*", sentence[:at]) or [""])[-1].lower()
+                # The two-word name only: the world's single capitalised words ("Sister")
+                # are in `known` as vocabulary, and a lone plural of one proves nothing.
+                if any(f"{prev} {s}" in whole
+                       for s in (low[:-1], low[:-2] if low.endswith("es") else "")
+                       if s):
+                    continue
             # "I've", "I'll", "We're" — a capitalised contraction is not a name. Tested
             # on the head rather than a list of forms, so every contraction of a word
             # already known not to be a name is covered without enumerating them.

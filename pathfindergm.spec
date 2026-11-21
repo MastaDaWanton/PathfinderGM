@@ -56,6 +56,7 @@ CONTENT_DIRS = [
     "style",       # the intimate-scene passages the app ships (gm/intimate.shipped_path)
     "bloodlines",  # what a sorcerer's bloodline powers do (rules/grantedpowers.py)
     "schools",     # a wizard's school powers and arcane bond (rules/grantedpowers.py)
+    "dungeons",    # a dungeon's builders and ruin tags, its story (rules/dungeons.py)
 ]
 
 datas = [(f"content/{name}", f"content/{name}") for name in CONTENT_DIRS]

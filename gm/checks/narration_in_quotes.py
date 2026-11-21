@@ -67,14 +67,55 @@ def _names_self(line: str, name: str) -> bool:
     return names_person(line, name)
 
 
-def quoted_narration(text: str, said, actors) -> list[tuple[str, str]]:
-    """(line, why) for every quotation on the page that is narration in quotes."""
+# How many of the player's own words in a row make a quotation theirs (`_players_line`).
+_PC_RUN = 6
+
+
+def pc_words(player_text: str, outcomes=()) -> tuple[str, ...]:
+    """The player's own words this turn: what their `say` ops said (the engine's record),
+    and the player's line itself. Lower-case words joined by single spaces."""
+    from gm.narration import _words
+
+    out = [" ".join(_words(player_text or ""))]
+    for o in outcomes or ():
+        effects = o.get("effects") if isinstance(o, dict) else getattr(o, "effects", None)
+        for e in effects or ():
+            if isinstance(e, dict) and e.get("kind") == "said"                     and str(e.get("who") or "") in ("", "pc") and e.get("words"):
+                out.append(" ".join(_words(str(e["words"]))))
+    return tuple(w for w in out if w)
+
+
+def _players_line(line: str, mine) -> bool:
+    """Whether a quotation holds the player's own words: a run of `_PC_RUN` of them (all of
+    them, for a shorter line). jack T208 (owner's save 2026-11-17): the player's quoted
+    offer to the innkeeper and the innkeeper's reply were read as one quotation, which
+    named the innkeeper, and both were cut — "You look the Tengu innkeeper in the eye and
+    offer a deal." was all the page kept, and the player had to say "I wait for his
+    reply". The player's own words are never narration in somebody's mouth."""
+    from gm.narration import _words
+
+    said = _words(line)
+    if not said:
+        return False
+    page = " " + " ".join(said) + " "
+    for w in mine or ():
+        ws = w.split()
+        n = min(_PC_RUN, len(ws))
+        if n and any(" " + " ".join(ws[i:i + n]) + " " in page
+                     for i in range(len(ws) - n + 1)):
+            return True
+    return False
+
+
+def quoted_narration(text: str, said, actors, mine=()) -> list[tuple[str, str]]:
+    """(line, why) for every quotation on the page that is narration in quotes. `mine`:
+    the player's own words this turn (`pc_words`), whose quotations are never judged."""
     from gm.checks._quotes import speakers
     from gm.narration import introductions
 
     out: list[tuple[str, str]] = []
     for _qa, _qb, line, ref in speakers(text, said, actors):
-        if not line.strip():
+        if not line.strip() or _players_line(line, mine):
             continue
         m = _HINT_ECHO.search(line)
         if m:
@@ -96,7 +137,8 @@ def quoted_narration(text: str, said, actors) -> list[tuple[str, str]]:
 
 def find(ctx) -> list:
     actors = dict(getattr(ctx.scene, "actors", {}) or {})
-    found = quoted_narration(ctx.text, ctx.said, actors)
+    found = quoted_narration(ctx.text, ctx.said, actors,
+                             pc_words(ctx.player_text, getattr(ctx, "outcomes", ())))
     if not found:
         return []
     return [Finding(

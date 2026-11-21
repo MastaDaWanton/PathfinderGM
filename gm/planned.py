@@ -510,6 +510,9 @@ _LEFT = {
     "shaken": ("hurting from it", "rattled", "blinking it away"),
     "reeling": ("reeling", "the beating telling on them", "close to dropping"),
     "staggering": ("staggering, all but out", "barely upright", "one more and they drop"),
+    # Exactly 0 hit points: the condition tell's own words ("disabled: still standing",
+    # `rules.engine` CONDITION_TELLS), never "down" beside it (playtest 2026-11-20 #24).
+    "disabled": ("disabled: still standing, but any real effort now costs blood",),
     "down": ("down",),
     "dead": ("dead",),
 }
@@ -819,6 +822,239 @@ def _jobs_held(engine, ref: str) -> str:
     return jobs_mod.slot_facts(engine, ref)
 
 
+# --- what a person knows: the engine's facts their answer is drawn from ---------------------
+#
+# Playtest 2026-11-16 #54, #58, #66, #96: the reply slot was told to answer "only from what
+# THE SCENE says they know", and THE SCENE gave a person one sentence of their notes and a
+# bare list of place names. The dungeon's smuggler, whose notes hold the dungeon's story, said
+# "I don't know what's in the deep rooms" and "The cargo's gone" beside "hiding up with the
+# cargo"; a lifelong resident of a city with a cathedral said "I do not know of any healers or
+# temples"; a deckhand of a ship with an empty hold said "We were hauling trade goods for the
+# guild". Nothing told any of them what they knew.
+#
+# How the traditions hold it. TADS 3 gives every actor its own topic database and a `known`
+# flag per topic, with a DefaultAskTopic as the catch-all for what that actor has no answer to
+# (TADS 3 Library Manual: Topic, ActorTopicDatabase, DefaultAskTopic) — ignorance is what is
+# left over, never the first answer. Morrowind filters its shared topics by the speaker's cell
+# and settlement, so anyone in a town answers "specific place" and directions about that
+# town's own places (UESP, Morrowind Mod: Dialogue Window — the Cell condition). What was
+# abandoned is the other half: Ultima IV's typed keywords became the guess-the-word problem
+# and Ultima IX dropped them for full lines, and Morrowind's shared generic answers, the same
+# canned line from every mouth, are what Oblivion and Skyrim were faulted for and pared
+# back (forum and press criticism; no developer statement found). So the facts are the
+# engine's, per person, and the words stay the speaker's own model-written line.
+#
+# shortcut: everyone standing in a settlement knows its places, residents and strangers alike;
+# a per-person "is this a local" test is the upgrade when the engine marks strangers.
+
+# Each kind said in the plain words a question uses: told "(faith and the dead)", the read
+# back passed "I do not know of any healers or temples" beside the cathedral 3 of 3; told
+# "(temples, shrines and the places of the dead)", it caught it (2026-11-17, gemma-4-12B).
+_CATEGORY_WORDS = {"faith": "temples, shrines and the places of the dead",
+                   "trade": "shops, markets and workshops",
+                   "civic": "the watch, the law and the halls",
+                   "leisure": "inns, taverns and places to rest or be entertained",
+                   "utility": "wells, stores and what the place needs to run",
+                   "transport": "docks, stables and the ways out",
+                   "hidden": "back ways where nobody is watching", "": "streets and squares"}
+# The words of those labels that name one kind of place, which a label only says where the
+# settlement has one. jack T276 (owner's save 2026-11-17): Featherperch has no docks, and
+# its stables were labelled "(docks, stables and the ways out)", so asked the way to the
+# docks the page gave one. A kind named and absent is said absent instead.
+_KIND_WORDS = {"docks": "the docks", "stables": "the stables", "workshops": "the workshops",
+               "markets": "the market", "inns": "the inn", "taverns": "the tavern",
+               "wells": "the well"}
+
+
+# Said absent outright: a kind somebody asks the way to. Not a market, an inn or a tavern,
+# whose lack a town makes up some other way (a merchants' row, the other house of beds).
+_SAID_ABSENT = ("docks", "stables", "wells", "workshops")
+
+
+def _and(items: list[str]) -> str:
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def _category_label(cat: str, present: set[str]) -> str:
+    """`_CATEGORY_WORDS[cat]` with every kind word the settlement lacks taken out."""
+    words = _CATEGORY_WORDS.get(cat, cat)
+    items = re.split(r", | and ", words)
+    kept = [w for w in items if w not in _KIND_WORDS or _KIND_WORDS[w] in present]
+    return _and(kept) if kept and kept != items else words
+
+
+def _kinds_absent(present: set[str], settlement: str) -> str:
+    """The one fact that the settlement lacks the kinds somebody asks the way to, or ""."""
+    gone = [w for w in _SAID_ABSENT if _KIND_WORDS[w] not in present]
+    if not gone:
+        return ""
+    said = gone[0] if len(gone) == 1 else ", ".join(gone[:-1]) + f" or {gone[-1]}"
+    # Bare: live, a tail ("there are none here to send anyone to") came back in the
+    # answer nearly word for word.
+    return f"{settlement} has no {said}."
+
+
+def _places_known(engine, name: str) -> list[str]:
+    """`name` knows the settlement they stand in: its places by kind, each with the way to it
+    from here (`places.route`), one fact a kind. [] off a settlement's streets' set."""
+    from rules import places as places_mod
+
+    scene = engine.scene
+    try:
+        known = tuple(engine.places())
+    except Exception:  # noqa: BLE001 — no places to hand, nothing to say of them
+        return []
+    town = [p for p in known if not p.described_only
+            and places_mod.terrain_of(p.id) == places_mod.URBAN
+            and places_mod.setting_of(p.id) == "in" and places_mod.storey_of(p.id) == 0]
+    if len(town) < 2:
+        return []
+    by_id = {p.id: p for p in known}
+    here = str(getattr(scene, "at", "") or "")
+    world = getattr(engine, "world", None)
+    loc = world.get(scene.location_id) if world is not None else None
+    settlement = str(getattr(loc, "name", "") or "the settlement")
+    groups: dict[str, list[str]] = {}
+    present = {" ".join(str(p.kind or p.name).split()).lower() for p in town}
+    for p in town:
+        if p.id == here:
+            continue
+        kind = p.kind or p.name
+        cat = places_mod.category_of(kind)
+        said = p.name + (f" ({kind})" if p.kind and p.kind.lower() != p.name.lower() else "")
+        hops = places_mod.route(known, here, p.id) if here in by_id else ()
+        between = [by_id[h].name for h in hops[:-1] if h in by_id]
+        if between:
+            said += f", the way by {', '.join(between)}"
+        elif hops:
+            said += ", next door"
+        groups.setdefault(cat, []).append(said)
+    absent = _kinds_absent(present, settlement)
+    return [f"{name} knows these places of {settlement} ({_category_label(cat, present)}): "
+            + "; ".join(items) + "." for cat, items in groups.items()]         + ([f"{name} knows {absent}"] if absent else [])
+
+
+def _ship_known(engine, ref: str, name: str) -> list[str]:
+    """`name` works the ship the party is aboard: what her hold carries, from the party's
+    cargo records (`trade.shipping_in`) — or that it carries nothing, there being no other
+    record of cargo in the engine — and who holds her. [] for anyone not of her crew."""
+    from rules import ships as ships_mod
+    from rules import trade as trade_mod
+
+    scene = engine.scene
+    ship = ships_mod.aboard(scene)
+    if ship is None or ref not in {a.ref for a in ships_mod.crew_of(scene, ship)}:
+        return []
+    lots = trade_mod.shipping_in(scene, ship.id)
+    out = [f"{name} knows {ship.name}'s hold: "
+           + (f"she carries {', '.join(trade_mod.said(x) for x in lots)}." if lots else
+              "she carries no cargo at all; her hold is empty, and she was carrying none.")]
+    holder = scene.actors.get(ship.held_by) if ship.held_by else None
+    if holder is not None:
+        out.append(f"{name} knows {ship.name} is held now by "
+                   f"{'the player' if holder.is_pc else holder.name}, who took her.")
+    return out
+
+
+def known_to(engine, ref: str) -> list[str]:
+    """What this person knows, as the engine holds it: their own notes (a dungeon's ally
+    holds its story there, `dungeons.meet_ally`), the ship they work, and the settlement's
+    places. Their answer draws on these and is read back against them (`_knowledge_kept`)."""
+    a = engine.scene.actors.get(ref)
+    if a is None or a.is_pc:
+        return []
+    name = narration_mod.definite(a.name) if a.name else "they"
+    out = []
+    notes = " ".join(str(getattr(a, "notes", "") or "").split())
+    # Not the stat block's own line ("CR 1/2 humanoid", "Warrior 1 in a chain shirt"): that
+    # is the GM's card for the creature, not anything the person knows.
+    from rules import bestiary
+
+    tpl = str(getattr(a, "from_template", "") or "")
+    block = (bestiary.lookup(tpl) if tpl else None) or {}
+    if notes and notes != " ".join(str(block.get("notes") or "").split()):
+        out.append(f"About {name}, what they know of themselves and this place: {notes}")
+    return (out + _ship_known(engine, ref, name) + _places_known(engine, name)
+            + _goods_known(engine, a, name) + _sword_known(engine, a, name)
+            + _carried_known(a, name))
+
+
+def _carried_known(a, name: str) -> list[str]:
+    """What this person has on them, the engine's record, so an offer names only real
+    things: playtest 2026-11-20 #5, the carter offered "dried meat and some hard bread" from
+    a pack that held nothing, and accepting it fed the player her own rations. A keeper's
+    wares are on the counter (ON DISPLAY), so an empty pocket is not said of them; nor of a
+    body whose pockets are still a kit's claim (`bestiary.collapse_kit`)."""
+    from rules import goods, keepers
+
+    held = {k: int(n or 0) for k, n in (getattr(a, "goods", None) or {}).items()
+            if int(n or 0) > 0}
+    if held:
+        things = ", ".join(
+            (f"{n} × " if n != 1 else "") + str(getattr(goods.good(k), "name", "") or k)
+            for k, n in sorted(held.items()))
+        return [f"{name} has on them, and can offer, hand over or sell only these: "
+                f"{things}."]
+    if keepers.keeps_a_counter(a) or getattr(a, "kit_pending", None):
+        return []
+    return [f"{name} has nothing on them to offer or hand over."]
+
+
+def _sword_known(engine, a, name: str) -> list[str]:
+    """A sword for hire knows their own rate: the engine's wage (`hirelings.day_cp`, the
+    book's for their level, moved by their terms) and the week up front. Playtest
+    2026-11-17b #20: asked his rate, the man in the corner said "My rate depends on the
+    danger" and named none, while the engine held one. [] for anybody who does not hire
+    out, or is already in the party's pay."""
+    from rules import goods, hirelings
+
+    scene = engine.scene
+    if not hirelings.hires_out(scene, a) or hirelings.wage(a) is not None:
+        return []
+    coins = engine._coins_here()
+    day = goods.purse_line(goods.coins_for(hirelings.day_cp(scene, a)), coins)
+    week = goods.purse_line(goods.coins_for(hirelings.week_cp(scene, a)), coins)
+    return [f"{name} hires out as a sword and asks {day} a day to come along and guard, "
+            f"with a week ({week}) paid up front."]
+
+
+def _goods_known(engine, a, name: str) -> list[str]:
+    """A trader here (a counter's keeper, or the master of the market) knows what the
+    party's goods fetch at this market: the engine's own book (`trade.book_cp`, before
+    anybody's terms), for each lot the party can trade from here. Playtest 2026-11-17 #7:
+    asked who buys silk by the bale and what it fetches, the master named the merchants'
+    row and the docks and gave no price, while the trade code held one. [] for anyone
+    else, or with no lot here."""
+    from rules import goods, keepers
+    from rules import trade as trade_mod
+
+    scene = engine.scene
+    world = getattr(engine, "world", None)
+    master = keepers.master_here(scene)
+    trader = keepers.counter_of(getattr(a, "world_entity_id", "") or "") or (
+        master is not None and master.ref == a.ref)
+    place = str(getattr(scene, "location_id", "") or "")
+    if not trader or world is None or not place:
+        return []
+    coins = goods.coins_here(world, scene)
+    out = []
+    for lot in trade_mod.reachable(scene):
+        key = lot.get("key")
+        if key not in trade_mod.ROWS:
+            continue
+        units = min(int(lot.get("units", 0)), trade_mod.can_sell(scene, world, place, key))
+        if units <= 0:
+            out.append(f"{name} knows this market will take no more {lot['name']} today.")
+            continue
+        cp = trade_mod.book_cp(scene, world, place, key, units, buying=False)
+        why = {"demand": ", wanted here", "supply": ", made here, so cheap"}.get(
+            trade_mod.standing(world, place, key), "")
+        out.append(f"{name} knows what the player's goods fetch at this market, before "
+                   f"any haggling: {trade_mod.said(dict(lot, units=units))} for about "
+                   f"{goods.purse_line(goods.coins_for(cp), coins)}{why}.")
+    return out
+
+
 def matter_slot(pull) -> dict | None:
     """The "matter" slot for the open matter the engine picked (`cards.thread_to_pull`), or
     None. Its words come from the pull's facts and never its `text`, which is the free
@@ -859,6 +1095,19 @@ def matter_slot(pull) -> dict | None:
         return {"key": "matter", "want": MATTER_WANT,
                 "say": lead + what + ". Let it touch the scene in one sentence, as a fact, "
                                      "without resolving it."}
+    carrier = _one_line((pull.get("carrier") or {}).get("name"), 60)
+    if stands == "situation" and carrier:
+        # Talk in town (`cards._rumour_pull`): somebody's words, about somewhere else.
+        # Playtest 2026-11-16 #67 and #90: told "seen or heard here", the slot hung the
+        # talk in the air, and on the Red Gull's deck put "the sewers beneath the rigging".
+        return {"key": "matter", "want": MATTER_WANT, "not_own": title,
+                "approach": "go_between",
+                "carrier_ref": str((pull.get("carrier") or {}).get("ref") or ""),
+                "say": f"{carrier}, who is here, mentions in passing, in one sentence of "
+                       f"their own words, the talk in town ({title}): {fact or title}. It "
+                       "is talk about that place, which is somewhere else, not here. It is "
+                       "not the player's goal: never write that they seek it, pursue it or "
+                       "keep it in mind. Do not resolve it."}
     if stands == "situation":
         return {"key": "matter", "want": MATTER_WANT, "not_own": title,
                 "say": f"A matter of the world here, not a task of the player's: {what}. Let "
@@ -1053,7 +1302,8 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
                      "number.")
             slots.append({"key": f"fact{i + 1}",
                           "want": min(FACT_CEILING, BLOW_WANT + BLOW_EACH * (len(blows) - 1)),
-                          "say": say, "tells": tells})
+                          "say": say, "tells": tells,
+                          "blow": _struck([b for o in act for b in _blows_of(o)], engine)})
             continue
         # What the player's line may add to an act: how they go about what the engine
         # decided, and only on the act their words led to. Not on their own `say` — its tell
@@ -1074,10 +1324,20 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
             # the same tell were never told — 14% of the diagnosis's baseline errors: 7 of 7
             # runs of the declared punch, 2 of 7 of the declared cruelty. Re-asked with this
             # shape, 8 of 8 carried the warrant (0 of 4 before).
-            first = ("the player squares up to them from where they stand: nobody moves, "
-                     "no blow lands and nobody is hurt yet" if not moved else
-                     "the player closes and squares up to them: no blow lands and nobody "
-                     "is hurt yet")
+            # A walk of the player's in another act of this turn has its own slot: the
+            # squaring-up says nothing of moving then. Playtest 2026-11-20 #97, "I move to
+            # A14 and strike the clockwork spy": "preparing to strike from your current
+            # position. You move across the ground…" — "nobody moves", then the move.
+            walks_later = not moved and any(
+                getattr(o, "op", "") in ("move", "travel")
+                and str(getattr(o, "actor", "") or "") in {me, "pc"} - {""}
+                for o in outcomes or ())
+            first = ("the player closes and squares up to them: no blow lands and nobody "
+                     "is hurt yet" if moved else
+                     "the player squares up to them: no blow lands and nobody is hurt yet"
+                     if walks_later else
+                     "the player squares up to them from where they stand: nobody moves, "
+                     "no blow lands and nobody is hurt yet")
             rest = [str(e["told"]) for o in act for e in (getattr(o, "effects", None) or [])
                     if isinstance(e, dict) and e.get("told")]
             moment = [first, *dict.fromkeys(rest)]
@@ -1138,10 +1398,39 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
         if pc_name and any(pc_name in str(t or "") for t in tells):
             say += (f' {pc_name} is the player\'s character: "you" in every sentence, never '
                     f'"he", "she" or "they".')
+        # The player's own words, when this act says them: whatever the slot puts in quote
+        # marks is held to the words the engine heard said in it (`misquoted`, playtest
+        # 2026-11-16 #60) — anybody's in the act, so another's quoted line is no fault.
+        spoken = (" | ".join(str(e.get("words") or "") for o in act
+                             for e in (getattr(o, "effects", None) or [])
+                             if isinstance(e, dict) and e.get("kind") == "said")
+                  if i == spoken_at else "")
+        # A dungeon room walked into: its trace and who holds it are this act's own facts
+        # to tell, so the slot is given the room's share and read back for them
+        # (`_all_told`). Owner bug 2026-11-17 #4 (frag): two of six traces and the
+        # rat-king's line never reached the page, asked into 220 characters.
+        room = [str(f) for o in act for e in (getattr(o, "effects", None) or [])
+                if isinstance(e, dict) and e.get("kind") == "room_facts"
+                for f in e.get("facts") or ()]
+        want = min(FACT_CEILING, FACT_WANT + FACT_EACH * (len(tells) - 1))
+        if room:
+            want = FACT_CEILING
+            must = list(dict.fromkeys([*must, *room]))
+        # What came of it, read back after the slot is written (`_came_out`): the act and not
+        # its result was the owner's complaint of 2026-11-20 (#7). Not a declared fight or a
+        # refusal (their own asks), not the player's own words (the answer is the reply's),
+        # and not a walk alone, whose arrival is the walk.
+        result = ""
+        if not declared and not refused and i != spoken_at and not all(
+                getattr(o, "op", "") in ("move", "travel", "say") for o in act):
+            result = " ".join(beat_verify.tell_premises(tells))
         slots.append({"key": f"fact{i + 1}",
-                      "want": min(FACT_CEILING, FACT_WANT + FACT_EACH * (len(tells) - 1)),
+                      "want": want,
                       "say": say, "tells": tells, **({"not_own": theirs} if theirs else {}),
-                      **({"must_tell": must} if must else {})})
+                      **({"must_tell": must} if must else {}),
+                      **({"outcome": result} if result else {}),
+                      **({"verbatim": spoken, "typed": player_input}
+                         if spoken.strip() else {})})
         employer = next((e.get("employer") for o in act
                          for e in (getattr(o, "effects", None) or [])
                          if isinstance(e, dict) and e.get("kind") == "job"
@@ -1273,13 +1562,24 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
                 slots[:] = [x for x in slots if x["key"] not in folded]
                 work += (" They are putting this work to the player now, in this answer: "
                          "say what it is, where and when, and what it pays, once.")
+            # What they know, as the engine holds it (`known_to`), said before "they do not
+            # know": playtest 2026-11-16 #54/#58/#66/#96, where ignorance was the first
+            # answer and an invented one the second. Read back against the reply as it is
+            # written (`_knowledge_kept`).
+            knows = known_to(engine, speaker["ref"])
+            # Shown to this slot's own call only (`slot_messages`), not in the PLAN every
+            # slot reads: a city's places run to two thousand characters.
+            knows_said = ("WHAT THEY KNOW (engine facts; theirs to tell when asked, in "
+                          "their own words, and never to deny or change):\n"
+                          + "\n".join(f"- {k}" for k in knows) if knows else "")
             slots.append({
                 "key": "reply", "want": REPLY_WANT, "speaker": speaker["ref"],
                 "speaker_name": speaker["name"], **({"not_manner": used} if used else {}),
+                **({"knows": knows, "knows_said": knows_said} if knows else {}),
                 "say": f'{speaker["name"]} answers the player, in their own voice, as '
                        "themselves (\"I\", never their own name or title), only from what "
-                       "THE SCENE says they know; if THE SCENE does not say, they do not "
-                       "know and say so." + work + asks,
+                       "they know (WHAT THEY KNOW, when given) and what THE SCENE says; "
+                       "where neither says, they do not know and say so." + work + asks,
                 **({"not_own": matter["not_own"]} if asks else {}),
                 **({"no_job": speaker["name"]}
                    if not _holds_a_job(engine, speaker["ref"]) else {}),
@@ -1304,6 +1604,7 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
         if speaker is None and people:
             names = ", ".join(f'{p["name"]} ({p["ref"]})' for p in people)
             slots.append({"key": "aside", "want": ASIDE_WANT,
+                          "names": [p["name"] for p in people],
                           "say": f"Nobody was spoken to. One of the people here ({names}) "
                                  "goes on with what they were already doing, in one "
                                  "sentence, without speaking."})
@@ -1355,6 +1656,7 @@ def turn_plan(engine, outcomes, said=None) -> list[dict]:
                           "say": f"The engine decided this: {decided} {_AS_IT_HAPPENS}",
                           "tells": tells})
             continue
+        raw = [x for o in act for x in _blows_of(o)]
         for k, b in enumerate(blows):
             head = (f"The engine decided this: {decided}\n" if k == 0 else
                     "The same act goes on: its next blow.\n")
@@ -1366,8 +1668,53 @@ def turn_plan(engine, outcomes, said=None) -> list[dict]:
                         "how it is struck, how it lands or misses, and how the one struck is "
                         "left. Nothing the facts and THE SCENE do not give, and never a "
                         "number. " + blow_opening(said)),
-                "tells": tells if k == 0 else []})
+                "tells": tells if k == 0 else [],
+                "blow": _struck(raw[k:k + 1], engine)})
     return slots
+
+
+def _blows_of(o) -> list[dict]:
+    """An outcome's blows that `blow_facts` tells, in its order: the hits and the misses."""
+    return [b for b in getattr(o, "blows", None) or [] if b.get("result") in ("hit", "miss")]
+
+
+def _struck(blows: list[dict], engine) -> list[str]:
+    """Who these blows HIT, by the name the plan calls them; a miss changes nobody. Truthy
+    on a slot only when its blow changes somebody, which is what `NOT_YET` is about."""
+    scene = engine.scene
+    out = []
+    for b in blows:
+        who = scene.actors.get(b.get("ref")) if b.get("result") == "hit" else None
+        if who is not None:
+            name = "you" if who.is_pc else narration_mod.definite(str(who.name))
+            if name not in out:
+                out.append(name)
+    return out
+
+
+# A3 (pgm-work/richer-prose-paths.md; playtest 2026-11-20, shadow-0097): every slot shares
+# one prefix, kept byte-identical so Ollama reuses its cache, and that prefix is the END of
+# the turn: PEOPLE HERE NOW had the clockwork spy "broken, on the ground" for the
+# squaring-up slot, and the plan's own blow slot says so. So a slot that comes before a
+# blow is told, in its own ask, that the blow has not landed: a MUD's combat message is
+# sent at its event with that moment's state (tbaMUD `dam_message`), never the end state.
+# Not a second PEOPLE HERE per slot: the engine keeps no snapshot of the bands before the
+# turn (docs/research/2026-11-20-narration-inputs.md, section 4).
+NOT_YET = ("This slot comes before the blow in slot {n}: that blow has not landed yet. {who} "
+           "{be} not yet struck by it, and nobody is hurt, down, broken or dying from it in "
+           "this slot. PEOPLE HERE NOW and THE SCENE AS IT STANDS NOW tell how things stand "
+           "after the whole turn, not at this moment.")
+
+
+def _not_yet(slots: list[dict], i: int) -> str:
+    """`NOT_YET` for slot `i`, naming the next slot whose blow changes somebody, or ""."""
+    later = next((n for n in range(i + 1, len(slots)) if slots[n].get("blow")), None)
+    if later is None:
+        return ""
+    who = list(slots[later]["blow"])
+    who[0] = who[0][:1].upper() + who[0][1:]
+    return NOT_YET.format(n=later + 1, who=_and(who),
+                          be="are" if len(who) > 1 or who == ["You"] else "is")
 
 
 def turn_block(engine, outcomes, acting: str, manner: str = "") -> str:
@@ -1530,8 +1877,10 @@ def slot_messages(plan: list[dict], slots: list[dict], i: int, written: list[str
     ask = (plan[1]["content"]
            + ("\n\nWRITTEN SO FAR (do not repeat any of it; carry straight on from it):\n"
               + so_far if so_far else "")
+           + (f"\n\n{s['knows_said']}" if s.get("knows_said") else "")
            + f'\n\nNow write slot {i + 1}, "{s["key"]}", and only that slot: {s["say"]}'
            + size
+           + (f"\n{_not_yet(slots, i)}" if _not_yet(slots, i) else "")
            + (f"\n\n{redo}" if redo else "")
            + "\n" + shape)
     return [plan[0], {"role": "user", "content": ask}]
@@ -1584,7 +1933,10 @@ def compose_reply(slot: dict, words: str, manner: str) -> str:
 
 
 # A reply as `compose_reply` writes it: the say tag, the quoted words, the speaker written in.
-_COMPOSED = re.compile(r"^(<say [^>]*>)'(.*)'(</say>\s.*)$", re.S)
+# Or as the slot holds it once its tags are lifted (`GMAgent._lift`, which every slot goes
+# through): "'…,' the smuggler says." Without this the cut never matched a lifted reply of
+# two sentences and the read-backs' cut left them standing (found 2026-11-17, #58's test).
+_COMPOSED = re.compile(r"^(<say [^>]*>)?'(.*)'((?:</say>)?\s+\S.*)$", re.S)
 
 
 def cut_slot_sentence(text: str, said: str) -> str:
@@ -1614,6 +1966,7 @@ def cut_slot_sentence(text: str, said: str) -> str:
                        if not x.lstrip("\"'“‘(")[:1].islower()).strip()
         return cut if narration_mod._sentences(narration_mod.unquoted(cut)) else ""
     head, words, tail = m.groups()
+    head = head or ""
     parts = narration_mod._sentences(words)
     if len(parts) != len(whole):
         return text
@@ -1652,6 +2005,56 @@ def _fit(text: str, max_chars: int) -> str:
     return " ".join(out)
 
 
+def _folded(text: str) -> str:
+    return " ".join(str(text or "").replace("’", "'").lower().split())
+
+
+def misquoted(text: str, words: str) -> list[str]:
+    """The quotations in a slot that are not the player's words as they said them: each
+    span inside quote marks (`speech.spans`), its edge punctuation off, must stand in
+    `words` letter for letter (case and spacing aside). Playtest 2026-11-16 #60: "You said
+    the beast ate your crew" came back in quotes as "You mentioned the beast ate your crew",
+    and "Where is this cargo of yours" as "Where is your cargo". Code comparing strings,
+    never reading them. A slot that reports the words without quote marks is not judged."""
+    from . import speech
+
+    said = _folded(words)
+    out = []
+    for a, b in speech.spans(text):
+        piece = _folded(text[a + 1:b - 1]).strip(" ,.;:!?\"'“”‘")
+        if piece and piece not in said:
+            out.append(text[a:b])
+    return out
+
+
+# Speech verbs that say HOW a line was spoken, which is the player's to choose. Playtest
+# 2026-11-17b #9: '"A room for the night, and a hot meal. What do I owe you?" I ask the
+# barkeep' came back 'You look at the Korvu behind the bar and demand, "…"' — a polite
+# question told as a demand. A closed list, matched only right before the player's own
+# quotation (`speech.spans`), and only when the player did not use the verb themselves.
+_LOADED_SPEECH = re.compile(
+    r"\b(demand|order|command|snap|bark|growl|snarl|hiss|spit|shout|yell|bellow|roar|"
+    r"plead|beg|insist|scream|sneer)(s|ed)?(,?\s*)$", re.I)
+
+
+def plain_speech(text: str, typed: str) -> str:
+    """`text` with a loaded verb right before a quotation put back to "say", or "ask" for
+    a question, when the player's own line (`typed`) never used that verb."""
+    from . import speech
+
+    typed_words = set(re.findall(r"[a-z]+", _folded(typed)))
+    out = str(text or "")
+    for a, b in reversed(speech.spans(out)):
+        m = _LOADED_SPEECH.search(out[:a])
+        if not m or {m.group(1).lower(), m.group(1).lower() + (m.group(2) or "").lower()} \
+                & typed_words:
+            continue
+        verb = "ask" if out[a:b].rstrip("\"'”’ ").endswith("?") else "say"
+        verb = (verb + (m.group(2) or "").lower()).replace("sayed", "said")
+        out = out[:m.start()] + verb + m.group(3) + out[a:]
+    return out
+
+
 def page_fault(text: str) -> str:
     """What the house's own page checks find wrong with one slot as written (rough edge 3):
     the schema bled into the prose, or a sentence the grammar or the model left unfinished
@@ -1684,7 +2087,8 @@ def write(engine, *, brief: str, outcomes, player_input: str, who: tuple,
           last_beat: str = "", last_plain: str = "", since=None, scene_now: str = "",
           pull=None, claim: str = "", lift=None, check=None,
           budget: int | None = None, reading=None, goal=None, job=None,
-          faith=None, acting: str = "", manner: str = "", before: str = "") -> Planned:
+          faith=None, acting: str = "", manner: str = "", before: str = "",
+          known=None) -> Planned:
     """Plan the beat and write it slot by slot. `who` is (model, host, provider, key) —
     the prose role's, so a hosted narrator writes planned beats too. `last_beat` is the
     beat before as the model is shown it (speaker tags back on); `last_plain` the same
@@ -1698,6 +2102,8 @@ def write(engine, *, brief: str, outcomes, player_input: str, who: tuple,
     (`_no_job_made_up`). `faith(text, tells)` reads the written beat against its own tells
     (`beat_verify.against_tells`), and a slot holding a sentence that cannot be true beside
     one is asked again with that tell named (`_tells_kept`).
+    `known(speaker, text, facts)` reads a reply against what its speaker knows
+    (`known_to`, `_knowledge_kept`), a `beat_verify.TellsRead`.
     `acting` makes it somebody else's turn in a fight, written from `turn_plan` (one slot a
     blow) with `turn_block` beside the plan; `manner` is a companion's (`companions.
     manner_line`), and `before` what is already on the page of this turn (a companion's
@@ -1723,7 +2129,9 @@ def write(engine, *, brief: str, outcomes, player_input: str, who: tuple,
     try:
         _write_slots(out, plan, slots, who, last_plain or last_beat, lift, check, goal, job,
                      suggest=not acting and not player_dead(engine), before=before,
-                     told=getattr(faith, "second", None) if faith is not None else None)
+                     told=getattr(faith, "second", None) if faith is not None else None,
+                     known=known,
+                     came=getattr(faith, "came", None) if faith is not None else None)
     except Exception as exc:
         # The calls made before the failure, for the turn log beside the free beat.
         exc.calls = list(out.calls)
@@ -1844,6 +2252,44 @@ def _matter_is_its_own(out: Planned, plan, slots, i, written, who, s: dict, text
     return None
 
 
+def _name_words(names) -> list[str]:
+    """The words a person here is told by: "a deckhand" -> deckhand, "the Korvu
+    harbourmaster" -> korvu, harbourmaster. Our own names, never the page's English."""
+    skip = {"the", "a", "an", "of", "and"}
+    return sorted({w for n in names for w in re.findall(r"[a-z][a-z'-]{2,}", str(n).lower())
+                   if w not in skip})
+
+
+def _aside_is_theirs(out: Planned, plan, slots, i, written, who, s: dict, text: str, *,
+                     final: bool, lift) -> str | None:
+    """The aside as it may stand: about one of the people it was offered, by their own
+    name words, asked once more with them named, else dropped (the aside is never core).
+
+    E2 of the 2026-11-16 playtest (narration lane, live), and docs/narrator-guards.md's
+    "not covered" of the same day: offered the deckhand on the Red Gull's deck, the slot
+    wrote "The merchant continues to adjust the crates" — nobody of that name was aboard,
+    and the seen-people ruling then makes whoever the page shows. The same shape as
+    `_matter_is_its_own`."""
+    from rules import cards as cards_mod
+
+    keys = _name_words(s["names"])
+    if not keys or cards_mod._identity_hits(keys, text):
+        return text
+    them = " or ".join(str(n) for n in s["names"])
+    redo = (f"You wrote: {text!r}. Nobody of that description is here. Write the one "
+            f"sentence about {them}, by that name, and about nobody else.")
+    text2, _data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
+                         core=False, redo=redo)
+    ok = bool(text2) and bool(cards_mod._identity_hits(keys, text2))
+    out.calls[-1]["note"] = "not one of the people here, named" + ("" if ok else " — still not")
+    if ok:
+        out.notes.append('the "aside" slot wrote somebody not here — asked again, fixed')
+        return text2
+    out.notes.append(f'the "aside" slot wrote somebody not here twice: dropped '
+                     f'({text[:80]!r})')
+    return None
+
+
 def _no_job_made_up(out: Planned, plan, slots, i, written, who, s: dict, text: str, job,
                     *, final: bool, lift, core: bool) -> str:
     """The reply as it may stand, when its speaker holds no work for the player
@@ -1892,6 +2338,78 @@ def _no_job_made_up(out: Planned, plan, slots, i, written, who, s: dict, text: s
     return text
 
 
+def _quoted_as_said(out: Planned, plan, slots, i, written, who, s: dict, text: str, *,
+                    final: bool, lift, core: bool) -> str:
+    """The slot that says the player's words, with every quotation in it theirs as typed
+    (`misquoted`): asked once more with the words named; still wrong, the sentences holding
+    the misquotation go, and the engine's own line (`engine_line`, which quotes a quotation
+    exactly) stands in when nothing is left."""
+    words = str(s["verbatim"])
+    bad = misquoted(text, words)
+    if not bad:
+        return text
+    redo = (f"You wrote: {text!r}. {bad[0]} is not what the player said. Their words were, "
+            f"exactly: \"{words}\". Put their words in quote marks only exactly as they are "
+            f"written there, every word the same, or tell them without quote marks.")
+    text2, _data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
+                         core=core, redo=redo)
+    again = misquoted(text2, words) if text2 else bad
+    out.calls[-1]["note"] = "misquoted the player, named" + (" — still" if again else "")
+    if text2 and not again:
+        out.notes.append(f'the "{s["key"]}" slot misquoted the player — asked again, fixed')
+        return text2
+    held = [x for x in narration_mod._sentences(text) if misquoted(x, words)]
+    cut = narration_mod._cut_sentences(text, held).strip() if held else text
+    if not narration_mod._sentences(narration_mod.unquoted(cut)):
+        cut = engine_line(s.get("tells") or ())
+    out.notes.append(f'the "{s["key"]}" slot misquoted the player twice — '
+                     f'{"cut" if cut else "left"} {bad[0][:80]!r}')
+    return cut or text
+
+
+def _knowledge_kept(out: Planned, plan, slots, i, written, who, s: dict, text: str, known,
+                    *, final: bool, lift, core: bool) -> str:
+    """The reply as it may stand beside what its speaker knows (`s["knows"]`, `known_to`):
+    read back by `known(speaker, text, facts)` (`beat_verify.against_tells` with the
+    speaker's facts as its premises), and asked once more with the sentence and the fact it
+    breaks named. Still broken: that sentence is cut when the reply has anything else in
+    it, else left standing and said so — the house's shape (`_no_job_made_up`).
+
+    Playtest 2026-11-16 #58: the smuggler's notes said "hiding up with the cargo", and his
+    answer was "The cargo's gone, lost to the beast's hunger"."""
+    speaker = str(s.get("speaker_name") or "")
+    read = known(speaker, text, s["knows"])
+    if read is None or getattr(read, "error", ""):
+        out.notes.append(f'the "{s["key"]}" slot: whether {speaker} kept to what they know '
+                         f'was not answered — left as written')
+        return text
+    if not read.clashes:
+        return text
+    c = read.clashes[0]
+    redo = (f"You wrote: {text!r}. In {c.sentence!r}, {speaker} says what cannot be true "
+            f"beside what they know: {c.tell} Write it again with {speaker} answering from "
+            f"that, in their own words.")
+    text2, _data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
+                         core=core, redo=redo)
+    again = known(speaker, text2, s["knows"]) if text2 else None
+    fixed = bool(text2) and again is not None and not getattr(again, "error", "") \
+        and not again.clashes
+    out.calls[-1]["note"] = "against what they know, named" + ("" if fixed
+                                                               else " — still there")
+    if fixed:
+        out.notes.append(f'the "{s["key"]}" slot: {speaker} said what they know is not so '
+                         f'— asked again, fixed')
+        return text2
+    cut = cut_slot_sentence(text, c.sentence)
+    if cut and cut != text:
+        out.notes.append(f'the "{s["key"]}" slot: {speaker} said what they know is not so '
+                         f'twice — cut {c.sentence[:80]!r}')
+        return cut.strip()
+    out.notes.append(f'the "{s["key"]}" slot: {speaker} said what they know is not so twice '
+                     f'— left standing, nothing else in it')
+    return text
+
+
 def _untold(s: dict, text: str, told) -> list[str] | None:
     """The slot's `must_tell` facts its text says nothing about, by the fact-first read
     (`beat_verify.second_on_tell`, `told(text, fact)`): None when a read went unanswered."""
@@ -1935,6 +2453,35 @@ def _all_told(out: Planned, plan, slots, i, written, who, s: dict, text: str, to
                      + ("told" if better and not again else
                         "told in part" if better else "still untold: first answer kept"))
     return text2 if better else text
+
+
+def _came_out(out: Planned, plan, slots, i, written, who, s: dict, text: str, came, *,
+              final: bool, lift) -> str:
+    """An act slot read back for whether it says how the act came out (`came(text,
+    result)`, `beat_verify.outcome_told`), and on "only the attempt" asked once more with the
+    result named. The remake stands only when it is read as telling it; otherwise the first
+    answer does — a false alarm costs one call, never a sentence.
+
+    Playtest 2026-11-20, the owner: "I had another turn that tells me what I did without
+    telling me how the world responded and asks again what do I do." An omission
+    contradicts nothing, so the tells check never sees it (docs/research/
+    2026-11-20-empty-turns.md)."""
+    result = s["outcome"]
+    told = came(text, result)
+    if told is not False:
+        if told is None:
+            out.notes.append(f'the "{s["key"]}" slot: whether it said what came of it was '
+                             f"not answered — left as written")
+        return text
+    redo = (f"You wrote: {text!r}. It shows only the attempt. Say what came of it, as the "
+            f"engine decided: {result} Write it again with the outcome told.")
+    text2, _data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
+                         core=False, redo=redo)
+    fixed = bool(text2) and came(text2, result) is True
+    out.calls[-1]["note"] = "outcome named" + ("" if fixed else " — still only the attempt")
+    out.notes.append(f'the "{s["key"]}" slot showed only the attempt — asked again, '
+                     + ("told" if fixed else "first answer kept"))
+    return text2 if fixed else text
 
 
 # A bracketed aside of an engine line: "(Escape Artist)", "(a combat manoeuvre)".
@@ -2225,7 +2772,7 @@ def _opens_a_sentence(line: str) -> str:
 
 def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,
                  goal=None, job=None, *, suggest: bool = True, before: str = "",
-                 told=None) -> None:
+                 told=None, known=None, came=None) -> None:
     # `before`: what this turn already put on the page ahead of the slots (a companion's
     # wind-up), shown to every slot as written so far and never written again.
     written: list[str] = [before.strip()] if before and before.strip() else []
@@ -2281,6 +2828,14 @@ def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,
                 cut, _gone = narration_mod.trim_unfinished(cut)
                 text = cut or text
                 out.notes.append(f'the "{s["key"]}" slot: {fault} — cut to whole sentences')
+        if s.get("verbatim"):
+            text = _quoted_as_said(out, plan, slots, i, written, who, s, text,
+                                   final=final, lift=lift, core=core)
+            plain = plain_speech(text, str(s.get("typed") or ""))
+            if plain != text:
+                out.notes.append(f'the "{s["key"]}" slot: how the player spoke is theirs — '
+                                 f'the plain verb put back')
+                text = plain
         wrong = check(s["key"], text) if check is not None else ""
         if wrong:
             text2, data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
@@ -2298,11 +2853,23 @@ def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,
             if text is None:
                 out.slots.append({**s, "wrote": "", "dropped": True})
                 continue
+        if s["key"] == "aside" and s.get("names"):
+            text = _aside_is_theirs(out, plan, slots, i, written, who, s, text,
+                                    final=final, lift=lift)
+            if text is None:
+                out.slots.append({**s, "wrote": "", "dropped": True})
+                continue
         if s.get("no_job") and job is not None:
             text = _no_job_made_up(out, plan, slots, i, written, who, s, text, job,
                                    final=final, lift=lift, core=core)
+        if s.get("knows") and known is not None:
+            text = _knowledge_kept(out, plan, slots, i, written, who, s, text, known,
+                                   final=final, lift=lift, core=core)
         if s.get("must_tell") and told is not None:
             text = _all_told(out, plan, slots, i, written, who, s, text, told,
+                             final=final, lift=lift)
+        if s.get("outcome") and came is not None:
+            text = _came_out(out, plan, slots, i, written, who, s, text, came,
                              final=final, lift=lift)
         if s.get("not_own") and goal is not None:
             text = _not_their_goal(out, plan, slots, i, written, who, s, text, goal,
@@ -2398,6 +2965,15 @@ def _ask(out: Planned, plan, slots, i, written, who, *, suggest: bool = False,
         raise PlanFailed(f'slot "{s["key"]}": {type(exc).__name__}: '
                          f"{str(exc)[:160]}") from exc
     text = realise(s, data, lift)
+    if s.get("max") and not (s["key"] == "reply" and s.get("speaker")):
+        # A cut is a repair, and logged as one: owner bug 2026-11-17 #4, the rat-king's
+        # line was cut from the throne room's slot by `_fit` and nothing said so. A composed
+        # reply is skipped: compose_reply books the line as said, and a second call booked
+        # it twice.
+        whole = realise({**s, "max": 0}, data, lift)
+        if len(whole) > len(text):
+            out.notes.append(f'the "{s["key"]}" slot ran past its {s["max"]} characters: '
+                             f'cut {whole[len(text):].strip()[:80]!r}')
     out.calls.append({"key": s["key"], "messages": messages, "raw": reply.text,
                       "seconds": round(reply.seconds, 1), "model": reply.model or model,
                       "note": ""})

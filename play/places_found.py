@@ -81,6 +81,8 @@ visited — against a turn that waits on a local model for tens of seconds.
       "stubs": [{"from", "group", "dashed", "toward": int | None}],
       "roads": [{"from", "to", "name", "time_words", "shut"}],
       "layout": {"size": int, "links": [[i, j], ...]},
+      "town":    {"wall", "half", "gate", "seats": {id: {"at", "drawn", "kind",
+                  "foot", "ward", "storeys"}}},   # play/town_seats.py, places found only
     }
 
 - `edges` are the ways out of places you have been, one per direction: a pair walked
@@ -109,6 +111,7 @@ from __future__ import annotations
 from collections import deque
 
 from . import exits as exits_mod
+from . import town_seats
 
 
 def chart(engine, world) -> dict:
@@ -186,6 +189,9 @@ def chart(engine, world) -> dict:
         "stubs": stubs,
         "roads": roads,
         "layout": {"size": len(index), "links": [list(pair) for pair in links]},
+        # The tabletop's seats for the places found (play/town_seats.py), dealt over the
+        # whole town here so the page never needs an unfound place to lay one out.
+        "town": town_seats.seats(known, [n["id"] for n in nodes], here.id),
     }
 
 

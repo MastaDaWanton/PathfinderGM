@@ -318,8 +318,12 @@ def settle_people(scene, world, actor, *, words: str = "", template: str = "",
     shown = faces_mod.people_of(str(getattr(actor, "appearance", "") or ""))
     if redraw_face or chosen or not getattr(actor, "appearance", "") \
             or (shown and heritage and shown.lower() != heritage.lower()):
-        face = (names_mod.appearance_for(world, location, people_id=pid, ref=ref, own=own)
-                if pid else names_mod.appearance_of_kind(kind, ref, location, own=own))
+        # Spread over the faces the scene already holds (playtest 2026-11-17b #19).
+        seen = faces_mod.seen_in(scene, but=actor) if own is None else None
+        face = (names_mod.appearance_for(world, location, people_id=pid, ref=ref, own=own,
+                                         seen=seen)
+                if pid else names_mod.appearance_of_kind(kind, ref, location, own=own,
+                                                         seen=seen))
         if face:
             actor.appearance = face
     if chosen and pid and not keep_name:

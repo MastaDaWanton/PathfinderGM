@@ -57,17 +57,22 @@ def _engine(world, *, kit: str | None = "smith's field kit", carry=(), hides=())
     return e, pc
 
 
-def _make(e, craft, item, words="", work="plain", faces=(15, 15, 15, 15)):
-    """The make op as the act->op table builds it, every step's die the player's own."""
+def _make(e, craft, item, words="", work="plain", faces=None):
+    """The make op as the act->op table builds it, every step's die the player's own.
+    A step with no face given (None, or past the end of `faces`) rolls the face that just
+    makes its DC, so the 5+ margin bands (ruling 2026-11-18) give nothing unless asked."""
     r = e.run(e.validate([{"op": "make", "actor": "pc",
                            "params": {"craft": craft, "item": item, "words": words,
                                       "work": work},
                            "because": "the player works at their craft"}]))
     asked = []
-    faces = list(faces)
+    faces = list(faces) if faces is not None else []
     while r.awaiting:
         asked.append(r.awaiting["label"])
-        r = e.resume(faces.pop(0))
+        face = faces.pop(0) if faces else None          # a None in `faces` too
+        if face is None:
+            face = max(1, min(20, int(r.awaiting["dc"]) - int(r.awaiting["modifier"])))
+        r = e.resume(face)
     out = next(o for o in r.outcomes if o.op == "make")
     return out, asked
 

@@ -61,7 +61,9 @@ def quiet_road(monkeypatch):
         asked.append(hours)
         return None
 
-    monkeypatch.setattr(ontheway, "road", road)
+    # The journey's stretch check (travel pacing), and a quiet sea after it.
+    monkeypatch.setattr(ontheway, "road_stretches", road)
+    monkeypatch.setattr(ontheway, "sea_stretches", lambda *a, **k: None)
     return asked
 
 
@@ -126,14 +128,16 @@ def test_a_harbour_road_stopped_short_resumes_and_the_row_offers_it(monkeypatch)
     from play import exits
 
     scene, engine, pc = _at_vormoor()
-    met = iter([ontheway.Meeting(kind="weather", roll=1, after=1), None])
+    # Travellers who bring nobody: weather walks on since travel pacing.
+    met = iter([ontheway.Meeting(kind="travellers", roll=1, count=0, after=1), None])
     asked: list[int] = []
 
     def road(dice, hours, *a, **k):
         asked.append(hours)
         return next(met)
 
-    monkeypatch.setattr(ontheway, "road", road)
+    monkeypatch.setattr(ontheway, "road_stretches", road)
+    monkeypatch.setattr(ontheway, "sea_stretches", lambda *a, **k: None)
     _journey(engine, "Ledgerwarren")
     assert engine.aboard() is None and scene.road.get("then") == LEDGERWARREN
     assert scene.road.get("to") == SCRAPDEN and scene.road.get("walked")

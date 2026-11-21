@@ -28,7 +28,12 @@
     "tindertwig, an antitoxin and the rest of the CRB's eight are the bench's own products,",
     "whose documents are their formula's core (content/rules/alchemy-formulae.json,",
     "rules/goods.py CLASSIC_GEAR). The tindertwig left the flint-and-steel row's names then:",
-    "struck, it lights its torch through the light model, as a used-up tool."
+    "struck, it lights its torch through the light model, as a used-up tool.",
+    "",
+    "The satchel's `water` (content/materials/blacksmith-materials.json) is the forge's",
+    "quenching water, a bench material counted in quench units with no volume. It is NOT",
+    "drinkable (call made 2026-11-18, owner bug list item 17): drinking from the slack tub",
+    "would make 20 units of forge stock 20 free days of water with no measure behind it."
   ],
   "items": {
     "trail rations": {
@@ -65,8 +70,41 @@
       "names": ["waterskin", "waterskins", "water skin", "full waterskin"],
       "does": "Half a gallon of water. A day needs a gallon (two skins); a wait of a day or more drinks from it, and the empty skin stays in the pack.",
       "source": "CRB p.158 / UE p.58: 'It is watertight and holds about 1/2 gallon of liquid.' CRB Environment, Starvation and Thirst: 'at least a gallon of fluids ... per day'.",
-      "drink": {"spends": 1, "gallons": 0.5, "leaves": "empty waterskin"},
-      "not_yet": ["nothing refills an empty skin yet; buy another, or drink at the table"]
+      "drink": {"spends": 1, "gallons": 0.5, "leaves": "empty waterskin"}
+    },
+    "empty waterskin": {
+      "names": ["empty waterskin", "empty waterskins", "empty water skin"],
+      "does": "An empty skin. Fill it wherever there is water to fill it from: a well, a cistern, a spring or a river.",
+      "source": "CRB p.158 / UE p.58 (the waterskin). Refilling is not priced by the book: water where it is found is free.",
+      "fills": "waterskin"
+    },
+    "ale": {
+      "names": ["mug of ale", "ale", "mugs of ale"],
+      "does": "A mug of ale: about a pint, an eighth of the gallon of fluids a day needs.",
+      "source": "CRB Table 6-9 (Food, Drink, and Lodging): ale, mug, 4 cp. CRB p.444: 'at least a gallon of fluids'.",
+      "house_rule": "The book gives the mug no size. A pint (1/8 gallon) is this table's. Ale counts as fluid (the owner, 2026-11-18); drunkenness is not modelled. Fallout: New Vegas's hardcore mode made alcohol worsen thirst, and players' mods turned it back; the owner's ruling is the one kept.",
+      "drink": {"spends": 1, "gallons": 0.125}
+    },
+    "ale gallon": {
+      "names": ["gallon of ale", "ale gallon", "gallons of ale"],
+      "does": "A gallon of ale: a day's fluids.",
+      "source": "CRB Table 6-9: ale, gallon, 2 sp.",
+      "house_rule": "Ale counts as fluid (the owner, 2026-11-18); drunkenness is not modelled.",
+      "drink": {"spends": 1, "gallons": 1}
+    },
+    "wine": {
+      "names": ["pitcher of common wine", "pitcher of wine", "common wine", "wine"],
+      "does": "A pitcher of common wine: about half a gallon of fluids.",
+      "source": "CRB Table 6-9: wine, common (pitcher), 2 sp.",
+      "house_rule": "The book gives the pitcher no size. Half a gallon is this table's. Wine counts as fluid (the owner, 2026-11-18); drunkenness is not modelled.",
+      "drink": {"spends": 1, "gallons": 0.5}
+    },
+    "fine wine": {
+      "names": ["bottle of fine wine", "fine wine"],
+      "does": "A bottle of fine wine: about a fifth of a gallon of fluids.",
+      "source": "CRB Table 6-9: wine, fine (bottle), 10 gp.",
+      "house_rule": "The book gives the bottle no size. A fifth of a gallon (a standard 750 ml bottle) is this table's. Drunkenness is not modelled.",
+      "drink": {"spends": 1, "gallons": 0.2}
     },
     "bedroll": {
       "names": ["bedroll"],

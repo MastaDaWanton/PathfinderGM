@@ -1504,3 +1504,179 @@ phrase, never a sentence cut at a length.
 ### Done when
 
 No `play.cards[]` title is a strict prefix of one of that card's own facts.
+
+## 28. `ruins` on a place — who built the old works, when, and what ended them
+
+*Asked 2026-11-16 (feat/dungeon-story). Optional: without it a dungeon's history is drawn
+from the app's own authored rows (`content/dungeons/builders.json`), grounded where it can
+be in the world's PEOPLE, NATION and faction names and its oldest dated chronology events
+(`rules/dungeons.py` `_world_sources`), which is how every world plays today.*
+
+The owner: "A proper dungeon cannot just be random rooms and it must hold a cohesive
+story/pattern." Every way down now carries a concept chosen before any room: who built it
+and for what, how old it is, how it was ruined, who used it after, who holds it now, why it
+is still unlooted, and what the town says of it. The app can only guess the first four
+from names: a tomb "of the Korvu" because the Korvu are the continent's people, "in the days
+of the Founding of Pangrella" because that is one of the world's oldest events. It cannot
+know that the Korvu buried their dead in the sinkholes their Founding Story names, or that
+the Shattering of the Citadel is what emptied the old works under Vyrakon. A world that
+knows its own ruins should be able to say so, and the app should then tell that history in
+the rooms instead of a guessed one.
+
+**Shape.** An optional list on any settlement entity or `play.places[]` row, beside ask 25's
+`dungeons` (the two may be one row: a `dungeons` entry may carry these fields too):
+
+```json
+{"id": "5bbd0c40345f", "name": "Pangrella",
+ "ruins": [{"under": "crypt", "built_by": "fd4449bc9a64", "built_for": "tomb",
+            "when": "event:Founding of Pangrella", "ended_by": "flood",
+            "after": ["e1a2b3c4d5e6"],
+            "about": "The first Korvu dead were laid under the sinkholes, until the water came up."}]}
+```
+
+| field | what it is |
+|---|---|
+| `under` | the venture kind it lies under: `cave`, `mine`, `ruins`, `crypt`, `sewers`, `cellar` or `tower` |
+| `built_by` | the id of the PEOPLE, NATION or faction that built it (never a free-text name) |
+| `built_for` | one word: `tomb`, `temple`, `smuggling`, `garrison`, `mine`, `retreat`, `drains`, `treasury`, `prison`, `natural`, `monastery` |
+| `when` | `event:<chronology event name>`, or one word: `recent`, `old`, `ancient` |
+| `ended_by` | one word: `flood`, `fire`, `plague`, `collapse`, `war`, `sealed`, `quarrel`, `abandoned` |
+| `after` | ids of PEOPLE, NATION or factions that used it later, oldest first; may be empty |
+| `about` | one sentence, the world's own prose |
+
+**Rule 1 still holds.** Ids and words, never numbers: what lives there now, its creatures,
+traps, doors and treasure stay the app's (the ruin tag, the bestiary through the encounter
+budget, the CRB's traps and treasure). Ask 14 still holds too: no Pathfinder setting names
+in `about`.
+
+### Done when
+
+An export carries `ruins` on at least one settlement, `tools/check_places.py` accepts the
+fields above and nothing else, and a way down found under that settlement names those
+builders, that age and that ending in its rooms' traces, every time.
+
+## 30. An inn in every settlement's `play.places[]` — somewhere a traveller can sleep
+
+*Asked 2026-11-17 (fix/inns-and-jobs; 29 left free for feat/travel-pacing). Optional:
+without it the app appends `the inn` to every authored settlement that lists no inn, and
+`the tavern` beside it to a city (`places.APPENDED_TO_AUTHORED`, published in
+`docs/place-vocabulary.json`), which is how every world plays today.*
+
+Playtest 2026-11-17b #4/#7/#8: in Mirabalos (Pangrella's export, a city of 23 places) "head
+to an inn in the city" walked the player aboard her own ship twice, the harbourmaster named
+the gardens as a place to rest, and the city's own news spoke of "the death at the tavern"
+that its place list did not hold. Measured that day: no inn or tavern in 8 of Pangrella's 12
+settlements (all 6 towns, 2 of 6 cities). A settlement with nowhere to let a bed is one the
+rest door cannot price a night in (CRB Goods and Services, inn stay 2 sp / 5 sp / 2 gp).
+
+**Shape.** No new field: a row in `play.places[]` for each place that lets beds, under a
+name of the world's own, with the kind the app reads (`"kind": "inn"` or `"kind": "tavern"`),
+and, when the world knows it, the optional word `lodging` (docs/from-world-bible.md, "Where
+beds are let"):
+
+```json
+{"id": "7ef5e373c993~urban:the-salt-lantern", "name": "the Salt Lantern",
+ "kind": "inn", "lodging": "common", "parent": "7ef5e373c993",
+ "about": "Where the caravans' drivers sleep, two to a bed."}
+```
+
+| scale | at least |
+|---|---|
+| village | one inn (or one tavern that lets beds) |
+| town | one inn |
+| city | one inn and one tavern |
+
+**Rule 1 still holds.** A word, never a price: the stay's cost, the meals and the drink
+are the app's (CRB Goods and Services, "Food, Drink, and Lodging").
+
+### Done when
+
+Every settlement in an export holds an inn or tavern row of its own, `tools/check_places.py`
+reports none appended for lodging.
+
+## 31. A place's `about` is the place, never one of the settlement's own facts
+
+*Asked 2026-11-18 (fix/hire-arena-shops; 29 left free for feat/travel-pacing). Optional:
+without it the app drops an authored `about` that repeats one of the settlement's facts word
+for word and uses its own line for the place's kind (`places._authored`), which is how
+every world plays today.*
+
+Playtest 2026-11-17b #27: walking through Mirabalos's market, the page described it as
+"(Patrilineal clans, Zhilakai nobility, artisan guilds)". That is the city's `Social Classes`
+fact, which Pangrella's export also wrote as the `about` of `the market` and `the guildhall`.
+A walk reads a place's `about` to say what the player passes through, so a list of the town's
+social classes reads as the market's stalls.
+
+**Shape.** No new field: `about` on every `play.places[]` row is one sentence about that
+place (what is there, what it looks like, who uses it), and is never a copy of a fact of the
+settlement it stands in.
+
+| row | `about` |
+|---|---|
+| the market | "Stalls under awnings, and the clerk's table at the well." |
+| not | "Patrilineal clans, Zhilakai nobility, artisan guilds." (the city's `Social Classes`) |
+
+### Done when
+
+No `play.places[]` row's `about` equals, ignoring case and a closing full stop, any fact
+value of the settlement it belongs to.
+
+## 32. `miles` at a journey's scale, and `measured` when they are
+
+*Asked 2026-11-16 (feat/travel-pacing, built on feat/travel-pacing-2). Optional: without it the app holds every unmeasured
+route to a floor, three days on foot between two settlements and a fortnight at sea
+(`journey.ROAD_DAYS_AT_LEAST`, `ships.PASSAGE_DAYS_AT_LEAST`), which is how every world plays
+today.*
+
+The owner, 2026-11-16: "overland travel is too short it should be a few days minimum to other
+cities and over water it should be a few weeks minimum." Measured on the shipped worlds the
+same day: Pangrella's roads are 48 to 96 miles and its two stated crossings 192 and 216;
+Aurvantis's roads 24 to 96 and its 38 crossings 192 to 216. Those come from
+`agent_engine/distance.py`'s bands (nation 1-2 days, continent 3-4, world 8-9, at 24 miles a
+walking day), "derived from the tree and never measured". So a sea crossing is eight or nine
+days ON FOOT, and by the Core Rulebook's sailing ship (48 miles a day, Table 7-9) four.
+
+**Shape.** No new route field beyond one boolean; the band table changes.
+
+| field | what it is |
+|---|---|
+| `miles` | as ask 6, but banded at a journey's scale: two towns of one nation 72-120 miles (three to five days on foot), one continent 120-240, a sea crossing 672-1,344 (two to four weeks under sail at 48 miles a day). The width rule in `distance.py` still holds |
+| `measured` | `true` only on a route whose `miles` an author or a map measured. Omitted on every derived one |
+
+**Rule 1 still holds.** Miles, never days or hours: how long they take depends on who goes
+and how, which is the consumer's business.
+
+### Done when
+
+An export's derived crossings are 672 miles or more, its derived roads 72 or more, and a route
+an author measured carries `measured: true` and is played at its stated length.
+
+## 33. Coordinates and ground on settlements and nations
+
+*Asked 2026-11-19 (feat/hex-travel, docs/hexcrawl-plan.md). Optional: without it the app lays
+the map out from road miles (`rules/hexes.py` `layout`, the place map's spring pass) and
+invents the ground between towns by rule from the world's name, which is how every world
+plays today.*
+
+The owner's hexcrawl (2026-11-18/19): the Region map is played on Pathfinder's 12-mile hex,
+one hex a move on foot and two riding, and every hex has ground and sometimes a site. The
+export says where nothing is: no settlement carries a position, and the only ground between
+towns is what a road `crosses` and a settlement's `near`/`beyond`. Measured on the shipped
+worlds the same day: by the road rule alone 350 of 417 hexes of Aurvantis's first nation came
+out grassland; the app now fills the rest in patches from each town's own ground words.
+
+**Shape.**
+
+| field | where | what it is |
+|---|---|---|
+| `at` | each settlement | `[x, y]` in miles on its continent, north up |
+| `ground` | each nation | the share of each biome over its land, `{forest: .3, hills: .2, ...}` summing to 1, in the `biomes` words |
+| `rivers` | each continent | lines of `[x, y]` points in miles |
+
+**Rule 1 still holds.** Positions and miles, never hours: how long a hex takes is the
+consumer's business (Ultimate Campaign's 5 hours on plain, 8 elsewhere, at speed 30).
+
+### Done when
+
+Every settlement in an export carries `at`, every nation `ground`, and the app's layout of a
+new campaign puts each town at its `at` (a campaign already begun keeps its stored layout).

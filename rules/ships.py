@@ -46,27 +46,28 @@ HARDNESS = 5
 
 # GameMastery Guide, Table 7-49: Ships. AC, hit points, base save, maximum speed in feet,
 # arms (how many siege engines it can carry), ram damage, its size in squares, and the crew
-# it needs and can hold.
+# it needs and can hold. `price_gp` is the CRB's (Table 6-9, Transport): what the law prices
+# a taken ship at (rules/trial.py, the theft fine).
 #
 # Every speed on this table is under sail, and a ship with the wind behind it moves at
 # double — which is the one weather rule this app has, and it is the book's.
 VESSELS: dict[str, dict] = {
     "keelboat": {
-        "name": "keelboat", "ac": 8, "hp": 60, "save": 4, "speed": 30, "arms": 1,
+        "name": "keelboat", "price_gp": 3000, "ac": 8, "hp": 60, "save": 4, "speed": 30, "arms": 1,
         "ram": "2d6+6", "squares": 2, "crew": (1, 4), "passengers": 15,
         "about": "a river boat with a shallow draught and no pretensions",
         "places": (("the deck", "planking, a tiller, and not much room", False),
                    ("the hold", "cargo, bilge water, and a low beam", True)),
     },
     "longship": {
-        "name": "longship", "ac": 6, "hp": 75, "save": 5, "speed": 60, "arms": 1,
+        "name": "longship", "price_gp": 10000, "ac": 6, "hp": 75, "save": 5, "speed": 60, "arms": 1,
         "ram": "4d6+18", "squares": 3, "crew": (50, 50), "passengers": 75,
         "about": "shallow, fast, and built to be dragged up a beach",
         "places": (("the deck", "benches, oars, and the shields along the rail", False),
                    ("the steering deck", "the steerboard, and whoever holds it", False)),
     },
     "sailing ship": {
-        "name": "sailing ship", "ac": 6, "hp": 125, "save": 6, "speed": 60, "arms": 2,
+        "name": "sailing ship", "price_gp": 10000, "ac": 6, "hp": 125, "save": 6, "speed": 60, "arms": 2,
         "ram": "3d6+12", "squares": 3, "crew": (20, 20), "passengers": 50,
         # Two masts, as Ultimate Combat's sailing ship has them (the deck layout follows UC).
         "about": "a trader: two masts, a deep hold, and a crew who want no trouble",
@@ -77,7 +78,7 @@ VESSELS: dict[str, dict] = {
                     False)),
     },
     "warship": {
-        "name": "warship", "ac": 2, "hp": 175, "save": 7, "speed": 60, "arms": 3,
+        "name": "warship", "price_gp": 25000, "ac": 2, "hp": 175, "save": 7, "speed": 60, "arms": 3,
         "ram": "3d6+12", "squares": 4, "crew": (60, 60), "passengers": 80,
         "about": "built to close with other ships and take them",
         "places": (("the deck", "cleared for action, and the engines on it", False),
@@ -87,7 +88,7 @@ VESSELS: dict[str, dict] = {
                    ("the hold", "powder, shot, and water in barrels", True)),
     },
     "galley": {
-        "name": "galley", "ac": 2, "hp": 200, "save": 8, "speed": 90, "arms": 4,
+        "name": "galley", "price_gp": 30000, "ac": 2, "hp": 200, "save": 8, "speed": 90, "arms": 4,
         "ram": "6d6+24", "squares": 4, "crew": (200, 200), "passengers": 250,
         "about": "two hundred oars and a beak at the front for using them on",
         "places": (("the deck", "the gangway down the middle, and the engines", False),
@@ -116,11 +117,48 @@ PORT_PLACES = ("the docks", "the harbour", "the quay", "the wharf")
 # which is most of why the sea is faster than the road even at the same speed.
 HOURS_AT_SEA = 24
 
-# A cruise (`Engine._cruise`): the sea's check is made each watch, four watches a day —
-# the land's rate (Ultimate Wilderness p.127: four checks a day), not a voyage's one — and a
-# turn's cruise is at most one day of them.
+# How far each vessel goes in a day: Core Rulebook Table 7-9, Mounts and Vehicles (aonprd
+# Rules "Movement", Exploration Movement, fetched 2026-11-16): "Sailing ship (sailed) 2
+# miles [an hour], 48 miles [a day]"; warship 60, longship 72, galley 96; "for a sailing
+# ship, it represents 24 hours". The keelboat is rowed 10 miles in its 10 hours "and can
+# also float an additional 14 hours, if someone can guide it, adding an additional 42
+# miles" — a passage boat has a crew to guide her, so 52.
+#
+# Until 2026-11-16 the day was worked out from Ultimate Combat's TACTICAL speed (60 ft a
+# round, so 6 mph for 24 hours, 144 miles a day): three times the book's sailing ship, and
+# with World Bible's 192-mile crossings it made every sea passage of the shipped worlds a
+# day and a half (the owner: "over water it should be a few weeks minimum"). The table is
+# the overland rule and the feet are the battle's; UC prints no conversion between them.
+MILES_A_DAY: dict[str, int] = {"keelboat": 52, "longship": 72, "sailing ship": 48,
+                               "warship": 60, "galley": 96}
+
+# The shortest passage between two settlements, in days, when the world's miles are not
+# marked measured (`journey.Leg.measured`). The owner, 2026-11-16: "over land ... it should
+# be a few days minimum to other cities and over water it should be a few weeks minimum."
+# Two weeks is the app's reading of "a few weeks"; a river runs inside one continent, so
+# it takes the road's floor (`journey.ROAD_DAYS_AT_LEAST`). Why a floor and not the miles:
+# World Bible's distances are DERIVED from its containment tree and "never measured"
+# (World Bible agent_engine/distance.py, its own words), banded in walking days at 24
+# miles a day, so its sea band of 192-216 miles is eight or nine days ON FOOT and four by
+# the book's sailing ship. for-world-bible ask 32 asks for measured miles at a voyage's
+# scale; a world that marks its miles measured is taken at its word.
+#
+# At sea the floor is a DISTANCE, a fortnight under the CRB's sailing ship (672 miles), as
+# the road's is (`journey.ROAD_DAYS_AT_LEAST`, so a horse still halves a road): a galley
+# makes it in a week and the fare is for the same miles whatever she is. As a floor in
+# days it made a faster ship's fare dearer — measured 2026-11-18, Pangrella's longship
+# asked 100 gp 8 sp for 14 days at 72 miles, over the 100 gp a test party carried.
+PASSAGE_DAYS_AT_LEAST = 14
+PASSAGE_MILES_AT_LEAST = PASSAGE_DAYS_AT_LEAST * 48     # the sailing ship's day (Table 7-9)
+
+# A cruise (`Engine._cruise`): a ship hunting sails looks each watch, four watches a day —
+# the land's rate (Ultimate Wilderness p.127: four checks a day), not a passage's one roll
+# a stretch — so a day of it meets something 1 - 0.8^4 = 59% of the time. The cruise runs
+# day after day until she meets something or `CRUISE_DAYS` pass (2026-11-16: one day a
+# turn was the day-by-day the owner asked to be rid of).
 WATCH_MINUTES = 6 * 60
 CRUISE_WATCHES = 4
+CRUISE_DAYS = 7
 
 # 0 hit points is not sunk: it is SINKING, which is ten rounds of people getting off.
 SINKS_AFTER = 10
@@ -167,6 +205,11 @@ class Vessel:
     # The town her seizure was sworn in, by the master who yielded her (2026-11-16,
     # `Engine._ships_left_settle`): sworn once, whoever answers for her after him.
     sworn: str = ""
+    # What her hold carries that is her owners' (`lading`, playtest 2026-11-16 #92): rows
+    # of `rules/trade.py`, {"key", "units", "commodity"}. None until she is laden (the
+    # first `Engine._keep_vessel`); [] once emptied, or once taken — a prize's cargo moves
+    # to `Scene.cargo` as the holder's lots in her hold, where selling it already works.
+    cargo: list | None = None
 
     def as_dict(self) -> dict:
         return {"id": self.id, "name": self.name, "kind": self.kind, "hp": self.hp,
@@ -177,7 +220,9 @@ class Vessel:
                 "river": self.river,
                 **({"lands_at": self.lands_at} if self.lands_at else {}),
                 **({"held_by": self.held_by} if self.held_by else {}),
-                **({"sworn": self.sworn} if self.sworn else {})}
+                **({"sworn": self.sworn} if self.sworn else {}),
+                **({"cargo": [dict(x) for x in self.cargo]} if self.cargo is not None
+                   else {})}
 
     @classmethod
     def from_dict(cls, d: dict) -> "Vessel | None":
@@ -198,7 +243,9 @@ class Vessel:
                               else None),
                    passengers=[str(r) for r in (d.get("passengers") or [])],
                    river=bool(d.get("river")), lands_at=str(d.get("lands_at") or ""),
-                   held_by=str(d.get("held_by") or ""), sworn=str(d.get("sworn") or ""))
+                   held_by=str(d.get("held_by") or ""), sworn=str(d.get("sworn") or ""),
+                   cargo=([dict(x) for x in d["cargo"] if isinstance(x, dict)]
+                          if isinstance(d.get("cargo"), list) else None))
 
     @property
     def row(self) -> dict:
@@ -306,6 +353,74 @@ def offered_at(port_id: str, scale: str, n: int = 2) -> list[Vessel]:
     return out
 
 
+# --- what a trader carries ---------------------------------------------------------------
+#
+# Playtest 2026-11-16 #92: a merchantman taken by threat had nothing in her hold, so a
+# Perception roll decided whether the crates in plain sight held anything. A trader's hold
+# is laden; what is in it is seen, not searched for.
+#
+# How much: Skull & Shackles' plunder (The Wormwood Mutiny, as quoted on Paizo's forums;
+# the book itself could not be read): a point of plunder is about 1,000 gp of goods and
+# takes about 10 tons of hold. A prize of mixed goods runs about 3 points. A keelboat is
+# rated one point here, which is this app's call. What the goods are is her home port's own
+# trade (`trade.supplied_at`), priced and weighed by the trade table (`trade.ROWS`). Cheap
+# goods fill the hold before they reach the value: a grain ship carries grain by the ton,
+# not 1,000 gp of it per point.
+PLUNDER = {"sailing ship": 3, "keelboat": 1}
+PLUNDER_GP = 1000
+PLUNDER_LB = 20000
+# A port that ships nothing the trade table prices still loads something. These are staples
+# from the Core table. Livestock never goes in: a hold of animals needs feeding.
+STAPLES = ("wheat", "iron", "linen", "salt", "wool", "cheese")
+
+
+def lading(vessel_id: str, kind: str, supplies: dict | None = None) -> list[dict]:
+    """The cargo a trader of this kind carries out of a port that ships `supplies` ({row:
+    the world's word}). One or two rows, seeded off her id like her name, so the same ship
+    always carries the same goods. [] for a kind that carries no trade (a warship's hold is
+    powder and shot)."""
+    from . import trade
+
+    points = PLUNDER.get(kind, 0)
+    if not points:
+        return []
+    supplies = dict(supplies or {})
+    rows = [k for k in supplies if k in trade.ROWS and trade.ROWS[k][4] != "livestock"]         or list(STAPLES)
+    seed = _seed(f"{vessel_id}|cargo")
+    picks = [rows[seed % len(rows)]]
+    other = rows[(seed >> 8) % len(rows)]
+    if other not in picks:
+        picks.append(other)
+    out = []
+    for key in picks:
+        _name, cp, _unit, lb, _kind = trade.ROWS[key]
+        units = int(points * PLUNDER_GP * 100 / len(picks) // cp)
+        if lb:
+            units = min(units, int(points * PLUNDER_LB / len(picks) // lb))
+        if units > 0:
+            out.append({"key": key, "units": units,
+                        "commodity": str(supplies.get(key) or trade.ROWS[key][0])})
+    return out
+
+
+def hold_said(scene, vessel: Vessel) -> tuple[list[str], list[str]]:
+    """Everything in her hold, in words ("15000 lb of iron"): (her owners' cargo, the
+    party's lots stowed in her — `trade.shipping_in`, a prize's cargo among them), each
+    with the world's own name for it when it has one."""
+    from . import trade
+
+    def said(lot: dict) -> str:
+        words = trade.said({"key": lot["key"], "name": trade.ROWS[lot["key"]][0],
+                            "units": lot["units"]})
+        own = str(lot.get("commodity") or "")
+        return words + (f" ({own})" if own and own.lower() != trade.ROWS[lot["key"]][0]
+                        else "")
+
+    theirs = [said(x) for x in (vessel.cargo or ()) if x.get("key") in trade.ROWS]
+    ours = [said(x) for x in trade.shipping_in(scene, vessel.id)]
+    return theirs, ours
+
+
 def places_of(vessel: Vessel):
     """The rooms of a ship, as `places.Place` objects hanging off the vessel's own id.
 
@@ -335,27 +450,38 @@ def deck_of(vessel: Vessel) -> str:
 # --- what the sea costs ------------------------------------------------------------------------
 
 def days_for(miles: int | None, kind: str, days_apart: int = 1,
-             with_the_wind: bool = False) -> int:
+             with_the_wind: bool = False, *, measured: bool = False,
+             river: bool = False) -> int:
     """How long a passage takes, in days.
 
-    Miles when the world states them, at the vessel's own speed — a ship's speed is feet
-    per round like everything else in this game, and the conversion to miles an hour is
-    the one `rules/journey.py` already uses. When the world states no distance, the tree's
-    own ordering stands in, exactly as it does for a road: two settlements on one
-    continent are nearer than two on different ones, whatever the miles turn out to be.
+    Miles when the world states them, at the vessel's day's run (`MILES_A_DAY`, the CRB's
+    Table 7-9). When the world states no distance, the tree's own ordering stands in,
+    exactly as it does for a road: two settlements on one continent are nearer than two on
+    different ones, whatever the miles turn out to be.
 
-    Never less than a day. A crossing that takes an afternoon is a ferry, and a ferry is
-    not a passage — it is a road with water under it.
+    Never less than the passage floor (`PASSAGE_MILES_AT_LEAST` at sea, at her own run;
+    the road's days on a river) unless the world marked its miles `measured`; never less
+    than a day.
     """
     from . import journey as journey_mod
 
-    speed = int(VESSELS.get(kind, VESSELS["sailing ship"])["speed"])
-    if with_the_wind:
-        speed *= 2                      # "vessels move at double speed with the wind"
-    if not miles:
-        return max(1, int(days_apart))
-    mph = max(0.1, speed / journey_mod.FEET_PER_MPH)
-    return max(1, round(int(miles) / (mph * HOURS_AT_SEA)))
+    per_day = miles_a_day(kind) * (2 if with_the_wind else 1)
+    days = (max(1, round(int(miles) / max(1, per_day))) if miles
+            else max(1, int(days_apart)))
+    if measured:
+        return days
+    if river:
+        return max(days, journey_mod.ROAD_DAYS_AT_LEAST)
+    return max(days, round(PASSAGE_MILES_AT_LEAST / max(1, per_day)))
+
+
+def leg_days(leg, kind: str) -> int:
+    """`days_for` for a journey leg: its miles when stated, its tree days when not, and
+    whether the world measured them. The one reading of a leg's days at sea — the booking,
+    the exits row and a held ship coming about all ask it."""
+    return days_for(leg.miles if leg.source == "exact" else None, kind, leg.days_apart,
+                    measured=bool(getattr(leg, "measured", False)),
+                    river=getattr(leg, "by", "") == "river")
 
 
 def ram_damage(kind: str) -> str:
@@ -498,7 +624,11 @@ def her_waters(world, vessel: Vessel) -> list:
         town = world.get(vessel.came_from) if world is not None else None
         legs.append(journey_mod.Leg(to_id=vessel.came_from,
                                     to_name=str(getattr(town, "name", "") or "port"),
-                                    days_apart=1, by="sea", by_sea=True, to_port=True))
+                                    days_apart=1, by="sea", by_sea=True, to_port=True,
+                                    # A day back to her own port is the cruise's own
+                                    # reach, not a passage between two settlements: the
+                                    # passage floor is not hers.
+                                    measured=True))
     return legs
 
 
@@ -520,16 +650,13 @@ def crewed(vessel: Vessel) -> bool:
 # passenger, as every row of that table is; food is the ship's, as a berth's always was.
 PASSAGE_CP_PER_MILE = 10
 
-# A day at sea is a whole one (HOURS_AT_SEA): a sailing ship at 60 ft makes 6 miles an
-# hour, so 144 miles a day.
+# A day at sea is a whole one (HOURS_AT_SEA): the CRB's sailing ship makes 2 miles an
+# hour, 48 miles a day (`MILES_A_DAY`).
 MINUTES_A_DAY = 24 * 60
 
 
 def miles_a_day(kind: str) -> int:
-    from . import journey as journey_mod
-
-    speed = int(VESSELS.get(kind, VESSELS["sailing ship"])["speed"])
-    return int(speed / journey_mod.FEET_PER_MPH * HOURS_AT_SEA)
+    return int(MILES_A_DAY.get(kind, MILES_A_DAY["sailing ship"]))
 
 
 def fare_cp(miles: int, heads: int = 1) -> int:
@@ -555,36 +682,28 @@ def passenger_ship(port_id: str, scale: str, river: bool = False) -> "Vessel":
 
 # --- the weather at sea ------------------------------------------------------------------------
 #
-# Rolled once per day at sea, by the engine, hidden. Researched 2026-11-13:
+# Researched 2026-11-13, when it was rolled once per day at sea:
 #
 # - Ultimate Wilderness p.165ff, Table 4-28 (Wind), rolled "for the day's wind": 96–100
 #   is a windstorm. A 5% day is the storm a ship has to ride out.
 # - Core Rulebook Table 13-9 (Random Weather): 91–99 storm, 100 powerful storm (windstorm,
 #   hurricane). One storm in ten is the powerful kind, and that is the one that breaks a
-#   ship. So a wreck is 10% of storms, 0.5% of days at the published rate.
+#   ship. So a wreck is 10% of storms.
 # - Skull & Shackles' own Shackles weather table (Tempest Rising p.72) could not be
 #   read; its numbers are not used and not claimed. Stormwrack (3.5) likewise.
 #
-# The place's volatility scales the storm, as it scales every table's base chance
-# (`volatility.factor`, uneasy = 1.0 = the published rate): calm water 2.5% a day,
-# lawless water 10%.
-STORM_PCT = 5.0
+# Since 2026-11-16 (travel pacing) a storm is a band of the voyage table (content/rules/
+# journey-events.json `sea`, widened by volatility like the other danger bands), not a
+# daily roll of its own: a daily 5% beside the stretch check stopped a fortnight's passage
+# for weather half the time (1 - 0.95^14 = 51%), the day-by-day the owner asked away.
 WRECK_PCT_OF_STORMS = 10
 
 
-def storm_pct(level: int) -> float:
-    from . import volatility
-
-    return STORM_PCT * volatility.factor(level)
-
-
-def day_at_sea(dice, level: int) -> str:
-    """'calm', 'storm' or 'wreck' for one day, on the engine's hidden dice."""
-    roll = dice.roll("1d100", label="the weather at sea", visibility="hidden").total
-    if roll > storm_pct(level):
-        return "calm"
-    worst = dice.roll("1d100", label="how bad the storm is", visibility="hidden").total
-    return "wreck" if worst <= WRECK_PCT_OF_STORMS else "storm"
+def storm_wrecks(dice) -> bool:
+    """Whether a storm a voyage met (the journey table's `storm` band, 2026-11-16) is the
+    powerful kind that breaks her: one in ten (CRB Table 13-9)."""
+    return dice.roll("1d100", label="how bad the storm is",
+                     visibility="hidden").total <= WRECK_PCT_OF_STORMS
 
 
 # The storm on deck, as the Core Rulebook's Storm entry writes it (Environment,

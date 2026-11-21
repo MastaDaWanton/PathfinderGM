@@ -228,8 +228,17 @@ ALWAYS_BY_SCALE = {
     # arriving at is also a settlement the LAW cannot watch — `_op_travel`'s warrant check
     # asks whether the party is leaving by the gate, and in a place with none it has never
     # once fired.
-    "village": ("the way in", "the well"),
-    "town": ("the gate", "the guardhouse", "the well", "the guildhall"),
+    #
+    # And a bed, at every scale (playtest 2026-11-17b #4/#5/#7/#8): the essentials' "somewhere
+    # to sleep" was the leisure category's first row, taken only while the budget lasted,
+    # so a village whose words earned four places had none, and an authored city (below)
+    # had whatever its author listed. Mirabalos, a city of the shipped Pangrella export,
+    # listed an arena and gardens and no bed, and "head to an inn" walked the player to her
+    # own ship. The inn is guaranteed at every scale; a city has a tavern beside it. A
+    # town is not given its tavern by scale: its budget is where the essentials live (the
+    # smithy's note below), and the fill or the `found` door gives it one.
+    "village": ("the way in", "the well", "the inn"),
+    "town": ("the gate", "the guardhouse", "the well", "the guildhall", "the inn"),
     # A city has a smithy, whatever the seed (blacksmithing plan §10). Measured 2026-10-03
     # over 200 seeds per scale: the old fill gave a smithy to 0 of 200 villages, 0 of 200
     # towns and 0 of 200 cities. In a village and a town the guarantees and the four
@@ -255,7 +264,7 @@ ALWAYS_BY_SCALE = {
     # workers at once — a room a town keeps, not a tool you carry (aonprd Rules ID 1291).
     # Towns and villages get one from their own words or the `found` door, as the smithy.
     "city": ("the gate", "the guardhouse", "the barracks", "the well", "the guildhall",
-             "the smithy", "the laboratory"),
+             "the smithy", "the laboratory", "the inn", "the tavern"),
 }
 
 # Rows a settlement only ever has by name — guaranteed by its scale (`ALWAYS_BY_SCALE`),
@@ -1164,7 +1173,14 @@ def _with_a_way_in(authored: tuple[Place, ...], here: str, location) -> tuple[Pl
 # open point 7): "every city has a laboratory to rent". Published in
 # docs/place-vocabulary.json (`appended_to_authored`) so the author can see it happen and
 # write their own instead.
-APPENDED_TO_AUTHORED = {"city": ("the smithy", "the laboratory")}
+#
+# And a bed, from 2026-11-17 (playtest 2026-11-17b #8): somewhere to sleep is what a
+# settlement is FOR in the rest door's rule (`lodging.lets_beds`, `Engine._room_bill`), as
+# the smithy is for the forge's. Measured that day on the shipped Pangrella export: no
+# inn or tavern in 8 of its 12 authored settlements (all 6 towns; Mirabalos and
+# Khalmorin of its 6 cities). By scale, as `ALWAYS_BY_SCALE` gives a generated one.
+APPENDED_TO_AUTHORED = {"village": ("the inn",), "town": ("the inn",),
+                        "city": ("the smithy", "the laboratory", "the inn", "the tavern")}
 
 
 def _with_a_smithy(authored: tuple[Place, ...], here: str,
@@ -1188,6 +1204,10 @@ def _with_a_smithy(authored: tuple[Place, ...], here: str,
     Sublime, Transmute and rare reagents need one (`laboratory_here`). An author's own
     laboratory by any name stands, as long as its kind is one whose keeper is an
     alchemist (`"kind": "laboratory"`, read by `_authored`).
+
+    The inn and a city's tavern joined 2026-11-17 (`APPENDED_TO_AUTHORED`'s note): a bed
+    is what the rest door's price and a night off the ground need, and an author's own
+    inn or tavern by any name (`"kind": "inn"`) stands.
 
     Attached as the way in is: its exits run to the first place, and the first place
     gains it, so it is reachable (an exit is adjacency, and adjacency runs both ways). In
@@ -1339,6 +1359,12 @@ def _wanted(scale: str, earned: tuple[tuple[str, str], ...],
     # nothing else.
     rows = [r for r in rows if r[0] not in ONLY_WHEN_NAMED]
     for category in ESSENTIAL_CATEGORIES:
+        # The bed is the leisure essential ("somewhere to sleep"), and the inn is now
+        # guaranteed by scale: taking a second leisure row for it pushed a village's lane
+        # out (`tools/check_places.py`: "nothing of the hidden kind", 2026-11-17). Only
+        # leisure: a city's guaranteed smithy is trade, and its market still comes here.
+        if category == "leisure" and "the inn" in seen:
+            continue
         take(next((r for r in rows if r[3] == category and r[0] not in seen), None),
              capped=False)
     # Within a category, the biggest thing this settlement is entitled to comes first. A
@@ -1464,6 +1490,19 @@ def _authored(location) -> tuple[Place, ...]:
     """
     from . import floorplan
 
+    # An `about` that is one of the settlement's own facts word for word is a line about
+    # the town, not the room. Playtest 2026-11-17b #27: the walk said the market was
+    # "(Patrilineal clans, Zhilakai nobility, artisan guilds)", Mirabalos's Social Classes
+    # fact, which the export wrote as the market's and the guildhall's `about`. Detected
+    # by comparison with the facts (never by reading the words) and replaced by the
+    # table's line for the place's kind, or nothing (World Bible ask 31).
+    def _norm(text) -> str:
+        return " ".join(str(text or "").lower().split()).strip(" .;")
+
+    town_facts = {_norm(v) for v in (getattr(location, "facts", None) or {}).values()
+                  if isinstance(v, str)} - {""}
+    table_about = {row[0]: row[1] for row in SETTLEMENT_PLACES}
+
     out: list[Place] = []
     for raw in getattr(location, "places", None) or ():
         if not isinstance(raw, dict):
@@ -1472,10 +1511,15 @@ def _authored(location) -> tuple[Place, ...]:
         ground = terrain_of(pid)
         if not pid or not ground:
             continue
+        name = str(raw.get("name") or "").strip() or pid.rsplit(":", 1)[-1]
+        about = str(raw.get("about") or "").strip()
+        if _norm(about) in town_facts:
+            kind = _authored_kind(raw.get("kind")) or kind_named(name)
+            about = table_about.get(f"the {kind}", "")
         out.append(Place(
             id=pid,
-            name=str(raw.get("name") or "").strip() or pid.rsplit(":", 1)[-1],
-            about=str(raw.get("about") or "").strip(),
+            name=name,
+            about=about,
             terrain=ground,
             exits=tuple(str(x) for x in (raw.get("exits") or []) if str(x).strip()),
             described_only=bool(raw.get("described_only")),
@@ -1555,7 +1599,7 @@ def region_set(location_id: str, terrain: str) -> tuple[Place, ...]:
 
 
 def for_scene(location, at: str, terrain_hint: str = "",
-              founded=(), ring=(), moored=()) -> tuple[Place, ...]:
+              founded=(), ring=(), moored=(), stepping=()) -> tuple[Place, ...]:
     """Every place the party can name from where they stand: home, plus the ground
     they are on if it is not home, plus what play has minted here (`founded`).
 
@@ -1607,12 +1651,20 @@ def for_scene(location, at: str, terrain_hint: str = "",
             return with_founded(aboard, founded, at)
         others = tuple(m for m in moored if m != ships.vessel_of(at))
         return _gangplank(for_scene(location, "", terrain_hint, founded, ring, others), aboard)
+    wild = _out_in_a_hex(founded, at, stepping)
+    if wild:
+        return wild
     home = home_set(location, terrain_hint)
     ground = terrain_of(at)
     ring = tuple(ring or ())
     base = _with_ring(home, ring) if ring else home
     ids = {p.id for p in base}
-    if is_ring(at) and len(_spot_path(at)) == 1 and at not in ids:
+    # A hex of open ground (rules/hexes.py) is a minted place with its own name: standing
+    # on it, the bare "outside" stand-in below would shadow it, and a cave entered from
+    # the hex opened "off outside" (measured 2026-11-19).
+    minted_here = any((m.id if isinstance(m, Place) else str((m or {}).get("id") or "")) == at
+                      for m in (founded or ()))
+    if is_ring(at) and len(_spot_path(at)) == 1 and at not in ids and not minted_here:
         # Stood on the outside by an engine that cannot build the ring (no world to hand):
         # the place is still real, and the id says enough to stand on it. A stretch of
         # road a journey stopped on is the case that matters — `place_party` validates
@@ -1634,7 +1686,42 @@ def for_scene(location, at: str, terrain_hint: str = "",
             base = tuple(_replace(p, exits=tuple(p.exits) + (region[0].id,))
                          if p.id == outskirts.id else p for p in base)
         base = base + region
-    return with_founded(with_storeys(base), founded, at)
+    return _outfall_to_water(with_founded(with_storeys(base), founded, at))
+
+
+# Where a town's sewers empty: the first of these its own places name (playtest 2026-11-16
+# #83). A quay before a beach, the river's crossing where there is no quay.
+_WATERSIDE = ("the harbour", "the docks", "the quay", "the wharf", "the shore",
+              "the bridge", "the ford")
+
+
+def _outfall_to_water(known: tuple[Place, ...]) -> tuple[Place, ...]:
+    """A sewers' outfall opens onto the town's water, when the town has any: playtest
+    2026-11-16 #83, the outfall under a port city was a dead end, its only way back the
+    sewers. An outfall is where a sewer empties into the river or the sea — in a port,
+    the harbour — so it gains a way out to the town's waterside place and back, and says
+    where it empties. A town with no waterside place keeps the outfall as it was. From
+    there a ship lying off is swum to, as from any beach (owner ruling 2026-11-14)."""
+    outfall = VENTURES["sewers"]["spots"][0][0]
+    sewers = _slug(VENTURES["sewers"]["label"])
+    falls = [p for p in known if p.origin == "venture" and p.name == outfall
+             and str(p.parent).rsplit("/", 1)[-1] == sewers]
+    if not falls:
+        return known
+    named = {" ".join(str(p.name).split()).lower(): p for p in known}
+    water = next((named[w] for w in _WATERSIDE if w in named), None)
+    if water is None:
+        return known
+    ids = {p.id for p in falls}
+    out = []
+    for p in known:
+        if p.id in ids and water.id not in p.exits:
+            p = _replace(p, exits=tuple(p.exits) + (water.id,),
+                         about=f"where the sewer empties out by {water.name}")
+        elif p.id == water.id:
+            p = _replace(p, exits=tuple(p.exits) + tuple(i for i in ids if i not in p.exits))
+        out.append(p)
+    return tuple(out)
 
 
 def _gangplank(town: tuple[Place, ...], rooms: tuple[Place, ...]) -> tuple[Place, ...]:
@@ -1703,13 +1790,19 @@ def with_founded(base: tuple[Place, ...], founded, at: str = "") -> tuple[Place,
     if not minted:
         return base
     out = {p.id: p for p in base}
+    # Every place up the parent chain from where the party stands joins too: the way up out
+    # of a site is always there. Playtest 2026-11-20 #3: in the ruins off a forest hex whose
+    # parent no longer led back to the town, the forest hex was off the set and every way out
+    # was refused.
+    up = up_from(minted, at)
     changed = True
     while changed:
         changed = False
         for m in minted:
             if m.id in out:
                 continue
-            reachable = (m.parent in out) or (at and (m.id == at or str(at).startswith(m.id + "/")))
+            reachable = (m.parent in out) or m.id in up or (
+                at and (m.id == at or str(at).startswith(m.id + "/")))
             if not reachable:
                 continue
             out[m.id] = m
@@ -1740,6 +1833,87 @@ def with_founded(base: tuple[Place, ...], founded, at: str = "") -> tuple[Place,
         # made it a tavern the moment it was read back.
         result[pid] = _replace(p, exits=tuple(exits))
     return tuple(result.values())
+
+
+def _out_in_a_hex(founded, at: str, stepping=()) -> tuple[Place, ...]:
+    """Standing in a hex of open ground away from any town, or in its site: that hex and
+    what hangs off it, and nothing of the town it is filed under. () anywhere else.
+
+    Playtest 2026-11-20 #3: from the ruins twelve miles out, "I leave the ruins" walked to
+    Branford's outskirts in "a few minutes' walk", and the refusals listed the town's well
+    and market as places "you can reach". Every tradition's overland map keeps the town at
+    another scale (Ultima VI dropped the cut, `outskirts.py`); here the way between hexes is
+    the region map's move. The town's own hex keeps the town: its doc has the outskirts as
+    an exit. `stepping`: the hex the map's move is walking into this moment."""
+    from . import hexes
+
+    h = hexes.parse_place(at)
+    if h is None:
+        return ()
+    docs = [m if isinstance(m, Place) else from_dict(m) for m in (founded or ())]
+    cell = next((m for m in docs if m.origin == "hex" and hexes.parse_place(m.id) == h
+                 and not hexes.in_site(m.id)), None)
+    if cell is None or cell.exits:
+        return ()
+    # Another hex is twelve miles off and reached by the map's move, never a word's walk of
+    # minutes; the chain up from here stays (the way out of a site) as far as the hex stood
+    # in and no further: a hex is filed under the one it was walked from, and past it the
+    # forest hex twelve miles back was "a few minutes' walk" (integration check 2026-11-20).
+    parents = _parent_ids(docs)
+    up: set[str] = set()
+    pid = str(at or "")
+    while pid and pid not in up:
+        up.add(pid)
+        if pid == cell.id:
+            break
+        pid = parents.get(pid, "")
+    return with_founded((), [m for m in docs if m.origin != "hex" or m.id in up
+                             or m.id in stepping], at)
+
+
+def _parent_ids(founded) -> dict[str, str]:
+    return {(m.id if isinstance(m, Place) else str((m or {}).get("id") or "")):
+            (m.parent if isinstance(m, Place) else str((m or {}).get("parent") or ""))
+            for m in (founded or ())}
+
+
+def up_from(founded, place_id: str) -> set[str]:
+    """`place_id` and every founded place up its parent chain, safe on a loop."""
+    parents = _parent_ids(founded)
+    out: set[str] = set()
+    pid = str(place_id or "")
+    while pid and pid not in out:
+        out.add(pid)
+        pid = parents.get(pid, "")
+    return out
+
+
+def break_parent_loops(founded: list) -> list[str]:
+    """Cut every loop in the founded places' parent chains, in place; the ids cut.
+
+    A containment tree may not hold a loop (PennMUSH's `moveit` refuses a move into
+    something the mover holds; LambdaMOO's `move()` raises E_RECMOVE). 0.4.4's hex move
+    re-parented a hex on every step, and out to the grassland and back left the forest and
+    grassland hexes each other's parent (playtest 2026-11-20 #3). The loop is cut at its
+    oldest member, first in `founded`, whose parent is cleared: `up_from` still joins it to
+    the set from anywhere below it."""
+    cut: list[str] = []
+    for doc in founded:
+        if not isinstance(doc, dict):
+            continue
+        parents = _parent_ids(founded)
+        seen: list[str] = []
+        pid = str(doc.get("id") or "")
+        while pid and pid not in seen:
+            seen.append(pid)
+            pid = parents.get(pid, "")
+        if not pid:
+            continue
+        loop = set(seen[seen.index(pid):])
+        oldest = next(d for d in founded if isinstance(d, dict) and d.get("id") in loop)
+        oldest["parent"] = ""
+        cut.append(str(oldest["id"]))
+    return cut
 
 
 def children_of(founded, parent_id: str) -> list[Place]:
@@ -1882,7 +2056,14 @@ def mint(parent: Place, label: str, about: str = "", *, terrain: str = "",
     parent's unless given. `exits` are wired by `with_founded` at read time."""
     ground = str(terrain or "").strip().lower() or parent.terrain
     pid = child_id(parent.id, label)
-    if ground and ground != parent.terrain and origin != "venture" \
+    hex_spot = "/".join(_spot_path(parent.id))
+    if ground and ground != parent.terrain and hex_spot.startswith("@hex-"):
+        # A site under a hex of open ground (rules/hexes.py, 2026-11-19): the hex's own
+        # spot, never its name. Named by miles and bearing from a town, two hexes on the
+        # same ground the same way out share a name, and `_slug(parent.name)` below would
+        # have given them one cave. New ids: no save holds a hex's site from before.
+        pid = f"{region_key(location_of(parent.id), ground)}:{hex_spot}/{_slug(label)}"
+    elif ground and ground != parent.terrain and origin != "venture" \
             and setting_of(parent.id) == "outside":
         # Other ground out past the edge: the mountain off the road to Grotburrow. The
         # head carries the new ground and the spot keeps the parent's whole path, so
@@ -2086,6 +2267,14 @@ def settings_for(place, known=()) -> frozenset[str]:
     pid = str(getattr(place, "id", "") or "")
     if not pid:
         return frozenset()
+    from . import ships
+
+    if ships.vessel_of(pid):
+        # Any room of a ship is aboard her: her hold, her cabin, her deck. Playtest
+        # 2026-11-16 #98: below decks was "indoors, under a roof" and not aboard a ship,
+        # so the page's true "the shadows of the ship's hold" was repaired into "the
+        # shadows of the building's interior".
+        return frozenset({SET_SHIP})
     ground = str(getattr(place, "terrain", "") or "") or terrain_of(pid)
     kinds = {kind_named(w) for w in words_for_here(place, known)}
     tavern = bool(kinds & _TAVERN_KINDS)
@@ -2095,6 +2284,11 @@ def settings_for(place, known=()) -> frozenset[str]:
     except Exception:  # noqa: BLE001 — a place with no floor plan answer is not judged
         return frozenset()
     out: set[str] = set()
+    if ground == "deck":                    # `ships.DECK`
+        # A ship's own rooms are aboard her, below decks too, and never a street: the
+        # 2026-11-16 overnight save's beat checks flagged "the ship's hold" as "not aboard
+        # a ship or boat" with the player standing in her hold.
+        return frozenset({SET_SHIP} | ({SET_BUILDING} if roofed else set()))
     if ground == "underground":
         out |= {SET_UNDER, SET_BUILDING}
     elif ground == "ruins":
@@ -2288,6 +2482,76 @@ def distance(a_id: str, b_id: str) -> int:
     return len(a) + len(b) - 2 * common
 
 
+WORSHIP = frozenset({"shrine", "temple", "cathedral"})
+# The prepositions a place's name is qualified by where it is (`find`).
+_LOCATIVE = _re.compile(r"\s+(?:under|below|beneath|in|inside|off|at|by|near|behind|"
+                        r"beyond|past|of|on|beside)\s+")
+
+
+def by_locative(places, wanted: str, near: str = "") -> Place | None:
+    """The place a name qualified by where it is names ("the well room under the
+    sewers"): the head's exact name, the nearest under the qualifier when it names a
+    place too. None when no head is a place's exact name (`find`)."""
+    want = " ".join(str(wanted or "").split()).lower()
+    for m in _LOCATIVE.finditer(want):
+        head = want[:m.start()]
+        hits = [p for p in places or ()
+                if head in (p.name.lower(), p.name.lower().removeprefix("the "))]
+        if hits:
+            under = find(places, want[m.end():], near)
+            inside = [p for p in hits if under is not None and p.id.startswith(under.id)]
+            return _nearest(inside or hits, near)
+    return None
+
+
+_POSSESSIVE_END = _re.compile(r"(?:'s|’s|s'|s’)(?:\s+(?:shop|place|stall|counter))?$")
+
+
+def by_keeper(places, wanted: str, near: str = "") -> Place | None:
+    """The place a shop named by its keeper is: "the alchemist's" is the laboratory (its
+    keeper's title, `STAFFED`), "the blacksmith's" the smithy (the keeper's first word),
+    and "the general store" or "the armorer's" the market, where that counter stands
+    (content/rules/stall-lines.json). None when nothing here is kept by them.
+
+    Playtest 2026-11-17b #26: "Head to the alchemist's" founded "the alchemist's … It is
+    a laboratory" beside the city's own laboratory; 2026-11-17 #10: "I go to the general
+    store" founded a second general store off the granary while its keeper stood in the
+    market. The name was nowhere in the place list, so the plan was told to found it.
+    CircleMUD binds every shop to its keeper mob in the shop file (src/shop.c), so the
+    shop is found through who keeps it, never as a second room. Nothing here reads
+    English: the keeper titles and counter labels are the engine's own closed lists. A
+    keeper's title asks for the possessive ("the alchemist" alone is a person), a
+    counter's own label ("the general store") does not."""
+    want = " ".join(str(wanted or "").split()).lower()
+    m = _POSSESSIVE_END.search(want)
+    owner = want[:m.start()] if m else ""
+    if owner and not owner.startswith("the "):
+        owner = "the " + owner
+    if owner:
+        hits = []
+        for p in places or ():
+            title, words = keeper_of("the " + _kind_of_place(p))
+            if title and owner in (title, f"the {words[0]}" if words else title):
+                hits.append(p)
+        if hits:
+            return _nearest(hits, near)
+    try:
+        from . import market as market_mod
+
+        doc = market_mod.lines_doc()
+        counters = [*doc.get("shops", ()), doc.get("stables") or {}]
+    except Exception:  # noqa: BLE001 - no content to hand (a bare test engine): no counters
+        counters = []
+    labels = {str(c.get("label") or "").lower() for c in counters} - {""}
+    titles = {str(c.get("title") or "").lower() for c in counters} - {""}
+    # A label that is also the keeper's title ("the alchemist") names the person bare.
+    if (want in labels - titles) or (owner and owner in labels | titles):
+        markets = [p for p in places or () if _kind_of_place(p) == "market"]
+        if markets:
+            return _nearest(markets, near)
+    return None
+
+
 def _nearest(found: list, near: str):
     """The first of `found`, or the one nearest `near` when there is a choice (`find`)."""
     if near and len(found) > 1:
@@ -2313,6 +2577,12 @@ def find(places, wanted: str, near: str = "") -> Place | None:
     want = " ".join(str(wanted or "").split()).lower()
     if not want:
         return None
+    # "an inn in the city" is the inn: a place is named by the definite article, and the
+    # indefinite one names one of a kind. Playtest 2026-11-17b #4: "head to an inn in the
+    # city" was found nowhere, and the plan's own walk took her aboard her ship.
+    for article in ("a ", "an "):
+        if want.startswith(article) and len(want) > len(article):
+            want = "the " + want[len(article):]
     named = [p for p in places or ()
              if want in (p.id.lower(), p.name.lower(), p.name.lower().removeprefix("the "))]
     if named:
@@ -2332,6 +2602,27 @@ def find(places, wanted: str, near: str = "") -> Place | None:
         if want in (f"{room} of {ship}", f"{room} of {ship.removeprefix('the ')}",
                     f"{ship}'s {room.removeprefix('the ')}"):
             return p
+    # A place named with where it is: "the well room under the sewers". Playtest
+    # 2026-11-16 E1: the last-word rule below read it as "the sewers", where she stood,
+    # and the walk to the well room was no walk at all. The head before the locative is
+    # the place, by exact name only; what follows only picks among same-named ones.
+    located = by_locative(places, want, near)
+    if located is not None:
+        return located
+    # A kind word for a house of worship the town has under another scale's name: "the
+    # nearest temple" in a city whose faith is a cathedral. Playtest 2026-11-16 #68: three
+    # plans were refused "there is no 'the temple' here" before the fourth chose the
+    # cathedral, a model call each. Shrine, temple and cathedral are one place of worship
+    # at three scales of `SETTLEMENT_PLACES` (village, town, city); "church" and "chapel"
+    # fold into them (`KIND_WORDS`).
+    last = kind_named(want.split()[-1])
+    if last in WORSHIP:
+        same = [p for p in places or () if p.name.lower().removeprefix("the ") in WORSHIP]
+        if same:
+            return _nearest(same, near)
+    kept = by_keeper(places, want, near)
+    if kept is not None:
+        return kept
     # The GM's own dressing of a real place: "the merchant's gate" for "the gate", "the
     # old market" for "the market". Measured at the table, 2026-09-06: the plan wrote
     # `travel` to "the merchant's gate", the exact match failed, and the turn was a 502.
@@ -2361,6 +2652,26 @@ SETTLEMENT_WORDS = frozenset({"town", "city", "village", "settlement", "hamlet",
 _CENTRES = ("the great square", "the market", "the square", "the green", "the well")
 
 
+# Where "ashore" is from a ship: the land end of her gangplank (`_gangplank`). Playtest
+# 2026-11-17b #6: "I go ashore and ask the harbourmaster…" from her own deck was read
+# `go: ashore`, no place is called that, no travel was built, and she asked a harbourmaster
+# who stood on the quay. A word for the land, never for a ship's room: the gangplank's own
+# exit answers it, so a ship at sea has no "ashore" and the walk is refused as nowhere.
+ASHORE = frozenset({"ashore", "shore", "land", "dry land"})
+
+
+def _ashore(places, here: str) -> Place | None:
+    """The town place a ship's rooms step off onto, or None: not aboard, or at sea."""
+    from . import ships
+
+    vid = ships.vessel_of(here)
+    if not vid:
+        return None
+    by_id = {p.id: p for p in places or ()}
+    return next((by_id[x] for p in by_id.values() if ships.vessel_of(p.id) == vid
+                 for x in p.exits if x in by_id and ships.vessel_of(x) != vid), None)
+
+
 def the_settlement(places, wanted: str, here: str, name: str = "") -> Place | None:
     """The place a walk to "the town" means, or None when the words are not the town.
 
@@ -2373,6 +2684,8 @@ def the_settlement(places, wanted: str, here: str, name: str = "") -> Place | No
     want = " ".join(str(wanted or "").split()).lower()
     for article in ("the ", "a "):
         want = want.removeprefix(article)
+    if want in ASHORE:
+        return _ashore(places, here)
     if not want or not (want in SETTLEMENT_WORDS or (name and want == name.lower())):
         return None
     rooms = [p for p in places or () if setting_of(p.id) != "outside"

@@ -6621,6 +6621,18 @@ class Actor:
                 "nonlethal_withheld": self.withheld_nonlethal(),
                 "slept": slept, "fatigue": fatigue}
 
+    def settle_level(self, dice=None) -> dict | None:
+        """The level the experience has earned, taken in a sleep (`leveling.level_up`), or
+        None when none is owed. Any eight hours' sleep settles it, the night that heals or
+        not: playtest 2026-11-17b #2, a second sleep inside the day refused the healing
+        and the level with it, and nothing said when it would come."""
+        from . import leveling as leveling_mod
+        from . import xp as xp_mod
+
+        if not self.is_pc or not xp_mod.ready_to_level(self):
+            return None
+        return leveling_mod.level_up(self, dice=dice)
+
     def sleep_through(self, kind: str = "night", dice=None, slept: int | None = None) -> dict:
         """Everything a full night's sleep gives, through one door.
 
@@ -6640,13 +6652,9 @@ class Actor:
         (8 hours of sleep or more)".
         """
         from . import casting
-        from . import leveling as leveling_mod
-        from . import xp as xp_mod
 
-        levelled = None
         # Before the rest itself, so the new hit die is part of the night's recovery.
-        if kind == "night" and self.is_pc and xp_mod.ready_to_level(self):
-            levelled = leveling_mod.level_up(self, dice=dice)
+        levelled = self.settle_level(dice) if kind == "night" else None
         result = self.rest(kind, slept)
         refilled = self.refresh_pools("rest.night", dice)
         prepared = ""

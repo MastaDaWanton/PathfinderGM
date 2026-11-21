@@ -921,6 +921,18 @@ def place_in_its_own_words(location, budget: int = PLACE_WORDS_BUDGET) -> str:
     return text.strip()
 
 
+def held_count(s) -> str:
+    """How much of a shelf entry is carried, for the brief: a measured thing by its measure
+    (rope's count is feet: "×49" read as forty-nine ropes, playtest 2026-11-17 #17), else
+    "×n" for more than one."""
+    from rules import goods as _goods
+
+    unit = _goods.unit_for(getattr(s, "base", "") or getattr(s, "name", ""))
+    if unit:
+        return f", {_goods.measure(int(s.count), unit)}"
+    return f" ×{s.count}" if s.count > 1 else ""
+
+
 def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 known=(), recent=None, secret=False, turn=0, names_for=None,
                 absent: str = "", buying: str = "", reading=None, player_text: str = "",
@@ -1140,8 +1152,8 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
             # it could cite". A player character is the only one with a satchel.
             stock = getattr(actor, "stock", None) or {}
             if stock:
-                jars = ", ".join(f"{iid} ({s.base}" + (f" ×{s.count}" if s.count > 1 else "")
-                                 + ")" for iid, s in sorted(stock.items()))
+                jars = ", ".join(f"{iid} ({s.base}{held_count(s)})"
+                                 for iid, s in sorted(stock.items()))
                 lines.append(f"    CARRYING (use_item by id): {jars}")
             # The raw herbs, with what the character KNOWS of each and nothing more
             # (docs/herbalism-revamp-plan.md §8.1, law 3): an unknown property never
@@ -1234,6 +1246,11 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
             # the person's name (`faces.for_a_model`, measured 2026-10-09).
             looks = (f" Looks (fact — every description of them keeps to it): "
                      f"{_faces.for_a_model(face)}" if face else "")
+            unseen = hasattr(scene, "sees_nothing") and scene.sees_nothing(scene.pc(), actor)
+            if unseen:
+                # Pitch dark to the player (#57): heard, never seen.
+                looks = (" UNSEEN in the dark (fact): the player can hear, smell or touch "
+                         "them, and sees nothing of their face, body or clothes.")
             # A creature's size and kind from its own record, as a fact: the grioth, a
             # Medium monstrous humanoid, was written "massive", "large" and "towering"
             # because no brief ever said how big it was (owner's report, 2026-10-27). A
@@ -1244,7 +1261,7 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 body = _bestiary.body_said(_bestiary.body_words(actor))
             except Exception:  # noqa: BLE001 — a block that will not load says nothing
                 body = ""
-            if body:
+            if body and not unseen:
                 looks += (f" What it is (fact — its size and kind; never write it bigger "
                           f"or smaller): {body}.")
             # Who this person is TO the player. Both are facts the engine holds and the
@@ -2032,8 +2049,9 @@ def scene_now(scene, was_clock: int | None = None, outcomes=None, gone=()) -> st
     if gone:
         facts.append(f"GONE from here since the last passage, and taking no part in this "
                      f"one: {', '.join(gone)}")
-    heat = getattr(scene, "heat", None) or {}
-    if heat.get("note"):
+    # Only while somebody who saw it is here (`judgement.heat_seen`, playtest 2026-11-20 #23).
+    heat = _judgement.heat_seen(scene)
+    if heat:
         facts.append(f"what the crowd just saw: {heat['note']}")
     # What lies at this spot, whose it is and what it was — the props ledger, so a
     # sundered club's pieces stay the challenger's pieces of a club and never become
@@ -2132,9 +2150,18 @@ def light_now(scene, outcomes=None) -> str:
     searching = any(getattr(o, "op", None) == "check"
                     and "perception" in str(getattr(o, "tell", "") or "").lower()
                     for o in outcomes or ())
-    if not (fighting or searching):
-        return ""
     seen = light_shown.sight(scene)
+    if not (fighting or searching):
+        # Pitch dark is said on every beat, not only a fight's: playtest 2026-11-16 #57,
+        # a walk into an unlit cell block came back with scorched plaster, charcoal beams
+        # and a stranger's ink-dotted knuckles. Dim light, which still shows shapes, keeps
+        # the fight-and-search rule above.
+        if seen is None or seen["level"] != "dark":
+            return ""
+        return (f"THE LIGHT (engine fact, this moment): {seen['why']}, pitch dark — the "
+                f"player sees nothing at all. Write only what they hear, smell and feel: "
+                f"no colours, no shapes, no faces, nothing of the room that would have to "
+                f"be seen. No numbers.")
     if seen is None:
         # Lit where the player stands, in a place the night or the ground holds dark:
         # the light they fight in is a thing they carry, and its edge is part of it.
@@ -3109,6 +3136,14 @@ def stuck_note(actor) -> str:
     and op names only; the engine owns the DC and the bonus (law 3)."""
     ref = getattr(actor, "ref", "")
     lines = []
+    # Disabled at 0 is on its feet (CRB p.190: "a single move or standard action each
+    # turn"). Playtest 2026-11-17 #29: told only "conditions: disabled", the dire rat's
+    # turn gave "it is too weak to stand" as its reason and wrote it "where it lies, its
+    # body slumped and motionless against the stone floor".
+    if actor.has_state("state.impaired.disabled") and not actor.has_state("state.down"):
+        lines.append("They are DISABLED: still on their feet and able to act, one move "
+                     "or one standard action this turn; a strenuous one costs them blood "
+                     "and may drop them. They are not lying down.")
     if actor.has_state("state.burning"):
         lines.append('They are ON FIRE: it burns them again next round unless put out. '
                      'Putting it out takes the whole turn: {"op": "extinguish", "actor": '
@@ -3750,6 +3785,9 @@ def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...],
         props[name] = {"type": "boolean" if name in FLAG_PARAMS
                        else _NUMERIC_PARAMS.get(name, "string")}
     need = list(required)
+    if op == "say":
+        # The player's line: nobody else is its speaker (playtest 2026-11-17b #18).
+        props.pop("actor", None)
     if op == "travel" and places:
         props["place"] = {"type": "string", "enum": list(places)}
         need = ["place"]
@@ -3814,8 +3852,13 @@ def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...],
 def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
                 min_chars: int = 0, must_contain: tuple[str, ...] = (),
                 ops: tuple[str, ...] = (), places: tuple[str, ...] = (),
-                aims: tuple[str, ...] = (), skill: str = "") -> dict:
+                aims: tuple[str, ...] = (), skill: str = "",
+                speakers: tuple[str, ...] = ()) -> dict:
     """The JSON schema this turn's reply must satisfy.
+
+    `speakers` is who may `say` in this plan: given for the player's own turn (the player
+    and any companion), it gives `say` its own shape with words required; empty (a
+    companion's or a cheat's plan) leaves `say` like every other op.
 
     `skill` is the check skill the player's words declared, if any: a declared check is
     held to it (`_declared_op`).
@@ -3861,6 +3904,35 @@ def turn_schema(*, fighting: bool = False, refs: tuple[str, ...] = (),
         },
         "required": ["op"],
     }
+    say_ok = "say" in intent["properties"]["op"]["enum"]
+    if speakers and say_ok:
+        # A `say` in the player's plan is spoken by the player (or a companion) and carries
+        # words; an NPC's answer is the reply slot's, after the dice. Playtest 2026-11-17b
+        # #14/#18/#22/#25: with one intent shape for every op, the actor enum offered every
+        # ref to `say`, and the model wrote the clerk's line before the Diplomacy roll, gave
+        # the player's question to the man asked it, and seven times wrote a say with no
+        # words at all. One branch for `say`, one for the rest: Ollama keeps an `anyOf` of
+        # objects and their required properties (the reader's per-act schema, 6 of 6).
+        rest = dict(intent, properties=dict(
+            intent["properties"],
+            op={"type": "string",
+                "enum": [o for o in intent["properties"]["op"]["enum"] if o != "say"]}))
+        said = {
+            "type": "object",
+            "properties": {
+                "op": {"type": "string", "enum": ["say"]},
+                "actor": {"type": "string", "enum": list(speakers)},
+                "target": intent["properties"]["target"],
+                "because": {"type": "string"},
+                "params": {"type": "object", "properties": {
+                    "words": {"type": "string", "minLength": 1},
+                    "to": intent["properties"]["target"],
+                    "quoted": {"type": "boolean"}},
+                    "required": ["words"]},
+            },
+            "required": ["op", "actor", "params"],
+        }
+        intent = {"anyOf": [said, rest]}
     intents = {"type": "array", "items": intent}
     if fighting:
         # The whole point. In a fight the list may not be empty, so "narrated the punch

@@ -91,7 +91,7 @@
      "gear": ["backpack", "bedroll", "blanket", "rope", "torch", "lantern", "oil",
               "rations", "waterskin", "flint and steel", "grappling hook", "crowbar",
               "chalk", "sack", "whetstone", "tent", "shovel", "hammer", "pitons",
-              "candle", "caltrops"],
+              "candle", "caltrops", "healer's kit", "sunrod", "antitoxin", "map"],
      "consumables": ["alchemist"]},
     {"id": "armorer", "label": "the armorer", "title": "the armorer",
      "words": ["armorer", "blacksmith", "smith"], "smallest": "town",

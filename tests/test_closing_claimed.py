@@ -131,5 +131,26 @@ def test_through_the_real_door_the_beat_reaches_the_page_without_the_claim(monke
     text, attempt = gm.narrate_outcome("", res.outcomes, "Clockwork Spy acts",
                                        rewrite=False, acting="Clockwork Spy")
     assert "landing right before you" not in text
-    assert text.endswith("The Clockwork Spy is still 10 feet from you.")
+    # With the walk the cut took (playtest 2026-11-20 #86: the creature's move kept).
+    assert text.endswith("The Clockwork Spy comes 30 feet closer and is still 10 feet "
+                         "from you.")
     assert "closing claimed" in attempt.note
+
+
+def test_the_backstop_says_the_distance_once():
+    """Playtest 2026-11-20 #71: the kept text already read "It stops twenty feet away from
+    you", and the backstop still added "The ghoran is still 20 feet from you." — the same
+    distance twice in one beat. A kept sentence that already gives the engine's number (in
+    words or digits) is enough."""
+    scene, engine = _owners_board()
+    _run(engine, [TOWARD])
+    beat = ("The Clockwork Spy stops ten feet away from you, between the broken walls. It "
+            "closes the gap in three bounds.")
+    ctx = _ctx(engine, beat)
+    found = closing_claimed.find(ctx)
+    kept, notes = closing_claimed.backstop(ctx, beat, found)
+    assert kept == "The Clockwork Spy stops ten feet away from you, between the broken walls."
+    assert notes
+    assert closing_claimed.says_feet("It is 10 ft off.", 10)
+    assert not closing_claimed.says_feet("It is a hundred and ten feet off, or 110 ft.", 10)
+    assert not closing_claimed.says_feet("It stops twenty-five feet away.", 5)

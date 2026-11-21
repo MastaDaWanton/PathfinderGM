@@ -112,11 +112,14 @@ def rack_key(client, form, *, material=None):
     raise AssertionError(f"no {form} {material or ''} on the rack")
 
 
-def step(client, method, slots, score=0.6, face=20, **extra):
+def step(client, method, slots, score=0.6, face=None, **extra):
     body = {"method": method, "slots": slots, "face": face, **extra}
     chk = post(client, "/api/leather/check", body)
     assert chk.status_code == 200, chk.content[:300]
     assert chk.json()["can_roll"], chk.json()["problems"]
+    if face is None:
+        # the face that just makes the DC: no 5+ margin bands (ruling 2026-11-18)
+        body["face"] = max(1, min(20, int(chk.json()["dc"]) - int(chk.json()["bonus"])))
     r = post(client, "/api/leather/roll", body)
     assert r.status_code == 200, r.content[:300]
     got = r.json()

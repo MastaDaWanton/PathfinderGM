@@ -39,6 +39,7 @@ import re
 from dataclasses import dataclass, field
 
 from . import places as places_mod
+from . import ships as ships_mod
 from . import states
 from .activeeffect import ActiveEffect
 
@@ -60,6 +61,10 @@ TAG_STRAIN = "situation.strain"      # what is wrong with this place, from the e
 TAG_HOOK = "situation.hook"          # the world's own unwritten hooks — the GM's
 TAG_WORLD = "situation.world"        # authored by World Bible, shipped with the world
 TAG_PLAY = "situation.play"          # arose in play
+# What a settlement says of a place nearby (rules/dungeons.py `spread_rumours`): ambient,
+# the world's matter and never the player's, pulled in passing until the prose has
+# carried it once (`salience`'s "talk").
+TAG_RUMOUR = "situation.rumour"
 # A quest: a situation the player has taken up as a task, with a giver, objectives to
 # tick and something promised at the end. Baldur's Gate 3's journal keeps the same
 # two things apart — *objectives* say what to do next, *steps* (our facts) say what just
@@ -1014,6 +1019,14 @@ def salience(scene, *, recent, player_text: str = "", tells=(),
             why.append("quiet")
         if since >= URGENT_TURNS:
             why.append("urgent")
+        # Talk in town about a place nearby: heard in passing, once, wherever the party is
+        # in that settlement — the hook that gives a dungeon a reason to be gone to (the
+        # Worlds Without Number review's complaint, and the Alexandrian's rumours "in the
+        # general conversation"). Carried once, it is ambient like any other.
+        talk = (c.is_(TAG_RUMOUR) and not c.mentioned and bool(c.place)
+                and places_mod.location_of(c.place) == places_mod.location_of(here))
+        if talk:
+            why.append("talk")
         # A quest is the player's own only once taken (`standing`); every quest card also
         # carries TAG_PLAY, so the tag alone made a scheme's unheard quest "own".
         own = (is_own(c) or (c.kind not in TASKS and c.is_(TAG_PLAY)) or present)
@@ -1027,10 +1040,32 @@ def salience(scene, *, recent, player_text: str = "", tells=(),
             # word "merchant" in the tells was enough to make it "spoken". A matter of the
             # player's own still goes where they go.
             continue
+        if c.is_(TAG_RUMOUR) and ships_mod.vessel_of(c.place):
+            # A ship is no settlement and has no ways down (`dungeons.spread_rumours`).
+            # Playtest 2026-11-16 #90: a save made before that guard holds "What Mirabalos
+            # says of the sewers off the rigging", written "the sewers beneath the rigging".
+            continue
+        if (c.place and c.place != here and c.place != places_mod.location_of(c.place)
+                and not present and not c.is_(TAG_RUMOUR)
+                and standing(c) in (OWN, SITUATION)
+                and not (_hits(c, player_text or "") >= 2
+                         or _names_in(names, player_text or ""))):
+            # The player's own matter, or the world's, pinned to another spot with none of
+            # its people here, comes up when the player raises it, never on its own.
+            # Playtest 2026-11-16 #59: asking the smuggler in the cells about her cargo, the
+            # beat gained "You are still driven by the goal to uncover what lies beneath the
+            # sewers" (the quest, pinned to the main channel); #76: at the east crossing,
+            # "A hidden passage remains a secret of the architecture" (a card pinned to the
+            # main channel, "spoken" only because the gate's tell listed the main channel
+            # among the ways out). The player's own words only: a tell naming the place is
+            # not the matter raised. The Journal keeps what the prose leaves (BG3's journal
+            # guidelines: objectives live in the journal, not in a bark). A strain pinned
+            # to its settlement is not a spot and is judged as before.
+            continue
         if own:
             qualifies = bool(set(why) - {"quiet", "urgent"})
         else:
-            qualifies = "spoken" in why or "recent" in why
+            qualifies = "spoken" in why or "recent" in why or "talk" in why
         if qualifies:
             out.append((len(why), why, c))
     out.sort(key=lambda t: (-t[0], -t[2].touched, t[2].id))
@@ -1093,8 +1128,41 @@ def _carrier(scene, giver_ref: str):
             continue
         if a.has_state("state.hidden") or a.has_state("state.down"):
             continue
+        from . import bestiary
+
+        if not bestiary.has_a_people(a):
+            continue        # a mite or a gull carries no word of anybody's trouble
         return a
     return None
+
+
+def _rumour_pull(scene, c: Card, out: dict, player_text: str) -> dict | None:
+    """Talk in town reaches the player as somebody's words, at a moment that is free for
+    it, or not at all this beat: somebody of this place standing here says it in passing
+    (`go_between`, `_carrier`), and never while the player is busy with somebody or in a
+    fight (`hooks.scene_state`).
+
+    Playtest 2026-11-16 #67: asking the gardener for a healer, the matter slot wrote
+    "Nearby, the local gossip of the city's well-known cellar treasures and the missing
+    travelers on the nearby roads hangs in the air like a persistent, unsettling rumor"
+    between her question and his answer: nobody said it, and it came at the one moment
+    the player had asked about something else. The Alexandrian's rumour tables put talk
+    in a person's mouth ("in the general conversation"), and Skyrim's overheard barks
+    belong to a speaker; neither has talk hang in the air."""
+    from . import hooks
+    from gm import interpret as _interpret
+
+    reading = _interpret.reading_of(player_text) if player_text else None
+    if reading is not None and reading.get("error"):
+        reading = None
+    if hooks.scene_state(scene, c, reading) in (hooks.BUSY, hooks.FIGHT, hooks.ASKED):
+        return None
+    carrier = _carrier(scene, "")
+    if carrier is None:
+        return None
+    out.update(approach="go_between", carrier={"ref": carrier.ref, "name": carrier.name},
+               text=out["text"] + f" {carrier.name}, who is here, says it in passing.")
+    return out
 
 
 def _head(c: Card, why, fact: str, stands: str, giver_name: str = "") -> str:
@@ -1121,6 +1189,15 @@ def _head(c: Card, why, fact: str, stands: str, giver_name: str = "") -> str:
             f"mind or set out to do): {c.title}.")
 
 
+def _names_the_pc(scene, fact: str) -> bool:
+    """Whether a card's fact names the player's character, by the sheet's own name (any
+    word of it, whole words): the player's doing, never the world's matter (#25)."""
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    words = [w for w in re.findall(r"[A-Za-z][A-Za-z'-]+", str(getattr(pc, "name", "") or ""))
+             if len(w) >= 3]
+    return any(re.search(rf"\b{re.escape(w)}\b", str(fact or "")) for w in words)
+
+
 def _pull_one(scene, c: Card, why, *, player_text: str, turn: int, world) -> dict | None:
     """The pull for one card, or None when it cannot reach the player here.
 
@@ -1138,6 +1215,22 @@ def _pull_one(scene, c: Card, why, *, player_text: str, turn: int, world) -> dic
     fact = open_objective or (c.facts[-1] if c.facts else "")
     if stands in (OFFERED, HEARD, UNHEARD):
         fact = ""
+    if stands == SITUATION:
+        # A matter of the world is never the player's own deed told back. Playtest
+        # 2026-11-20 #25, shadow-0141/0144: the watcher's card for the lizard fight ("The
+        # Hollow's Toll") ended on "Shadow has collected the essence from the fallen
+        # lizard", and the slot told it twice as a matter of the world. A card born in
+        # play is a matter only while one of its people is here and up to carry it
+        # (Blades' faction clocks are a faction's goal, not a record of the crew's
+        # score), and a fact naming the player's character is theirs, not the world's.
+        if c.is_(TAG_PLAY) and not any(
+                (a := (getattr(scene, "actors", {}) or {}).get(r)) is not None
+                and not a.is_down for r in c.people):
+            return None
+        fact = open_objective or next((f for f in reversed(c.facts)
+                                       if not _names_the_pc(scene, f)), "")
+        if not fact and c.facts:
+            return None
     since = int(turn) - int(c.mentioned or c.touched or 0)
     out = {"id": c.id, "title": c.title, "kind": c.kind, "fact": fact,
            "keys": identity_keys(c, names), "people": names, "since": since,
@@ -1147,6 +1240,18 @@ def _pull_one(scene, c: Card, why, *, player_text: str, turn: int, world) -> dic
     from . import residency
 
     mine = stands in (OWN, SITUATION)
+    # A matter of the world is the settlement's, seen or heard in its streets; under them
+    # nobody is there to have heard it. Playtest 2026-11-17 #35: in a dungeon cell the
+    # page read "The heavy, oppressive silence of the underground feels weighted by the
+    # whispered rumors of the bribes and backroom deals … fueling the rivalry between the
+    # local lords" — a town strain with nobody to say it, pasted into a cell.
+    if stands == SITUATION:
+        from . import places as places_mod
+
+        if places_mod.setting_of(str(getattr(scene, "at", "") or "")) == "under":
+            return None
+    if c.is_(TAG_RUMOUR):
+        return _rumour_pull(scene, c, out, player_text)
     giver = hooks.giver_of(scene, c)
     if giver is None:
         return out if mine else None

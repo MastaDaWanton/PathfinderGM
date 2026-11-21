@@ -513,6 +513,9 @@ GEAR: dict[str, dict] = {
     "tent": {"name": "tent", "cost_gp": 10.0, "lb": 20},
     "antitoxin": {"name": "antitoxin", "cost_gp": 50.0, "lb": 0},
     "shovel": {"name": "shovel", "cost_gp": 2.0, "lb": 8},
+    # A nation's map (rules/maps.py): the general store's alone, named for the store's own
+    # nation when it is bought. Its own category, so no other counter shelves it.
+    "map": {"name": "map of the land", "cost_gp": 5.0, "lb": 0.5, "category": "map"},
     "hammer": {"name": "hammer", "cost_gp": 0.5, "lb": 2},
     "pitons": {"name": "pitons", "cost_gp": 0.1, "lb": 0.5},
     "mirror": {"name": "small steel mirror", "cost_gp": 10.0, "lb": 0.5},
@@ -602,7 +605,9 @@ def unit_price(name: str) -> float | None:
     back for 9.50 gp, a 1 cp torch for 19 cp, and 11 of 41 plain goods for more than cost.
     Looked up by name rather than stamped on at purchase so a save from before this sells
     at the book's price too."""
-    low = " ".join(str(name or "").split()).lower()
+    from .maps import shelf_name
+
+    low = " ".join(str(shelf_name(name) or "").split()).lower()
     if not low:
         return None
     from . import market
@@ -669,7 +674,7 @@ def stocked_at(counter_kind: str) -> list[str]:
         from . import market
 
         return list(market.gear_of(kind))
-    return [k for k in GEAR if _category(k) != "food"]
+    return [k for k in GEAR if _category(k) not in ("food", "map")]
 
 
 @dataclass(frozen=True)
@@ -1139,6 +1144,14 @@ def _want_words(text: str) -> list[str]:
             if w not in _MEASURE_WORDS]
 
 
+# The words a tavern's food and drink are asked for by, beside their names: "a drink" is
+# the mug of ale, "food" a meal. Playtest 2026-11-17b #10: "I buy a meal and a drink from
+# the barkeep" named no row. A closed table by the GEAR key, never the player's English.
+ASKED_AS = {"ale": "drink beer", "ale gallon": "drink beer", "wine": "drink",
+            "fine wine": "drink", "good meal": "food supper dinner",
+            "common meal": "food supper dinner", "poor meal": "food supper dinner"}
+
+
 def match_want(want: str, rows) -> tuple[object | None, list]:
     """The shelf row the player asked for, or None and what is nearest.
 
@@ -1166,13 +1179,54 @@ def match_want(want: str, rows) -> tuple[object | None, list]:
         bare = rid.split(":", 1)[1] if rid.split(":", 1)[0] + ":" in PREFIXES.values() \
             else rid
         have = {_stem(w) for w in re.findall(
-            r"[a-z][a-z'-]*", f"{name} {bare.replace('-', ' ')}".lower())}
+            r"[a-z][a-z'-]*", f"{name} {bare.replace('-', ' ')} "
+                              f"{ASKED_AS.get(bare, '')}".lower())}
         if all(w in have for w in words):
             fits.append(r)
     if not fits:
         return None, []
     fits.sort(key=lambda r: fit_rank(want, r))
     return fits[0], fits
+
+
+def wants_among(want: str, rows) -> list:
+    """Every shelf row named whole inside a want that lists several things, in the want's
+    order, longest name first where two overlap: "a few torches, a flint and steel, a
+    healer's kit" is the torch, the flint and steel and the healer's kit. The shelf is the
+    closed vocabulary here, never the want (`holding.named_among`'s rule). Playtest
+    2026-11-17 #11: a typed shopping list matched no one row, and nothing was picked."""
+    from .population import _stem
+
+    said = [_stem(w) for w in re.findall(r"[a-z][a-z'-]*", str(want or "").lower())]
+    found: list[tuple[int, object]] = []
+    taken: set[int] = set()
+    named = []
+    for r in rows:
+        name = str(getattr(r, "name", "") or (r.get("name") if isinstance(r, dict) else ""))
+        words = [_stem(w) for w in re.findall(r"[a-z][a-z'-]*", name.lower())]
+        if words:
+            named.append((words, r))
+    for words, r in sorted(named, key=lambda x: -len(x[0])):
+        n = len(words)
+        at = next((i for i in range(len(said) - n + 1) if said[i:i + n] == words
+                   and not taken & set(range(i, i + n))), None)
+        if at is not None:
+            taken |= set(range(at, at + n))
+            found.append((at, r))
+    if not found:
+        # Each thing of the list on its own, when no name stands whole in it: "a meal and
+        # a drink" is a meal and a drink (playtest 2026-11-17b #10). Cut only at the
+        # list's own joins, and each part matched by the shelf's one matcher.
+        parts = [p for p in re.split(r",|\band\b|\bthen\b", str(want or "").lower())
+                 if p.strip()]
+        if len(parts) > 1:
+            out = []
+            for part in parts:
+                hit, _ = match_want(part, rows)
+                if hit is not None and hit not in out:
+                    out.append(hit)
+            return out
+    return [r for _, r in sorted(found, key=lambda x: x[0])]
 
 
 def _head(text: str) -> str:
@@ -1198,4 +1252,9 @@ def fit_rank(want: str, row) -> tuple:
     v = getattr(row, "price_gp", None)
     if v is None and isinstance(row, dict):
         v = row.get("gp")
-    return (0 if wanted and _head(name) == wanted else 1, float(v or 0))
+    # And the book's own "common" quality before the cheaper poor one: "a meal" at a
+    # tavern is the common meal (CRB, Food, Drink, and Lodging: poor, common, good).
+    # Only among things that ARE the want: "a drink" is still the cheapest drink, the ale.
+    head = bool(wanted) and _head(name) == wanted
+    return (0 if head else 1, 0 if head and "common" in name.lower().split() else 1,
+            float(v or 0))

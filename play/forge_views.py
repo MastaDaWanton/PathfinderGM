@@ -27,7 +27,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 
 from rules import blacksmith as bs
-from rules import crafting, worldclass
+from rules import crafting, inprogress, worldclass
 
 from rules import knowledge
 
@@ -653,8 +653,9 @@ def _plan_from(c, pc, body):
     aim = body.get("masterwork", True)
     plan = bs.plan_step(pc, progress, method, slots, batch,
                         shape=str(body.get("shape") or ""), where=where,
-                        masterwork=aim is not False)
-    rent = bs.rent_cp(c.scene, where.get("smithy"), plan.minutes, _known(c)) \
+                        masterwork=aim is not False, waits=True)
+    # The forge is rented for the whole step, its In-progress wait included.
+    rent = bs.rent_cp(c.scene, where.get("smithy"), plan.minutes + plan.waits, _known(c)) \
         if plan.units else 0
     if rent:
         from rules import goods
@@ -877,6 +878,11 @@ def forge_roll(request):
     # A skill check: no natural 20 or natural 1 (CRB p.180; `crafting.check_odds`).
     success = margin >= 0
     track, progress = _progress(pc)
+    # Beating the DC by 5 or more (ruling 2026-11-18, `crafting.margin_bonus`): less time
+    # at the anvil and in the wait now; more units and a quality floor at the finish.
+    bonus = crafting.margin_bonus(margin, best) if success else None
+    plan.minutes = crafting.bonus_minutes(plan.minutes, bonus)
+    plan.waits = crafting.bonus_minutes(plan.waits, bonus)
 
     paid = []
     if rent:
@@ -888,7 +894,8 @@ def forge_roll(request):
             paid.append({"cp": rent, "to": (_where(c, pc).get("smithy") or {}).get("keeper")})
     lived = bench_clock.pass_time(c, engine, pc, plan.minutes, "at the forge")
     roll = {"face": best, "faces": faces, "bonus": plan.bonus, "total": total,
-            "dc": plan.dc, "success": success, "margin": margin, "terms": plan.terms}
+            "dc": plan.dc, "success": success, "margin": margin, "terms": plan.terms,
+            "margin_bonus": bonus}
     out = {"roll": roll,
            "verdict": {"verdict": "success" if success else "failure", "natural": best,
                        "word": "Success" if success else "Failure"},
@@ -898,7 +905,8 @@ def forge_roll(request):
         token = secrets.token_urlsafe(16)
         _PENDING[c.id] = {"token": token, "plan": plan, "roll": roll}
         out["token"] = token
-        out["tuning"] = dict(bs.tuning_for(plan), **_game_tuning(plan))
+        out["tuning"] = dict(bs.tuning_for(plan), **_game_tuning(plan),
+                             **crafting.ladder(plan.step_ceiling, bonus))
         out["heat"] = _heat(plan)
     else:
         miss = -margin
@@ -951,7 +959,8 @@ def forge_finish(request):
             return _err(f"The {name} set aside for this step is gone. Nothing was made.",
                         409)
 
-    tier, score = crafting.tier_from_score(body.get("score"), plan.step_ceiling)
+    bonus = pend["roll"].get("margin_bonus")
+    tier, score = crafting.tier_from_score(body.get("score"), plan.step_ceiling, bonus)
     reheats = read_int(body, "reheats", 0, lo=0, hi=50)
     engine = c.engine()
 
@@ -965,7 +974,8 @@ def forge_finish(request):
     # discoveries.
     settled = bs.settle_made(pc, progress, plan, tier,
                              [(fresh[p.key], n) for p, n in plan.consumes],
-                             dice=engine.dice, now=int(c.scene.clock_minutes or 0))
+                             dice=engine.dice, now=int(c.scene.clock_minutes or 0),
+                             margin_bonus=bonus)
     landed = settled["landed"]
     lines, levelled = settled["lines"], settled["levelled"]
     discoveries = settled["discoveries"]
@@ -975,7 +985,7 @@ def forge_finish(request):
     what = ", ".join(f"{n} {w.name}" for _k, w, n in landed)
     c.transcript.append({"who": "gm", "kind": "consequence", "text": (
         f"{pc.name} works the forge: {what}, {tier_name} "
-        f"(d20 {r['face']}{r['bonus']:+d} = {r['total']} vs DC {r['dc']}).")})
+        f"(d20 {r['face']}{r['bonus']:+d} = {r['total']} vs DC {r['dc']}).") + (" " + str((r.get("margin_bonus") or {}).get("words") or "")).rstrip()})
     c.save()
 
     rack_now = {p.key: p for p in _rack(c, pc)}
@@ -995,6 +1005,13 @@ def forge_finish(request):
             entry["build"] = lv._page_build(built_now, pc, (rec or {}).get("pieces"))
         entry["color"] = material_color(w.material)
         entry["next"] = _next_step(w)
+        # A step of an hour or more waits In progress (ruling 2026-11-18): no "Next" for a
+        # piece that is not on the rack yet; the page says when it is ready instead.
+        st = pc.stock.get(key)
+        waiting = inprogress.held_back(st, int(c.scene.clock_minutes or 0)) if st else ""
+        if waiting:
+            entry["next"] = None
+            entry["waiting"] = f"The {w.name} is {waiting}."
         products.append(entry)
     return JsonResponse({
         "tier": tier, "tier_name": tier_name, "score": score,

@@ -246,6 +246,20 @@ def _passage_note(c) -> str:
             f"berth from the offer on the screen.")
 
 
+def _known_places_state(c) -> dict:
+    """`scene.known_places` (play/atlas.py), rebuilt every state like the chart beside it;
+    {} when there is nowhere to stand. Never worth failing a turn over."""
+    from . import atlas
+
+    try:
+        return atlas.known_places(c.engine(), c.world)
+    except Exception:      # noqa: BLE001 — a map is never worth failing a turn
+        import logging
+
+        logging.getLogger("pathfindergm").exception("the known-places state failed")
+        return {}
+
+
 def _places_found_state(c) -> dict:
     """`scene.places_found`: the fog-of-war place chart (play/places_found.py), rebuilt
     from the engine every state beside the exits row it is read from. {} when there is
@@ -811,19 +825,22 @@ def _strike_out_of_reach(scene, pc, raw: list) -> str:
             miss = None
         if miss is None:
             continue
-        x, y = int(frm[0]), int(frm[1])
+        # The square as the board prints it (E6), not x,y (playtest 2026-11-20 #9).
+        from rules.fixtures import square_name
+
+        sq = square_name(frm)
         if before_the_move:
             why = (f"too close for a reach weapon, which strikes from {miss.reach} ft"
                    if miss.too_close else f"and you reach {miss.reach} ft")
             return (f"The strike comes before the move, so it is struck from where you "
-                    f"stand (square {x},{y}), where {foe.name} is {miss.feet} ft away, "
+                    f"stand (square {sq}), where {foe.name} is {miss.feet} ft away, "
                     f"{why}. Nothing was done: put the move first, or strike from where "
                     f"the blow lands and then move.")
         if miss.too_close:
-            return (f"From square {x},{y} {foe.name} would be {miss.feet} ft away — too "
+            return (f"From square {sq} {foe.name} would be {miss.feet} ft away — too "
                     f"close for a reach weapon, which strikes from {miss.reach} ft. Nothing "
                     f"was done: pick another square, or strike without moving.")
-        return (f"From square {x},{y} {foe.name} would be {miss.feet} ft away, and you "
+        return (f"From square {sq} {foe.name} would be {miss.feet} ft away, and you "
                 f"reach {miss.reach} ft — the blow could not land. Nothing was done: pick a "
                 f"square beside them, or strike without moving.")
     return ""
@@ -883,8 +900,10 @@ def _move_after_full_round(scene, pc, raw: list) -> str:
                     "flames": ("Putting out the flames", "step one square, or leave the "
                                                          "move for your next turn"),
                 }[whole]
+                from rules.fixtures import square_name
+
                 return (f"{what} takes the whole round, and after it the only movement "
-                        f"left is a 5-foot step; square {to[0]},{to[1]} is {feet} ft away. "
+                        f"left is a 5-foot step; square {square_name(to)} is {feet} ft away. "
                         f"Nothing was done: {fix}.")
             here = to
     return ""
@@ -1178,6 +1197,11 @@ def _state(c) -> dict:
             # The harbourmaster's berths, offered while the player talks with them
             # (2026-11-13). Appended after pc_down: the key order is a contract.
             "passage_offer": _passage_offer(c, exits_now),
+            # What the player knows of the wider world, for the place map's World,
+            # Continent, Region and Site (play/atlas.py): towns stood in, heard of and
+            # mapped, and the caves and dungeons found with their known rooms. Appended
+            # last: the key order is a contract (2026-11-18).
+            "known_places": _known_places_state(c),
         },
         # The abilities this character can use right now, for the row of buttons under
         # the transcript. Sent with the state because reaching a tier changes it.
@@ -1768,6 +1792,33 @@ def state(request):
         if watcher.drain(c):
             concurrency.bump()
     return JsonResponse(_state(c))
+
+
+@require_GET
+def atlas_view(request):
+    """The world as the place map draws it (play/atlas.py): every settlement, its nation
+    and continent, the ground round it and the journeys between. Static for a campaign,
+    so the page fetches it once rather than on every state.
+
+    `no-store`: the Electron shell keeps its HTTP cache in the user data directory, which
+    outlives every reinstall (CLAUDE.md, the five-day-old stylesheet); a world re-exported
+    under the same campaign must never be drawn from a stale copy."""
+    from . import atlas
+
+    from rules import hexes
+
+    c = campaign_mod.current()
+    got = dict(atlas.atlas(c.world))
+    if got.get("cities"):
+        # The campaign's own stored layout (rules/hexes.py), so the maps draw the towns
+        # exactly where the engine's hexes put them. Stored now if this is its first look.
+        had = isinstance(c.scene.hexes.get("layout"), dict)
+        got["layout"] = hexes.held_layout(c.scene, got)
+        if not had:
+            c.save()
+    response = JsonResponse(got)
+    response["Cache-Control"] = "no-store"
+    return response
 
 
 @require_GET
@@ -2387,6 +2438,13 @@ def _carried(pc) -> list[dict]:
             if usable and d.get(f"{how}able"):
                 acts.append({"label": label, "api": "/api/use",
                              "body": {"item": d["id"], "how": how}})
+        # A nation's map is read (rules/maps.py, `Engine._read_map`): ten minutes, and the
+        # place maps know its towns from then on.
+        from rules import maps as maps_mod
+
+        if maps_mod.is_map(d["name"]):
+            acts.append({"label": "Read", "api": "/api/use",
+                         "body": {"item": d["id"], "how": "read"}})
         # A forged weapon is held, not worn (enchanting lane U1, seen live 2026-10-06): its
         # record's slot is "hands", so this row offered Wear, which wrote the +1 flaming
         # longsword into the gloves' slot as "worn" and left the rapier in hand; nothing on
@@ -2674,12 +2732,19 @@ def write(request):
 
 
 def _gear_acts(row: dict | None, item_id: str) -> list[dict]:
-    """The Equipment row's buttons a gear row earns: Eat, for food (the `eat` op with the
-    item named, through `/api/use`). Nothing else a row says is a button: a bedroll and a
-    tent do their work when you sleep, a backpack while you carry it."""
-    if row and row.get("eat"):
-        return [{"label": "Eat", "api": "/api/use", "body": {"item": item_id, "how": "eat"}}]
-    return []
+    """The Equipment row's buttons a gear row earns, through `/api/use`: Eat for food
+    (the `eat` op with the item named), Drink for drink (`drink`, item named) and Fill
+    for an empty vessel (`drink` with fill). Nothing else a row says is a button: a
+    bedroll and a tent do their work when you sleep, a backpack while you carry it.
+    Drink and Fill came 2026-11-18 (owner bug list item 17): the waterskin had no button
+    anywhere, so the only way to drink it was a jar door that wasted it."""
+    acts = []
+    for verb, label in (("eat", "Eat"), ("drink", "Drink"), ("fills", "Fill")):
+        if row and row.get(verb):
+            acts.append({"label": label, "api": "/api/use",
+                         "body": {"item": item_id,
+                                  "how": "fill" if verb == "fills" else verb}})
+    return acts
 
 
 def _gear_note(row: dict | None) -> str:
@@ -4589,8 +4654,14 @@ def _ask_the_gm(c, engine, question: str) -> str:
     agent.brief_facts = dict(report.get("facts") or {})
     # The story's own use of a word before the rulebook's, as `answer` does: handed the
     # spell *Veil* as grounding, the model answers about the spell (2026-10-03).
-    found = "\n".join(gm_answers.story_first(c, engine, question)
-                      or gm_answers.look_up(c, engine, question))
+    # A crafting question is grounded on the benches' own rules and the character's track
+    # first (owner, 2026-11-17 item 19): the rulebook's "Forge" is not the forge.
+    # They ride as the record (last, under "answer from what is above"), and the world
+    # search and town notes stay out: measured live, "how does drying work" came back
+    # with the town's "some of what the town keeps" note tacked on.
+    crafts = gm_answers.craft_facts(c, engine, question)
+    found = "" if crafts else "\n".join(gm_answers.story_first(c, engine, question)
+                                        or gm_answers.look_up(c, engine, question))
     # What the character would know (2026-09-18, item 9). Public facts are answered.
     # Rumour-grade facts ride ONE secret Knowledge (local) roll per place — DC 15, the
     # Core Rulebook's "common rumour", "Try Again: No" — recorded on the scene so
@@ -4635,24 +4706,39 @@ def _ask_the_gm(c, engine, question: str) -> str:
     # A question that names a thing the record has nothing on is answered by the code,
     # never by the model — which, told to say "unknown", does so about a third of the
     # time and answers confidently the rest.
-    hits = gm_search.search(c.world, question)
-    here = gm_search.asks_about_here(question) or gm_answers.wants_a_reading(question)
+    hits = [] if crafts else gm_search.search(c.world, question)
+    here = not crafts and (gm_search.asks_about_here(question)
+                           or gm_answers.wants_a_reading(question))
     # The place the party stands in is the default subject of a question that names
     # nobody: "who guards the gate" found a town called Dustgate; the gate meant was this
     # one. A proper name with hits is the one case the notes are left out.
+    # Out on a hex of open ground, or in its site, "here" is not the town the hex is filed
+    # under: playtest 2026-11-20 #11, in the ruins twelve miles out, the town's notes
+    # grounded the answer and its footer said "Some of what the town keeps". A question
+    # that names the town still finds it through `hits`.
+    from rules import hexes as hexes_mod
+
+    out_on_a_hex = hexes_mod.parse_place(str(c.scene.at or "")) is not None
     notes = (gm_search.dossier(c.world, c.location, question, allow=allow)
-             if (here or not hits or not gm_search.proper_noun(question)) else "")
-    if not hits and not found and not here:
+             if not crafts and not out_on_a_hex
+             and (here or not hits or not gm_search.proper_noun(question))
+             else "")
+    if not hits and not found and not here and not crafts:
         unknown = gm_search.unfiled(c.world, question)
         if unknown:
             return gm_search.nothing_filed(question, unknown, notes)
-    record = gm_search.passages(c.world, hits, question, allow=allow)
+    record = ("\n".join(crafts) if crafts
+              else gm_search.passages(c.world, hits, question, allow=allow))
     # What was kept back, and the line that says so.
     kept: list[str] = []
     if c.location is not None and notes:
         kept += [k for k, _t in gm_search.withheld_from(
             dict(getattr(c.location, "facts", {}) or {}), allow)]
-    for h in hits:
+    # Out on a hex, a question that names nothing is about the ground underfoot: the search's
+    # loose matches (live 2026-11-20 in the ruins: "the Salt Fever", the world itself, a
+    # stranger's secret) are not what was asked about, and their withheld facts printed the
+    # town's footer twelve miles from any town (#11).
+    for h in (hits if not out_on_a_hex or gm_search.proper_noun(question) else ()):
         kept += [k for k, _t in gm_search.withheld_from(h.facts or {}, allow)]
     withheld_note = ""
     # Only when the question was about the world: a named thing found (`hits`) or the place
@@ -4667,6 +4753,12 @@ def _ask_the_gm(c, engine, question: str) -> str:
             withheld_note = ("\n  — There is more here your character wouldn't know yet. "
                              "Say the word (\"tell me anyway\") if you want it, or find "
                              "it out in play: ask around (Diplomacy, an hour or four).")
+        elif out_on_a_hex:
+            # Gather Information is "canvassing people at local taverns, markets, and
+            # gathering places" (CRB, Diplomacy): there are none out here.
+            withheld_note = ("\n  — Some of what is known about that, your character has "
+                             "not learned. Ask around in a town: Diplomacy, an hour or "
+                             "four, and it can be tried again.")
         else:
             withheld_note = ("\n  — Some of what the town keeps, your character has not "
                              "learned. Ask around in play: Diplomacy, an hour or four, "
@@ -4851,9 +4943,7 @@ def _advance(c, agent, narration, plan, player_input):
     # answer is the strongest template it sees, so the parts that must be written fresh
     # each turn are withheld from it. The full intents still reach the turn log.
     c.history.append({"role": "assistant", "content": json.dumps(
-        {"narration": narration,
-         "intents": [{"op": i.op, "actor": i.actor, "target": i.target}
-                     for i in plan.intents]}
+        {"narration": narration, "intents": [_remembered(i) for i in plan.intents]}
     )})
     _remember(c, resolution, player_input)
     _log_turn(c, plan, resolution)
@@ -4864,6 +4954,19 @@ def _advance(c, agent, narration, plan, player_input):
 
     return _finish(c, agent, resolution, narration, player_input, plan)
 
+
+
+def _remembered(i) -> dict:
+    """One intent as the history keeps it: op, actor, target — and a `say`'s words, which
+    are the player's own line (the user message just above it), so there is nothing of the
+    model's to parrot. Playtest 2026-11-17b #22: every remembered say was `{"op": "say",
+    "actor": "pc", "target": "c45"}`, a say with nothing in it, and the plans copied the
+    shape: 10 refusals of "say: missing required param(s) words" on 4 of round 5's turns,
+    seven on one."""
+    out = {"op": i.op, "actor": i.actor, "target": i.target}
+    if i.op == "say" and (i.params or {}).get("words"):
+        out["params"] = {"words": i.params["words"]}
+    return out
 
 
 def _arm_cards(agent, c) -> None:
@@ -5343,6 +5446,10 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             for ref in ([looked] if looked in owed else []) + sorted(owed - {looked}):
                 who = c.scene.actors.get(ref)
                 if who is None or not getattr(who, "appearance", ""):
+                    continue
+                if c.scene.sees_nothing(c.scene.pc(), who):
+                    # Unseen in the dark (playtest 2026-11-16 #57): owed, not given, so
+                    # the face comes on the first beat there is light to see it by.
                     continue
                 # The people's line once per campaign; after that this person's own
                 # details (rules/faces.py, "a people described once").
@@ -6050,8 +6157,14 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 # ends the fight when they are stable and lets the winners act — "the
                 # player down is not the fight over", above. A player held (paralysed,
                 # bound) has no rounds on that door, so their fight ends here as before.
-                c.transcript.append({"who": "gm", "text": lost, "kind": "consequence"})
-                if downed.state_of(scene.pc()) in ("dying", "stable"):
+                # A bout lost ends there, with its purse to the other fighter and its
+                # state off both (`Engine._settle_bout`, rules/arena.py): a knockout bout
+                # ends when one side falls, so the winner does not go on swinging at a
+                # fighter out cold (Ultimate Combat, Performance Combat).
+                bout = c.engine()._settle_bout()
+                c.transcript.append({"who": "gm", "text": lost + bout,
+                                     "kind": "consequence"})
+                if not bout and downed.state_of(scene.pc()) in ("dying", "stable"):
                     return
                 scene.end_encounter()
                 return
@@ -6071,6 +6184,13 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
         for b in scene.bleeding:
             who = scene.get(b["ref"])
             name = who.name if who else b["ref"]
+            # A bestiary creature is a kind of thing, with its article, and every line opens
+            # with a capital: "giant cockroach is still down" (playtest 2026-11-20 #108).
+            from rules.engine import _sentence, _the_creature
+
+            if who is not None and getattr(who, "from_template", ""):
+                name = _the_creature(name)
+            name = _sentence(name)
             line = {
                 "dead": f"{name} stops moving.",
                 "stable": f"{name} is still down, but the bleeding has stopped.",
@@ -6764,8 +6884,16 @@ def use_item(request):
     # rations reset my hunger"): it spends one and resets hunger through
     # rules/survival.py. A jar is drunk, thrown or coated by `use_item`, as before.
     power = str(body.get("power", "") or "").strip()
+    from rules import gear as gear_mod
+
+    # Drinking out of the pack and filling its skins are the `drink` op's (2026-11-18,
+    # owner bug list item 17); a jar is still `use_item`'s.
+    drinks = how == "fill" or (how == "drink" and gear_mod.drinkable(pc, item) is not None)
     raw = ({"op": "eat", "actor": "pc", "because": f"{pc.name} eats",
             "params": {"item": item}} if how == "eat" else
+           {"op": "drink", "actor": "pc",
+            "because": f"{pc.name} {'fills a skin' if how == 'fill' else 'drinks'}",
+            "params": {"fill": True} if how == "fill" else {"item": item}} if drinks else
            # A magic item's power (`use_item {item, power}`, `Engine._use_power`): the
            # Equipment row's Use for a worn ring's daily spell or a pot of war paint.
            # Before 2026-10-30 only the GM's words reached it, so a bought paint had no
@@ -6941,6 +7069,7 @@ def _merchant_here(scene):
     for another.
     """
     from rules import keepers, states
+    from rules import services as services_mod
 
     found = []
     for ref, a in scene.actors.items():
@@ -6951,8 +7080,11 @@ def _merchant_here(scene):
         # they are called. The name test below cannot see a keeper: they are named out
         # of the world ("Gorvothys Vyrnys") precisely so that they are a person and not
         # a job title, and a panel that only opens for people called "the stallholder"
-        # would refuse every real shopkeeper this app builds.
-        if keepers.keeps_a_counter(a):
+        # would refuse every real shopkeeper this app builds. A temple's keeper sells its
+        # castings across the same panel (rules/services.py, playtest 2026-11-16 #70).
+        # And somebody selling what they carry, a carter off a cart (playtest 2026-11-20 #6).
+        if keepers.keeps_a_counter(a) or services_mod.keeps_a_temple(a) \
+                or a.has_state(states.SELLS_WHAT_THEY_CARRY):
             found.append(a)
             continue
         if keepers.is_keeper(wid) and not keepers.counter_of(wid) \
@@ -7057,24 +7189,45 @@ def _offer_and_seller(c, player_text: str):
     from rules import keepers
 
     want = judgement.purchase_sought(player_text)
-    if not want or c.scene.in_encounter:
+    # A sale offered opens the same counter (playtest 2026-11-17 #8): "offer to sell the
+    # silk from the Red Gull's hold" is an offer, never a sale (`acts_to_ops._sell`), and
+    # the screen is where a priced sale is made in one step.
+    selling = "" if want else judgement.sale_offered(player_text)
+    if want and _room_slept_in(c, player_text, want):
+        want = ""
+    if not (want or selling) or c.scene.in_encounter:
         return None, None
     pc = c.scene.pc()
     if pc is None:
         return None, None
+    extra = {"sell": selling} if selling else {}
     counter, seller, _at, choices = _counter_pick(c, want=want)
     if choices:
         if seller is None or keepers.shut_here(c.scene, seller):
             return None, None
         if _counter_refusal(c, pc, seller) is not None:
             return None, None
-        return {"open": True, "want": want, "line": counter.id}, seller
+        return {"open": True, "want": want, "line": counter.id, **extra}, seller
     merchant = _merchant_here(c.scene)
     if keepers.shut_here(c.scene) or merchant is None:
         return None, None
     if _counter_refusal(c, pc) is not None:
         return None, None
-    return {"open": True, "want": want, "line": ""}, merchant
+    return {"open": True, "want": want, "line": "", **extra}, merchant
+
+
+def _room_slept_in(c, player_text: str, want: str) -> bool:
+    """Whether the purchase is a room the same line sleeps in: "I pay for a room for the
+    night and go to bed" is the rest door's, which bills the room and holds it
+    (`Engine._room_bill`), so no counter opens to sell it a second time. The reading's
+    `rest` and the inn's own stays (`lodging.find`), never the words."""
+    from gm import interpret
+    from rules import lodging
+
+    if not lodging.lets_beds(c.scene) or lodging.find(want) is None:
+        return False
+    reading = interpret.reading_of(str(player_text or "")) or {}
+    return any(a.get("act") == "rest" for a in reading.get("actions") or [])
 
 
 def _trade_offer(c, player_text: str) -> dict | None:
@@ -7099,7 +7252,7 @@ def _buying_note(c, player_text: str) -> str:
         # 2026-09-27, the market shut for the night: the prose invented a vendor, sold
         # bread and torches, and finished "The transaction for the egg is complete".
         want = judgement.purchase_sought(player_text)
-        if not want or c.scene.in_encounter:
+        if not want or c.scene.in_encounter or _room_slept_in(c, player_text, want):
             return ""
         from rules import keepers
 
@@ -7116,6 +7269,11 @@ def _buying_note(c, player_text: str) -> str:
         # Which counter, by name: the market is its counters, and the prose that walks
         # the player to "the stallholder" without saying which invents one (item 10).
         where = f" at {label}" if label else ""
+    if offer.get("sell"):
+        return (f"The player offers {offer['sell']} for sale: the counter's own screen opens "
+                f"for it after this beat. {who}{where} comes to the counter and may look the "
+                f"goods over and name a price; nothing is sold and no coin changes hands in "
+                f"the prose — the player sells on the screen.")
     return (f"The player is buying {offer['want']}: the counter's own screen opens for it "
             f"after this beat. {who}{where} comes to the counter and may show the goods "
             f"and name a price; nothing is handed over and no coin changes hands in the "
@@ -7153,6 +7311,12 @@ def _counter_refusal(c, pc, merchant=None):
     if refused:
         return JsonResponse({"error": refused}, status=409)
     if states.standing_with_the_law(pc, town) != "wanted":
+        return None
+    from rules import services as services_mod
+
+    if services_mod.keeps_a_temple(merchant):
+        # Sanctuary: a temple tends the hurt whoever is looking for them (owner call,
+        # 2026-11-16 overnight). The refusal below is the watch's reach, not the faith's.
         return None
     return JsonResponse({"error": (
         f"{merchant.name} looks at {pc.name} and then at the door. {pc.name} is "
@@ -7279,8 +7443,14 @@ def _food_names() -> frozenset:
     (`goods.deliver`); the gear list's food rows are how it is known for food."""
     from rules import goods
 
+    from rules import gear as gear_mod
+
+    # And every name a gear row with `eat`, `drink` or `fills` answers to: trail rations
+    # and the waterskin were filed on the gear shelf among the rope (owner bug list
+    # 2026-11-18, item 17).
     return frozenset(str(e["name"]).lower() for e in goods.GEAR.values()
-                     if e.get("category") in ("food", "provisions"))
+                     if e.get("category") in ("food", "provisions")) | frozenset(
+        n for n in gear_mod._by_name() if gear_mod.provision_row(n))
 
 
 @require_POST
@@ -7324,6 +7494,8 @@ def trade(request):
     refusal = _counter_refusal(c, pc, merchant)
     if refusal:
         return refusal
+    if counter is None and _sells_carried(merchant):
+        return JsonResponse(_carried_wares(c, pc, merchant, want))
 
     place, stall, day = _stall_of(c, counter, merchant, str(body.get("stall") or ""))
     kind = counter.kind if counter is not None else market.counter_kind_here(c.scene, stall)
@@ -7344,10 +7516,16 @@ def trade(request):
     # it is not, the keeper says so (tbaMUD: "Sorry, I haven't got exactly that item.")
     # and nothing is guessed in its place.
     pick, want_line = "", ""
+    picks: list[str] = []
     if want:
         found, _fits = goods.match_want(want, shelf)
+        listed = goods.wants_among(want, shelf) if found is None else []
         if found is not None:
             pick = str(getattr(found, "id", ""))
+        elif listed:
+            # A list of things (#11): each one the shelf has, in the basket.
+            picks = [str(getattr(g, "id", "")) for g in listed]
+            pick = picks[0]
         else:
             who = getattr(merchant, "name", "") or "The keeper"
             thing = re.sub(r"^(?:a|an|some|the)\s+", "", want)
@@ -7361,8 +7539,49 @@ def trade(request):
         # A keeper minted for this counter is part of the save from now on.
         c.save()
 
+    from rules import services as services_mod
+
+    temple = services_mod.keeps_a_temple(merchant)
+    temple_rows: list[dict] = []
+    if temple:
+        # A temple's wares are its castings (rules/services.py), priced as the engine's buy
+        # door charges them (`Engine._buy_spell`: the keeper's terms, never a haggle), and
+        # it buys nothing.
+        scale = places_mod.scale_of(c.location) if c.location is not None else "town"
+        percent, moved, _markup = c.engine()._cargo_terms(pc, merchant)
+        for r in services_mod.menu(scale):
+            gp = pricing.moved_cp(r["cp"], percent) / 100
+            temple_rows.append({"id": r["id"], "name": r["spell_name"].capitalize(),
+                                "tier": "common", "count": 1, "gp": gp,
+                                "price": pricing.as_text(gp), "does_something": True,
+                                "shelf": "magic", "staple": False})
+        if want:
+            found_row = services_mod.find(want, scale)
+            pick = found_row["id"] if found_row is not None else ""
+            want_line = "" if pick else (f"{merchant.name} casts no such spell for pay. "
+                                         f"This is what the temple casts.")
+
+    # An inn's or a tavern's rooms beside its food and drink (rules/lodging.py, playtest
+    # 2026-11-17b #10), priced as the engine's buy door charges them (`Engine._buy_stay`:
+    # the keeper's terms, never a haggle).
+    from rules import lodging as lodging_mod
+
+    stay_rows: list[dict] = []
+    if not temple and lodging_mod.lets_beds(c.scene) \
+            and _keepers.keeper_in(c.scene, str(c.scene.at or "")) is merchant:
+        stay_percent, _why = pricing.seller_percent(c.scene, merchant)
+        for r in lodging_mod.menu():
+            gp = pricing.moved_cp(r["cp"], stay_percent) / 100
+            stay_rows.append({"id": r["id"], "name": r["shown"], "tier": "common",
+                              "count": 1, "gp": gp, "price": pricing.as_text(gp),
+                              "does_something": True, "shelf": "gear", "staple": False})
+        stay = lodging_mod.find(want) if want and not (pick or picks) else None
+        if stay is not None:
+            pick, want_line = stay["id"], ""
+
     return JsonResponse({
         "stall": stall, "place": place, "day": day, "pick": pick, "want_line": want_line,
+        "picks": picks or ([pick] if pick else []),
         "line": counter.id if counter is not None else "",
         "counter": counter.label if counter is not None else "",
         "lines": _lines_of(c, at, choices) if choices else [],
@@ -7383,20 +7602,71 @@ def trade(request):
             ({**_row(s, tradecraft.sell_price(
                 pricing.what_a_shop_pays(s, seller=pc, town=place), percent), s.count),
               "unit": goods.unit_for(getattr(s, "base", "") or s.name)}
-             for s in pc.stock.values()),
+             for s in pc.stock.values() if not temple),
             key=lambda r: -r["gp"]),
-        "theirs": sorted((_row(m, tradecraft.buy_price(
-            pricing.worth(m, buyer=pc, town=place), percent)) for m in shelf),
-                         key=lambda r: -r["gp"]),
+        "theirs": temple_rows if temple else stay_rows + sorted(
+            (_row(m, tradecraft.buy_price(pricing.worth(m, buyer=pc, town=place), percent))
+             for m in shelf), key=lambda r: -r["gp"]),
         "haggled": haggled,
         # Why the prices moved, in words ("the smith likes you: 5% off"), or "".
-        "terms": tradecraft.terms_said(merchant, percent, why),
+        "terms": moved if temple else tradecraft.terms_said(merchant, percent, why),
         "terms_percent": percent,
-        "can_haggle": not haggle_spent,
+        "can_haggle": not haggle_spent and not temple,
         "law": states.standing_with_the_law(pc, place),
         # Bulk trade goods (rules/trade.py): what this place makes, and the party's lots.
-        "cargo": _cargo_block(c, pc, merchant),
+        "cargo": (dict(_cargo_block(c, pc, merchant), offers=[], lots=[]) if temple
+                  else _cargo_block(c, pc, merchant)),
     })
+
+
+def _sells_carried(merchant) -> bool:
+    """Whether the panel's seller sells what they carry rather than a counter's shelf."""
+    from rules import keepers, states
+
+    return (merchant is not None and merchant.has_state(states.SELLS_WHAT_THEY_CARRY)
+            and not keepers.keeps_a_counter(merchant))
+
+
+def _carried_wares(c, pc, merchant, want: str) -> dict:
+    """The panel's answer for somebody selling what they carry (playtest 2026-11-20 #6):
+    "theirs" is their own `goods`, each line at the price `Engine._buy_carried` charges,
+    counted as they hold it; they buy nothing ("mine" empty, as a temple's) and keep no
+    till but their purse. The list IS the record — tbaMUD's `shopping_list` walks the
+    keeper's own carrying list."""
+    from rules import goods, pricing, states, tradecraft
+
+    percent, why = pricing.seller_percent(c.scene, merchant)
+    rows = []
+    for key, n in merchant.goods.items():
+        g = goods.good(key)
+        if g is None or int(n or 0) <= 0:
+            continue
+        rows.append(dict(_row(g, tradecraft.buy_price(float(g.price_gp), percent),
+                              int(n)), staple=False))
+    rows.sort(key=lambda r: -r["gp"])
+    pick, want_line = "", ""
+    if want:
+        found, _fits = goods.match_want(want, [goods.good(k) for k in merchant.goods
+                                               if goods.good(k) is not None])
+        pick = str(getattr(found, "id", "")) if found is not None else ""
+    coins = goods.coins_here(c.world, c.scene)
+    gp = round(goods.in_copper(merchant.purse) / 100, 2)
+    place = str(c.scene.location_id or "")
+    return {
+        "stall": "", "place": place, "day": 0, "pick": pick, "want_line": want_line,
+        "picks": [pick] if pick else [], "line": "", "counter": "", "lines": [],
+        "seller": {"ref": merchant.ref, "name": str(merchant.name)},
+        "till": {"gp": gp, "text": goods.purse_line(merchant.purse, coins)
+                 if gp else "no coin"},
+        "purse": goods.purse_line(pc.purse, coins),
+        "purse_gp": round(goods.in_copper(pc.purse) / 100, 2),
+        "mine": [], "theirs": rows, "haggled": 0,
+        "terms": tradecraft.terms_said(merchant, percent, why, who=str(merchant.name)),
+        "terms_percent": percent, "can_haggle": False,
+        "law": states.standing_with_the_law(pc, place),
+        "cargo": {"offers": [], "lots": [], "haul": {"lb": 0}, "carried_lb": 0,
+                  "terms": ""},
+    }
 
 
 def _cargo_block(c, pc, merchant) -> dict:
@@ -7487,6 +7757,15 @@ def trade_do(request):
     op = str(body.get("op", "")).strip().lower()
     if op not in ("sell", "buy"):
         return JsonResponse({"error": "sell or buy"}, status=400)
+    from rules import services as services_mod
+
+    if op == "sell" and services_mod.keeps_a_temple(merchant):
+        return JsonResponse({"error": f"{merchant.name} buys nothing: a temple casts for "
+                                      f"pay, and is no shop."}, status=409)
+    carried = counter is None and _sells_carried(merchant)
+    if op == "sell" and carried:
+        return JsonResponse({"error": f"{merchant.name} sells what they carry and buys "
+                                      f"nothing: there is no counter here."}, status=409)
 
     place, stall, day = _stall_of(c, counter, merchant, str(body.get("stall") or ""))
     item = str(body.get("item", "")).strip().lower()
@@ -7496,7 +7775,7 @@ def trade_do(request):
                                 hi=CARGO_COUNT_MAX if item.startswith("cargo:") else 999)}
     # At a market's counter the keeper is named, so the tell says who was paid — never
     # the master, who sells nothing (I2).
-    if counter is not None:
+    if counter is not None or carried:
         params["from_" if op == "buy" else "to"] = merchant.ref
     # The haggle, when the screen has offered a partial and the player took it. Only ever
     # lowers what is asked — see `_op_sell`.
@@ -7521,6 +7800,13 @@ def trade_do(request):
         return JsonResponse({"error": f"{type(exc).__name__}: {exc}"}, status=400)
 
     tell = _page_tells(c, resolution.outcomes)
+    # On the record like every turn (`_log_turn`'s shape): frag T109 (owner's save
+    # 2026-11-17) bought a good room here and the turn log had no row of it, so nothing
+    # could say which stay was bought, or that it was bought at all.
+    c.turn_log.append(history_mod.stamp(c, {
+        "kind": "turn", "door": "trade",
+        "intents": [{"op": op, "actor": "pc", "params": params, "because": "at the counter"}],
+        "outcomes": [o.as_dict() for o in resolution.outcomes]}))
     c.transcript.append({"who": "gm", "kind": "consequence", "text": tell})
     c.save()
     return JsonResponse({"ok": True, "tell": tell})

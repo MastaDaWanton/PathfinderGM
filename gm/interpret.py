@@ -42,8 +42,27 @@ ACTS = (
     "sell", "give", "take", "drop", "steal", "attack", "cast", "use", "consume", "wait",
     "rest", "rise", "call_on", "break_in", "stealth", "athletics", "exert", "gather",
     "follow", "request", "claim", "craft", "commission", "escape", "loot", "harvest", "prone",
-    "disguise", "threaten", "surrender", "other",
+    "disguise", "threaten", "surrender", "challenge", "fend", "hunt", "other",
 )
+# `challenge` since 2026-11-18 (playtest 2026-11-17b #24): "Put me in the next bout. Who do
+# I fight, and what does the winner take?" to an arena's master of the games was read
+# `other` and `talk`, owed no op, and the master gave two speeches and staged nothing.
+# Offering or asking for a bout is its own deed; at an arena it owes the engine's `bout`
+# op, built whole (`acts_to_ops._challenge`): the opponent by the encounter budget, the
+# purse, and a knockout fight (rules/arena.py). The target is who is challenged, if
+# anybody; a challenge to a person anywhere but an arena owes nothing yet (stays talk).
+# `fend` since 2026-11-18, from the owner's report of 2026-11-17 (#6): parched in a
+# forest, "I search for a pond, spring or river", "I search for a source of water" and "I
+# search for a river" were read `search` three times and built a Perception check, a herb
+# forage and a hunt for tracks; nothing gave water. Living off the land is its own deed in
+# the book — Survival's "get along in the wild" (CRB p.107): DC 10, hunting and foraging
+# feeds and waters you for a day, and one more person per 2 points over — and it owes the
+# engine's `live_off_land` op, built whole (`acts_to_ops._fend`). `hunt` is the same
+# rule's hunting, an act of its own: it owes the `hunt` op, which draws an animal through
+# the forage's creature pick. It was a closed `seeks` choice on `fend` first, and live
+# 2026-11-18 "I go hunting for game in the woods" came back water-and-food three times
+# out of three (the enum's first value, with no hunt demonstration the prompt budget
+# could hold); an act's own name is the reader's strongest cue.
 # `prone` since 2026-11-15, from the playtest that day (#62, #64): "I drop to my knees, put
 # my hands behind my head" was read `go`, the engine told "Vesna Kroll moves from near to
 # near", no prone state was laid, and the sergeant's spear swung at her standing AC. Going
@@ -165,6 +184,19 @@ DIVERSIONS = ("none", "bluff")
 #   `take`: twenty when the words take 20 or search for as long as it takes, ten when
 #     they take 10, else roll (Taking 10 and Taking 20, CRB p.86).
 SEARCH_WHERE = ("elsewhere", "here")
+# `seeking` since 2026-11-20, the third closed answer of a `search`: what kind of thing its
+# `object` is. The owner's ruling that day: "If I type to search for anything I should be
+# searching for that thing, not tracks. If I look for a river and it tells me there are no
+# tracks this is a bug." #28 of the playtest, "I search the woods for the cave everyone has
+# a story about", was read `where: elsewhere`, which owed no op; the plan rolled a track and
+# a secret-door check, and the page answered about footprints. The engine now answers about
+# the named thing (`Engine._sought`), with its own finders for a person, a place and a
+# thing; `water` is the one kind no finder can ground from the words (a well, a spring, a
+# stream), so the reader names it. Water sought out in the wild is still `fend` (CRB
+# p.107, the owner's 2026-11-17 #6), which waters the party; `seeking: water` is for a
+# search the reader files as one (the town's well). `anything` is a search for whatever is hidden (a
+# hatch, a way down, a trap, somebody hiding) or names nothing at all.
+SEEKING = ("anything", "a person", "a place", "a thing", "water")
 TAKES = ("roll", "ten", "twenty")
 # `until` since 2026-11-01, on `wait` and `rest`: the time of day the words wait or sleep
 # until, as a closed choice the sampler holds. The owner's report that day (Corvin): "wait
@@ -206,7 +238,7 @@ DAY_PARTS = frozenset({"dawn", "morning", "noon", "dusk", "midnight"})
 
 # What a `request` asks for: payment (pay, a reward, wages, compensation, money) or a
 # favour (help, aid, a service). `rules/requests.KINDS` is the engine's copy of this list.
-REQUESTS = ("payment", "favour")
+REQUESTS = ("payment", "favour", "hire")
 # `rise` and `track` since 2026-10-09, both from one live run (gemma-4-12B, Pangrella):
 #
 # * "I break camp and head back to town" was read `rest, go` — the vocabulary had a word
@@ -303,12 +335,13 @@ ACT_COSTS: dict[str, str] = {
     "look": "quick", "take": "quick", "give": "quick", "drop": "quick", "consume": "quick",
     "use": "quick", "steal": "quick", "cast": "quick", "break_in": "quick",
     "athletics": "quick", "exert": "quick", "escape": "quick", "rise": "quick",
-    "other": "quick", "prone": "free", "disguise": "takes_time",
+    "other": "quick", "prone": "free", "disguise": "takes_time", "fend": "takes_time",
+    "hunt": "takes_time",
     "journey": "takes_time", "search": "takes_time", "track": "takes_time",
     "gather": "takes_time", "craft": "takes_time", "harvest": "takes_time",
     "loot": "takes_time", "wait": "takes_time", "rest": "takes_time",
     "talk": "addresses", "insult": "addresses", "request": "addresses", "buy": "addresses",
-    "threaten": "addresses",
+    "threaten": "addresses", "challenge": "addresses",
     "sell": "addresses", "commission": "addresses", "call_on": "addresses",
     "attack": "addresses", "surrender": "addresses",
 }
@@ -410,6 +443,13 @@ def within_place(action: dict, places=(), here: str = "") -> bool:
             said in (p.name.lower(), p.name.lower().removeprefix("the ")) and p.id != here
             for p in places):
         return False
+    # And one named with where it is (`places.by_locative`): playtest 2026-11-16 E1, "I
+    # walk back down to the well room under the sewers" was read `within_place` with
+    # fixture `floor` in the gardens, and the walk was dropped as a move inside them.
+    if said and places:
+        located = places_mod.by_locative(places, said, here)
+        if located is not None and located.id != here:
+            return False
     # And a ship's room by her name ("the hold of the Red Gull", `places.find`): live
     # 2026-11-16 it was read `within_place` with fixture `floor` and the walk dropped.
     if said and places:
@@ -515,6 +555,10 @@ ACT_SLOTS: dict[str, tuple[str, ...]] = {
     "disguise": ("object",),
     # Who the player gives themselves up to ("the sergeant", "the city watch").
     "surrender": ("target",),
+    # Who is challenged to a bout, if anybody ("the champion", "one of the soldiers").
+    "challenge": ("target",),
+    # What is looked for (water, a river, a deer) and where the looking is done.
+    "fend": ("object", "place"), "hunt": ("object", "place"),
     "other": ("target", "object", "place"),
 }
 
@@ -524,15 +568,16 @@ go        walk somewhere within reach (a place in town, the crossroads, the fiel
           `within_place` is true for a move inside the place you are in (across the
           room, to the hearth, a corner, the bar, the window), false for anywhere else;
           `fixture` is which fixture the walk is to (counter for a bar, bookshelf, stair,
-          barrel…; gallery for a wall-walk, landing, loft or balcony above the floor;
-          floor for back down to the ground), or none
+          barrel…; gallery for upstairs, a landing, loft, balcony;
+          floor for back down to the ground), or none. The object is what or who you
+          take along: a thing carried, or a person you lead or who comes with you
 journey   take the road or a ship to another town; book or take passage, board a ship
           bound somewhere, set sail, sail on, or order a ship's crew to sail somewhere
 leave     walk or climb out of where you are — a building, ground gone down into (a
           cellar, a crypt, the sewers, a cave), or the settlement itself — with nowhere
           else named
 look      look, watch, listen, read, examine
-search    look for a THING or a PLACE (water, a way in, somewhere to sleep). `where` is
+search    look for a THING or a PLACE (a way in, somewhere to sleep). `where` is
           here for going over where you are or a part of it (a room, its walls or
           floor, a ship's hold, the ground here) for anything hidden or lost, else
           elsewhere; `take` is twenty when the words take 20 or keep searching as long
@@ -541,18 +586,17 @@ track     look for tracks, a trail or footprints; read the ground for who passed
 seek      look for, ask around for, wave down, head for or turn to a PERSON
 talk      speak to, ask, tell, greet, thank, persuade, order, haggle with somebody;
           asking a question, for directions or for advice is talk
-request   ask somebody to pay you for your work, reward you, or do you a favour or help
-          for nothing in return; `asks_for` is payment (money owed or given to you) or
-          favour (anything else). Buying, ordering, taking a room and paying or bribing
-          somebody are never a request
+request   ask somebody to pay you, reward you, help you for nothing, or work for you for
+          a wage; `asks_for` is payment (money to you), hire (them on a wage) or favour
+          (else). Buying, ordering, taking a room, paying or bribing are never a request
 insult    mock, taunt, call names, spit at, pick a fight with words — and telling
           anybody something meant to shame somebody ("I tell the room he is a coward")
-buy       buy, order, shop for, pay for goods, take goods and pay the seller for them;
-          the object is the goods
+challenge ask for a bout or duel, or a place in an arena's bout
+buy       buy, order, shop for, browse wares, pay for goods; the object is the goods
 sell      sell, offer for sale, agree a sale, accept a price, close a deal
 give      hand over, pay a debt or a fee, buy somebody a drink
-take      pick up, take, tip or count out of a container; the target is the
-          person or the container it comes out of
+take      pick up, take, accept a gift, tip or count out of a container;
+          the target is the person or the container it comes out of
 drop      put down, set down, drop or leave a thing behind
 steal     pick a pocket, steal, filch
 loot      loot, strip, search or go through the body or belongings of somebody or some
@@ -592,7 +636,8 @@ exert     lift, push, pull, heave, drag, hold up or shift something heavy by mai
           strength, alone or with somebody; the target is whoever you help with it.
           Never a person pushed or shoved: that is attack
 gather   forage, gather, fill waterskins
-follow    follow somebody or a trail; go along with or come quietly with whoever is
+follow    follow somebody or a trail (not a road, tunnel or river: going along one
+          is go); go along with or come quietly with whoever is
           taking you somewhere (going quietly is never stealth)
 claim     assert who or what you are
 craft     make or work something yourself at a trade: forge, smith, hammer out or
@@ -613,6 +658,8 @@ prone     drop to the ground, throw yourself flat, hit the deck, lie down in a f
 disguise  make yourself look like somebody else or like nobody anyone would know: a
           disguise, a false look, passing yourself off as another, using the Disguise
           skill; the object is who or what you mean to pass for
+fend      seek water or food in the wild
+hunt      hunt or fish for game
 surrender give yourself up: yield, lay down your arms, put your hands up to be taken,
           hand yourself in, or own up to the watch or a guard that you did a crime; the
           target is who you give yourself up to. Said in words ("I tell the sergeant I
@@ -633,11 +680,11 @@ addresses   asking, offering, buying from, threatening, insulting or striking so
             here who will answer"""
 
 _DEMOS = [
-    ("I head down to the docks and ask a fisherman what he caught today.",
-     {"question": False, "claims": [], "actions": [
-         {"span": "head down to the docks", "place": "the docks", "act": "go"},
-         {"span": "ask a fisherman what he caught today", "target": "a fisherman",
-          "says": "what he caught today", "act": "talk"}]}),
+    # The walk-then-ask pair that opened this list ("I head down to the docks and ask a
+    # fisherman what he caught today") was dropped 2026-11-18 at the 0.4.3 merge to fit the
+    # window (49,492 > 49,228 chars). It was the pair `window.fit` silently cut on every
+    # reading until 0.4.1 (playtest 2026-11-16 N4), so the game had played without it;
+    # walk-then-talk is still shown by the netmaker and candle pairs.
     ("I look for the tailor who mended my cloak last week.",
      {"question": False, "claims": [], "actions": [
          {"span": "look for the tailor who mended my cloak last week",
@@ -679,6 +726,13 @@ _DEMOS = [
          {"span": "ask the gatekeeper to hold the gate open for me",
           "target": "the gatekeeper", "object": "to hold the gate open for me",
           "asks_for": "favour", "act": "request"}]}),
+    # A hire (2026-11-18, playtest 2026-11-17b #21), in no world's words. The prompt's
+    # budget (tests/test_playtest_2026_11_17_reader_budget.py) had room for one; a bout
+    # asked for and a browse are their glosses' (`challenge`, `buy`).
+    ("I take the drover on as my bodyguard.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "take the drover on as my bodyguard", "target": "the drover",
+          "object": "my bodyguard", "asks_for": "hire", "act": "request"}]}),
     # …and what is NOT a request, because the first cut took them: on the labelled set
     # "I order an ale" and "I pay for a room at the inn" came back `request` (they are
     # buy and rest), and "I try to bribe the gatekeeper with a silver coin" too (a give).
@@ -698,6 +752,10 @@ _DEMOS = [
          {"span": "smash the tavern door", "object": "the tavern door", "act": "break_in"}]}),
     ("Is it still raining?",
      {"question": True, "claims": [], "actions": []}),
+    # What a search is for, the closed `seeking` (2026-11-20), is shown on the ledger's
+    # line below; a person-search demonstration ("the charm-seller") was cut to keep the
+    # prompt inside its budget (tests/test_playtest_2026_11_17_reader_budget.py). Water
+    # sought out in the wild stays `fend` (the 2026-11-17 #6 demonstration).
     ("I find somewhere dry to shelter and sleep until first light.",
      {"question": False, "claims": [], "actions": [
          {"span": "find somewhere dry to shelter", "object": "somewhere dry to shelter",
@@ -831,6 +889,13 @@ _DEMOS = [
          {"span": "climb the steps up onto the wall-walk above the gate",
           "place": "the wall-walk", "within_place": True, "fixture": "gallery",
           "act": "go"}]}),
+    # Going UP the stair is going to what it is the stair of (playtest 2026-11-20 #141):
+    # "I up upstairs" was read fixture `stair`, the move stood the player on the stair's
+    # foot, and the page said "You begin to ascend the stairs" with nobody up there.
+    ("I go upstairs.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "go upstairs", "within_place": True, "fixture": "gallery",
+          "act": "go"}]}),
     ("I head back down to the ground.",
      {"question": False, "claims": [], "actions": [
          {"span": "head back down to the ground", "place": "the ground",
@@ -856,7 +921,7 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "turn the whole loft over looking for the missing ledger",
           "object": "the missing ledger", "place": "the whole loft", "where": "here",
-          "act": "search"}]}),
+          "seeking": "a thing", "act": "search"}]}),
     # Taking 20 (CRB p.86), the closed `take` (2026-11-16). Not a test line.
     ("I go over the chapel floor slab by slab, as long as it takes, for a hidden hatch.",
      {"question": False, "claims": [], "actions": [
@@ -927,6 +992,12 @@ _DEMOS = [
           "says": "Long night, friend?", "act": "talk"}]}),
     # Things moving, the shapes the owner's items save misread. Out of a container, the
     # container is the take's target; set down is `drop`, never a give to the nearest.
+    # Accepting a thing offered is taking it from whoever offers it, never eating or using
+    # it: playtest 2026-11-20 #5, "I accept the food" (a carter's) came back `consume`, and
+    # the player ate her own trail rations. Written in no world's words.
+    ("I accept the pie.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "accept the pie", "object": "the pie", "act": "take"}]}),
     ("I shake the silver out of the sack into my purse and set the empty sack down by "
      "the door.",
      {"question": False, "claims": [], "actions": [
@@ -998,6 +1069,18 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "take the lamp along to the old woman's hut",
           "place": "the old woman's hut", "object": "the lamp", "act": "go"}]}),
+    # Somebody led, or coming along, is the walk's object (playtest 2026-11-17 #34): "I lead
+    # the smuggler on into the broken pen" was read `follow: the smuggler`, the walk was
+    # refused as leaving him behind, and "…and the smuggler comes with me" was a claim.
+    ("Lamp up, I lead the tinker on through the archway.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "Lamp up", "act": "other"},
+         {"span": "lead the tinker on through the archway", "place": "the archway",
+          "object": "the tinker", "act": "go"}]}),
+    ("I head down to the mill, and Orla comes with me.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "head down to the mill, and Orla comes with me", "place": "the mill",
+          "object": "Orla", "act": "go"}]}),
     # A purpose clause or a plan: intended, never done. "going to <a place>" is going;
     # "going to <do something>" is a plan.
     ("I'm going to the baker's to buy bread.",
@@ -1016,6 +1099,16 @@ _DEMOS = [
          {"span": "go to the forge", "place": "the forge", "act": "go"},
          {"span": "to sell the horseshoes", "commit": "intended",
           "object": "the horseshoes", "act": "sell"}]}),
+    # A purpose that somebody else would carry out is still a purpose. Playtest 2026-11-17
+    # #2: "walk to the cathedral to get my wounds healed" came back `other, done`, and the
+    # deeds repair wrote the priest healing her: hp 6/26 before and after.
+    ("I climb out of the boat, then up the steps, and go to the healer's hut to get this "
+     "gash stitched.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "climb out of the boat", "place": "the boat", "act": "leave"},
+         {"span": "go to the healer's hut", "place": "the healer's hut", "act": "go"},
+         {"span": "to get this gash stitched", "commit": "intended",
+          "object": "this gash", "act": "other"}]}),
     # A price is not a second thing sold: "agree to sell the goat to the herder for six
     # silver" came back as two sales on the dev lines, the second of "six silver".
     ("I accept four silver from the tanner for the hides.",
@@ -1259,10 +1352,8 @@ _DEMOS = [
          {"span": "try to get loose", "commit": "tried", "way": "either",
           "act": "escape"}]}),
     # Going down on the ground (playtest 2026-11-15 #62): a deed of its own, not a walk.
-    ("I drop to my knees and put my hands behind my head.",
-     {"question": False, "claims": [], "actions": [
-         {"span": "drop to my knees", "act": "prone"},
-         {"span": "put my hands behind my head", "act": "other"}]}),
+    # "Drop to my knees" is shown in the watchman yield below (cut here 2026-11-20 to fit
+    # the reader's budget after three lanes each added a demonstration).
     ("I throw myself flat as the arrows come in, then get back up.",
      {"question": False, "claims": [], "actions": [
          {"span": "throw myself flat as the arrows come in", "act": "prone"},
@@ -1274,11 +1365,16 @@ _DEMOS = [
          {"span": "drop my sword", "object": "my sword", "act": "drop"},
          {"span": "raise my hands and surrender to the guard captain",
           "target": "the guard captain", "act": "surrender"}]}),
-    ("I kneel and tell the watchman I yield and will come quietly.",
+    ("I drop to my knees and tell the watchman I yield and will come quietly.",
      {"question": False, "claims": [], "actions": [
-         {"span": "kneel", "act": "prone"},
+         {"span": "drop to my knees", "act": "prone"},
          {"span": "tell the watchman I yield and will come quietly",
           "target": "the watchman", "act": "surrender"}]}),
+    # Living off the land (the owner's report 2026-11-17 #6): water, food and game are
+    # sought by `fend`, never `search`, which stays the looking-over of a room or a body.
+    ("I search for a river.",
+     {"question": False, "claims": [], "actions": [
+         {"span": "search for a river", "object": "a river", "act": "fend"}]}),
     ("I tell the guard that I'm the one who broke into the chandler's last night.",
      {"question": False, "claims": [], "actions": [
          {"span": "tell the guard that I'm the one who broke into the chandler's last "
@@ -1375,7 +1471,8 @@ def per_act_schema() -> dict:
                  # Where a search is, and whether it takes 10 or 20 (`SEARCH_WHERE`,
                  # `TAKES`), after the words, as `pace`.
                  **({"where": {"type": "string", "enum": list(SEARCH_WHERE)},
-                     "take": {"type": "string", "enum": list(TAKES)}}
+                     "take": {"type": "string", "enum": list(TAKES)},
+                     "seeking": {"type": "string", "enum": list(SEEKING)}}
                     if act == "search" else {}),
                  # Until what time of day (`UNTILS`), after the time slot's own words.
                  **({"until": {"type": "string", "enum": list(UNTILS)}}
@@ -1445,7 +1542,8 @@ def _demo_reply(frame: dict) -> str:
                          "diversion": a.get("diversion") or DIVERSIONS[0]}
                         if a["act"] == "stealth" else {}),
                      **({"where": a.get("where") or SEARCH_WHERE[0],
-                         "take": a.get("take") or TAKES[0]}
+                         "take": a.get("take") or TAKES[0],
+                         "seeking": a.get("seeking") or SEEKING[0]}
                         if a["act"] == "search" else {}),
                      **({"until": a.get("until") or UNTILS[0]}
                         if a["act"] in UNTIL_ACTS else {}),
@@ -1458,8 +1556,13 @@ def _demo_reply(frame: dict) -> str:
                      **({"within_place": bool(a.get("within_place")),
                          "fixture": a.get("fixture") or "none"}
                         if a["act"] == "go" else {}), **cost, **means})
+    # Compact JSON (playtest 2026-11-16 N4): the reader's prompt was 50,142 characters,
+    # 15,850 tokens of a 16,384 window (Ollama's prompt_eval_count, measured 2026-11-17),
+    # over its budget, so its first demonstration was cut on every reading. The spaces
+    # after ", " and ": " were 2,755 of those tokens across the 115 demonstrations: 13,095
+    # compact, every demonstration kept, and the grammar's reply is the same JSON.
     return json.dumps({"question": frame.get("question", False), "actions": acts,
-                       "claims": frame.get("claims", [])})
+                       "claims": frame.get("claims", [])}, separators=(",", ":"))
 
 
 def messages(sentence: str) -> list[dict]:
@@ -1586,6 +1689,9 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
             take = str(a.get("take") or "").strip().lower()
             if take in TAKES and take != TAKES[0]:
                 kept["take"] = take
+            seeking = str(a.get("seeking") or "").strip().lower()
+            if seeking in SEEKING and seeking != SEEKING[0]:
+                kept["seeking"] = seeking
         if kept["act"] in UNTIL_ACTS:
             # The enum's or nothing, kept only when it names something (`UNTILS`). Outside
             # it (a hosted provider, a remembered frame) the time slot's words are read
@@ -1650,6 +1756,17 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
         # question is asked about (`confirm_sale`).
         if _within(a.get("span"), sentence):
             kept["span"] = " ".join(str(a["span"]).split())
+        # A deed whose words are nothing but its thing is no deed: how something is held,
+        # said beside the deed. Playtest 2026-11-17 #45: "Torch in one hand and dagger in
+        # the other, I go through into the beast's pool" came back `use`, object and span
+        # both the stance phrase; scope looked it up as a thing, refused "There is no torch
+        # in one hand and dagger in the other here", and the page told her light and blade
+        # gone on the walk into the lair. A comparison of two slots, no word read.
+        if kept.get("span") and kept.get("object") \
+                and kept["span"].lower().strip(" ,.") == \
+                " ".join(kept["object"].split()).lower().strip(" ,."):
+            dropped.append(f"{kept['act']} {kept['span']!r}: no deed, only the thing")
+            continue
         actions.append(kept)
     actions = merge_repeats(actions)
     claims = [c for c in (frame.get("claims") or []) if _within(c, sentence)]
@@ -1731,6 +1848,10 @@ def _speech_is_not_a_target(action: dict, dropped: list[str]) -> None:
             action["says"] = words
 
 
+# The reader's reply allowance, in tokens: what its window must leave free.
+READ_TOKENS = 400
+
+
 def interpret(sentence: str, *, model: str | None = None, host: str | None = None,
               provider: str | None = None, api_key: str = "",
               temperature: float = 0.0) -> dict:
@@ -1745,9 +1866,24 @@ def interpret(sentence: str, *, model: str | None = None, host: str | None = Non
     if not cfg.get("model"):
         cfg = modelcfg.for_role("narrator")
     started = time.monotonic()
-    reply = client.chat(messages(sentence), model or cfg["model"],
+    sent = messages(sentence)
+    # Said in the reader's own words when its demonstrations will be cut (N4, 2026-11-16:
+    # 50,142 characters over a 49,988 budget cut the first pair on every reading, and the
+    # client's generic line was the only trace). The test pins the size; this catches a
+    # world whose text tokenises worse than any measured.
+    from . import window
+
+    budget = window.prompt_budget_chars(model or cfg["model"], completion=READ_TOKENS)
+    size = sum(len(m["content"]) for m in sent)
+    if size > budget:
+        import logging
+
+        logging.getLogger("pathfindergm").warning(
+            "the reader's prompt is %d characters, over its %d-character budget: its "
+            "first demonstrations are cut from the front this reading", size, budget)
+    reply = client.chat(sent, model or cfg["model"],
                         host or cfg["host"], as_json=True, think=False,
-                        temperature=temperature, num_predict=400,
+                        temperature=temperature, num_predict=READ_TOKENS,
                         provider=provider or cfg.get("provider", "ollama"),
                         api_key=api_key or cfg.get("api_key", ""), schema=reply_schema())
     try:
@@ -2313,6 +2449,82 @@ _SEA_DEMOS = [
 ]
 
 
+# Whether the player's words ask the house for a bout (`acts_to_ops.bout_spoken`), asked only
+# at an arena (or on the way to one) when the reading built none. Measured live 2026-11-18
+# on fix/hire-arena-shops, at Mirabalos's arena: "I tell the master of the games to put me in
+# the next bout." was read `talk`, and the playtest's own line (2026-11-17b #24) once `other`
+# and `talk`, once a bare question; the `challenge` gloss alone did not reach it, and the
+# reader's prompt had no room for a demonstration (its budget test). Demonstrations written
+# for this, in no world's words.
+BOUT_ANSWERS = {"asks to fight a bout": "bout", "something else": ""}
+_BOUT_DEMOS = [
+    ("sign me up for the next fight", "asks to fight a bout"),
+    ("I want to fight in the pit today. Who's my opponent?", "asks to fight a bout"),
+    ("tell the matchmaker I'll take on his champion", "asks to fight a bout"),
+    ("put my name down for a match", "asks to fight a bout"),
+    ("ask how much the last winner took home", "something else"),
+    ("I watch the fighters train", "something else"),
+    ("ask the matchmaker where the inn is", "something else"),
+]
+
+
+# Whether a `look` at something is looking over what a seller has for sale (`browsed`). Live
+# 2026-11-18 (fix/hire-arena-shops) and playtest 2026-11-17b #29: "look over what potions they
+# have for sale" came back `look` both times, beside the `buy` gloss that names browsing, so
+# no counter opened. Demonstrations written for this, in no world's words.
+BROWSE_ANSWERS = {"looks over goods for sale": "browse", "something else": ""}
+_BROWSE_DEMOS = [
+    ("look over what knives the cutler has for sale", "looks over goods for sale"),
+    ("see what the chandler has on his shelves", "looks over goods for sale"),
+    ("browse the bookseller's stock", "looks over goods for sale"),
+    ("look at the stranger's face", "something else"),
+    ("look around the room", "something else"),
+    ("examine the sword on my belt", "something else"),
+]
+
+
+def confirm_browse(span: str, *, model: str | None = None) -> str:
+    """"browse" when the words look over what a seller has for sale, else ""."""
+    system = ("In a role-playing game the character looks at something. Answer from the "
+              "words alone: is the character looking over what a seller has for sale "
+              "(their wares, stock, shelves, goods), or something else?")
+    messages = [{"role": "system", "content": system}]
+    for said, answer in _BROWSE_DEMOS:
+        messages.append({"role": "user", "content": f"The words: {said}"})
+        messages.append({"role": "assistant", "content": json.dumps({"answer": answer})})
+    messages.append({"role": "user", "content": f"The words: {span}"})
+    return BROWSE_ANSWERS.get(_closed(messages, tuple(BROWSE_ANSWERS), model), "")
+
+
+def browsed(frame: dict | None, ask=None) -> list[str]:
+    """Turn, in place, each acting `look` with an object that the closed question says is
+    looking over goods for sale into the `buy` it is, so the counter opens with what was
+    asked to see (`judgement.purchase_sought` reads this same dict). Returns the spans.
+    `ask` None (the suite, the reader off) changes nothing."""
+    if ask is None or not frame or frame.get("error"):
+        return []
+    out = []
+    for a in frame.get("actions") or []:
+        if a.get("act") == "look" and a.get("object") and acting(a) and a.get("span") \
+                and ask(a["span"]) == "browse":
+            a["act"], a["was"] = "buy", "look"
+            out.append(a["span"])
+    return out
+
+
+def confirm_bout(span: str, *, model: str | None = None) -> str:
+    """"bout" when the player's words at an arena ask to fight in one, else ""."""
+    system = ("In a role-playing game the character is at an arena where bouts are fought "
+              "for a purse. Answer from the words alone: does the character ask to fight a "
+              "bout themselves (be put in a match, take on a fighter), or something else?")
+    messages = [{"role": "system", "content": system}]
+    for said, answer in _BOUT_DEMOS:
+        messages.append({"role": "user", "content": f"The words: {said}"})
+        messages.append({"role": "assistant", "content": json.dumps({"answer": answer})})
+    messages.append({"role": "user", "content": f"The words: {span}"})
+    return BOUT_ANSWERS.get(_closed(messages, tuple(BOUT_ANSWERS), model), "")
+
+
 # Whether the player's words put a ship they hold out to cruise (`acts_to_ops.cruise_spoken`),
 # asked only aboard a ship the PC holds with no other ship in sight: the engine's `sea`
 # `cruise`, or nothing. Playtest 2026-11-16 #8/#9: "take the Red Gull out along the trade
@@ -2348,6 +2560,65 @@ def confirm_cruise(span: str, *, model: str | None = None) -> str:
         messages.append({"role": "assistant", "content": json.dumps({"answer": answer})})
     messages.append({"role": "user", "content": f"The words: {span}"})
     return CRUISE_ANSWERS.get(_closed(messages, tuple(CRUISE_ANSWERS), model), "")
+
+
+# A `stealth` act beside a walk, asked again (`unhidden`): playtest 2026-11-16 #77, "I keep
+# my head down and carry on to the docks, keeping well away from the gate" was read go +
+# `stealth: the gate`, re-read the same way live with a gloss line added (one line costs
+# demos at the front of a full window, see `messages`), and the Stealth was refused "the
+# foreman is watching" onto the page. Keeping clear of a place is the way a walk goes,
+# not hiding. Demonstrations in no world's words; none is the playtest line.
+HIDING_ANSWERS = ("hides", "a way to go")
+_HIDING_DEMOS = [
+    ("keeping well clear of the barracks", "a way to go"),
+    ("giving the tollhouse a wide berth", "a way to go"),
+    ("by the back lanes, avoiding the market", "a way to go"),
+    ("keeping to the shadows of the wall", "hides"),
+    ("slipping past the sentries unseen", "hides"),
+    ("ducking behind the carts so the watch won't see me", "hides"),
+    # Playtest 2026-11-17 #23: past somebody in plain sight is a walk (not that line).
+    ("walking on past the doorman", "a way to go"),
+]
+
+
+def confirm_hiding(span: str, *, model: str | None = None) -> str:
+    """"hides" when the words have the character keep out of sight, "a way to go" when
+    they only say which way a walk goes, or "" when the question failed."""
+    system = ("In a role-playing game the character is walking somewhere. Answer from the "
+              "words alone: does the character try to stay unseen (hide, sneak, keep out "
+              "of sight), or do the words only say which way they go?")
+    messages = [{"role": "system", "content": system}]
+    for said, answer in _HIDING_DEMOS:
+        messages.append({"role": "user", "content": f"The words: {said}"})
+        messages.append({"role": "assistant", "content": json.dumps({"answer": answer})})
+    messages.append({"role": "user", "content": f"The words: {span}"})
+    return _closed(messages, HIDING_ANSWERS, model)
+
+
+def unhidden(frame: dict | None, ask=None) -> list[str]:
+    """Take out of the reading, in place, each `stealth` act done alongside a walk of the
+    same line that the targeted question says only names the way (`confirm_hiding`).
+    Returns the spans taken out, for the turn log. Only beside an acting go, leave or
+    journey; `ask` None (the suite, the reader off) changes nothing.
+
+    A stealth act with a `target` is asked too, since playtest 2026-11-17 #23: "I step past
+    the toll-keeper and go on into the turnkey's room" came back `stealth, target: the
+    toll-keeper`, the question was never asked, and the Stealth was refused for want of
+    cover in plain sight. Slipping past a sentry unseen still answers "hides"."""
+    if ask is None or not frame or frame.get("error"):
+        return []
+    acts = [a for a in frame.get("actions") or [] if acting(a)]
+    if not any(a.get("act") in ("go", "leave", "journey") for a in acts):
+        return []
+    out = []
+    for a in acts:
+        if a.get("act") == "stealth" and a.get("span") \
+                and ask(a["span"]) == "a way to go":
+            out.append(a["span"])
+    if out:
+        frame["actions"] = [a for a in frame.get("actions") or []
+                            if not (a.get("act") == "stealth" and a.get("span") in out)]
+    return out
 
 
 def confirm_sea(span: str, *, model: str | None = None) -> str:
@@ -2652,6 +2923,42 @@ def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
     return ops
 
 
+# The acts whose target is looked for among the people where the act is done.
+_ADDRESSING_ACTS = frozenset({"talk", "seek", "call_on", "request", "insult", "threaten"})
+
+
+def scene_by_then(frame: dict | None, scene, places=(), upto: int | None = None):
+    """The scene the reading's first deed at somebody is done in (or its action `upto`):
+    `scene` itself, or — when moves of the same line come before it — the scene seen
+    from where they end (`engine.SeenFrom`). Playtest 2026-11-16 #94 ("go back up on deck
+    and ask the deckhand") and #75 ("go down to the docks and ask the foreman"): the
+    person was looked for where she stood before the walk. Place names through the
+    engine's own finder, never English; a move that names no place it knows changes
+    nothing."""
+    from rules import places as places_mod
+    from rules.engine import SeenFrom
+
+    if not frame or frame.get("error") or scene is None or not places:
+        return scene
+    here = str(getattr(scene, "at", "") or "")
+    by_then = here
+    for k, a in enumerate(frame.get("actions") or []):
+        if upto is not None and k >= upto:
+            break
+        if not acting(a):
+            continue
+        if upto is None and a.get("act") in _ADDRESSING_ACTS:
+            break
+        if a.get("act") in ("go", "leave", "journey") and a.get("place"):
+            p = places_mod.find(places, a["place"], near=by_then)
+            if p is not None:
+                by_then = p.id
+    else:
+        if upto is None:
+            return scene               # nobody addressed: nothing to look up
+    return scene if by_then == here else SeenFrom(scene, by_then)
+
+
 def until_words(action: dict | None) -> str:
     """The words a wait or a sleep runs until, for the clock's numbers table
     (`timewords.minutes_until`): "until morning" when the reader named a time of day
@@ -2935,6 +3242,7 @@ _OP_NEEDS = {
     "sell": {"sell"},
     "rest": {"rest"}, "advance_time": {"wait", "rest"}, "call_on": {"call_on"},
     "break_in": {"break_in"}, "forage": {"gather"}, "prospect": {"gather"},
+    "live_off_land": {"fend"}, "hunt": {"hunt"},
     "gather": {"gather"},
     "loot": {"take", "steal", "loot"}, "cast": {"cast"},
     "use_item": {"consume", "use"}, "drink": {"consume"}, "eat": {"consume"},
@@ -2986,6 +3294,13 @@ DEED_SKILL_ACTS = {
 # used "to hide" by the one hiding (CRB p.106, "You can't use Stealth while being observed"
 # is a rule about the choice, not a check the world imposes).
 CHOSEN_SKILLS = frozenset({"stealth", "sleight of hand", "disguise"})
+# And the player's own Perception roll, put in front of them to make: a look or a search
+# of theirs asks for it. Playtest 2026-11-16 E3, "Climb back up out of the culvert and
+# walk back up to the gardens" (athletics + go) left the plan's Perception at DC 10
+# waiting for the player's die, a roll nobody asked for that decided nothing. Noticing
+# what hides is the engine's own (rules/awareness.py, the dungeons' searches), not
+# the plan's to hand the player.
+ROLLED_ON_ASKING = CHOSEN_SKILLS | {"perception"}
 
 
 def supported(ops: list[str], frame: dict | None,
@@ -3047,7 +3362,7 @@ def drop_unchosen_checks(raw, frame: dict | None, pc_ref: str = "pc") -> tuple[l
         p = (r.get("params") or {}) if isinstance(r, dict) else {}
         skill = str(p.get("skill") or "").strip().lower()
         if (isinstance(r, dict) and str(r.get("op", "")).lower() == "check"
-                and skill in CHOSEN_SKILLS and r.get("actor") in (None, "", "pc", pc_ref)
+                and skill in ROLLED_ON_ASKING and r.get("actor") in (None, "", "pc", pc_ref)
                 and not acts & DEED_SKILL_ACTS[skill]):
             dropped.append(skill)
             continue

@@ -537,15 +537,17 @@ def with_party_lb(scene) -> float:
 
 
 def add_lot(scene, key: str, units: int, owner: str, paid_cp: int, bought_at: str,
-            commodity: str = "") -> dict:
-    """The party's new lot, merged into one of the same row already stowed with them."""
-    lot = next((x for x in lots(scene) if x.get("key") == key and x.get("stowed") == "party"
-                and x.get("owner") == owner), None)
+            commodity: str = "", vessel: str = "") -> dict:
+    """The party's new lot, merged into one of the same row already stowed with them — or,
+    given a `vessel`, already in that ship's hold (a prize's cargo, `Engine._keep_vessel`)."""
+    where = {"stowed": "hold", "vessel": vessel} if vessel else {"stowed": "party"}
+    lot = next((x for x in lots(scene) if x.get("key") == key and x.get("owner") == owner
+                and all(x.get(k) == v for k, v in where.items())), None)
     if lot is None:
         n = 1 + max((int(str(x.get("id", "lot-0"))[4:] or 0) for x in lots(scene)
                      if str(x.get("id", "")).startswith("lot-")), default=0)
         lot = {"id": f"lot-{n}", "key": key, "name": ROWS[key][0], "units": 0,
-               "paid_cp": 0, "owner": owner, "stowed": "party", "bought_at": bought_at,
+               "paid_cp": 0, "owner": owner, **where, "bought_at": bought_at,
                "commodity": commodity or ROWS[key][0]}
         scene.cargo.append(lot)
     lot["units"] = int(lot["units"]) + int(units)

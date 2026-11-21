@@ -126,10 +126,13 @@ def test_parts_and_fixtures_of_the_room_are_inside_it_and_the_quarters_are_not()
 
     for place in ("the other side of the room", "the far end of the hall", "the hearth",
                   "the fire", "the back corner", "the middle of the taproom",
-                  "the stairs", "the rear of the inn"):
+                  "the stairs", "the rear of the hall"):
         assert inside(place), place
     assert not inside("the quarters")
     assert not inside("the docks")
+    # Pangrella has an inn since 2026-11-17 (playtest 2026-11-17b #8), so "the rear of the
+    # inn" is a part of another place the town has: that place, not this room.
+    assert not inside("the rear of the inn")
     elsewhere = next(p for p in places if p.id != here)
     assert not inside(f"the far side of {elsewhere.name}")
     # A go only: "the side of the room" under another act is not a walk.

@@ -20,6 +20,12 @@ def _ground_mint(client, n: int):
     return _key(client, "Ground Mint")
 
 
+def _whole(check) -> int:
+    """A step's whole time: its hands-on minutes and its In-progress wait (the owner's
+    ruling of 2026-11-18 sends a step of an hour or more In progress)."""
+    return int(check["minutes"]) + int((check.get("product") or {}).get("ready_minutes") or 0)
+
+
 def test_drying_twelve_doses_is_one_eight_hour_batch_not_ninety_six_hours(bench):
     """24 ground in, 12 dried doses out: was 12 x 480 = 5,760 minutes (96 hours, Ansel's
     measured case), now one batch of 480."""
@@ -29,7 +35,7 @@ def test_drying_twelve_doses_is_one_eight_hour_batch_not_ninety_six_hours(bench)
                                              "items": [{"key": key, "count": 24}]})
     assert got["doses"] == 12
     assert got["batch_capacity"] == 12 and got["batches"] == 1
-    assert got["minutes"] == 480, got["minutes"]
+    assert _whole(got) == 480 and got["minutes"] == 10, got["minutes"]
 
 
 def test_twenty_four_doses_take_two_batches_at_herbalist_2_and_one_at_herbalist_4(bench):
@@ -40,15 +46,16 @@ def test_twenty_four_doses_take_two_batches_at_herbalist_2_and_one_at_herbalist_
     key = _ground_mint(bench, 48)
     body = {"method": "dry", "items": [{"key": key, "count": 48}]}
     two = _post(bench, "/api/bench/check", body)
-    assert (two["doses"], two["batches"], two["minutes"]) == (24, 2, 960)
+    assert (two["doses"], two["batches"], _whole(two)) == (24, 2, 960)
     _level(4)
     one = _post(bench, "/api/bench/check", body)
-    assert (one["batch_capacity"], one["batches"], one["minutes"]) == (24, 1, 480)
+    assert (one["batch_capacity"], one["batches"], _whole(one)) == (24, 1, 480)
 
 
-def test_the_roll_passes_one_batch_of_time_on_the_clock(bench):
-    """The time the check shows is the time the roll passes: 480 minutes for one batch,
-    landed or not."""
+def test_the_roll_passes_the_hands_on_time_and_the_batch_dries_in_progress(bench):
+    """The batch is still 480 minutes; since the owner's ruling of 2026-11-18 the roll
+    passes only the 10 hands-on minutes, landed or not, and the other 470 are the racks'
+    own countdown In progress."""
     _level(2)
     key = _ground_mint(bench, 24)
     from play import campaign as cm
@@ -56,8 +63,8 @@ def test_the_roll_passes_one_batch_of_time_on_the_clock(bench):
     before = cm.current().scene.clock_minutes
     r = _post(bench, "/api/bench/roll", {"method": "dry", "face": 1,
                                          "items": [{"key": key, "count": 24}]})
-    assert r["minutes"] == 480
-    assert cm.current().scene.clock_minutes == before + 480
+    assert r["minutes"] == 10
+    assert cm.current().scene.clock_minutes == before + 10
 
 
 def test_no_copy_of_the_per_dose_drying_rule_survives():

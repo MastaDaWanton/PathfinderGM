@@ -179,8 +179,13 @@ def test_a_hired_hand_is_told_what_they_were_hired_for_not_that_they_are_a_frien
                 "guard": "hired sword"}[role] in said
 
 
-def test_the_bond_goes_when_the_wagons_are_in(worlds):
-    """Paid at the far end, the caravan's people stop travelling with the player."""
+def test_the_bond_goes_when_the_wagons_are_in(worlds, monkeypatch):
+    """Paid at the far end, the caravan's people stop travelling with the player. On a
+    quiet road: since travel pacing a journey's stretches meet bandits often enough that
+    a seed arrived mid-fight, and pay waits for the fight (2026-11-18)."""
+    from rules import ontheway
+
+    monkeypatch.setattr(ontheway, "road_stretches", lambda *a, **k: None)
     s, e, _clerk, esc = _set_out(worlds)
     for _ in range(12):
         e._journeyed = ""

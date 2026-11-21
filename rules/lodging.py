@@ -24,8 +24,30 @@ tagged `holds.room.<slug>` and timed in rounds, so a second sleep at the same in
 is not charged again and the hold evaporates on the clock like every timed thing (law 2).
 A place the sleeper holds themselves (`holds.place.<slug>`, the `found` door) charges
 nothing: it is theirs.
+
+## At the counter (2026-11-17)
+
+Playtest 2026-11-17b #5/#9/#10: at a tavern, "a room for the night, and a hot meal" and
+"I buy a meal and a drink" bought nothing, the keeper selling nothing at all. Prices
+re-read that day at legacy.aonprd.com/coreRulebook/equipment.html, Goods and Services,
+"Food, Drink, and Lodging": ale 4 cp a mug and 2 sp a gallon; inn stay per day good 2 gp,
+common 5 sp, poor 2 sp; meals per day good 5 sp, common 3 sp, poor 1 sp; wine 2 sp a
+pitcher, 10 gp a fine bottle. d20pfsrd's Hirelings, Servants & Services page prints the
+stay "per night" at the same three prices, with the descriptions quoted above.
+
+The keeper of an inn or a tavern now keeps a counter (`keepers.keeps_a_counter`): the
+food and drink are goods on it (`goods.stocked_at`), and the three stays are rows of
+`menu`, sold the way a temple's castings are (rules/services.py): the book's price moved
+by the keeper's own terms, never haggled, through `Engine._buy_stay`, which holds the
+room exactly as the rest door's bill does (`hold`). A stay bought at the counter makes
+the night's sleep there free (`held`). Baldur's Gate's innkeepers sell their rooms by
+tier off the same store screen as their drink (from memory, not re-checked); its rooms
+heal more by tier, which the book does not do, so the three stays differ in price and
+in the words alone.
 """
 from __future__ import annotations
+
+import re
 
 # Copper, per day (CRB Table 6-9).
 STAY_CP = {"poor": 20, "common": 50, "good": 200}
@@ -33,6 +55,12 @@ DEFAULT_STAY = "common"
 # How long a paid room stays the payer's: the book's unit, one day.
 HELD_MINUTES = 24 * 60
 ORIGIN = "rule:inn-stay"
+# A stay on the counter's screen: `service:inn-stay:<quality>`.
+PREFIX = "service:inn-stay:"
+# The book's own words for each stay (d20pfsrd, Hirelings, Servants & Services).
+ABOUT = {"poor": "a place on the floor near the hearth",
+         "common": "a place on a raised, heated floor, a blanket and a pillow",
+         "good": "a small private room with one bed"}
 
 
 def kinds() -> frozenset[str]:
@@ -64,12 +92,61 @@ def price_cp(scene, at: str = "") -> int:
     return STAY_CP[quality(scene, at)]
 
 
+def menu() -> list[dict]:
+    """The stays a keeper lets, cheapest first: one row a quality, at the book's price.
+    `name` carries how a bed is asked for, for the counter's matcher (`goods.match_want`:
+    every word of the want in the row's name), as `services.menu` does for healing."""
+    return [{"id": PREFIX + q, "quality": q, "cp": cp, "gp": cp / 100,
+             "shown": f"A {q} room for the night ({ABOUT[q]})",
+             "name": f"a {q} room or bed for the night, a night's lodging at the inn: "
+                     f"{ABOUT[q]} (inn stay)"}
+            for q, cp in sorted(STAY_CP.items(), key=lambda kv: kv[1])]
+
+
+# How a stay is asked for by its rank rather than the book's word. Owner's saves
+# 2026-11-17: "the cheapest room available" matched no row (frag T106-T109) and "the best
+# room" none (T128); "the private room" is the good stay's own words. A closed vocabulary
+# asked only beside a word for a bed (`_BED_WORDS`), so "the best ale" is still the ale.
+_RANKS = {"poor": frozenset({"cheapest", "cheap", "cheaper", "poorest", "hearth", "floor"}),
+          "good": frozenset({"best", "finest", "nicest", "better", "private"}),
+          "common": frozenset({"common"})}
+_BED_WORDS = frozenset({"room", "rooms", "bed", "beds", "stay", "lodging", "lodgings",
+                        "spot", "space", "place", "chamber", "night"})
+
+
+def find(want: str) -> dict | None:
+    """The stay the words ask for, or None. A room asked for with no quality named is the
+    common stay, the one the rest door charges (`DEFAULT_STAY`)."""
+    from . import goods
+
+    want = " ".join(str(want or "").split()).lower()
+    rows = menu()
+    if want.startswith(PREFIX):
+        return next((r for r in rows if r["id"] == want), None)
+    said = set(re.findall(r"[a-z]+", want))
+    if said & _BED_WORDS:
+        ranked = next((q for q, ws in _RANKS.items() if said & ws), "")
+        if ranked:
+            return next(r for r in rows if r["quality"] == ranked)
+    found, fits = goods.match_want(want, rows)
+    if found is None:
+        return None
+    # "good" is one of the matcher's measure words ("a good rope"), so the quality is
+    # asked of the want's own words here, against the book's three.
+    q = next((q for q in STAY_CP if q in said), DEFAULT_STAY)
+    return next((r for r in fits if r["quality"] == q), found)
+
+
 def slug(at: str) -> str:
     """The whole place id as one tag segment, dots made safe. Not the `found` door's
     last-segment slug: two towns' founded taverns are both "…/the-tavern", and a room
     paid for in one was held in the other (seen live 2026-10-16: the tag came out
-    `holds.room.the-tavern`)."""
-    return str(at or "").replace(".", "-")
+    `holds.room.the-tavern`). The house, not the floor: jack T205-T225 (owner's save
+    2026-11-17) paid downstairs, walked up to the upper floor of the inn to sleep, and
+    was billed a second time there."""
+    from . import places
+
+    return places.base_of(str(at or "")).replace(".", "-")
 
 
 def tag(at: str) -> str:
@@ -81,17 +158,33 @@ def held(actor, at: str) -> bool:
     return bool(at) and actor is not None and actor.has_state(tag(at))
 
 
+def room_held(actor) -> tuple[str, str] | None:
+    """(the house's place id, the stay) of the room `actor` holds today, or None. Read off
+    the hold itself, the one record: its source is the place, its child tag the stay (a
+    hold from before the stay was tagged is the rest door's common one)."""
+    for e in getattr(actor, "effects", None) or ():
+        if getattr(e, "origin", "") != ORIGIN or not str(e.source).startswith("place:"):
+            continue
+        at = str(e.source)[len("place:"):]
+        stay = next((t.rsplit(".", 1)[1] for t in e.tags
+                     if t.startswith(tag(at) + ".") and t.rsplit(".", 1)[1] in STAY_CP),
+                    DEFAULT_STAY)
+        return at, stay
+    return None
+
+
 def owns(actor, at: str) -> bool:
     """Whether the place is the sleeper's own (`holds.place.<slug>`)."""
     return bool(at) and actor is not None and \
         actor.has_state(f"holds.place.{str(at).rsplit('/', 1)[-1]}")
 
 
-def hold(actor, at: str, name: str, rounds_per_minute: int):
+def hold(actor, at: str, name: str, rounds_per_minute: int, stay: str = DEFAULT_STAY):
     """Hold the room for the day, through the one applicator."""
     from .activeeffect import ActiveEffect
 
     return actor.apply_effect(ActiveEffect(
-        name=f"a room at {name}", kind="situation", key=f"room:{at}",
+        name=f"a {stay} room at {name}" if stay != DEFAULT_STAY else f"a room at {name}", kind="situation", key=f"room:{at}",
         source=f"place:{at}", origin=ORIGIN, duration="rounds",
-        rounds_left=HELD_MINUTES * int(rounds_per_minute), tags=(tag(at),)))
+        rounds_left=HELD_MINUTES * int(rounds_per_minute),
+        tags=(tag(at), f"{tag(at)}.{stay}")))

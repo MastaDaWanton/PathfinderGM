@@ -151,16 +151,26 @@ def test_a_search_here_is_built_whole_and_the_plans_survival_and_forage_go():
     raw = acts_to_ops.apply(plan, rows, frame, s)
     checks = [r for r in raw if r.get("op") == "check"]
     assert checks == [{"op": "check", "actor": "pc", "because": "the player searches",
-                       "params": {"skill": "perception", "search": True, "take": 20}}]
+                       "params": {"skill": "perception", "search": True, "take": 20,
+                                  "sought": "every brick"}}]
     assert not any(r.get("op") == "forage" for r in raw)
 
 
-def test_a_search_for_somewhere_else_builds_nothing():
-    """"I find somewhere dry to shelter" is a search `where: elsewhere`: the travel and
-    found doors answer it, as before; no Perception is rolled at the ground underfoot."""
+def test_a_search_for_somewhere_else_is_answered_about_it():
+    """"I find somewhere dry to shelter" is a search `where: elsewhere`. Until 2026-11-20 it
+    built nothing, and the travel and found doors answered it. The owner's ruling that day
+    (playtest 2026-11-20 #19: "If I type to search for anything I should be searching for
+    that thing, not tracks") makes every search that names its object the engine's
+    search, which answers about that object. A walk the plan adds to go and find it is not
+    dropped."""
     rows = acts_to_ops.table(_frame({"act": "search", "object": "somewhere dry"}),
                              _scene(), sentence="…")
-    assert not any(r.intents for r in rows)
+    built = [b for r in rows for b in r.intents]
+    assert [b["params"].get("sought") for b in built] == ["somewhere dry"]
+    raw = acts_to_ops.apply([{"op": "travel", "actor": "pc", "params": {"place": "the inn"}}],
+                            rows, {"actions": [{"act": "search", "object": "somewhere dry"}]},
+                            _scene())
+    assert any(r.get("op") == "travel" for r in raw)
 
 
 def test_the_reader_keeps_where_and_take_only_inside_their_enums():

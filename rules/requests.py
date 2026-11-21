@@ -55,11 +55,17 @@ from __future__ import annotations
 
 from . import states
 
-# The two kinds of request the reader can name (`interpret.REQUESTS`). A closed list, the
+# The kinds of request the reader can name (`interpret.REQUESTS`). A closed list, the
 # engine's own; anything the reader cannot place in it stays talk.
 PAYMENT = "payment"
 FAVOUR = "favour"
-KINDS = (PAYMENT, FAVOUR)
+# Asking somebody to work for the player for a wage (since 2026-11-18, playtest 2026-11-17b
+# #21): "I'll hire you for a week, to guard me. Name your price" was read a favour, rolled
+# Diplomacy, paid 150 XP and hired nobody. A hire is a purchase of service, never Make
+# Request: it rolls nothing and goes to the hirelings' door (`Engine._company_hire`), which
+# names the wage or says why they do not hire out. Not in `ROW_FOR`: no DC is ever made.
+HIRE = "hire"
+KINDS = (PAYMENT, FAVOUR, HIRE)
 
 # Core Rulebook p.93, the request modifiers, by the book's own words. Only "simple aid"
 # is used: payment and a favour are both aid the person can simply give.
@@ -223,7 +229,9 @@ def sells(scene, actor) -> str:
     if cid:
         return market.COUNTER_PREFIX + cid
     kind = keepers.kind_of(place, getattr(scene, "founded", None) or ())
-    if keepers.keeps_a_counter(actor) or kind in _lodging_kinds():
+    from . import services
+
+    if keepers.keeps_a_counter(actor) or kind in _lodging_kinds()             or services.keeps_a_temple(actor):
         return kind
     return ""
 
@@ -237,6 +245,14 @@ def offered(scene, actor, want: str):
     kind = sells(scene, actor)
     if not kind or not str(want or "").strip():
         return None
+    from . import services
+
+    if services.keeps_a_temple(actor):
+        # A temple sells castings and nothing else (playtest 2026-11-16 #70): healing
+        # asked of its priest is bought at the counter, never begged with Diplomacy. The
+        # widest menu is matched here; the counter says what this temple does not cast.
+        row = services.find(want, "city")
+        return ("goods", row) if row is not None else None
     if kind in _lodging_kinds():
         found, _ = goods.match_want(want, [{"id": INN_STAY, "name": _INN_STAY_NAME}])
         if found is not None:

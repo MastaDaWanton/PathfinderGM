@@ -34,8 +34,13 @@ import re
 # Words in front of a noun that do not change which thing it is. "the Brunt of the weight"
 # and "brunt of the weight" are one thing: the 2026-10-03 drop missed the carried one by
 # its capital B and copied it to the smith instead.
+# And a partitive in front of the owner ("one of my torches", "a couple of the apples"):
+# one thing out of what is carried, named by what it is. Playtest 2026-11-17 #15: "I light
+# one of my torches", three torches on the shelf, was refused "There is no one of my
+# torches here".
 _DETERMINERS = re.compile(
-    r"^(?:(?:the|a|an|my|your|his|her|their|its|our|some|this|that|these|those)\s+)+",
+    r"^(?:(?:(?:one|two|three|any|each|either|both|all|some|few|couple)\s+of|few|"
+    r"the|a|an|my|your|his|her|their|its|our|some|this|that|these|those)\s+)+",
     re.I)
 
 
@@ -54,7 +59,17 @@ def same(a, b) -> bool:
     x, y = plain(a), plain(b)
     if not x or not y:
         return False
-    return x == y or x.rstrip("s") == y.rstrip("s")
+    return _alike(x, y)
+
+
+def _alike(x: str, y: str) -> bool:
+    """One word or name, singular or plural: "-s" off either ("axes" is "axe"), or "-es"
+    ("torches" is "torch": playtest 2026-11-17 #15, where `rstrip("s")` alone made it
+    "torche", and one of three torches was not a torch)."""
+    if x == y or x.rstrip("s") == y.rstrip("s"):
+        return True
+    es = ("ches", "shes", "xes", "sses", "zes")
+    return (x[:-2] if x.endswith(es) else x) == (y[:-2] if y.endswith(es) else y)
 
 
 def key_in(store, name) -> str | None:
@@ -69,6 +84,30 @@ def key_in(store, name) -> str | None:
         if same(key, raw):
             return key
     return None
+
+
+def stock_key(stock, name) -> str:
+    """The id of the shelf entry (`Actor.stock`) the words name, exact by id, name or base
+    — `consumables.resolve_stock` guesses by content words, and a sale by guess sells the
+    wrong jar. "" when the shelf has none. Bought gear lives on the shelf, not in `goods`:
+    playtest 2026-11-17 #19, "strike my flint and steel" was refused "has no flint and
+    steel" with one on the shelf, because only `goods` was asked."""
+    for sid, item in (stock or {}).items():
+        for n in (getattr(item, "name", ""), getattr(item, "base", ""),
+                  str(sid).split("#")[0].replace("-", " "), sid):
+            if n and same(n, name):
+                return sid
+    return ""
+
+
+def stock_among(stock, phrase) -> str:
+    """The id of the shelf entry whose own name stands whole among the words (`named_among`
+    over the shelf's names), or "": "a fresh torch" is the torch. Asked after `stock_key`
+    finds nothing. Playtest 2026-11-17b #3: "I light a fresh torch" built no light, three
+    torches on the shelf, because "fresh torch" is not `same` as "torch"."""
+    names = {getattr(s, "name", "") or sid: sid for sid, s in (stock or {}).items()}
+    hit = named_among(names, phrase)
+    return names[hit] if hit else ""
 
 
 # --- a key is bookkeeping, never a word on the page -----------------------------------------
@@ -164,16 +203,17 @@ def named_among(store, phrase) -> str | None:
     out of nothing into the player's pack. Asked only after `key_in` finds nothing."""
     if not store:
         return None
-    said = [w.rstrip("s") for w in re.findall(r"[a-z0-9][a-z0-9'-]*", plain(phrase))]
+    said = re.findall(r"[a-z0-9][a-z0-9'-]*", plain(phrase))
     if not said:
         return None
     best: tuple[int, str] | None = None
     for key in store:
-        want = [w.rstrip("s") for w in re.findall(r"[a-z0-9][a-z0-9'-]*", plain(key))]
+        want = re.findall(r"[a-z0-9][a-z0-9'-]*", plain(key))
         n = len(want)
         if not n or n > len(said):
             continue
-        if any(said[i:i + n] == want for i in range(len(said) - n + 1)):
+        if any(all(_alike(a, b) for a, b in zip(said[i:i + n], want))
+               for i in range(len(said) - n + 1)):
             if best is None or n > best[0]:
                 best = (n, key)
     return best[1] if best is not None else None
@@ -230,8 +270,64 @@ _TOKEN_MATERIALS = frozenset("lead brass iron wooden wood bone clay tin glass st
                              "lucky strange foreign ancient old rare gaming".split())
 
 
+# Food by its kind, not its name: "the food", "some provisions". Whatever a person carries
+# that eats (`gear.food`) is what these mean (playtest 2026-11-20 #5, "I accept the food"
+# offered as "dried meat and some hard bread").
+_FOOD_WORDS = frozenset("food foods provisions victuals meal snack".split())
+
+
 def is_container(name) -> bool:
     return head_of(name) in CONTAINERS
+
+
+def carried_by(holder, item: str) -> str | None:
+    """The name, as `holder` carries it, of the thing `item` asks for — their goods
+    line, a jar on their shelf, a weapon on their list, food by its kind, or what their own
+    label puts in their hands — or None when they carry nothing it can be. The engine's own
+    lists are the vocabulary; the words are only searched for one of their names
+    (`named_among`), never trusted to name a new thing. `Engine._carried_by` and the
+    act→op table (`acts_to_ops._take`) both ask this one definition."""
+    from . import goods
+
+    key = key_in(holder.goods, item) or named_among(holder.goods, item)
+    if key:
+        return key
+    shelf = {}
+    for iid, s in (getattr(holder, "stock", None) or {}).items():
+        for n in (getattr(s, "name", ""), getattr(s, "base", ""),
+                  str(iid).split("#")[0].replace("-", " ")):
+            if n:
+                shelf.setdefault(str(n), str(getattr(s, "name", "") or n))
+    key = key_in(shelf, item) or named_among(shelf, item)
+    if key:
+        return shelf[key]
+    arms = {str(w): str(w) for w in getattr(holder, "weapons", None) or ()
+            if str(w).lower() not in ("unarmed", "improvised")}
+    canon = goods.canonical(item)
+    key = (next((w for w in arms if goods.canonical(w) == canon), None)
+           or named_among(arms, item))
+    if key:
+        return key
+    if head_of(item) in _FOOD_WORDS:
+        from . import gear
+
+        meal = gear.food(holder)
+        if meal is not None:
+            return str(meal["name"])
+    return label_carries(holder.name, item) or None
+
+
+def is_box(name, props=()) -> bool:
+    """A container by its noun, or a record here that holds `contents` under this name.
+    Owner bug 2026-11-17 #2: 16 of the 44 treasure containers the dungeon writes ("a hoard
+    of bright things", "a sarcophagus", "a tarred sea-chest") have no noun on the closed
+    list, so the 70 gp hoard could be neither opened nor emptied. The record decides."""
+    if is_container(name):
+        return True
+    want = head_of(name)
+    return bool(want) and any(
+        "contents" in r and (same(r.get("name"), name) or head_of(r.get("name")) == want)
+        for r in props or ())
 
 
 def is_money(name) -> bool:

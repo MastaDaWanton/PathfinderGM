@@ -47,9 +47,9 @@ def test_three_unlock_levels_then_endless_levels_with_the_forges_four_perks():
     yield. Measured before: five written levels and a flat 100 a level after them, the last
     world class still on the per-recipe table."""
     t = _track()
-    assert t.max_level == 3 and t.thresholds == [25, 65]
+    assert t.max_level == 3 and t.thresholds == [100, 260]   # the 2026-11-18 curve
     assert t.perks == ("potency", "hardening", "quality", "yield")
-    assert [t.to_next(n) for n in (1, 2, 3, 4, 10)] == [25, 65, 50, 60, 120]
+    assert [t.to_next(n) for n in (1, 2, 3, 4, 10)] == [100, 260, 400, 400, 400]
     assert not t.milestones and not t.deeds, "the legendary-hide milestone is retired"
     assert [t.at(n).ceiling for n in (1, 2, 3)] == [2, 3, 4]
 

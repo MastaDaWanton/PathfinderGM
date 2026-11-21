@@ -387,9 +387,11 @@ def _post(client, url, body):
 
 
 def _step(client, body):
-    rolled = _post(client, "/api/forge/roll", {**body, "face": 20}).json()
-    assert rolled["roll"]["success"], rolled
-    return _post(client, "/api/forge/finish", {"token": rolled["token"], "score": 1.0}).json()
+    # The shared step: the face that just makes the DC (no 5+ margin bands) and a step of
+    # an hour or more waited out and collected (both the owner's rulings of 2026-11-18).
+    from tests.test_forge_api import do_step
+
+    return do_step(client, body)
 
 
 def test_state_gives_the_page_its_swatches_place_line_and_slots(forge):
@@ -452,7 +454,13 @@ def test_the_whole_chain_and_what_the_work_order_is_sent(forge):
     assert "rounded toward zero" in card["how"]
     f = _step(forge, body)
     blank = f["products"][0]
-    assert blank["next"] == "quench" and blank["color"]
+    # Forging is 90 minutes, so the blank waited In progress (ruling 2026-11-18): the
+    # result named no Next while it forged, and said when it would be ready instead.
+    assert blank["next"] is None and "still forging" in blank["waiting"] and blank["color"]
+    from rules import blacksmith as bs
+
+    assert forge_views._next_step(bs.Work.from_stock(cm.current().scene.pc().stock[
+        blank["key"].split(":", 1)[1]])) == "quench"
     quench = {"method": "quench", "slots": {"piece": blank["key"], "quenchant": "inv:water"}}
     rolled = _post(forge, "/api/forge/roll", {**quench, "face": 20}).json()
     # Lane U3's games read the bath and the work's metal from `tuning` (contracts §11).
@@ -476,7 +484,9 @@ def test_the_whole_chain_and_what_the_work_order_is_sent(forge):
     assert c["heat"] is None
     done = _step(forge, order)
     sword = done["products"][0]
-    assert sword["card"]["rows"] and sword["next"] == "finish"
+    # Assembling is an hour: it waited In progress, so Next (Finish) was withheld (2026-11-18).
+    assert sword["card"]["rows"] and sword["next"] is None
+    assert "still assembling" in sword["waiting"]
     assert [k["slot"] for k in sword["card"]["columns"]] == ["head", "haft", "fittings"]
 
 

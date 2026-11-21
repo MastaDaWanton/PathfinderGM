@@ -56,6 +56,8 @@ PAYING_ACTS = frozenset({"give", "buy", "drop"})
 
 _PRONOUNS = frozenset({"him", "her", "them", "he", "she", "they", "his", "their"})
 _IT = frozenset({"it", "them", "these", "those", "this", "that"})
+# The words for the whole of what a container holds: a quantifier, not a thing's name.
+_WHOLE = frozenset({"everything", "contents", "inside", "all", "stuff", "lot", "within"})
 _NUMBERS = {"a": 1, "an": 1, "one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
             "six": 6, "seven": 7, "eight": 8, "nine": 9, "ten": 10, "eleven": 11,
             "twelve": 12, "fifteen": 15, "twenty": 20, "thirty": 30, "forty": 40,
@@ -118,6 +120,10 @@ def _plain(words) -> str:
     from rules import holding
 
     return holding.plain(words)
+
+
+def _props(scene) -> list:
+    return getattr(scene, "props", None) or []
 
 
 def addressed(scene) -> str:
@@ -343,7 +349,12 @@ def jobs_spoken(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list
         return bool(jobs_mod.held_by(scene, r)
                     or jobs_mod.hires_hands((getattr(scene, "actors", {}) or {}).get(r)))
 
-    hiring = [r for r in (getattr(scene, "actors", {}) or {}) if hires(r)]
+    # The ones who hold work first: a keeper who hires on demand (the guild's clerk at the
+    # counter) is asked only when nobody here holds any, or the hiring table's own clerk
+    # had a rival in the same room (Pangrella's guildhall, 2026-11-17).
+    holding = [r for r in (getattr(scene, "actors", {}) or {})
+               if jobs_mod.held_by(scene, r)]
+    hiring = holding or [r for r in (getattr(scene, "actors", {}) or {}) if hires(r)]
     for row in rows:
         a = actions[row.index] if row.index < len(actions) else {}
         if row.act not in _JOB_ACTS or not interpret.acting(a):
@@ -358,7 +369,7 @@ def jobs_spoken(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list
             # (first in the room) beside the guild clerk taking names. The room's own
             # finder words it as a tie; the work decides it.
             ref = hiring[0]
-        if not ref or ref in done or not hires(ref):
+        if not ref or ref in done or ref not in hiring:
             continue
         offered = [c for c in jobs_mod.held_by(scene, ref)
                    if cards_mod.standing(c) == cards_mod.OFFERED and c.job.get("work")]
@@ -414,6 +425,16 @@ def jobs_spoken(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list
             notes.append(f"{who}: {answer}")
         if built is None:
             continue
+        if built.get("do") == "offer":
+            # Asking for work is not asking to be paid: live 2026-11-17 (fix/inns-and-jobs),
+            # "I ask the clerk of the guild if there is any paid work for a blade" was read
+            # a `request` for payment, and a Diplomacy roll for a favour (failed, "offers no
+            # payment") stood beside the week of guard work the clerk put. The job is the
+            # answer; the request roll for it goes.
+            row.intents[:] = [i for i in row.intents
+                              if not (i.get("op") == "check" and i.get("target") == ref
+                                      and (i.get("params") or {}).get("request")
+                                      == "payment")]
         row.intents.append({"op": "job", "actor": pc.ref, "target": ref, "params": built,
                             "because": f"the player, to {who}: {answer}"})
         done.add(ref)
@@ -446,12 +467,7 @@ def _stock_id(pc, words) -> str:
     wrong jar."""
     from rules import holding
 
-    for sid, item in (getattr(pc, "stock", {}) or {}).items():
-        for name in (getattr(item, "name", ""), getattr(item, "base", ""),
-                     str(sid).split("#")[0].replace("-", " "), sid):
-            if name and holding.same(name, words):
-                return sid
-    return ""
+    return holding.stock_key(getattr(pc, "stock", {}) or {}, words)
 
 
 def _carried(pc, words, coming=()) -> str:
@@ -549,8 +565,34 @@ def _take(row: Row, frame, i, scene, pc, recent=()) -> None:
                      if p.get("act") in ("take", "steal")), None)
         if prev is not None and prev.get("target"):
             source = " ".join(str(prev["target"]).split())
+    # Still nobody named: a thing that is not lying here, carried by the one person the
+    # player is dealing with, comes out of their hands — so `confirm_takes` asks whether
+    # they offered it. Playtest 2026-11-20 #5: "I accept the food" named nobody, and the
+    # food offered never left the carter's pack (nothing on record held it, then).
+    held_from = ""
+    if not source and not coin:
+        ref = addressed(scene)
+        them = (getattr(scene, "actors", {}) or {}).get(ref) if ref else None
+        lying = getattr(scene, "prop_on_the_ground", None)
+        if them is not None and not them.is_pc and holding.carried_by(them, thing) \
+                and not (lying and lying(thing) is not None):
+            held_from = ref
+    if source and _mine(source) and not coin and not person(scene, source):
+        # Out of the player's own pack, pocket or pouch: what it holds is what they carry,
+        # and taking it out moves nothing (playtest 2026-11-17 #18: "take a torch out of my
+        # pack" built a pick-up, refused "a torch is not here: it lies at the market").
+        # Not `holding.is_container`, whose closed list has no "pack": "my" says whose.
+        boxed = any(r.get("held_by") == pc.ref and holding.key_in(
+            ((r.get("contents") or {}).get("goods") or {}), thing)
+            for r in getattr(scene, "props", None) or ())
+        if not boxed:
+            if _carried(pc, thing):
+                row.note = f"{thing} is already carried"
+            else:
+                row.missing = row.unheld = f"{pc.name} has no {_plain(thing)}"
+            return
     if getattr(scene, "in_encounter", False) and not coin \
-            and not (source and holding.is_container(source)):
+            and not (source and holding.is_box(source, _props(scene))):
         # In a fight, a thing taken off a foe is 1e's Steal (CMB against CMD, the `attack`
         # op's `manoeuvre: steal`, which picks from what they really carry and refuses in
         # words what they do not — `Engine._steal_choice`). The foe is the one the words
@@ -569,17 +611,25 @@ def _take(row: Row, frame, i, scene, pc, recent=()) -> None:
             row.note = f"a steal from {actor.name}: {thing}"
             return
     params: dict = {"item": _plain(thing) or thing, "to": pc.ref}
-    amount = coin_amount(thing) if coin and not holding.is_container(source) else None
+    amount = coin_amount(thing) if coin and not holding.is_box(source, _props(scene)) else None
     if amount:
         # "ten gold" from a person or a till: a denomination and a count, as a give's is
         # (a pouch's coin keeps its own door, which empties it).
         params.update(item=amount[0], count=amount[1])
-    if source and holding.is_container(source):
+    if source and holding.is_box(source, _props(scene)):
         params["from_"] = _plain(source)
+        if set(re.findall(r"[a-z]+", _plain(thing))) & _WHOLE:
+            # "everything that's in the gaoler's box", "what's inside": the box emptied,
+            # its contents the engine's record (`Engine._empty_box`). Playtest 2026-11-17
+            # #42: the give of "everything" was answered "'everything' is a word, not a
+            # thing", logged resolved, and the 50 gp stayed in the box.
+            params["item"] = "everything"
     elif source:
         who = person(scene, source) or _counter_keeper(scene)
         if who:
             params["from_"] = who
+    elif held_from:
+        params["from_"] = held_from
     if not coin and "from_" not in params and holding.key_in(pc.goods, thing):
         # Carrying what is already carried: "I take the crate to the counting house"
         # (2026-10-03, turn 73: a second crate came out of the air).
@@ -678,6 +728,20 @@ def _give(row: Row, frame, i, scene, pc, recent=(), coming=()) -> None:
         # "pay", "give him the money": coin of no named amount, at a keeper asked for
         # work today, is the job's price paid — the commission's own (`_agreed_work`).
         return
+    if not coin_amount(thing) and not _carried(pc, thing, coming):
+        # Paid to somebody asking a toll, a sum not named is the toll (`Engine._pay_toll`):
+        # "I pay the toll-keeper his toll" (playtest 2026-11-17 #22) was "not carrying his
+        # toll" to every door, and no coin moved. Structure: who it goes to holds the toll.
+        from rules import states
+
+        said_to = " ".join(str(a.get("target") or "").split())
+        ref = person(scene, said_to) if said_to else addressed(scene)
+        held = (getattr(scene, "actors", {}) or {}).get(ref)
+        if held is not None and held.has_state(states.ASKS_A_TOLL):
+            row.intents.append({"op": "give", "actor": pc.ref,
+                                "params": {"item": "the toll", "from_": pc.ref, "to": ref},
+                                "because": "the player paid the toll"})
+            return
     if not thing:
         row.note = "nothing named to hand over"
         return
@@ -707,12 +771,40 @@ def _give(row: Row, frame, i, scene, pc, recent=(), coming=()) -> None:
         row.missing = (f"there is nobody here who is {to_words}" if to_words
                        else f"nobody here to give {thing} to")
         return
+    stay = _stay_paid_for(a, scene, to) if (amount or _is_coin(thing)) else None
+    if stay is not None:
+        # Coin handed to the house's keeper for a room is the room bought, at the book's
+        # price through the counter's own door (`Engine._buy_stay`), never the sum said:
+        # jack T205 (owner's save 2026-11-17), "I hand over 2 gold for the private room"
+        # was a plain gift, no room was held, and the night upstairs was billed again.
+        row.intents.append({"op": "buy", "actor": pc.ref,
+                            "params": {"item": stay["id"], "from_": to},
+                            "because": "the player paid the keeper for a room"})
+        row.note = f"coin for a room: the {stay['quality']} stay, at the house's price"
+        return
     if amount:
         params = {"item": amount[0], "count": amount[1], "from_": pc.ref, "to": to}
     else:
         params = {"item": key or _plain(thing), "from_": pc.ref, "to": to}
     row.intents.append({"op": "give", "actor": pc.ref, "params": params,
                         "because": "the player handed it over"})
+
+
+def _stay_paid_for(a: dict, scene, to: str) -> dict | None:
+    """The inn's stay a coin `give` pays for (`lodging.find`'s row), or None: only to the
+    keeper of the house the party stands in, where beds are let, and only when the act's
+    own place slot (else its span) names a room the house lets."""
+    from rules import keepers, lodging
+
+    at = str(getattr(scene, "at", "") or "")
+    keeper = keepers.keeper_in(scene, at) if at and lodging.lets_beds(scene, at) else None
+    if keeper is None or keeper.ref != to:
+        return None
+    for words in (a.get("place"), a.get("span")):
+        found = lodging.find(str(words or "")) if words else None
+        if found is not None:
+            return found
+    return None
 
 
 def _agreed_work(row: Row, a: dict, scene, pc) -> bool:
@@ -907,6 +999,21 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
     led = _walk_rides_the_follow(frame, scene)
     for i, a in enumerate(frame.get("actions") or []):
         act = str(a.get("act") or "")
+        if act == "attack" and a.get("target") and not person(scene, a["target"]):
+            # A blow at a shut door out of here is the door forced (`break_in`, which
+            # dungeons.break_door rolls at the book's DC). Playtest 2026-11-17 #43: "I
+            # throw my shoulder against the door to the beast's pool again" was read
+            # `attack, target: the door…`, nobody answered to it, and the turn was a 422
+            # "Nobody here answers to the door to the beast's pool" — while the same door
+            # forced in other words a turn earlier had worked. Rewritten in the reading,
+            # so every later reader of it (`broken_into`, `victims`) agrees.
+            from rules import dungeons
+
+            beyond = dungeons.shut_door_named(scene, a["target"])
+            if beyond:
+                a.pop("blow", None)
+                a.update(act="break_in", target=beyond)
+                act = "break_in"
         row = Row(index=i, act=act, commit=str(a.get("commit") or "done"))
         if i in bought:
             row.note = bought[i]
@@ -973,6 +1080,11 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
             # The op names: one action at a time through the reading's own op map, so each
             # op is owed by the action that declared it.
             row.ops = interpret.ops_for({"actions": [a]}, scene, places)
+            if act in ("leave", "athletics") and pc is not None \
+                    and pc.has_state("state.position.pit"):
+                _out_of_the_pit(row, pc)
+                rows.append(row)
+                continue
             if act == "go" and pc is not None and _to_the_square(row, a, scene, pc):
                 rows.append(row)              # "I go to C5": the board's own square
                 continue
@@ -984,9 +1096,16 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
             # pick-up ran at the tannery, and the engine minted a second crate there.
             if act == "go" and not row.ops and a.get("place"):
                 from rules import heard_places
+                from rules import places as places_mod
 
-                if heard_places.named_in(str(a["place"]), scene, places) is not None:
-                    row.ops = ["found", "travel"]
+                heard = heard_places.named_in(str(a["place"]), scene, places)
+                if heard is not None:
+                    # A rumoured way in is a venture (`go_to_heard_place`), not a found.
+                    mark = (places_mod.find(places, heard.get("landmark") or "")
+                            if heard.get("landmark") else None)
+                    row.ops = (["venture"] if mark is not None
+                               and heard_places.venture_kind(heard, scene, mark)
+                               else ["found", "travel"])
             if act in ("go", "seek") and a.get("here"):
                 approached = str(a["here"])
             if act == "talk" and not a.get("says") and pc is not None:
@@ -1002,7 +1121,7 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                         if not places or places_mod.find(places, a["place"]) is None else "")
                 if home:
                     _home_together(row, home, scene, pc)
-                else:
+                elif not _to_my_room(row, str(a["place"]), scene, places, pc):
                     _to_the_town(row, str(a["place"]), scene, places, pc)
                     _nowhere(row, a, scene, places)
             if act == "go" and a.get("fixture"):
@@ -1091,12 +1210,29 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                     _to_the_fixture(row, kind, scene, pc)
                 _sneak(row, a, scene, pc)
             if act == "use" and pc is not None and not row.ops:
-                if not (_skill_used(row, a, pc) or _put_on(row, a, pc)):
+                if not (_skill_used(row, a, pc) or _put_on(row, a, pc)
+                        or _light(row, a, pc)):
                     _draw(row, a, pc)
+            if act in ("other", "look", "use") and pc is not None and not row.intents:
+                _look_in(row, frame, i, scene, rows, places)
             if act == "disguise" and pc is not None:
                 _disguise(row, a, pc)
+            if act == "challenge" and pc is not None:
+                _challenge(row, a, scene, pc)
             # Taking 10 or 20 is always on the ground at hand: nobody takes 20 on a tavern.
-            if act == "search" and (a.get("where") == "here" or a.get("take"))                     and pc is not None:
+            # And a search at the landmark somebody gave for a way in they spoke of, read
+            # "elsewhere" because it looks for somewhere to go: the engine's search looks
+            # for that place there (`Engine._search_for_heard`). Playtest 2026-11-20 #2,
+            # "I search the woods for the cave everyone has a story about", standing in
+            # the woods the carter's old mine is off: it owed no op, and the plan rolled
+            # tracks and a secret-door check.
+            # And every search that names what it is for (the owner's ruling of
+            # 2026-11-20, #19: "If I type to search for anything I should be searching for
+            # that thing, not tracks"): the engine answers about that thing
+            # (`Engine._sought`). A walk the plan adds to go and find it stays.
+            if act == "search" and pc is not None and (
+                    a.get("where") == "here" or a.get("take") or a.get("object")
+                    or _heard_way_in_here(scene, places)):
                 _search(row, a, pc)
             if act == "commission" and pc is not None:
                 _commission(row, a, scene, pc)
@@ -1106,6 +1242,8 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 _posture(row, act, pc)
             if act == "surrender" and pc is not None:
                 _surrender(row, a, scene, pc)
+            if act in ("fend", "hunt") and pc is not None:
+                _fend(row, act, pc)
         rows.append(row)
     # One commission a keeper a turn: "agree to his price and pay" is read as two deeds
     # (`sell`, `give`), and each agrees the same job (`_agreed_work`). The first stands.
@@ -1173,6 +1311,34 @@ def _take_is_the_harvest(rows: list[Row]) -> None:
             row.intents = [t for t in row.intents if t not in folded]
             row.note = (f"{folded[0]['params'].get('item')} comes off the carcass with the "
                         f"harvest: one deed, not a second take")
+
+
+def _out_of_the_pit(row: Row, pc) -> None:
+    """Leaving, or climbing, at the bottom of a pit is the climb out, built whole: a Climb
+    check the engine sets at the pit's DC (`dungeons.climb_out`). Inform's EXIT leaves
+    the container you are in, and the pit is that container, so no walk is owed.
+
+    Playtest 2026-11-17 #38: "I climb up out of the pit" read `leave` and built nothing,
+    and the next turn's Climb check was the plan's DC 10, which changed nothing."""
+    row.ops = []
+    row.intents.append({"op": "check", "actor": pc.ref, "params": {"skill": "climb"},
+                        "because": "the player climbs out of the pit"})
+    row.note = "at the bottom of a pit: the climb out"
+
+
+def _fend(row: Row, act: str, pc) -> None:
+    """Living off the land (`fend`) or hunting (`hunt`), the reader's acts: the engine's
+    `live_off_land` (CRB p.107, get along in the wild) or `hunt` op, built whole.
+    Whether the ground can feed anybody is the engine's (`Engine._op_live_off_land`).
+
+    The owner's report of 2026-11-17 (#6): three searches for water in a forest built a
+    Perception check, a herb forage and a hunt for tracks, and none of them gave water."""
+    hunt = act == "hunt"
+    row.intents.append({"op": "hunt" if hunt else "live_off_land", "actor": pc.ref,
+                        "params": {},
+                        "because": "the player hunts" if hunt
+                        else "the player lives off the land"})
+    row.note = "hunting for game" if hunt else "living off the land"
 
 
 def _posture(row: Row, act: str, pc) -> None:
@@ -1282,13 +1448,43 @@ def _loot(row: Row, frame, i, scene, pc) -> None:
     was not down yet when the plan was read. The blow before it in the same sentence runs
     first, so a body killed by it is a body by the time the loot is resolved."""
     ref = _whose_body(frame, i, scene)
-    if not ref:
+    # Words that name no body ("search the area for more loot", "loot the room") search
+    # the room as well: every container lying here that holds something on the record is
+    # emptied (`Engine._empty_box`). Owner bug 2026-11-17 #2 (frag, turn 831): the words
+    # were read `loot: the area`, the dire rat's picked-clean body was looted again, and
+    # the 70 gp hoard on the same floor stayed unopened.
+    boxes = [] if _names_a_body(frame, i, scene) else [
+        str(r["name"]) for r in _props(scene)
+        if r.get("at") == getattr(scene, "at", None) and not r.get("held_by")
+        and ((r.get("contents") or {}).get("goods")
+             or any((r.get("contents") or {}).get("purse", {}).values()))]
+    if not ref and not boxes:
         row.note = "nobody here to loot"
         return
-    row.intents.append({"op": "loot", "actor": pc.ref, "params": {"from_": ref},
-                        "because": "the player searches the body"})
+    if ref:
+        row.intents.append({"op": "loot", "actor": pc.ref, "params": {"from_": ref},
+                            "because": "the player searches the body"})
+    for name in boxes:
+        row.intents.append({"op": "give", "actor": pc.ref,
+                            "params": {"item": "everything", "from_": name, "to": pc.ref},
+                            "because": "the player searches the room"})
     who = (getattr(scene, "actors", {}) or {}).get(ref)
-    row.note = f"a loot of {getattr(who, 'name', ref)}"
+    row.note = "; ".join(([f"a loot of {getattr(who, 'name', ref)}"] if ref else [])
+                         + [f"{n} emptied" for n in boxes])
+
+
+def _names_a_body(frame, i: int, scene) -> bool:
+    """Whether a loot's words mean one body: a person here they name, a pronoun, or the
+    target of a blow earlier in the sentence (`_whose_body`'s first three answers)."""
+    from rules import scope
+
+    acts = frame.get("actions") or []
+    words = " ".join(str(acts[i].get("target") or acts[i].get("object") or "").split())
+    if words.lower() in _PRONOUNS:
+        return True
+    if words and scope.in_the_room(scene, words) in (getattr(scene, "actors", {}) or {}):
+        return True
+    return any(p.get("act") == "attack" and p.get("target") for p in acts[:i])
 
 
 def _harvest(row: Row, frame, i, scene, pc, rows=()) -> None:
@@ -1366,6 +1562,104 @@ def _draw(row: Row, a: dict, pc) -> None:
         row.intents.append({"op": "wear", "actor": pc.ref,
                             "params": {"item": str(carried), "actor": pc.ref},
                             "because": f"the player draws the {carried}"})
+
+
+def _light(row: Row, a: dict, pc) -> bool:
+    """A `use` of a thing on the player's shelf that gives light (a torch, a sunrod: its
+    own `light` document, `consumables._light`): the `use_item` that lights it, through
+    the engine's door. True when it was built.
+
+    Playtest 2026-11-17 #13 and #15: "I light a torch" and "I light one of my torches",
+    three torches on the shelf, built no op either way, and the page lit a torch the engine
+    never did — on the way into a dark dungeon. The shelf's own record says what lights,
+    never the verb: "use my torch" and "light my torch" are one deed. And 2026-11-17b #3:
+    "a fresh torch" is the torch, its name found whole among the words — among the things
+    that light only, so "the torch with my flint and steel" is still the torch."""
+    from rules import consumables, holding
+
+    def lights(item) -> bool:
+        return any(str(s.get("type")) in ("light", "manifest")
+                   for s in consumables._specs(item))
+
+    shelf = getattr(pc, "stock", {}) or {}
+    said = " ".join(str(a.get("object") or "").split())
+    sid = _stock_id(pc, said) if said else ""
+    if said and (not sid or not lights(shelf[sid])):
+        sid = holding.stock_among({k: v for k, v in shelf.items() if lights(v)}, said)
+    held = shelf.get(sid) if sid else None
+    if held is None or not lights(held):
+        return False
+    row.intents.append({"op": "use_item", "actor": pc.ref,
+                        "params": {"item": sid, "how": "light"},
+                        "because": f"the player lights the {held.name}"})
+    row.note = f"lights the {held.name}"
+    return True
+
+
+def _look_in(row: Row, frame, i: int, scene, rows=(), places=()) -> None:
+    """Opening or looking into a container that holds something on the engine's record
+    ("open the gaoler's box", "see what's inside" after it): `narrate_only` with
+    `looks_in`, which tells the contents (`Engine._looks_in`). Once a box a turn.
+    Playtest 2026-11-17 #41: the prose pried the lid and never said what was inside.
+    The record decides — a container named here with `contents` — never the verb.
+
+    "Here" is where the sentence has walked by then: R1 of 2026-11-17, "I go to the broken
+    pen and open the gaoler's box to see what's inside" from the cells, looked for the box
+    in the cells, found none, and nothing was said of the 50 gp in it. One action at a
+    time, each against the place the last one leaves (Inform's DM4 §34, as `order`)."""
+    from rules import holding
+    from rules import places as places_mod
+
+    from . import interpret
+
+    acts = frame.get("actions") or []
+    said = " ".join(str(acts[i].get("object") or "").split())
+    boxes = getattr(scene, "props", None) or ()
+    if said and not holding.is_box(said, boxes) and (
+            set(re.findall(r"[a-z]+", _plain(said))) & _WHOLE or said.lower() in _IT):
+        # "what's inside", "it": the container of the deed before it.
+        said = next((" ".join(str(p.get("object") or "").split())
+                     for p in reversed(acts[:i])
+                     if holding.is_box(str(p.get("object") or ""), boxes)), "")
+    if not said or not holding.is_box(said, boxes):
+        return
+    want = holding.head_of(said)
+    here = str(getattr(scene, "at", "") or "")
+    for p in acts[:i]:
+        if places and p.get("act") == "go" and p.get("place") and interpret.acting(p):
+            went = places_mod.find(places, str(p["place"]), near=here)
+            here = went.id if went is not None else here
+    pc = scene.pc()
+    if not any("contents" in r and (holding.same(r.get("name"), said)
+                                    or holding.head_of(r.get("name")) == want)
+               and (r.get("at") == here or r.get("held_by") == pc.ref)
+               for r in getattr(scene, "props", None) or ()):
+        return
+    if any(b.get("params", {}).get("looks_in") and holding.head_of(b["params"]["looks_in"])
+           == want for r in rows for b in r.intents):
+        return
+    row.intents.append({"op": "narrate_only", "actor": pc.ref,
+                        "params": {"looks_in": _plain(said)},
+                        "because": "the player looks inside"})
+
+
+def _challenge(row: Row, a: dict, scene, pc) -> None:
+    """A bout asked for, built whole: the engine's `bout` op (`Engine._op_bout`), which
+    an arena's house stages and anywhere else refuses with who does. Playtest 2026-11-17b
+    #24: "Put me in the next bout" to the master of the games built nothing. A challenge to
+    somebody here by name who is not the keeper of this place is theirs to answer in
+    words, and builds nothing (a sparring match with a soldier is not built)."""
+    from rules import keepers
+
+    words = " ".join(str(a.get("target") or "").split())
+    who = person(scene, words) if words else ""
+    actor = (getattr(scene, "actors", {}) or {}).get(who) if who else None
+    if actor is not None \
+            and actor is not keepers.keeper_in(scene, str(getattr(scene, "at", "") or "")):
+        return
+    row.intents.append({"op": "bout", "actor": pc.ref, "params": {},
+                        "because": "the player asks for a bout"})
+    row.note = "a bout asked for"
 
 
 def _disguise(row: Row, a: dict, pc, what: str | None = None) -> None:
@@ -1459,6 +1753,18 @@ def _sneak(row: Row, a: dict, scene, pc) -> None:
         "Stealth at full speed (-5)" if params.get("pace") else "Stealth at half speed")
 
 
+def _heard_way_in_here(scene, places) -> bool:
+    """Whether a heard-of way in (`heard_places.ventures_at`) has its landmark where the
+    party stands."""
+    from rules import heard_places
+    from rules import places as places_mod
+
+    if scene is None or not getattr(scene, "heard_places", None):
+        return False
+    here = places_mod.find(places or (), getattr(scene, "at", "") or "")
+    return bool(heard_places.ventures_at(scene, here, places or ()))
+
+
 def _search(row: Row, a: dict, pc) -> None:
     """A search of where the player is (`interpret.SEARCH_WHERE` here), built whole: the
     engine's Perception search, one roll against everything hidden here at its own DC
@@ -1473,6 +1779,12 @@ def _search(row: Row, a: dict, pc) -> None:
     take = {"ten": 10, "twenty": 20}.get(str(a.get("take") or ""))
     if take:
         params["take"] = take
+    # What it is for: the player's words, and the reader's closed kind of thing.
+    sought = " ".join(str(a.get("object") or "").split())
+    if sought:
+        params["sought"] = sought[:80]
+    if a.get("seeking") and a["seeking"] != "anything":
+        params["seeking"] = str(a["seeking"])
     row.intents.append({"op": "check", "actor": pc.ref, "params": params,
                         "because": "the player searches"})
     row.note = f"a Perception search, taking {take}" if take else "a Perception search"
@@ -1662,6 +1974,41 @@ def _carry_on(row: Row, scene, pc) -> None:
     row.note = f"the walk goes on to {walk['name']}"
 
 
+# A room the player holds at an inn, by the head nouns a bed is asked for by: the same closed
+# vocabulary shape as DWELLINGS, asked only while a room is held (`lodging.room_held`).
+_MY_ROOM_WORDS = frozenset({"room", "rooms", "bed", "bedroom", "chamber", "bedchamber",
+                            "quarters", "lodging", "lodgings"})
+
+
+def _to_my_room(row: Row, phrase: str, scene, places, pc) -> bool:
+    """A walk to the room the player paid for — "my room", "the room i paid for" — is the
+    walk up to the inn's upper floor while the room is held (its ground floor where the
+    house has none). True when it was settled here. frag T113 (owner's save 2026-11-17):
+    "go to the room i paid for" was "You don't know of anywhere called…", and the prose
+    said the only beds were the floor by the hearth, of a good room bought that night."""
+    from rules import lodging
+    from rules import places as places_mod
+
+    held = lodging.room_held(pc)
+    words = set(re.findall(r"[a-z]+", phrase.lower()))
+    if held is None or not (words & _MY_ROOM_WORDS) or places_mod.find(places, phrase):
+        return False
+    house = places_mod.base_of(held[0])
+    up = places_mod.storey_id(house, 1)
+    target = next((p for p in places or () if p.id == up), None) \
+        or next((p for p in places or () if p.id == house), None)
+    if target is None:
+        return False
+    if target.id == getattr(scene, "at", None):
+        row.note = "already in the room the player holds"
+    else:
+        row.intents.append({"op": "travel", "actor": pc.ref,
+                            "params": {"place": target.name},
+                            "because": f"to the {held[1]} room the player holds"})
+        row.note = f"{phrase}: the {held[1]} room held at {target.name}"
+    return True
+
+
 def _to_the_town(row: Row, phrase: str, scene, places, pc) -> None:
     """A walk to the settlement named whole — "the town", "the city", its own name — is a
     walk to its way in from outside, or to its middle from inside
@@ -1809,6 +2156,20 @@ def _home_together(row: Row, ref: str, scene, pc) -> None:
                         "because": f"the player goes home with {who.name}"})
     row.ops = []
     row.note = f"home with {who.name}, who is here"
+
+
+def _a_square(frame, i: int, scene) -> bool:
+    """Whether action `i` of the reading names a square of this board (`_to_the_square`'s
+    own read: `fixtures.square_said`)."""
+    from rules import fixtures
+
+    acts = (frame or {}).get("actions") or []
+    grid = getattr(scene, "grid", None)
+    if grid is None or not 0 <= i < len(acts):
+        return False
+    a = acts[i]
+    return fixtures.square_said(grid, f"{a.get('place') or ''} {a.get('span') or ''}"
+                                .upper()) is not None
 
 
 def _to_the_square(row: Row, a: dict, scene, pc) -> bool:
@@ -1967,7 +2328,7 @@ def things_not_here(raw, rows: list[Row], *, notes: list | None = None) -> list:
     if notes is not None:
         notes.append(f"things the deeds handle that are not here: {line}")
     for r in out:
-        if _op(r) == "narrate_only":
+        if _op(r) == "narrate_only" and not (r.get("params") or {}).get("looks_in"):
             had = " ".join(str((r.get("params") or {}).get("not_here") or "").split())
             if line in had:
                 return out
@@ -2002,11 +2363,40 @@ def nowhere_to_go(raw, rows: list[Row], *, notes: list | None = None) -> list:
     if notes is not None:
         notes.append(f"a walk to nowhere the engine holds: {said[0]}")
     for r in out:
-        if _op(r) == "narrate_only":
+        if _op(r) == "narrate_only" and not (r.get("params") or {}).get("looks_in"):
             r["params"] = dict(r.get("params") or {}, not_here=said[0])
             return out
     return out + [{"op": "narrate_only", "because": "the player walked to nowhere known",
                    "params": {"not_here": said[0]}}]
+
+
+def search_unanswered(raw, frame: dict | None, scene, *, notes: list | None = None) -> list:
+    """The plan, with the Perception search of where the player stands when the reading
+    holds a search and the turn is otherwise nothing (only `narrate_only`, no printed
+    answer): searching is Perception, "intentionally searching for stimulus is a move
+    action" (CRB, Perception), and a search no travel, found or venture door took is still
+    a search of here. The same "otherwise nothing" rule as `nowhere_to_go`.
+
+    Playtest 2026-11-20 #50: "Look for a different way into the gallery", in the ruins,
+    was read `search` with `where` left at elsewhere, so the table built nothing; the plan's
+    own check was aimed at a placeholder and dropped on the retry; the turn resolved only
+    `narrate_only`, and the page said "You scan the surrounding ruins, searching for a
+    different way into the gallery. What do you do?" — the act and no answer."""
+    if not isinstance(raw, list) or not isinstance(frame, dict):
+        return raw
+    acts = [a for a in frame.get("actions") or [] if isinstance(a, dict)]
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if pc is None or not any(a.get("act") == "search" for a in acts):
+        return raw
+    if any(_op(r) != "narrate_only" for r in raw) or any(
+            isinstance(r, dict) and (r.get("params") or {}).get(k)
+            for r in raw for k in ("not_here", "looks_in")):
+        return raw
+    row = Row(index=0, act="search")
+    _search(row, next(a for a in acts if a.get("act") == "search"), pc)
+    if notes is not None:
+        notes.append("a search nothing answered: the Perception search of here")
+    return [r for r in raw if _op(r) != "narrate_only"] + row.intents
 
 
 def _effort_check(r, pc) -> bool:
@@ -2103,6 +2493,10 @@ def _request(row: Row, a: dict, scene, pc) -> None:
     never invented."""
     kind = str(a.get("asks_for") or "")
     words = " ".join(str(a.get("target") or "").split())
+    # "you" (or "him") is the one spoken to: live 2026-11-18, "Then I'll hire you for a
+    # week" came back `target: you` and was refused "there is nobody here who is you".
+    if words.lower() in _PRONOUNS | {"you"}:
+        words = ""
     # Somebody named who is not here is not quietly swapped for whoever is.
     who = person(scene, words) if words else addressed(scene)
     actor = (getattr(scene, "actors", {}) or {}).get(who) if who else None
@@ -2115,10 +2509,19 @@ def _request(row: Row, a: dict, scene, pc) -> None:
     name = str(actor.name)
     if name[:1].islower() and not name.lower().startswith(("the ", "a ", "an ")):
         name = f"the {name}"
+    # A hire rides the same check to the engine, which takes it to the wage door and
+    # rolls nothing (`Engine._make_request`, `requests.HIRE`).
+    # What a favour asks for, in the player's own words: playtest 2026-11-20 #14, "I'd like
+    # an item from his pack in exchange" was told "agrees to do Shadow the favour. Nothing
+    # changes hands." — what favour? — and the carter's answer about his pack was then cut
+    # as a clash with it.
+    wants = " ".join(str(a.get("object") or "").split()) if kind == "favour" else ""
     row.intents.append({"op": "check", "actor": pc.ref, "target": who,
-                        "params": {"skill": "diplomacy", "request": kind},
-                        "because": f"the player asks {name} for "
-                                   + ("payment" if kind == "payment" else "a favour")})
+                        "params": {"skill": "diplomacy", "request": kind,
+                                   **({"wants": wants} if wants else {})},
+                        "because": (f"the player hires {name}" if kind == "hire" else
+                                    f"the player asks {name} for "
+                                    + ("payment" if kind == "payment" else "a favour"))})
     row.note = f"a request of {name}: {kind}"
 
 
@@ -3066,12 +3469,17 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     # plan's own for the same outfit would find it already on and be refused beside it.
     dressing = {str((b.get("params") or {}).get("item") or "") for b in built
                 if b.get("op") == "wear"} - {""}
+    lighting = [str((b.get("params") or {}).get("item") or "") for b in built
+                if b.get("op") == "use_item"]
+    taken = any(r.act in ("take", "steal") and any(b.get("op") == "give" for b in r.intents)
+                for r in rows)
     # A loot or a harvest the table built is the turn's word on that body: the plan's own
     # loot, or a skill check it wrote for the cutting, would strip or roll a second time.
     looting = any(b.get("op") == "loot" for b in built)
     posturing = any(b.get("op") == "condition" and (b.get("params") or {}).get(
         "condition") == "prone" for b in built)
     harvesting = any(b.get("op") == "harvest" for b in built)
+    fending = any(b.get("op") in _FEND_OPS for b in built)
     # A go the reading owes a journey for (`interpret.ops_for`: a town the roads reach) is
     # that journey, and the plan's own walk beside it is not: measured on the 0.2.22
     # leftovers run, "I … lead the wagons on toward Kalixiri" from a stretch of the road
@@ -3096,8 +3504,27 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     # untrained Profession and the job taken at the list price.
     commissioned = {str((b.get("params") or {}).get("who")): b for b in built
                     if b.get("op") == "commission"}
+    from rules import lodging as _lodging
+
+    staying = {str((b.get("params") or {}).get("from_") or "") for b in built
+               if b.get("op") == "buy" and str((b.get("params") or {}).get("item") or "")
+               .startswith(_lodging.PREFIX)}
+    # A take the table built as a give is that act's whole deed: when it is the only act
+    # that could stand behind a take-off, the plan's take-off has none. Playtest 2026-11-17
+    # #49: "I take the coin from the crew's cargo chest" was planned as take_off of
+    # "cargo_chest_coins" beside the built give; the take-off resolved as "is wearing
+    # nothing called cargo_chest_coins", and the beat told the one take three times.
+    doffs = interpret._OP_NEEDS["take_off"]
+    taken = [r for r in rows if r.act == "take"
+             and any(i.get("op") == "give" for i in r.intents)]
+    unbacked_doff = bool(taken) and sum(1 for a in acting
+                                        if a.get("act") in doffs) <= len(taken)
     for r in raw:
         op = _op(r)
+        if op == "take_off" and unbacked_doff:
+            if notes is not None:
+                notes.append("the plan's take_off dropped: the take is the built give")
+            continue
         if op == "haggle" and str((r or {}).get("target") or "") in commissioned:
             commissioned[str(r.get("target"))].setdefault("params", {})["haggle"] = True
             if notes is not None:
@@ -3133,6 +3560,21 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
             if notes is not None:
                 notes.append(f"the plan's {op} replaced by the reading's escape")
             continue
+        # Living off the land or a hunt (`_fend`) is the turn's word on the hours spent
+        # looking: the plan's own forage, track, Perception or Survival check, or a wait
+        # beside it, is the same looking a second time (owner's report 2026-11-17 #6: a
+        # Perception check, a herb forage and a hunt for tracks, and no water). And its
+        # drink or meal from the pack is the need the land just met: live 2026-11-18, "I
+        # look around for a stream to drink from" carried the plan's `drink`, refused "the
+        # pack holds none, and there is no well here", and the page said so beside the
+        # stream found.
+        if fending and str((r or {}).get("actor") or pc.ref) in (pc.ref, "pc") and (
+                op in _FEND_OPS | {"forage", "track", "advance_time", "drink", "eat"}
+                or (op == "check" and str(((r or {}).get("params") or {}).get("skill")
+                                          or "").lower() in ("perception", "survival"))):
+            if notes is not None:
+                notes.append(f"the plan's {op} replaced by the reading's fend")
+            continue
         # Dropping prone or standing (`_posture`) is the turn's word on the player's
         # posture: the plan's own `move` beside it walked nowhere and told "moves from near
         # to near" (playtest 2026-11-15 #62), and its own prone would lay it twice.
@@ -3151,6 +3593,25 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
             continue
         if op == "wear" and dressing and str(((r or {}).get("params") or {}).get("item")
                                               or "").lower().strip() in dressing:
+            continue
+        if op == "use_item" and _is_coin(((r or {}).get("params") or {}).get("item")):
+            # Coin is spent by a trade, never used: playtest 2026-11-16 N2's `use_item gold
+            # piece` was refused into "she has no gold" with 12 gp in her purse.
+            if notes is not None:
+                notes.append("the plan's use_item of coin dropped")
+            continue
+        if op == "take_off" and taken and not (acts & {"use", "drop", "other"}):
+            # A take the table built whole is the turn's take: the plan's `take_off` beside
+            # it is the planner reaching for an op called "take". Playtest 2026-11-17 #48:
+            # beside the give of the cargo chest's coin it wrote `take_off
+            # cargo_chest_coins`, told "is wearing nothing called cargo_chest_coins".
+            if notes is not None:
+                notes.append("the plan's take_off dropped: the reading's take is a give")
+            continue
+        if op == "use_item" and lighting and any(
+                _same_thing(((r or {}).get("params") or {}).get("item"), x, pc)
+                for x in lighting):
+            # The torch the table lights (`_light`): the plan's own would light a second.
             continue
         if op == "disguise":
             # Code-only (`intents.CODE_ONLY_OPS`): a disguise is the reading's act.
@@ -3225,9 +3686,20 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
         if searching and str((r or {}).get("actor") or pc.ref) in (pc.ref, "pc") and (
                 (op == "track" and "track" not in acts)
                 or (op == "check" and _skill(r) == "survival" and "track" not in acts)
-                or (op == "forage" and "gather" not in acts)):
+                # A prospect too: live 2026-11-20, "I search the woods for my lost silver
+                # locket" came back with an hour's dig and two chunks of lead ore.
+                or (op in ("forage", "prospect") and "gather" not in acts)):
             if notes is not None:
                 notes.append(f"the plan's {op} replaced by the reading's search")
+            continue
+        if op == "track" and not acts & {"track", "follow"} and str(
+                (r or {}).get("actor") or pc.ref) in (pc.ref, "pc"):
+            # Tracks are looked for when the player asks for them (the owner, 2026-11-20
+            # #19). Live that day: "I look around the woods for the harbourmaster" was
+            # read `seek`, the engine said he was not here, and the plan's own track with
+            # `follow` rolled Survival and told of footprints.
+            if notes is not None:
+                notes.append("the plan's track dropped: no look for tracks was asked for")
             continue
         if exerted and _effort_check(r, pc):
             if notes is not None:
@@ -3258,6 +3730,13 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
             if notes is not None:
                 notes.append(f"the plan's {op} of {p.get('item')!r} to the keeper: the "
                              f"room is the rest's to charge, at the house's price, dropped")
+            continue
+        if _is_coin(p.get("item")) and str(p.get("to") or target or "") in staying:
+            # Coin to the keeper the table bought the room from (`_stay_paid_for`): the
+            # stay charges the house's price, so the plan's figure beside it pays twice.
+            if notes is not None:
+                notes.append("the plan's coin to the keeper: the stay bought charges its "
+                             "own price, dropped")
             continue
         if op in ("give", "sell") and _is_coin(p.get("item")) \
                 and str(p.get("to") or target or "") in commissioned:
@@ -3386,16 +3865,25 @@ def walk_in_place(raw, rows: list[Row], frame: dict | None, scene, places=(), *,
     if not isinstance(raw, list) or not frame or frame.get("error") or scene is None:
         return raw
     here = str(getattr(scene, "at", "") or "")
-    within = any(interpret.acting(a) and interpret.within_place(a, places, here)
-                 for a in frame.get("actions") or [])
+    acts = frame.get("actions") or []
+
+    def inside_here(k: int, a: dict) -> bool:
+        # A square of this board named by its coordinate (`_to_the_square`) is a step
+        # inside the place, whatever the reader said of it. Owner bug 2026-11-17 #5 (jack,
+        # turn 83): "I move to G3" in the woods kept a planned travel to the outskirts as
+        # well, an hour away, and the flying squirrel beside G3 was "left behind".
+        return interpret.within_place(a, places, here) or (
+            a.get("act") == "go" and _a_square(frame, k, scene))
+
+    within = any(interpret.acting(a) and inside_here(k, a) for k, a in enumerate(acts))
     built = [i for r in rows for i in r.intents if i.get("op") == "move"]
     pc = scene.pc() if hasattr(scene, "pc") else None
     if not within and not built:
         return raw
 
     inside = {" ".join(str(a.get("place") or "").lower().split())
-              for a in frame.get("actions") or []
-              if interpret.acting(a) and interpret.within_place(a, places, here)} - {""}
+              for k, a in enumerate(acts)
+              if interpret.acting(a) and inside_here(k, a)} - {""}
 
     def is_here(name: str) -> bool:
         if not name:
@@ -3409,10 +3897,9 @@ def walk_in_place(raw, rows: list[Row], frame: dict | None, scene, places=(), *,
     # venture is the player's at all. Live on the fix, 2026-11-11: "I go back down"
     # (fixture `floor`) was planned as a travel to the outskirts beside the built move;
     # `unasked_travel` stands aside for any moving act, so it walked the party out of town.
-    moving = [a for a in frame.get("actions") or []
+    moving = [(k, a) for k, a in enumerate(acts)
               if interpret.acting(a) and a.get("act") in interpret._MOVING_ACTS]
-    inside_only = within and moving and all(
-        interpret.within_place(a, places, here) for a in moving)
+    inside_only = within and moving and all(inside_here(k, a) for k, a in moving)
     out = []
     for r in raw:
         op = _op(r)
@@ -3595,6 +4082,44 @@ def company_asked(raw, frame: dict | None, scene, *, ask=None, asked: dict | Non
     return out or [{"op": "narrate_only", "because": "nothing the reading stands behind"}]
 
 
+def trade_sought(raw, frame: dict | None, *, notes: list | None = None) -> list:
+    """The one newcomer a plan introduces on a turn whose reading went looking for
+    somebody by their trade is somebody of that trade: `trade` on the introduce, so the
+    population rolls their life to it (`population.note`'s `work`).
+
+    Playtest 2026-11-17b #17/#20: "I walk to the tavern near the docks and look for a
+    sellsword for hire" was read `seek: a sellsword for hire`; the finder missed
+    (`work:caravan-guard`), the plan introduced "man in corner" with no trade, and the
+    next turn he called himself a sellsword with no rate and could never be hired
+    (`hirelings.hires_out` reads the population's work). Structure only: the reading's
+    one acting `seek` target, the occupation table's own match words for it
+    (`lives.occupation_for`), and exactly one introduce whose `who` names no trade of its
+    own. Two seeks or two newcomers are not guessed between."""
+    from rules import lives
+
+    from . import interpret
+
+    if not isinstance(raw, list) or not frame or frame.get("error"):
+        return raw
+    sought = [str(a.get("target") or "") for a in frame.get("actions") or []
+              if a.get("act") == "seek" and interpret.acting(a) and a.get("target")]
+    newcomers = [r for r in raw if _op(r) == "introduce"]
+    if len(sought) != 1 or len(newcomers) != 1:
+        return raw
+    occ = lives.occupation_for(sought[0])
+    params = dict(newcomers[0].get("params") or {})
+    if occ is None or params.get("trade") or lives.occupation_for(str(params.get("who") or "")):
+        return raw
+    # The table's own word the player used, so the newcomer's trade reads as they said it.
+    word = next((m for m in occ.get("match") or () if m in sought[0].lower()),
+                str(occ["name"]))
+    params["trade"] = word
+    newcomers[0]["params"] = params
+    if notes is not None:
+        notes.append(f"the newcomer {params.get('who')!r} is the {word} the player looked for")
+    return raw
+
+
 def orders_spoken(raw, frame: dict | None, scene, *, ask=None, asked: dict | None = None,
                   ask_what=None, notes: list | None = None) -> list:
     """A hire or a guard order the player's words make and the plan left out, added:
@@ -3635,6 +4160,10 @@ def orders_spoken(raw, frame: dict | None, scene, *, ask=None, asked: dict | Non
     planned = {(_company_who(scene, r),
                 str(((r or {}).get("params") or {}).get("do") or "join").lower())
                for r in raw if _op(r) == "company"}
+    # The reading's own hire (`_request`, a check the engine takes to the wage door).
+    planned |= {(str((r or {}).get("target") or ""), "hire") for r in raw
+                if _op(r) == "check"
+                and str(((r or {}).get("params") or {}).get("request") or "") == "hire"}
     spoken = [a for a in frame.get("actions") or [] if interpret.acting(a)
               and str(a.get("act") or "") in _HIRE_ACTS]
     if not spoken:
@@ -3709,6 +4238,49 @@ def orders_spoken(raw, frame: dict | None, scene, *, ask=None, asked: dict | Non
             if hired_now or guarded:
                 break
     return out
+
+
+# The acts a bout is asked for in, besides the reader's own `challenge`: words to the house,
+# a request, anything else.
+_BOUT_ACTS = frozenset({"talk", "request", "other"})
+
+
+def bout_spoken(raw, frame: dict | None, scene, *, ask=None, places=(),
+                notes: list | None = None) -> list:
+    """The `bout` the player's words ask the arena for, when the reading built none.
+
+    Playtest 2026-11-17b #24 and the live check of 2026-11-18: words asking the master of
+    the games for a bout came back `talk`, `other` or a bare question, never `challenge`,
+    and the house staged nothing. Detected in code (the party stands at an arena, or the
+    same plan walks there; no `bout` in the plan; an act done now), repaired by ONE closed
+    question per act (`interpret.confirm_bout`). With no question (`ask` None) nothing is
+    added; the engine still refuses a bout where no house stages one."""
+    from rules import arena, keepers
+    from rules import places as places_mod
+
+    from . import interpret
+
+    if ask is None or not isinstance(raw, list) or not frame or frame.get("error") \
+            or scene is None or any(_op(r) == "bout" for r in raw):
+        return raw
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    founded = getattr(scene, "founded", ()) or ()
+    going = [places_mod.find(places, str(((r or {}).get("params") or {}).get("place") or ""))
+             for r in raw if _op(r) == "travel"]
+    there = keepers.kind_of(str(getattr(scene, "at", "") or ""), founded) == arena.KIND \
+        or any(p is not None and keepers.kind_of(p.id, founded) == arena.KIND for p in going)
+    if pc is None or not there:
+        return raw
+    for a in frame.get("actions") or []:
+        if not interpret.acting(a) or str(a.get("act") or "") not in _BOUT_ACTS:
+            continue
+        if ask(str(a.get("span") or "")) != "bout":
+            continue
+        if notes is not None:
+            notes.append("the bout the words asked for, added")
+        return raw + [{"op": "bout", "actor": pc.ref, "params": {},
+                       "because": "the player asks for a bout"}]
+    return raw
 
 
 def sea_spoken(raw, frame: dict | None, scene, *, ask=None, notes: list | None = None) -> list:
@@ -3856,6 +4428,44 @@ def journey_named(raw, frame: dict | None, *, notes: list | None = None) -> list
     return out
 
 
+def led_along(raw, frame: dict | None, scene, *, notes: list | None = None) -> list:
+    """Somebody here the reading's walk takes along (`go`/`leave`/`journey` whose `object`
+    is a person here) is put in every walk's `with`; the engine then decides whether they
+    come and whether they stay with the party (`Engine._op_travel`, the `company` rule).
+
+    Playtest 2026-11-17 #34: the smuggler had just said "I'll follow you into the dark",
+    and "I lead the smuggler on into the broken pen" was refused twice as a travel that
+    would leave him behind, then built a 10 ft move inside the cells. Structure, not
+    English: the reader's slot names the person, the engine's finder says who."""
+    from . import interpret
+
+    if not isinstance(raw, list) or not frame or frame.get("error") or scene is None:
+        return raw
+    led: list[str] = []
+    for a in frame.get("actions") or []:
+        if not isinstance(a, dict) or a.get("act") not in ("go", "leave", "journey")                 or not interpret.acting(a):
+            continue
+        ref = person(scene, a.get("object"))
+        actor = (getattr(scene, "actors", {}) or {}).get(ref)
+        if actor is not None and not actor.is_pc and ref not in led:
+            led.append(ref)
+    if not led:
+        return raw
+    out = []
+    for r in raw:
+        if _op(r) in ("travel", "journey"):
+            params = dict((r or {}).get("params") or {})
+            taken = params.get("with") or []
+            taken = [taken] if isinstance(taken, str) else list(taken)
+            more = [ref for ref in led if ref not in taken]
+            if more:
+                r = {**r, "params": {**params, "with": taken + more}}
+                if notes is not None:
+                    notes.append(f"{', '.join(more)} led along on the walk, from the words")
+        out.append(r)
+    return out
+
+
 def wage_not_tipped(raw, scene, *, notes: list | None = None) -> list:
     """No coin `give` beside a hire to the same person: the engine's wage is the payment.
 
@@ -3871,6 +4481,9 @@ def wage_not_tipped(raw, scene, *, notes: list | None = None) -> list:
         return raw
     hired = {_company_who(scene, r) for r in raw if _op(r) == "company"
              and str(((r or {}).get("params") or {}).get("do") or "").lower() == "hire"}
+    hired |= {str((r or {}).get("target") or "") for r in raw if _op(r) == "check"
+              and str(((r or {}).get("params") or {}).get("request") or "") == "hire"}
+    hired.discard("")
     if not hired:
         return raw
     pc = scene.pc() if hasattr(scene, "pc") else None
@@ -3878,6 +4491,13 @@ def wage_not_tipped(raw, scene, *, notes: list | None = None) -> list:
     out = []
     for r in raw:
         params = (r or {}).get("params") or {}
+        if _op(r) == "company" and str(params.get("do") or "join").lower() == "join" \
+                and _company_who(scene, r) in hired:
+            # The plan's own "come along" beside the hire: the hire brings them. Live
+            # 2026-11-18, it was refused beside it "is indifferent ... Talk them round".
+            if notes is not None:
+                notes.append("the plan's company struck: the hire brings them along")
+            continue
         to = intents_mod.normalise_ref(str(params.get("to") or ""))
         frm = str(params.get("from_") or params.get("from") or (r or {}).get("actor") or "")
         if (_op(r) == "give" and to in hired
@@ -3891,7 +4511,7 @@ def wage_not_tipped(raw, scene, *, notes: list | None = None) -> list:
 
 
 def address_the_named(raw, frame: dict | None, scene, *,
-                      notes: list | None = None) -> list:
+                      notes: list | None = None, places=()) -> list:
     """The player's line goes to the person the reading's `talk` names — never to
     somebody else the plan picked.
 
@@ -3926,8 +4546,20 @@ def address_the_named(raw, frame: dict | None, scene, *,
              and str(a.get("target") or "").strip()]
     says = [k for k, r in enumerate(raw) if _op(r) == "say"
             and str(r.get("actor") or "pc").lower() in ("pc", pc.ref.lower(), "none", "")]
+    if places and len(named) > 1 and len(named) == len(says):
+        return _each_to_its_own(raw, frame, scene, places, says, notes)
+    # Who is spoken to after the line's own walk is looked for where it ends (#94). A say
+    # no talk owns is looked for where its own words were said (`_said_in`, #30): "I go to
+    # the barracks and challenge one of the soldiers" speaks at the barracks.
+    owner = _said_in(raw[says[0]], frame) \
+        if says and not any(a.get("act") in interpret._ADDRESSING_ACTS
+                            for a in frame.get("actions") or []) else None
+    scene = (interpret.scene_by_then(frame, scene, places, upto=owner) if places
+             and owner is not None else
+             interpret.scene_by_then(frame, scene, places) if places else scene)
     if not named and len(says) == 1:
-        return _said_to_nobody(raw, frame, scene, says[0], notes)
+        return _said_to_nobody(raw, frame, scene, says[0], notes,
+                               moved=owner is not None and _seen_from(scene))
     if len(named) != 1 or len(says) != 1:
         return raw
     want = person(scene, named[0])
@@ -3955,7 +4587,89 @@ def address_the_named(raw, frame: dict | None, scene, *,
     return out
 
 
-def _said_to_nobody(raw, frame, scene, k: int, notes) -> list:
+def once_each_walk(raw, *, notes: list | None = None) -> list:
+    """A plan's second `travel` to the place an earlier one in the list already goes,
+    struck. Live 2026-11-17 on the playtest's #75 line, once the whole line ran: the plan
+    wrote the walk to the docks three times, and the two the engine refused ("The party has
+    already travelled this turn and is at the docks") reached the page as "Since you've
+    already made your travel for this turn". The same op with the same params, compared
+    as data; a walk on to somewhere else is kept for the engine's one-journey rule."""
+    if not isinstance(raw, list):
+        return raw
+    seen, out = [], []
+    for r in raw:
+        if _op(r) == "travel":
+            key = dict((r or {}).get("params") or {})
+            if key in seen:
+                if notes is not None:
+                    notes.append(f"a second travel to {key.get('place')!r} struck")
+                continue
+            seen.append(key)
+        out.append(r)
+    return out
+
+
+def _each_to_its_own(raw, frame, scene, places, says: list[int], notes) -> list:
+    """Two or more lines to two or more people named, as many says as talks: the n-th
+    say goes to the one the n-th talk names, looked for where the line has walked to by
+    then (`interpret.scene_by_then`). Live 2026-11-17 on the playtest's #75 line: "I tell
+    the deckhand I'll be back by nightfall, then walk down to the docks and ask the
+    foreman…" ran whole, and the parting words went to nobody ("Vesna Kroll speaks, to
+    the effect that…"), since this door paired only one talk with one say. Nobody new is
+    named here: a name not found leaves that say as the plan wrote it."""
+    from . import interpret
+
+    talks = [k for k, a in enumerate(frame.get("actions") or [])
+             if a.get("act") in ("talk", "insult") and interpret.acting(a)
+             and str(a.get("target") or "").strip()]
+    out = list(raw)
+    for k, at in zip(says, talks):
+        name = str(frame["actions"][at]["target"]).strip()
+        want = person(interpret.scene_by_then(frame, scene, places, upto=at), name)
+        params = dict(out[k].get("params") or {})
+        if not want or params.get("to") == want:
+            continue
+        was = params.get("to") or "nobody named"
+        params["to"] = want
+        out[k] = dict(out[k], params=params,
+                      **({"target": want} if out[k].get("target") else {}))
+        if notes is not None:
+            notes.append(f"the say to {was} goes to {want}: the one the player's words name")
+    return out
+
+
+def _seen_from(scene) -> bool:
+    from rules.engine import SeenFrom
+
+    return isinstance(scene, SeenFrom)
+
+
+def _nearest_answerer(scene) -> str:
+    """The ref of the nearest person here who would answer a question put to the room: up,
+    seen, not hostile, and not the market's master, who answers only the one who turns to
+    them (`gm/checks/master_unprompted.py`). Nearest by the board's squares, else the first.
+    "" for nobody."""
+    from rules import attitude, keepers
+
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    master = keepers.master_here(scene)
+    pos = getattr(scene, "positions", None) or {}
+    me = tuple(pos.get(getattr(pc, "ref", ""), ()) or ())[:2]
+    who = [(r, a) for r, a in (getattr(scene, "actors", {}) or {}).items()
+           if not a.is_pc and a.name and not a.is_down and not a.has_state("state.hidden")
+           and attitude.of(a) != attitude.HOSTILE
+           and (master is None or r != master.ref)]
+    if not who:
+        return ""
+
+    def far(item) -> int:
+        there = tuple(pos.get(item[0], ()) or ())[:2]
+        return max(abs(there[0] - me[0]), abs(there[1] - me[1])) if me and there else 999
+
+    return min(who, key=far)[0]
+
+
+def _said_to_nobody(raw, frame, scene, k: int, notes, moved: bool = False) -> list:
     """A line the reading says nobody would answer goes to nobody the plan picked.
 
     Measured live 2026-11-15 (the table-checks lane; first seen 2026-11-07): 'I mutter
@@ -3969,11 +4683,44 @@ def _said_to_nobody(raw, frame, scene, k: int, notes) -> list:
 
     talks = [a for a in frame.get("actions") or []
              if a.get("act") == "talk" and interpret.acting(a)]
-    if not talks or any(str(a.get("cost") or "") != "free" for a in talks):
-        return raw
     say = raw[k]
     params = dict(say.get("params") or {})
     was = str(params.get("to") or say.get("target") or "")
+    # Or said to somebody the line's own walk left behind: playtest 2026-11-17b #11, "I walk
+    # to the guildhall and ask if anyone's hiring a blade", the plan wrote the say `to` the
+    # barkeep she had been talking with in the tavern, the engine found nobody of that ref
+    # at the guildhall, and the clerk, the one person there, was told "ignoring the
+    # inquiry". Asked aloud in a room of one, it is asked of that one (`Engine._op_say`'s
+    # own rule, which an absent `to` had switched off). `scene` is where the walk ends.
+    # `moved`: a say no talk owns, said after the line's walk (#30) — the same test.
+    gone = (bool(talks) or moved) and bool(was)         and was not in (getattr(scene, "actors", {}) or {})
+    # A question put to the room, the reader naming nobody: asked of somebody who can
+    # answer. jack T276 (owner's save 2026-11-17), "I ask how to get to the docks?" at the
+    # market: the say went to nobody, no reply was written, and the page had the master and
+    # a keeper go about their business; the player had to ask again by name. The engine
+    # reads only `to`, and fills a missing one only in a room of one. Live on this branch
+    # the plan wrote the say three ways — no `to`, `to=new1` nobody introduced, and
+    # `target` on the market's master with no `to` — and each went to nobody.
+    to = str(params.get("to") or "")
+    if talks and (not to or to not in (getattr(scene, "actors", {}) or {})) \
+            and all(interpret.cost_of(a, scene) == "addresses" for a in talks):
+        from rules import keepers
+
+        master = keepers.master_here(scene)
+        aimed = was if was in (getattr(scene, "actors", {}) or {}) \
+            and (master is None or was != master.ref) else ""
+        # The plan's own aim when it is somebody who answers; then the one the player is
+        # dealing with; then the nearest who can answer (never the master unprompted).
+        near = aimed or addressed(scene) or _nearest_answerer(scene)
+        if near:
+            out = list(raw)
+            out[k] = dict(say, params=dict(params, to=near), target=near)
+            if notes is not None:
+                notes.append(f"the say to nobody goes to {near}: the nearest who can answer")
+            return out
+    if not gone and (not talks
+                     or any(str(a.get("cost") or "") != "free" for a in talks)):
+        return raw
     keep = addressed(scene)
     if not was or was == keep:
         return raw
@@ -3985,8 +4732,9 @@ def _said_to_nobody(raw, frame, scene, k: int, notes) -> list:
     if keep:
         out[k]["target"] = keep
     if notes is not None:
-        notes.append(f"the say to {was} goes to {keep or 'nobody'}: the words were said "
-                     f"to nobody who would answer")
+        notes.append(f"the say to {was} goes to {keep or 'nobody'}: "
+                     + ("the one it was meant for is not where the walk ends" if gone else
+                        "the words were said to nobody who would answer"))
     return out
 
 
@@ -4036,7 +4784,9 @@ def timed_rests(raw, frame: dict | None, *, notes: list | None = None) -> list:
 # (content/rules/law.json `report.minutes`), so waiting over a crime sees who comes.
 OPEN_WAIT_MINUTES = 10
 _OWN_CLOCK = frozenset({"advance_time", "rest", "travel", "venture", "journey", "forage",
-                        "prospect", "gather"})
+                        "prospect", "gather", "live_off_land", "hunt"})
+# The ops a `fend` builds (`_fend`).
+_FEND_OPS = frozenset({"live_off_land", "hunt"})
 
 
 def _open_wait(raw, wait, resting, scene, notes) -> list:
@@ -4130,10 +4880,38 @@ def timed_waits(raw, frame: dict | None, scene, *, notes: list | None = None) ->
 # is the survival door's, `judgement.inject_survival`), so the plan's `eat`, written last,
 # had no owner and the night ran first: "rests for 8 hours ... hunger holds it until Ansel
 # eats", and only then "Ansel has no bread to eat".
-_PLACED_BY_ACT = {"consume": ("eat", "drink", "taste", "use_item")}
+# And a climb's check where the climb is in the words, before the walk that follows it
+# (playtest 2026-11-16 E4: "climb out and walk to X" rolled the climb after the travel).
+_PLACED_BY_ACT = {"consume": ("eat", "drink", "taste", "use_item"), "athletics": ("check",)}
 
 
-def order(raw, rows: list[Row]) -> list:
+def _said_in(say: dict, frame: dict | None) -> int | None:
+    """The index of the reading's action whose words a `say` no action owns came from:
+    the one whose span shares the most content words with it, or None. Playtest
+    2026-11-17b #30: "I go to the barracks and challenge one of the soldiers to a friendly
+    sparring bout" was read `go` + `attack` (no `talk`, so no row owned the plan's say),
+    the say kept its place ahead of the walk, and the challenge went to the alchemist she
+    was leaving. Word overlap with the player's own spans, as `own_words_only` measures a
+    say's words; no meaning read."""
+    from .judgement import _content_words
+
+    if not isinstance(frame, dict) or frame.get("error"):
+        return None
+    words = _content_words(str((say.get("params") or {}).get("words") or ""))
+    best, at = 0, None
+    for k, a in enumerate(frame.get("actions") or []):
+        n = len(words & _content_words(str((a or {}).get("span") or "")))
+        if n > best:
+            best, at = n, k
+    return at
+
+
+# The acts whose deed is the speaking: within one, the words come before what the table
+# built from them (the job taken, the hire made).
+_SPOKEN_ACTS = frozenset({"talk", "request", "insult", "threaten"})
+
+
+def order(raw, rows: list[Row], frame: dict | None = None) -> list:
     """The plan's ops in the order the words do them.
 
     Each op owed by exactly one action of the reading (a built op by its row, a named op
@@ -4141,10 +4919,12 @@ def order(raw, rows: list[Row]) -> list:
     its place. Inform's DM4 §34 and adv3Lite parse and run one action at a time, because
     what the second means depends on where the first left the player: "I pick up the
     crate, then go to the market" carries the crate there, and the other way round leaves
-    it behind."""
+    it behind. A player's say no action owns goes where its words were said (`_said_in`,
+    given the reading's `frame`)."""
     if not isinstance(raw, list) or not rows:
         return raw
     by_built = {id(i): r.index for r in rows for i in r.intents}
+    acts = {r.index: r.act for r in rows}
     owners: dict[str, list[int]] = {}
     for r in rows:
         for op in (*r.ops, *(op for op in _PLACED_BY_ACT.get(r.act, ())
@@ -4155,11 +4935,19 @@ def order(raw, rows: list[Row]) -> list:
         idx = by_built.get(id(r))
         if idx is None and len(owners.get(_op(r), ())) == 1:
             idx = owners[_op(r)][0]
+        if idx is None and _op(r) == "say" and not owners.get("say") \
+                and str(r.get("actor") or "pc").lower() in ("pc", "none", ""):
+            idx = _said_in(r, frame)
         if idx is not None:
             slots.append(k)
             # Within one action, what the table built goes first: the crate a walk carries
-            # is picked up before the walk (`_carry`), not at the far end of it.
-            keyed.append((idx, 0 if id(r) in by_built else 1, k, r))
+            # is picked up before the walk (`_carry`), not at the far end of it. Except
+            # where the act IS the speaking: the words first, then the job they take.
+            # Playtest 2026-11-17b #15: "Fine. I'll take the guard work." was told after
+            # the whole week it agreed to, and after the pay for it.
+            first = (_op(r) == "say") if acts.get(idx) in _SPOKEN_ACTS \
+                else id(r) in by_built
+            keyed.append((idx, 0 if first else 1, k, r))
     if len(keyed) < 2:
         return raw
     keyed.sort(key=lambda t: t[:3])

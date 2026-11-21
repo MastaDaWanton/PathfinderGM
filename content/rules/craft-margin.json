@@ -1,0 +1,16 @@
+{
+ "_ruling_note": "The owner's ruling of 2026-11-18 (docs/owner-bugs-plan item 16): beating a craft or harvest check by 5 or more makes everything better (extra yield, less time, a higher quality floor), and a natural 20 breaks through the quality cap. Read by rules/crafting.py `margin_bonus` for the herb bench, the forge, the alchemist's bench, the leather bench and the harvest; enchanting is left out (see `_enchanting_note`).",
+ "_rule_note": "Shaped as foraging's margin bands (rules/foraging.py BANDS: one band per 5 points of margin). The CRB's Craft rule (Core Rulebook p.91) is where the shape comes from: progress per week is the check result x the DC, so a higher check finishes sooner, and the book's own steps are 5 wide (fail by 4 or less, by 5 or more). The book gives no quality ladder and no extra units; those are this app's, by the ruling.",
+ "band": 5,
+ "_cap_note": "At most `max_bands` bands count. Bonuses already far outrun the DCs (the owner's save frag: Herbalism +12 against DC 3, so almost any face beat it by 5), so without a cap every step would always land the top reward and the bands would mean nothing.",
+ "max_bands": 3,
+ "_time_note": "Each band cuts the step's minutes (the hands-on time and any In Progress wait) by this fraction: x0.9, x0.8, x0.7 at the cap. Never below one minute.",
+ "time_cut_per_band": 0.1,
+ "_yield_note": "Each band adds this fraction of the units made, rounded up, so any band on any yielding step gives at least one more: 1 dose gives 2 at every band, 24 doses give 27, 29, 32. Only steps that make countable units yield (the same steps the craft's own Yield perk reads: herb doses, a forge's smelt and forge, an alchemist's units; the leather bench reads no yield, the owner's Q6.3, so a hide's bonus units come at the harvest).",
+ "yield_per_band": 0.1,
+ "_floor_note": "Each band raises the lowest quality the minigame can land by one step, never above one step under the crafter's ceiling: the top rung is always the hands' own, so the minigame still decides (the always-play ruling, rulings 2026-11-11). At the harvest the floor is a grade (1 best, 4 worst): each band makes the worst grade one better, never better than grade 2, and a reject is lifted to the floor.",
+ "floor_per_band": 1,
+ "_natural_note": "A natural 20 on a check that succeeds lifts the ceiling by `natural_breakthrough` steps for that one step: a perfect minigame lands one rung past what the crafter's level allows (Flawless +1 at Herbalist 3). A natural 20 still does not succeed by itself (a skill check, CRB p.180). The harvest has no level ceiling to break (its grades are the hide's), so it takes no breakthrough.",
+ "natural_breakthrough": 1,
+ "_enchanting_note": "Enchanting is left out for now: its margin already has its own band (`enchanter.verdict_of`: a near miss that still takes, flawed), its time is the book's magic-item days (CRB p.549-553) waiting In progress, it makes no countable units, and a breakthrough tier would reach past what an item's enhancement may hold. The owner's XP ruling excepted it too."
+}

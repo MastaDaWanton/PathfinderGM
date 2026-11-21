@@ -78,7 +78,8 @@ def test_a_town_laboratory_charges_its_hours_at_the_roll(bench, where):
         "rent_cp", "minutes", "problems", "lab", "units")}
     before = goods.in_copper(_pc().purse)
     clock = cm.current().scene.clock_minutes
-    r = post(bench, "/api/alchemy/roll", dict(body, face=20)).json()
+    face = max(1, min(20, chk["dc"] - chk["bonus"]))  # the face that just makes the DC: no 5+ margin bands (ruling 2026-11-18)
+    r = post(bench, "/api/alchemy/roll", dict(body, face=face)).json()
     assert r["rent"] and r["rent"][0]["cp"] == 4
     assert goods.in_copper(_pc().purse) == before - 4
     assert cm.current().scene.clock_minutes == clock + 10

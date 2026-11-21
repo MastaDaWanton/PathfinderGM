@@ -366,7 +366,7 @@ def _mint(engine, label: str, words, place_id: str):
         taken += [a.name for a in scene.people.values()]
         actor.true_name = names_mod.true_name(world, scene.location_id, actor.ref,
                                               [t for t in taken if t])
-        actor.appearance = names_mod.face_of(world, scene.location_id, actor)
+        actor.appearance = names_mod.face_of(world, scene.location_id, actor, scene=scene)
         person_words.settle_people(scene, world, actor, words=label, template=template,
                                    place=place_id, take_grant=False, keep_name=True)
     return actor
@@ -706,6 +706,13 @@ HIRES: dict[str, tuple[str, ...]] = {
     "the workshops": ("labour", "carry"), "the tannery": ("labour",),
     "the brewery": ("labour", "carry"), "the mill": ("labour", "carry"),
     "the carters yard": ("carry", "labour"),
+    # The guild's clerk, where the trades meet, hires a sword by the week as the hiring
+    # table does (the owner's answer 1, 2026-10-27: "I can fight" is a real escort when
+    # one is going out, else a week of guard work). Playtest 2026-11-17b #12: asked
+    # "Is the guild hiring anyone for escort or caravan guard work?", the clerk held no
+    # job, and said "several openings ... posted on the notice board" that the engine
+    # never listed. Guard first: it is what a blade is asked for.
+    "the guildhall": ("guard", "carry", "count"),
 }
 
 

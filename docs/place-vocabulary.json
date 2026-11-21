@@ -129,13 +129,15 @@
  "always_by_scale": {
   "village": [
    "the way in",
-   "the well"
+   "the well",
+   "the inn"
   ],
   "town": [
    "the gate",
    "the guardhouse",
    "the well",
-   "the guildhall"
+   "the guildhall",
+   "the inn"
   ],
   "city": [
    "the gate",
@@ -144,13 +146,23 @@
    "the well",
    "the guildhall",
    "the smithy",
-   "the laboratory"
+   "the laboratory",
+   "the inn",
+   "the tavern"
   ]
  },
  "appended_to_authored": {
+  "village": [
+   "the inn"
+  ],
+  "town": [
+   "the inn"
+  ],
   "city": [
    "the smithy",
-   "the laboratory"
+   "the laboratory",
+   "the inn",
+   "the tavern"
   ]
  },
  "water_sources": [

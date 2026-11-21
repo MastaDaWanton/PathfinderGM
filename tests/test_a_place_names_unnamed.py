@@ -88,3 +88,14 @@ def test_the_sentence_the_un_namer_reads_is_unchanged_on_the_page():
     """The phrase rule changes no sentence boundaries: the beat splits as it did."""
     out, _ = narration.unname_strangers(VEIL, set())
     assert [s for s, _ in page_sentences(out)] == [s for s, _ in page_sentences(VEIL)]
+
+
+def test_a_known_thing_counted_in_the_plural_is_not_a_person():
+    """Playtest 2026-11-20 #12: the tell said "6× Glow Mote", the prose "collecting six
+    Glow Motes", and the un-namer printed "collecting six the stranger from its remains"."""
+    from gm import narration
+
+    text = "You gather the essence the lizard held, collecting six Glow Motes from its remains."
+    assert narration.unname_strangers(text, {"Glow Mote"}) == (text, [])
+    assert narration.established_names(["Shadow puts it in the pack: 6× Glow Mote."],
+                                       minimum=1) >= {"Glow", "Mote"}

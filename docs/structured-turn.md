@@ -407,6 +407,87 @@ would now strike somebody), two sales gained a second act, and one line was wron
 ways. On the dev lines three got better. A first try that also reworded the `insult` gloss ("a fight picked with WORDS
 alone") flipped the same `insult` line and was withdrawn for the smaller change.
 
+### The reader and scope (playtest 2026-11-16 overnight, fix/reader-and-scope)
+
+The reader read most of the night's lost deeds right; code then lost them. Probed live on
+the playtest's own lines before any change: "I tell the smuggler I'll be back for the
+beast, then make my way back out…" came back talk + go + go, and '"Father, …" I show him my
+coin' talk + other. What lost them, and what holds them now:
+- **The turn budget ended the turn on the words** (`sequence._spoken_with`). Words followed
+  at once by walking off are parting words and cost nothing (the owner's 2026-10-17 ruling,
+  speech before the leave); a quick deed at the same listener goes with the words.
+- **A noun of address was looked for as a person** (`judgement.addressed_in_speech`): a
+  target found only inside the player's quotation is how the listener is called.
+- **The person after a walk was looked for before it** (`interpret.scene_by_then`,
+  `engine.SeenFrom`): the absent-answer and the addressee are asked from where the line's
+  own walk ends.
+- **A bare trade matched somebody in another town** (`population.find`).
+- **Place names**: a name qualified by where it is (`places.by_locative`, "the well room
+  under the sewers") and the worship kinds at three scales (`places.WORSHIP`).
+- **One gloss line** for `follow` (a road, tunnel or river is gone along, `go`). Probed:
+  the tunnel and river lines moved to `go`; "follow the tracks" stayed `track`; "follow
+  the trail of blood to the cellar" moved from `track` to `go`, the one line that got
+  arguably worse.
+- **`stealth` beside a walk is asked again** (`interpret.confirm_hiding`), one closed
+  question, because a gloss line did not move "keeping well away from the gate".
+
+**The reader's prompt is over its window.** Measured on integrate/0.4.0 before this lane:
+50,142 characters against the client's 49,988-character budget, so the first demonstration
+pair is cut from the front on every reading ("the prompt was cut to fit the window"), and a
+long line has come back unreadable when the reply had under 200 tokens left. Two
+demonstrations written here for #69/#77/#81 were withdrawn for that reason; the net
+addition is 61 characters of gloss. Every new demonstration now costs an old one.
+
+**Under it again (fix/reader-budget, 2026-11-17, N4).** The window, measured rather than
+assumed: Ollama's own `prompt_eval_count` for the reader's 232-message prompt was **15,850
+tokens of the 16,384** `num_ctx`, leaving 534 for a 400-token reply. Raising the budget
+was not honest — the char budget was right, the window really was nearly full — and
+raising `num_ctx` reloads the model for every call that differs (`prompts.NUM_CTX` is one
+window, named once). The demonstrations were JSON with `", "` and `": "` separators;
+written compact (`_demo_reply`) the same 115 demonstrations are **13,095 tokens** and
+47,041 characters: 2,755 tokens back, nothing withdrawn. The grammar's reply is the same
+JSON either way. Pinned by `tests/test_playtest_2026_11_17_reader_budget.py` at the worst
+characters-a-token any world has measured (3.2), and said at runtime by the reader itself
+when a world tokenises worse ("the reader's prompt is N characters, over its budget").
+The interpreter bench (302 labelled lines) before and after is in the lane report.
+
+### Who speaks, and in what order (playtest 2026-11-17b, fix/speech-and-order)
+
+**The planner wrote the NPCs' lines.** Four times in round 5 (T454, T463, T467, T471), on
+0.4.2: a `say` with the NPC as its actor in the player's own plan. The clerk's answer came
+before the Diplomacy roll it depended on and invented "the private listings of the merchant
+houses"; the player's own "Are you for hire?" was given to the man she asked; and one turn
+spent seven attempts on "say: missing required param(s) words" before the fallback model
+took it. Measured on the save's turn log for round 5: 14 turns, 25 plan attempts, 3 NPC
+says resolved, 10 say-without-words refusals on 4 turns, one turn handed to the fallback.
+
+Why the model wrote them, from the code:
+- **The schema let it.** One intent shape for every op: `actor` an enum of every ref, and
+  `params` a free object, so a say could be anybody's and carry nothing. The declared say's
+  body even offered `params.actor`.
+- **The history taught it.** Each turn's plan goes into the history stripped to op, actor
+  and target (`views._remembered`; the `because` copying measured in 2026-08). Every
+  remembered say was `{"op": "say", "actor": "pc", "target": "c45"}`: a say with no words,
+  copied as the shape. Once one NPC say was in the history, the next turns copied that too
+  (T458 the clerk, T467 the man, T476 the master).
+
+What holds them now:
+- `prompts.turn_schema(speakers=…)`: on the player's plan, `say` is its own `anyOf` branch,
+  the actor an enum of the player and any companion out of a fight, `words` required with a
+  minimum length. A companion's or a cheat's plan keeps the one shape.
+- `judgement.no_npc_lines`, before `inject_say`: a non-player say whose words are the
+  player's is the player's say to that person (#18); a companion's own line is kept; any
+  other is dropped, its answer left to the reply slot (`planned.known_to`), written after
+  the dice. Inform answers an order only after the persuasion and the action are decided
+  (Writing with Inform §12.4 persuasion, §12.13 reporting what others do).
+- The history keeps a say's words, which are the player's own line.
+
+**Order.** `acts_to_ops.order` now puts a talk's words before what the table built on them
+(#15: the week of guard work and its pay were told before "Fine. I'll take the guard work"),
+and a say no action owns where its words were said (#30: "go to the barracks and challenge
+one of the soldiers" was read `go` + `attack`, so no row owned the say, and the challenge
+went to the alchemist before the walk). `address_the_named` asks who hears it from there.
+
 ## Backward: the narration (lane N)
 
 The prose call's JSON is NOT given new fields. It was cut back to one field because

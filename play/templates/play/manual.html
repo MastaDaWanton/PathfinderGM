@@ -400,6 +400,34 @@ cannot quietly turn one into a fact about the world on the next turn.</p>
 <p><b>Crafting.</b> {{ disciplines }} — each with its own materials, recipes, and the
 gathering that feeds it. Reachable from the shelf or from the table.</p>
 
+<h3 id="craft-levels">How every craft levels</h3>
+
+<p>Each craft is a track of its own beside your class: an Herbalist, a Blacksmith, an
+Alchemist, a Leatherworker, an Enchanter. It grants no hit points or saves. It levels on
+the work you do at its bench, and the levels open new methods and rarer materials up to
+level 3. Past that the levels never stop, and each one gives you two perk picks.</p>
+
+<p><b>Mastery.</b> Every step that succeeds pays mastery: 1 for the step, 1 more for each
+band of rarity above common, 1 more for Superior work and 2 for Flawless. A batch pays for
+every dose in it. A first time (a new property learned, a new kind of product) pays 3, and
+reading a craft manual you have not read pays 5. Studying a material pays 1 for each
+property it turns up. A failure teaches a little, twice, and
+then nothing more.</p>
+
+<p><b>What a level costs.</b> Level 2 costs 100 mastery, level 3 costs 260, and every level
+after that costs 400. Enchanting keeps its own, gentler curve: 25, then 65, then 50 for
+level 4 and 10 more each level after. Levels you have already earned are kept. The /gm
+door tells you exactly where you stand: ask it "what do I need for the next forge
+level".</p>
+
+<p><b>Long steps.</b> Any step of an hour or more goes In Progress: you set it going, the
+bench shows it working, and it is ready when the clock reaches its time. You need not
+stand over it.</p>
+
+<p><b>Beating the check.</b> Beat a craft or harvest check by 5 or more and everything
+goes better: more comes out, it takes less time, and the quality cannot fall as low. A
+natural 20 lets the work break through your quality ceiling.</p>
+
 <h3 id="herbalism">Herbalism</h3>
 
 <p>Herbalism is worked at the table, one step at a time: pick a method, put what you carry
@@ -448,6 +476,362 @@ Each step is rarer and harder than the last, so a deep concentrate is a master's
 tea what is swallowed, a poultice what works in a wound, a salve or cream what works on the
 skin or the eyes. Anything that reaches outside the body, like invisibility, is alchemy and
 is left out.</p>
+
+<h3 id="forge">The forge</h3>
+
+<p>Smithing is worked at the anvil, one step at a time: pick a method, put what you carry on
+the anvil, roll your Craft check, then play the short game that decides how good the result
+is. Every step puts a real thing on your rack, an ingot, a bar, a blank, a plate or a finished
+item, ready for the next step. A weapon goes smelt, alloy, forge, quench, temper, fold or hone,
+assemble, finish; you can stop at any step and pick up later.</p>
+
+<table>
+<tr><td><b>Smelt</b> (Blacksmith 1)</td><td>Two ore and two fuel into one ingot, in a smithy's
+furnace. A flux in the charge carries off the slag of dirty ore. Exotic or legendary ore needs
+a fuel of rare tier or better.</td></tr>
+<tr><td><b>Forge</b> (1)</td><td>Bars and fuel into a blank for a weapon or a plate for armour
+or a shield, in the shape you pick from the weapon and armour lists. Bigger things take more
+bars.</td></tr>
+<tr><td><b>Quench</b> (1)</td><td>A hot blank or plate into a bath to harden it. The bath leaves
+its mark on the metal, and leaves it brittle until it is tempered.</td></tr>
+<tr><td><b>Assemble</b> (1)</td><td>The pieces into the finished item: head, haft and fittings
+for a weapon; body, fastenings and lining for armour. The first two are needed, the third is
+optional. The main piece counts in full, the others half.</td></tr>
+<tr><td><b>Assay</b> (1)</td><td>Tests a sliver of a material to learn what it does. Worked from
+the material's card, not the anvil.</td></tr>
+<tr><td><b>Alloy</b> (2)</td><td>Ingots or bars of two or more metals melted together into a
+named alloy: steel (iron and carbon), bronze, brass and rarer ones. Melting undoes any
+strengthening.</td></tr>
+<tr><td><b>Temper</b> (2)</td><td>Takes the brittleness out of a quenched piece.</td></tr>
+<tr><td><b>Fold</b> (2)</td><td>Doubles a bar or piece over itself. It drives the slag out of
+dirty metal; on clean metal it adds a little hardness. A steel bar folded with a high-carbon
+steel bar makes pattern steel.</td></tr>
+<tr><td><b>Hone</b> (2)</td><td>Puts the edge on a slashing or piercing weapon blank.</td></tr>
+<tr><td><b>Strengthen</b> (2)</td><td>Two bars of one metal welded into one. Everything the
+metal carries, good and bad, counts half again as much. It can be done again.</td></tr>
+<tr><td><b>Finish</b> (2)</td><td>A treatment on a finished item's surface: bluing, etching,
+plating, silvering. Holy anointing, ghost-salt blanching and oblivion water need Blacksmith
+3.</td></tr>
+</table>
+
+<p><b>The roll.</b> Your Craft check is d20 + your Blacksmith level + half your character
+level + Intelligence + half your Craft ranks, against the DC shown before you roll. Forge and
+Assemble use the book's DC for the item: simple weapons 12, martial 15, exotic 18, armour and
+shields 10 plus their armour bonus. Other steps use the material's own DC, higher for rarer
+metal. A bench check has no automatic 20 or 1: if no roll can make it, the bench says how much
+more you need. Miss by 4 or less and you lose only the time. Miss by 5 or more and half of what
+was on the anvil is ruined, the cheaper things first.</p>
+
+<p><b>Quality.</b> The game after a good roll sets the quality: Crude, Sound, Fine, Superior,
+Flawless, and past that Flawless +1 and on. Your level sets the best you can reach (Fine at
+Blacksmith 1, Superior at 2, Flawless at 3, more with Quality perks). A finished item can rise
+at most one step above its main piece. Better work makes the metal's good marks count for more
+and never makes its drawbacks worse.</p>
+
+<p><b>Masterwork.</b> Superior or better is masterwork. Before Assemble you choose whether to
+aim for it: aiming raises the DC to 20, and not aiming caps the item at Fine. The main piece
+must be tempered, and an edged blade honed, or the item cannot be Superior.</p>
+
+<p><b>Where you work.</b> A field kit (camp anvil, bellows, hearth, quench bucket, whetstone)
+works anywhere for forge, quench, temper, hone, assemble, finish and assay on common and
+uncommon metal. Smelt, alloy, fold and strengthen, and any rare or rarer metal, need a smithy:
+a town forge you pay by the hour, or one you own, which is free. A smith who dislikes you will
+not let you at the forge.</p>
+
+<p><b>Rarer metal.</b> Blacksmith 1 works common and uncommon metal, 2 rare and exotic, 3
+legendary.</p>
+
+<p><b>Alloys.</b> Each recipe wants its metals in a share window, and the bench names the
+share that is off. Two metals no recipe names still pour a new alloy, named after both, if
+each is at least a fifth of the charge; two different metals of the same top rarity come out
+one band rarer. Cold iron, mithral, adamantine and the skymetals work alone and only go into a
+recipe that names them.</p>
+
+<p><b>Materials and their marks.</b> Every metal, fitting, fuel and bath has its own good and
+bad marks, and each piece brings its own onto the item. A bath's quench mark lands once.
+Finishes add their own effect and keep the book's limits: alchemical silver will not take on
+adamantine, cold iron or mithral, and adamantine edging and cold-iron blanching go on weapons
+only. Some metals change how the work goes: slaggy metal cannot reach your best quality until
+it is folded, malleable metal ruins nothing on a bad miss, pure metal lets you roll the check
+twice and keep the better, and sulfurous fuel can leave crude work hot-short.</p>
+
+<p><b>Studying materials.</b> An assay costs a tenth of a bar or one ore, and ten minutes,
+whether or not you make the roll. Its DC is 10, plus 5 for each band of rarity above common,
+less 1 for each other material of the same kind you know (at most 4 less). Success reveals
+one benefit and one drawback. Reactive metals bite back: their harm lands on you whatever the
+roll. Working a metal at the anvil also teaches you how it behaves, a smith will teach what
+they know for a fee if they like you well enough, and a library holds the benefits of common
+and uncommon metals.</p>
+
+<p><b>Leather on the anvil.</b> A leatherworker's grip can be a weapon's haft and a lacing
+set a suit's fastenings. Studded leather and the armoured coat are finished from a
+leatherworker's base, and steel lamellar must be laced with a lacing set. A suit made on a
+leather base is no better than its base.</p>
+
+<h3 id="alchemy">Alchemy</h3>
+
+<p>Alchemy is worked at the bench, one step at a time: pick a method, set what you carry
+on the glass, roll your Craft check, then play the short game that decides how good the
+result is. What a step makes goes back on your shelf, ready for the next step. Most lines
+start with Dissolve and end with Bottle, and a bottled product never goes back in.</p>
+
+<table>
+<tr><td><b>Dissolve</b> (Alchemist 1)</td><td>A solid in a solvent (water, spirits,
+vinegar, oil or acid) into a solution, which keeps three days.</td></tr>
+<tr><td><b>Calcine</b> (1)</td><td>A solid roasted in the crucible to a calx, which keeps
+for ever. Anything combustible burns away instead.</td></tr>
+<tr><td><b>Bottle</b> (1)</td><td>A liquid or a powder into a vessel. The vessel decides
+what you make: a vial is drunk or poured on, a clay flask thrown, a casing struck, a stick
+lit.</td></tr>
+<tr><td><b>Assay</b> (1)</td><td>A pinch of a reagent (a tenth of one) tested on glass. A
+success shows one benefit and one drawback; a miss shows nothing, and the pinch is gone
+either way.</td></tr>
+<tr><td><b>Filter</b> (2)</td><td>A liquid through cloth. Every drawback stays on the
+cloth as a precipitate, and the filtrate runs clean at nine tenths of its strength.</td></tr>
+<tr><td><b>Distill</b> (2)</td><td>Two measures of a liquid into one spirit, half again as
+strong and as long lasting. A spirit keeps a year. Laboratory only.</td></tr>
+<tr><td><b>React</b> (2)</td><td>Two or more inputs, one of them a liquid, into an
+admixture. Their traits merge, and the same trait from two materials adds its grades.</td></tr>
+<tr><td><b>Sublime</b> (3)</td><td>Two measures of a solid into one sublimate, half again
+as strong and as long lasting. Laboratory only.</td></tr>
+<tr><td><b>Transmute</b> (3)</td><td>Two of a material into one of the same kind, one band
+rarer, that shares an essence with it. You choose which. A day's work, laboratory
+only.</td></tr>
+</table>
+
+<p><b>The roll.</b> Your Craft check is d20 + your Alchemist level + half your character
+level + Intelligence + half your Craft ranks, and +2 more in a laboratory. The DC is the
+hardest input's own, a known formula's book DC when you bottle it (5 + caster level for a
+spell potion), or 10 + 5 a band of rarity for a Transmute. Each Distill or Sublime past the
+first adds 2. A bench check has no automatic 20 or 1: if no roll can make it, the bench
+says how much more you need. Miss by 4 or less and you lose only the time. Miss by 5 or
+more and half of what was on the bench is ruined.</p>
+
+<p><b>Quality.</b> The game after a good roll sets the quality: Crude, Sound, Fine,
+Superior, Flawless, and past that Flawless +1 and on. Your level sets the best you can
+reach (Fine at Alchemist 1, Superior at 2, Flawless at 3, more with Quality perks). Better
+work is stronger, lasts longer and has milder drawbacks; a spell potion's quality raises
+its caster level instead. A poor game never costs you materials.</p>
+
+<p><b>Where you work.</b> Common and uncommon work needs an alchemist's field kit in your
+pack, which you buy. Rare and rarer material, and Distill, Sublime and Transmute, need a
+laboratory: your own is free, a town's is rented by the hour. Nothing is worked in a
+fight.</p>
+
+<p><b>Traits and grades.</b> Everything you put in brings its traits, each distinct
+material once however many you use. Same-named traits add their grades, but never past your
+Alchemist level. A higher grade means more dice, a larger bonus, a longer condition and a
+save 2 harder for each grade above the first.</p>
+
+<p><b>What a product can carry.</b> A draught holds three benefits, an oil, flask or smoke
+pot two, a stick one, and a formula's core takes one of them. The rest are your pick. A
+draught carries what works when swallowed, an oil what works on the skin, a flask what
+works where it strikes; anything else is shown dimmed with the reason and left out.
+Drawbacks take no room and always come along, unless you filtered them out first.</p>
+
+<p><b>Formulae.</b> A formula is made of essences, not of named reagents: any reagent that
+carries fire serves an alchemist's fire. You start knowing alchemist's fire, acid,
+antitoxin and the tanglefoot bag. Bottle with no formula chosen and you experiment: if the
+mix fits exactly one formula within your reach, a success writes it into your formulary.
+Spell formulae can also be copied from a scroll or a spellbook (a check against DC 15 +
+the spell's level, and the writing cost), learned from a potion in hand (which is used
+up), or taught by a companion who knows the spell; an alchemist teacher or a formulary
+teaches any. You can bottle spells up to half your Alchemist level, at least 1st. A
+harmful spell in a draught takes whoever drinks it as its target.</p>
+
+<p><b>Volatile and toxic.</b> A volatile input flares on a miss by 5 or more, once for
+the batch, and you take the harm it names, shown before you roll. Each volatile input
+beyond the first adds 3 to the DC, and each stabilizer you add makes one of them safe. A
+toxic reagent hurts as the step begins, whatever the roll, unless a laboratory's fume hood
+or a mask and gloves protect you. Both apply to an assay too. Corrosive work cannot be
+bottled in metal: use glass or clay.</p>
+
+<p><b>Catalysts.</b> A catalyst or a piece of apparatus set beside the work is never spent
+and widens the game's window. Some do more: philosopher's mercury makes a Transmute one
+for one, and pure material lets you roll twice and keep the better.</p>
+
+<h3 id="leatherworking">Leatherworking</h3>
+
+<p>Leatherworking is worked one step at a time, from a green hide off the carcass to the
+finished piece: pick a method, put what you carry on the bench, roll your Craft check,
+then play the short game that decides how good the result is. Every stage goes back on your
+shelf (salted hide, pelt, leather, panels, plates), ready for the next step.</p>
+
+<table>
+<tr><td><b>Salt</b> (Leatherworker 1)</td><td>Rubs curing salt into a green hide, one measure
+a hide unit. A salted hide keeps for six weeks instead of two days.</td></tr>
+<tr><td><b>Flense</b> (1)</td><td>Scrapes a green or salted hide into a pelt, ready to tan. A
+thick hide must first sit three days in a tannery's lime pit.</td></tr>
+<tr><td><b>Tan</b> (1)</td><td>A pelt and a tannin into leather, or into fur with the hair
+left on. With no tannin at all the hide is dried as rawhide.</td></tr>
+<tr><td><b>Cut</b> (1)</td><td>Leather, fur or rawhide into panels for a pattern's body or
+lining, a lacing set or a grip. Hides of one kind and grade combine; what is left over goes
+back on the shelf.</td></tr>
+<tr><td><b>Stitch</b> (1)</td><td>Cut panels into a body or a lining, with a thread.</td></tr>
+<tr><td><b>Harden</b> (1)</td><td>Boils bark- or planar-tanned panels into hardened plates,
+the body of leather armour, lamellar and the madu.</td></tr>
+<tr><td><b>Assemble</b> (1)</td><td>A body, its fastenings and a lining if you want one into
+the finished suit, shield, cloak, boots, bag or other good.</td></tr>
+<tr><td><b>Grade</b> (1)</td><td>Flexes a scrap of a material (a quarter unit of hide, or one
+measure of a supply) to learn one thing it gives and one it costs.</td></tr>
+<tr><td><b>Curry</b> (2)</td><td>Works an oil into tanned leather or fur until it is supple.
+A soft body needs it before it can be masterwork.</td></tr>
+<tr><td><b>Tool</b> (2)</td><td>Stamps and carves the leather's face, with a wax if you have
+one. A body must be tooled to reach Flawless.</td></tr>
+<tr><td><b>Dye</b> (2)</td><td>Colours a tanned piece. Mordant salts make the colour fast.</td></tr>
+<tr><td><b>Laminate</b> (2)</td><td>Two of one leather into one heavier leather: every
+modifier half as strong again, the drawbacks too.</td></tr>
+</table>
+
+<p><b>The roll.</b> Your Craft check is d20 + your Leatherworker level + half your character
+level + Intelligence + half your Craft ranks, against the DC shown before you roll. A step
+on a common hide is DC 10, and 5 more for each step of rarity, unless the material says
+otherwise. Assemble uses the book's Craft DC: 10 + the armour bonus for a suit or shield,
+10 for anything else. A bench check has no automatic 20 or 1: if no roll can make it, the
+bench says how much more you need. Miss by 4 or less and you lose only the time. Miss by 5
+or more and half of what was on the bench is ruined. A masterwork kit roll you made
+yourself adds +2.</p>
+
+<p><b>Quality.</b> The game after a good roll sets the quality: Crude, Sound, Fine, Superior,
+Flawless, and past that Flawless +1 and on. Your level sets the best you can reach (Fine at
+Leatherworker 1, Superior at 2, Flawless at 3, more with Quality perks). Superior or better
+is masterwork.</p>
+
+<p><b>Hide grades.</b> Every hide has a grade, and the worst grade on the bench caps the
+work: grade 1 has no cap, grade 2 caps at Superior, grade 3 at Fine, grade 4 at Sound. A
+reject hide makes scraps only. Some tannins raise or lower the ceiling of everything made
+from their leather.</p>
+
+<p><b>Masterwork at Assemble.</b> Choose before you roll whether you aim for masterwork.
+Aiming raises the DC to 20; not aiming caps the piece at Fine. A soft body must be curried
+and plates hardened before the piece can be Superior, and a body that is not tooled stops at
+Superior. A hide that is masterwork by nature needs none of this. A finished piece can be at
+most one step better than its body.</p>
+
+<p><b>Where you work.</b> The leatherworker's field kit works common and uncommon hides
+anywhere, Harden and a bark tan included. A tannery, rented by the hour or one you own,
+adds the vats (mineral and planar tannages), the lime pit for thick hides, and rare and
+rarer hides. Your level also limits the hides you can work: uncommon at 1, exotic at 2,
+legendary at 3.</p>
+
+<p><b>From hide to piece.</b> Salt (if the beam is far off), Flense, Tan, then Curry, Tool or
+Dye as you wish, Cut to a pattern, Stitch the panels (or Harden them for leather armour,
+lamellar and the madu), and Assemble. A suit's body takes more hide for a bigger wearer.
+Hide armour wants a thick hide. Steel or cold-iron studs are fitted at a smith's anvil, not
+here.</p>
+
+<p><b>Tannages.</b> The tannin must be within one tier of the hide. Brain and smoke (1) is a
+day's bench work and needs no wait. Rawhide (1) dries in about four hours. Bark (1) soaks for
+about four days and sixteen hours, twice that for a thick hide, in your pack or in a rented
+vat if begun at a tannery. Alum tawing (2) takes about a day and more, mineral (2) half a day
+in a tannery's vat, planar (3) about a week in a tannery's vat. Only bark and planar leather
+will harden; brain, alum and mineral stay soft, and rawhide turns to glue. A salted hide
+soaks for eight hours first unless the tannin does not mind salt.</p>
+
+<p><b>Freshness.</b> A green hide spoils 48 hours after the kill. Salt stops the clock for six
+weeks, then it runs again. Tanned work never spoils. A spoiled hide is scraps and glue stock:
+it can still be graded and sold, never worked. A hide bought at a counter comes already
+oak-bark tanned, at grade 2.</p>
+
+<h3 id="enchanting">Enchanting</h3>
+
+<p>Enchanting lays magic over an item someone else made. It is worked in a circle, three
+steps in order: prepare the vessel, attune essences to it, then bind them. Each step is a
+Craft check and, if it lands, a short game that decides how good the step is. Take off
+anything you mean to enchant first: a worn or held item cannot go in the circle.</p>
+
+<table>
+<tr><td><b>Prepare</b> (Enchanter 1)</td><td>Lay a circle round a vessel: one chalk or salt,
+one ink, and at most one treatment. A ring or amulet also needs a gem set as its focus. The
+rarer the circle material, the harder the check, and a chalk circle holds essence one band
+rarer than itself.</td></tr>
+<tr><td><b>Attune</b> (1)</td><td>Seat essences on a prepared vessel, one to a seat, and make
+any choices (the foe for bane, the energy for a resistance). Nothing is spent yet. An
+attuned vessel holds for a day; after that the essences go back to your shelf unharmed.</td></tr>
+<tr><td><b>Bind</b> (1)</td><td>The book's creation check on an attuned vessel. The essences
+and any catalyst are spent and the item goes In progress for the book's time.</td></tr>
+<tr><td><b>Read</b> (1)</td><td>Ten minutes and a tenth of a phial to learn one thing about
+an essence.</td></tr>
+<tr><td><b>Identify</b> (1)</td><td>Study a magic item for what it was made to do. Once per
+item per day.</td></tr>
+<tr><td><b>Unbind</b> (1)</td><td>Take the whole magic layer off an item, curse and all. The
+item stays as the smith made it, a quarter of the layer's motes come back as arcane residue,
+and you learn what kinds of property it carried, never how strong.</td></tr>
+<tr><td><b>Refine</b> (2)</td><td>Condense two or more phials of one essence family into one
+fuller phial, so one seat holds more. A clean draw keeps every mote; a Crude one loses a
+fifth.</td></tr>
+<tr><td><b>Cleanse</b> (3)</td><td>Lift a curse you know of and keep the rest of the
+magic.</td></tr>
+</table>
+
+<p><b>The roll.</b> Your Craft check is d20 + your Enchanter level + half your character
+level + Intelligence + half your Craft ranks. Only your own Intelligence counts: a headband
+or a spell that raises it does not reach the circle, though damage and drain do. A bench
+check has no automatic 20 or 1: if no roll can make it, the bench says how much more you
+need. Prepare, Attune and Refine are DC 5 + 5 for each rarity band of the rarest thing in
+them. Read is DC 10 + 5 a band, Unbind and Cleanse DC 10 + the item's caster level.
+Identify is DC 15 + the item's caster level, using the better of this check and your
+Spellcraft.</p>
+
+<p><b>Bind's DC.</b> 5 + the item's caster level, +5 for each spell the property needs that
+you neither know nor carry in a potion or scroll (a carried one is used up), +5 if your
+Enchanter level is below the caster level the item asks, and +5 to hurry it into half the
+time. A catalyst lowers it, and so does affinity (below).</p>
+
+<p><b>A miss.</b> A spoiled Prepare spends the circle materials; the vessel is untouched.
+Missing Bind by 4 or less does not take: the essences are kept and the vessel stays attuned.
+Miss it by 5 or more and it takes anyway, flawed, with a curse you cannot see; the item will
+know it is flawed, and a fragile focus cracks. Missing Refine by 5 or more ruins half the
+phials. Missing Unbind by 5 or more tears the layer away and loses it, with no residue and
+nothing learned. Any other miss costs only the time.</p>
+
+<p><b>Quality.</b> The game after a good roll sets the quality, from Crude up. Your level
+sets the best you can reach (Fine at Enchanter 1, Superior at 2, Flawless at 3), and a
+binding can reach at most one step above the Prepare and the Attune it was laid on. A good
+circle is what lets a binding reach Superior and Flawless.</p>
+
+<p><b>Where you can work.</b> Anywhere quiet, out of a fight: a circle on the ground will
+do. Refine, Cleanse and legendary essence need a sanctum, a place of your own founded as
+one. Somebody else's sanctum is not yours to work in.</p>
+
+<p><b>Vessels and what they hold.</b> A weapon, armour or shield must be Superior or better
+before it can carry magic, and needs at least a +1 enhancement before any special ability
+(+5 at most). Rings, amulets and wondrous items take no enhancement, only powers. An item
+holds half your Enchanter level in bonus (never less than +1), and +1 more for each quality
+step above Superior. Only Enchanter 2 and up can bind more than one new property at a time.</p>
+
+<p><b>Essences and seats.</b> Common and uncommon essence is yours at Enchanter 1, rare and
+exotic at 2, legendary at 3. Each essence carries motes, and a working costs motes: the
+seated essences must carry enough between them. Each vessel has a few named seats, and the
+number of seats is how many phials one working can take: a weapon has Point, Edge and Guard;
+armour Breast, Back and Shoulders; a shield Face and Rim; a ring Stone and Band; an amulet
+or cloak Clasp and Hem.</p>
+
+<p><b>Polarity.</b> An essence wants a kind of vessel. A weapon essence sits only on a
+weapon, an armour essence on armour, a shield or a wondrous item, a ward essence on a ring
+or wondrous item, and an essence that goes on anything goes anywhere. The wrong one is
+refused at Attune with the reason.</p>
+
+<p><b>Affinity.</b> When an essence's family suits the material its seat sits on (the blade's
+metal at Point and Edge, the gem at a ring's Stone), Bind is 1 easier for that seat, and
+at most 2 easier in all.</p>
+
+<p><b>The hour.</b> Each essence family has its phase of the day. Bind inside it and the
+game's windows are half again as wide; Wait for it moves the clock there. A few essences bind
+only between dusk and dawn unless the vessel was prepared with a treatment that lifts it.</p>
+
+<p><b>Learning essences.</b> Seating an essence shows where it sits and its hour; binding it
+shows what it grants; Read shows one trait more. A volatile essence bites whoever reads it,
+whatever the roll, with its own drawback for an hour. A missed Read still spends the pinch.</p>
+
+<p><b>Curses.</b> Identify that beats the DC by 10 also finds a curse. Unbind is the cheap
+cure: the curse goes with the whole layer. Cleanse keeps the magic, but needs Enchanter 3, a
+sanctum, and a curse you already know of.</p>
+
+<p><b>Stopping a binding.</b> Stop it while it is In progress and the item comes back as it
+was, but the essences are spent.</p>
+
+<h3 id="homebrew">Homebrew</h3>
 
 <p><b>Homebrew.</b> Editors for classes, races, spells, effects and consumables, plus
 house rules — point buy, ability ceilings, magic stacking, whether the Core races are

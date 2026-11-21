@@ -29,7 +29,7 @@ from __future__ import annotations
 import logging
 import re
 
-from . import lives
+from . import faces as faces_mod, lives
 
 
 def _norm(phrase: str) -> str:
@@ -328,7 +328,8 @@ _HINT_WORK = re.compile(r"\b(?:her|his|their)\s+([a-z][a-z'-]{2,})", re.I)
 
 
 def note(scene, phrase: str, *, turn: int = 0, body: str = "", fresh: bool = False,
-         spot: str | None = None, heard_from: str = "", hint: str = "") -> dict:
+         spot: str | None = None, heard_from: str = "", hint: str = "",
+         work: str = "") -> dict:
     """Record the person this phrase describes, where the party stands; return the record.
 
     The same phrase at the same place is the same person seen again — their `last_seen`
@@ -367,9 +368,12 @@ def note(scene, phrase: str, *, turn: int = 0, body: str = "", fresh: bool = Fal
     # unless the words make her a child) and the work the speaker gave them, if any.
     said = person_words.from_words(phrase)
     rolled = person_words.roll_phrase(phrase, said)
-    work = [w for w in _HINT_WORK.findall(str(hint or "")) if lives.occupation_for(w)]
-    if work and not lives.occupation_for(rolled):
-        rolled = f"{rolled} {work[0]}"
+    # `work`: the trade the player went looking for, when this newcomer is who answers it
+    # (an introduce's `trade`, playtest 2026-11-17b #17); else what the speaker's words gave.
+    hinted = [work] if work and lives.occupation_for(work) else []
+    hinted += [w for w in _HINT_WORK.findall(str(hint or "")) if lives.occupation_for(w)]
+    if hinted and not lives.occupation_for(rolled):
+        rolled = f"{rolled} {hinted[0]}"
     used = used_frames(scene, home)
     life = None
     if heard and spot:
@@ -384,14 +388,16 @@ def note(scene, phrase: str, *, turn: int = 0, body: str = "", fresh: bool = Fal
         slot = residency.slot_of(clock)
         for salt in range(12):
             cand = lives.roll(f"{home}|{pid}" + (f"|{salt}" if salt else ""),
-                              phrase=rolled, body=body, used_frames=used)
+                              phrase=rolled, body=body, used_frames=used,
+                              seen=faces_mod.seen_in(scene))
             probe = {"id": pid, "life": cand.as_dict(), "first_seen": clock}
             if cand.mobility != "resident" or \
                     residency.schedule_for(probe)[slot] == residency.WORK:
                 life = cand
                 break
     if life is None:
-        life = lives.roll(f"{home}|{pid}", phrase=rolled, body=body, used_frames=used)
+        life = lives.roll(f"{home}|{pid}", phrase=rolled, body=body, used_frames=used,
+                          seen=faces_mod.seen_in(scene))
     where = spot if heard else getattr(scene, "at", None)
     rec = {
         "id": pid, "phrase": " ".join(str(phrase).split()), "home": home,
@@ -982,7 +988,16 @@ def find(scene, phrase: str, *, rings: tuple[str, ...] | None = None,
             return Found(scope=HERE if name == HERE else ELSEWHERE, ring=name, people=[rec])
         if told:
             return Found(scope=AMBIGUOUS, ring=told[0][0], people=[r for _n, r in told])
+    # A bare trade ("the foreman", "the smith") asks for whoever does that work HERE, never
+    # one met in another town: playtest 2026-11-16 #75, "ask the foreman" at Mirabalos'
+    # docks found a dock labourer glimpsed in Zhilvarnia (the trade read as work:labourer)
+    # and refused "The dock laborer is in Zhilvarnia now, not here". Somebody standing here
+    # still answers to it, wherever their home.
+    trade_only = all(w.startswith("work:") for w in words)
+    home = getattr(scene, "location_id", None)
     for name, members in ringed():
+        if trade_only and name != HERE:
+            members = [r for r in members if r.get("home") == home]
         fits = [r for r in members if _fits(words, _bag(r, scene), peoples)]
         if len(fits) == 1:
             return Found(scope=HERE if name == HERE else ELSEWHERE, ring=name, people=fits)

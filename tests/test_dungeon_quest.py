@@ -61,7 +61,9 @@ def test_finding_the_way_down_opens_the_players_own_quest_told_and_in_the_journa
     s, engine, head, told = _found_cave()
     card = _quest(s)
     assert cards.is_own(card) and card.live
-    assert card.title.startswith("Clear what lies below the cave")
+    # Titled from the dungeon's concept now (feat/dungeon-story), still naming the place.
+    tag = dungeons.story()["tags"][head["deeper"]["concept"]["tag"]]
+    assert "below the cave" in card.title and card.title.startswith(tag["quest"].split()[0])
     assert "takes it on: " + card.title in told
     log = cards.quest_log(s)
     row = next(r for r in log["active"] if r["id"] == card.id)
@@ -146,7 +148,7 @@ def test_a_save_with_a_found_way_and_no_quest_gets_its_quest(always):
     s.cards = [c for c in s.cards if not str(c.get("origin", "")).startswith("rule:dungeon/")]
     out = _run(engine, "check", {"skill": "perception", "search": True})
     assert _quest(s).live
-    assert any("takes it on: Clear what lies below" in o.tell for o in out)
+    assert any("takes it on: " + _quest(s).title in o.tell for o in out)
 
 
 def test_the_way_down_and_its_rooms_stay_on_the_chart_after_leaving(always):

@@ -28,7 +28,7 @@ ORDER = 22
 
 def step(ctx) -> list[dict]:
     from gm import beat_reader
-    from rules import heard_places
+    from rules import heard_places, heard_towns
 
     reading = ctx.attribution
     scene = ctx.scene
@@ -51,6 +51,18 @@ def step(ctx) -> list[dict]:
             rows.append({"kind": "heard-of-place", "name": kept["name"],
                          "kind_of_place": kept.get("kind", ""),
                          "landmark": kept.get("landmark", ""), "from": said_by})
+    # Other towns the speaker named (rules/heard_towns.py): the World map's "heard" pins.
+    actors = getattr(scene, "actors", {}) or {}
+    for t in reading.towns:
+        said_by = _ref(reading, t.said_by)
+        ln = lines.get(t.line)
+        a = actors.get(said_by)
+        kept = heard_towns.record(scene, t.city, who=str(getattr(a, "name", "") or ""),
+                                  said_by=said_by, line=ln.words if ln else "",
+                                  turn=int(ctx.turn or 0))
+        if kept:
+            rows.append({"kind": "heard-of-town", "town": t.city, "words": t.words,
+                         "from": said_by})
     return rows
 
 

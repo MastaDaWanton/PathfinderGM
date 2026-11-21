@@ -434,8 +434,22 @@ def charges(engine, pc, town: str) -> list[Charge]:
             continue
         if pay.get("deed") and pay["deed"] in judged(pc, town):
             continue
-        out.append(Charge(kind=kind, proof="accused", warrant=e.source,
-                          what=str(pay.get("what") or "")))
+        # A warrant sworn by somebody who saw it done (a ship's master who yielded her
+        # under the knife, `Engine._ships_left_settle`) is witnessed: playtest 2026-11-16
+        # #85, where his sworn word "fell for want of proof: nobody saw".
+        # A save from 0.3.9 swore it without naming him: the seized ship's warrant is the
+        # master's by its source alone.
+        sworn = bool(pay.get("witness")) or str(e.source).startswith("rule:ship-seized/")
+        worth = float(pay.get("worth_gp") or 0)
+        if sworn and not worth:
+            from . import ships as ships_mod
+
+            ship = engine.vessel(str(e.source).split("/", 1)[-1])
+            worth = float(ships_mod.VESSELS.get(getattr(ship, "kind", ""), {})
+                          .get("price_gp") or 0)
+        out.append(Charge(kind=kind, proof="witnessed" if sworn else "accused",
+                          warrant=e.source, what=str(pay.get("what") or ""),
+                          subject_name=str(pay.get("witness") or ""), worth_gp=worth))
         kinds.add(kind)
     held = _goods_held(engine, pc)
     for c in out:
@@ -625,6 +639,11 @@ def take_in(engine, pc, who, town: str, *, how: str = "taken"):
                 scene.move(g.ref, hold.id)
     who = [g for g in who if g.ref in scene.actors]
     where = hold.name if hold is not None else "the watch's keeping"
+    # Being taken in and questioned is a sitting, not a word at the door (playtest
+    # 2026-11-16 #86: yielding to walking free took eight minutes of clock, walk and all).
+    asked = doc.get("questioning") or {}
+    scene.advance(int(asked.get("minutes") or 0))
+    held_for = str(asked.get("said") or "")
     chs = charges(engine, pc, town)
     officers = [g for g in who if g.has_state(states.GUARD_OFFICER)] or \
         [a for a in _law_here(engine) if a.has_state(states.GUARD_OFFICER)]
@@ -652,8 +671,9 @@ def take_in(engine, pc, who, town: str, *, how: str = "taken"):
         # Nothing proven at all: every warrant of this town lifted — a warrant that says
         # nothing about what it is for is an accusation too.
         _clear_warrants(pc, town, only_rules=False)
-        return _release(engine, pc, town, None, lead + fell + f" Questioned there, "
-                        f"{pc.name} is let go for want of proof", grace=False,
+        return _release(engine, pc, town, None, lead + fell + f" Questioned there"
+                        + (f" for {held_for}" if held_for else "")
+                        + f", {pc.name} is let go for want of proof", grace=False,
                         effects_kind="no-proof",
                         hold={"hold": hold.id if hold is not None else scene.at,
                               "hold_name": where})
@@ -666,7 +686,8 @@ def take_in(engine, pc, who, town: str, *, how: str = "taken"):
                                  origin=SOURCE, duration="until-dismissed",
                                  tags=(states.CUSTODY,), payload=pay))
     asker = _named(q.name) if q is not None else "the watch"
-    tell = (f"{lead}{fell} {_cap(asker)} questions {pc.name}: charged with "
+    tell = (f"{lead}{fell} {_cap(asker)} questions {pc.name}"
+            + (f" for {held_for}" if held_for else "") + ": charged with "
             f"{'; '.join(c.said() for c in chs)}. "
             + choices(pc.name, ["talk their way out (Diplomacy, Bluff or Intimidate)",
                                 "say nothing"]))
@@ -1268,8 +1289,8 @@ def _after_questioning(engine, pc, held, town: str):
     what = ("death, hanged at first light tomorrow" if sent["death"]
             else f"{counts}: a fine of {_coin(engine, sent['fine_cp'])} in all" if counts
             else f"a fine of {_coin(engine, sent['fine_cp'])}")
-    took = (" and the stolen goods given back" if any(c.goods or c.taken for c in chs)
-            else "")
+    took = (" and the stolen goods given back"
+            if any(c.goods or c.taken or _ship_of(c) for c in chs) else "")
     # The sentence said as still to come, after the last word. Measured on the narration
     # diagnosis bench (2026-11-04, mechanism 9): "The sentence for murder is death, hanged
     # at first light tomorrow. Before it is passed, … may speak once more" came back "He
@@ -1422,6 +1443,12 @@ def _sentence(engine, pc, held, town: str):
                    tell=" ".join(bits).replace("..", "."))
 
 
+def _ship_of(c) -> str:
+    """The ship a theft charge is for (the seized ship's warrant), or ""."""
+    src = str(c.warrant or "")
+    return src.split("/", 1)[1] if c.kind == "theft" and         src.startswith("rule:ship-seized/") else ""
+
+
 def _confiscate(engine, pc, chs=()) -> list[dict]:
     """Stolen things off the player and back to the people they were stolen from: the
     item leaves the player's holdings (the give door, from the player to nobody) and its
@@ -1435,6 +1462,28 @@ def _confiscate(engine, pc, chs=()) -> list[dict]:
     scene = engine.scene
     out = []
     for c in chs:
+        ship = engine.vessel(_ship_of(c)) if _ship_of(c) else None
+        if ship is not None and ship.held_by == pc.ref:
+            # A seized ship goes back to the master who swore it (#85): hers no longer.
+            ship.held_by = ""
+            # Her cargo goes back into her hold with her (playtest 2026-11-16 N3): the
+            # plunder lots still the player's, wherever they lie. shortcut: plunder already
+            # sold is not repaid beyond the fine, which is the ship's own book price.
+            from . import trade as trade_mod
+
+            back = [x for x in trade_mod.lots(scene) if x.get("plunder") == ship.id
+                    and x.get("stowed") != "taken"]
+            if back:
+                ship.cargo = list(ship.cargo or []) + [
+                    {"key": x["key"], "units": int(x.get("units", 0)),
+                     "commodity": x.get("commodity") or ""} for x in back]
+                scene.cargo = [x for x in trade_mod.lots(scene) if x not in back]
+            engine._keep_vessel(ship)
+            out.append({"item": ship.name, "owner": "",
+                        "owner_name": c.subject_name or "her master"})
+            for x in back:
+                out.append({"item": trade_mod.said(x), "owner": "",
+                            "owner_name": c.subject_name or "her master"})
         owner = scene.people.get(c.subject)
         for name in c.taken:
             # shortcut: the haul's coin is not handed back, the fine already takes the

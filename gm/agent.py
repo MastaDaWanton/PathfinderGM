@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 
 from rules.intents import (Intent, IntentError, claims_held_by_hiding,
-                          claims_the_engine_backs, cut_outcome_claims,
+                          claims_the_engine_backs, cut_outcome_claims, cut_sentence,
                           find_outcome_claims)
 
 from . import client, judgement, narration as narration_mod, prompts
@@ -417,6 +417,16 @@ class GMAgent:
 
         means.said_aloud(read_ok, player_input,
                          ask=means.claim_kind if interpret.ENABLED else None)
+        # A sneak read beside a walk is asked whether it hides or only names the way
+        # (`interpret.unhidden`, playtest 2026-11-16 #77).
+        for span in interpret.unhidden(
+                read_ok, ask=interpret.confirm_hiding if interpret.ENABLED else None):
+            read_ok.setdefault("dropped", []).append(f"stealth {span!r}: a way to go")
+        # A look over a seller's wares is a browse, the counter's to open (`interpret.
+        # browsed`, playtest 2026-11-17b #29).
+        for span in interpret.browsed(
+                read_ok, ask=interpret.confirm_browse if interpret.ENABLED else None):
+            read_ok.setdefault("dropped", []).append(f"look {span!r}: a browse, the counter's")
         # The act→op table (gm/acts_to_ops.py): one row per action of the reading.
         self.rows = acts_to_ops.table(read_ok, self.engine.scene,
                                       places=self.engine.places(), sentence=player_input,
@@ -730,7 +740,10 @@ class GMAgent:
                                     # a line the map's axes.
                                     aims=self._cast_aims(player_input)
                                     if "cast" in declared else (),
-                                    skill=check_skill if "check" in declared else ""))
+                                    skill=check_skill if "check" in declared else "",
+                                    # Who may `say` here: the player, and a companion
+                                    # out of a fight (`judgement.no_npc_lines`).
+                                    speakers=self._speakers()))
             except client.ModelUnavailable as exc:
                 down.add(model)
                 # A wedged Ollama is wedged for every model it serves: the backup on the
@@ -822,6 +835,11 @@ class GMAgent:
                     raw, self.engine.scene, notes=own_words,
                     addressed_refs=companions_mod.addressed(self.engine.scene,
                                                             player_input))
+                # And nobody else's line: an NPC's answer is the reply slot's, after the
+                # dice (playtest 2026-11-17b #14, #18, #22, #25). Before `inject_say`,
+                # which stands aside for any say already in the list.
+                raw = judgement.no_npc_lines(raw, player_input, self.engine.scene,
+                                             notes=own_words)
                 raw = judgement.repair_bare_spawns(raw, player_input,
                                                    judgement._pc_level(self.engine.scene))
                 raw = judgement.normalize_attacks(raw, self.engine.scene) or raw
@@ -833,6 +851,9 @@ class GMAgent:
                 # The stat block a person the plan introduces walks on with, read off
                 # their words the way the prose's people always were (`template_for`).
                 raw = judgement.fill_introduce_templates(raw, self.engine.scene)
+                # And the trade the player went looking for, on the one newcomer who
+                # answers it (`acts_to_ops.trade_sought`).
+                raw = acts_to_ops.trade_sought(raw, read_ok, notes=own_words)
                 # A blow at a thing somebody holds is a blow at that somebody, and
                 # a sunder asked for is a sunder: "I strike the weapon and sunder it"
                 # died five times on "a sunder needs a target" and then spawned a
@@ -902,6 +923,12 @@ class GMAgent:
                     raw, read_ok, self.engine.scene,
                     ask=interpret.confirm_sea if interpret.ENABLED else None,
                     notes=own_words)
+                # At an arena, the bout the words asked for (`acts_to_ops.bout_spoken`),
+                # one closed question per deed.
+                raw = acts_to_ops.bout_spoken(
+                    raw, read_ok, self.engine.scene,
+                    ask=interpret.confirm_bout if interpret.ENABLED else None,
+                    places=self.engine.places(), notes=own_words)
                 # And aboard a ship the PC holds, her cruise the words gave
                 # (`acts_to_ops.cruise_spoken`), one closed question per deed.
                 raw = acts_to_ops.cruise_spoken(
@@ -911,6 +938,8 @@ class GMAgent:
                 # A journey the plan wrote with nowhere to go, given the place the reading's
                 # journey names (`acts_to_ops.journey_named`).
                 raw = acts_to_ops.journey_named(raw, read_ok, notes=own_words)
+                # Somebody the walk leads along goes in its `with` (`acts_to_ops.led_along`).
+                raw = acts_to_ops.led_along(raw, read_ok, self.engine.scene, notes=own_words)
                 raw = judgement.resolve_sold_items(raw, self.engine.scene)
                 raw = judgement.inject_ability(raw, player_input, self.engine.scene)
                 # And its complement: a power the player named that nobody has is a
@@ -1028,10 +1057,19 @@ class GMAgent:
                                                         self.engine.scene, self.world,
                                                         reading=reading,
                                                         attached=getattr(self, "attachments", ()))
+                # And a departure from a venture walks out of it, not deeper in.
+                raw = judgement.out_of_the_venture(raw, self.engine.scene,
+                                                   self.engine.places(), location,
+                                                   reading=reading)
                 # After travel, load-bearing: "go to the forest and forage" must move
                 # first or the forage rolls the old ground's tables.
                 raw = judgement.inject_forage(raw, player_input, self.engine.scene)
-                raw = judgement.inject_prospect(raw, player_input, self.engine.scene)
+                # Not where the reading overruled it: live 2026-11-20, "I search the woods
+                # for my lost silver locket" had the prospect overruled (the "silver" of
+                # the locket is an ore word to `_GATHERS_ORE`), and this put it back — an
+                # hour's dig and two chunks of lead ore for a locket.
+                if "prospect" not in ((read_ok or {}).get("overruled") or ()):
+                    raw = judgement.inject_prospect(raw, player_input, self.engine.scene)
                 # A place somebody named and the player now goes to: founded under the
                 # landmark the speaker gave, then walked into (rules/heard_places.py).
                 # After the within-scene filter, so a walk across the room stays one.
@@ -1105,6 +1143,8 @@ class GMAgent:
                 if not interpret.said_to_nobody(read_ok, self.engine.scene):
                     raw = judgement.inject_provoke(raw, player_input, self.engine.scene)
                 raw = judgement.inject_say(raw, player_input, self.engine.scene)
+                by_then = interpret.scene_by_then(read_ok, self.engine.scene,
+                                                  self.engine.places())
                 # And the world's answer when the player looked for somebody who is not
                 # here, stated whether or not the plan reached for them (item 29). Last,
                 # because it reads the player's own sentence and competes with nothing.
@@ -1112,8 +1152,10 @@ class GMAgent:
                 # (playtest 2026-11-16 #9, "a merchant ship" looked up as a person).
                 if not any(isinstance(r, dict) and r.get("op") == "sea"
                            and (r.get("params") or {}).get("do") == "cruise" for r in raw):
-                    raw = judgement.answer_the_absent(raw, player_input,
-                                                      self.engine.scene, self.world)
+                    # Asked from where the line's own walk ends, when one comes first
+                    # (`interpret.scene_by_then`, playtest 2026-11-16 #94).
+                    raw = judgement.answer_the_absent(raw, player_input, by_then,
+                                                      self.world)
                 # And a walk to a place the engine cannot find, on a plan that moves
                 # nobody, is the engine's printed answer — never a narrated nothing
                 # (`acts_to_ops.nowhere_to_go`; the owner's 2026-11-05 save, row 69:
@@ -1140,12 +1182,15 @@ class GMAgent:
                 # And the line goes to whom the words name (`acts_to_ops.address_the_named`):
                 # never the plan's pick of somebody else here.
                 raw = acts_to_ops.address_the_named(raw, read_ok, self.engine.scene,
-                                                    notes=own_words)
+                                                    notes=own_words,
+                                                    places=self.engine.places())
                 # The ops the reading owes, in the order the words do them — after every
                 # injector has appended its own, and before a chip's op is put where the
                 # words put it (which then has the last word on order).
                 if not getattr(self, "attachments", ()):
-                    raw = acts_to_ops.order(raw, self.rows)
+                    raw = acts_to_ops.order(raw, self.rows, read_ok)
+                # And one walk to one place is walked once (`acts_to_ops.once_each_walk`).
+                raw = acts_to_ops.once_each_walk(raw, notes=own_words)
                 # And the attached spell or place put where the words do it, after
                 # every injector above has appended its own (gm/sequence.py).
                 raw = judgement.order_the_attached(
@@ -1166,6 +1211,10 @@ class GMAgent:
                 # walk names (`acts_to_ops.travel_named`).
                 raw = acts_to_ops.travel_named(raw, read_ok, self.engine.places(),
                                                notes=own_words)
+                # And a search the settle left as nothing is the search of here, never a
+                # narrated attempt with no answer (playtest 2026-11-20 #50).
+                raw = acts_to_ops.search_unanswered(raw, read_ok, self.engine.scene,
+                                                    notes=own_words)
                 # A thing the plan reaches for that nothing records is asked about once,
                 # of the passages the player read here (gm/scenery.py): shown, or loose in
                 # any place of this kind, it is ledgered before the engine looks for it;
@@ -2114,7 +2163,26 @@ class GMAgent:
             for sid in (list(getattr(actor, "spellbook", []) or [])
                         + list(getattr(actor, "prepared", {}) or {})):
                 names.add(str(sid).replace("-", " "))
+            # And what they carry, wield, wear and know how to do, by its own name: owner
+            # bug 2026-11-17 #8 (frag), "your Lucerne hammer" was un-named into "your the
+            # stranger hammer" — the weapon on frag's own sheet.
+            things = [*(getattr(actor, "goods", None) or {}),
+                      *(getattr(actor, "weapons", None) or ()),
+                      *(getattr(actor, "feats", None) or ()),
+                      getattr(actor, "armour", ""), getattr(actor, "shield", "")]
+            for slot in (getattr(actor, "slots", None) or {}).values():
+                things += [t for t in slot or () if isinstance(t, str) and t]
+            for thing in things:
+                said = str(thing or "").replace("-", " ").strip()
+                if said and said != "none":
+                    names |= {said, said.title(), said[:1].upper() + said[1:]}
         names |= self._engine_place_names()
+        # The rules' own words: the six abilities and the skills ("Charisma" was un-named
+        # in frag's game, #8).
+        from rules import tables
+
+        names |= set(tables.ABILITY_FULL.values())
+        names |= {k.title() for k in tables.SKILLS} | {k.split()[0].title() for k in tables.SKILLS}
         # And the coin the engine names in its tells (`goods.coins_here`, the coin-names
         # ruling). Live 2026-11-15, a sale at Zhilvarnia: "Eldrida" read as an invented
         # person and the page said "18 the stranger platinum pieces".
@@ -2357,6 +2425,14 @@ class GMAgent:
                 notes.append(f"repeated beats: cut {cut}")
         return text, notes
 
+    def _anyone_but_the_party(self) -> bool:
+        """Whether anybody stands here who is not the player or travelling with them: a
+        body of any kind on the map, the fallen too (`rules.states.TRAVELS_WITH_YOU`)."""
+        from rules import states
+
+        return any(not a.is_pc and not a.has_state(states.TRAVELS_WITH_YOU)
+                   for a in (getattr(self.engine.scene, "actors", None) or {}).values())
+
     def _groom(self, text: str, *, earlier: list[str] | None = None,
                min_chars: int = 0, max_chars: int = 0, player_input: str = "",
                brief: str = "", hand_back: bool = True, claims: bool = True,
@@ -2437,6 +2513,14 @@ class GMAgent:
         # A legacy campaign's woven-in people count as known from here down, so the
         # reviewer stops burning rewrites on Vorgath and the un-namer leaves him be.
         extra = narration_mod.established_names(earlier)
+        # The turn's own tells light what they say burned: owner bug 2026-11-17 #4 (frag,
+        # the settling tank), the room's trace "the beams are charcoal … the fire came
+        # from the way in" was written and cut as fire from nowhere — the guard read the
+        # place's brief and the earlier beats, never this turn's tells.
+        told = [str(getattr(o, "tell", "") or "") for o in outcomes or ()] + list(facts or ())
+        # And any name the engine's own tells this turn used: the narrator was fed it
+        # (playtest 2026-11-20 #12, "6× Glow Mote" in the tell was un-named on the page).
+        extra = extra | narration_mod.established_names(told, minimum=1)
         if rewrite and whole_rewrite:
             text, p_repairs, p_attempts = self.polish(
                 text, earlier=earlier, min_chars=min_chars, max_chars=max_chars,
@@ -2446,7 +2530,7 @@ class GMAgent:
                 # What could have lit anything: the place's brief and the recent
                 # beats. None when the caller had no brief (a consequence line),
                 # and the fire finding is not judged.
-                fire_context=(" ".join([brief] + list(earlier or []))
+                fire_context=(" ".join([brief, *told] + list(earlier or []))
                               if brief else fire_context))
             repairs += p_repairs
             attempts += p_attempts
@@ -2615,11 +2699,12 @@ class GMAgent:
         # a name the answer invents is held to the world like any other. Player turns
         # only, and only where a rewrite is allowed at all.
         if rewrite and not acting and player_input and player_input != prompts.CARRY_ON:
-            asked = self._who_was_asked(player_input)
+            asked = self._who_was_asked(player_input, outcomes)
             if asked is not None and not narration_mod.answered(
                     text, asked.ref, self.last_said, player_input):
                 text, answer_notes, answer_attempts = self._answer_the_question(
-                    text, asked, player_input, brief)
+                    text, asked, player_input, brief,
+                    left_behind=asked.ref not in self.engine.scene.actors)
                 repairs += answer_notes
                 attempts += answer_attempts
         # Declared, and the beat picked up after it (owner, 2026-10-01): a deed the player
@@ -2740,11 +2825,21 @@ class GMAgent:
                            f"landed a blow before any die was rolled")
         # Fire with nothing to light it, when the rewrite left it standing: cut. Judged
         # only with a brief in hand, the same gate the finding has.
-        lit_by = (" ".join([brief] + list(earlier or [])) if brief else fire_context)
+        lit_by = (" ".join([brief, *told] + list(earlier or [])) if brief else fire_context)
         if lit_by is not None:
             text, lit = narration_mod.cut_fire_from_nowhere(text, lit_by)
             if lit:
                 repairs.append(f"fire from nowhere: cut {len(lit)} sentence(s)")
+        # A crowd where the map holds nobody but the party and the engine laid no crowd
+        # (rules/crowds.py): cut (owner bug 2026-11-17 #7). The engine's crowd is the half
+        # the owner asked for on 2026-11-18 — without it every market read deserted.
+        from rules import crowds as crowds_mod
+
+        text, crowd = narration_mod.cut_crowd_from_nowhere(
+            text, self._anyone_but_the_party()
+            or crowds_mod.standing(self.engine.scene) is not None, " ".join(told))
+        if crowd:
+            repairs.append(f"crowd from nowhere: cut {len(crowd)} sentence(s)")
         # Every model call above this line wrote words onto the page after the page
         # checks ran: the rewrite, the sentence repairs, the answer, the deeds, the
         # renamed and the restated. Item 19 (2026-10-03) shipped a polish with "(c1)" and
@@ -2782,7 +2877,9 @@ class GMAgent:
                 for a in self.engine.scene.actors.values() if not a.is_pc)
             text, beasts = narration_mod.creature_nouns_for_pc(
                 text, pc.name, people_only, acting=acting,
-                whose=attribution.who, pc_ref=pc.ref)
+                whose=attribution.who, pc_ref=pc.ref,
+                grounded=" ".join([str(f) for f in (facts or [])]
+                                  + [str((pull or {}).get(k) or "") for k in ("title", "fact")]))
             if beasts:
                 # Into the player's own person, like every other mention of them: this
                 # ran after the name swap above, so the name it wrote stayed a name on
@@ -3235,7 +3332,7 @@ class GMAgent:
                 # What the crowd just saw, out of fights only: in a fight the NPC
                 # turns are the reaction.
                 heat=(None if self.engine.scene.in_encounter
-                      else (getattr(self.engine.scene, "heat", None) or None)),
+                      else (judgement.heat_seen(self.engine.scene) or None)),
             )
 
         review = _review(text)
@@ -3668,7 +3765,7 @@ class GMAgent:
                 narration = narration.replace(claim.sentence, fixed)
                 repairs.append(f"{claim.why}: {claim.sentence!r} -> {fixed!r}")
             else:
-                narration = narration.replace(claim.sentence, "").strip()
+                narration = cut_sentence(narration, claim.sentence).strip()
                 repairs.append(f"{claim.why}: cut {claim.sentence!r}")
 
         # Belt and braces, by character span. The `replace` calls above are silent no-ops
@@ -3811,41 +3908,67 @@ class GMAgent:
         return kept, [f"wrong actor: {why} — the rewrite failed; cut {len(cut)} "
                       f"sentence(s), the tells stand"], attempts
 
-    def _who_was_asked(self, player_input: str):
+    def _who_was_asked(self, player_input: str, outcomes=None):
         """The person the player's line asks something of, when the beat owes them an
         answer: named by the interpreter's reading, else the one person in conversation.
         None out of a fight's way, when nobody or several could be meant, when they are
-        down, when their attitude would refuse a name (`attitude.tells_their_name` — an
-        unwilling person's silence is their answer), or when the party moved."""
+        down, or when their attitude would refuse a name (`attitude.tells_their_name` — an
+        unwilling person's silence is their answer).
+
+        When the party moved, only somebody the reading's talk names at a place this
+        turn's walk left, asked before a walk the reading puts after the asking: they
+        answer before the player goes. Playtest 2026-11-16 N6: "I go up on deck, ask the
+        deckhand what's in the hold, then go ashore and walk to the cathedral" — the walk
+        chained, and the question was never answered, because a moved party asked nobody."""
+        from types import SimpleNamespace
+
         from rules import attitude as attitude_mod
         from rules import scope as scope_mod
+
+        from . import interpret as interpret_mod
 
         scene = self.engine.scene
         if scene.in_encounter or not narration_mod.wants_an_answer(player_input):
             return None
+        was = getattr(self, "_was_at", "")
+        moved = bool(was and was != str(getattr(scene, "at", "") or ""))
+        where = scene
+        if moved:
+            left = {str(e.get(k) or "") for o in outcomes or ()
+                    if getattr(o, "status", "") != "refused"
+                    for e in getattr(o, "effects", ()) or ()
+                    if isinstance(e, dict) and e.get("kind") == "biome"
+                    for k in ("place", "was_place")} | {was}
+            left -= {"", str(scene.at or "")}
+            where = SimpleNamespace(
+                actors={r: a for r, a in scene.people.items()
+                        if not a.is_pc and str(getattr(a, "at", "") or "") in left},
+                founded=getattr(scene, "founded", ()))
         who = None
         reading = getattr(self, "reading", None)
         if isinstance(reading, dict) and not reading.get("error"):
-            for a in reading.get("actions") or ():
-                if isinstance(a, dict) and a.get("act") == "talk" \
-                        and str(a.get("target") or "").strip():
-                    ref = scope_mod.in_the_room(scene, str(a["target"]))
-                    who = scene.actors.get(ref) if ref else None
+            actions = [a for a in reading.get("actions") or () if isinstance(a, dict)]
+            for k, a in enumerate(actions):
+                if a.get("act") == "talk" and str(a.get("target") or "").strip():
+                    if moved and not any(b.get("act") in interpret_mod._MOVING_ACTS
+                                         for b in actions[k + 1:]):
+                        return None     # asked where they arrived: not this door's
+                    ref = scope_mod.in_the_room(where, str(a["target"]))
+                    who = where.actors.get(ref) if ref else None
                     break
-        if who is None:
+        if who is None and not moved:
             talking = self.engine.talking_to()
             who = talking[0] if len(talking) == 1 else None
-        if who is None or who.is_pc or not scene.conscious(who.ref):
+        if who is None or who.is_pc or who.is_down \
+                or (not moved and not scene.conscious(who.ref)):
             return None
         if not attitude_mod.tells_their_name(who):
             return None
-        was = getattr(self, "_was_at", "")
-        if was and was != str(getattr(scene, "at", "") or ""):
-            return None
         return who
 
-    def _answer_the_question(self, text: str, who, player_input: str,
-                             brief: str) -> tuple[str, list[str], list[Attempt]]:
+    def _answer_the_question(self, text: str, who, player_input: str, brief: str,
+                             left_behind: bool = False
+                             ) -> tuple[str, list[str], list[Attempt]]:
         """`who` was asked something and the beat gave no answer: one small call for
         their spoken answer alone, put before the hand-back. Kept only if it is speech —
         a quotation — and does not hand the turn back itself; otherwise the beat is left
@@ -3869,7 +3992,9 @@ class GMAgent:
                 or len(answer) > prompts.ANSWER_MAX_CHARS + 40:
             return text, [f"unanswered: {who.name} — the answer did not hold "
                           f"({answer[:60]!r}); kept, Continue carries it"], [attempt]
-        answered = narration_mod.put_before_the_hand_back(text, answer)
+        # Asked before walking off (`_who_was_asked`): answered before the departure.
+        answered = (narration_mod.put_the_deeds_in(text, answer, before_move=True)
+                    if left_behind else narration_mod.put_before_the_hand_back(text, answer))
         if self._tells_refuse("answer", text, answered):
             return text, [f"unanswered: {who.name} — the answer broke one of the beat's "
                           f"tells ({answer[:60]!r}); kept, Continue carries it"], [attempt]
@@ -4341,6 +4466,14 @@ class GMAgent:
             def job(speaker: str, text: str, held: str = ""):
                 return beat_verify.invented_job_sentence(text, speaker, held=held, **route)
 
+        # And a reply read against what its speaker knows (`planned._knowledge_kept`;
+        # playtest 2026-11-16 #54/#58/#66/#96). Off with the read back.
+        known = None
+        if beat_verify.ENABLED and self.prose_model:
+            def known(speaker: str, text: str, facts):
+                return beat_verify.against_tells(text, facts, speaker=speaker or "they",
+                                                 **route)
+
         # The extra step (the owner, 2026-11-02): the written beat read sentence by sentence
         # against its own tells, a slot that breaks one asked again with the tell named
         # (`planned._tells_kept`, docs/narration-faithfulness.md). Off with the read back.
@@ -4357,11 +4490,15 @@ class GMAgent:
             # first (`planned._tells_kept`).
             faith.second = lambda sentence, tell: beat_verify.second_on_tell(
                 sentence, tell, who_pc, **route)
+            # And each act slot for whether it says what came of it (`planned._came_out`,
+            # playtest 2026-11-20 #7).
+            faith.came = lambda passage, result: beat_verify.outcome_told(
+                passage, result, who_pc, **route)
 
         try:
             beat = planned.write(
                 self.engine, brief=brief, outcomes=outcomes, player_input=player_input,
-                goal=goal, job=job, faith=faith,
+                goal=goal, job=job, faith=faith, known=known,
                 who=(self.prose_model, self.prose_host, self.prose_provider,
                      self.prose_key),
                 # The beat before, as the bench showed it: its last 900 characters.
@@ -4931,6 +5068,19 @@ class GMAgent:
         except Exception:  # noqa: BLE001 — a schema hint must never take the turn down
             return ()
 
+    def _speakers(self) -> tuple[str, ...]:
+        """The refs a `say` in the player's plan may have as its actor: the player, and
+        out of a fight a companion (`judgement.no_npc_lines` holds the same line)."""
+        from . import companions as companions_mod
+
+        scene = self.engine.scene
+        pc = scene.pc()
+        if pc is None:
+            return ()
+        along = () if scene.in_encounter else tuple(
+            r for r, a in scene.actors.items() if companions_mod.is_companion(a))
+        return (pc.ref, *along)
+
     @staticmethod
     def _merge_declared(raw, declared, actor: str = "") -> list:
         """The `declared` ops of the reply, added to its intents where missing.
@@ -5471,7 +5621,12 @@ def keep_act_slots(before: str, after: str, slots, *, rewrites=None
     sentence is `planned.slot_of`, the matching the tells check and "That's wrong" use."""
     from . import planned
 
-    acts = [s for s in slots or () if isinstance(s, dict) and s.get("tells")
+    # And the reply slot, whose words are the answer the player asked for: jack T208 and
+    # T211 (owner's save 2026-11-17), the innkeeper's reply was written and cut whole by
+    # two checks, and the player had to type "I wait for his reply". It has no tells; what
+    # it wrote goes back.
+    acts = [s for s in slots or () if isinstance(s, dict)
+            and (s.get("tells") or s.get("key") == "reply")
             and str(s.get("wrote") or "").strip()]
     if not acts or not after:
         return after, []
@@ -5490,7 +5645,7 @@ def keep_act_slots(before: str, after: str, slots, *, rewrites=None
         now = [(x, planned.slot_of(_was(x), acts)) for x in narration_mod._sentences(after)]
         if n not in was or any(o == n for _x, o in now):
             continue
-        line = planned.engine_line(s["tells"])
+        line = str(s["wrote"]).strip() if s.get("key") == "reply" and not s.get("tells")             else planned.engine_line(s["tells"])
         if not line or line in after:
             continue
         later = next((x for x, o in now if o is not None and o > n), None)

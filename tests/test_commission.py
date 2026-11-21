@@ -54,7 +54,7 @@ def _smith(e):
 
 
 def _blank(e, pc):
-    _make(e, "blacksmith", "a dagger", faces=(15, 1))     # forged, then a spoiled fit
+    _make(e, "blacksmith", "a dagger", faces=(None, 1))     # forged, then a spoiled fit
     assert [st.name for st in pc.stock.values()] == ["Iron Blank (Dagger)"]
 
 
@@ -404,7 +404,7 @@ def test_a_second_commission_holds_only_the_new_piece(world, monkeypatch, collec
         (key,) = [k for k, st in pc.stock.items() if st.name == "Iron Dagger"]
         assert inprogress.collect(pc, key, now=e.scene.clock_minutes,
                                   here=smithy.id)["ok"]
-    _make(e, "blacksmith", "a dagger", faces=(15, 1))
+    _make(e, "blacksmith", "a dagger", faces=(None, 1))
     # The record carries the forging track's level, and making the second blank raised it:
     # put back, the keeper's second dagger is the first one's exact twin, which stacks.
     pc.track("blacksmith").level = level

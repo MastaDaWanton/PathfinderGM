@@ -243,6 +243,9 @@ def test_e_a_crowd_sees_a_spell_wound_as_violence():
     outs = burn(e, man)
     if not any(x.get("kind") == "damage" for o in outs for x in o.effects):
         pytest.skip("saved to nothing on this seed")
+    # An onlooker who is not the man burned: the burned man, hostile now, is no crowd of
+    # his own fight (playtest 2026-11-20 #23, `judgement.witnesses`).
+    s.add(instantiate("guildhand", scene=s, name="a woodcutter"))
     s.heat = {}
     judgement.note_heat(s, outs, "")
     assert s.heat.get("kind") == "violence"

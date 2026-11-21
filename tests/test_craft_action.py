@@ -31,7 +31,8 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(craft_views, "_narrate_outcome", lambda *a, **k: "")
     with override_settings(CAMPAIGN_DIR=tmp_path / "campaigns"):
         cm._LIVE.clear()
-        c = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+        # Pinned: a drawn start can bring a caravan that stays (2026-11-17).
+        c = cm.begin_with(load_pc("fixtures/pc-kesst.json"), start_id="quiet-the-well-queue")
         for ref in [r for r in c.scene.actors if r != "pc"]:
             c.scene.depart(ref)
         stand_on(c.scene, "forest")

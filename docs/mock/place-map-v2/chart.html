@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Illustrated Chart</title>
+<link rel="stylesheet" href="shared/ui.css">
+<style>
+  /* The game's own chart paper (.v2-chart-paper), lit from the upper left. */
+  .paper { background: radial-gradient(110% 90% at 28% 18%, rgba(255, 243, 212, .22), transparent 62%),
+                       radial-gradient(140% 120% at 50% 45%, transparent 58%, rgba(96, 62, 24, .38) 100%),
+                       url("assets/chart-paper.jpg") 40% 40% / 720px auto #e2d2ae; }
+  svg.surface { cursor: url("assets/cursor-candle.png") 24 0, grab; touch-action: none; }
+  svg.surface:active { cursor: grabbing; }
+  .rain, svg.live { pointer-events: none; }
+  /* Each layer its own compositor layer: without it, a moving puff of smoke repainted the
+     filtered, blended sheet under it every frame (47 fps measured; see perf.mjs). */
+  .stage > .surface { will-change: transform; }
+  .lbl { font-family: var(--body); font-weight: 600; fill: #2a2019; paint-order: stroke; stroke: rgba(236, 224, 196, .92); stroke-linejoin: round; }
+  .lbl.seen { font-style: italic; font-weight: 400; fill: #4a3a2a; }
+  .lbl.here { font-weight: 700; fill: #142457; }
+  .lbl.days { font-style: italic; font-weight: 400; fill: #5a4630; }
+  .place, .roadout { cursor: inherit; outline: none; }
+  .place:focus-visible .hitpad, .roadout:focus-visible rect { stroke: #f0a040; stroke-width: 3; }
+  .place:hover path { stroke: #27406e; }
+  /* New ink: a place found on this walk is written in, not popped in. */
+  .place.fresh > g { animation: inkin 1.4s cubic-bezier(.2, .7, .2, 1) both; }
+  @keyframes inkin { from { opacity: 0; filter: blur(3px); } 60% { opacity: .9; } to { opacity: 1; } }
+</style>
+</head>
+<body>
+<noscript>This mock needs JavaScript.</noscript>
+<script src="shared/model.js"></script>
+<script src="shared/ui.js"></script>
+<script src="chart.js"></script>
+<script>MapUI.start(ChartRenderer, { styleName: "1 · Living illustrated chart" }).catch(err => {
+  document.body.textContent = "Could not load the map data: " + err.message + ". Serve this folder (python -m http.server 8980).";
+});</script>
+</body>
+</html>

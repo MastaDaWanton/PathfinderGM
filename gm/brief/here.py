@@ -17,6 +17,7 @@ SCAFFOLD = (
     "and not anywhere else;",
     "they are there now.",
     "THE PLACES HERE (the only ones that exist):",
+    "CROWD at",
     "To move between them use",
     "Anything else is refused, and so is a SECOND travel in the same plan — one "
     "journey a turn.",
@@ -56,6 +57,10 @@ def section(ctx) -> tuple[str, dict]:
     setting = where.setting if where is not None else "in"
     if setting == "road":
         lines = [f"\nHERE: {where.label}, {where.detail}; {location.name} is {scale}."]
+    elif setting == "aboard":
+        # Aboard her at the quay (playtest 2026-11-16 #100): the ship, then the town.
+        lines = [f"\nHERE: aboard {where.label}, {where.detail}; {location.name} is "
+                 f"{scale}."]
     elif setting in ("outside", "under"):
         lines = [f"\nHERE: {setting} {location.name}, {scale}."]
     else:
@@ -97,6 +102,9 @@ def section(ctx) -> tuple[str, dict]:
         if setting == "in":
             lines.append(f"  The party is at {here.name}. Not anywhere else in "
                          f"{location.name}; they are there now.")
+        elif setting == "aboard":
+            lines.append(f"  The party is at {here.name}, aboard {where.label}, and not "
+                         f"anywhere else; they are there now.")
         else:
             lines.append(f"  The party is at {here.name}, {setting if setting != 'road' else 'outside'} "
                          f"{location.name}, and not anywhere else; they are there now.")
@@ -146,4 +154,12 @@ def section(ctx) -> tuple[str, dict]:
             lines.append(f"  UNDERFOOT at {here.name} (what is physically here, and "
                          f"what the map is drawn from): {underfoot}.")
             facts["underfoot"] = underfoot
+    # The crowd, when the engine laid one (rules/crowds.py, owner 2026-11-18): said every
+    # beat it stands, so a busy market reads busy; with none, the crowd cut holds.
+    from rules import crowds as _crowds
+
+    if ctx.scene is not None and here_now is not None \
+            and _crowds.standing(ctx.scene, here_now.id) is not None:
+        lines.append(f"  CROWD at {here_now.name}: {_crowds.BRIEF}")
+        facts["crowd"] = True
     return "\n".join(lines), facts

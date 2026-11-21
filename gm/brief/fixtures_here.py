@@ -20,6 +20,8 @@ def section(ctx) -> tuple[str, dict]:
     grid = getattr(scene, "grid", None) if scene is not None else None
     if grid is None or here is None or not getattr(grid, "fixtures", None):
         return "", {}
+    if hasattr(scene, "sees_nothing") and scene.sees_nothing(scene.pc()):
+        return "", {}            # pitch dark: nothing on the map is seen (#57)
     from rules import fixtures
 
     said = fixtures.said(grid)

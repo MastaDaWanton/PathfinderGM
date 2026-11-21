@@ -1,0 +1,35 @@
+{
+  "name": "e-phone-terrain-zoom",
+  "title": "D, with terrain that reads as what it is, and zoom",
+  "skills": ["design-taste-frontend (redesign-preserve)", "mobile-native", "break-ui", "apple-design"],
+  "summary": "Everything in d-phone-worst-case, unchanged, plus the owner's two asks. Terrain: each category the engine sends (blocked, difficult, obscuring, raised, rail) is drawn as the kind of thing it is in both views, from the same payload, and nothing is called a wall, pillar or stall because the engine does not know which; a connected run of blocked squares is one mass and a lone one is one object, which is geometry the data already holds. Zoom: pinch, two-finger pan, one-finger or mouse drag once zoomed, ctrl+wheel and trackpad pinch at the pointer, buttons (+, minus, Fit, You) and keys (+ - 0, arrows) on a focused board; it keeps its centre as a square on the board, so a quarter-turn or Flat to 3D still looks at the same place. Scene C is the fixture city's great square, 24 by 24 from the world's own size, built through the engine like scene A.",
+  "changes": [
+    {"change": "Blocked squares are a lighter stone than any floor, with a lit rim toward the lamp, a dark rim away from it, a long cast shadow and one outline per connected run; the grid lines stop under them. In 3D a run is one block with no bevel per square and a lit rim only round its outside top edge.",
+     "reason": "In D a blocked square (#3a3128) and raised ground (#3d3527) were the same value, and each blocked square was its own bevelled brick, so a wall read as a row of crates and a crate as a dark floor tile. Solid, shadowed and continuous reads as something you cannot enter; the run-or-single shape comes from the data, not from a guess at what it is."},
+    {"change": "Difficult ground keeps its dark fill and gains a scatter of ochre grit (a pattern, rotated off the grid), in both views; no edge.",
+     "reason": "A flat dark square said 'something', and next to the fog it said 'can't see'. Grit says rough footing, and leaving it without an outline keeps it ground you cross rather than a thing in the way."},
+    {"change": "Obscuring is a haze in the night tone (--player) at .17 with a dotted edge round the whole cloud, under the tokens; in 3D a see-through volume one person high with walls only on the cloud's outside.",
+     "reason": "You see into it and not through it: a body inside still shows, the cloud reads as one thing, and the cool tone keeps it apart from the warm fog of 'out of sight', which is a different fact."},
+    {"change": "Raised ground casts a shadow down-light (longer the higher it is) as well as D's lit lip; in 3D every raised or blocked square throws a shadow along the floor computed from the room's own LIGHT vector, so it turns with the board as the lit walls do.",
+     "reason": "A lip says 'edge'; a shadow on the ground beside it says 'higher than this'. Deriving the 3D shadow from the same lamp keeps the shading and the shadow from ever disagreeing at any quarter-turn."},
+    {"change": "A rail is a cased brass bar along its run with a post at each square's ends, instead of one line.",
+     "reason": "One thin line read as a crack or a rule. Bar and posts is a balustrade: you shoot over it and do not walk through it, and it never fills the square, which would say wall."},
+    {"change": "The map's edge is a hairline where the floor stops, over the dark of the well; in 3D the board is a slab whose near sides drop away as a thin dark skirt below the floor.",
+     "reason": "A wall rises, is lit and casts a shadow; the edge of the world does none of these. Zoomed in, D's floor and the space past the edge were the same colour and the edge vanished."},
+    {"change": "The key lists the terrain present on this board, worded as the engine's docs word it: 'Blocked: walls, pillars, stalls'.",
+     "reason": "The board cannot say which blocked square is a wall, so the key says what the category covers instead."},
+    {"change": "Zoom by viewBox, starting at Fit, up to about 72 px a square; pan clamped to the board plus a 44 px margin.",
+     "reason": "A 24 by 24 board at Fit is 14 px a square at 880 by 600 and 13 px on a phone: tokens are specks and their letters unreadable. viewBox zoom stays vector, keeps every data-sq target the same element, and needs no hit-test correction."},
+    {"change": "Pinch zooms about its midpoint and pans in the same move; one finger or the mouse pans only after 8 px and only when zoomed; a pan or pinch is never also a tap; release glides at the finger's speed and any new input stops it.",
+     "reason": "A tap must still select (the slop and the click guard), and the board should follow the finger 1:1 and hand back its speed, as a phone's own maps do. At Fit one finger does nothing new, so taps behave exactly as in D."},
+    {"change": "ctrl+wheel and trackpad pinch zoom at the pointer; a plain wheel or two-finger scroll pans, and only while the board can move that way.",
+     "reason": "A plain wheel that zoomed would trap the page's scroll over the board. Pan-on-scroll and zoom-on-ctrl is what trackpad users already expect from map and canvas tools, and at Fit or at an edge the wheel is left to the page."},
+    {"change": "Buttons +, minus, Fit and You over the board's corner, and + - 0 and arrows when the board has focus; the only eased motion is these steps, 180 ms ease-out, and none under reduced motion.",
+     "reason": "Visible controls for those who do not pinch; You brings the PC into view at a readable size. A press is one event, so a short eased step keeps the eye on where the board went; the overlay never changes the board's size."}
+  ],
+  "files": {
+    "markup": "board.html",
+    "styles": ["board.css"],
+    "scripts": ["scene3d.js", "polish.js", "map.js", "zoom.js"]
+  }
+}

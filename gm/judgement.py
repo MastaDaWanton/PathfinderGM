@@ -1079,6 +1079,16 @@ def leave_before_leaving(raw_intents, player_text: str, scene, frame=None, *,
     # talk with Snik Dunmoor. Walking up to somebody, or across the room, is not walking
     # off. A `leave`, a `journey` and a `rest` are leavings by what they are.
     walks = bool(have & (_LEAVING_OPS[1] | {"journey"}))
+    # A walk that takes everybody in the conversation along walks off from nobody.
+    # Playtest 2026-11-17 #39: "I go to the broken pen, and the smuggler comes with me"
+    # (travel with c28) took her leave of him first, the tell said so, and the page
+    # wrote "leaving the starving smuggler behind" of the man walking beside her.
+    partners = {a.ref for a in actors.values()
+                if not a.is_pc and a.has_state(states_mod.TALKING)}
+    along = {str(x) for r in raw_intents if op(r) in _LEAVING_OPS[1]
+             for x in ((r.get("params") or {}).get("with") or ())}
+    if partners and partners <= along:
+        return [r for r in raw_intents if not a_leave(r)]
     # And the sleep the reading implies: a search for somewhere to sleep that the plan
     # carries out as a `rest` (owner report 2026-11-01, Corvin, turn 32: "go find a quiet
     # place to sleep out of the way" was read `search, stealth`, the plan's rest stood,
@@ -2856,8 +2866,26 @@ def inject_improvised(raw_intents, player_text: str, scene) -> list:
     attacks = [r for r in out if isinstance(r, dict) and str(r.get("op", "")).lower() == "attack"
                and (r.get("actor") or pc.ref) == pc.ref]
     if not attacks:
+        target = None
+        if thrown:
+            # The one the throw is AT, by the scene's own names standing in the words after
+            # "at" (`holding.named_among`: the closed vocabulary is who is here, never the
+            # phrase), asked first: "at the goat" is the goat, whoever else stands here.
+            # Naming somebody goes round the bystander rule, as `_can_be_fought`
+            # says. Owner bug list 2026-11-18, item 18: "I pick up a rock and throw it at
+            # the goat" planned the pick-up alone, the table said "Nice shot", and no
+            # attack was ever rolled — the move action (pick up) and the standard action
+            # (the throw, CRB Actions in Combat) are both the player's this turn.
+            from rules import holding
+
+            named = {a.name: r for r, a in scene.actors.items()
+                     if not a.is_pc and int(getattr(a, "hp", 1)) > 0
+                     and not a.has_state("state.down")}
+            hit = holding.named_among(named, text[m.end():])
+            target = named.get(hit) if hit else None
         engaged = engaged_refs(scene)
-        target = engaged[0] if len(engaged) == 1 else None
+        if target is None:
+            target = engaged[0] if len(engaged) == 1 else None
         if target is None:
             foes = [r for r, a in scene.actors.items() if not a.is_pc and _can_be_fought(a)]
             target = foes[0] if len(foes) == 1 else None
@@ -5205,6 +5233,43 @@ def keep_movement_in_the_scene(raw_intents, player_text: str, scene, known=(),
     return out
 
 
+def out_of_the_venture(raw_intents, scene, places, location=None, reading=None) -> list:
+    """Read as leaving a venture, the walk goes out of it: the travels that stay inside it
+    become the one walk to the place it opens off (`interpret.travel_choices`, the only
+    choice its enum offers).
+
+    Playtest 2026-11-20 #3, live on the fix: "I leave the ruins" was read `leave, place:
+    the ruins` and planned as travels to the gate and then the courtyard, both inside the
+    ruins; the enum that would have held it rides in a `contains`, which the sampler does
+    not enforce (memory: ollama-schema-enforcement). The reading is the engine's, and with
+    one way out there is nothing to guess, so the travel is rewritten, not asked again."""
+    from rules import places as places_mod
+
+    from . import interpret
+
+    if not isinstance(raw_intents, list) or not isinstance(reading, dict) \
+            or "error" in reading or scene is None:
+        return raw_intents
+    if interpret._going(reading, scene, places, location) != "venture":
+        return raw_intents
+    way = interpret.travel_choices(reading, scene, places, location)
+    by_id = {p.id: p for p in places or ()}
+    head = places_mod.venture_head(places, by_id.get(getattr(scene, "at", "")))
+    if len(way) != 1 or head is None:
+        return raw_intents
+    out, done = [], False
+    for r in raw_intents:
+        if isinstance(r, dict) and str(r.get("op", "")).lower() == "travel":
+            target = places_mod.find(places, str((r.get("params") or {}).get("place") or ""))
+            if target is None or places_mod.venture_head(places, target) == head:
+                if done:
+                    continue
+                r = {**r, "params": {**(r.get("params") or {}), "place": way[0]}}
+            done = True
+        out.append(r)
+    return out
+
+
 def refuse_leaving_in_place(raw_intents, player_text: str, scene, world=None,
                             reading=None, attached=()) -> list:
     """Told to leave, the model may not name the room the party is standing in.
@@ -6095,7 +6160,8 @@ def inject_wait(raw_intents, player_text: str, scene) -> list:
         present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
         pc = scene.pc()
         if pc is not None and not present & {"rest", "travel", "venture", "forage",
-                                             "prospect", "gather"}:
+                                             "prospect", "gather", "live_off_land",
+                                             "hunt"}:
             return [r for r in raw_intents if not (isinstance(r, dict) and str(
                 r.get("op", "")).lower() == "narrate_only")] + [{
                 "op": "advance_time", "actor": pc.ref,
@@ -6103,7 +6169,7 @@ def inject_wait(raw_intents, player_text: str, scene) -> list:
                 "because": "the player waited until a time they named"}]
     present = {str(r.get("op", "")).lower() for r in raw_intents if isinstance(r, dict)}
     if present & {"advance_time", "rest", "forage", "prospect", "gather", "travel",
-                  "venture"}:
+                  "venture", "live_off_land", "hunt"}:
         return raw_intents
     m = _WAITS.search(player_text)
     if not m:
@@ -6421,6 +6487,24 @@ def go_to_heard_place(raw_intents, player_text: str, scene, known=(), reading=No
     if landmark is not None:
         params["parent"] = landmark.name
     core = re.sub(r"^the\s+", "", rec["name"].lower())
+    kind = heard_places.venture_kind(rec, scene, landmark) if landmark is not None else ""
+    if kind:
+        # A rumoured way in is ground gone into off its landmark, by the venture door
+        # that seeded the rumour's own head (rules/dungeons.py `spread_rumours`): a
+        # `found` made "the old mine" a mine head building beside it, with no way down
+        # (playtest 2026-11-20 #2). The plan's own found and travel to it go.
+        out = [r for r in raw_intents if not (
+            isinstance(r, dict) and str(r.get("op", "")).lower() in ("found", "travel")
+            and core in str((r.get("params") or {}).get("name")
+                            or (r.get("params") or {}).get("place") or "").lower())]
+        if any(isinstance(r, dict) and str(r.get("op", "")).lower() == "venture"
+               for r in out):
+            return out
+        went = {"op": "venture", "params": {"kind": kind, "parent": landmark.id},
+                "because": f"the player went to {rec['name']}, which they had heard of"}
+        if pc is not None:
+            went["actor"] = pc.ref
+        return out + [went]
     out, travelled = [], False
     for r in raw_intents:
         if not isinstance(r, dict):
@@ -6819,6 +6903,100 @@ def _said_whole(entry: dict) -> dict:
     return dict(entry, params=params)
 
 
+def _quoted_if_quoted(entry: dict, player_text: str) -> dict:
+    """A say whose words are the player's quotation, word for word, marked `quoted`, so the
+    engine's tell quotes them (`says to X: "…"`) instead of reporting them ("to the effect
+    that …"). Playtest 2026-11-16 #60: the planner wrote the say itself, `inject_say` (which
+    marks a quotation) stood aside for it, the tell reported the quoted line, and the slot
+    retold it edited — "You said the beast ate your crew" came back "You mentioned the beast
+    ate your crew". Read off the quote marks (`speech.spans`), never the words' meaning."""
+    from . import speech
+
+    params = dict(entry.get("params") or {})
+    if params.get("quoted"):
+        return entry
+    text = str(player_text or "")
+    quoted = [" ".join(text[a + 1:b - 1].split()).strip(" ,") for a, b in speech.spans(text)
+              if text[a] == '"' or text[a] in "“”"]
+    words = " ".join(str(params.get("words") or "").split()).strip(" ,")
+    if words and quoted and (words in quoted or words == " ".join(quoted)):
+        params["quoted"] = True
+        return dict(entry, params=params)
+    # A piece of one quotation is that quotation, quoted whole. Playtest 2026-11-17 #3: the
+    # plan's say was "I need healing. What will it cost?" of the player's "Father, I need
+    # healing. What will it cost?" — the address dropped, so neither test above held, the
+    # tell reported it, and the page retold it as "asking what the cost will be".
+    whole = next((q for q in quoted if words and words in q), "")
+    if whole:
+        params.update(words=whole, quoted=True)
+        return dict(entry, params=params)
+    return entry
+
+
+def no_npc_lines(raw_intents, player_text: str, scene, *, notes: list | None = None) -> list:
+    """The player's plan speaks for the player, never for the people they talk to.
+
+    Playtest 2026-11-17b #14, #18, #22, #25, four times in one session (0.4.2):
+      * T454, a `say` by the guild clerk written before the player's Diplomacy roll ("The
+        guild doesn't haggle … the private listings of the merchant houses"): the haggle
+        settled before the dice, and a world fact invented;
+      * T463, the player's own "Are you for hire?" given to the man in the corner as his
+        line (`say actor=c42`), told as "The man in corner speaks, to the effect that…";
+      * T467, seven attempts refused "say: missing required param(s) words" (a say by the
+        man with nothing in it) and the turn handed to the fallback model;
+      * T471, the master of the games' previous answer written again as his say.
+    An NPC's answer is the reply slot's (`planned.known_to` grounds it), written after the
+    dice, as Inform's persuasion and report rules answer only once the action is decided
+    (Writing with Inform §12.4, §12.13). So a non-player say here is:
+      * the player's own, when its words are the player's (#18): said BY the player TO the
+        one the plan made the speaker;
+      * kept, for a companion out of a fight (`companions.on_their_own_turn` has already
+        taken them out of one), the plan acting for them as the brief's companion line asks;
+      * otherwise dropped, its words never reaching a tell.
+    Runs before `inject_say`, which stands aside for any say already in the list: #14's
+    clerk line was why the player's own demand never became a say. Structure only: the
+    actor is a ref, and "the player's words" is `own_words_only`'s own overlap measure."""
+    if not isinstance(raw_intents, list):
+        return raw_intents
+    from . import companions as companions_mod
+
+    actors = getattr(scene, "actors", {}) or {}
+    mine = _content_words(player_text)
+    out: list = []
+    for r in raw_intents:
+        actor = str((r or {}).get("actor") or "pc").lower() if isinstance(r, dict) else "pc"
+        if not (isinstance(r, dict) and str(r.get("op", "")).lower() == "say") \
+                or actor in ("pc", "none", "") \
+                or getattr(actors.get(actor), "is_pc", False):
+            out.append(r)
+            continue
+        params = dict(r.get("params") or {})
+        words = str(params.get("words") or "").strip()
+        theirs = _content_words(words)
+        speaker = actors.get(r.get("actor"))
+        if words and theirs and len(theirs & mine) / len(theirs) >= OWN_WORDS:
+            # The schema's ref enum (and `introduce`'s new1…) is all an actor can be, so
+            # the one the plan made speak is a real addressee or a placeholder the
+            # settle step binds.
+            params["to"] = r["actor"]
+            fixed = {k: v for k, v in r.items() if k != "actor"}
+            fixed.update(actor="pc", params=params, target=r["actor"])
+            out.append(fixed)
+            if notes is not None:
+                notes.append(f"the player's words in {r['actor']}'s mouth: said by the "
+                             f"player to {r['actor']} instead")
+            continue
+        if words and companions_mod.is_companion(speaker):
+            out.append(r)
+            continue
+        if notes is not None:
+            notes.append(f"a line for {r.get('actor')} in the plan: dropped "
+                         f"{words[:80]!r}; their answer is the narration's")
+    if not out and raw_intents:
+        out = [{"op": "narrate_only", "because": "the plan only spoke for somebody else"}]
+    return out
+
+
 def own_words_only(raw_intents, player_text: str, reading=None, *,
                    notes: list | None = None) -> list:
     """A `say` the player's character makes carries the player's words, or none.
@@ -6899,7 +7077,7 @@ def own_words_only(raw_intents, player_text: str, reading=None, *,
                                  f"whole {says[:80]!r}")
                 params["words"] = says
                 entry = dict(entry, params=params)
-            out.append(_said_whole(entry))
+            out.append(_said_whole(_quoted_if_quoted(entry, player_text)))
             continue
         # The redactor's guess only when the reader did not read the line. Playtest
         # 2026-11-15 #68: "I say nothing and stare at the wall" was read as a talk with
@@ -6909,12 +7087,36 @@ def own_words_only(raw_intents, player_text: str, reading=None, *,
         instead = says or ("" if wordless else spoken(player_text))
         if instead:
             params["words"] = instead
-            out.append(_said_whole(dict(entry, params=params, because="the player said it")))
+            out.append(_said_whole(_quoted_if_quoted(
+                dict(entry, params=params, because="the player said it"), player_text)))
             if notes is not None and words:
                 notes.append(f"a say in words the player never wrote: {words[:80]!r} "
                              f"-> the player's own {instead[:80]!r}")
         elif notes is not None:
             notes.append(f"a say in words the player never wrote: dropped {words[:80]!r}")
+    # One line said once. Playtest 2026-11-16 N5: on "Father, I'm badly hurt. Can you heal
+    # me? I can pay." the plan wrote two says, the whole line and "I can pay." (carried up
+    # to the reader's whole words, above), and the engine told it twice. A player's say
+    # whose words lie inside another's, to the same person, is that say.
+    def _mine(e) -> bool:
+        return (isinstance(e, dict) and str(e.get("op", "")).lower() == "say"
+                and str(e.get("actor") or "pc").lower() in ("pc", "none", ""))
+
+    def _flat(e) -> str:
+        return " ".join(str((e.get("params") or {}).get("words") or "").lower().split())
+
+    def _to(e) -> str:
+        return str((e.get("params") or {}).get("to") or e.get("target") or "")
+
+    said = [e for e in out if _mine(e)]
+    twice = [e for k, e in enumerate(said) if any(
+        _to(o) in ("", _to(e)) or _to(e) == ""
+        for j, o in enumerate(said) if j != k and _flat(e) and _flat(e) in _flat(o)
+        and (_flat(e) != _flat(o) or j < k))]
+    if twice:
+        if notes is not None:
+            notes.append(f"the same say twice: {len(twice)} dropped")
+        out = [e for e in out if not any(e is t for t in twice)]
     if not out and raw_intents:
         # Never an empty list for want of a line: the turn still says it had nothing.
         out = [{"op": "narrate_only", "because": "nothing the player said was theirs"}]
@@ -8473,22 +8675,13 @@ def clear_cast(scene) -> None:
 # and nothing else, so nothing carried "he just attacked somebody's goods" into the
 # next beat, and the model — which continues what is in front of it — wrote the crowd
 # as it had been: watching.
-_HEAT_PROPERTY = re.compile(
-    r"\b(?:strike|strikes|hit|hits|smash|smashes|kick|kicks|hack|hacks|break|breaks|"
-    r"shatter|shatters|implode|implodes|topple|topples|burn|burns|cut|cuts|slash|"
-    r"slashes|stab|stabs|overturn|overturns|knock|knocks|split|splits|destroy|destroys|"
-    r"swing|swings|swung|bring|brings|drive|drives|slam|slams|hurl|hurls)"
-    r"\b[^.!?]{0,40}?\b(?:crates?|box(?:es)?|barrels?|stalls?|carts?|wagons?|doors?|"
-    r"tables?|walls?|signs?|windows?|shutters?|posts?|beams?|ropes?|sacks?|goods|wares|"
-    r"awnings?|benches?|counters?|shelves|shelf|jars?|pots?)\b", re.I)
-_HEAT_BRANDISH = re.compile(
-    r"\b(?:draw|draws|unsheathe|unsheathes|brandish|brandishes|level|levels)\s+"
-    r"(?:my\s+|the\s+)?(?:sword|blade|longsword|axe|dagger|knife|weapon|spear|mace|"
-    r"hammer|bow|crossbow)\b"
-    r"|\bswing\w*\s+(?:my\s+|the\s+)?(?:sword|blade|longsword|axe|hammer|weapon|mace)\b",
-    re.I)
-_HEAT_SHOUT = re.compile(r"\b(?:shout|shouts|scream|screams|yell|yells|bellow|bellows|"
-                         r"roar|roars|howl|howls)\b", re.I)
+#
+# Read off the reader's closed reading since 2026-11-20, never the player's English: the
+# three regexes that were here (property, brandish, shout) read the words, against the
+# owner's ruling of 2026-10-03 (docs/structured-turn.md). The reader already says an
+# attack at something that is nobody, a door forced, a threat. A drawn blade and a shout
+# have no closed reading yet (a shout is read `talk`; there is no `draw` act), so they
+# make no heat until the reader carries them — a reader field to bench, not a regex.
 HEAT_TURNS = 8
 
 
@@ -8513,9 +8706,8 @@ def note_heat(scene, outcomes, player_text: str = "") -> None:
     if heat:
         heat["age"] = int(heat.get("age", 0)) + 1
         scene.heat = {} if heat["age"] > HEAT_TURNS else heat
-    watchers = bool(scene.cast) or any(
-        not a.is_pc and not a.is_down for a in scene.actors.values())
-    if not watchers:
+    seen_by = witnesses(scene)
+    if not seen_by:
         return
     killed, struck = [], []
     for o in outcomes or []:
@@ -8536,11 +8728,13 @@ def note_heat(scene, outcomes, player_text: str = "") -> None:
                 struck.append(a.name)
     if killed:
         scene.heat = {"note": f"the player just killed {', '.join(killed)} in "
-                              f"front of onlookers", "age": 0, "kind": "killing"}
+                              f"front of onlookers", "age": 0, "kind": "killing",
+                      "seen_by": seen_by}
         return
     if struck:
         scene.heat = {"note": f"the player just attacked {', '.join(sorted(set(struck)))} "
-                              f"in front of onlookers", "age": 0, "kind": "violence"}
+                              f"in front of onlookers", "age": 0, "kind": "violence",
+                      "seen_by": seen_by}
         return
     said = str(player_text or "")
     # A claim about what they are, made out loud, that the sheet holds false: the
@@ -8566,23 +8760,76 @@ def note_heat(scene, outcomes, player_text: str = "") -> None:
                               f"onlookers, that they {claim} — and nothing happened"
                               + ("; the claim half-took with some of them" if took
                                  else "; nobody believed a word of it"),
-                      "age": 0, "kind": "delusion"}
+                      "age": 0, "kind": "delusion", "seen_by": seen_by}
         return
-    m = _HEAT_PROPERTY.search(said)
-    if m:
-        scene.heat = {"note": f"the player just went at somebody's goods in the open "
-                              f"— {' '.join(m.group(0).split())} — in front of "
-                              f"onlookers", "age": 0, "kind": "property"}
-        return
-    m = _HEAT_BRANDISH.search(said)
-    if m:
-        scene.heat = {"note": f"the player just drew a weapon in the open — "
-                              f"{' '.join(m.group(0).split())} — in front of onlookers",
-                      "age": 0, "kind": "threat"}
-        return
-    if _HEAT_SHOUT.search(redact_speech(said)):
-        scene.heat = {"note": "the player just shouted in the open, in front of "
-                              "onlookers", "age": 0, "kind": "threat"}
+    kind = _reading_heat(scene, said)
+    if kind == "property":
+        scene.heat = {"note": "the player just went at somebody's goods in the open, in "
+                              "front of onlookers", "age": 0, "kind": "property",
+                      "seen_by": seen_by}
+    elif kind == "threat":
+        scene.heat = {"note": "the player just threatened somebody in the open, in front "
+                              "of onlookers", "age": 0, "kind": "threat",
+                      "seen_by": seen_by}
+
+
+def _reading_heat(scene, said: str) -> str:
+    """What the reader's closed reading of the player's words makes of them for the crowd:
+    "property" for an attack at something that is nobody here (a crate, a stall) or a door
+    forced, "threat" for a threat, else "". The reading is this turn's, a cache lookup."""
+    from . import interpret
+    from .acts_to_ops import person
+
+    reading = interpret.reading_of(said) if said else None
+    if not isinstance(reading, dict) or reading.get("error"):
+        return ""
+    for a in reading.get("actions") or ():
+        act = str(a.get("act") or "")
+        if act == "break_in" or (act == "attack" and a.get("target")
+                                 and not person(scene, a["target"])):
+            return "property"
+        if act == "threaten":
+            return "threat"
+    return ""
+
+
+def witnesses(scene) -> list[str]:
+    """Who here could have seen what the player just did, as refs: a person present, up
+    and not hidden, who is not the party's own and not a foe fighting the player.
+
+    Playtest 2026-11-20 #23: in the empty ruins every beat carried "WHAT THE CROWD JUST
+    SAW ... The people here react to it NOW — flinching, backing off, somebody going for
+    the watch" with only the ghoran being fought in PEOPLE HERE NOW: the foe counted as an
+    onlooker of its own fight, and a model told a crowd reacts writes one. A witness is
+    somebody who saw (Skyrim's crime: "Anyone that sees you commit a crime will become a
+    witness"); somebody fighting you is not the crowd, and their reaction is their own turn.
+    The prose's cast ledger no longer counts: it names nobody the engine can find."""
+    from rules import states as states_mod
+
+    came = set(getattr(scene, "came_along", ()) or ())
+    out = []
+    for ref, a in (getattr(scene, "actors", {}) or {}).items():
+        if getattr(a, "is_pc", False) or getattr(a, "is_down", False) or ref in came:
+            continue
+        has = getattr(a, "has_state", None)
+        if has is not None and (has("state.hidden")
+                                or states_mod.attitude_of(a) == "hostile"):
+            continue
+        out.append(ref)
+    return out
+
+
+def heat_seen(scene) -> dict:
+    """The heat, while somebody who saw it is still here to react, else {}: the line goes
+    with its witnesses (they walked off, or the player did, or they are down), as a
+    bounty in Skyrim goes with the last witness. A heat written before witnesses were
+    kept names nobody, and carries to nobody."""
+    t = getattr(scene, "heat", None) or {}
+    if not t.get("note"):
+        return {}
+    here = set(witnesses(scene))
+    seen = [r for r in t.get("seen_by") or () if r in here]
+    return dict(t, seen_by=seen) if seen else {}
 
 
 _HEAT_REACTS = {
@@ -8607,11 +8854,15 @@ _HEAT_REACTS = {
 
 
 def heat_brief(scene) -> str:
-    t = getattr(scene, "heat", None) or {}
-    if not t.get("note"):
+    t = heat_seen(scene)
+    if not t:
         return ""
     react = _HEAT_REACTS.get(str(t.get("kind") or "killing"), _HEAT_REACTS["killing"])
-    return f"WHAT THE CROWD JUST SAW (fact): {t['note']}. {react}"
+    actors = getattr(scene, "actors", {}) or {}
+    who = ", ".join(str(actors[r].name) for r in t["seen_by"])
+    # Who saw it, by name: the reaction is theirs and nobody else's (#23).
+    return (f"WHAT THE CROWD JUST SAW (fact): {t['note']}. Seen by: {who}, and nobody "
+            f"else. {react}")
 
 
 # --- Company: the person the player addresses must exist ------------------------------
@@ -8859,8 +9110,14 @@ def _a_place_word(phrase: str) -> bool:
     # And the places the engine makes itself, a city's middle and crossings and the
     # ventures and their spots: playtest 2026-11-16 #45, the clicked "I go to the great
     # square." logged a population miss for a person called "great square".
-    return any(words == k or words.endswith(" " + k)
-               for k in (*places_mod.KINDS, *places_mod.generated_names()))
+    # And a dungeon room's name, whole: playtest 2026-11-16 #56, the Map's "I go to the
+    # cells." logged a population miss for a person called "cells". Exact only, since
+    # rooms are called "the kennel" and "the mess", which end ways of naming a person.
+    from rules import dungeons
+
+    return words in dungeons.room_names() or any(
+        words == k or words.endswith(" " + k)
+        for k in (*places_mod.KINDS, *places_mod.generated_names()))
 
 
 def sought_indefinitely(player_text: str) -> bool:
@@ -8898,6 +9155,24 @@ def sought_indefinitely(player_text: str) -> bool:
                 or head in ("someone", "somebody", "anyone", "anybody", "whoever"))
 
 
+def addressed_in_speech(target: str, player_text: str) -> bool:
+    """Whether a reading's target is a noun of address inside the player's own quoted
+    words, and nowhere outside them: "Father" in '"Father, I'm badly hurt..."'. Grammar's
+    vocative (the Inform 7 Handbook's "noun of address", ch. 5, "Giving Orders to
+    Characters"): it names the one spoken to as the speaker chooses to call them, which is
+    not a person looked for. Playtest 2026-11-16 #69: "Father" said to the cathedral's
+    priest was looked up as a person, refused "No Father is here", and the beat said no
+    priest was there while she stood talking to him. Structure only (the one quotation
+    scanner, `speech.blanked`): the words' place on the page, never their meaning."""
+    from . import speech
+
+    want = " ".join(str(target or "").lower().split())
+    text = " ".join(str(player_text or "").split())
+    if not want or want not in text.lower():
+        return False
+    return want not in " ".join(speech.blanked(text).lower().split())
+
+
 def person_sought(player_text: str) -> str:
     """The person the player's own sentence goes looking for, or "".
 
@@ -8917,7 +9192,7 @@ def person_sought(player_text: str) -> str:
         # The reading is the answer when there is one, including "nobody new": live
         # 2026-09-27, "I buy a loaf from her and ask her name" read as talking to HER,
         # and falling back to the regex here brought back "her name" as a person.
-        if not target:
+        if not target or addressed_in_speech(target, player_text):
             return ""
         if target:
             # An indefinite description asks for any such person, and its clause is no
@@ -9083,6 +9358,29 @@ def provoked_one(raw_intents, player_text: str, scene) -> str:
     return ""
 
 
+def _names_a_creature_not_a_slur(player_text: str, scene) -> bool:
+    """Whether every insulting word the sentence holds is the name of a creature the
+    engine has in the scene — talk ABOUT the rat, not calling somebody one. Playtest
+    2026-11-17 #33: "The rat's dealt with … Come with me and you'll have your cargo back"
+    provoked the starving smuggler on "rat", the dire rat she had just fought. The
+    creatures' names are the engine's closed vocabulary; a name-call ("you rat") or a
+    provoking verb still provokes."""
+    text = str(player_text or "")
+    if _CALLS_A_NAME.search(text) or _PROVOKES.search(text) or _SLIGHTS.search(text):
+        return False
+    found = list(_INSULTING.finditer(text))
+    # "you rat", "you filthy rat": said to somebody's face, a name-call.
+    if not found or any(re.search(r"\byou(?:\s+\w+){0,2}\s*$", text[:m.start()], re.I)
+                        for m in found):
+        return False
+    said = [m.group(0).lower() for m in found]
+    names = set()
+    for a in (getattr(scene, "people", {}) or {}).values():
+        if not getattr(a, "is_pc", False):
+            names.update(re.findall(r"[a-z]+", str(getattr(a, "name", "") or "").lower()))
+    return all(w in names for w in said)
+
+
 def inject_provoke(raw_intents, player_text: str, scene) -> list:
     """The player's words insult or slight somebody here: the plan provokes them, first
     in the list — before the `say` that carries the words, so that exchange earns no
@@ -9094,7 +9392,7 @@ def inject_provoke(raw_intents, player_text: str, scene) -> list:
            for r in raw_intents):
         return raw_intents
     how = provocation_in(player_text)
-    if not how:
+    if not how or _names_a_creature_not_a_slur(player_text, scene):
         return raw_intents
     ref = provoked_one(raw_intents, player_text, scene)
     if not ref:
@@ -9456,10 +9754,15 @@ def answer_the_absent(raw_intents, player_text: str, scene, world=None):
     from rules import scope as scope_mod
 
     found = _sought(scene, world, player_text)
-    if found.get("scope") not in (scope_mod.ELSEWHERE, scope_mod.NOWHERE,
-                                  scope_mod.AMBIGUOUS):
+    # Somebody sought to buy the party's own cargo is the market's question, and the
+    # trade code holds the answer (`buyers_for_cargo`): playtest 2026-11-17 #5, "find a
+    # cloth merchant who'll buy a hold full of Khy'vyr silk" was a population miss on the
+    # whole phrase and nothing was said.
+    said = "" if found.get("scope") == scope_mod.HERE else         buyers_for_cargo(scene, world, player_text)
+    if not said and found.get("scope") not in (scope_mod.ELSEWHERE, scope_mod.NOWHERE,
+                                               scope_mod.AMBIGUOUS):
         return raw_intents
-    said = str(found.get("line") or "")
+    said = said or str(found.get("line") or "")
     if not said:
         return raw_intents
     out = [dict(r) if isinstance(r, dict) else r for r in raw_intents]
@@ -9470,6 +9773,42 @@ def answer_the_absent(raw_intents, player_text: str, scene, world=None):
     return out + [{"op": "narrate_only",
                    "because": "the player looked for somebody who is not here",
                    "params": {"not_here": said}}]
+
+
+def buyers_for_cargo(scene, world, player_text: str) -> str:
+    """Who in this town buys the cargo a seek's buyer is wanted for, in the trade code's
+    own words, or "". The cargo is a closed vocabulary — the party's own lots, by their
+    row's name — matched whole-word against the reading's seek target; no other English
+    is read. The buyers are the market's merchants, who take bulk goods at the market's
+    standing (`Engine._sell_cargo`), or nobody when the market is full of it."""
+    from rules import trade as trade_mod
+
+    from . import interpret as _interpret
+
+    reading = _interpret.reading_of(player_text)
+    if not reading or reading.get("error") or scene is None:
+        return ""
+    said = set(trade_mod.words_of(_interpret.target_of(reading, acts=("seek",))))
+    if not said:
+        return ""
+    keys = sorted({str(x.get("key") or "") for x in trade_mod.lots(scene)
+                   if x.get("stowed") != "taken"} & set(trade_mod.ROWS))
+    key = next((k for k in keys if set(trade_mod.words_of(trade_mod.ROWS[k][0])) <= said),
+               "")
+    if not key:
+        return ""
+    place = str(getattr(scene, "location_id", "") or "")
+    town = str(getattr(world.get(place), "name", "") or "this town") if world else "this town"
+    name, unit = trade_mod.ROWS[key][0], trade_mod.ROWS[key][2]
+    room = trade_mod.can_sell(scene, world, place, key)
+    if room <= 0:
+        return (f"Nobody in {town} will take more {name}: the market is full of it, and it "
+                f"clears over {trade_mod.RECOVER_DAYS} days.")
+    how = {"demand": ", and pay dear for it: it is wanted here",
+           "supply": ", though it is made here and goes cheap"}.get(
+        trade_mod.standing(world, place, key), "")
+    return (f"The merchants of {town}'s market buy {name}{how}. They will take up to "
+            f"{room} {unit} of it.")
 
 
 _ASKS_A_NAME = re.compile(r"\b(?:your|his|her|their|the)\s+name\b|\bwho are you\b|"
@@ -9568,18 +9907,21 @@ def name_the_nameless(scene, world) -> list[str]:
             a.true_name = a.name
             if not a.appearance:
                 a.appearance = (names_mod.resident_appearance(world, a.world_entity_id)
-                                or names_mod.face_of(world, scene.location_id, a, ref=ref))
+                                or names_mod.face_of(world, scene.location_id, a, ref=ref,
+                                                     scene=scene))
             continue
         if not descriptor:
             a.true_name = a.name
             if not a.appearance:
-                a.appearance = names_mod.face_of(world, scene.location_id, a, ref=ref)
+                a.appearance = names_mod.face_of(world, scene.location_id, a, ref=ref,
+                                                   scene=scene)
             continue
         taken = [x.true_name for x in scene.actors.values() if getattr(x, "true_name", "")]
         taken += [x.name for x in scene.actors.values()]
         a.true_name = names_mod.true_name(world, scene.location_id, ref, taken)
         if not a.appearance:
-            a.appearance = names_mod.face_of(world, scene.location_id, a, ref=ref)
+            a.appearance = names_mod.face_of(world, scene.location_id, a, ref=ref,
+                                             scene=scene)
         done.append(ref)
     return done
 
@@ -9607,7 +9949,7 @@ def settle_descriptions(scene, beat: str, player_text: str = "",
     were first described (`gm/brief/faces.py`, item 16.7).
     """
     from .checks._people import name_words
-    from .narration import describing_sentences, faceless
+    from .narration import _describes, describing_sentences, faceless
 
     if scene is None or not beat:
         return []
@@ -9617,6 +9959,13 @@ def settle_descriptions(scene, beat: str, player_text: str = "",
     addressed = _name_words(redact_speech(player_text or ""))
     owed: list[str] = []
     for ref, a in (getattr(scene, "actors", {}) or {}).items():
+        kept = getattr(a, "described_as", None) or []
+        if (not a.is_pc and getattr(a, "described", False) and kept
+                and not any(_describes(str(s)) for s in kept)):
+            # Marked described by a sentence that described nobody (a save from before
+            # 2026-11-20: "You square your shoulders and face the clockwork spy",
+            # shadow-0105): owed a real face again.
+            a.described, a.described_as = False, []
         if a.is_pc or getattr(a, "described", False):
             continue
         name = str(a.name or "")
@@ -10954,6 +11303,19 @@ def purchase_sought(player_text: str) -> str:
     return what
 
 
+def sale_offered(player_text: str) -> str:
+    """What the player offers for sale, in their words, when the reading has a `sell` only
+    tried — an offer, which the counter's screen settles — or "". The reading only: with
+    none, nothing is guessed (playtest 2026-11-17 #8)."""
+    from . import interpret as _interpret
+
+    reading = _interpret.reading_of(str(player_text or ""))
+    for a in (reading or {}).get("actions") or []:
+        if a.get("act") == "sell" and a.get("commit") == "tried" and a.get("object"):
+            return str(a["object"])
+    return ""
+
+
 def strip_counter_buys(raw_intents, player_text: str, scene=None) -> list:
     """A purchase the player declared is made on the counter's screen, not in the plan:
     a `buy` the model wrote for it would settle the sale before the player saw the price
@@ -10973,7 +11335,14 @@ def strip_counter_buys(raw_intents, player_text: str, scene=None) -> list:
         # the plan wrote `give item="gp"` beside the purchase.
         coin = item in ("gp", "sp", "cp", "pp", "gold", "silver", "copper", "coin",
                         "coins") or item.endswith((" gp", " sp", " cp", " coins"))
-        return op == "buy" or (op == "give" and (to in ("pc", "you", "player") or coin))
+        # And coin "used" for it: playtest 2026-11-16 N2, beside a temple purchase the plan
+        # wrote `use_item gold piece`, refused into "she has no gold" with 12 gp in hand.
+        from rules import goods, holding
+
+        coin = coin or holding.is_money(item) or bool(goods.coin_named(item))
+        return op == "buy" or (op in ("give", "use_item")
+                               and (to in ("pc", "you", "player") or coin)
+                               and (op == "give" or coin))
     return [r for r in raw_intents if not settles_it(r)]
 
 

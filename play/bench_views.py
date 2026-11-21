@@ -28,7 +28,7 @@ import secrets
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 
-from rules import crafting, herbknowledge, knowledge, worldclass
+from rules import crafting, herbknowledge, inprogress, knowledge, worldclass
 
 from . import bench_clock
 from . import campaign as campaign_mod
@@ -273,7 +273,7 @@ def _plan_from(c, pc, body) -> tuple[object, list, JsonResponse | None]:
     batch = read_int(body, "batch", 1, lo=1, hi=MAX_BATCH)
     track, progress = _progress(pc)
     plan = crafting.plan_step(pc, progress, method, picks, batch,
-                              perks=perk_multipliers(progress))
+                              perks=perk_multipliers(progress), waits=True)
     return plan, items, None
 
 
@@ -394,11 +394,18 @@ def bench_roll(request):
     # A skill check: no natural 20 or natural 1 (CRB p.180; `crafting.check_odds`).
     success = margin >= 0
     track, progress = _progress(pc)
+    # Beating the DC by 5 or more (ruling 2026-11-18): less time now and in the wait, more
+    # doses and a quality floor at the finish (`crafting.margin_bonus`).
+    bonus = crafting.margin_bonus(margin, face) if success else None
+    plan.minutes = crafting.bonus_minutes(plan.minutes, bonus)
+    if plan.ready_minutes:
+        plan.ready_minutes = crafting.bonus_minutes(plan.ready_minutes, bonus)
 
     lived = bench_clock.pass_time(c, engine, pc, plan.minutes,
                                   f"at the herb bench on the {plan.name}")
     roll = {"face": face, "bonus": plan.bonus, "total": total, "dc": plan.dc,
-            "success": success, "margin": margin, "terms": plan.terms}
+            "success": success, "margin": margin, "terms": plan.terms,
+            "margin_bonus": bonus}
     out = {"roll": roll,
            "verdict": {"verdict": "success" if success else "failure", "natural": face,
                        "word": "Success" if success else "Failure"},
@@ -409,7 +416,8 @@ def bench_roll(request):
         _PENDING[c.id] = {"token": token, "plan": plan, "roll": roll,
                           "recipe": _recipe_ref(body)}
         out["token"] = token
-        out["tuning"] = crafting.tuning_for(plan)
+        out["tuning"] = dict(crafting.tuning_for(plan),
+                             **crafting.ladder(plan.ceiling, bonus))
         # No transcript line yet: the step is written once, when it lands (finish).
         # Measured live: a line on the roll and another on the finish put two lines in
         # the table's log for every step, where the old bench wrote one per batch.
@@ -467,7 +475,8 @@ def bench_finish(request):
                         f"made.", 409)
 
     ceiling = worldclass.ceiling_index(progress)
-    tier, score = crafting.tier_from_score(body.get("score"), ceiling)
+    bonus = pend["roll"].get("margin_bonus")
+    tier, score = crafting.tier_from_score(body.get("score"), ceiling, bonus)
     now = int(c.scene.clock_minutes or 0)
     engine = c.engine()
     _PENDING.pop(c.id, None)
@@ -476,7 +485,7 @@ def bench_finish(request):
     # discoveries.
     settled = crafting.settle_made(pc, progress, plan, tier,
                                    [(fresh[m.key], n) for m, n in plan.consumes],
-                                   dice=engine.dice, now=now)
+                                   dice=engine.dice, now=now, margin_bonus=bonus)
     made, count = settled["made"], settled["count"]
     lines, levelled = settled["lines"], settled["levelled"]
     discoveries = settled["discoveries"]
@@ -495,11 +504,16 @@ def bench_finish(request):
     r = pend["roll"]
     c.transcript.append({"who": "gm", "kind": "consequence", "text": (
         f"{pc.name} makes {count} {made.name}, {tier_name} "
-        f"(d20 {r['face']}{r['bonus']:+d} = {r['total']} vs DC {r['dc']}).")})
+        f"(d20 {r['face']}{r['bonus']:+d} = {r['total']} vs DC {r['dc']}).") + (" " + str((r.get("margin_bonus") or {}).get("words") or "")).rstrip()})
     c.save()
 
     item_key = f"stock:{made.id}"
     item = next((m.as_item(pc, now) for m in _satchel(c, pc) if m.key == item_key), None)
+    # A step of an hour or more waits In progress (ruling 2026-11-18): the page says so
+    # in place of "Next", which would reach for a thing not on the shelf yet.
+    waiting = inprogress.held_back(made, now)
+    if waiting:
+        nxt = None
     return JsonResponse({
         "tier": tier, "tier_name": tier_name, "score": score, "ceiling": ceiling,
         "stopped": bool(body.get("stopped")),
@@ -508,6 +522,7 @@ def bench_finish(request):
                     "levelled": levelled},
         "discoveries": discoveries,
         "next": nxt, "recipe": ref,
+        "waiting": f"The {made.name} is {waiting}." if waiting else "",
         "state": _state_body(c, pc),
     })
 

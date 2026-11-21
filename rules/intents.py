@@ -306,8 +306,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # `demand` (2026-11-15): what a threat demands (`morale.DEMANDS`), the reader's closed
     # answer about the player's words (`acts_to_ops._threaten`); read by Intimidate's two
     # uses, Influence Attitude and Demoralize (`Engine._cowed`, `Engine._demoralize`).
+    # `wants` (2026-11-20): what a favour asks for, in the player's own words (the reader's
+    # `object`, `acts_to_ops._request`), said in the request's tell (`Engine._make_request`).
     "check": (("skill",), ("dc", "opposed_by", "circumstance", "aid", "request", "search",
-                           "pace", "diversion", "past", "demand", "take"),
+                           "pace", "diversion", "past", "demand", "take", "wants",
+                           "sought", "seeking"),
               "player"),
     "save": (("save", "dc"), ("on_success", "on_failure", "breaks"), "player"),
     # `player`, because the PC rolls their own to-hit and their own damage. Defaulting
@@ -428,6 +431,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # for who they pass for. Written only by the act->op table from the reader's
     # `disguise` act, and by the engine for a plan's Disguise check (CODE_ONLY_OPS).
     "disguise": ((), ("actor", "as"), "hidden"),
+    # An arena's house stages a knockout bout for the player (rules/arena.py): the
+    # opponent, the purse and the fight are all the engine's. Written only by the act->op
+    # table from the reader's `challenge` act (CODE_ONLY_OPS).
+    "bout": ((), ("actor",), "player"),
     # Giving oneself up to the law (rules/trial.py `give_up`): yielding mid-fight, handing
     # oneself in, owning up to a crime. Aimed by `target` at the one yielded to; the law
     # present is the engine's. Written only by the act->op table (CODE_ONLY_OPS).
@@ -564,12 +571,23 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Ore, not herbs: the same expedition against the blacksmith's stock list, in
     # ground that carries it — mountain, hills, underground, a bog for bog iron.
     "prospect": ((), ("actor", "hours"), "player"),
+    # Survival's "get along in the wild" (CRB p.107): a day's food and water for the one
+    # looking and one more per 2 points over DC 10. Hunting: an animal of this ground,
+    # found first. Both written only by the act->op table from the reader's `fend` act
+    # (CODE_ONLY_OPS); the ground, the hours and the DC are the engine's.
+    "live_off_land": ((), ("actor",), "player"),
+    "hunt": ((), ("actor",), "player"),
     # Looking for tracks: 1e's Survival to find tracks against the ground's DC, and what
     # the engine knows crossed it (rules/tracking.py). The ground and the trails are the
     # scene's, never the plan's. `quarry` (the player's words for what they are after) and
     # `follow` (walk where the trail leads) are written by the act→op table from the
     # reading (`acts_to_ops`); the plan's own track is replaced by the table's.
     "track": ((), ("actor", "quarry", "follow"), "player"),
+    # Hex travel on the region map (rules/hexes.py, 2026-11-19): written only by the
+    # board's click (CODE_ONLY_OPS). `hex` is the hex's [q, r]; reach, hours and the look
+    # round are the engine's. `hex_enter` goes into the site of the hex the party is in.
+    "hex_move": (("hex",), ("actor",), "player"),
+    "hex_enter": ((), ("actor",), "player"),
     # Any craft's excursion onto open ground, by the craft panel's key ("alchemist:quarry",
     # "leatherworker:gather", content/rules/gathering.json): the one gathering door
     # forage and prospect also run through (`Engine._gather`). The same hours, the same
@@ -689,7 +707,9 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # prose will use (`who`). The same plan targets them as new1, new2, new3 in the
     # order introduced (`INTRODUCED_REFS`); the engine swaps in the real refs.
     # `already_here` binds to somebody the scene already holds before making anybody.
-    "introduce": (("who",), ("count", "how", "template", "zone"), "hidden"),
+    # `trade`: the work the player's words went looking for ("a sellsword"), when the
+    # newcomer is who answers it (`acts_to_ops.trade_sought`): their life is rolled to it.
+    "introduce": (("who",), ("count", "how", "template", "zone", "trade"), "hidden"),
     # The player provokes the person in `target`: an insult or a slight. Their regard
     # falls and a roll on their temper decides whether they come to blows
     # (rules/provocation.py). Nobody rolls to land an insult; the roll is the response.
@@ -748,7 +768,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # (content/rules/gear.json's `eat` rows; the Equipment tab's Eat, 2026-10-01). With no
     # item the meal is the scene's, as it always was: a tavern's supper is not carried.
     "eat": ((), ("actor", "item"), "hidden"),
-    "drink": ((), ("actor",), "hidden"),
+    # `item`: which of the pack's `drink` rows (a waterskin, a mug of ale), else a
+    # waterskin first, else the well. `fill`: fill the pack's empty skins from the water
+    # here instead of drinking (the Equipment tab's Fill; owner bug list 2026-11-18).
+    "drink": ((), ("actor", "item", "fill"), "hidden"),
     # A nibble of a raw herb, to learn what it does (docs/herbalism-revamp-plan.md §8.2):
     # the dose is spent, the herb's own effects land for real, and one benefit and one
     # drawback are learned. `item` is the herb's id or name; every number is the herb's.
@@ -758,7 +781,9 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # item 29). It travels on `narrate_only` because there is no ref to hang it on — that
     # is the whole point — and `_op_narrate_only` tells it, so the narrator dresses a fact
     # instead of conjuring somebody to satisfy the sentence.
-    "narrate_only": ((), ("not_here",), "hidden"),
+    # `looks_in`: a container the player opens or looks into, whose contents the engine
+    # tells (`Engine._op_narrate_only`, playtest 2026-11-17 #41). Code-only as well.
+    "narrate_only": ((), ("not_here", "looks_in"), "hidden"),
     # Experience awarded outright: the GM's story award for a matter the fights do not
     # pay, and the author's own hand through `/cheat I gain 2000 experience` — which
     # did nothing twice on 2026-09-18 because no op carried experience at all
@@ -807,8 +832,8 @@ PARAM_ALIASES = {
 # `undecided` is `judgement.check_the_target` handing an ambiguous attack back as a
 # printed question; `not_here` is the world's answer for a person the player looked for
 # who is not here, which the engine prints instead of anybody being created (item 29).
-CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending", "request", "job",
-                              "demand",
+CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "looks_in", "defending", "request", "job",
+                              "demand", "wants",
                               "ends_when", "pace", "diversion", "past", "together",
                               # A held player's save (`Engine.held_save_turn`) names the
                               # hold it ends; honoured only with an engine origin.
@@ -824,8 +849,10 @@ CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "defending", "request", "
 # `craft` act, built whole into `make`; the chain bench (play/craft_views.py) still writes
 # `craft` itself, from code.
 # `harvest` since 2026-11-01: the reader's `harvest` act, built whole (`acts_to_ops._harvest`).
+# `bout` since 2026-11-18: the reader's `challenge` act at an arena (`acts_to_ops._challenge`).
 CODE_ONLY_OPS = frozenset({"job", "make", "craft", "greet", "commission", "harvest",
-                           "disguise", "surrender"})
+                           "disguise", "surrender", "bout", "live_off_land", "hunt",
+                           "hex_move", "hex_enter"})
 # Ops only the author's own hand writes (`/cheat`, origin `author:`): left out of the
 # turn's op enum like the code-only ops, but offered to the cheat (`prompts.CHEAT_OPS`),
 # and refused by the engine from any other origin. `xp` since 2026-11-07 (audit #22): a
@@ -1397,6 +1424,11 @@ def _check_params(intent: Intent, index: int) -> None:
                 p.get("take") not in (None, "") and not search):
             raise IntentError("check: take is 10 or 20, and only on a search.",
                               "schema", index)
+        # What a search is for (playtest 2026-11-20 #19): the player's own words for it
+        # and the reader's closed kind (`interpret.SEEKING`), answered by the engine.
+        if (p.get("sought") or p.get("seeking")) and not search:
+            raise IntentError("check: sought and seeking are only on a search.",
+                              "schema", index)
         if p.get("pace") not in (None, "", "half", "full") or (
                 p.get("pace") and p.get("skill") != "stealth"):
             raise IntentError('check: pace is "half" or "full", and only on a stealth '
@@ -1838,6 +1870,15 @@ def _check_params(intent: Intent, index: int) -> None:
                     f"introduce: no creature {p['template']!r}." + bestiary.suggestion(raw_t),
                     "schema", index)
             p["template"] = raw_t
+        if p.get("trade"):
+            # A trade word the occupation table knows, or none: read, never refused.
+            from . import lives
+
+            trade = " ".join(str(p["trade"]).split()).lower()[:40]
+            if lives.occupation_for(trade) is None:
+                p.pop("trade", None)
+            else:
+                p["trade"] = trade
 
     elif op in ("judge", "mend"):
         p["item"] = " ".join(str(p.get("item") or "").split())[:80]
@@ -2088,7 +2129,13 @@ _OUTCOME_PATTERNS: list[tuple[str, str]] = [
     # about a blow that never rolled. Anything described as being *from the blow* asserts
     # the blow happened.
     (r"\bfrom the blow\b", "states an attack having landed"),
-    (r"\b(?:misses|missed|goes wide|glances off|skitters past|flashes past|sails wide)\b",
+    (r"\b(?:misses|missed|goes wide|glances off|sails wide)\b", "states an attack missing"),
+    # "skitters past" and "flashes past" are a miss only with a weapon going by. Playtest
+    # 2026-11-16 #61: the night's one event, "a lone Mite skitters past your head in the
+    # dark" (the engine's "a Mite comes near the camp, and goes on by"), was cut as an
+    # attack missing, and the page lost it.
+    (r"\b(?:blow|blade|arrow|bolt|dart|stone|shot|strike|swing|dagger|rapier|sword|knife|"
+     r"axe|spear|club|mace|fist|claw|bite|steel)\b[^.!?]{0,30}?\b(?:skitters|flashes) past\b",
      "states an attack missing"),
     (r"\byou (?:dodge|duck|roll) (?:clear|aside|away)\b", "states a save succeeding"),
     (r"\bthe (?:save|check|roll) (?:succeeds|fails)\b", "states a roll's result"),
@@ -2341,6 +2388,13 @@ def claims_the_engine_backs(outcomes) -> frozenset[str]:
         # when an op actually took them through one.
         if op in ("travel", "move"):
             allow("moved")
+        # A walk the engine stopped short (`stopped_short`: the watch at the gate, a
+        # meeting on the way) failed to get there, and "you fail to reach the docks" is
+        # the report. Playtest 2026-11-16 #74: that sentence was cut as an invented
+        # verdict, its repair wrote "as you approach the docks", and the page never said
+        # she was stopped at the east crossing.
+        if any(isinstance(e, dict) and e.get("stopped_short") for e in effects):
+            allow("verdict")
         # The sums this turn's tells state, as tokens: a sum the engine said may be said
         # again (`sums_told`, below).
         backed.update(f"sum:{s}" for s in sums_told([o]))
@@ -2429,14 +2483,46 @@ def find_outcome_claims(narration: str, backed=(), restrained: bool = True) -> l
     return claims
 
 
+# Quote marks at a sentence's head belong to the speech either side of the break, never to
+# the sentence cut: playtest 2026-11-17b #9, a price cut from the start of the barkeep's
+# reply took the close of the player's question and the open of the reply with it, and the
+# page read "…What do I owe you? I can get you a seat…,' the one behind the bar says".
+_EDGE_QUOTES = "\"'“”‘’"
+
+
+def _sentence_span(text: str, index: int) -> tuple[int, int]:
+    """The (start, end) of the sentence around `index`, the spaces and quote marks at its
+    head left outside it."""
+    start = max((text.rfind(c, 0, index) for c in ".!?\n"), default=-1) + 1
+    while start < index and (text[start].isspace() or text[start] in _EDGE_QUOTES):
+        start += 1
+    ends = [e for e in (text.find(c, index) for c in ".!?\n") if e != -1]
+    return start, (min(ends) + 1 if ends else len(text))
+
+
 def _sentence_around(text: str, index: int) -> str:
-    start = max(
-        (text.rfind(c, 0, index) for c in ".!?\n"), default=-1
-    )
-    end_candidates = [text.find(c, index) for c in ".!?\n"]
-    end_candidates = [e for e in end_candidates if e != -1]
-    end = min(end_candidates) + 1 if end_candidates else len(text)
-    return text[start + 1:end].strip()
+    start, end = _sentence_span(text, index)
+    return text[start:end].strip()
+
+
+def cut_span(text: str, start: int, end: int) -> str:
+    """`text` without text[start:end]; a quotation it opened stays opened on the words
+    after it ("…' I can get you" would read as a closing mark)."""
+    head, tail = text[:start], text[end:]
+    if head and head[-1] in _EDGE_QUOTES and (len(head) == 1 or head[-2].isspace()):
+        tail = tail.lstrip()
+    elif tail[:1] and not tail[:1].isspace() and head and not head[-1].isspace():
+        tail = " " + tail
+    return head + tail
+
+
+def cut_sentence(text: str, sentence: str) -> str:
+    """`text` without every copy of `sentence` (`cut_span`), as `str.replace` cut it."""
+    at = text.find(sentence) if sentence else -1
+    while at >= 0:
+        text = cut_span(text, at, at + len(sentence))
+        at = text.find(sentence, at)
+    return text
 
 
 def cut_outcome_claims(text: str, restrained: bool = True,
@@ -2459,10 +2545,7 @@ def cut_outcome_claims(text: str, restrained: bool = True,
 
     spans: list[tuple[int, int]] = []
     for c in claims:
-        start = max((text.rfind(ch, 0, c.start) for ch in ".!?\n"), default=-1) + 1
-        ends = [e for e in (text.find(ch, c.start) for ch in ".!?\n") if e != -1]
-        end = min(ends) + 1 if ends else len(text)
-        spans.append((start, end))
+        spans.append(_sentence_span(text, c.start))
 
     spans.sort()
     merged: list[list[int]] = []
@@ -2475,5 +2558,5 @@ def cut_outcome_claims(text: str, restrained: bool = True,
     cut = [text[s:e].strip() for s, e in merged]
     out = text
     for s, e in reversed(merged):
-        out = out[:s] + " " + out[e:]
+        out = cut_span(out, s, e)
     return " ".join(out.split()), cut

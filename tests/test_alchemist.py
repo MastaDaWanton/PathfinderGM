@@ -57,10 +57,10 @@ def test_the_track_paces_as_the_other_two_and_runs_on_in_perks(track):
     """Plan §4.1-4.2: 25 and 65 to reach 2 and 3 (herbalism's and the forge's, kept equal
     on purpose), then endless levels with two picks each, Containment the alchemist's own
     perk. Measured before: the 25/65/50/100 curve and a `legendary-work` deed at 5."""
-    assert track.thresholds == [25, 65]
+    assert track.thresholds == [100, 260]   # the owner's 2026-11-18 curve
     assert not track.milestones and not track.deeds
     assert track.perks == ("potency", "duration", "quality", "yield", "containment")
-    assert track.to_next(3) == 50 and track.to_next(4) == 60
+    assert track.to_next(3) == 400 and track.to_next(4) == 400
     p = wc.Progress(track="alchemist", level=5)
     assert wc.perk_picks_banked(p) == 4
     assert [wc.ceiling_index(wc.Progress(track="alchemist", level=n)) for n in (1, 2, 3)] \

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Board polish mocks</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="../../../play/static/css/theme-v2.css">
+<link rel="stylesheet" href="harness.css">
+</head>
+<body>
+<header class="bar">
+  <h1>Board polish: current beside proposed</h1>
+  <div class="controls">
+    <label>Scene
+      <select id="scene">
+        <option value="A">A, the fight</option>
+        <option value="B-dawn">B, dawn</option>
+        <option value="B-noon">B, noon</option>
+        <option value="B-night">B, night</option>
+        <option value="C">C, the great square (24 by 24)</option>
+        <option value="C-night">C, the great square at night</option>
+      </select>
+    </label>
+    <div class="group" role="group" aria-label="View">
+      <button type="button" data-view="flat" aria-pressed="true">Flat</button>
+      <button type="button" data-view="3d" aria-pressed="false">3D</button>
+    </div>
+    <div class="group" role="group" aria-label="Turn the board">
+      <button type="button" data-turn="-1">Turn left</button>
+      <button type="button" data-turn="1">Turn right</button>
+    </div>
+    <label><input type="checkbox" id="spell"> Show the burning hands area</label>
+    <label>Proposed
+      <select id="variant"></select>
+    </label>
+    <label>Size
+      <select id="size">
+        <option value="880x600">880 × 600 (board column, desktop)</option>
+        <option value="700x520">700 × 520</option>
+        <option value="375x520">375 × 520 (phone)</option>
+      </select>
+    </label>
+    <div class="group" role="group" aria-label="Layout">
+      <button type="button" data-layout="side" aria-pressed="true">Side by side</button>
+      <button type="button" data-layout="flick" aria-pressed="false">Flick</button>
+    </div>
+    <button type="button" id="flick" hidden>Show the other</button>
+  </div>
+</header>
+<main id="panels" class="panels side">
+  <figure class="panel" id="left">
+    <figcaption>Current</figcaption>
+    <iframe title="Current board" id="frame-left"></iframe>
+  </figure>
+  <figure class="panel" id="right">
+    <figcaption id="right-name">Proposed</figcaption>
+    <iframe title="Proposed board" id="frame-right"></iframe>
+  </figure>
+</main>
+<p class="notes">Both boards draw the same engine output (data.js, built by build_data.py).
+  The left is the game's own code, copied unchanged; the README lists where it still differs.</p>
+<script src="harness.js"></script>
+</body>
+</html>

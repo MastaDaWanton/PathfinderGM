@@ -142,6 +142,10 @@ CONFIDES = "helpful"
 # above, so no reader anywhere spells an attitude — the three-laws ratchet counts literal
 # keys per file and caught the first cut of the watch's recognition doing exactly that.
 HOSTILE = TRACK[0]
+# The step above it: people who hold a place and meet strangers in it — a dungeon's
+# smugglers or deserters (rules/dungeons.py), wary, not attacking on sight. Named here for
+# the reason HOSTILE is.
+WARY = TRACK[1]
 
 
 def of(actor, default: str = DEFAULT) -> str:

@@ -31,6 +31,25 @@ def _at_port(seed: int = 4, gp: int = 500):
     return scene, engine, pc
 
 
+def _quiet(monkeypatch):
+    """A passage that meets nothing: the voyage table's stretch check never hits."""
+    from rules import ontheway
+
+    monkeypatch.setattr(ontheway, "sea_stretches", lambda *a, **k: None)
+
+
+def _storm(monkeypatch, wrecks: bool):
+    """The voyage's first stretch meets the table's storm band, breaking her or not; a
+    river passage meets none, as the table keeps the storm to open water."""
+    from rules import ontheway
+
+    left = [ontheway.Meeting(kind="storm", roll=50, count=0, day=1)]
+    monkeypatch.setattr(ontheway, "sea_stretches",
+                        lambda *a, river=False, **k: None if river else
+                        (left.pop() if left else None))
+    monkeypatch.setattr(ships, "storm_wrecks", lambda dice: wrecks)
+
+
 def _journey(engine, to: str = "Zhilvarnia", **params):
     engine._journeyed = ""
     res = engine.run(engine.validate(
@@ -47,8 +66,9 @@ def test_the_two_continents_are_a_passage_apart_both_ways():
     assert ZHILVARNIA in there and there[ZHILVARNIA].by == "sea"
     assert there[ZHILVARNIA].from_port and there[ZHILVARNIA].source == "derived"
     # As wide as the world's own stated crossings (192 and 216 miles), not the tree's
-    # seven days: 7 days was 100 gp a head at the book's fare.
-    assert there[ZHILVARNIA].days_apart == 2
+    # seven days: at the CRB's sailing ship (48 miles a day) that is four. The passage
+    # floor then holds the voyage to a fortnight (`ships.PASSAGE_DAYS_AT_LEAST`).
+    assert there[ZHILVARNIA].days_apart == 4
     back = {l.to_id for l in journey.legs_from(PANGRELLA, ZHILVARNIA)}
     assert MIRABALOS in back
     # Never between two ports on one continent: the roads the world wrote stand.
@@ -87,19 +107,20 @@ def test_a_short_purse_is_refused_with_the_price_and_takes_nothing():
     assert engine.aboard() is None
 
 
-def test_the_exits_row_offers_the_passage_and_then_the_voyage():
+def test_the_exits_row_offers_the_passage_and_then_the_voyage(monkeypatch):
     """The UI door: the docks offer the passage as a journey, and once aboard the deck
     offers sailing on — both rows go to the journey op (`views._take_the_exit`)."""
     from play import exits
 
+    _quiet(monkeypatch)
     scene, engine, pc = _at_port()
     rows = exits.exits(engine, PANGRELLA)
     passage = next(r for r in rows if r["id"] == ZHILVARNIA)
     assert passage["journey"] and not passage["blocked"]
     # Days at sea and the fare the booking will charge, never a road's "how far, nobody
     # has written down" (what the row said until 2026-11-13).
-    assert passage["time_words"] == "2 days at sea, 2 Kaldrimia platinum pieces, " \
-        "8 Kaldrimia gold pieces, 8 Kaldrimia silver pieces passage", passage
+    assert passage["time_words"] == "14 days at sea, 6 Kaldrimia platinum pieces, " \
+        "7 Kaldrimia gold pieces, 2 Kaldrimia silver pieces passage", passage
     _journey(engine, to=passage["id"])
     rows = exits.exits(engine, PANGRELLA)
     # A ship's rooms are next door to each other, not "Outside" an hour away.
@@ -125,7 +146,8 @@ def test_the_reader_takes_a_named_port_for_a_journey():
     assert "journey" in interpret.ops_for(frame, scene, engine.places())
 
 
-def test_sailing_arrives_at_the_far_docks_after_the_days():
+def test_sailing_arrives_at_the_far_docks_after_the_days(monkeypatch):
+    _quiet(monkeypatch)
     scene, engine, pc = _at_port()
     _journey(engine)
     days = engine.aboard().days_total
@@ -137,26 +159,18 @@ def test_sailing_arrives_at_the_far_docks_after_the_days():
     assert "makes Zhilvarnia" in out.tell
 
 
-def test_the_daily_storm_is_scaled_by_volatility_and_defaults_to_the_published_rate():
-    """Ultimate Wilderness Table 4-28's windstorm (96-100) is a 5% day; one storm in ten
-    is CRB Table 13-9's powerful kind, the one that wrecks. Volatility multiplies it.
-    Over 4,000 seeded days calm water storms less than lawless water."""
-    assert ships.storm_pct(2) == ships.STORM_PCT == 5.0
-    assert volatility.factor(2) == 1.0
-    counts = {}
-    for level in (0, 2, 4):
-        dice = Dice(seed=7)
-        got = [ships.day_at_sea(dice, level) for _ in range(4000)]
-        counts[level] = sum(1 for g in got if g != "calm")
-    assert counts[0] < counts[2] < counts[4], counts
-    assert 120 <= counts[2] <= 290, counts       # ~200 expected at 5%
+def test_one_storm_in_ten_is_the_kind_that_wrecks():
+    """CRB Table 13-9: 100 of the storm rows' 91-100 is the powerful storm. Over 4,000
+    seeded storms about a tenth break the ship (`ships.storm_wrecks`)."""
+    dice = Dice(seed=7)
+    wrecked = sum(ships.storm_wrecks(dice) for _ in range(4000))
+    assert 320 <= wrecked <= 480, wrecked
 
 
 def test_a_storm_is_told_as_a_storm_and_rides_an_effect(monkeypatch):
     scene, engine, pc = _at_port()
     _journey(engine)
-    weather = iter(["storm"])
-    monkeypatch.setattr(ships, "day_at_sea", lambda dice, level: next(weather, "calm"))
+    _storm(monkeypatch, wrecks=False)
     out = _journey(engine)
     assert "storm" in out.tell.lower(), out.tell
     assert engine.aboard() is not None and engine.aboard().days_left > 0
@@ -172,7 +186,7 @@ def test_a_wreck_washes_the_party_up_on_a_real_coast_with_what_it_cost(monkeypat
     pc.inventory["woundwort"] = 3
     _journey(engine)
     vid = engine.aboard().id
-    monkeypatch.setattr(ships, "day_at_sea", lambda dice, level: "wreck")
+    _storm(monkeypatch, wrecks=True)
     out = _journey(engine)
     assert all(v["id"] != vid for v in scene.vessels), "the ship was not lost"
     assert scene.location_id in journey.ports(PANGRELLA)
@@ -212,6 +226,7 @@ def test_a_save_mid_voyage_loads_and_sails_on(tmp_path, settings, monkeypatch):
     from play import campaign as cm
 
     settings.CAMPAIGN_DIR = tmp_path
+    _quiet(monkeypatch)
     scene, engine, pc = _at_port()
     _journey(engine)
     _journey(engine, days=1)
@@ -228,12 +243,13 @@ def test_a_save_mid_voyage_loads_and_sails_on(tmp_path, settings, monkeypatch):
     assert back.scene.location_id == ZHILVARNIA, out.tell
 
 
-def test_a_crossing_from_inland_is_a_passage_too():
+def test_a_crossing_from_inland_is_a_passage_too(monkeypatch):
     """Integrator's run, 2026-11-13: Vormoor to Ledgerwarren went the old free crossing
     (no ship, no fare, no weather) while Ledgerwarren to Vormoor was a paid passage. Every
     crossing by water is now the one path: Zhilgoroth has no docks and its sea route to
     Khalmorin still books, boards and sails."""
     zhilgoroth, khalmorin = "58b90a214ada", "b36e9f16214d"
+    _quiet(monkeypatch)
     scene = Scene(location_id=zhilgoroth)
     pc = load_pc("fixtures/pc-kesst.json")
     scene.add(pc)
@@ -253,12 +269,13 @@ def test_a_crossing_from_inland_is_a_passage_too():
 
 def test_a_river_passage_is_a_keelboat_and_rolls_no_storm(monkeypatch):
     """Mirabalos to Elyrielle is by river: a passage like any other, on a keelboat, and
-    the storm table is open water's — so a forced wreck never reaches it."""
+    the storm band is open water's — so a forced storm never reaches it (`_storm` keeps
+    to the table's `waters`, as the real check does)."""
     elyrielle = "d677be869434"
     scene, engine, pc = _at_port()
     _journey(engine, to="Elyrielle")
     ship = engine.aboard()
     assert ship.kind == "keelboat" and ship.river
-    monkeypatch.setattr(ships, "day_at_sea", lambda dice, level: "wreck")
+    _storm(monkeypatch, wrecks=True)
     out = _journey(engine, to="Elyrielle")
     assert scene.location_id == elyrielle and "on the river" in out.tell, out.tell

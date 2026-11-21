@@ -100,3 +100,45 @@ def named_in(text: str, scene, known=()) -> dict | None:
             if best is None or len(h["name"]) > len(best["name"]):
                 best = h
     return best
+
+
+def venture_kind(rec: dict, scene=None, landmark=None) -> str:
+    """The kind of venture (`places.VENTURES`) a heard-of place is, or "": a rumoured way
+    down is ground gone into off its landmark, never a building to found.
+
+    By its name when that is a venture's own label ("the old mine"), else by the town's
+    rumour of a venture off that landmark (`dungeons.spread_rumours`' card, whose place is
+    the venture's seeded head) — so the reader writing "the mine" or "the workings" still
+    finds the one the carter meant. Structure only: a closed label and a card's place id."""
+    from . import cards as cards_mod
+    from . import places as places_mod
+
+    core = re.sub(r"^the\s+", "", " ".join(str(rec.get("name") or "").lower().split()))
+    for kind, spec in places_mod.VENTURES.items():
+        if spec["label"].removeprefix("the ") == core:
+            return kind
+    if scene is None or landmark is None:
+        return ""
+    rumoured = {c.place for c in cards_mod.load(scene)
+                if cards_mod.TAG_RUMOUR in (c.tags or ()) and c.stage != "resolved"}
+    for kind in places_mod.VENTURES:
+        if places_mod.venture_set(landmark, kind)[0].id in rumoured:
+            return kind
+    return ""
+
+
+def ventures_at(scene, here, known=()) -> list[tuple[dict, str]]:
+    """The heard-of places still to be found whose landmark is `here` (a Place) and which
+    are ventures, with their kind: what a search at that landmark looks for (playtest
+    2026-11-20 #2). Every one of them, whatever word the player used for it — the heard
+    place there is the one they mean, so "the cave" finds the carter's old mine."""
+    if here is None:
+        return []
+    out = []
+    for h in of_here(scene, known):
+        if h.get("landmark") != here.id:
+            continue
+        kind = venture_kind(h, scene, here)
+        if kind:
+            out.append((h, kind))
+    return out

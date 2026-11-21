@@ -1,0 +1,39 @@
+{
+ "gpuName": "NVIDIA GeForce RTX 3080",
+ "ollama": [
+  "igorls/gemma-4-12B-it-heretic-GGUF:latest 7.76 GiB"
+ ],
+ "baselineMiB": 10958,
+ "baselineUtil": [
+  15,
+  17,
+  13,
+  18,
+  15
+ ],
+ "pages": [
+  {
+   "page": "tabletop.html?level=world",
+   "fps": 120,
+   "p50": 8.3,
+   "p95": 8.4,
+   "worst": 8.6,
+   "gpuMiB": 11114,
+   "deltaMiB": 80,
+   "blankMiB": [
+    10976,
+    11092
+   ],
+   "gpuUtil": 23,
+   "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3080 (0x0000220A) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+   "three": {
+    "fps": 120,
+    "geometries": 43,
+    "textures": 7,
+    "calls": 92,
+    "triangles": 14632,
+    "gl": "WebGL 2.0 (OpenGL ES 3.0 Chromium)"
+   }
+  }
+ ]
+}

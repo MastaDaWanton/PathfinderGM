@@ -1,0 +1,5699 @@
+{
+ "where": "Featherperch",
+ "here": "86d535c37ebd~urban:the-inn",
+ "found": 40,
+ "visited": 18,
+ "nodes": [
+  {
+   "id": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+   "name": "the road to Balzun",
+   "setting": "outside",
+   "visited": true,
+   "current": false,
+   "near": false,
+   "i": 4,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-north-crossing",
+      "name": "the north crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-north-crossing",
+      "to": "86d535c37ebd~urban:the-gate",
+      "name": "the gate",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-gate",
+      "to": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+      "name": "the road to Balzun",
+      "time_words": "half an hour",
+      "minutes": 27
+     }
+    ],
+    "minutes": 51
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~forest:@the-crossroads",
+   "name": "the crossroads",
+   "setting": "outside",
+   "visited": true,
+   "current": false,
+   "near": false,
+   "i": 1,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-north-crossing",
+      "name": "the north crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-north-crossing",
+      "to": "86d535c37ebd~urban:the-gate",
+      "name": "the gate",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-gate",
+      "to": "86d535c37ebd~forest:@the-crossroads",
+      "name": "the crossroads",
+      "time_words": "a quarter of an hour",
+      "minutes": 18
+     }
+    ],
+    "minutes": 42
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~forest:@the-outskirts",
+   "name": "the outskirts",
+   "setting": "outside",
+   "visited": true,
+   "current": false,
+   "near": false,
+   "i": 2,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-north-crossing",
+      "name": "the north crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-north-crossing",
+      "to": "86d535c37ebd~urban:the-gate",
+      "name": "the gate",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-gate",
+      "to": "86d535c37ebd~forest:@the-outskirts",
+      "name": "the outskirts",
+      "time_words": "a few minutes' walk",
+      "minutes": 9
+     }
+    ],
+    "minutes": 33
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~forest:@the-woods",
+   "name": "the woods",
+   "setting": "outside",
+   "visited": true,
+   "current": false,
+   "near": false,
+   "i": 7,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-north-crossing",
+      "name": "the north crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-north-crossing",
+      "to": "86d535c37ebd~urban:the-gate",
+      "name": "the gate",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-gate",
+      "to": "86d535c37ebd~forest:@the-woods",
+      "name": "the woods",
+      "time_words": "about an hour",
+      "minutes": 69
+     }
+    ],
+    "minutes": 93
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~underground:the-woods/the-cave",
+   "name": "the cave",
+   "setting": "outside",
+   "visited": true,
+   "current": false,
+   "near": false,
+   "i": 8,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-north-crossing",
+      "name": "the north crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-north-crossing",
+      "to": "86d535c37ebd~urban:the-gate",
+      "name": "the gate",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-gate",
+      "to": "86d535c37ebd~forest:@the-woods",
+      "name": "the woods",
+      "time_words": "about an hour",
+      "minutes": 69
+     },
+     {
+      "from": "86d535c37ebd~forest:@the-woods",
+      "to": "86d535c37ebd~underground:the-woods/the-cave",
+      "name": "the cave",
+      "time_words": "about an hour",
+      "minutes": 60
+     }
+    ],
+    "minutes": 153
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-gate",
+   "name": "the gate",
+   "setting": "in",
+   "visited": true,
+   "current": false,
+   "near": false,
+   "i": 23,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-north-crossing",
+      "name": "the north crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-north-crossing",
+      "to": "86d535c37ebd~urban:the-gate",
+      "name": "the gate",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 24
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-north-crossing",
+   "name": "the north crossing",
+   "setting": "in",
+   "visited": true,
+   "current": false,
+   "near": false,
+   "i": 45,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-north-crossing",
+      "name": "the north crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 16
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-great-square",
+   "name": "the great square",
+   "setting": "in",
+   "visited": true,
+   "current": false,
+   "near": true,
+   "i": 28,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 8
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-inn",
+   "name": "the inn",
+   "setting": "in",
+   "visited": true,
+   "current": true,
+   "near": false,
+   "i": 34,
+   "walk": null,
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-inn^1",
+   "name": "the upper floor of the inn",
+   "setting": "in",
+   "visited": true,
+   "current": false,
+   "near": true,
+   "i": 35,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-inn^1",
+      "name": "the upper floor of the inn",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 8
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-market",
+   "name": "the market",
+   "setting": "in",
+   "visited": true,
+   "current": false,
+   "near": false,
+   "i": 43,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-north-crossing",
+      "name": "the north crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-north-crossing",
+      "to": "86d535c37ebd~urban:the-market",
+      "name": "the market",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 24
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-cistern",
+   "name": "the cistern",
+   "setting": "in",
+   "visited": true,
+   "current": false,
+   "near": false,
+   "i": 19,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-north-crossing",
+      "name": "the north crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-north-crossing",
+      "to": "86d535c37ebd~urban:the-cistern",
+      "name": "the cistern",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 24
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-laboratory",
+   "name": "the laboratory",
+   "setting": "in",
+   "visited": true,
+   "current": false,
+   "near": false,
+   "i": 40,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-laboratory",
+      "name": "the laboratory",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 16
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-west-crossing",
+   "name": "the west crossing",
+   "setting": "in",
+   "visited": true,
+   "current": false,
+   "near": false,
+   "i": 58,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-west-crossing",
+      "name": "the west crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 16
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-carters-yard",
+   "name": "the carters yard",
+   "setting": "in",
+   "visited": true,
+   "current": false,
+   "near": false,
+   "i": 14,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-west-crossing",
+      "name": "the west crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-west-crossing",
+      "to": "86d535c37ebd~urban:the-carters-yard",
+      "name": "the carters yard",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 24
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-keep",
+   "name": "the keep",
+   "setting": "in",
+   "visited": true,
+   "current": false,
+   "near": false,
+   "i": 36,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-west-crossing",
+      "name": "the west crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-west-crossing",
+      "to": "86d535c37ebd~urban:the-keep",
+      "name": "the keep",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 24
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-south-crossing",
+   "name": "the south crossing",
+   "setting": "in",
+   "visited": true,
+   "current": false,
+   "near": false,
+   "i": 48,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-south-crossing",
+      "name": "the south crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 16
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+   "name": "the road to Ledgernook",
+   "setting": "outside",
+   "visited": true,
+   "current": false,
+   "near": false,
+   "i": 5,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-north-crossing",
+      "name": "the north crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-north-crossing",
+      "to": "86d535c37ebd~urban:the-gate",
+      "name": "the gate",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-gate",
+      "to": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+      "name": "the road to Ledgernook",
+      "time_words": "half an hour",
+      "minutes": 27
+     }
+    ],
+    "minutes": 51
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+   "name": "the road to Milldell",
+   "setting": "outside",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 3,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-north-crossing",
+      "name": "the north crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-north-crossing",
+      "to": "86d535c37ebd~urban:the-gate",
+      "name": "the gate",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-gate",
+      "to": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+      "name": "the road to Milldell",
+      "time_words": "half an hour",
+      "minutes": 27
+     }
+    ],
+    "minutes": 51
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+   "name": "the road to Underrun",
+   "setting": "outside",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 6,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-north-crossing",
+      "name": "the north crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-north-crossing",
+      "to": "86d535c37ebd~urban:the-gate",
+      "name": "the gate",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-gate",
+      "to": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+      "name": "the road to Underrun",
+      "time_words": "half an hour",
+      "minutes": 27
+     }
+    ],
+    "minutes": 51
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~desert:@the-desert",
+   "name": "the desert",
+   "setting": "outside",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 0,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-north-crossing",
+      "name": "the north crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-north-crossing",
+      "to": "86d535c37ebd~urban:the-gate",
+      "name": "the gate",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-gate",
+      "to": "86d535c37ebd~desert:@the-desert",
+      "name": "the desert",
+      "time_words": "about five hours",
+      "minutes": 289
+     }
+    ],
+    "minutes": 313
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~underground:the-woods/the-cave/the-mouth",
+   "name": "the mouth",
+   "setting": "outside",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 9,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-north-crossing",
+      "name": "the north crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-north-crossing",
+      "to": "86d535c37ebd~urban:the-gate",
+      "name": "the gate",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-gate",
+      "to": "86d535c37ebd~forest:@the-woods",
+      "name": "the woods",
+      "time_words": "about an hour",
+      "minutes": 69
+     },
+     {
+      "from": "86d535c37ebd~forest:@the-woods",
+      "to": "86d535c37ebd~underground:the-woods/the-cave",
+      "name": "the cave",
+      "time_words": "about an hour",
+      "minutes": 60
+     },
+     {
+      "from": "86d535c37ebd~underground:the-woods/the-cave",
+      "to": "86d535c37ebd~underground:the-woods/the-cave/the-mouth",
+      "name": "the mouth",
+      "time_words": "about an hour",
+      "minutes": 60
+     }
+    ],
+    "minutes": 213
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~underground:the-woods/the-cave/the-throat",
+   "name": "the throat",
+   "setting": "outside",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 10,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-north-crossing",
+      "name": "the north crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-north-crossing",
+      "to": "86d535c37ebd~urban:the-gate",
+      "name": "the gate",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-gate",
+      "to": "86d535c37ebd~forest:@the-woods",
+      "name": "the woods",
+      "time_words": "about an hour",
+      "minutes": 69
+     },
+     {
+      "from": "86d535c37ebd~forest:@the-woods",
+      "to": "86d535c37ebd~underground:the-woods/the-cave",
+      "name": "the cave",
+      "time_words": "about an hour",
+      "minutes": 60
+     },
+     {
+      "from": "86d535c37ebd~underground:the-woods/the-cave",
+      "to": "86d535c37ebd~underground:the-woods/the-cave/the-throat",
+      "name": "the throat",
+      "time_words": "about an hour",
+      "minutes": 60
+     }
+    ],
+    "minutes": 213
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-graveyard",
+   "name": "the graveyard",
+   "setting": "in",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 27,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-north-crossing",
+      "name": "the north crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-north-crossing",
+      "to": "86d535c37ebd~urban:the-graveyard",
+      "name": "the graveyard",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 24
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-smithy",
+   "name": "the smithy",
+   "setting": "in",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 46,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-north-crossing",
+      "name": "the north crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-north-crossing",
+      "to": "86d535c37ebd~urban:the-smithy",
+      "name": "the smithy",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 24
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-east-crossing",
+   "name": "the east crossing",
+   "setting": "in",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 22,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-east-crossing",
+      "name": "the east crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 16
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-tavern",
+   "name": "the tavern",
+   "setting": "in",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 51,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-tavern",
+      "name": "the tavern",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 16
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-cistern^-1",
+   "name": "the undercroft of the cistern",
+   "setting": "in",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 20,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-north-crossing",
+      "name": "the north crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-north-crossing",
+      "to": "86d535c37ebd~urban:the-cistern",
+      "name": "the cistern",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-cistern",
+      "to": "86d535c37ebd~urban:the-cistern^-1",
+      "name": "the undercroft of the cistern",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 32
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-cistern^1",
+   "name": "the upper floor of the cistern",
+   "setting": "in",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 21,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-north-crossing",
+      "name": "the north crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-north-crossing",
+      "to": "86d535c37ebd~urban:the-cistern",
+      "name": "the cistern",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-cistern",
+      "to": "86d535c37ebd~urban:the-cistern^1",
+      "name": "the upper floor of the cistern",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 32
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-laboratory^-1",
+   "name": "the undercroft of the laboratory",
+   "setting": "in",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 41,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-laboratory",
+      "name": "the laboratory",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-laboratory",
+      "to": "86d535c37ebd~urban:the-laboratory^-1",
+      "name": "the undercroft of the laboratory",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 24
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-laboratory^1",
+   "name": "the upper floor of the laboratory",
+   "setting": "in",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 42,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-laboratory",
+      "name": "the laboratory",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-laboratory",
+      "to": "86d535c37ebd~urban:the-laboratory^1",
+      "name": "the upper floor of the laboratory",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 24
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-green",
+   "name": "the green",
+   "setting": "in",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 29,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-west-crossing",
+      "name": "the west crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-west-crossing",
+      "to": "86d535c37ebd~urban:the-green",
+      "name": "the green",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 24
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-well",
+   "name": "the well",
+   "setting": "in",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 57,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-west-crossing",
+      "name": "the west crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-west-crossing",
+      "to": "86d535c37ebd~urban:the-well",
+      "name": "the well",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 24
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-keep^-1",
+   "name": "the undercroft of the keep",
+   "setting": "in",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 37,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-west-crossing",
+      "name": "the west crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-west-crossing",
+      "to": "86d535c37ebd~urban:the-keep",
+      "name": "the keep",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-keep",
+      "to": "86d535c37ebd~urban:the-keep^-1",
+      "name": "the undercroft of the keep",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 32
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-keep^1",
+   "name": "the upper floor of the keep",
+   "setting": "in",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 38,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-west-crossing",
+      "name": "the west crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-west-crossing",
+      "to": "86d535c37ebd~urban:the-keep",
+      "name": "the keep",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-keep",
+      "to": "86d535c37ebd~urban:the-keep^1",
+      "name": "the upper floor of the keep",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 32
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-keep^2",
+   "name": "the top floor of the keep",
+   "setting": "in",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 39,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-west-crossing",
+      "name": "the west crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-west-crossing",
+      "to": "86d535c37ebd~urban:the-keep",
+      "name": "the keep",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-keep",
+      "to": "86d535c37ebd~urban:the-keep^2",
+      "name": "the top floor of the keep",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 32
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-barracks",
+   "name": "the barracks",
+   "setting": "in",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 12,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-south-crossing",
+      "name": "the south crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-south-crossing",
+      "to": "86d535c37ebd~urban:the-barracks",
+      "name": "the barracks",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 24
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-granary",
+   "name": "the granary",
+   "setting": "in",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 24,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-south-crossing",
+      "name": "the south crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-south-crossing",
+      "to": "86d535c37ebd~urban:the-granary",
+      "name": "the granary",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 24
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-merchants-row",
+   "name": "the merchants row",
+   "setting": "in",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 44,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-south-crossing",
+      "name": "the south crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-south-crossing",
+      "to": "86d535c37ebd~urban:the-merchants-row",
+      "name": "the merchants row",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 24
+   },
+   "why": ""
+  },
+  {
+   "id": "86d535c37ebd~urban:the-warrens",
+   "name": "the warrens",
+   "setting": "in",
+   "visited": false,
+   "current": false,
+   "near": false,
+   "i": 53,
+   "walk": {
+    "legs": [
+     {
+      "from": "86d535c37ebd~urban:the-inn",
+      "to": "86d535c37ebd~urban:the-great-square",
+      "name": "the great square",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-great-square",
+      "to": "86d535c37ebd~urban:the-south-crossing",
+      "name": "the south crossing",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     },
+     {
+      "from": "86d535c37ebd~urban:the-south-crossing",
+      "to": "86d535c37ebd~urban:the-warrens",
+      "name": "the warrens",
+      "time_words": "a few minutes' walk",
+      "minutes": 8
+     }
+    ],
+    "minutes": 24
+   },
+   "why": ""
+  }
+ ],
+ "edges": [
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+   "to": "86d535c37ebd~forest:@the-crossroads",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a few minutes' walk",
+   "minutes": 9,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+   "to": "86d535c37ebd~forest:@the-outskirts",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a quarter of an hour",
+   "minutes": 18,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+   "to": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a quarter of an hour",
+   "minutes": 18,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+   "to": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a quarter of an hour",
+   "minutes": 18,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+   "to": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a quarter of an hour",
+   "minutes": 18,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+   "to": "86d535c37ebd~forest:@the-woods",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "an hour and more",
+   "minutes": 78,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+   "to": "86d535c37ebd~desert:@the-desert",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about five hours",
+   "minutes": 298,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-crossroads",
+   "to": "86d535c37ebd~forest:@the-outskirts",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a few minutes' walk",
+   "minutes": 9,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-crossroads",
+   "to": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a few minutes' walk",
+   "minutes": 9,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-crossroads",
+   "to": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a few minutes' walk",
+   "minutes": 9,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-crossroads",
+   "to": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a few minutes' walk",
+   "minutes": 9,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-crossroads",
+   "to": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a few minutes' walk",
+   "minutes": 9,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-crossroads",
+   "to": "86d535c37ebd~forest:@the-woods",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about an hour",
+   "minutes": 69,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-crossroads",
+   "to": "86d535c37ebd~desert:@the-desert",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about five hours",
+   "minutes": 289,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-outskirts",
+   "to": "86d535c37ebd~urban:the-gate",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 9,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-outskirts",
+   "to": "86d535c37ebd~forest:@the-crossroads",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a few minutes' walk",
+   "minutes": 9,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-outskirts",
+   "to": "86d535c37ebd~forest:@the-woods",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about an hour",
+   "minutes": 60,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-outskirts",
+   "to": "86d535c37ebd~desert:@the-desert",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about five hours",
+   "minutes": 280,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-outskirts",
+   "to": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a quarter of an hour",
+   "minutes": 18,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-outskirts",
+   "to": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a quarter of an hour",
+   "minutes": 18,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-outskirts",
+   "to": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a quarter of an hour",
+   "minutes": 18,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-outskirts",
+   "to": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a quarter of an hour",
+   "minutes": 18,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-woods",
+   "to": "86d535c37ebd~forest:@the-outskirts",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about an hour",
+   "minutes": 60,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-woods",
+   "to": "86d535c37ebd~underground:the-woods/the-cave",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about an hour",
+   "minutes": 60,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-woods",
+   "to": "86d535c37ebd~forest:@the-crossroads",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about an hour",
+   "minutes": 69,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-woods",
+   "to": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "an hour and more",
+   "minutes": 78,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-woods",
+   "to": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "an hour and more",
+   "minutes": 78,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-woods",
+   "to": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "an hour and more",
+   "minutes": 78,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-woods",
+   "to": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "an hour and more",
+   "minutes": 78,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-woods",
+   "to": "86d535c37ebd~desert:@the-desert",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about six hours",
+   "minutes": 340,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~underground:the-woods/the-cave",
+   "to": "86d535c37ebd~underground:the-woods/the-cave/the-mouth",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about an hour",
+   "minutes": 60,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~underground:the-woods/the-cave",
+   "to": "86d535c37ebd~underground:the-woods/the-cave/the-throat",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about an hour",
+   "minutes": 60,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~underground:the-woods/the-cave",
+   "to": "86d535c37ebd~forest:@the-woods",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about an hour",
+   "minutes": 60,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~underground:the-woods/the-cave",
+   "to": "86d535c37ebd~forest:@the-outskirts",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about two hours",
+   "minutes": 120,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~underground:the-woods/the-cave",
+   "to": "86d535c37ebd~forest:@the-crossroads",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about two hours",
+   "minutes": 129,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~underground:the-woods/the-cave",
+   "to": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about two hours",
+   "minutes": 138,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~underground:the-woods/the-cave",
+   "to": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about two hours",
+   "minutes": 138,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~underground:the-woods/the-cave",
+   "to": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about two hours",
+   "minutes": 138,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~underground:the-woods/the-cave",
+   "to": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about two hours",
+   "minutes": 138,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~underground:the-woods/the-cave",
+   "to": "86d535c37ebd~desert:@the-desert",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about seven hours",
+   "minutes": 400,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-gate",
+   "to": "86d535c37ebd~urban:the-cistern",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-gate",
+   "to": "86d535c37ebd~urban:the-graveyard",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-gate",
+   "to": "86d535c37ebd~urban:the-market",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-gate",
+   "to": "86d535c37ebd~urban:the-north-crossing",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-gate",
+   "to": "86d535c37ebd~urban:the-smithy",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-gate",
+   "to": "86d535c37ebd~forest:@the-outskirts",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a few minutes' walk",
+   "minutes": 9,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-gate",
+   "to": "86d535c37ebd~forest:@the-crossroads",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a quarter of an hour",
+   "minutes": 18,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-gate",
+   "to": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "half an hour",
+   "minutes": 27,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-gate",
+   "to": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "half an hour",
+   "minutes": 27,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-gate",
+   "to": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "half an hour",
+   "minutes": 27,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-gate",
+   "to": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "half an hour",
+   "minutes": 27,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-gate",
+   "to": "86d535c37ebd~forest:@the-woods",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about an hour",
+   "minutes": 69,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-gate",
+   "to": "86d535c37ebd~desert:@the-desert",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about five hours",
+   "minutes": 289,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-north-crossing",
+   "to": "86d535c37ebd~urban:the-cistern",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-north-crossing",
+   "to": "86d535c37ebd~urban:the-gate",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-north-crossing",
+   "to": "86d535c37ebd~urban:the-graveyard",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-north-crossing",
+   "to": "86d535c37ebd~urban:the-great-square",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-north-crossing",
+   "to": "86d535c37ebd~urban:the-market",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-north-crossing",
+   "to": "86d535c37ebd~urban:the-smithy",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-great-square",
+   "to": "86d535c37ebd~urban:the-east-crossing",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-great-square",
+   "to": "86d535c37ebd~urban:the-north-crossing",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-great-square",
+   "to": "86d535c37ebd~urban:the-south-crossing",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-great-square",
+   "to": "86d535c37ebd~urban:the-west-crossing",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-great-square",
+   "to": "86d535c37ebd~urban:the-laboratory",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-great-square",
+   "to": "86d535c37ebd~urban:the-inn",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-great-square",
+   "to": "86d535c37ebd~urban:the-tavern",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-inn",
+   "to": "86d535c37ebd~urban:the-great-square",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-inn",
+   "to": "86d535c37ebd~urban:the-inn^1",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-inn^1",
+   "to": "86d535c37ebd~urban:the-inn",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-market",
+   "to": "86d535c37ebd~urban:the-cistern",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-market",
+   "to": "86d535c37ebd~urban:the-gate",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-market",
+   "to": "86d535c37ebd~urban:the-graveyard",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-market",
+   "to": "86d535c37ebd~urban:the-north-crossing",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-market",
+   "to": "86d535c37ebd~urban:the-smithy",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-cistern",
+   "to": "86d535c37ebd~urban:the-gate",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-cistern",
+   "to": "86d535c37ebd~urban:the-graveyard",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-cistern",
+   "to": "86d535c37ebd~urban:the-market",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-cistern",
+   "to": "86d535c37ebd~urban:the-north-crossing",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-cistern",
+   "to": "86d535c37ebd~urban:the-smithy",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-cistern",
+   "to": "86d535c37ebd~urban:the-cistern^-1",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-cistern",
+   "to": "86d535c37ebd~urban:the-cistern^1",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-laboratory",
+   "to": "86d535c37ebd~urban:the-great-square",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-laboratory",
+   "to": "86d535c37ebd~urban:the-laboratory^-1",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-laboratory",
+   "to": "86d535c37ebd~urban:the-laboratory^1",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-west-crossing",
+   "to": "86d535c37ebd~urban:the-carters-yard",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-west-crossing",
+   "to": "86d535c37ebd~urban:the-great-square",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-west-crossing",
+   "to": "86d535c37ebd~urban:the-green",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-west-crossing",
+   "to": "86d535c37ebd~urban:the-keep",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-west-crossing",
+   "to": "86d535c37ebd~urban:the-well",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-carters-yard",
+   "to": "86d535c37ebd~urban:the-green",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-carters-yard",
+   "to": "86d535c37ebd~urban:the-keep",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-carters-yard",
+   "to": "86d535c37ebd~urban:the-well",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-carters-yard",
+   "to": "86d535c37ebd~urban:the-west-crossing",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-keep",
+   "to": "86d535c37ebd~urban:the-carters-yard",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-keep",
+   "to": "86d535c37ebd~urban:the-green",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-keep",
+   "to": "86d535c37ebd~urban:the-well",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-keep",
+   "to": "86d535c37ebd~urban:the-west-crossing",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-keep",
+   "to": "86d535c37ebd~urban:the-keep^-1",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-keep",
+   "to": "86d535c37ebd~urban:the-keep^1",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-keep",
+   "to": "86d535c37ebd~urban:the-keep^2",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-south-crossing",
+   "to": "86d535c37ebd~urban:the-barracks",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-south-crossing",
+   "to": "86d535c37ebd~urban:the-granary",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-south-crossing",
+   "to": "86d535c37ebd~urban:the-great-square",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-south-crossing",
+   "to": "86d535c37ebd~urban:the-merchants-row",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~urban:the-south-crossing",
+   "to": "86d535c37ebd~urban:the-warrens",
+   "group": "next_door",
+   "dashed": false,
+   "time_words": "a few minutes' walk",
+   "minutes": 8,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+   "to": "86d535c37ebd~forest:@the-crossroads",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a few minutes' walk",
+   "minutes": 9,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+   "to": "86d535c37ebd~forest:@the-outskirts",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a quarter of an hour",
+   "minutes": 18,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+   "to": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a quarter of an hour",
+   "minutes": 18,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+   "to": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a quarter of an hour",
+   "minutes": 18,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+   "to": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "a quarter of an hour",
+   "minutes": 18,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+   "to": "86d535c37ebd~forest:@the-woods",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "an hour and more",
+   "minutes": 78,
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+   "to": "86d535c37ebd~desert:@the-desert",
+   "group": "outside",
+   "dashed": true,
+   "time_words": "about five hours",
+   "minutes": 298,
+   "shut": ""
+  }
+ ],
+ "stubs": [
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+   "group": "outside",
+   "dashed": true,
+   "toward": 6
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+   "group": "outside",
+   "dashed": true,
+   "toward": 0
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+   "group": "road",
+   "dashed": true,
+   "toward": null
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+   "group": "outside",
+   "dashed": true,
+   "toward": 3
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+   "group": "outside",
+   "dashed": true,
+   "toward": 0
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+   "group": "road",
+   "dashed": true,
+   "toward": null
+  },
+  {
+   "from": "86d535c37ebd~desert:@the-desert",
+   "group": "outside",
+   "dashed": true,
+   "toward": 3
+  },
+  {
+   "from": "86d535c37ebd~desert:@the-desert",
+   "group": "outside",
+   "dashed": true,
+   "toward": 6
+  },
+  {
+   "from": "86d535c37ebd~urban:the-graveyard",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 46
+  },
+  {
+   "from": "86d535c37ebd~urban:the-smithy",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 27
+  },
+  {
+   "from": "86d535c37ebd~urban:the-smithy",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 47
+  },
+  {
+   "from": "86d535c37ebd~urban:the-east-crossing",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 11
+  },
+  {
+   "from": "86d535c37ebd~urban:the-east-crossing",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 15
+  },
+  {
+   "from": "86d535c37ebd~urban:the-east-crossing",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 30
+  },
+  {
+   "from": "86d535c37ebd~urban:the-east-crossing",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 32
+  },
+  {
+   "from": "86d535c37ebd~urban:the-east-crossing",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 49
+  },
+  {
+   "from": "86d535c37ebd~urban:the-tavern",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 52
+  },
+  {
+   "from": "86d535c37ebd~urban:the-green",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 57
+  },
+  {
+   "from": "86d535c37ebd~urban:the-well",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 29
+  },
+  {
+   "from": "86d535c37ebd~urban:the-keep^1",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 39
+  },
+  {
+   "from": "86d535c37ebd~urban:the-keep^2",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 38
+  },
+  {
+   "from": "86d535c37ebd~urban:the-barracks",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 24
+  },
+  {
+   "from": "86d535c37ebd~urban:the-barracks",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 44
+  },
+  {
+   "from": "86d535c37ebd~urban:the-barracks",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 53
+  },
+  {
+   "from": "86d535c37ebd~urban:the-barracks",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 13
+  },
+  {
+   "from": "86d535c37ebd~urban:the-granary",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 12
+  },
+  {
+   "from": "86d535c37ebd~urban:the-granary",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 44
+  },
+  {
+   "from": "86d535c37ebd~urban:the-granary",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 53
+  },
+  {
+   "from": "86d535c37ebd~urban:the-granary",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 25
+  },
+  {
+   "from": "86d535c37ebd~urban:the-granary",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 26
+  },
+  {
+   "from": "86d535c37ebd~urban:the-merchants-row",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 12
+  },
+  {
+   "from": "86d535c37ebd~urban:the-merchants-row",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 24
+  },
+  {
+   "from": "86d535c37ebd~urban:the-merchants-row",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 53
+  },
+  {
+   "from": "86d535c37ebd~urban:the-warrens",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 12
+  },
+  {
+   "from": "86d535c37ebd~urban:the-warrens",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 24
+  },
+  {
+   "from": "86d535c37ebd~urban:the-warrens",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 44
+  },
+  {
+   "from": "86d535c37ebd~urban:the-warrens",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 54
+  },
+  {
+   "from": "86d535c37ebd~urban:the-warrens",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 55
+  },
+  {
+   "from": "86d535c37ebd~urban:the-warrens",
+   "group": "next_door",
+   "dashed": false,
+   "toward": 56
+  }
+ ],
+ "roads": [
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+   "to": "634f5db08475",
+   "name": "Balzun",
+   "time_words": "about four days on foot",
+   "shut": ""
+  },
+  {
+   "from": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+   "to": "6cff3bc578e0",
+   "name": "Ledgernook",
+   "time_words": "about five days on foot",
+   "shut": ""
+  }
+ ],
+ "layout": {
+  "size": 59,
+  "links": [
+   [
+    0,
+    2
+   ],
+   [
+    1,
+    2
+   ],
+   [
+    1,
+    3
+   ],
+   [
+    1,
+    4
+   ],
+   [
+    1,
+    5
+   ],
+   [
+    1,
+    6
+   ],
+   [
+    2,
+    7
+   ],
+   [
+    2,
+    23
+   ],
+   [
+    7,
+    8
+   ],
+   [
+    8,
+    9
+   ],
+   [
+    8,
+    10
+   ],
+   [
+    11,
+    15
+   ],
+   [
+    11,
+    22
+   ],
+   [
+    11,
+    30
+   ],
+   [
+    11,
+    32
+   ],
+   [
+    11,
+    49
+   ],
+   [
+    12,
+    13
+   ],
+   [
+    12,
+    24
+   ],
+   [
+    12,
+    44
+   ],
+   [
+    12,
+    48
+   ],
+   [
+    12,
+    53
+   ],
+   [
+    14,
+    29
+   ],
+   [
+    14,
+    36
+   ],
+   [
+    14,
+    57
+   ],
+   [
+    14,
+    58
+   ],
+   [
+    15,
+    16
+   ],
+   [
+    15,
+    17
+   ],
+   [
+    15,
+    18
+   ],
+   [
+    15,
+    22
+   ],
+   [
+    15,
+    30
+   ],
+   [
+    15,
+    32
+   ],
+   [
+    15,
+    49
+   ],
+   [
+    17,
+    18
+   ],
+   [
+    19,
+    20
+   ],
+   [
+    19,
+    21
+   ],
+   [
+    19,
+    23
+   ],
+   [
+    19,
+    27
+   ],
+   [
+    19,
+    43
+   ],
+   [
+    19,
+    45
+   ],
+   [
+    19,
+    46
+   ],
+   [
+    22,
+    28
+   ],
+   [
+    22,
+    30
+   ],
+   [
+    22,
+    32
+   ],
+   [
+    22,
+    49
+   ],
+   [
+    23,
+    27
+   ],
+   [
+    23,
+    43
+   ],
+   [
+    23,
+    45
+   ],
+   [
+    23,
+    46
+   ],
+   [
+    24,
+    25
+   ],
+   [
+    24,
+    26
+   ],
+   [
+    24,
+    44
+   ],
+   [
+    24,
+    48
+   ],
+   [
+    24,
+    53
+   ],
+   [
+    25,
+    26
+   ],
+   [
+    27,
+    43
+   ],
+   [
+    27,
+    45
+   ],
+   [
+    27,
+    46
+   ],
+   [
+    28,
+    34
+   ],
+   [
+    28,
+    40
+   ],
+   [
+    28,
+    45
+   ],
+   [
+    28,
+    48
+   ],
+   [
+    28,
+    51
+   ],
+   [
+    28,
+    58
+   ],
+   [
+    29,
+    36
+   ],
+   [
+    29,
+    57
+   ],
+   [
+    29,
+    58
+   ],
+   [
+    30,
+    31
+   ],
+   [
+    30,
+    32
+   ],
+   [
+    30,
+    49
+   ],
+   [
+    32,
+    33
+   ],
+   [
+    32,
+    49
+   ],
+   [
+    34,
+    35
+   ],
+   [
+    36,
+    37
+   ],
+   [
+    36,
+    38
+   ],
+   [
+    36,
+    39
+   ],
+   [
+    36,
+    57
+   ],
+   [
+    36,
+    58
+   ],
+   [
+    38,
+    39
+   ],
+   [
+    40,
+    41
+   ],
+   [
+    40,
+    42
+   ],
+   [
+    43,
+    45
+   ],
+   [
+    43,
+    46
+   ],
+   [
+    44,
+    48
+   ],
+   [
+    44,
+    53
+   ],
+   [
+    45,
+    46
+   ],
+   [
+    46,
+    47
+   ],
+   [
+    48,
+    53
+   ],
+   [
+    49,
+    50
+   ],
+   [
+    51,
+    52
+   ],
+   [
+    53,
+    54
+   ],
+   [
+    53,
+    55
+   ],
+   [
+    53,
+    56
+   ],
+   [
+    55,
+    56
+   ],
+   [
+    57,
+    58
+   ]
+  ]
+ },
+ "clock_minutes": 16391,
+ "settings": {
+  "86d535c37ebd~urban:the-great-square": "in",
+  "86d535c37ebd~urban:the-north-crossing": "in",
+  "86d535c37ebd~urban:the-east-crossing": "in",
+  "86d535c37ebd~urban:the-south-crossing": "in",
+  "86d535c37ebd~urban:the-west-crossing": "in",
+  "86d535c37ebd~urban:the-gate": "in",
+  "86d535c37ebd~urban:the-guardhouse": "in",
+  "86d535c37ebd~urban:the-barracks": "in",
+  "86d535c37ebd~urban:the-well": "in",
+  "86d535c37ebd~urban:the-market": "in",
+  "86d535c37ebd~urban:the-cathedral": "in",
+  "86d535c37ebd~urban:the-warrens": "in",
+  "86d535c37ebd~urban:the-green": "in",
+  "86d535c37ebd~urban:the-smithy": "in",
+  "86d535c37ebd~urban:the-stables": "in",
+  "86d535c37ebd~urban:the-granary": "in",
+  "86d535c37ebd~urban:the-keep": "in",
+  "86d535c37ebd~urban:the-graveyard": "in",
+  "86d535c37ebd~urban:the-arena": "in",
+  "86d535c37ebd~urban:the-merchants-row": "in",
+  "86d535c37ebd~urban:the-carters-yard": "in",
+  "86d535c37ebd~urban:the-cistern": "in",
+  "86d535c37ebd~urban:the-guildhall": "in",
+  "86d535c37ebd~urban:the-laboratory": "in",
+  "86d535c37ebd~urban:the-inn": "in",
+  "86d535c37ebd~urban:the-tavern": "in",
+  "86d535c37ebd~forest:@the-outskirts": "outside",
+  "86d535c37ebd~forest:@the-road-to-634f5db08475": "outside",
+  "86d535c37ebd~forest:@the-road-to-6cff3bc578e0": "outside",
+  "86d535c37ebd~forest:@the-road-to-5beb4a684ab9": "outside",
+  "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d": "outside",
+  "86d535c37ebd~forest:@the-crossroads": "outside",
+  "86d535c37ebd~forest:@the-woods": "outside",
+  "86d535c37ebd~desert:@the-desert": "outside",
+  "86d535c37ebd~urban:the-guardhouse^1": "in",
+  "86d535c37ebd~urban:the-barracks^1": "in",
+  "86d535c37ebd~urban:the-cathedral^-1": "in",
+  "86d535c37ebd~urban:the-cathedral^1": "in",
+  "86d535c37ebd~urban:the-cathedral^2": "in",
+  "86d535c37ebd~urban:the-warrens^-1": "in",
+  "86d535c37ebd~urban:the-warrens^1": "in",
+  "86d535c37ebd~urban:the-warrens^2": "in",
+  "86d535c37ebd~urban:the-smithy^1": "in",
+  "86d535c37ebd~urban:the-stables^1": "in",
+  "86d535c37ebd~urban:the-granary^1": "in",
+  "86d535c37ebd~urban:the-granary^2": "in",
+  "86d535c37ebd~urban:the-keep^-1": "in",
+  "86d535c37ebd~urban:the-keep^1": "in",
+  "86d535c37ebd~urban:the-keep^2": "in",
+  "86d535c37ebd~urban:the-cistern^-1": "in",
+  "86d535c37ebd~urban:the-cistern^1": "in",
+  "86d535c37ebd~urban:the-guildhall^1": "in",
+  "86d535c37ebd~urban:the-laboratory^-1": "in",
+  "86d535c37ebd~urban:the-laboratory^1": "in",
+  "86d535c37ebd~urban:the-inn^1": "in",
+  "86d535c37ebd~urban:the-tavern^1": "in",
+  "86d535c37ebd~underground:the-woods/the-cave": "outside",
+  "86d535c37ebd~underground:the-woods/the-cave/the-mouth": "outside",
+  "86d535c37ebd~underground:the-woods/the-cave/the-throat": "outside"
+ },
+ "ids": [
+  "86d535c37ebd~desert:@the-desert",
+  "86d535c37ebd~forest:@the-crossroads",
+  "86d535c37ebd~forest:@the-outskirts",
+  "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+  "86d535c37ebd~forest:@the-road-to-634f5db08475",
+  "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+  "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+  "86d535c37ebd~forest:@the-woods",
+  "86d535c37ebd~underground:the-woods/the-cave",
+  "86d535c37ebd~underground:the-woods/the-cave/the-mouth",
+  "86d535c37ebd~underground:the-woods/the-cave/the-throat",
+  "86d535c37ebd~urban:the-arena",
+  "86d535c37ebd~urban:the-barracks",
+  "86d535c37ebd~urban:the-barracks^1",
+  "86d535c37ebd~urban:the-carters-yard",
+  "86d535c37ebd~urban:the-cathedral",
+  "86d535c37ebd~urban:the-cathedral^-1",
+  "86d535c37ebd~urban:the-cathedral^1",
+  "86d535c37ebd~urban:the-cathedral^2",
+  "86d535c37ebd~urban:the-cistern",
+  "86d535c37ebd~urban:the-cistern^-1",
+  "86d535c37ebd~urban:the-cistern^1",
+  "86d535c37ebd~urban:the-east-crossing",
+  "86d535c37ebd~urban:the-gate",
+  "86d535c37ebd~urban:the-granary",
+  "86d535c37ebd~urban:the-granary^1",
+  "86d535c37ebd~urban:the-granary^2",
+  "86d535c37ebd~urban:the-graveyard",
+  "86d535c37ebd~urban:the-great-square",
+  "86d535c37ebd~urban:the-green",
+  "86d535c37ebd~urban:the-guardhouse",
+  "86d535c37ebd~urban:the-guardhouse^1",
+  "86d535c37ebd~urban:the-guildhall",
+  "86d535c37ebd~urban:the-guildhall^1",
+  "86d535c37ebd~urban:the-inn",
+  "86d535c37ebd~urban:the-inn^1",
+  "86d535c37ebd~urban:the-keep",
+  "86d535c37ebd~urban:the-keep^-1",
+  "86d535c37ebd~urban:the-keep^1",
+  "86d535c37ebd~urban:the-keep^2",
+  "86d535c37ebd~urban:the-laboratory",
+  "86d535c37ebd~urban:the-laboratory^-1",
+  "86d535c37ebd~urban:the-laboratory^1",
+  "86d535c37ebd~urban:the-market",
+  "86d535c37ebd~urban:the-merchants-row",
+  "86d535c37ebd~urban:the-north-crossing",
+  "86d535c37ebd~urban:the-smithy",
+  "86d535c37ebd~urban:the-smithy^1",
+  "86d535c37ebd~urban:the-south-crossing",
+  "86d535c37ebd~urban:the-stables",
+  "86d535c37ebd~urban:the-stables^1",
+  "86d535c37ebd~urban:the-tavern",
+  "86d535c37ebd~urban:the-tavern^1",
+  "86d535c37ebd~urban:the-warrens",
+  "86d535c37ebd~urban:the-warrens^-1",
+  "86d535c37ebd~urban:the-warrens^1",
+  "86d535c37ebd~urban:the-warrens^2",
+  "86d535c37ebd~urban:the-well",
+  "86d535c37ebd~urban:the-west-crossing"
+ ],
+ "names": {
+  "86d535c37ebd~desert:@the-desert": "the desert",
+  "86d535c37ebd~forest:@the-crossroads": "the crossroads",
+  "86d535c37ebd~forest:@the-outskirts": "the outskirts",
+  "86d535c37ebd~forest:@the-road-to-5beb4a684ab9": "the road to Milldell",
+  "86d535c37ebd~forest:@the-road-to-634f5db08475": "the road to Balzun",
+  "86d535c37ebd~forest:@the-road-to-6cff3bc578e0": "the road to Ledgernook",
+  "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d": "the road to Underrun",
+  "86d535c37ebd~forest:@the-woods": "the woods",
+  "86d535c37ebd~underground:the-woods/the-cave": "the cave",
+  "86d535c37ebd~underground:the-woods/the-cave/the-mouth": "the mouth",
+  "86d535c37ebd~underground:the-woods/the-cave/the-throat": "the throat",
+  "86d535c37ebd~urban:the-arena": "the arena",
+  "86d535c37ebd~urban:the-barracks": "the barracks",
+  "86d535c37ebd~urban:the-barracks^1": "the upper floor of the barracks",
+  "86d535c37ebd~urban:the-carters-yard": "the carters yard",
+  "86d535c37ebd~urban:the-cathedral": "the cathedral",
+  "86d535c37ebd~urban:the-cathedral^-1": "the undercroft of the cathedral",
+  "86d535c37ebd~urban:the-cathedral^1": "the upper floor of the cathedral",
+  "86d535c37ebd~urban:the-cathedral^2": "the top floor of the cathedral",
+  "86d535c37ebd~urban:the-cistern": "the cistern",
+  "86d535c37ebd~urban:the-cistern^-1": "the undercroft of the cistern",
+  "86d535c37ebd~urban:the-cistern^1": "the upper floor of the cistern",
+  "86d535c37ebd~urban:the-east-crossing": "the east crossing",
+  "86d535c37ebd~urban:the-gate": "the gate",
+  "86d535c37ebd~urban:the-granary": "the granary",
+  "86d535c37ebd~urban:the-granary^1": "the upper floor of the granary",
+  "86d535c37ebd~urban:the-granary^2": "the top floor of the granary",
+  "86d535c37ebd~urban:the-graveyard": "the graveyard",
+  "86d535c37ebd~urban:the-great-square": "the great square",
+  "86d535c37ebd~urban:the-green": "the green",
+  "86d535c37ebd~urban:the-guardhouse": "the guardhouse",
+  "86d535c37ebd~urban:the-guardhouse^1": "the upper floor of the guardhouse",
+  "86d535c37ebd~urban:the-guildhall": "the guildhall",
+  "86d535c37ebd~urban:the-guildhall^1": "the upper floor of the guildhall",
+  "86d535c37ebd~urban:the-inn": "the inn",
+  "86d535c37ebd~urban:the-inn^1": "the upper floor of the inn",
+  "86d535c37ebd~urban:the-keep": "the keep",
+  "86d535c37ebd~urban:the-keep^-1": "the undercroft of the keep",
+  "86d535c37ebd~urban:the-keep^1": "the upper floor of the keep",
+  "86d535c37ebd~urban:the-keep^2": "the top floor of the keep",
+  "86d535c37ebd~urban:the-laboratory": "the laboratory",
+  "86d535c37ebd~urban:the-laboratory^-1": "the undercroft of the laboratory",
+  "86d535c37ebd~urban:the-laboratory^1": "the upper floor of the laboratory",
+  "86d535c37ebd~urban:the-market": "the market",
+  "86d535c37ebd~urban:the-merchants-row": "the merchants row",
+  "86d535c37ebd~urban:the-north-crossing": "the north crossing",
+  "86d535c37ebd~urban:the-smithy": "the smithy",
+  "86d535c37ebd~urban:the-smithy^1": "the upper floor of the smithy",
+  "86d535c37ebd~urban:the-south-crossing": "the south crossing",
+  "86d535c37ebd~urban:the-stables": "the stables",
+  "86d535c37ebd~urban:the-stables^1": "the upper floor of the stables",
+  "86d535c37ebd~urban:the-tavern": "the tavern",
+  "86d535c37ebd~urban:the-tavern^1": "the upper floor of the tavern",
+  "86d535c37ebd~urban:the-warrens": "the warrens",
+  "86d535c37ebd~urban:the-warrens^-1": "the undercroft of the warrens",
+  "86d535c37ebd~urban:the-warrens^1": "the upper floor of the warrens",
+  "86d535c37ebd~urban:the-warrens^2": "the top floor of the warrens",
+  "86d535c37ebd~urban:the-well": "the well",
+  "86d535c37ebd~urban:the-west-crossing": "the west crossing"
+ },
+ "ways": {
+  "86d535c37ebd~desert:@the-desert": [
+   {
+    "id": "86d535c37ebd~forest:@the-outskirts",
+    "name": "the outskirts",
+    "group": "outside",
+    "time_words": "about five hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 280
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-crossroads",
+    "name": "the crossroads",
+    "group": "outside",
+    "time_words": "about five hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 289
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+    "name": "the road to Balzun",
+    "group": "outside",
+    "time_words": "about five hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 298
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+    "name": "the road to Ledgernook",
+    "group": "outside",
+    "time_words": "about five hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 298
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+    "name": "the road to Milldell",
+    "group": "outside",
+    "time_words": "about five hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 298
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+    "name": "the road to Underrun",
+    "group": "outside",
+    "time_words": "about five hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 298
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-woods",
+    "name": "the woods",
+    "group": "outside",
+    "time_words": "about six hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 340
+   }
+  ],
+  "86d535c37ebd~forest:@the-crossroads": [
+   {
+    "id": "86d535c37ebd~forest:@the-outskirts",
+    "name": "the outskirts",
+    "group": "outside",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 9
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+    "name": "the road to Balzun",
+    "group": "outside",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 9
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+    "name": "the road to Ledgernook",
+    "group": "outside",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 9
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+    "name": "the road to Milldell",
+    "group": "outside",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 9
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+    "name": "the road to Underrun",
+    "group": "outside",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 9
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-woods",
+    "name": "the woods",
+    "group": "outside",
+    "time_words": "about an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 69
+   },
+   {
+    "id": "86d535c37ebd~desert:@the-desert",
+    "name": "the desert",
+    "group": "outside",
+    "time_words": "about five hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 289
+   }
+  ],
+  "86d535c37ebd~forest:@the-outskirts": [
+   {
+    "id": "86d535c37ebd~urban:the-gate",
+    "name": "the gate",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 9
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-crossroads",
+    "name": "the crossroads",
+    "group": "outside",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 9
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-woods",
+    "name": "the woods",
+    "group": "outside",
+    "time_words": "about an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 60
+   },
+   {
+    "id": "86d535c37ebd~desert:@the-desert",
+    "name": "the desert",
+    "group": "outside",
+    "time_words": "about five hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 280
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+    "name": "the road to Balzun",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+    "name": "the road to Ledgernook",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+    "name": "the road to Milldell",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+    "name": "the road to Underrun",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   }
+  ],
+  "86d535c37ebd~forest:@the-road-to-5beb4a684ab9": [
+   {
+    "id": "86d535c37ebd~forest:@the-crossroads",
+    "name": "the crossroads",
+    "group": "outside",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 9
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-outskirts",
+    "name": "the outskirts",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+    "name": "the road to Balzun",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+    "name": "the road to Ledgernook",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+    "name": "the road to Underrun",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-woods",
+    "name": "the woods",
+    "group": "outside",
+    "time_words": "an hour and more",
+    "blocked": "",
+    "journey": false,
+    "minutes": 78
+   },
+   {
+    "id": "86d535c37ebd~desert:@the-desert",
+    "name": "the desert",
+    "group": "outside",
+    "time_words": "about five hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 298
+   },
+   {
+    "id": "5beb4a684ab9",
+    "name": "Milldell",
+    "group": "road",
+    "time_words": "about three days on foot",
+    "blocked": "",
+    "journey": true,
+    "minutes": 0
+   }
+  ],
+  "86d535c37ebd~forest:@the-road-to-634f5db08475": [
+   {
+    "id": "86d535c37ebd~forest:@the-crossroads",
+    "name": "the crossroads",
+    "group": "outside",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 9
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-outskirts",
+    "name": "the outskirts",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+    "name": "the road to Ledgernook",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+    "name": "the road to Milldell",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+    "name": "the road to Underrun",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-woods",
+    "name": "the woods",
+    "group": "outside",
+    "time_words": "an hour and more",
+    "blocked": "",
+    "journey": false,
+    "minutes": 78
+   },
+   {
+    "id": "86d535c37ebd~desert:@the-desert",
+    "name": "the desert",
+    "group": "outside",
+    "time_words": "about five hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 298
+   },
+   {
+    "id": "634f5db08475",
+    "name": "Balzun",
+    "group": "road",
+    "time_words": "about four days on foot",
+    "blocked": "",
+    "journey": true,
+    "minutes": 0
+   }
+  ],
+  "86d535c37ebd~forest:@the-road-to-6cff3bc578e0": [
+   {
+    "id": "86d535c37ebd~forest:@the-crossroads",
+    "name": "the crossroads",
+    "group": "outside",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 9
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-outskirts",
+    "name": "the outskirts",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+    "name": "the road to Balzun",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+    "name": "the road to Milldell",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+    "name": "the road to Underrun",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-woods",
+    "name": "the woods",
+    "group": "outside",
+    "time_words": "an hour and more",
+    "blocked": "",
+    "journey": false,
+    "minutes": 78
+   },
+   {
+    "id": "86d535c37ebd~desert:@the-desert",
+    "name": "the desert",
+    "group": "outside",
+    "time_words": "about five hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 298
+   },
+   {
+    "id": "6cff3bc578e0",
+    "name": "Ledgernook",
+    "group": "road",
+    "time_words": "about five days on foot",
+    "blocked": "",
+    "journey": true,
+    "minutes": 0
+   }
+  ],
+  "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d": [
+   {
+    "id": "86d535c37ebd~forest:@the-crossroads",
+    "name": "the crossroads",
+    "group": "outside",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 9
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-outskirts",
+    "name": "the outskirts",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+    "name": "the road to Balzun",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+    "name": "the road to Ledgernook",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+    "name": "the road to Milldell",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-woods",
+    "name": "the woods",
+    "group": "outside",
+    "time_words": "an hour and more",
+    "blocked": "",
+    "journey": false,
+    "minutes": 78
+   },
+   {
+    "id": "86d535c37ebd~desert:@the-desert",
+    "name": "the desert",
+    "group": "outside",
+    "time_words": "about five hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 298
+   },
+   {
+    "id": "8c3cc1822e7d",
+    "name": "Underrun",
+    "group": "road",
+    "time_words": "about three days on foot",
+    "blocked": "",
+    "journey": true,
+    "minutes": 0
+   }
+  ],
+  "86d535c37ebd~forest:@the-woods": [
+   {
+    "id": "86d535c37ebd~forest:@the-outskirts",
+    "name": "the outskirts",
+    "group": "outside",
+    "time_words": "about an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 60
+   },
+   {
+    "id": "86d535c37ebd~underground:the-woods/the-cave",
+    "name": "the cave",
+    "group": "outside",
+    "time_words": "about an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 60
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-crossroads",
+    "name": "the crossroads",
+    "group": "outside",
+    "time_words": "about an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 69
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+    "name": "the road to Balzun",
+    "group": "outside",
+    "time_words": "an hour and more",
+    "blocked": "",
+    "journey": false,
+    "minutes": 78
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+    "name": "the road to Ledgernook",
+    "group": "outside",
+    "time_words": "an hour and more",
+    "blocked": "",
+    "journey": false,
+    "minutes": 78
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+    "name": "the road to Milldell",
+    "group": "outside",
+    "time_words": "an hour and more",
+    "blocked": "",
+    "journey": false,
+    "minutes": 78
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+    "name": "the road to Underrun",
+    "group": "outside",
+    "time_words": "an hour and more",
+    "blocked": "",
+    "journey": false,
+    "minutes": 78
+   },
+   {
+    "id": "86d535c37ebd~desert:@the-desert",
+    "name": "the desert",
+    "group": "outside",
+    "time_words": "about six hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 340
+   }
+  ],
+  "86d535c37ebd~underground:the-woods/the-cave": [
+   {
+    "id": "86d535c37ebd~underground:the-woods/the-cave/the-mouth",
+    "name": "the mouth",
+    "group": "outside",
+    "time_words": "about an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 60
+   },
+   {
+    "id": "86d535c37ebd~underground:the-woods/the-cave/the-throat",
+    "name": "the throat",
+    "group": "outside",
+    "time_words": "about an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 60
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-woods",
+    "name": "the woods",
+    "group": "outside",
+    "time_words": "about an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 60
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-outskirts",
+    "name": "the outskirts",
+    "group": "outside",
+    "time_words": "about two hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 120
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-crossroads",
+    "name": "the crossroads",
+    "group": "outside",
+    "time_words": "about two hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 129
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+    "name": "the road to Balzun",
+    "group": "outside",
+    "time_words": "about two hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 138
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+    "name": "the road to Ledgernook",
+    "group": "outside",
+    "time_words": "about two hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 138
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+    "name": "the road to Milldell",
+    "group": "outside",
+    "time_words": "about two hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 138
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+    "name": "the road to Underrun",
+    "group": "outside",
+    "time_words": "about two hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 138
+   },
+   {
+    "id": "86d535c37ebd~desert:@the-desert",
+    "name": "the desert",
+    "group": "outside",
+    "time_words": "about seven hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 400
+   }
+  ],
+  "86d535c37ebd~underground:the-woods/the-cave/the-mouth": [
+   {
+    "id": "86d535c37ebd~underground:the-woods/the-cave",
+    "name": "the cave",
+    "group": "outside",
+    "time_words": "about an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 60
+   }
+  ],
+  "86d535c37ebd~underground:the-woods/the-cave/the-throat": [
+   {
+    "id": "86d535c37ebd~underground:the-woods/the-cave",
+    "name": "the cave",
+    "group": "outside",
+    "time_words": "about an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 60
+   }
+  ],
+  "86d535c37ebd~urban:the-arena": [
+   {
+    "id": "86d535c37ebd~urban:the-cathedral",
+    "name": "the cathedral",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-east-crossing",
+    "name": "the east crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-guardhouse",
+    "name": "the guardhouse",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-guildhall",
+    "name": "the guildhall",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-stables",
+    "name": "the stables",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-barracks": [
+   {
+    "id": "86d535c37ebd~urban:the-granary",
+    "name": "the granary",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-merchants-row",
+    "name": "the merchants row",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-south-crossing",
+    "name": "the south crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-warrens",
+    "name": "the warrens",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-barracks^1",
+    "name": "the upper floor of the barracks",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-barracks^1": [
+   {
+    "id": "86d535c37ebd~urban:the-barracks",
+    "name": "the barracks",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-carters-yard": [
+   {
+    "id": "86d535c37ebd~urban:the-green",
+    "name": "the green",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-keep",
+    "name": "the keep",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-well",
+    "name": "the well",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-west-crossing",
+    "name": "the west crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-cathedral": [
+   {
+    "id": "86d535c37ebd~urban:the-arena",
+    "name": "the arena",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-east-crossing",
+    "name": "the east crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-guardhouse",
+    "name": "the guardhouse",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-guildhall",
+    "name": "the guildhall",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-stables",
+    "name": "the stables",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-cathedral^-1",
+    "name": "the undercroft of the cathedral",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-cathedral^1",
+    "name": "the upper floor of the cathedral",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-cathedral^2",
+    "name": "the top floor of the cathedral",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-cathedral^-1": [
+   {
+    "id": "86d535c37ebd~urban:the-cathedral",
+    "name": "the cathedral",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-cathedral^1": [
+   {
+    "id": "86d535c37ebd~urban:the-cathedral",
+    "name": "the cathedral",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-cathedral^2",
+    "name": "the top floor of the cathedral",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-cathedral^2": [
+   {
+    "id": "86d535c37ebd~urban:the-cathedral^1",
+    "name": "the upper floor of the cathedral",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-cathedral",
+    "name": "the cathedral",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-cistern": [
+   {
+    "id": "86d535c37ebd~urban:the-gate",
+    "name": "the gate",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-graveyard",
+    "name": "the graveyard",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-market",
+    "name": "the market",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-north-crossing",
+    "name": "the north crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-smithy",
+    "name": "the smithy",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-cistern^-1",
+    "name": "the undercroft of the cistern",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-cistern^1",
+    "name": "the upper floor of the cistern",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-cistern^-1": [
+   {
+    "id": "86d535c37ebd~urban:the-cistern",
+    "name": "the cistern",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-cistern^1": [
+   {
+    "id": "86d535c37ebd~urban:the-cistern",
+    "name": "the cistern",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-east-crossing": [
+   {
+    "id": "86d535c37ebd~urban:the-arena",
+    "name": "the arena",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-cathedral",
+    "name": "the cathedral",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-great-square",
+    "name": "the great square",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-guardhouse",
+    "name": "the guardhouse",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-guildhall",
+    "name": "the guildhall",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-stables",
+    "name": "the stables",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-gate": [
+   {
+    "id": "86d535c37ebd~urban:the-cistern",
+    "name": "the cistern",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-graveyard",
+    "name": "the graveyard",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-market",
+    "name": "the market",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-north-crossing",
+    "name": "the north crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-smithy",
+    "name": "the smithy",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-outskirts",
+    "name": "the outskirts",
+    "group": "outside",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 9
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-crossroads",
+    "name": "the crossroads",
+    "group": "outside",
+    "time_words": "a quarter of an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 18
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-634f5db08475",
+    "name": "the road to Balzun",
+    "group": "outside",
+    "time_words": "half an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 27
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-6cff3bc578e0",
+    "name": "the road to Ledgernook",
+    "group": "outside",
+    "time_words": "half an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 27
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-5beb4a684ab9",
+    "name": "the road to Milldell",
+    "group": "outside",
+    "time_words": "half an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 27
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-road-to-8c3cc1822e7d",
+    "name": "the road to Underrun",
+    "group": "outside",
+    "time_words": "half an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 27
+   },
+   {
+    "id": "86d535c37ebd~forest:@the-woods",
+    "name": "the woods",
+    "group": "outside",
+    "time_words": "about an hour",
+    "blocked": "",
+    "journey": false,
+    "minutes": 69
+   },
+   {
+    "id": "86d535c37ebd~desert:@the-desert",
+    "name": "the desert",
+    "group": "outside",
+    "time_words": "about five hours",
+    "blocked": "",
+    "journey": false,
+    "minutes": 289
+   }
+  ],
+  "86d535c37ebd~urban:the-granary": [
+   {
+    "id": "86d535c37ebd~urban:the-barracks",
+    "name": "the barracks",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-merchants-row",
+    "name": "the merchants row",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-south-crossing",
+    "name": "the south crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-warrens",
+    "name": "the warrens",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-granary^1",
+    "name": "the upper floor of the granary",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-granary^2",
+    "name": "the top floor of the granary",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-granary^1": [
+   {
+    "id": "86d535c37ebd~urban:the-granary",
+    "name": "the granary",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-granary^2",
+    "name": "the top floor of the granary",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-granary^2": [
+   {
+    "id": "86d535c37ebd~urban:the-granary^1",
+    "name": "the upper floor of the granary",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-granary",
+    "name": "the granary",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-graveyard": [
+   {
+    "id": "86d535c37ebd~urban:the-cistern",
+    "name": "the cistern",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-gate",
+    "name": "the gate",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-market",
+    "name": "the market",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-north-crossing",
+    "name": "the north crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-smithy",
+    "name": "the smithy",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-great-square": [
+   {
+    "id": "86d535c37ebd~urban:the-east-crossing",
+    "name": "the east crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-north-crossing",
+    "name": "the north crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-south-crossing",
+    "name": "the south crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-west-crossing",
+    "name": "the west crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-laboratory",
+    "name": "the laboratory",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-inn",
+    "name": "the inn",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-tavern",
+    "name": "the tavern",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-green": [
+   {
+    "id": "86d535c37ebd~urban:the-carters-yard",
+    "name": "the carters yard",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-keep",
+    "name": "the keep",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-well",
+    "name": "the well",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-west-crossing",
+    "name": "the west crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-guardhouse": [
+   {
+    "id": "86d535c37ebd~urban:the-arena",
+    "name": "the arena",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-cathedral",
+    "name": "the cathedral",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-east-crossing",
+    "name": "the east crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-guildhall",
+    "name": "the guildhall",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-stables",
+    "name": "the stables",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-guardhouse^1",
+    "name": "the upper floor of the guardhouse",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-guardhouse^1": [
+   {
+    "id": "86d535c37ebd~urban:the-guardhouse",
+    "name": "the guardhouse",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-guildhall": [
+   {
+    "id": "86d535c37ebd~urban:the-arena",
+    "name": "the arena",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-cathedral",
+    "name": "the cathedral",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-east-crossing",
+    "name": "the east crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-guardhouse",
+    "name": "the guardhouse",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-stables",
+    "name": "the stables",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-guildhall^1",
+    "name": "the upper floor of the guildhall",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-guildhall^1": [
+   {
+    "id": "86d535c37ebd~urban:the-guildhall",
+    "name": "the guildhall",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-inn": [
+   {
+    "id": "86d535c37ebd~urban:the-great-square",
+    "name": "the great square",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-inn^1",
+    "name": "the upper floor of the inn",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-inn^1": [
+   {
+    "id": "86d535c37ebd~urban:the-inn",
+    "name": "the inn",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-keep": [
+   {
+    "id": "86d535c37ebd~urban:the-carters-yard",
+    "name": "the carters yard",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-green",
+    "name": "the green",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-well",
+    "name": "the well",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-west-crossing",
+    "name": "the west crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-keep^-1",
+    "name": "the undercroft of the keep",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-keep^1",
+    "name": "the upper floor of the keep",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-keep^2",
+    "name": "the top floor of the keep",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-keep^-1": [
+   {
+    "id": "86d535c37ebd~urban:the-keep",
+    "name": "the keep",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-keep^1": [
+   {
+    "id": "86d535c37ebd~urban:the-keep",
+    "name": "the keep",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-keep^2",
+    "name": "the top floor of the keep",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-keep^2": [
+   {
+    "id": "86d535c37ebd~urban:the-keep^1",
+    "name": "the upper floor of the keep",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-keep",
+    "name": "the keep",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-laboratory": [
+   {
+    "id": "86d535c37ebd~urban:the-great-square",
+    "name": "the great square",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-laboratory^-1",
+    "name": "the undercroft of the laboratory",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-laboratory^1",
+    "name": "the upper floor of the laboratory",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-laboratory^-1": [
+   {
+    "id": "86d535c37ebd~urban:the-laboratory",
+    "name": "the laboratory",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-laboratory^1": [
+   {
+    "id": "86d535c37ebd~urban:the-laboratory",
+    "name": "the laboratory",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-market": [
+   {
+    "id": "86d535c37ebd~urban:the-cistern",
+    "name": "the cistern",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-gate",
+    "name": "the gate",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-graveyard",
+    "name": "the graveyard",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-north-crossing",
+    "name": "the north crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-smithy",
+    "name": "the smithy",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-merchants-row": [
+   {
+    "id": "86d535c37ebd~urban:the-barracks",
+    "name": "the barracks",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-granary",
+    "name": "the granary",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-south-crossing",
+    "name": "the south crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-warrens",
+    "name": "the warrens",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-north-crossing": [
+   {
+    "id": "86d535c37ebd~urban:the-cistern",
+    "name": "the cistern",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-gate",
+    "name": "the gate",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-graveyard",
+    "name": "the graveyard",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-great-square",
+    "name": "the great square",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-market",
+    "name": "the market",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-smithy",
+    "name": "the smithy",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-smithy": [
+   {
+    "id": "86d535c37ebd~urban:the-cistern",
+    "name": "the cistern",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-gate",
+    "name": "the gate",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-graveyard",
+    "name": "the graveyard",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-market",
+    "name": "the market",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-north-crossing",
+    "name": "the north crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-smithy^1",
+    "name": "the upper floor of the smithy",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-smithy^1": [
+   {
+    "id": "86d535c37ebd~urban:the-smithy",
+    "name": "the smithy",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-south-crossing": [
+   {
+    "id": "86d535c37ebd~urban:the-barracks",
+    "name": "the barracks",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-granary",
+    "name": "the granary",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-great-square",
+    "name": "the great square",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-merchants-row",
+    "name": "the merchants row",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-warrens",
+    "name": "the warrens",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-stables": [
+   {
+    "id": "86d535c37ebd~urban:the-arena",
+    "name": "the arena",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-cathedral",
+    "name": "the cathedral",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-east-crossing",
+    "name": "the east crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-guardhouse",
+    "name": "the guardhouse",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-guildhall",
+    "name": "the guildhall",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-stables^1",
+    "name": "the upper floor of the stables",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-stables^1": [
+   {
+    "id": "86d535c37ebd~urban:the-stables",
+    "name": "the stables",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-tavern": [
+   {
+    "id": "86d535c37ebd~urban:the-great-square",
+    "name": "the great square",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-tavern^1",
+    "name": "the upper floor of the tavern",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-tavern^1": [
+   {
+    "id": "86d535c37ebd~urban:the-tavern",
+    "name": "the tavern",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-warrens": [
+   {
+    "id": "86d535c37ebd~urban:the-barracks",
+    "name": "the barracks",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-granary",
+    "name": "the granary",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-merchants-row",
+    "name": "the merchants row",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-south-crossing",
+    "name": "the south crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-warrens^-1",
+    "name": "the undercroft of the warrens",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-warrens^1",
+    "name": "the upper floor of the warrens",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-warrens^2",
+    "name": "the top floor of the warrens",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-warrens^-1": [
+   {
+    "id": "86d535c37ebd~urban:the-warrens",
+    "name": "the warrens",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-warrens^1": [
+   {
+    "id": "86d535c37ebd~urban:the-warrens",
+    "name": "the warrens",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-warrens^2",
+    "name": "the top floor of the warrens",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-warrens^2": [
+   {
+    "id": "86d535c37ebd~urban:the-warrens^1",
+    "name": "the upper floor of the warrens",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-warrens",
+    "name": "the warrens",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-well": [
+   {
+    "id": "86d535c37ebd~urban:the-carters-yard",
+    "name": "the carters yard",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-green",
+    "name": "the green",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-keep",
+    "name": "the keep",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-west-crossing",
+    "name": "the west crossing",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ],
+  "86d535c37ebd~urban:the-west-crossing": [
+   {
+    "id": "86d535c37ebd~urban:the-carters-yard",
+    "name": "the carters yard",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-great-square",
+    "name": "the great square",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-green",
+    "name": "the green",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-keep",
+    "name": "the keep",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   },
+   {
+    "id": "86d535c37ebd~urban:the-well",
+    "name": "the well",
+    "group": "next_door",
+    "time_words": "a few minutes' walk",
+    "blocked": "",
+    "journey": false,
+    "minutes": 8
+   }
+  ]
+ },
+ "been": [
+  "86d535c37ebd~forest:@the-road-to-634f5db08475",
+  "86d535c37ebd~forest:@the-crossroads",
+  "86d535c37ebd~forest:@the-outskirts",
+  "86d535c37ebd~forest:@the-woods",
+  "86d535c37ebd~underground:the-woods/the-cave",
+  "86d535c37ebd~urban:the-gate",
+  "86d535c37ebd~urban:the-north-crossing",
+  "86d535c37ebd~urban:the-great-square",
+  "86d535c37ebd~urban:the-inn",
+  "86d535c37ebd~urban:the-inn^1",
+  "86d535c37ebd~urban:the-market",
+  "86d535c37ebd~urban:the-cistern",
+  "86d535c37ebd~urban:the-laboratory",
+  "86d535c37ebd~urban:the-west-crossing",
+  "86d535c37ebd~urban:the-carters-yard",
+  "86d535c37ebd~urban:the-keep",
+  "86d535c37ebd~urban:the-south-crossing",
+  "86d535c37ebd~forest:@the-road-to-6cff3bc578e0"
+ ]
+}

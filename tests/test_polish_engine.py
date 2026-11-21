@@ -47,6 +47,12 @@ class TestTheArticle:
         assert names.with_articles("You leave man mid-sentence.", ["man"]) == \
             "You leave the man mid-sentence."
 
+    def test_an_adjective_after_the_article_keeps_the_phrase_definite(self):
+        """Playtest 2026-11-16 E5: with a bat actor present "the great bat" came back
+        "the great the bat" -- only the one word before the name was asked."""
+        assert names.with_articles("the great bat wheels overhead.", ["bat"]) ==             "the great bat wheels overhead."
+        assert names.with_articles("A grey old man nods. You see man.", ["man"]) ==             "A grey old man nods. You see the man."
+
     def test_a_sentence_opening_takes_a_capital(self):
         assert names.with_articles("man takes it badly.", ["man"]) == "The man takes it badly."
         assert names.with_articles("Kesst waits. Man comes round.", ["man"]) == \

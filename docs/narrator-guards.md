@@ -1136,3 +1136,85 @@ lanes were using at the same time (turns took 35-600 s). Three runs each:
 The master walk also invented the culvert seam again on its second beat. These are small
 samples: the claim rests on the mechanism, which the tests pin
 (tests/test_playtest_2026_11_16_narration.py).
+
+## Talk in the air, a recap nobody asked for, and the ship called a building (2026-11-17)
+
+The overnight playtest of integrate/0.4.0 (pgm-work/playtest-2026-11-16.md, items 59, 61,
+62, 67, 74, 76, 87, 88, 89, 90, 98, 99 and E2). Read off the save's turn log first, as the
+day before: most of these slips came from our own pull, repairs and tells.
+
+- **The town's talk (#67, #90).** A rumour card (`cards.TAG_RUMOUR`) qualified on "talk"
+  and reached the matter slot as "a matter of the world here … seen or heard here". The
+  slot hung it in the air between the player's question and the gardener's answer, and on
+  the Red Gull's deck wrote "the sewers beneath the rigging". That rumour was itself wrong:
+  `spread_rumours` ran aboard the ship at the quay, took her for the settlement and gave her
+  rigging a way down. **Fixed:** a rumour reaches the player as somebody's words, at a free
+  moment (`cards._rumour_pull`): somebody of the place here says it in passing
+  (`go_between`, `_carrier`, which now passes over creatures), and never while the player
+  is talking with somebody or in a fight. The slot names who says it and that the place is
+  elsewhere. A ship spreads no talk, and an old save's ship rumour is never pulled. The
+  Alexandrian's rumour tables deliver talk through a scene with a speaker (a quiet word,
+  someone boasting at the next table; "Hexcrawl Tool: Rumor Tables", part 2,
+  thealexandrian.net/?p=48552), and warn that too much of it turns to noise.
+- **The recap (#59, #76).** The player's own quest, pinned to the main channel, wrote "You
+  are still driven by the goal to uncover what lies beneath the sewers" into a question to
+  the smuggler. A watcher card pinned to the same spot wrote "A hidden passage remains a
+  secret of the architecture" at the east crossing, "spoken" only because the gate's tell
+  listed the main channel among the ways out. **Fixed** (`cards.salience`): a matter of the
+  player's own or of the world, pinned to another spot with none of its people here, comes
+  up only when the player's own words raise it. A tell naming the place does not count. The
+  Journal keeps the rest. A strain pinned to its settlement is not a spot and is unchanged.
+- **The night's event cut (#61).** "A lone Mite skitters past your head" was the engine's
+  "a Mite comes near the camp, and goes on by". The outcome-claims row took "skitters past"
+  for an attack missing and cut it. Now it counts only with a weapon going by.
+- **Morning air underground (#62).** A right hour told with the sky in a place that has
+  none. An hour claim whose quote names the air, sky, sun or daylight, on a beat set wholly
+  underground, is a contradiction, and its repair is told so.
+- **The stop at the crossing (#74).** "As you fail to reach the docks" was cut as an
+  invented verdict. Its repair wrote "as you approach the docks", and the tells gate
+  refused it. A walk the engine stopped short (`stopped_short`) now backs the failure. A
+  say with nobody here to hear it now tells "Nobody here answers.", so no foreman is
+  written answering and then made by the seen-people door.
+- **The unanswered question (#87).** Arriving at a quay, the travel tell names the party's
+  own ships lying there ("The Red Gull lies at the quay.").
+- **A smith's smell on the harbourmaster (#88).** `faces.details_for` drew the forge's
+  hands line with no work known. Lines that belong to one trade (`faces.ONE_TRADE`) are
+  re-picked. People already in a save keep the face they have.
+- **Heavy limbs after the fatigue ended (#89).** The wound strain read "gravely hurt, with
+  little strength left in them". The check's rewrite turned that into "your heavy limbs
+  trembling", and the backstop wrote a second wound line under it. It now says the wounds.
+- **The building below decks (#98).** `places.settings_for` had below decks as "indoors,
+  under a roof" and not aboard a ship. A true "the ship's hold" was repaired into "the
+  building's interior". The deck had the same gap, as a street. Every room of a vessel is
+  now aboard a ship, and only aboard.
+- **The refusal pasted raw (#99).** The refused-rest reader took the refusal's own choices
+  ("You must decide whether to sleep now…") for the player sleeping. The backstop then cut
+  them and pasted the engine line "It is early morning (about 8 in the morning) now: the
+  time you meant…". The reader is now told a choice put to the player is no sleep. The
+  refusal reads as a sentence: "It is about 8 in the morning, and dawn has already come
+  today, so … has not lain down."
+- **Somebody who was not there (E2).** The aside, offered the deckhand, wrote "The merchant
+  continues to adjust the crates". The aside is now read back by the names it was offered.
+  If it names none of them it is asked once more, and then dropped (`_aside_is_theirs`,
+  the shape of `_matter_is_its_own`). Not covered: the "still" slot names nobody by ref and
+  can still write "the curt merchant" (seen once in the baseline below).
+
+**Measured** with `tools/narration_diag/drive.py`, three runs each, against
+integrate/0.4.0 (1b785de3) and this branch, on the shared Ollama (turns 28-235 s). The
+scenarios were snapshots of the playtest save: the deck before T327; the great square one
+turn later; the deck with both rumours made fresh, to reproduce the first telling.
+
+| item | 0.4.0 | this branch |
+|---|---|---|
+| #99: the refusal pasted as engine text, brackets and all | 3 of 3 (once twice) | 0 of 3 (1 of 3 carries the new sentence) |
+| #98: the ship below decks called a building or a cellar | 2 of 3 | 0 of 3 |
+| #87: the page says whether the Red Gull is at the quay | 1 of 3 (unprompted) | 3 of 3 |
+| #59: a quest recap on arriving at the docks | 2 of 3 | 0 of 3 |
+| #67/#90: the town's talk pasted into a question to the deckhand | 3 of 3 | 0 of 3 |
+| #90: "the sewers off the rigging" on the page | 3 of 3 | 0 of 3 |
+| #88: smoke and hot iron on the harbourmaster | 1 of 3 | 3 of 3 (his face is stored in the save) |
+
+Seen and left: the refused-rest reader still flagged "you have not yet laid down" once (1
+of 3). The fixed arm's beats each re-told the wounds once, because the save's stored
+`body:told` words were the old ones; a live game retells them once and then rests for the
+hour. Tests: tests/test_playtest_2026_11_16_fidelity.py.

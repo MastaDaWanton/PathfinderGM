@@ -126,17 +126,63 @@ def test_the_viewport_is_a_way_of_looking_and_not_a_fact_about_the_scene():
     # deleted rather than understood.
     for name in ("turn", "camera", "view", "view3d", "level_shown"):
         assert f'"{name}"' not in sent, f"the server has started deciding the {name}"
-    assert "let MAP_TURN = 0, MAP_3D = false;" in _page()
+    assert "let MAP_TURN = 0, MAP_3D = false" in _page()
 
 
-def test_rotation_is_quarter_turns():
-    """Four fixed orientations, which is what Firaxis chose for XCOM — a fixed camera
-    with 90-degree steps, specifically against the disorientation a free camera causes
-    over a tactical map. Free rotation is the one thing WebGL would buy here, and it is
-    the thing that was decided against."""
-    js = _js()
-    assert "TURNS: 4" in js
-    assert "& 3" in js, "the turn is not clamped to four orientations"
+_PROBE = r"""
+global.window = {};
+require(process.argv[2]);
+const S = global.window.Scene3D;
+// A walled room: a wall row across the middle, a person behind it.
+const g = { width: 8, height: 6, floor: [], blocked: [[2,3],[3,3],[4,3],[5,3]],
+            reachable: [[1,1,10,0],[6,5,25,0]], fixtures: [] };
+const actors = [{ ref: "pc", name: "Shadow", at: [1, 1], stance: "pc", hp: 9, hp_max: 9 },
+                { ref: "c1", name: "lizard", at: [4, 5], stance: "foe", hp: 3, hp_max: 3 }];
+const out = {};
+for (const q of [0, 0.37, 1, 2.5, 3.9]) {
+  const svg = S.render(g, actors, { turn: q, reach: true });
+  const vb = svg.match(/viewBox="([^"]+)"/)[1].split(" ").map(Number);
+  const sq = (svg.match(/data-sq="/g) || []).length;
+  const back = S.toBoard(...S.toUser(3.25, 1.5, q), q);
+  out[q] = { w: vb[2], h: vb[3], sq, back };
+}
+// A whole turn is the old quarter-turn swap, (a, b) -> (b, -a), exactly.
+out.whole = S.toUser(2, 5, 1);
+out.swapped = S.toUser(5, -2, 0);
+console.log(JSON.stringify(out));
+"""
+
+
+def test_the_board_turns_freely_and_keeps_its_frame(tmp_path):
+    """Playtest 2026-11-20 #8: the owner asked for free rotation, because figures between
+    walls could not be seen from any of the four fixed quarter-turns (`TURNS: 4`, `& 3`,
+    which an earlier version of this test pinned as a decision). Driven through the real
+    renderer under node: at any angle every reachable square still carries its `data-sq`
+    (clicking keeps working), a board point survives `toUser` then `toBoard` (zoom keeps
+    its centre), and the frame is the same size at every angle. Measured from the corners,
+    a square board's frame grew 41% between a diamond and a square, and Fit with it."""
+    import json
+    import shutil
+    import subprocess
+
+    import pytest
+
+    if shutil.which("node") is None:
+        pytest.skip("node is not on this machine")
+    probe = tmp_path / "probe.js"
+    probe.write_text(_PROBE, encoding="utf-8")
+    done = subprocess.run(["node", str(probe), str(Path(settings.BASE_DIR, "play", "static",
+                                                         "js", "scene3d.js"))],
+                          capture_output=True, text=True, encoding="utf-8")
+    assert done.returncode == 0, done.stderr
+    got = json.loads(done.stdout.strip().splitlines()[-1])
+    sizes = {(round(v["w"], 3), round(v["h"], 3)) for k, v in got.items()
+             if k not in ("whole", "swapped")}
+    assert len(sizes) == 1, f"the frame changes size as the board turns: {sizes}"
+    for q in ("0", "0.37", "1", "2.5", "3.9"):
+        assert got[q]["sq"] >= 2, f"at turn {q} the reachable squares lost their data-sq"
+        assert abs(got[q]["back"][0] - 3.25) < 1e-9 and abs(got[q]["back"][1] - 1.5) < 1e-9
+    assert got["whole"] == got["swapped"], "a whole quarter-turn is no longer the old swap"
 
 
 # --- the rework: one light, and it belongs to the room --------------------------------------

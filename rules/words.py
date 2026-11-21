@@ -57,3 +57,38 @@ def plural(noun: str) -> str:
     else:
         pl = last + "s"
     return " ".join(words[:-1] + [pl])
+
+
+def is_plural(noun: str) -> bool:
+    """Whether a name takes a plural verb: "the sewers open", "the crypt opens". Read off
+    its last word (playtest 2026-11-16 #80, "The sewers opens off the gardens"); a word
+    in -ss, -us or -is is singular (the pass, the abyss, the oasis)."""
+    words = str(noun or "").split()
+    low = words[-1].lower() if words else ""
+    if low in ("folk", "people", "kin"):
+        return True
+    return low.endswith("s") and not low.endswith(("ss", "us", "is"))
+
+
+def verb(noun: str, singular: str, plural: str) -> str:
+    """The verb that agrees with `noun`: verb("the sewers", "opens", "open") → "open"."""
+    return plural if is_plural(noun) else singular
+
+
+_ONES = ("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
+         "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
+         "seventeen", "eighteen", "nineteen")
+_TENS = ("", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety")
+
+
+def number(n: int) -> str:
+    """A whole number in words, 0 to 99 ("eleven", "twenty-three"); digits past that.
+    For the journey's quiet days (`ontheway.quiet_days`): a tell says "eleven quiet days",
+    as the owner did, never "11"."""
+    n = int(n)
+    if 0 <= n < 20:
+        return _ONES[n]
+    if 20 <= n < 100:
+        tens, ones = divmod(n, 10)
+        return _TENS[tens] + (f"-{_ONES[ones]}" if ones else "")
+    return str(n)

@@ -238,6 +238,15 @@ def scene_facts(c) -> tuple[list[str], list[str]]:
     ranks = sorted(k for k, v in (getattr(pc, "ranks", None) or {}).items() if v)
     if pc is not None and ranks:
         checked.append(f"{pc.name} is trained in these skills: {', '.join(ranks)}.")
+    # And what they carry, by the sheet. Playtest 2026-11-17 #16: over a wrong refusal
+    # ("There is no one of my torches here") the table said "You don't have any torches in
+    # your pack" while she had three, and the read passed it for want of the sheet.
+    if pc is not None:
+        from rules import holding
+
+        things = holding.carried_list(pc)
+        if things:
+            checked.append(f"{pc.name} carries, by the sheet: {', '.join(things)}.")
     return said, checked
 
 
@@ -282,9 +291,12 @@ act for the player's character.
 # now handed the job of its moment, and the examples are labelled with theirs, so the
 # demonstration and the request have the same shape.
 JOBS = {
+    # "point at another way if there is an obvious one" was answered "Try looking for a
+    # different way in, like a cellar or a crawlspace" over ruins that held neither
+    # (playtest 2026-11-20 #45): only a way the moment or the scene names.
     "refused": "Something the player tried did not happen. Tell them plainly why, using "
-               "the reason in the MOMENT, and point at another way if there is an obvious "
-               "one. Do not praise the attempt.",
+               "the reason in the MOMENT, and point at another way only if the MOMENT or "
+               "THE SCENE names one. Do not praise the attempt.",
     "you_down": "The player's character is down. Make the danger felt. No jokes.",
     "bend": "You gave a bonus or a penalty for how it was done. Say why, in a few words.",
     "fight_starts": "A fight has started. Make the stakes felt in a few words.",
@@ -559,7 +571,8 @@ def _log(c, row: dict) -> None:
 
 
 def _held_to_the_tells(agent, ask, msgs, line: str, said: str, premises: list[str], pc,
-                       allowed: str, recent: list[str]) -> tuple[str, str, bool]:
+                       allowed: str, recent: list[str],
+                       attacked: bool | None = None, story: str = "") -> tuple[str, str, bool]:
     """(line, why, remade): the line read against the turn's tells and the scene, as the
     narrator's beat is (`beat_verify.against_tells`, the same first read) — and on a clash,
     asked once more with the fact it breaks named, read again, and dropped if it still
@@ -580,7 +593,8 @@ def _held_to_the_tells(agent, ask, msgs, line: str, said: str, premises: list[st
     who = str(getattr(pc, "name", "") or "")
     read = beat_verify.against_tells(strip_gestures(line), premises, who=who, **route)
     if not read.clashes:
-        return line, "", False
+        return _nothing_past_the_facts(ask, msgs, line, said, premises, who, route,
+                                       allowed, recent, attacked, story)
     c0 = read.clashes[0]
     mend = (f'"{c0.words}" is not true: {c0.tell} Say it again so that it agrees with '
             f"that, and add nothing the MOMENT does not say.")
@@ -594,6 +608,59 @@ def _held_to_the_tells(agent, ask, msgs, line: str, said: str, premises: list[st
         return "", f"contradicts the engine: {c0.words} (remake: {why})", True
     if beat_verify.against_tells(strip_gestures(line2), premises, who=who, **route).clashes:
         return "", f"contradicts the engine twice: {c0.words}", True
+    line3, why, _ = _nothing_past_the_facts(ask, msgs, line2, again, premises, who, route,
+                                            allowed, recent, attacked, story)
+    return line3, why, True
+
+
+def _nothing_past_the_facts(ask, msgs, line: str, said: str, premises: list[str], who: str,
+                            route: dict, allowed: str, recent: list[str],
+                            attacked: bool | None = None,
+                            story: str = "") -> tuple[str, str, bool]:
+    """(line, why, remade): the line read for a world fact or a deed that no tell and no
+    scene fact carries (`beat_verify.beyond_tells`); on one, asked once more with the words
+    named, read again, and what still adds something is cut sentence by sentence — the
+    line dropped when nothing spoken is left. Playtest 2026-11-16 #71 ("Mirabalos doesn't
+    have any healers in this order" over a refusal that said only that no Father is here)
+    and #93 ("You tripped over your own feet while looking" on a natural one on a search;
+    no tell said so, and 1e has no fumble on a skill check). Unread, the line stands."""
+    from gm import beat_verify
+    from gm.client import ModelUnavailable
+
+    # `attacked`: whether the turn rolled an attack. "Nice shot" over a pick-up with no
+    # throw (owner bug list 2026-11-18, item 18) claims one (`beyond_tells`).
+    # `story`: the beat the player just read, a source of what is there for this read only
+    # (the rubble the page described may be pointed at; crates it never held may not —
+    # playtest 2026-11-20 #9, #45, #48; probed 0 of 4 such leads caught before, 4 of 4
+    # after, no false alarm in 6 clean lines with the story given).
+    premises = [*premises, *([f"The story the player just read: {story}"] if story else [])]
+    found = beat_verify.beyond_tells(strip_gestures(line), premises, who=who,
+                                     attacked=attacked, **route)
+    if not found:
+        return line, "", False
+    words = found[0][1]
+    mend = (f'"{words}" is not in the MOMENT. Say it again without it, and state nothing '
+            f"about the world or about what anyone did that the MOMENT does not say.")
+    try:
+        again = ask(msgs + [{"role": "assistant", "content": said},
+                            {"role": "user", "content": mend}])
+    except ModelUnavailable:
+        again = ""
+    line2, _why = check(again, allowed, recent) if again else ("", "empty")
+    if line2 and not beat_verify.against_tells(strip_gestures(line2), premises, who=who,
+                                               **route).clashes:
+        still = beat_verify.beyond_tells(strip_gestures(line2), premises, who=who,
+                                         attacked=attacked, **route)
+        if not still:
+            return line2, "", True
+    else:
+        line2, still = line, found
+    # Cut what still adds: "Ouch, that one is a sting." survives its invented trip.
+    for sentence, _w in still or ():
+        line2 = line2.replace(sentence, "")
+    line2 = " ".join(line2.split())
+    if not strip_gestures(line2):
+        return "", f"states what no fact carries: {words}", True
     return line2, "", True
 
 
@@ -677,9 +744,11 @@ def after_the_beat(c, agent, resolution) -> None:
                 if line and not gives_the_reason(line, facts):
                     line, why = "", "never said why it was refused"
             if line:
-                line, why, again = _held_to_the_tells(agent, ask, msgs, line, said,
-                                                      [*facts, *here, *trained], pc,
-                                                      allowed, recent)
+                line, why, again = _held_to_the_tells(
+                    agent, ask, msgs, line, said, [*facts, *here, *trained], pc, allowed,
+                    recent, attacked=any(getattr(o, "op", "") == "attack"
+                                         for o in getattr(resolution, "outcomes", None)
+                                         or ()), story=beat)
                 remade = remade or again
         seconds = round(time.monotonic() - started, 1)
         _log(c, {"moments": kinds, "job": job, "said": line, "dropped": why,

@@ -129,17 +129,19 @@ def test_every_level_lands_on_mastery_alone(herbalist):
 def test_the_save_that_sat_at_110_of_100_now_levels(herbalist):
     """Found in the owner's own live save: Herbalist 4 at 110 MP of a 100 MP threshold,
     `to_next.need` 0, bar drawn full, level not moving, waiting on `legendary-catalyst`.
-    Migrated, level 4 is an endless level costing 60 with no deed, so the next step it
-    earns lands Herbalist 5 and the rest of the 110 carries over."""
+    Migrated, level 4 is an endless level with no deed (since the owner's 2026-11-18 ruling
+    it costs a flat 400), so a step that reaches the price lands Herbalist 5 and the rest
+    carries over; nothing waits on a milestone."""
     p = wc.Progress(track="herbalist", level=4, mp=110)
     assert wc.migrate(p)
     assert p.level == 4 and p.mp == 110                      # migration moves nothing
     assert wc._remaining(herbalist, p)["milestone"] is None
 
+    p.mp = 399
     got = wc.award_step(herbalist, p, method="dry", ingredient_id="comfrey",
                         rarity_rank=1, quality_index=2)
     assert got["levelled"] == [5]
-    assert p.mp == 110 + 1 - 60
+    assert p.mp == 399 + 1 - 400
 
 
 # --- 3. the ceiling, one copy, through the engine -------------------------------------------
@@ -260,7 +262,10 @@ def test_a_gm_can_hand_over_a_legendary_monster_part(client):
     scene.add(load_pc("fixtures/pc-kesst.json"))
     scene.add(instantiate("thug", scene=scene, name="a wandering trader"))
     engine = Engine(scene, Dice(seed=3))
+    # The GM's own word (`origin` author:) since playtest 2026-11-20 #5: a trader with no
+    # feather on record hands none over to a model's give — nobody offers what they do
+    # not hold.
     engine.run(engine.validate([{
         "op": "give", "actor": "c1", "because": "the trader hands it over",
-        "params": {"to": "pc", "item": "Phoenix Feather", "count": 1}}]))
+        "params": {"to": "pc", "item": "Phoenix Feather", "count": 1}}], origin="author:gm"))
     assert scene.pc().inventory.get("phoenix-feather") == 1

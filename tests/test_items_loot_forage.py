@@ -317,7 +317,8 @@ def test_the_forage_creature_is_capped_by_the_characters_level():
 def test_the_engine_forages_at_the_lower_of_trade_and_body(monkeypatch):
     """The engine's door, not the function: what `_gathering_encounter` hands the table is
     the party's APL with the PC at min(trade, body). A level-3 body with a trade of 18 is a
-    lone level 3 (APL 1); a trade of 1 on the same body is a lone level 1 (APL -1)."""
+    lone level 3 (APL 2); a trade of 1 on the same body is a lone level 1 (APL 0, the
+    owner's 2026-11-18 one-down for a lone PC)."""
     seen = []
     monkeypatch.setattr(gathering, "roll", lambda biome, level, dice, apl=None, danger=1.0:
                         seen.append(apl) or gathering.Encounter("quiet", 1))
@@ -326,7 +327,7 @@ def test_the_engine_forages_at_the_lower_of_trade_and_body(monkeypatch):
     e = Engine(s, Dice(seed=1))
     e._gathering_encounter(s.pc(), "swamp", 18, "herb", effects=[])
     e._gathering_encounter(s.pc(), "swamp", 1, "herb", effects=[])
-    assert seen == [1, -1]
+    assert seen == [2, 0]
 
 
 # --- 6. a cure with nothing to cure ----------------------------------------------------------------
@@ -352,3 +353,22 @@ def test_a_nonlethal_poultice_on_a_body_with_none_is_not_spent():
     assert out.status == "refused", out.tell
     assert "non-lethal damage only" in out.tell and "dose is kept" in out.tell
     assert sum(st.count for st in pc.stock.values()) == 2
+
+
+def test_a_forage_group_of_three_all_come_in_and_all_fight(monkeypatch):
+    """The owner's 2026-11-18 ruling, wilderness fights hold up to three
+    (`encounter_budget.MOST`): the engine's forage door brought in `count=1` whatever the
+    draw, so a group the budget priced would have arrived as one. All three come in, far
+    off, and all three are on the other side of the fight their kind opens."""
+    row = next(r for r in bestiary.search(biome="forest", stated=True, limit=50)
+               if r.get("creature_type") == "animal")
+    monkeypatch.setattr(gathering, "roll", lambda *a, **k: gathering.Encounter(
+        "creature", 80, creature=row, aggressive=True, count=3))
+    s = _scene("forest")
+    e = Engine(s, Dice(seed=1))
+    effects = [{}]
+    clause = e._gathering_encounter(s.pc(), "forest", 1, "herbs", effects=effects)
+    refs = effects[-1]["refs"]
+    assert len(refs) == 3 and all(s.zones[r] == "far" for r in refs)
+    assert s.in_encounter and set(refs) <= set(s.sides["them"]), s.sides
+    assert "three" in clause and "they are coming for you" in clause, clause

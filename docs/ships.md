@@ -395,8 +395,19 @@ was lost the moment her new owner stepped ashore at Mirabalos. Built:
 Researched for the cruise: Sid Meier's Pirates! (2004) shows the sails and lets the player
 choose and chase a target; the Skull & Shackles plunder rules price a cargo (a mixed
 trader about 4 plunder) but print no rate for meeting one, and no 1e book I could read
-does. Not built: the merchant running from a closing hunter, her cargo as plunder, a
-naval patrol that challenges a pirate, keeping prisoners in irons.
+does. Not built: the merchant running from a closing hunter, a naval patrol that
+challenges a pirate, keeping prisoners in irons.
+
+- **Her cargo** (playtest 2026-11-16 #92; `ships.lading`, `Engine._keep_vessel`). A trader
+  (a sailing ship, a keelboat) is laden the first time she is kept, off her home port's own
+  trade (`trade.supplied_at`), one or two rows of the trade table seeded off her id. How
+  much is Skull & Shackles plunder as quoted from The Wormwood Mutiny (the book could not
+  be read): a point is about 1,000 gp of goods in about 10 tons of hold, a mixed prize
+  about 3 points (a keelboat 1, this app's call). Cheap goods fill the hold before they
+  reach the value. Her owners' cargo is `Vessel.cargo`; taken, it moves to `Scene.cargo`
+  as the taker's lots in her hold (`plunder` = her id), sold from the hold where she lies
+  and kept aboard when she makes port. In the hold the brief says what is stowed, as fact
+  (`gm/brief/in_the_hold.py`): it is seen, not searched for.
 
 ## Still open
 
@@ -418,5 +429,5 @@ naval patrol that challenges a pirate, keeping prisoners in irons.
   table's abstract number; who of them is aboard as a person is still the master and a
   hand. Buying one, wages, stores and repair are unbuilt.
 - **A ship as a place to live between passages.** The deck exists while an engagement
-  does. Sleeping aboard, keeping cargo in the hold, and coming back to the same ship in
-  port are all unbuilt.
+  does. A held ship's hold keeps its cargo in port (above); sleeping aboard and coming
+  back to the same ship in port are unbuilt.

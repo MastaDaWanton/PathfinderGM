@@ -207,10 +207,14 @@ def test_seller_attitude_moves_the_bulk_price_but_the_haggle_does_not():
 
 # --- by sea: freight, the quay, the sale, the wreck ------------------------------------
 
-def test_freight_rides_on_the_fare_and_sells_dear_across_the_water():
+def test_freight_rides_on_the_fare_and_sells_dear_across_the_water(monkeypatch):
     """The whole trade: buy iron where it is mined, ship it as freight (a berth's rate
     for each 200 lb), land it on the quay and sell it where the world says it is wanted,
-    for more than it cost."""
+    for more than it cost. A quiet passage: a pirate sail met on the way left this loop
+    refused for ever (travel pacing, 2026-11-18)."""
+    from rules import ontheway
+
+    monkeypatch.setattr(ontheway, "sea_stretches", lambda *a, **k: None)
     scene, engine, pc = _at(gp=3000)
     leg = {l.to_id: l for l in journey.legs_from(PANGRELLA, MIRABALOS)}[ZHILVARNIA]
     bare = engine.passage_quote(leg)[2]
@@ -241,7 +245,12 @@ def test_a_wreck_takes_the_hold(monkeypatch):
     scene, engine, pc = _at(seed=9)
     _do(engine, "buy", "cargo:iron", 100)
     _sail(engine)
-    monkeypatch.setattr(ships, "day_at_sea", lambda dice, level: "wreck")
+    from rules import ontheway
+
+    storm = [ontheway.Meeting(kind="storm", roll=50, count=0, day=1)]
+    monkeypatch.setattr(ontheway, "sea_stretches",
+                        lambda *a, **k: storm.pop() if storm else None)
+    monkeypatch.setattr(ships, "storm_wrecks", lambda dice: True)
     out = _sail(engine)
     assert not trade.lots(scene)
     assert "100 lb of iron" in out.tell, out.tell

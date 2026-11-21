@@ -261,7 +261,8 @@ def test_pay_and_a_blessing_stay_requests_even_of_a_seller():
     assert [c["params"] for c in checks] == [{"skill": "diplomacy", "request": "payment"}]
     s, priest = _keeper_scene("the-temple", "the priest")
     _frame, _rows, checks = _asks(s, "the priest", "to bless my blade")
-    assert [c["params"] for c in checks] == [{"skill": "diplomacy", "request": "favour"}]
+    assert [c["params"] for c in checks] == [{"skill": "diplomacy", "request": "favour",
+                                              "wants": "to bless my blade"}]
 
 
 # --- the prose cannot hand over what the engine did not give ---------------------------------

@@ -144,7 +144,9 @@ def test_eating_rations_resets_hunger_and_spends_one():
     e = Engine(s, Dice(seed=1))
     out = e.run(e.validate([{"op": "eat", "actor": "pc",
                              "params": {"item": "trail rations"}}])).outcomes[0]
-    assert pc.fed_minutes == 0 and pc.hunger_checks == 0
+    # A ration is a pound, a day's food (CRB p.444; owner 2026-11-18: partial credit by
+    # the book's rates): 50 hours behind comes back one day, not to nothing.
+    assert pc.fed_minutes == 50 * 60 - 24 * 60 and pc.hunger_checks == 0
     assert pc.stock["trail-rations#1"].count == 9
     assert "9 left" in out.tell and out.effects[0]["origin"] == "item:trail-rations#1"
 

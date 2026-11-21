@@ -169,22 +169,27 @@ def face_people(world, location_id: str | None,
 
 
 def face_of(world, location_id: str | None, actor, *, ref: str = "",
-            own: str | None = None, people_id: str | None = None) -> str:
+            own: str | None = None, people_id: str | None = None, scene=None) -> str:
     """`appearance_for` for a body somebody is about to wear — "" for one that has no people
     (`bestiary.has_a_people`: a beast, a monstrous humanoid, a humanoid race the land
     holds). Every door that writes `Actor.appearance` from the people's pools asks through
     here, so the rule has one copy at the point of writing as well as at the spawn: the
-    0.2.22 escort run met a reptoid on the road wearing "of the Korvu people"."""
-    from . import bestiary
+    0.2.22 escort run met a reptoid on the road wearing "of the Korvu people".
+
+    `scene`, when the door has one, spreads the new face over the lines the people it
+    already holds wear (`faces.seen_in`, playtest 2026-11-17b #19)."""
+    from . import bestiary, faces as faces_mod
 
     if actor is not None and not bestiary.has_a_people(actor):
         return ""
     return appearance_for(world, location_id, people_id=people_id,
-                          ref=ref or str(getattr(actor, "ref", "") or ""), own=own)
+                          ref=ref or str(getattr(actor, "ref", "") or ""), own=own,
+                          seen=faces_mod.seen_in(scene, but=actor) if scene is not None
+                          else None)
 
 
 def appearance_for(world, location_id: str | None, people_id: str | None = None,
-                   ref: str = "", own: str | None = None) -> str:
+                   ref: str = "", own: str | None = None, seen: dict | None = None) -> str:
     """What a stranger would see of a person of this people: the export's own body
     sentences for the people, one or two of them, in the people's name.
 
@@ -200,7 +205,7 @@ def appearance_for(world, location_id: str | None, people_id: str | None = None,
             return ""
         from . import faces as faces_mod
 
-        own = own if own is not None else faces_mod.details_for("", ref, location_id)
+        own = own if own is not None else faces_mod.details_for("", ref, location_id, seen)
         return f"{named}: {own}" if own else ""
     body = [str(b).strip() for b in (race.get("body") or []) if str(b).strip()]
     if not body:
@@ -217,7 +222,7 @@ def appearance_for(world, location_id: str | None, people_id: str | None = None,
     # `own` is given when the person was rolled by `rules.lives`, whose face was chosen to
     # agree with their work (2026-09-25); otherwise the seeded pick from `faces`.
     if own is None:
-        own = faces_mod.details_for(" ".join(lines), ref, location_id)
+        own = faces_mod.details_for(" ".join(lines), ref, location_id, seen)
     if own:
         lines.append(own)
     named = str(race.get("name") or people_name(world, pid) or "").strip()
@@ -225,7 +230,7 @@ def appearance_for(world, location_id: str | None, people_id: str | None = None,
 
 
 def appearance_of_kind(word: str, ref: str, location_id: str | None = None,
-                       own: str | None = None) -> str:
+                       own: str | None = None, seen: dict | None = None) -> str:
     """A face for a person of a kind the world ships no people for — "human" granted in a
     world with no Human (F2): the kind's own word and the person's own details, and no
     people's body borrowed for it."""
@@ -234,7 +239,7 @@ def appearance_of_kind(word: str, ref: str, location_id: str | None = None,
         return ""
     from . import faces as faces_mod
 
-    own = own if own is not None else faces_mod.details_for("", ref, location_id)
+    own = own if own is not None else faces_mod.details_for("", ref, location_id, seen)
     return f"{word[:1].upper()}{word[1:]}: {own}" if own else ""
 
 
@@ -382,9 +387,26 @@ def definite(name: str) -> str:
 
 
 _QUOTED = re.compile(r"\"[^\"]*\"|“[^”]*”")
-_WORD_BEFORE = re.compile(r"([A-Za-z'’]+)\s+$")
+# Up to three words straight before a name, no punctuation between: a determiner
+# anywhere in them already opens the noun phrase ("the great bat", "a grey old man").
+_PHRASE_BEFORE = re.compile(r"((?:[A-Za-z'’-]+\s+){1,3})$")
 _POSSESSIVE = re.compile(r"(?:['’]s|s['’])$", re.I)
 _SENTENCE_START = re.compile(r"(?:^|[.!?]\s+|\n\s*)$")
+# A tell's verb ends the noun phrase: playtest 2026-11-17 #28, "the dagger misses dire
+# rat" found "the" three words back and printed "misses dire rat". Read nearest first, a
+# third-person verb ("misses", "hits", "strikes") stops the search; "-ous" and "-ss"
+# words are adjectives and nouns ("the ravenous rat", "the glass golem").
+_VERB_S = re.compile(r"(?:[a-rt-z]s|[^s]es|sses)$", re.I)
+
+
+def _definite(words: list[str]) -> bool:
+    """Whether these words straight before a name already open its noun phrase."""
+    for w in reversed(words):
+        if w.lower() in _DETERMINERS or _POSSESSIVE.search(w):
+            return True
+        if _VERB_S.search(w) and not w.lower().endswith("ous"):
+            return False
+    return False
 
 
 def with_articles(text: str, names) -> str:
@@ -431,10 +453,9 @@ def with_articles(text: str, names) -> str:
             claimed.append((lo, hi))
             if not is_descriptor(name):
                 continue
-            prev = _WORD_BEFORE.search(before)
-            if prev and (prev.group(1).lower() in _DETERMINERS
-                         or _POSSESSIVE.search(prev.group(1))):
-                continue                 # "the ship's master", "Kesst's man": definite
+            prev = _PHRASE_BEFORE.search(before)
+            if prev and _definite(prev.group(1).split()):
+                continue                 # "the ship's master", "the great bat": definite
             edits.append((lo, hi, f"{'The' if opening else 'the'} {name}"))
     for lo, hi, new in sorted(edits, reverse=True):
         text = text[:lo] + new + text[hi:]

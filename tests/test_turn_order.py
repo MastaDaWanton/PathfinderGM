@@ -27,7 +27,7 @@ from django.test import Client, override_settings
 
 from rules.sheet import load_pc
 from tests._board import face_to_face
-from tests._exits_dom import PRELUDE, TABLE
+from tests._exits_dom import PRELUDE, TABLE, board_names
 
 
 # --- the server: the order posted is the order run ----------------------------------------
@@ -303,7 +303,7 @@ def _page(tmp_path, steps: str) -> dict:
     turns = (TABLE / "04-combat-and-turns.js").read_text(encoding="utf-8")
     turns = turns[:turns.index("/* ---- The full character sheet")]
     f = tmp_path / "plan.js"
-    f.write_text(PRELUDE + _DOM + turns + "\n" + _FIGHT + "\n" + steps, encoding="utf-8")
+    f.write_text(PRELUDE + _DOM + board_names() + turns + "\n" + _FIGHT + "\n" + steps, encoding="utf-8")
     done = subprocess.run([NODE, str(f)], capture_output=True, text=True,
                           encoding="utf-8", timeout=60)
     assert done.returncode == 0, done.stderr
@@ -321,7 +321,7 @@ commitTurn(false).then(() => console.log(JSON.stringify(POSTS[0].body)));
     assert [(a["op"], (a.get("params") or {}).get("ability")) for a in got["actions"]] == [
         ("move", None), ("use_ability", "Smite Evil"), ("use_ability", "Rage"),
         ("attack", None)]
-    assert got["label"] == "move to (3,1); swift: Smite Evil; free: Rage; strike the thug"
+    assert got["label"] == "move to D2; swift: Smite Evil; free: Rage; strike the thug"
 
 
 def test_strike_then_move_is_posted_in_that_order(tmp_path):
@@ -338,12 +338,14 @@ commitTurn(false).then(() => console.log(JSON.stringify({ before, after, html,
 """)
     assert got["before"] == ["move", "standard"] and got["after"] == ["standard", "move"]
     assert [a["op"] for a in got["body"]["actions"]] == ["attack", "move"]
-    assert got["body"]["label"] == "strike the thug; move to (3,1)"
+    # By the board's own name for the square, not x,y (playtest 2026-11-20 #9: "Move to
+    # 4,5" on a board whose edges read E6).
+    assert got["body"]["label"] == "strike the thug; move to D2"
     # Numbered in the new order.
     html = got["html"]
     assert html.index('data-step="standard"') < html.index('data-step="move"')
     assert 'aria-label="Step 1 of 2: Strike the thug"' in html
-    assert 'aria-label="Step 2 of 2: Move to 3,1"' in html
+    assert 'aria-label="Step 2 of 2: Move to D2"' in html
 
 
 def test_a_new_step_joins_where_it_always_went_and_removal_leaves_the_order(tmp_path):
@@ -389,7 +391,7 @@ COMBAT.move = [2, 2]; const step = wholeRoundAndMove(planOrder());
 renderPlan(); const html = ELS["cb-plan"].innerHTML;
 console.log(JSON.stringify({ moveFirst, strikeFirst, strikeFirstFar, late, full, step, html }));
 """)
-    assert "From 5,5 the strike will not reach the thug" in got["moveFirst"]
+    assert "From F6 the strike will not reach the thug" in got["moveFirst"]
     assert got["strikeFirst"] == "", "struck from (1,1), beside the thug"
     assert "comes before the move" in got["strikeFirstFar"]
     assert got["late"].startswith("Rage comes after the attack")

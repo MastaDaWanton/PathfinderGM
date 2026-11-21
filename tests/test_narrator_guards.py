@@ -396,9 +396,13 @@ def test_the_scene_block_names_the_dead_the_hostile_and_the_fight():
 
     s = _Scene({"pc": _Body("Kesst", pc=True),
                 "c7": _Body("the man", dead=True, hp=-9),
-                "c8": _Body("the guards", states=("attitude.hostile",))},
+                "c8": _Body("the guards", states=("attitude.hostile",)),
+                # Somebody who saw it and is still here: the line goes with its witnesses
+                # (playtest 2026-11-20 #23, `judgement.heat_seen`).
+                "c9": _Body("the crier")},
                fight=True,
-               heat={"note": "the player just killed the man in front of onlookers"},
+               heat={"note": "the player just killed the man in front of onlookers",
+                     "seen_by": ["c9"]},
                thread={"subject": "the crier", "doing": "watching"})
     block = prompts.scene_now(s)
     assert block.startswith("THE SCENE AS IT STANDS NOW")

@@ -380,13 +380,14 @@ def test_eating_resets_the_hunger_clock_and_only_that(wood):
 
 def test_drinking_resets_thirst(wood):
     """From the waterskin (since 2026-11-07; it reset thirst from nothing before), which
-    is left in the pack empty."""
+    is left in the pack empty. Half a gallon is half a day (CRB p.444; owner 2026-11-18):
+    15 hours behind comes back 12."""
     s, engine = wood
     pc = s.pc()
     pc.goods["waterskin"] = 1
     pc.watered_minutes = 900
     engine.run(engine.validate([{"op": "drink"}]))
-    assert pc.watered_minutes == 0
+    assert pc.watered_minutes == 900 - 12 * 60
     assert "waterskin" not in pc.goods and pc.goods.get("empty waterskin") == 1
 
 

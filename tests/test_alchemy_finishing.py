@@ -119,6 +119,10 @@ def table(tmp_path):
         cm._LIVE.clear()
         alchemy_views._PENDING.clear()
         c = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
+        # The start is drawn, and a drawn start can be a fight (the caravan attack, drawn
+        # here once the towns' inns moved the draw, 2026-11-17).
+        if c.scene.in_encounter:
+            c.scene.end_encounter()
         pc = c.scene.pc()
         pc.stock.clear()
         # As a counter delivers it: keyed by its own id, which the Equipment row sends.

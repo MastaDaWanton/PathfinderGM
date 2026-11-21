@@ -1459,11 +1459,13 @@ def spend(actor, consumes: list[tuple[Item, int]]) -> list[dict]:
 # Finishing: the records, the shelf, In progress
 # =============================================================================================
 
-def make(plan: AlchemyPlan, tier: int, *, extra: int = 0, now: int = 0) -> list[dict]:
+def make(plan: AlchemyPlan, tier: int, *, extra: int = 0, now: int = 0,
+         lift: int = 0) -> list[dict]:
     """The records a finished step writes, at the tier the player's hands earned, each with
     its `count` (contracts §6: ids and grades; the build is computed on read). `extra` is
     the Yield perk's one more, rolled and shown by the caller."""
-    tier = max(0, min(int(tier), int(plan.ceiling)))
+    # `lift`: a natural 20's breakthrough past the ceiling (`crafting.margin_bonus`).
+    tier = max(0, min(int(tier), int(plan.ceiling) + int(lift)))
     level, perks = plan.level, {k: v for k, v in plan.perks.items() if v}
     mats = list(plan.pool.get("materials") or ())
     if plan.method == "transmute":
@@ -1989,7 +1991,8 @@ def settle_miss(engine, actor, progress, plan: AlchemyPlan, miss: int) -> dict:
 
 
 def settle_made(actor, progress, plan: AlchemyPlan, tier: int, consumes, *, dice=None,
-                now: int = 0, where: dict | None = None, after_firsts=None) -> dict:
+                now: int = 0, where: dict | None = None, after_firsts=None,
+                margin_bonus: dict | None = None) -> dict:
     """A made roll at the alchemy bench, finished at `tier`: the Yield perk's d100 on
     `dice`, the materials in `consumes` (read fresh) spent, the product made and landed
     (work that waits goes In progress), the step and the firsts paid, and what the work
@@ -2010,8 +2013,14 @@ def settle_made(actor, progress, plan: AlchemyPlan, tier: int, consumes, *, dice
         yield_line = {"why": f"Yield perk: d100 {roll.total} against {at} or less, "
                              f"{'one more' if extra else 'nothing extra'}", "mp": 0}
 
+    # The margin's extra units (`crafting.margin_bonus`, ruling 2026-11-18), on the steps
+    # the Yield perk reads.
+    from .crafting import bonus_line, bonus_units
+
+    more = bonus_units(plan.units, margin_bonus) if plan.yields else 0
     spend(actor, list(consumes))
-    made = make(plan, tier, extra=extra, now=now)
+    made = make(plan, tier, extra=extra + more, now=now,
+                lift=int((margin_bonus or {}).get("breakthrough") or 0))
     landed = land(actor, plan, made, now=now, where=where)
 
     lines: list[dict] = []
@@ -2077,6 +2086,8 @@ def settle_made(actor, progress, plan: AlchemyPlan, tier: int, consumes, *, dice
                   else f"learned: {doc.get('name')}", int(getattr(wc, "STUDY_MP", 1)))
     if yield_line:
         lines.append(yield_line)
+    if more:
+        lines.append(bonus_line(more, plan.noun or "unit", margin_bonus))
     return {"made": made, "landed": landed, "lines": lines, "levelled": levelled,
             "discoveries": discoveries}
 

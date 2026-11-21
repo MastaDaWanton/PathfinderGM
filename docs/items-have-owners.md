@@ -121,8 +121,12 @@ the record is the hook a reaction would read, and building one is not part of th
 read as the smith taking one out of the air. A giver's thing is found by name the way
 people say it (`holding.key_in`), in the goods and then on the shelf (`stock`, exact id,
 base or name — never `consumables.resolve_stock`'s content-word guess, which would hand
-over the wrong jar). Somebody else's pockets stay open the way the world is (the clerk who
-slides a pouch across was holding one); the player's never are, and coin never is.
+over the wrong jar). Somebody else's pockets stayed open the way the world is (the clerk who
+slides a pouch across was holding one) until playtest 2026-11-20 #5: a carter offered food
+from an empty pack, and the owner ruled that an NPC may only offer what they hold. A
+hand-over now moves only what `holding.carried_by` finds on them (their goods, shelf,
+weapons, food by its kind, or their own label), and is refused otherwise; a document's give
+(`origin` stamped) is still its word (docs/research/2026-11-20-carter-goods.md).
 
 **Selling goods.** `_op_sell` sells a thing out of the pack when it is not a jar
 (`Engine._sell_goods`): the thing goes into the buyer's goods, the coin into the purse,

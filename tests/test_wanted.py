@@ -356,6 +356,11 @@ def counter(tmp_path):
         cm._LIVE.clear()
         c = cm.begin_with(load_pc("fixtures/pc-kesst.json"))
         c.scene.location_id = TOWN
+        # Mid-morning, whatever the drawn start's hour: an evening start (drawn here once
+        # the towns' inns moved the draw, 2026-11-17) finds the market shut.
+        c.scene.clock_minutes = (c.scene.clock_minutes // (24 * 60)) * 24 * 60 + 10 * 60
+        if c.scene.in_encounter:
+            c.scene.end_encounter()
         c.engine().place_party(MARKET)
         c.scene.add(instantiate("guildhand", scene=c.scene, name="the stallholder"))
         c.save()

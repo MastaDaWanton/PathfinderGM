@@ -51,13 +51,11 @@ def _post(client, url, body):
 
 
 def _step(client, body):
-    r = _post(client, "/api/forge/roll", {**body, "face": 20})
-    assert r.status_code == 200, r.content[:400]
-    rolled = r.json()
-    assert rolled["roll"]["success"], rolled
-    f = _post(client, "/api/forge/finish", {"token": rolled["token"], "score": 1.0})
-    assert f.status_code == 200, f.content[:400]
-    return f.json()
+    # The shared step: the face that just makes the DC (no 5+ margin bands) and a step of
+    # an hour or more waited out and collected (both the owner's rulings of 2026-11-18).
+    from tests.test_forge_api import do_step
+
+    return do_step(client, body)
 
 
 def test_a_blade_forged_at_the_bench_is_drawn_and_swung_with_its_own_numbers(forge):

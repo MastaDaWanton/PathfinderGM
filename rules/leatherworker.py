@@ -2021,10 +2021,11 @@ def _record(plan: LeatherPlan, spec: dict, tier: int) -> dict:
     return rec
 
 
-def make(plan: LeatherPlan, tier: int, *, now: int = 0) -> list[tuple]:
+def make(plan: LeatherPlan, tier: int, *, now: int = 0, lift: int = 0) -> list[tuple]:
     """What a finished step puts on the shelf, at the tier the player's hands earned under
     the step's ceiling. A leftover offcut from Cut keeps the quality it had."""
-    tier = max(0, min(int(tier), plan.step_ceiling))
+    # `lift`: a natural 20's breakthrough past the ceiling (`crafting.margin_bonus`).
+    tier = max(0, min(int(tier), plan.step_ceiling + int(lift)))
     out = []
     for i, (template, n) in enumerate(plan.outputs):
         if isinstance(template, dict):
@@ -2058,7 +2059,8 @@ def _land_record(actor, rec: dict) -> str:
 
 
 def land(actor, plan: LeatherPlan, made: list[tuple], *, now: int,
-         where: dict | None = None, setup_score: float | None = None) -> list[dict]:
+         where: dict | None = None, setup_score: float | None = None,
+         bonus: dict | None = None) -> list[dict]:
     """Put what a step made on the shelf; work that waits (a vat tannage, alum ageing,
     rawhide drying, a thick hide's lime pit) goes In progress (rules/inprogress.py, the one
     store), at the tannery when the tannery holds it, in the pack otherwise. Returns
@@ -2087,7 +2089,8 @@ def land(actor, plan: LeatherPlan, made: list[tuple], *, now: int,
         tannery = where.get("tannery") or {}
         at_tannery = plan.wait_where == "tannery" and tannery.get("place")
         place = f"place:{tannery['place']}" if at_tannery else "carried"
-        result = {"method": plan.method, "setup_score": setup_score,
+        # The roll's margin bonus travels with the wait: a tan's tier is set at collect.
+        result = {"method": plan.method, "setup_score": setup_score, "bonus": bonus,
                   "ceiling": plan.step_ceiling, "quarters": thing.quarters * int(n)}
         if at_tannery and plan.vats:
             result["vats"] = int(plan.vats)
@@ -2218,7 +2221,8 @@ def _collect(item, actor) -> dict:
     cut = result.get("cut_score")
     if setup is not None and cut is not None and result.get("method") == "tan":
         ceiling = int(result.get("ceiling", h.quality or 0) or 0)
-        tier, _ = crafting.tier_from_score((float(setup) + float(cut)) / 2, ceiling)
+        tier, _ = crafting.tier_from_score((float(setup) + float(cut)) / 2, ceiling,
+                                           result.get("bonus"))
         h.quality = tier
         h.name = ""
         h.name = hide_name(h)
@@ -2541,7 +2545,7 @@ def settle_miss(actor, progress, plan: LeatherPlan, miss: int) -> dict:
 
 def settle_made(actor, progress, plan: LeatherPlan, tier: int, consumes, *, now: int = 0,
                 where: dict | None = None, setup_score: float | None = None,
-                vat_cp: int = 0) -> dict:
+                vat_cp: int = 0, margin_bonus: dict | None = None) -> dict:
     """A made roll at the leather bench, finished at `tier`: the materials in `consumes`
     (read fresh) spent, the vats paid for the wait, the product made and landed (a tan
     that waits goes In progress), the step and the firsts paid, and what the work showed
@@ -2557,9 +2561,9 @@ def settle_made(actor, progress, plan: LeatherPlan, tier: int, consumes, *, now:
             actor.purse = purse
             paid.append({"cp": vat_cp, "for": f"{plan.vats} vat{'s' if plan.vats != 1 else ''} "
                                               f"for the wait"})
-    made = make(plan, tier, now=now)
+    made = make(plan, tier, now=now, lift=int((margin_bonus or {}).get("breakthrough") or 0))
     landed = land(actor, plan, made, now=now, where=dict(where or {}),
-                  setup_score=setup_score)
+                  setup_score=setup_score, bonus=margin_bonus)
 
     lines: list[dict] = []
     levelled: list[int] = []

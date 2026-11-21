@@ -185,6 +185,11 @@ WANTED = "state.wanted"
 SUSPECTED = "state.suspected"
 GUARD = "role.guard"
 BYSTANDER = "role.bystander"
+# Sells what they carry, once each (tbaMUD's keeper selling off `keeper->carrying`): a
+# carter with a cart of goods, no counter and no shelf of its own. The trade panel opens
+# across them and lists their `goods`; `Engine._buy_carried` moves the real line. Granted by
+# an opening that loads them (`openings._load_up`, playtest 2026-11-20 #6).
+SELLS_WHAT_THEY_CARRY = "role.sells-what-they-carry"
 # Brought in by a source that already spent the party's encounter budget on them (a road
 # or forage draw, a scheme's hostile bring_in, the law admitted, an opening's foes, a
 # boarding crew). The effect's origin names the source (`budget:<source>`). Read by
@@ -200,6 +205,14 @@ TRAVELS_WITH_YOU = "bond.travels-with-you"
 # `hirelings.GUARDS` — the state the party's cargo is defended by.
 HIRED = "bond.hired"
 GUARDING = "bond.guarding"
+# A fighter in an arena's bout (rules/arena.py): the purse, the house that pays it and the
+# other fighter ride in the payload. Blows between two who hold it are nonlethal (a
+# knockout bout); settling the fight removes it from both, so nothing outlives the bout.
+IN_A_BOUT = "bond.in-a-bout"
+# A toll-keeper met on the way (rules/ontheway.py) who has not been paid: the price in
+# copper and the place the party came from ride in the payload. Granted and lifted by the
+# engine alone (`Engine._ask_toll`, `Engine._pay_toll`).
+ASKS_A_TOLL = "bond.asks-a-toll"
 # Non-lethal damage that will not mend until a need is met (CRB p.444, Starvation and
 # Thirst: "cannot be recovered until the character gets food or water, as needed—not even
 # magic that restores hit points heals this damage"). Granted by the `withheld` effect
@@ -438,6 +451,11 @@ TAGS: dict[str, tuple[str, ...]] = {
     # new disguise is made.
     "disguised":   ("state.disguised",),
     "prone":       ("state.position.prone", "recovery.rest"),
+    # At the bottom of a pit trap's pit (rules/dungeons.py `spring`): the way out is a
+    # Climb check at the pit's DC (`dungeons.climb_out`), and until it is made nobody
+    # walks off (`_op_travel`, `_op_move`). Not an Appendix 2 condition, so no row in
+    # `tables.CONDITIONS`; no `recovery.rest` — a night's sleep leaves you in the pit.
+    "in a pit":    ("state.position.pit",),
     "flat-footed": ("state.position.flat-footed", "recovery.rest", "state.exposed"),
     "bleed":       ("state.wound.bleeding",),
     # A poison or a disease running in the body (Core Rulebook, Afflictions, pp. 555-557):

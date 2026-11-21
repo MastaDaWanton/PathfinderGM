@@ -342,6 +342,7 @@ def validate(doc: dict) -> list[str]:
                  f"out.")
     if not lead.get("words"):
         p.append("lead.words: the role words the codex and the cast are searched by.")
+    p.extend(_carries_problems(lead.get("carries")))
     for field in ("look", "says"):
         if not str(lead.get(field) or "").strip():
             p.append(f"lead.{field}: required.")
@@ -1032,7 +1033,7 @@ def _stand_up(engine, doc: dict, label: str, words, *, zone: str, row: dict | No
         actor.true_name = name
         own = names_mod.resident_appearance(world, eid)
         actor.appearance = own or names_mod.face_of(world, scene.location_id, actor,
-                                                    ref=actor.ref or eid)
+                                                    ref=actor.ref or eid, scene=scene)
         scene.arrive(actor, zone=zone, source=f"start:{doc['id']}")
         speak_for(scene, eid)
         rec = population.note(scene, label, body=actor.appearance)
@@ -1067,6 +1068,58 @@ def _stand_up(engine, doc: dict, label: str, words, *, zone: str, row: dict | No
     scene.cast.append({"who": re.sub(r"^(?:the|a|an)\s+", "", label, flags=re.I),
                        "turn": 0, "ref": actor.ref})
     return actor
+
+
+def _carries_problems(carries) -> list[str]:
+    """What is wrong with a lead's `carries` ({"pack", "wares", "draw", "sells"}), or []:
+    every line a good the general store prices (`goods.good`), so nothing the lead holds
+    is a word without a price."""
+    from . import goods
+
+    if carries is None:
+        return []
+    if not isinstance(carries, dict):
+        return ["lead.carries: {pack, wares, draw, sells}."]
+    p = []
+    for field in ("pack", "wares"):
+        for row in carries.get(field) or ():
+            key = str((row or {}).get("key") or "") if isinstance(row, dict) else ""
+            if not key or goods.good(key) is None:
+                p.append(f"lead.carries.{field}: {row!r} is no good the general store "
+                         f"prices (rules/goods.py GEAR).")
+            elif int(row.get("count") or 0) < 1:
+                p.append(f"lead.carries.{field}: {key} needs a count of 1 or more.")
+    draw = carries.get("draw")
+    if draw is not None and not (isinstance(draw, int) and draw >= 1):
+        p.append("lead.carries.draw: how many of the wares rows are loaded, 1 or more.")
+    return p
+
+
+def _load_up(actor, carries, rng: random.Random) -> None:
+    """The lead's own things and the load they haul, onto their record before a word is
+    written: the pack always, `draw` of the `wares` rows seeded off the story, into
+    `goods` — the one store the take, hand-over, steal, loot and buy doors read. With
+    `sells`, the lead sells what they carry (`states.SELLS_WHAT_THEY_CARRY`).
+
+    Playtest 2026-11-20 #5/#6: the road-in carter had empty goods, offered "dried meat
+    and some hard bread" from a pack that held nothing, and "inspect his cargo" found no
+    cargo, because none was ever on record. The wares are the rulebook's general goods,
+    never a world's or a model's (research: docs/research/2026-11-20-carter-goods.md)."""
+    from . import states
+    from .activeeffect import ActiveEffect
+
+    if not isinstance(carries, dict) or actor is None:
+        return
+    wares = [r for r in carries.get("wares") or () if isinstance(r, dict) and r.get("key")]
+    draw = min(len(wares), int(carries.get("draw") or len(wares)))
+    for row in list(carries.get("pack") or ()) + rng.sample(wares, draw):
+        key = str(row["key"])
+        actor.goods[key] = int(actor.goods.get(key, 0) or 0) + int(row.get("count") or 1)
+    if carries.get("sells") and draw:
+        actor.apply_effect(ActiveEffect(
+            name="sells what they carry", kind="situation", key="sells-what-they-carry",
+            source="start:carries", origin="start:carries", duration="until-dismissed",
+            tags=(states.SELLS_WHAT_THEY_CARRY,)))
 
 
 def _run(engine, doc: dict, raw: list[dict]):
@@ -1118,6 +1171,7 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
     label = " ".join(str(lead.get("label") or "the stranger").split())
     who = _stand_up(engine, doc, label, lead.get("words"), zone="near", row=row,
                     look=str(lead.get("look") or ""))
+    _load_up(who, lead.get("carries"), rng_for(story_seed, "carries"))
     slots["lead"] = who.ref
 
     for step in doc.get("incident") or []:
@@ -1175,6 +1229,24 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
                            "zone": str(step.get("zone") or "near")}}])
             refs = [a["ref"] for o in res.outcomes for e in (o.effects or [])
                     if e.get("kind") == "spawn" for a in e.get("actors") or []]
+            # A foe who is a person gets a record and its face, as `_stand_up` gives the
+            # rest of the start's company (seen-people-are-real, 2026-10-01): measured
+            # 2026-11-17, road-caravan-attack's raider c4 had none, so once the fight was
+            # over nothing could find them. A beast has no people and stays a body.
+            from . import bestiary
+            from . import names as names_mod
+            from . import population
+
+            faces: dict[str, str] = {}
+            for r in refs:
+                foe = scene.people[r]
+                if not bestiary.has_a_people(foe):
+                    continue
+                rec = population.note(scene, label, fresh=True, body=foe.appearance)
+                rec["ref"] = r
+                faces[r] = rec["life"]["face"]
+                foe.appearance = names_mod.face_of(world, scene.location_id, foe,
+                                                   own=faces[r])
             if refs and str(step.get("from") or "") == "outlaws":
                 # The world's own outlaws, when it names a people that raids: Pangrella's
                 # Nirkor ("Nomadic herders, occasional raiders"). Their people, their face
@@ -1187,7 +1259,7 @@ def stage(engine, doc: dict, *, story_seed: int, bound: list[dict] | None = None
                     for r in refs:
                         person_words.settle_people(
                             scene, world, scene.people[r], words=f"{who} {label}",
-                            template=template, take_grant=False)
+                            template=template, take_grant=False, own=faces.get(r))
             if refs:
                 slots[slot] = refs[0]
                 foes.extend(refs)

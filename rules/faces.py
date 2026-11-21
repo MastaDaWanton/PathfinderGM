@@ -93,6 +93,14 @@ HANDS = (
     "a smell of smoke and hot iron that goes everywhere they do",
 )
 
+# The hands lines that tell one trade (`lives._HANDS_FIT` gives them that trade alone):
+# never drawn for a person whose work is not known.
+ONE_TRADE = frozenset({
+    "hands stained to the wrist with dye that will not wash out",
+    "fingers stained black at the tips with ink",
+    "a smell of smoke and hot iron that goes everywhere they do",
+})
+
 # Words in a body line that mean the head is not a head of hair.
 _NO_HAIR = ("feather", "beak", "frog", "scale", "fur", "feline", "simian", "rodent",
             "crow", "hairless", "shell", "chitin")
@@ -108,21 +116,66 @@ def _no_hair(body: str) -> bool:
     return any(w in low for w in _NO_HAIR)
 
 
-def details_for(body: str, ref: str, location_id: str | None = None) -> str:
+def worn(appearances) -> dict[str, int]:
+    """How many of the people already made wear each face line, from their appearances
+    (`own_details`, the label form). The count `least_worn` spreads new faces by."""
+    out: dict[str, int] = {}
+    for a in appearances or ():
+        for line in own_details(str(a or "")).rstrip(".").split("; "):
+            line = line.strip()
+            if line:
+                key = line[:1].lower() + line[1:]
+                out[key] = out.get(key, 0) + 1
+    return out
+
+
+def seen_in(scene, but=None) -> dict[str, int]:
+    """`worn` over everybody the scene holds (`Scene.people`), `but` the one being made."""
+    people = (getattr(scene, "people", None) or {}).values()
+    return worn(getattr(a, "appearance", "") for a in people
+                if a is not but and not getattr(a, "is_pc", False))
+
+
+def least_worn(pool, seen: dict[str, int] | None) -> tuple:
+    """The lines of `pool` the fewest people already wear: every line before any line is
+    worn twice. Playtest 2026-11-17b #19: the guild clerk, the barkeep and the garrison
+    sergeant, three Korvu met in a row, all had "a pale seam of scar tissue down one
+    forearm" (and two of them the same hair) — six of the nine people of that save wore
+    it, because each pick was a hash of the ref alone and nothing looked at the faces
+    already in the town. The pick within the least-worn stays the seeded one."""
+    pool = tuple(pool)
+    if not seen:
+        return pool
+    low = min(seen.get(p, 0) for p in pool)
+    return tuple(p for p in pool if seen.get(p, 0) == low)
+
+
+def details_for(body: str, ref: str, location_id: str | None = None,
+                seen: dict[str, int] | None = None) -> str:
     """Three things that are this person's and not their people's, as one sentence.
 
     `body` is the people's own line, read only to decide what may be offered. Empty
     `ref` gives nothing: a face with no person behind it is the people's line alone,
-    which is what the brief's "Looks" of a generic role wants.
+    which is what the brief's "Looks" of a generic role wants. `seen` is `worn` of the
+    people already made, so no line repeats while another is unworn (`least_worn`).
     """
     if not ref:
         return ""
     where = str(location_id or "")
-    bits = [_pick(YEARS, ref, where, "years")]
+    bits = [_pick(least_worn(YEARS, seen), ref, where, "years")]
     if not _no_hair(body or ""):
-        bits.append(_pick(HEAD, ref, where, "head"))
-    bits.append(_pick(MARK, ref, where, "mark"))
-    bits.append(_pick(HANDS, ref, where, "hands"))
+        bits.append(_pick(least_worn(HEAD, seen), ref, where, "head"))
+    bits.append(_pick(least_worn(MARK, seen), ref, where, "mark"))
+    hands = _pick(least_worn(HANDS, seen) if not seen else
+                  least_worn(tuple(h for h in HANDS if h not in ONE_TRADE), seen),
+                  ref, where, "hands")
+    if hands in ONE_TRADE:
+        # No work is known here, and a line that belongs to one trade would give it to
+        # whoever this is. Playtest 2026-11-16 #88: the harbourmaster's "presence marked
+        # by the scent of smoke and hot iron", a smith's. Re-picked, so every other pick
+        # stays the face it was.
+        hands = _pick(tuple(h for h in HANDS if h not in ONE_TRADE), ref, where, "hands")
+    bits.append(hands)
     # Three, so the line stays a line: years and a mark always, and one of the other
     # two — the head where a people has one, the hands otherwise.
     if len(bits) == 4:

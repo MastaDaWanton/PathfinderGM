@@ -20,6 +20,7 @@ from typing import Any, ClassVar
 
 from . import biomes
 from . import goods
+from . import maps as maps_mod
 from . import holding
 from . import ontheway
 from . import encounter_budget
@@ -44,6 +45,7 @@ from . import worldclass
 from . import grid as gridmod
 from . import guards as guards_mod
 from . import reactions
+from . import services as services_mod
 from . import spells as spells_mod
 from . import weapons as weapons_mod
 from .activeeffect import ActiveEffect
@@ -200,6 +202,36 @@ class _Here(Mapping):
 
     def __repr__(self) -> str:
         return f"_Here({dict(self)!r})"
+
+
+class SeenFrom:
+    """The scene as it will stand from another place: everything the scene's, but `at`
+    and so `actors` (`_Here`) the other place's. Nothing is written through it; every
+    finder that asks "who is here" asks it of this.
+
+    For a turn's later deed after its own move: playtest 2026-11-16 #94, "go back up on
+    deck and ask the deckhand…" was planned in the hold, the deckhand standing on deck was
+    looked for in the hold, and the turn refused "a deckhand is not here" though the walk
+    put her beside him first. Inform runs a command's actions one at a time because what
+    a noun phrase means depends on where the player is by then (DM4 §34); the planner
+    plans the line at once, so its lookups are asked from where the walk ends."""
+
+    def __init__(self, scene: "Scene", at: str):
+        self._scene = scene
+        self._from = at
+
+    @property
+    def at(self) -> str:
+        # Read-only: the party's own `at` keeps its named writers
+        # (tests/test_one_spatial_authority.py).
+        return self._from
+
+    def __getattr__(self, name):
+        return getattr(self._scene, name)
+
+    @property
+    def actors(self) -> Mapping[str, "Actor"]:
+        return _Here(self)
 
 
 @dataclass
@@ -422,6 +454,17 @@ class Scene:
     # them; each becomes a place through `found`, under the landmark the speaker gave,
     # the first time the player goes there (`judgement.go_to_heard_place`).
     heard_places: list[dict] = field(default_factory=list)
+    # Settlements an NPC named aloud (`rules/heard_towns.py`), {settlement id: {"who",
+    # "from", "line", "turn"}}, and the nations whose map the party has read (`rules/maps.py`):
+    # what the World and Continent maps know beyond the towns stood in. Stored, because talk
+    # and reading made them; both only grow.
+    heard_towns: dict[str, dict] = field(default_factory=dict)
+    maps_read: list[str] = field(default_factory=list)
+    # Hex travel on the region map (rules/hexes.py): the layout this campaign plays on,
+    # stored so a re-exported world never moves a hex under the party, and what the party
+    # did on each hex it touched ({"q,r": {"entered", "since", "searched", "explored"}})
+    # and the sites it has spotted ({"q,r": kind}). Stored, because play made it.
+    hexes: dict = field(default_factory=dict)
     # The schemes running in this campaign (rules/schemes.py): one instance per opened
     # scheme — its filled slots, the steps that fired and when, its outcome. Stored,
     # like `founded`, because play made it; read back through the one ticker.
@@ -1161,9 +1204,9 @@ class Scene:
                     # releasing all happened in total silence. Law 3 says the narrator
                     # may only dress what the engine recorded, so an expiry nobody
                     # records is an expiry the player can never be told about.
-                    self.hazards.extend(
-                        {"kind": "effect_ended", "ref": a.ref, "what": name}
-                        for name in a.tick_effects(1))
+                    had = list(a.effects)
+                    if a.tick_effects(1):
+                        self.hazards.extend(_ended_records(a, had))
                     self.hazards.extend(
                         {"kind": "pool_ready", "ref": a.ref, "pool": pid}
                         for pid in a.tick_pools(1))
@@ -1498,6 +1541,32 @@ class Scene:
                 best = max(best, min(level + 1, levels.index("normal")))
         return levels[best]
 
+    def sees_nothing(self, viewer, subject=None) -> bool:
+        """Whether `viewer` sees nothing of `subject` (or of the ground it stands on, with
+        no subject) for want of light: darkness where it stands as `viewer` sees it, and
+        no darkvision that reaches. "In areas of darkness, creatures without darkvision
+        are effectively blinded" (CRB p.172, Vision and Light). The one reader for what
+        the dark takes away: attacks of opportunity and the withdraw (rules/reactions.py),
+        and everything visual the tells and the brief would hand the narrator (playtest
+        2026-11-16 #57: a human with no light was told the room's scorched plaster and a
+        stranger's ink-dotted knuckles)."""
+        if viewer is None:
+            return False
+        who = subject if subject is not None else viewer
+        if self.light_at(self.positions.get(getattr(who, "ref", "")), viewer=viewer) != "dark":
+            return False
+        eyes = viewer.eyes() if hasattr(viewer, "eyes") else {}
+        dark_ft = int(eyes.get("darkvision") or 0)
+        if not dark_ft:
+            return True
+        here = self.positions.get(getattr(viewer, "ref", ""))
+        there = self.positions.get(getattr(who, "ref", ""))
+        if who is viewer or not here or not there:
+            return False
+        return gridmod.distance_between(
+            tuple(here[:2]), str(getattr(viewer, "size", "medium") or "medium"),
+            tuple(there[:2]), str(getattr(who, "size", "medium") or "medium")) > dark_ft
+
     # Ten rounds to the minute, written once. Six sites multiplied their own way to get
     # here — `hours * 600`, `worked * MINUTES_PER_HOUR`, `days * 24 * 60`, `rounds // 10`
     # — and four of them then ticked nothing at all.
@@ -1623,12 +1692,12 @@ class Scene:
                 self._mended_said(a, mended, body)
             had = list(a.effects)
             names = a.tick_effects(rounds)
-            ended.extend(f"{a.name}: {name}" for name in names)
+            quiet = {e.ended_label for e in had if _silent_end(e)
+                     and not any(e is x for x in a.effects)}
+            ended.extend(f"{a.name}: {name}" for name in names if name not in quiet)
             if names:
                 # Which effects went, by identity, so each record carries its origin.
-                told.extend({"kind": "effect_ended", "ref": a.ref, "what": e.ended_label,
-                             "origin": e.origin}
-                            for e in had if not any(e is x for x in a.effects))
+                told.extend(_ended_records(a, had))
             pools = a.tick_pools(rounds)
             ended.extend(f"{a.name}: {pid} is ready" for pid in pools)
             told.extend({"kind": "pool_ready", "ref": a.ref, "pool": pid} for pid in pools)
@@ -1668,6 +1737,30 @@ class Scene:
                     self._body_said.append(record)
             # A stable body's hourly check to come round (CRB p.190, `Actor.come_round`).
             # Not the player's: `play/downed.py` resolves theirs before they take a turn.
+            #
+            # Before it, the dying bleed on through the stretch's rounds: "A dying character
+            # loses 1 hit point every round. This continues until the character dies or
+            # becomes stable" (CRB, Injury and Death), with nothing about a fight. Only the
+            # played rounds bled anybody, so a giant cockroach left dying at the end of one
+            # fight lay dying through an hour of gathering and was reported mid-fight in the
+            # next ("giant cockroach is still down, but the bleeding has stopped", playtest
+            # 2026-11-20 #108). The same `Actor.bleed_out` the rounds use, round by round,
+            # until they are stable or dead. Not inside a fight: there the rounds do it.
+            if rounds and not a.is_pc and not self.in_encounter and self._dice is not None \
+                    and a.has_state("state.down.dying") and not states.destroyed_at_zero(a):
+                for _ in range(rounds):
+                    if not a.bleed_out(self._dice) or not a.has_state("state.down.dying"):
+                        break
+                a.apply_hp_state()
+                if not a.has_state("state.down.dying") and a.ref in self.actors:
+                    name = _sentence(_the_creature(a.name)
+                                     if getattr(a, "from_template", "") else a.name)
+                    line = (f"{name} stabilises where they lie."
+                            if a.has_state("state.down.stable") else
+                            f"{name} has bled out where they fell." if a.is_dead else
+                            f"{name} {_BROKEN_SAID}.")
+                    ended.append(line[:-1])
+                    told.append({"kind": "said", "ref": a.ref, "said": line})
             if hours and not a.is_pc and self._dice is not None \
                     and a.has_state("state.down.stable"):
                 came = a.come_round(self._dice, hours)
@@ -2332,6 +2425,9 @@ class Scene:
         world = {w.manifest_id for w in self.wards
                  if (w.spec or {}).get("hazard") and w.rounds_left is not None
                  and (w.spec or {}).get("at", "") == (self.at or "")}
+        # And the crowd (rules/crowds.py): the place's, not the fight's; the engine's
+        # crowd settle scatters it and brings it back.
+        world |= {m.id for m in self.manifests if m.what == "crowd"}
         for made in list(self.manifests):
             if made.id not in world:
                 self.lift(made)
@@ -3163,6 +3259,9 @@ class Engine:
         # tell read "You are at the cave now. The fight is left behind. Left behind:
         # wolf. The road is not empty: a wolf is on it, and it has seen you."
         self._hours_underway: dict[str, int] = {}
+        # A hex step's arrival (`_op_hex_move`): its own tell says the day, so `travel`
+        # leaves out the ground, "You are at", the place doc and the time it took.
+        self._hex_quiet: set[str] = set()
 
     # --- Checks 2 and 3 -------------------------------------------------------------
 
@@ -3226,6 +3325,10 @@ class Engine:
         # the crossing the party was leaving, and the question went to whoever stood in
         # the market instead.
         intents = _introduce_after_travel(intents)
+        # A pack's food or drink used as a jar is the meal it is, and only once: jack's
+        # plan was `use_item waterskin#1` AND a bare `drink` (owner bug list 2026-11-18,
+        # item 17), which would drink two skins where he reached for one.
+        intents = self._provisions_as_meals(intents)
         # Refs an earlier intent in this same list will have created by the time a later
         # one runs. Without this, "two bravos step out of the dark and I fight them" is
         # impossible to express: the whole list is validated before any of it runs, so a
@@ -3252,9 +3355,16 @@ class Engine:
         # Who searches earlier in this list (a creature's Perception with no DC): its blow
         # after the search is the search's to decide, at resolution (`_op_attack`'s floor).
         searched: set[str] = set()
+        # Who stands where an earlier `travel` in this list goes: there by the time a later
+        # intent runs. Playtest 2026-11-16 #94, "go back up on deck and ask the deckhand":
+        # the say to the deckhand on deck was refused "unknown ref" three plans running,
+        # because the list was checked against the hold before anything moved.
+        arrived: set[str] = set()
         for i, intent in enumerate(intents):
             self._standing_means(intent)
-            self._check_refs(intent, i, extra=pending | introduced)
+            self._check_refs(intent, i, extra=pending | introduced | arrived)
+            if intent.op == "travel" and intent.params.get("place"):
+                arrived |= self._standing_at(str(intent.params["place"]))
             self._check_legality(intent, i, moved=moved)
             self._check_unseen_target(intent, i, searched)
             self._force_visibility(intent)
@@ -3631,6 +3741,17 @@ class Engine:
         # sends it to the `refs` branch, which is the one branch that repairs.
         return isinstance(ref, str) and bool(ref) and (
             ref in self.scene.actors or ref in (extra or set()))
+
+    def _standing_at(self, place: str) -> set[str]:
+        """The refs of everybody standing at the place a travel names, never the party
+        (`validate`'s `arrived`). Empty when the finder knows no such place."""
+        from . import places as places_mod
+
+        there = places_mod.find(self.places(), place, near=self.scene.at or "")
+        if there is None or there.id == self.scene.at:
+            return set()
+        return {r for r, a in self.scene.people.items()
+                if a.at == there.id and not a.is_pc}
 
     def _elsewhere(self, ref) -> str:
         """Where a ref the campaign holds but the party cannot reach is standing, or "".
@@ -4034,8 +4155,11 @@ class Engine:
             item_id, _fits = (consumables.resolve_stock(actor.stock, said)
                               if actor is not None and said else (None, []))
             held = actor.stock.get(item_id) if item_id else None
-            if held is not None and held.count >= 1:
-                    how = str(intent.params.get("how", "drink")).strip().lower()
+            how = str(intent.params.get("how", "drink")).strip().lower()
+            if how == "read" and held is not None:
+                # A map is read, not drunk (`_read_map`), and what it refuses it says there.
+                pass
+            elif held is not None and held.count >= 1:
                     use = consumables.plan(held, how=how,
                                            target=intent.params.get("to") or intent.actor,
                                            because=intent.because,
@@ -4375,6 +4499,15 @@ class Engine:
         self._battle_joined = False
         self._journeyed = ""
         self._provoked = set()
+        # A ship kept before holds were laden (saves from before playtest 2026-11-16 #92)
+        # is laden through the one door the first time a turn finds her.
+        from . import ships as ships_mod
+
+        for raw in list(self.scene.vessels):
+            if "cargo" not in raw:
+                v = ships_mod.Vessel.from_dict(raw)
+                if v is not None:
+                    self._keep_vessel(v)
         # Homes whose door opened to the party this batch (`_op_call_on`, `_knock`).
         self._let_in = set()
         before = int(getattr(self.scene, "clock_minutes", 0) or 0)
@@ -4658,6 +4791,12 @@ class Engine:
                                                                    "error": str(exc)}],
                              tell="", because="")]
         resolution.outcomes.extend(self._articled(o) for o in extra)
+        # The crowd, after the clock and any fight this batch began (`_crowd_settle`).
+        said = self._crowd_settle()
+        if said:
+            resolution.outcomes.append(Outcome(
+                intent_id="", op="crowd", tell=" ".join(said), because="the hour or a fight",
+                effects=[{"kind": "crowd", "at": self.scene.at or "", "said": said}]))
         # Last, after anything the schemes brought in on a side: whoever is fighting the
         # player is hostile to them, on the track every surface reads.
         self._foes_settle()
@@ -5032,10 +5171,19 @@ class Engine:
 
         if not self.scene.has_grid or actor.ref not in self.scene.positions:
             return None
+        from . import crowds
+
+        # Standing in a crowd: "The crowds provide cover for anyone who does so, enabling a
+        # Stealth check" (CRB p.433, City Streets) — the specific rule over soft cover's
+        # general one below. House reading: not from somebody close enough to touch.
+        in_crowd = any(m.what == crowds.WHAT and m.terrain == "difficult"
+                       for m in self.scene.standing_on(actor.ref))
         for o in self._watchers(actor):
             if o.ref in ignore or o.ref not in self.scene.positions:
                 continue
             here, there = self.scene.positions[o.ref], self.scene.positions[actor.ref]
+            if in_crowd and max(abs(here[0] - there[0]), abs(here[1] - there[1])) > 1:
+                continue
             try:
                 if not self.scene.grid.line_of_sight(tuple(here), tuple(there)):
                     continue
@@ -5273,18 +5421,177 @@ class Engine:
             # The number to beat is whatever hides here, unknown to the searcher.
             roll = self._roll_or_suspend(intent, pc, mods, label=label, dc=0,
                                          partial=partial, dc_shown=False)
-        fx, found = self._player_finds(pc, roll.total, True)
         here = self.here()
+        sought = " ".join(str(intent.params.get("sought") or "").split())
+        seeking = str(intent.params.get("seeking") or "")
+        named = self._sought(here, sought, seeking) if sought else None
+        # A search for a named person, place, thing or water looks for THAT, not for a
+        # way down or a trap (the owner, 2026-11-20 #19: "If I look for a river and it
+        # tells me there are no tracks this is a bug"). Somebody hiding is still noticed
+        # on the roll: "Most Perception checks are reactive" (CRB p.102).
+        fx, found = self._player_finds(pc, roll.total, True, ways=named is None)
         took = (" over two minutes" if take == 20 else "")
-        if found:
-            tell = " ".join([f"{pc.name} searches {here.name}{took}.", *found])
+        # A heard way in is looked for by a search for a place or for nothing named, not
+        # by a search for the locket (live 2026-11-20: that search walked into the mine).
+        went = (self._search_for_heard(intent, pc, here, roll.total)
+                if named is None and seeking in ("", "a place") else None)
+        if went is not None:
+            return Outcome(intent_id=intent.id, op="check", rolls=[roll, *went.rolls],
+                           verdict="success", effects=[*fx, *went.effects],
+                           tell=" ".join([f"{pc.name} searches {here.name}{took}.", *found,
+                                          went.tell]).strip(),
+                           because=intent.because)
+        answer, got = (self._sought_line(pc, here, named, sought) if named is not None
+                       else ("", False))
+        if named is None and sought and not found:
+            # Nothing on the engine's record answers to the words, and nothing hidden
+            # was found: said about THAT thing, never about tracks or doors.
+            from . import holding
+
+            them = ("them" if seeking == "a person"
+                    or english.is_plural(holding.head_of(sought)) else "it")
+            tell = (f"{pc.name} searches {here.name}{took} for {sought} and does not "
+                    f"find {them} here.")
+        elif found or answer:
+            tell = " ".join([f"{pc.name} searches {here.name}{took}.", *found, answer]).strip()
         else:
             tell = f"{pc.name} searches {here.name}{took} and finds nothing."
         return Outcome(intent_id=intent.id, op="check", rolls=[roll],
-                       verdict="success" if found else "failure", effects=fx,
+                       verdict="success" if found or got else "failure", effects=fx,
                        tell=tell, because=intent.because)
 
-    def _player_finds(self, pc, total: int, searching: bool) -> tuple[list[dict], list[str]]:
+    def _sought(self, here, sought: str, seeking: str) -> "tuple | None":
+        """What a search's words name, by the engine's own finders: ("water", place or
+        None), ("person", actor), ("thing", prop record) or ("place", place); None when
+        nothing on the record answers to them (a hatch, a way down: whatever is hidden).
+        The reader's closed `seeking` (`interpret.SEEKING`) puts its kind first, and is
+        the only way to water: no finder grounds "a river" from the words."""
+        from . import holding, scope
+        from . import places as places_mod
+
+        if seeking == "water":
+            return ("water", self._water_near(here))
+        order = ["person", "thing", "place"]
+        kind = {"a person": "person", "a thing": "thing", "a place": "place"}.get(seeking)
+        if kind:
+            order.remove(kind)
+            order.insert(0, kind)
+        for k in order:
+            if k == "person":
+                ref = scope.in_the_room(self.scene, sought)
+                a = self.scene.actors.get(ref) if ref else None
+                if a is not None and not a.is_pc:
+                    return ("person", a)
+            elif k == "thing":
+                pc = self.scene.pc()
+                for rec in getattr(self.scene, "props", None) or ():
+                    if holding.same(rec.get("name"), sought) and (
+                            rec.get("at") == here.id
+                            or (pc is not None and rec.get("held_by") == pc.ref)):
+                        return ("thing", rec)
+            else:
+                p = places_mod.find(self.places(), sought, near=here.id)
+                if p is not None:
+                    return ("place", p)
+        return None
+
+    def _water_near(self, here):
+        """The water at hand: here, a step from here, or the settlement's free water
+        (`water_at_hand`) — a place a body can drink at by its kind (a well, a cistern,
+        the docks, a bridge or ford) or its wet ground. None when there is none."""
+        from . import places as places_mod
+        from . import water as water_mod
+
+        def wet(p) -> bool:
+            kind = places_mod._kind_of_place(p)
+            return (places_mod.WATER in places_mod.place_tags(p)
+                    or kind in places_mod.WATER_KINDS | places_mod._OUTSIDE_WATER
+                    or water_mod.is_wet(getattr(p, "terrain", "")))
+
+        if wet(here):
+            return here
+        by_id = {p.id: p for p in self.places()}
+        near = [by_id[x] for x in (here.exits or ()) if x in by_id]
+        hit = next((p for p in near if wet(p)), None)
+        if hit is not None:
+            return hit
+        well = self.water_at_hand()
+        return places_mod.find(self.places(), well) if well else None
+
+    def _sought_line(self, pc, here, named: tuple, sought: str) -> tuple[str, bool]:
+        """The search's answer about the thing it was for (playtest 2026-11-20 #19), and
+        whether it was found."""
+        from . import awareness
+        from . import places as places_mod
+        from .names import definite
+
+        def cap(x: str) -> str:
+            return x[:1].upper() + x[1:]
+
+        kind, obj = named
+        if kind == "water":
+            if obj is None:
+                wild = places_mod.setting_of(here.id) == "outside" or not self.water_at_hand()
+                return (f"{pc.name} finds no water at {here.name}."
+                        + (" Out here, water is found by living off the land (a Survival "
+                           "check)." if wild else ""), False)
+            if obj.id == here.id:
+                return f"There is water here, at {here.name}.", True
+            if obj.id in (here.exits or ()):
+                return f"The nearest water is {obj.name}, close by.", True
+            return f"The nearest free water in town is {obj.name}.", True
+        if kind == "person":
+            if obj.has_state(awareness.HIDDEN) and not awareness.locates(self.scene, pc, obj):
+                return f"{pc.name} does not find {sought} here.", False
+            return f"{cap(definite(obj.name))} is here.", True
+        if kind == "thing":
+            if obj.get("held_by") == pc.ref:
+                return f"{pc.name} has {obj.get('name')} already.", True
+            return f"There is {obj.get('name')} here.", True
+        if obj.id == here.id:
+            return f"{pc.name} is at {obj.name}.", True
+        if obj.id in (here.exits or ()):
+            return (f"{cap(obj.name)} is close by: the way there is open from "
+                    f"{here.name}."), True
+        return f"{cap(obj.name)} is not here, at {here.name}.", False
+
+    # A rumoured way in found at its landmark when the place has no hex DC of its own
+    # (the sewers off a street): Ultimate Campaign's own easiest hidden site, "Locating
+    # these caverns requires a successful DC 10 Perception or Survival check".
+    HEARD_FIND_DC = 10
+
+    def _search_for_heard(self, intent: Intent, pc, here, total: int) -> "Outcome | None":
+        """A search at the landmark somebody gave for a way in they spoke of — the
+        carter's "old mine off the woods" — looks for THAT place (playtest 2026-11-20 #2:
+        "I search the woods for the cave everyone has a story about" ran tracks and
+        secret doors, and the mine was never findable). Every heard-of venture whose
+        landmark is here (`heard_places.ventures_at`), whatever the player called it, at
+        the kind's hidden-site DC (`hexes.FIND_DC`, Ultimate Campaign's "a hidden site …
+        requiring the PCs to make an appropriate skill check"). Found, the party goes in
+        through the one venture door, which makes the same seeded head the town's rumour
+        was spread about, so its way down (rules/dungeons.py) is there. None when nothing
+        heard of is looked for here or the roll missed it (a miss says nothing)."""
+        from . import heard_places, hexes
+
+        if self.scene.in_encounter:
+            return None
+        for rec, kind in heard_places.ventures_at(self.scene, here, self.places()):
+            if total < hexes.FIND_DC.get(kind, self.HEARD_FIND_DC):
+                continue
+            went = self._op_venture(Intent(
+                op="venture", actor=pc.ref, because=intent.because,
+                params={"kind": kind, "parent": here.id}, visibility=intent.visibility,
+                id=intent.id, origin=intent.origin, origin_name=intent.origin_name), {})
+            lead = f"{pc.name} finds the way to {rec['name']} that was spoken of."
+            if went.status == "refused":
+                return Outcome(intent_id=intent.id, op="check", effects=[],
+                               tell=f"{lead} {went.tell}", because=intent.because)
+            went.tell = f"{lead} {went.tell}"
+            return went
+        return None
+
+    def _player_finds(self, pc, total: int, searching: bool, *,
+                      ways: bool = True) -> tuple[list[dict], list[str]]:
         """The player's own Perception result set against each creature hidden from them,
         at that creature's DC (`awareness.notice_dcs`: its Stealth result, its 10 when it
         hid with nobody watching, 20/40 for an invisible one and +20 to pinpoint), and
@@ -5309,7 +5616,10 @@ class Engine:
             if got["found"]:
                 recs.extend(got["effects"])
                 said.append(got["tell"])
-        # A way down and a dungeon's traps hide at their own DCs (rules/dungeons.py).
+        # A way down and a dungeon's traps hide at their own DCs (rules/dungeons.py);
+        # not looked for by a search for something named (`ways`, #19 of 2026-11-20).
+        if not ways:
+            return recs, said
         from . import dungeons
 
         fx, found = dungeons.searched(self, pc, total)
@@ -5638,6 +5948,13 @@ class Engine:
             # resumed on the player's own d20 arrives here exactly as a hidden one does.
             if intent.gate:
                 queue = self._settle_gate(intent, outcome, queue)
+            # A climb, a swim or a jump that fails gets the mover no further: the walk
+            # queued behind it by the same mover does not happen (`_held_by_failed_move`).
+            if intent.op == "check":
+                queue = self._held_by_failed_move(intent, outcome, queue)
+            # A walk something stopped gets the walker no further this turn either.
+            if intent.op in ("travel", "journey", "venture"):
+                queue = self._held_by_stopped_walk(intent, outcome, queue)
             # A weapon drawn in a fight is a move action: what that leaves of the turn is
             # written onto the blows still queued behind it (`_draw_paid`).
             if intent.op == "wear":
@@ -5801,6 +6118,52 @@ class Engine:
             if len(self.scene.log) > self.scene.LOG_KEPT:
                 del self.scene.log[:-self.scene.LOG_KEPT]
         return Resolution(outcomes=outcomes)
+
+    # The skills whose check IS getting somewhere: Climb ("you make no progress", CRB
+    # p.91), Swim (p.108), and the jump of Acrobatics (p.88).
+    _MOVING_SKILLS: ClassVar[frozenset] = frozenset({"climb", "swim", "acrobatics"})
+
+    def _held_by_failed_move(self, check: Intent, outcome: Outcome,
+                             queue: list[dict]) -> list[dict]:
+        """Take the mover's queued walks off the queue when their climb, swim or jump
+        has failed. Playtest 2026-11-16 E4: "climb out and walk to X" walked her to X with
+        the climb failed. By the book a failed Climb makes no progress, a failed Swim
+        none either; the walk beyond it starts from where the mover still is, so it is
+        the next turn's to try again. Only the mover's own, and only a resolved failure:
+        a check refused or unrolled holds nothing back."""
+        skill = str(check.params.get("skill") or "").strip().lower()
+        if skill not in self._MOVING_SKILLS or outcome.status != "resolved" \
+                or outcome.verdict != "failure":
+            return queue
+        mover = check.actor or ""
+        kept = [r for r in queue
+                if not (r.get("op") in ("travel", "venture")
+                        and str(r.get("actor") or mover) == mover)]
+        if len(kept) < len(queue):
+            who = self.scene.people.get(mover)
+            name = getattr(who, "name", "") or "The climber"
+            outcome.tell = (f"{outcome.tell} {name} gets no further, and the way on is "
+                            f"still to go.").strip()
+        return kept
+
+    def _held_by_stopped_walk(self, walk: Intent, outcome: Outcome,
+                              queue: list[dict]) -> list[dict]:
+        """Take the walker's later walks off the queue when this one was stopped — a
+        meeting, somebody lying in wait, pursuers — and a fight is on. Playtest 2026-11-17
+        #1: "The penguin is still here, and comes at you" on the deck, and the same plan's
+        next travel walked on ashore: "The fight is left behind". The roguelikes' rule for
+        a computed path: walk it until something disturbs you, then hand back the keys."""
+        if outcome.status != "resolved" or not self.scene.in_encounter:
+            return queue
+        stopped = any(isinstance(e, dict) and (e.get("met") or e.get("waylaid_by")
+                                              or e.get("pursued_by"))
+                      for e in outcome.effects)
+        if not stopped:
+            return queue
+        mover = walk.actor or ""
+        return [r for r in queue
+                if not (r.get("op") in ("travel", "journey", "venture", "move")
+                        and str(r.get("actor") or mover) == mover)]
 
     def _settle_gate(self, gate: Intent, outcome: Outcome, queue: list[dict]) -> list[dict]:
         """Take off the queue what a poison's save just ruled out.
@@ -6676,6 +7039,8 @@ class Engine:
         if actor is None or not actor.has_state("state.impaired.disabled") \
                 or actor.is_down or actor.hp > 0:
             return None
+        from . import names as names_mod
+
         before = actor.hp
         actor.hp -= 1
         crossed = self._hp_state_effects(actor)
@@ -6687,8 +7052,13 @@ class Engine:
                       "temp_hp": actor.temp_hp, "lethality": "lethal",
                       "nonlethal": actor.nonlethal, "note": "disabled, strained",
                       "origin": "rule:disabled", "was": before}] + crossed,
-            tell=f"The effort costs {actor.name} a hit point, disabled as they are."
-                 + self._hp_state_tell(crossed),
+            # "Then", and the article: playtest 2026-11-17 #30 fused the bite and its
+            # cost into one sentence, "lunges and snaps its teeth at you … remains
+            # unconscious and dying on the ground as it struggles to strike", from
+            # "The effort costs dire rat a hit point … dire rat is unconscious and dying."
+            tell=names_mod.with_articles(
+                f"Then, the act done, the effort costs {actor.name} a hit point, "
+                f"disabled as they are." + self._hp_state_tell(crossed), [actor.name]),
             because="")
 
     def _concentrate(self, intent: Intent, actor, spell, level: int, state: dict,
@@ -6882,6 +7252,88 @@ class Engine:
                  f"{pc.name} is {why} and never gets away.",
             because=intent.because)
 
+    def _pursuers(self, pc, escorts=()) -> list[str]:
+        """Who comes after a party walking out of a fight: refs, in the sides' order.
+
+        The CRB has no pursuit rule for a withdraw; the creature's turn is its own. So it
+        is decided by what the creature is (playtest 2026-11-16 #55, the owner's "hungry
+        beasts pursue"): a beast or a mindless thing (`morale.can_yield` false, Int under
+        3) that is still in the fight, can act, is not held or cornered, sees its quarry
+        (`awareness.sees` — the hidden and the invisible get away) and is at least as
+        fast on its feet keeps after it. A slower one cannot keep up: the walk out is a
+        double move at least. A person decides for themselves and is left to the fight's
+        end as before (an owner call, 2026-11-16). No tabletop or MUD source for a
+        pursuit rule of this shape was found (searched 2026-11-16); it is a reading of
+        creature behaviour, said as such.
+        """
+        from . import awareness, morale
+
+        if pc is None or not self.scene.in_encounter:
+            return []
+        ours = {pc.ref, *(escorts or ())}
+        pace = int(getattr(pc, "speed_feet", 30) or 30)
+        out: list[str] = []
+        for refs in self.scene.sides.values():
+            for r in refs:
+                a = self.scene.actors.get(r)
+                if a is None or a.is_pc or r in ours or r in out:
+                    continue
+                if a.is_down or a.is_helpless or not a.can_act() or morale.yielded(a)                         or self._cornered(a) or morale.can_yield(a):
+                    continue
+                if int(getattr(a, "speed_feet", 0) or 0) < pace:
+                    continue
+                if not awareness.sees(self.scene, a, pc):
+                    continue
+                out.append(r)
+        return out
+
+    # How long a beast left standing after a fight walked out of stays roused (`_lies_in_wait`).
+    GRUDGE_MINUTES = 24 * 60
+
+    def _lies_in_wait(self, place_id: str) -> list[str]:
+        """Who at `place_id` attacks a party walking into it: standing, able to act,
+        hostile (`states.attitude_of`), not yielded, and a beast or a mindless thing —
+        what a walker cannot talk past (`_pursuers`' line). Playtest 2026-11-16 #65: the
+        dire rat a fight was walked out of sat in the turnkey's room, and the walk out of
+        the sewers went straight through it. A hostile person is left to their own
+        choosing, as `_pursuers` leaves them (owner call). The Diku line's MEMORY flag
+        is the prior art: "Mob will remember the players that initiate attacks on it, and
+        initiate an attack on that player if it ever runs into him again" (CircleMUD
+        Builder's Manual, circlemud.org/cdp/building/building.txt)."""
+        from . import attitude as attitude_mod
+        from . import morale
+
+        pc = self.scene.pc()
+        out = []
+        for r, a in (self.scene.people or {}).items():
+            if a is pc or a.is_pc or str(getattr(a, "at", "") or "") != place_id:
+                continue
+            if a.is_down or not a.can_act() or morale.yielded(a) or morale.can_yield(a):
+                continue
+            if a.has_state("state.hidden") or a.has_state(states.TRAVELS_WITH_YOU):
+                continue
+            left = next((e for e in a.effects if e.source == "rule:fight-left"), None)
+            if left is not None:
+                # The grudge of a fight walked out of lasts a day, then the beast settles:
+                # playtest 2026-11-17 #1, a penguin left on the Red Gull's deck "comes at
+                # you" 44 hours after the fight. A grudge from before the stamp (0.4.0's
+                # first saves) has settled. THIS APP'S call: no rule in the book says how
+                # long an animal stays roused; a day is the owner's to move.
+                at = (left.payload or {}).get("at")
+                if at is None or self.scene.clock_minutes - int(at) > self.GRUDGE_MINUTES:
+                    continue
+            elif morale.TESTED_KEY in {e.key for e in a.effects}                     and not attitude_mod.step_of(attitude_mod.of(a))                     >= attitude_mod.step_of(attitude_mod.COMES_ALONG):
+                # A beast bloodied in a fight before 0.4.0 stamped the grudge (playtest
+                # 2026-11-17 #25: the dire rat fought and fled on T272 sat in torchlight
+                # sixteen hours later). Its morale test is the record that it fought.
+                # shortcut: no clock on these, so they never settle; they are stamped the
+                # first time a fight with them is walked out of again.
+                out.append(r)
+                continue
+            if states.attitude_of(a) == "hostile":
+                out.append(r)
+        return out
+
     def _spend_reaction(self, ref: str, budget: str) -> bool:
         """Take one from this creature's allowance, or refuse.
 
@@ -6972,8 +7424,33 @@ class Engine:
         said = " ".join(str(intent.params.get("not_here") or "").split())
         if said:
             return self._refuse(intent, said)
+        box = str(intent.params.get("looks_in") or "")
+        if box:
+            return self._looks_in(intent, box)
         return Outcome(intent_id=intent.id, op=intent.op, status="resolved",
                        tell="", because=intent.because)
+
+    def _looks_in(self, intent: Intent, name: str) -> Outcome:
+        """What a container here holds, told from its record and moving nothing (taking it
+        is `give`'s, `_empty_box`). Playtest 2026-11-17 #41: "I open the gaoler's box and
+        see what's inside" was a bare narrate_only, and the prose pried the lid and never
+        said what was in it — 50 gp the engine held."""
+        pc = self.scene.pc()
+        box = self._container_named(name, pc)
+        if box is None:
+            return self._refuse(intent, f"There is no {holding.plain(name) or name} here.")
+        coins = self._coins_here()
+        got = (box.get("contents") or {}).get("purse") or {}
+        inside = ([goods.purse_line(got, coins)] if goods.in_copper(got) else []) + [
+            f"{n} × {k}" if int(n or 1) != 1 else str(k)
+            for k, n in ((box.get("contents") or {}).get("goods") or {}).items()]
+        the = _sentence(self._the(str(box.get("name") or name)))
+        return Outcome(intent_id=intent.id, op=intent.op, status="resolved",
+                       because=intent.because,
+                       effects=[{"kind": "looked_in", "container": str(box.get("name")),
+                                 "items": inside}],
+                       tell=(f"{the} opens. Inside: {', '.join(inside)}." if inside
+                             else f"{the} opens. It is empty."))
 
     # provoke -----------------------------------------------------------------------------
 
@@ -7792,7 +8269,8 @@ class Engine:
         # tell that quotes it hands the narrator the player's own framing to put in
         # somebody's mouth.
         said = (f'{who} says{at}: "{words}"' if intent.params.get("quoted")
-                else reported_speech(who, at, words, heard.name if heard else ""))
+                else reported_speech(who, at, words, heard.name if heard else "",
+                                     getattr(speaker, "pronouns", "")))
         effects = [{"kind": "said", "who": intent.actor or "",
                     "to": heard.ref if heard is not None else "",
                     "words": words}]
@@ -7804,6 +8282,16 @@ class Engine:
         from . import attitude as attitude_mod, awareness
 
         bits = [said]
+        if heard is None and speaker is not None and speaker.is_pc and not any(
+                not a.is_pc and self.scene.conscious(r)
+                for r, a in self.scene.actors.items()):
+            # Said with nobody here to hear it: the negative stated, so no answer is
+            # written for anybody. Playtest 2026-11-16 #74: alone at the east crossing,
+            # "I ask the foreman…" (the plan aimed it at a dock labourer in Zhilvarnia),
+            # the beat had "the foreman shakes his head", and a foreman was made on the
+            # spot. The room, not the target: a say's target is never read
+            # (tests/test_dangling_placeholders.py).
+            bits.append("Nobody here answers.")
         # Speaking from hiding: "in combat or speaking" is -20 on the Perception DC to
         # notice an invisible creature (CRB p.564), and everybody who hears it gets a
         # fresh check against the hiding at the end of the batch (`_awareness_settle`).
@@ -7960,6 +8448,12 @@ class Engine:
                                        strict=True)
             if door is not None:
                 return door
+        # Climb at the bottom of a pit IS the climb out, at the pit's DC (playtest
+        # 2026-11-17 #40: the plan's DC 10, made by 7, and she stayed in the pit).
+        if str(skill).lower() == "climb" and helped is None and not opposed:
+            out = dungeons.climb_out(self, intent, actor, partial)
+            if out is not None:
+                return out
         if heard is not None and heard.refused:
             return self._refuse(intent, heard.refused, code="already_heard")
         if heard is not None:
@@ -8321,8 +8815,17 @@ class Engine:
         from . import requests as requests_mod
 
         kind = requests_mod.kind_of(intent.params.get("request"))
+        if kind == requests_mod.HIRE:
+            # A hire is bought, not asked: the wage door, no roll and so no XP (playtest
+            # 2026-11-17b #21, `requests.HIRE`).
+            return self._company_hire(intent, target)
         now = int(self.scene.clock_minutes)
         what = "payment for the work" if kind == requests_mod.PAYMENT else "a favour"
+        # The favour as the player asked it (`wants`, their own words, `acts_to_ops._request`):
+        # playtest 2026-11-20 #14, "agrees to do Shadow the favour" said of nothing named.
+        wants = " ".join(str(intent.params.get("wants") or "").split()).rstrip(".")
+        if wants and kind == requests_mod.FAVOUR:
+            what = f"a favour: {wants}"
         asks = f"{actor.name} asks {target.name} for {what}."
         if not self.scene.conscious(target.ref):
             return Outcome(intent_id=intent.id, op="check", rolls=[], effects=[],
@@ -8359,6 +8862,12 @@ class Engine:
             if kind == requests_mod.PAYMENT:
                 line, effects, paid = self._pay_for_work(actor, target)
                 tell = f"{tell} {line}"
+            elif wants:
+                # Agreed, not done: a promise is no handover, so the answer may promise it
+                # (the carter's "I can share something from my pack" was cut beside
+                # "Nothing changes hands"), and the giving is a later deed of its own.
+                tell = (f"{tell} {target.name} agrees to it. Nothing has changed hands "
+                        f"yet.")
             else:
                 tell = (f"{tell} {target.name} agrees to do {actor.name} the favour. "
                         f"Nothing changes hands.")
@@ -9067,6 +9576,11 @@ class Engine:
             unheld = self._improvised_unheld(actor, str(intent.params.get("item") or ""))
             if unheld:
                 return self._refuse(intent, unheld, code="not_here")
+            # Named as it is carried from here on: the tell says "the rock", and the
+            # throw takes that rock out of the pack (below), not "rock i picked up before".
+            held = self._improvised_held(actor, str(intent.params.get("item") or ""))
+            if held:
+                intent.params["item"] = held
         # A blow given or taken ends being a bystander. The one place besides
         # `join_fight` that lifts the tag, and it lifts it BEFORE the encounter forms so
         # the sides are drawn with both of them in.
@@ -9252,6 +9766,12 @@ class Engine:
         # nothing had ever asked.
         usual = weapons_mod.lethality_of(weapon)
         lethality = str(intent.params.get("lethality") or usual)
+        # A knockout bout (rules/arena.py): every blow between its two fighters is pulled
+        # to nonlethal, at the book's -4 with a lethal weapon. The bout's state, never the
+        # plan's word, decides it.
+        if actor.has_state(states.IN_A_BOUT) and defender is not None \
+                and defender.has_state(states.IN_A_BOUT):
+            lethality = "nonlethal"
         pulled = usual == "lethal" and lethality == "nonlethal"
 
         if coup:
@@ -10305,6 +10825,11 @@ class Engine:
                     if actor.goods[name] <= 0:
                         del actor.goods[name]
                     break
+            else:
+                # Thrown off the shelf (`_improvised_held`): it leaves the shelf too.
+                sid = holding.stock_key(actor.stock or {}, thrown_thing)
+                if sid:
+                    actor.take_stock(sid, 1)
             self.scene.place_prop(thrown_thing,
                                   owner=(rec or {}).get("owner") or actor.ref,
                                   from_=(rec or {}).get("from_", ""),
@@ -10333,11 +10858,18 @@ class Engine:
                   if coup_dc is not None else None)
         else:
             dc = {"value": target_ac, "explain": ac_note, "flat_footed": flat_footed}
+        # A reaction says it is one. Playtest 2026-11-20 #114: the third lizard closed on
+        # Shadow, provoked, and died to the attack of opportunity, and the page had only
+        # "You strike the third lizard" with no player action before it. The narrator is
+        # fed tells and nothing else (law three), so the tell is where the name has to be.
+        # It still opens with the attacker's name, which `_blows_from` reads.
+        lead = (f"{actor.name} takes an attack of opportunity on {defender.name}: "
+                if intent.params.get("reaction") == "attack_of_opportunity" else "")
         return Outcome(
             intent_id=intent.id, op="attack", rolls=rolls, dc=dc,
             verdict="hit" if any_hit else "miss",
             effects=effects,
-            tell=" ".join(state["tells"]) + self._hp_state_tell(crossed),
+            tell=lead + " ".join(state["tells"]) + self._hp_state_tell(crossed),
             because=intent.because,
             blows=list(state.get("blows") or []),
         )
@@ -10515,11 +11047,16 @@ class Engine:
         speed = int(getattr(actor, "speed_feet", 0) or 0)
         far = self.scene.in_encounter and speed and cost > speed
         if voice == "person":
+            # By the name the board prints (`fixtures.square_name`), never x,y: the player
+            # reads E6 on the board's edge (playtest 2026-11-20 #9).
+            from . import fixtures as _fixtures
+
+            named = _fixtures.square_name((x, y))
             if far:
-                return (f"{_sentence(fault)} The nearest square in reach, {x},{y}, is "
+                return (f"{_sentence(fault)} The nearest square in reach, {named}, is "
                         f"{cost} ft away and {actor.name} moves {speed} ft: close in "
                         f"this turn and strike on the next.")
-            return (f"{_sentence(fault)} Click square {x},{y} on the map to move there "
+            return (f"{_sentence(fault)} Click square {named} on the map to move there "
                     f"({cost} ft), then strike.")
         if far:
             return (f"{fault} The nearest square in reach, [{x}, {y}], is {cost} ft away "
@@ -11942,7 +12479,13 @@ class Engine:
                     name="a warrant", kind="situation", key=states.wanted_tag(town),
                     source=f"rule:ship-seized/{ship.id}", origin=f"rule:ship-seized/{ship.id}",
                     duration="until-dismissed", tags=(states.wanted_tag(town),),
-                    payload={"crime": "theft", "what": ship.name}))
+                    # Sworn by the man she was taken from, who saw it done: a witness,
+                    # never a bare accusation (playtest 2026-11-16 #85), and the ship's
+                    # book price for the theft's fine (`ships.VESSELS`, CRB Table 6-9).
+                    payload={"crime": "theft", "what": ship.name,
+                             "witness": master.name, "ship": ship.id,
+                             "worth_gp": float(ships_mod.VESSELS.get(
+                                 ship.kind, {}).get("price_gp") or 0)}))
                 effects.append({"kind": "wanted", "town": town})
             hands = [a for a in crew if a is not master and not a.is_down]
             quay = next((p for p in self.places() if " ".join(str(p.name).split()).lower()
@@ -13639,15 +14182,19 @@ class Engine:
             made = roll.total >= step.dc
             self._judge(roll, made)
             verdict = "success" if made else "failure"
-            # The time passes and the forge's hours are paid either way, as at the bench.
-            self.scene.advance(step.minutes)
+            # The time passes and the forge's hours are paid either way, as at the bench,
+            # cut by a margin of 5 or more (ruling 2026-11-18, `crafting.margin_bonus`).
+            from . import crafting as _crafting
+
+            mb = _crafting.margin_bonus(roll.total - step.dc, roll.natural) if made else None
+            self.scene.advance(_crafting.bonus_minutes(step.minutes, mb))
             if step.rent_cp:
                 from . import goods
 
                 purse, ok = goods.spend(actor.purse, step.rent_cp)
                 if ok:
                     actor.purse = purse
-            report = step.settle(made, roll.total - step.dc)
+            report = step.settle(made, roll.total - step.dc, face=roll.natural)
             if step.rent_cp:
                 report["effects"].append({"ref": actor.ref, "kind": "rent", "cp":
                                           step.rent_cp, "to": step.rent_to or ""})
@@ -14553,7 +15100,8 @@ class Engine:
                                     terrain_hint=self._terrain_hint(found),
                                     founded=self.scene.founded,
                                     ring=self._ring(found, self.scene.at),
-                                    moored=self.moored_here())
+                                    moored=self.moored_here(),
+                                    stepping=tuple(getattr(self, "_hex_quiet", ())))
 
     def moored_here(self) -> tuple[str, ...]:
         """The ships lying at this town's quay that the party may simply walk aboard: one
@@ -14698,6 +15246,54 @@ class Engine:
             self.scene.grid = None
             self.scene.positions.clear()
         self.lay_the_ground()
+        self._crowd_settle(quiet=True)
+
+    def _crowd_settle(self, quiet: bool = False) -> list[str]:
+        """Lay, lift or scatter the crowd where the party stands (rules/crowds.py), and
+        say what changed. One door: arrival (`quiet`, the travel tell says it), and the end
+        of every batch, where the hour turning thins or fills it and a fight scatters it
+        ("If crowds see something obviously dangerous, they'll move away", CRB p.433).
+
+        shortcut: the book's crowd moves off at 30 ft a round; this one is gone at the end
+        of the batch the fight started in, and stays gone for that three-hour slot. Move
+        it square by square if a fight in a crowd ever needs the escape modelled."""
+        from . import crowds, keepers, places as places_mod, residency
+
+        sc = self.scene
+        at = sc.at or ""
+        now = int(sc.clock_minutes or 0) // residency.SLOT_MINUTES
+        # A crowd left at another place went with that place's map (no lift: these squares
+        # are the old map's numbers), and a scattered one returns when the slot turns.
+        # So is one whose squares are no longer on this map: the grid was replaced under it
+        # (a GM-laid battlefield), and lifting it would take the new map's own squares.
+        diff = sc.grid.difficult if sc.grid is not None else set()
+        for m in [m for m in sc.manifests if m.what == crowds.WHAT]:
+            if m.source != at or (m.terrain == "none" and m.owner != f"scattered@{now}") \
+                    or (m.terrain == "difficult" and not set(map(tuple, m.added)) <= diff):
+                sc.manifests.remove(m)
+        crowd = next((m for m in sc.manifests if m.what == crowds.WHAT), None)
+        if crowd is not None and crowd.terrain == "none":
+            return []
+        name = keepers.label_of(at) or "here"
+        if sc.in_encounter:
+            if crowd is None:
+                return []
+            sc.lift(crowd)
+            sc.place(Manifestation(what=crowds.WHAT, source=at, owner=f"scattered@{now}"))
+            return [crowds.scattered_line(name)]
+        loc = self.world.get(sc.location_id) if self.world else None
+        want = sc.grid is not None and crowds.busy(
+            at, places_mod.scale_of(loc), sc.clock_minutes, sc.founded)
+        if want and crowd is None:
+            cells = crowds.squares(sc.grid, at)
+            if cells:
+                sc.place(Manifestation(what=crowds.WHAT, terrain="difficult",
+                                       squares=cells, source=at))
+                return [] if quiet else [crowds.gathered_line(name)]
+        if not want and crowd is not None:
+            sc.lift(crowd)
+            return [] if quiet else [crowds.thinned_line(name)]
+        return []
 
     def lay_the_ground(self, even_nowhere: bool = False, place: bool = True) -> bool:
         """The map of wherever the party is standing. Laid on arrival, not on violence.
@@ -15035,7 +15631,9 @@ class Engine:
         if (self.scene.road.get("to") == leg.to_id
                 and self.scene.road.get("from") == self.scene.location_id):
             resumed = max(0, int(self.scene.road.get("walked") or 0))
-            hours = max(1, hours - resumed)
+            # A bridge down on this road (`ontheway` band "bridge") is the long way
+            # round: its hours are road still to walk.
+            hours = max(1, hours - resumed + int(self.scene.road.get("detour") or 0))
         elif self.scene.road:
             # A different road, or the same one from somewhere else: the old one's
             # progress is gone, and so is its record — a stale one otherwise waits
@@ -15104,7 +15702,12 @@ class Engine:
         # after the storm's hours had gone into it: a ten-hour road held up by weather
         # on its second watch recorded twelve hours walked.
         progress = remaining = hours
-        met = ontheway.road(
+        weathered = 0
+        # In stretches of days, one check a stretch (`ontheway.road_stretches`, the owner
+        # 2026-11-16: "every few days you can roll an event"): until then this was the
+        # hops' four-a-day watch check, which on the floored roads (three days and up) met
+        # something on most journeys and stopped the march for it.
+        met = ontheway.road_stretches(
             self.dice, hours,
             (leg.crosses[0] if leg.crosses else places_mod.terrain_of(self.scene.at)),
             int(getattr(pc, "level", 1) or 1) if pc is not None else 1,
@@ -15123,6 +15726,9 @@ class Engine:
                 weathered = self.dice.roll(ontheway.WEATHER_HOURS,
                                            label="how long it holds you",
                                            visibility="hidden").total
+                # And the march goes on after it: a storm is nobody to play, and a stop
+                # for it on a days-long road is the tedium the stretches exist to remove.
+                progress = hours = remaining
                 hours += weathered
         # Stopped short only when the road is not all walked. A check falls at the END
         # of a watch, and the last watch of a march is the part-watch that ends where
@@ -15132,6 +15738,11 @@ class Engine:
         # party in the fields outside the town they had LEFT, with the next attempt
         # costing one hour.
         stopped_short = met is not None and progress < remaining
+        if met is not None and not stopped_short and met.kind in ("bridge", "ruin"):
+            # A bridge down or a ruin at the far town's own gate is not on the road: the
+            # road is behind them (an event falls at midday, so only a last day of four
+            # hours or less can land one here).
+            met = None
 
         toll_note = ""
         arrived, walked = self._march(pc, hours, places_mod.terrain_of(self.scene.at))
@@ -15172,6 +15783,9 @@ class Engine:
                                # nobody an inch nearer the far end. And they are hours
                                # ON FOOT, whatever the pace was.
                                "walked": resumed + walked_units}
+            if met is not None and met.kind == "bridge":
+                self.scene.road["detour"] = int(
+                    ontheway.events().get("bridge_detour_hours", 8))
             if sea_leg is not None:
                 # The crossing this road is the start of: the exits row offers it
                 # from the stretch of road, and the next journey resumes it.
@@ -15188,6 +15802,11 @@ class Engine:
             along = outskirts_mod.ring_id(self.scene.location_id, ground,
                                           outskirts_mod.along_slug(leg.to_id))
             self.place_party(along)
+            if met is not None and met.kind == "ruin":
+                # The ruin is a real place off this stretch of road, minted as the venture
+                # op mints one (places must be creatable, 2026-10-03): the exits row offers
+                # it, and going in is `venture` into the ruins, its dungeon chance and all.
+                self._mint_venture_here("ruins")
             # The turn's journey is spent, and it names where the party IS — the
             # refusal a second travel gets says "is at {here}", and until 2026-09-23
             # this said the far town, which they had just been told they did not reach.
@@ -15275,6 +15894,7 @@ class Engine:
         # ground the party is now standing on — the open country it stopped in, or the
         # far town's way in when the meeting fell on the road's last watch.
         made = self._meet_on_the_way(met, zone="far") if met is not None else []
+        toll_line = self._ask_toll(met, made)
         if met is not None and met.aggressive and pc is not None and made:
             self._ensure_encounter(pc.ref, target=made[0]["ref"])
 
@@ -15289,15 +15909,20 @@ class Engine:
                          if behind < journey_mod.HOURS_PER_DAY else
                          journey_mod.describe(leg, behind)
                          .replace(" on the road", ""))
-            bits = [f"{out_words} on foot out of "
-                    f"{getattr(self.world.get(self.scene.location_id), 'name', 'town') if self.world else 'town'} "
-                    f"on the road to {leg.to_name}"
-                    + (f" ({hours} hour{'s' if hours != 1 else ''} of it this time)"
-                       if resumed else "")
-                    + ", and the road stops being yours.",
+            start = (getattr(self.world.get(self.scene.location_id), 'name', 'town')
+                     if self.world else 'town')
+            quiet = (ontheway.quiet_days(met.day - 1, start, further=bool(resumed))
+                     if met.day > 1 else "")
+            bits = [(f"{quiet}; on the {self._ordinal(met.day)} day the road to "
+                     f"{leg.to_name} stops being yours." if quiet else
+                     f"{out_words} on foot out of {start} on the road to {leg.to_name}"
+                     + (f" ({hours} hour{'s' if hours != 1 else ''} of it this time)"
+                        if resumed else "")
+                     + ", and the road stops being yours."),
                     ontheway.describe(met, who=[self.scene.actors[m["ref"]].name
                                                 for m in made
-                                                if m["ref"] in self.scene.actors])]
+                                                if m["ref"] in self.scene.actors])
+                    + toll_line]
             if through:
                 bits.insert(0, f"Out by {_and_then(tuple(through))}.")
             if toll_note:
@@ -15324,7 +15949,11 @@ class Engine:
             bits.append(mount_note)
         if parted:
             bits.insert(0, parted)
-        if met is not None:
+        if met is not None and met.kind == "weather":
+            # Sat out and walked on (`weathered`): the hours are in the march's total.
+            bits.append(f"On the {self._ordinal(met.day or 1)} day the weather turned and "
+                        f"held them off the road for {weathered} hours.")
+        elif met is not None:
             # Met on the last watch: the road ended at the same time.
             bits.append(ontheway.describe(met))
         if resumed:
@@ -15366,8 +15995,8 @@ class Engine:
         return done
 
     def watch_at_the_way_out(self, pc, was_place: str, going_to, known, *,
-                             through: bool = False, crossing: bool = True
-                             ) -> tuple[str, str]:
+                             through: bool = False, crossing: bool | None = None,
+                             name_ways: bool = True) -> tuple[str, str]:
         """(refusal, line) for walking from `was_place` to `going_to` past the watch.
 
         The gate's reading of the warrant, as `_op_travel` has always applied it — moved
@@ -15393,7 +16022,18 @@ class Engine:
         it; asked as though it were the arch, the per-hop watch refused the wanted their
         own temple — "wanted is not house arrest" (`test_moving_inside_the_walls_is_not_
         watched`) — the moment it was built. A gate passed through on a walk that stays
-        inside is a square, not the way out.
+        inside is a square, not the way out. Left None (the exits row asks of one step),
+        it is read off the two places, as `_op_travel` reads it off the walk's two ends.
+
+        On a walk that stays inside, only the town's ARCH is where the watch stands: the
+        first of `places.ENTRANCES` the town has. Playtest 2026-11-16 #73: Mirabalos has
+        the gate AND the docks, and a walk from the cathedral to the quay — inside the
+        walls, leaving by sea being a passage `watch_on_the_road` reads — was stopped at
+        the east crossing as though the docks were the arch. A village whose only way in
+        is its docks still has the watch there.
+
+        `name_ways` is False when this is asked of the candidate ways round (the refusal's
+        list, below), so the list never asks itself.
         """
         from . import dungeons
         from . import places as places_mod
@@ -15413,7 +16053,16 @@ class Engine:
         # one list, so the generator and the law cannot disagree about what an
         # entrance is — and a village, which has a road rather than a gate, was
         # somewhere a warrant could never be enforced at all.
-        at_gate = " ".join(going_to.name.split()).lower() in places_mod.ENTRANCES
+        if crossing is None:
+            crossing = (places_mod.setting_of(was_place) == "outside") \
+                != (places_mod.setting_of(going_to.id) == "outside")
+        name = " ".join(going_to.name.split()).lower()
+        at_gate = name in places_mod.ENTRANCES
+        if at_gate and not crossing:
+            # Inside the walls, the watch stands at the arch alone (#73, above).
+            have = {" ".join(p.name.split()).lower() for p in known
+                    if places_mod.location_of(p.id) == town}
+            at_gate = name == next((x for x in places_mod.ENTRANCES if x in have), name)
         # Any way OUT, by place as well as by biome (Lane B, docs/fix-interfaces.md
         # §1.3 B3). This read `bool(want)`, so a travel by PLACE to ground outside —
         # which is how the outskirts and the road heads are entered — walked past the
@@ -15434,15 +16083,32 @@ class Engine:
         found = self.world.get(self.scene.location_id) if self.world else None
         town_name = str(getattr(found, "name", "") or "the town")
         if law == "wanted":
-            other_ways = [p.name for p in known
-                          if p.origin in ("found", "venture")
-                          and not p.described_only
-                          and p.terrain != places_mod.URBAN]
+            # Only ground outside the walls that a walk from here reaches with the watch
+            # never in the way, each named once. Playtest 2026-11-16 #73/#84: this listed
+            # every venture spot in town — "the crypt, the stair, … the sewers, the
+            # outfall, the main channel, the sump, the sewers, the outfall, the main
+            # channel" — dead ends under the streets, and taking its advice failed.
+            other_ways: list[str] = []
+            for p in (known if name_ways else ()):
+                if p.origin not in ("found", "venture") or p.described_only \
+                        or places_mod.setting_of(p.id) != "outside" \
+                        or p.name in other_ways:
+                    continue
+                prev, clear = was_place, True
+                for hop_id in places_mod.route(known, was_place, p.id) or ():
+                    hop = places_mod.find(known, hop_id)
+                    if hop is None or self.watch_at_the_way_out(
+                            pc, prev, hop, known, through=hop_id != p.id,
+                            crossing=True, name_ways=False)[0]:
+                        clear = False
+                        break
+                    prev = hop_id
+                if clear and prev == p.id:
+                    other_ways.append(p.name)
             how = (f"Leave by another way — {', '.join(other_ways)} — or "
                    f"clear your name."
                    if other_ways else
-                   "Leave by another way — ground you have founded or "
-                   "ventured into outside the walls — or clear your name.")
+                   "Find another way past the watch, or clear your name.")
             return (f"{pc.name} is wanted in {town_name}, and the gate is where the "
                     f"watch stands: they would take you at the arch. {how}"), ""
         if crossing:
@@ -15498,6 +16164,49 @@ class Engine:
             return None
         return keeper
 
+    def _a_step_within(self, place: str) -> bool:
+        """Whether a travel to `place` stays inside the venture or the ship the party is
+        in — the sewers' outfall from their main channel, the deck from the hold. Those
+        rooms are a minute apart (`outskirts.hop_minutes`), so the step is no journey
+        (playtest 2026-11-16 #79). A venture's rooms are found up their parents to its
+        head; a ship's rooms are read off her id (`ships.vessel_of`)."""
+        from . import places as places_mod
+        from . import ships as ships_mod
+
+        if not place:
+            return False
+        known = self.places()
+        here = self.here()
+        to = places_mod.find(known, place, near=here.id)
+        if to is None or to.id == here.id:
+            return False
+        vid = ships_mod.vessel_of(here.id)
+        if vid or ships_mod.vessel_of(to.id):
+            return vid == ships_mod.vessel_of(to.id)
+        inside = ("venture", "dungeon")
+        by_id = {p.id: p for p in known}
+
+        def head(p):
+            while p.parent in by_id and by_id[p.parent].origin in inside:
+                p = by_id[p.parent]
+            return p.id
+
+        # And the way into a venture from the place it opens off, or back up out of it:
+        # playtest 2026-11-17 #14, "head to the gardens, down the grate, and back through
+        # the culvert to the cells" walked to the gardens, and the planner's plain
+        # travels on into the sewers were refused "One journey a turn". The drop down the
+        # grate is a minute's step, as #41's venture op already made it. Only after the
+        # turn's journey: with none spent yet, the drop spends it as it always did, so
+        # "down the grate, along to the outfall, then across the city" is still two turns
+        # (#79's test).
+        def opens_off(inner, outer) -> bool:
+            top = by_id.get(head(inner))
+            return inner.origin in inside and top is not None and top.parent == outer.id
+
+        if self._journeyed and (opens_off(to, here) or opens_off(here, to)):
+            return True
+        return here.origin in inside and to.origin in inside and head(here) == head(to)
+
     def _op_travel(self, intent: Intent, partial: dict) -> Outcome:
         """Move the ground underfoot — and leave behind everyone who is not coming.
 
@@ -15521,6 +16230,15 @@ class Engine:
         held = trial_mod.on_travel(self, intent, partial)
         if held is not None:
             return held
+        # At the bottom of a pit, nobody walks off until they climb out (playtest
+        # 2026-11-17 #38). Asked of the tag; the way out named with its DC.
+        from . import dungeons as dungeons_mod
+
+        pit = dungeons_mod.in_pit(self.scene.pc())
+        if pit is not None:
+            return self._refuse(intent, f"{self.scene.pc().name} is at the bottom of the "
+                                        f"pit: climbing out is a DC {pit['climb']} Climb "
+                                        f"check first.", code="in_a_pit")
 
         # One journey a turn (item 35). A plan may name a whole route — measured
         # 2026-09-19 on "I find the mayor and grab him by the collar", which came back
@@ -15541,7 +16259,14 @@ class Engine:
         # destination and the system finds the way; here the model was handing over the
         # way itself. The refusal names where the party now stands so the next turn can
         # carry on from it, which is the roguelike's "repeat the command to resume".
-        if self._journeyed:
+        #
+        # A step between the rooms of one venture or one ship is no journey (playtest
+        # 2026-11-16 #79: down the grate and a few minutes along to the outfall was cut in
+        # two). It neither waits on the turn's journey nor spends it.
+        from . import ships as ships_mod
+
+        within = self._a_step_within(str(intent.params.get("place") or ""))
+        if self._journeyed and not within:
             return self._refuse(
                 intent, f"The party has already travelled this turn and is at "
                         f"{self._journeyed}. One journey a turn — the rest of the way "
@@ -15612,9 +16337,17 @@ class Engine:
                 # "I say I will go there now, and ask him to point the way". The
                 # legality check now names the fix at validate time, where the model
                 # can act on it; this is the floor for anything that slips past.
+                # A name, never an id (refs never on the page), and the short list from
+                # where the party stands, not every place of the town: playtest
+                # 2026-11-20 #3 printed a hex's raw id and the town's 25 places from
+                # inside the ruins 12 miles away.
+                if "~" in place or ":@" in place:
+                    rec = next((d for d in self.scene.founded if d.get("id") == place), None)
+                    place = str((rec or {}).get("name") or "that place")
+                reach = self._reachable_words()
                 return self._refuse(
-                    intent, f"There is no {place} here to go to. From here you can "
-                            f"reach {', '.join(p.name for p in known)}.")
+                    intent, f"There is no {place} here to go to."
+                            + (f" From here you can reach {reach}." if reach else ""))
             if going_to.described_only:
                 return self._refuse(
                     intent, f"{going_to.name} can be seen from here but not reached.")
@@ -15677,6 +16410,7 @@ class Engine:
                     f"travel: {w!r} names {len(matches)} people here; say which by "
                     f"ref: {', '.join(matches)}.", "refs")
             escorts.extend(matches)
+        named_escorts = list(escorts)
         # And whoever travels with you, without being named. `with` asked the model to
         # remember who the party is on every single move, and it did not: measured live
         # 2026-09-22, the tell for crossing a village read "Left behind: Drenn
@@ -15692,6 +16426,7 @@ class Engine:
         from . import journey as journey_mod
 
         fell_away: list[str] = []
+        joined: list[str] = []
         # The bond is lifted below, once nothing can refuse the walk: a travel run twice
         # (the attacks of opportunity a withdraw owes go first, `_leaving_the_fight`)
         # must find the same companions falling away the second time, and a refused one
@@ -15725,6 +16460,9 @@ class Engine:
         was_place = self.scene.at
         was_ground = here.terrain
         moved = going_to.id != was_place
+        barred = self._toll_bars(going_to, known) if moved and pc is not None else ""
+        if barred:
+            return self._refuse(intent, barred)
 
         # THE PACE, for a short trip out of town (I3, 2026-09-29). Lane B built riding and
         # galloping for journeys (owner, Q13) and could not give `travel` the param, so a
@@ -15835,6 +16573,7 @@ class Engine:
         met = None
         went_by: tuple[str, ...] = ()
         went_by_about: list[dict] = []
+        new_here = False
         meant_for = going_to.name
         meant_place = going_to.id
         minutes = 0
@@ -15882,6 +16621,7 @@ class Engine:
         # sentence in the tell (the first step was asked above, before the withdraw, and a
         # refusal there still refuses the whole travel).
         passing_said: list[str] = []
+        waiting: list[str] = []
         passing_met: list[dict] = []
         watch_stop = ""
         law_line = ""
@@ -15923,10 +16663,27 @@ class Engine:
                     # nothing (`journey.HUSTLE_FREE_HOURS`).
                     step = max(1, -(-step // journey_mod.PACES[pace]))
                     ridden_minutes += step
+                # Somebody hostile in a room on the way stops the walk there, as a
+                # meeting does: playtest 2026-11-16 #65, the walk out of the sewers went
+                # through the turnkey's room past the dire rat it had just fought.
+                waiting = self._lies_in_wait(hop.id)
+                if waiting:
+                    minutes += step
+                    if step_hours and not underway:
+                        far_walked = step_hours
+                    going_to = hop
+                    break
                 if hop.terrain == "deck":           # `ships.DECK`
                     # Up the gangplank or down a hatch: a deck is no street. Live
                     # 2026-11-16 (#19), boarding the Red Gull met "two of them going at
                     # each other in the middle of the road at the Red Gull".
+                    met = None
+                elif not underway and (places_mod.setting_of(hop.id) == "under"
+                                       or hop.terrain == "underground"):
+                    # Under the ground is neither street nor road: playtest 2026-11-17
+                    # #20, a sewer channel met the road's toll-keeper. What lives down
+                    # there is the venture's own (`_inhabit`), and lies in wait. The way
+                    # in from the surface (`underway`) is still the road's.
                     met = None
                 elif places_mod.setting_of(hop.id) == "in":
                     met = ontheway.street(self.dice, level,
@@ -15963,9 +16720,14 @@ class Engine:
             # separately — and so is the last hop of a walk the watch stopped, which
             # ended where it stood. A walk a meeting interrupted stops at the meeting's
             # place, so everything in hand is a place passed through.
-            kept = passed if met is not None else passed[:-1]
+            kept = passed if (met is not None or waiting) else passed[:-1]
             went_by = tuple(p.name for p in kept)
-            went_by_about = [{"name": p.name, "about": p.about} for p in kept if p.about]
+            # Rooms under the ground walked without light or darkvision are not seen
+            # (#57). Read by the light where the walk starts — shortcut: a lit room on
+            # the way still counts as dark; a per-room light needs lights kept per place.
+            blind = pc is not None and self.scene.sees_nothing(pc)
+            went_by_about = [{"name": p.name, "about": p.about} for p in kept if p.about
+                             and not (blind and places_mod.terrain_of(p.id) == "underground")]
 
         # The gate reads the warrant (docs/wanted.md, reader one), now hop by hop in the
         # walk above, against the step actually taken — so a suspected character stopped
@@ -15987,14 +16749,36 @@ class Engine:
         fight_ended = False
         xp_line = ""
         dying_tells: list[str] = []
+        chasing: list[str] = []
         if moved:
+            # Who comes after the party (`_pursuers`): the fight goes on where it stops,
+            # with them and nobody else. Playtest 2026-11-16 #55: "The fight is left
+            # behind" of a hungry dire rat at 40 ft against a walker at 30.
+            if self.scene.in_encounter:
+                chasing = self._pursuers(pc, escorts)
+                ours = {pc.ref if pc is not None else "", *escorts}
+                foes = [r for refs in self.scene.sides.values() for r in refs
+                        if r not in ours and r in self.scene.actors]
+                for r in foes:
+                    a = self.scene.actors[r]
+                    if r not in chasing and not a.is_down:
+                        # Left standing, it keeps the grudge (`_lies_in_wait`).
+                        from . import attitude as attitude_mod
+
+                        self._set_attitude(a, attitude_mod.HOSTILE, None, "rule:fight-left",
+                                           payload={"at": self.scene.clock_minutes})
             # In this order: pay, then end, then walk. `_settle_xp` needs the sides and
             # the bodies, `end_encounter` clears the sides, and a fight walked out of
             # used to pay nothing without a word — the tell below carries the line.
-            if self.scene.in_encounter:
+            if self.scene.in_encounter and not chasing:
                 xp_line = self._settle_xp()
                 self.scene.end_encounter()
                 fight_ended = True
+            elif chasing:
+                # The order cannot walk (`Scene.move` keeps the player in it): it is
+                # closed unpaid here and opened again from the pursuers' side on the
+                # ground the party stops on, below — the fight is not over, so no XP.
+                self.scene.end_encounter()
             for a in list(self.scene.actors.values()):
                 if a.is_pc:
                     continue
@@ -16003,12 +16787,17 @@ class Engine:
                     # stay where they fell. Said, rather than silently dropped.
                     stayed_down.append(a.name)
                     escorts.remove(a.ref)
-                if a.ref not in escorts:
+                if a.ref not in escorts and a.ref not in chasing:
                     # Three doors used to shed people and only two resolved the dying
                     # first; travel left them bleeding with no tell. Nobody bleeds out
                     # in silence because the party changed rooms.
                     if a.has_state("state.down.dying"):
-                        dying_tells.extend(self._resolve_dying(a))
+                        # Said where it happens. Playtest 2026-11-17 #31: "The dire rat
+                        # stabilises where they lie" in the walk's tell was told as "the
+                        # hall of the cells, where the dire rat lies still on the ground".
+                        dying_tells.extend(
+                            t.rstrip(".") + f", back in {here.name}."
+                            for t in self._resolve_dying(a))
                     # Not the hidden, not the dead: "Left behind: the man hiding in
                     # the back room and the body" is a fact the character does not
                     # hold, and the tell lands on the visible card.
@@ -16033,6 +16822,7 @@ class Engine:
             # (item 9 (f); `Scene.pass_through`).
             for p in kept:
                 self.scene.pass_through(p.id)
+            new_here = going_to.id not in self.scene.places_been()
             if pc is not None:
                 self.scene.move(pc.ref, going_to.id)
                 # The walk's minutes, charged once (the hop sum above). This was an hour
@@ -16084,6 +16874,21 @@ class Engine:
                 self.place_party(going_to.id)
             for ref in escorts:
                 self.scene.move(ref, going_to.id)
+            # Somebody taken along by name who would come anyway (friendly or better, the
+            # `company` op's own rule) has joined the party, not been carried one room.
+            # Playtest 2026-11-17 #34/#50: "I go to the broken pen, and the smuggler comes
+            # with me" walked a friendly smuggler there with `with`, unbonded, and the next
+            # walk left him behind, so he was "nowhere to be found" when she came back.
+            for ref in named_escorts:
+                a = self.scene.actors.get(ref)
+                if a is None or ref not in escorts or a.has_state(states.TRAVELS_WITH_YOU)                         or str(getattr(a, "from_template", "") or "") in journey_mod.MOUNTS                         or attitude_mod.step_of(attitude_mod.of(a))                         < attitude_mod.step_of(attitude_mod.COMES_ALONG):
+                    continue
+                self._travels_with_you(a)
+                joined.append(a.name)
+            for ref in chasing:
+                # On the party's heels: at the edge of the fight, not beside them.
+                self.scene.zones[ref] = "near"
+                self.scene.move(ref, going_to.id)
             # New room, new ground — the rule `place_party` states and this door never
             # kept. `Scene.move` changes where everybody is and touches no map, so
             # travelling from the well to the market left the WELL's floor on screen with
@@ -16110,12 +16915,15 @@ class Engine:
                         self.scene._end_standing(made)
                     self.scene._end_standing(w)
             self.lay_the_ground()
+            self._crowd_settle(quiet=True)
             # After every move, for the reason `settle_relations` gives.
             self.scene.settle_relations()
             # The one journey this batch is spent. Set only where the party actually
             # moved: a refused travel, or a travel to the ground already underfoot,
-            # costs the turn nothing and must not bar the real one behind it.
-            self._journeyed = going_to.name
+            # costs the turn nothing and must not bar the real one behind it. Nor does a
+            # step within one venture or ship (#79, above).
+            if not within:
+                self._journeyed = going_to.name
             # Back inside the walls is off the road. `scene.road` remembers how far
             # along an interrupted road the party got, keyed on the settlement they set
             # out from — and walking back into that settlement does not change the
@@ -16126,8 +16934,10 @@ class Engine:
                 self.scene.road = {}
             # Walking out is walking away: the conversation ends, and the tell says the
             # party walked away from it if no leave was taken (2026-09-24; reworded
-            # 2026-10-03, see `end_talk`).
-            parted = self.end_talk("walked away")
+            # 2026-10-03, see `end_talk`). Not with whoever walks along: playtest
+            # 2026-11-17 #39, the smuggler led on into the broken pen was told "You take
+            # your leave of the starving smuggler", and the page left him behind.
+            parted = self.end_talk("walked away", keep=escorts)
             # And whoever keeps the room they have just walked into, if it is a room
             # somebody keeps and nobody has kept it yet.
             self.staff_the_place()
@@ -16135,6 +16945,26 @@ class Engine:
         # Whoever the walk ran into arrives by the one door creatures arrive by, onto
         # the ground that has just been laid. After the move, never before: they are in
         # the place the party stopped at, and `_bring_in` places them on its grid.
+        # Whoever lay in wait on the way (`_lies_in_wait`) opens the fight from their
+        # side, on the ground just laid.
+        waiting_tell = ""
+        if chasing and pc is not None:
+            on_heels = [r for r in chasing if r in self.scene.actors]
+            if on_heels and not self.scene.in_encounter:
+                self._ensure_encounter(on_heels[0], target=pc.ref)
+            for r in on_heels:
+                self.join_fight(r, "them")
+        if waiting and pc is not None:
+            here_now = [r for r in waiting if r in self.scene.actors]
+            if here_now and not self.scene.in_encounter:
+                self._ensure_encounter(here_now[0], target=pc.ref)
+            for r in here_now:
+                self.join_fight(r, "them")
+            names = [self.scene.actors[r].name for r in here_now]
+            said = _and_then(tuple(names))
+            waiting_tell = (f"{said[:1].upper()}{said[1:]} "
+                            f"{'is' if len(names) == 1 else 'are'} still here, and "
+                            f"{'comes' if len(names) == 1 else 'come'} at you.")
         met_tell = ""
         met_refs: list[str] = []
         if met is not None:
@@ -16148,6 +16978,7 @@ class Engine:
                     pc, places_mod.location_of(self.scene.at) or self.scene.location_id)
             made = self._meet_on_the_way(met, zone="near")
             met_refs = [m["ref"] for m in made]
+            toll_line = self._ask_toll(met, made, came_from=prev.id)
             # A stop names who and why (Lane B, item 16.3): "the watch comes down the
             # road … You get no further" became background prose — "the watchmen are
             # making their rounds" — because the tell never said who had stopped you.
@@ -16157,7 +16988,7 @@ class Engine:
             met_tell = ontheway.describe(
                 met, going_to.name, law=law_now,
                 who=[self.scene.actors[r].name for r in met_refs if r in self.scene.actors],
-                arrived=going_to.id == meant_id)
+                arrived=going_to.id == meant_id) + toll_line
             if met.kind == "weather":
                 # The one band that is nobody. It costs what it costs on the road
                 # between towns — hours, off the clock — and here it costs the same,
@@ -16227,7 +17058,18 @@ class Engine:
                 bits.append(f"You go down under {town_name}.")
             elif was_setting == "under" and setting == "in":
                 bits.append(f"You come back up into {town_name}.")
-        elif going_to.terrain != was_ground:
+        elif moved and ships_mod.vessel_of(going_to.id) != ships_mod.vessel_of(was_place):
+            # Over a gangplank is boarding or landing, not a change of country: playtest
+            # 2026-11-16 #91, stepping from the quay onto her own ship told "The ground
+            # changes: a ship's planking: decks, rigging and the hold below".
+            vid = ships_mod.vessel_of(going_to.id)
+            if vid:
+                ship = self.vessel(vid)
+                name = ship.name if ship is not None else ships_mod.name_for(vid)
+                bits.append(f"You go aboard {name}.")
+            else:
+                bits.append("You step ashore.")
+        elif going_to.terrain != was_ground and going_to.id not in self._hex_quiet:
             bits.append(f"The ground changes: {biomes.describe(going_to.terrain).lower()}.")
         if went_by:
             # The places the walk actually crossed, said as fact. The narrator is asked
@@ -16247,8 +17089,40 @@ class Engine:
         # engine's own words: nobody was brought in, and "you walk on" is said so the
         # prose cannot make a stop of it.
         bits.extend(s for s in passing_said if s)
-        if moved:
+        if moved and going_to.id not in self._hex_quiet:
             bits.append(f"You are at {going_to.name} now.")
+            from . import dungeons as dungeons_mod
+
+            # The place's own words on the first visit, as the places walked through
+            # get them above: owner bug 2026-11-17 #1, the cistern ("under the street,
+            # and older than it") arrived as "You are at the cistern now" and nothing
+            # else. A dungeon room says its own (`dungeons.arrived`), and a dark place
+            # shows nothing.
+            # An entrance is skipped: it has its own inner-side sentence below, and its text
+            # ("the way in and the way out, watched by...") is what told walks to the gate
+            # as passing through it.
+            if new_here and going_to.about and dungeons_mod.room(self.scene, going_to.id) is None \
+                    and " ".join(going_to.name.split()).lower() not in places_mod.ENTRANCES \
+                    and not (pc is not None and self.scene.sees_nothing(pc)):
+                about = str(going_to.about).strip().rstrip(".")
+                bits.append(f"{going_to.name[:1].upper()}{going_to.name[1:]}: {about}.")
+            # The crowd arrival laid (`_crowd_settle`), said on every arrival, not only the
+            # first: it is the hour's, not the place's.
+            from . import crowds as crowds_mod
+
+            if crowds_mod.standing(self.scene, going_to.id) is not None:
+                bits.append(crowds_mod.gathered_line(going_to.name))
+            from . import ships as ships_mod
+
+            if " ".join(going_to.name.split()).lower() in ships_mod.PORT_PLACES:
+                # The party's own ships at this quay, said on arriving at it. Playtest
+                # 2026-11-16 #87: "I walk down to the docks to see whether the Red Gull is
+                # still tied up" — the beat never said, though the engine knew.
+                held = [ships_mod.name_for(v) for v in self.moored_here()]
+                if held:
+                    ships_said = _and_list(held)
+                    bits.append(f"{ships_said[:1].upper()}{ships_said[1:]} "
+                                f"{'lies' if len(held) == 1 else 'lie'} at the quay.")
         if moved and direction == "out" and found_loc is not None:
             from . import geography
 
@@ -16259,7 +17133,7 @@ class Engine:
                            if land.beyond else "")
                 bits.append(f"Past the last house the land opens: {close}{further}.")
         spent = minutes + (far_walked + walked_back) * 60
-        if moved and spent:
+        if moved and spent and going_to.id not in self._hex_quiet:
             from . import geography
 
             bits.append(f"It takes {geography.walk_words(spent)}.")
@@ -16277,7 +17151,7 @@ class Engine:
         if watch_stop:
             # The rule's own sentence, about the way out the walk did not take.
             bits.append(watch_stop)
-        if (met is not None or watch_stop) and meant_for != going_to.name:
+        if (met is not None or watch_stop or waiting) and meant_for != going_to.name:
             # Said plainly, because the player asked for somewhere else and needs to
             # know they did not get there — the roguelike's "you were interrupted", and
             # the thing that makes the next turn's repeat of the command make sense.
@@ -16285,6 +17159,14 @@ class Engine:
                         f"{going_to.name}.")
         if fight_ended:
             bits.append("The fight is left behind." + xp_line)
+        if chasing:
+            names = [self.scene.actors[r].name for r in chasing if r in self.scene.actors]
+            said = _and_then(tuple(names))
+            bits.append(f"{said[:1].upper()}{said[1:]} "
+                        f"{'comes' if len(names) == 1 else 'come'} after you, and the "
+                        f"fight goes on here.")
+        if waiting_tell:
+            bits.append(waiting_tell)
         if stayed_down:
             bits.append(f"{', '.join(stayed_down)} cannot come: they stay where they fell.")
         bits.extend(dying_tells)
@@ -16292,6 +17174,10 @@ class Engine:
             bits.append(f"Left behind: {', '.join(left)}.")
         if fell_away:
             bits.append(f"{', '.join(fell_away)} does not come with you any more.")
+        if joined:
+            said = _and_then(tuple(joined))
+            bits.append(f"{said[:1].upper()}{said[1:]} "
+                        f"{'comes' if len(joined) == 1 else 'come'} with you.")
         if law_line:
             bits.append(law_line)
         if moved and direction == "along" and setting in ("in", "under") \
@@ -16309,15 +17195,16 @@ class Engine:
         effect = {"kind": "biome", "biome": going_to.terrain, "was": was_ground,
                   "left": left, "place": self.scene.at, "was_place": was_place,
                   "fight_ended": fight_ended, "went_by": list(went_by),
+                  "pursued_by": list(chasing), "waylaid_by": list(waiting),
                   "met": met.kind if met is not None else ""}
         # The register's fields (docs/fix-interfaces.md §2.7), each only when set.
         extra = {"minutes": spent if moved else 0,
                  "went_by_about": went_by_about,
                  "setting": setting, "was_setting": was_setting,
                  "direction": direction,
-                 "stopped_short": bool((met is not None or watch_stop)
+                 "stopped_short": bool((met is not None or watch_stop or waiting)
                                        and meant_for != going_to.name),
-                 "meant_for": meant_for if (met is not None or watch_stop)
+                 "meant_for": meant_for if (met is not None or watch_stop or waiting)
                  and meant_for != going_to.name else "",
                  "passed_meetings": passing_met,
                  "watch_stopped": bool(watch_stop),
@@ -16335,7 +17222,9 @@ class Engine:
         # (rules/dungeons.py), after the arrival so whatever lives there is brought in
         # onto the room's own ground.
         more: list[dict] = []
-        if moved and not self.scene.in_encounter:
+        # A fight this walk brought along or ran into is no reason to skip the room: the
+        # player is in it (#55/#65), and the room is still said.
+        if moved and (not self.scene.in_encounter or chasing or waiting):
             from . import dungeons
 
             more, said = dungeons.arrived(self, going_to)
@@ -16350,9 +17239,8 @@ class Engine:
     # How many places the bare "where to?" names before it says how many more there are.
     WHERE_TO_SHOWN = 8
 
-    def _where_to(self) -> str:
-        """The refusal for a walk with nowhere in it: a short list of where to, never the
-        whole map.
+    def _reachable_words(self) -> str:
+        """Where the party can walk to, as words: a short list, never the whole map.
 
         Owner report 2026-11-01 (Corvin, turns 33 and 35): "go" and "go to the town" were
         each refused with sixty names — every upper floor and undercroft, the smithy the
@@ -16384,10 +17272,17 @@ class Engine:
         shown = [p.name for p in ordered[:self.WHERE_TO_SHOWN]]
         more = len(ordered) - len(shown)
         if not shown:
-            return "Nobody moves: there is nowhere else to go from here."
+            return ""
         tail = f", or one of {more} other places" if more > 0 else ""
-        return (f"Nobody moves: where to? From here you can reach {', '.join(shown)}{tail}. "
-                f"Name the place.")
+        return f"{', '.join(shown)}{tail}"
+
+    def _where_to(self) -> str:
+        """The refusal for a walk with nowhere in it: a short list of where to, never the
+        whole map (`_reachable_words`)."""
+        reach = self._reachable_words()
+        if not reach:
+            return "Nobody moves: there is nowhere else to go from here."
+        return f"Nobody moves: where to? From here you can reach {reach}. Name the place."
 
     def _mark_the_walk_cut(self, pc, cut: bool, meant_place: str, meant_for: str,
                            refs: list[str], kind: str) -> None:
@@ -16497,8 +17392,14 @@ class Engine:
             return []
         made = self._bring_in(
             met.template or "guildhand", count=met.count,
-            name=(met.creature or {}).get("name")
-                 or (met.words[0].title() if met.words else None))
+            name=(met.creature or {}).get("name") or getattr(met, "name", "")
+                 # A kind, lower-case like `bestiary.kind_word`: title-cased, "Commoner"
+                 # and "Toll-Keeper" read as proper names (playtest 2026-11-16 N7).
+                 or (met.words[0].lower() if met.words else None))
+        # And whoever comes with them: a caravan's guards (`ontheway.Meeting.also`).
+        for template, count, name in getattr(met, "also", ()) or ():
+            made += self._bring_in(template or "guildhand", count=max(1, int(count)),
+                                   name=name or None)
         for m in made:
             self.scene.zones[m["ref"]] = zone
             self.scene.positions.pop(m["ref"], None)
@@ -16507,6 +17408,91 @@ class Engine:
         if met.kind in ontheway.PRICED:
             self._mark_priced([m["ref"] for m in made], f"meeting:{met.kind}")
         return made
+
+    def _ask_toll(self, met, made, came_from: str = "") -> str:
+        """A toll-keeper's price, held on them as `bond.asks-a-toll` with the copper and the
+        place the party came from; returns the sentence that says it (" They ask …").
+
+        Playtest 2026-11-17 #21-#24: the toll had no figure ("a few silver pieces"), no way
+        to pay it, and walking on past the keeper drew nothing. The road table's own rule
+        is that a toll is "a decision, pay or go round"; the price is `TOLL_DICE`, the
+        payment a `give` (`_pay_toll`), and the way on is barred until it is made
+        (`_toll_bars`)."""
+        from .activeeffect import ActiveEffect
+
+        if met is None or met.kind != "toll" or not made or not met.price_cp:
+            return ""
+        keeper = self.scene.actors.get(made[0]["ref"])
+        if keeper is None:
+            return ""
+        keeper.apply_effect(ActiveEffect(
+            name="asks a toll", kind="bond", key="toll", source="rule:toll",
+            origin="rule:toll", duration="until-dismissed", tags=(states.ASKS_A_TOLL,),
+            payload={"cp": int(met.price_cp), "from": str(came_from or "")}))
+        line = goods.purse_line(goods.coins_for(int(met.price_cp)), self._coins_here())
+        return f" {_sentence(keeper.name)} asks {line} to let you by."
+
+    @staticmethod
+    def _toll_of(who) -> dict:
+        """The unpaid toll this person asks (`_ask_toll`'s payload), or {}."""
+        if who is None or not who.has_state(states.ASKS_A_TOLL):
+            return {}
+        e = next((e for e in who.effects if e.source == "rule:toll"), None)
+        return dict(e.payload or {}) if e is not None else {}
+
+    def _toll_bars(self, going_to, known) -> str:
+        """The refusal a walk on past an unpaid toll-keeper gets, or "". Turning back the
+        way the party came is free; anything else is past them. A keeper who is down, or
+        a fight already on, bars nothing."""
+        from . import places as places_mod
+
+        if self.scene.in_encounter:
+            return ""
+        here = self.scene.at
+        for a in self.scene.actors.values():
+            toll = self._toll_of(a) if not a.is_pc and not a.is_down else {}
+            if not toll:
+                continue
+            came = str(toll.get("from") or "")
+            first = (places_mod.route(known, here, going_to.id) or (going_to.id,))[0]
+            if came and first == came:
+                continue
+            line = goods.purse_line(goods.coins_for(int(toll.get("cp") or 0)),
+                                    self._coins_here())
+            back = places_mod.find(known, came) if came else None
+            return (f"{_sentence(a.name)} stands in the middle of the way and wants {line} "
+                    f"before you pass. Pay them, or turn back"
+                    + (f" to {back.name}" if back is not None else "") + ".")
+        return ""
+
+    def _pay_toll(self, intent: Intent, giver, keeper, offered_cp: int = 0) -> Outcome:
+        """The toll handed over (`_ask_toll`): the price, or a named sum at least that
+        much, from the payer's purse with change made (`goods.spend`); the keeper stands
+        aside. A sum short of it is refused with the price named."""
+        cp = int(self._toll_of(keeper).get("cp") or 0)
+        coins = self._coins_here()
+        if offered_cp and offered_cp < cp:
+            return self._refuse(
+                intent, f"{_sentence(keeper.name)} wants "
+                        f"{goods.purse_line(goods.coins_for(cp), coins)} and will not let "
+                        f"you by for {goods.purse_line(goods.coins_for(offered_cp), coins)}.")
+        pay = max(cp, int(offered_cp or 0))
+        purse, ok = goods.spend(giver.purse, pay)
+        if not ok:
+            return self._refuse(
+                intent, f"The toll is {goods.purse_line(goods.coins_for(pay), coins)}, and "
+                        f"{giver.name} carries {goods.purse_line(giver.purse, coins)}.")
+        giver.purse = purse
+        keeper.purse = goods.credit(keeper.purse, pay)
+        keeper.remove_effects(source="rule:toll")
+        return Outcome(
+            intent_id=intent.id, op="give", because=intent.because,
+            effects=[{"ref": giver.ref, "kind": "give", "item": "coin", "count": pay,
+                      "how": "toll", "from": giver.ref, "to": keeper.ref,
+                      "purse": dict(giver.purse), "goods": dict(giver.goods)}],
+            tell=(f"{giver.name} pays {keeper.name} the toll: "
+                  f"{goods.purse_line(goods.coins_for(pay), coins)}. "
+                  f"{_sentence(keeper.name)} stands aside, and the way on is open."))
 
     def _mark_priced(self, refs, source: str) -> None:
         """Mark people a budgeted source brought in (`states.PRICED`), through the one
@@ -16934,6 +17920,206 @@ class Engine:
             tell=(tell + (" " + more if more else "")).strip(),
             because=intent.because)
 
+    def _open_ground(self, intent: Intent, actor, noun: str):
+        """(the biome underfoot, None), or (None, the refusal): the question every act
+        on open ground asks first — a gathering excursion (`_gather`), living off the
+        land and a hunt (`_op_live_off_land`, `_op_hunt`).
+
+        Not under a roof. Measured on the owner's 0.2.25 report (2026-11-01): a forage in
+        the shrine came back with Power leaf and a giant rot grub guarding the patch,
+        inside the building — `_gather` read the biome (urban) and never asked whether
+        the party stood indoors. Survival's foraging is "getting along in the wild"
+        (CRB p.107); a room has no ground to search. Asked of the place the party is in
+        (`places.is_indoors`), the same question the herb bench asks for its roof.
+
+        The ground underfoot, and nothing else. Foraging used to honour a `biome`
+        parameter, which meant a request could search a forest from the middle of a
+        city — the bench sent one and the GM could invent one. Where you are is a fact
+        the scene owns; `travel` is the only thing that changes it."""
+        from . import places as places_mod
+
+        try:
+            here = self.here()
+            roofed = here is not None and places_mod.is_indoors(
+                here.id, shape=getattr(here, "shape", None))
+        except Exception:  # noqa: BLE001 - an unnamed place is not known to be indoors
+            here, roofed = None, False
+        if roofed:
+            return None, self._refuse(
+                intent, f"No {noun} happens. {actor.name} is indoors, at "
+                        f"{getattr(here, 'name', '') or 'a building'}: there is no open "
+                        f"ground under a roof to search. Go outside first.")
+        biome = biomes.canonical(str(self.scene.biome or ""))
+        if biome is None:
+            return None, self._refuse(
+                intent, "The ground here has not been named, so there is nothing to "
+                        "search. Travel somewhere first.")
+        return biome, None
+
+    # Ground with no wild to live off: a town feeds nobody for nothing (its well is free,
+    # `water_at_hand`), a deck is a ship's stores, and below the surface there is nothing to
+    # drink. Everywhere else the book's DC 10 stands — the woods and the rivers included.
+    _NO_WILD: ClassVar[frozenset] = frozenset({"urban", "deck", "underwater"})
+    # How long a stationary day's living off the land takes. HOUSE: the CRB's check "may
+    # represent activity over the course of hours or a full day" (Survival, Action) and
+    # names no length for a body that is not on the march; four hours is half a working
+    # day, and Ultimate Wilderness's forager is fatigued past eight (Foraging, p.134).
+    LIVE_OFF_LAND_HOURS: ClassVar[int] = 4
+    # A hunt's hours. HOUSE: no PF1 rule prices finding game apart from getting along in
+    # the wild (CRB p.107, "hunting and foraging"); two hours on the trail of an animal.
+    HUNT_HOURS: ClassVar[int] = 2
+
+    def _wild_check(self, intent: Intent, partial: dict, actor, label: str, dc: int):
+        """The player's own Survival d20 for an act on open ground (the popup, as a
+        forage's and a track's are), or the engine's hidden one for anybody else."""
+        mods = actor.skill_modifiers("survival")
+        if actor.is_pc:
+            if "player_face" in partial:
+                face = int(partial.pop("player_face"))
+            else:
+                raise _NeedsPlayerRoll({
+                    "label": f"Survival check — {label}", "die": "1d20",
+                    "actor": actor.name, "min": 1, "max": 20,
+                    "modifier": sum(m.value for m in mods),
+                    "breakdown": [m.as_dict() for m in mods],
+                    "dc": dc, "because": intent.because, "intent_id": intent.id,
+                }, {})
+            return self.dice.given(face, mods, label=f"{actor.name} Survival ({label})")
+        return self.dice.d20(mods, label=f"{actor.name} Survival ({label})",
+                             visibility="hidden")
+
+    def _spend_wild_hours(self, actor, hours: int, biome: str):
+        """The hours on the ground, the body consulted every one (`survival.pass_hours`),
+        then the clock through its one door. Returns the toll."""
+        toll = survival.pass_hours(actor, hours, self.dice, biome=biome)
+        self.scene.advance(max(1, toll.hours) * survival.MINUTES_PER_HOUR,
+                           charge_body=False)
+        return toll
+
+    def _op_live_off_land(self, intent: Intent, partial: dict) -> Outcome:
+        """Survival's "get along in the wild" (CRB p.107, Survival, DC 10): "hunting and
+        foraging (no food or water supplies needed). You can provide food and water for
+        one other person for every 2 points by which your check result exceeds 10." The
+        check stands for a day ("once every 24 hours"), so a success is a day's food and
+        water: `survival.lived_off_land`, the same reset a meal and a drink make.
+
+        The owner's report of 2026-11-17 (#6): parched in a forest, Jack searched "for a
+        pond, spring or river", "for a source of water" and "for a river" — read as a
+        Perception check, a herb forage and a hunt for tracks — and nothing gave water,
+        because free water existed only in a settlement's well (`water_at_hand`). The
+        woods and their rivers count: anywhere but a town, a deck or under water.
+
+        Fed first is the one looking, then their companions (`encounter_budget`'s party:
+        the people bonded by `company`), one more per 2 points over 10."""
+        from . import encounter_budget as eb
+
+        who = intent.actor or (self.scene.pc().ref if self.scene.pc() else None)
+        actor = self.scene.actors.get(who) if who else None
+        if actor is None:
+            return self._refuse(intent, "There is nobody here to live off the land.")
+        if self.scene.in_encounter:
+            return self._refuse(intent, "Not in the middle of a fight: living off the "
+                                        "land takes hours.")
+        biome, refused = self._open_ground(intent, actor, "living off the land")
+        if refused is not None:
+            return refused
+        if biome in self._NO_WILD:
+            why = {"urban": "a town feeds nobody for nothing: buy food, and drink at "
+                            "the well",
+                   "deck": "a ship's deck has no wild to live off: its stores are the "
+                           "food and water here",
+                   "underwater": "there is nothing to drink below the surface"}[biome]
+            return self._refuse(intent, f"{actor.name} cannot live off the land here: "
+                                        f"{why}.")
+        dc = survival.GET_ALONG_DC
+        roll = self._wild_check(intent, partial, actor, f"living off the land ({biome})", dc)
+        hours = self.LIVE_OFF_LAND_HOURS
+        toll = self._spend_wild_hours(actor, hours, biome)
+        n = survival.fed_by_the_land(roll.total)
+        party = [actor] + [a for a in self.scene.actors.values()
+                           if a is not actor and not a.is_down
+                           and eb.companion_with(a)]
+        fed = party[:n]
+        freed = [survival.released_said(a, need, pts) for a in fed
+                 for need, pts in survival.lived_off_land(a).items() if pts]
+        span = f"{toll.hours or hours} hour{'s' if (toll.hours or hours) != 1 else ''}"
+        where = f"in the {biome}"
+        if fed:
+            others = [a.name for a in fed[1:]]
+            tell = (f"{actor.name} spends {span} living off the land "
+                    f"{where}: Survival {roll.total} against DC {dc}. What water and "
+                    f"food the ground has is found, enough for a day for {actor.name}"
+                    + (f" and {', '.join(others)}" if others else "") + ".")
+        else:
+            tell = (f"{actor.name} spends {span} trying to live off the land "
+                    f"{where}: Survival {roll.total} against DC {dc}. Not enough water "
+                    f"or food is found to live on today.")
+        if freed:
+            tell += " " + " ".join(freed)
+        if toll.checks:
+            tell += f" It cost them: {survival_note(toll)}"
+        return Outcome(
+            intent_id=intent.id, op="live_off_land", rolls=[roll],
+            dc={"value": dc, "explain": "get along in the wild"},
+            verdict="success" if fed else "failure", margin=roll.total - dc,
+            effects=[{"ref": actor.ref, "kind": "lived_off_land", "biome": biome,
+                      "fed": [a.ref for a in fed], "hours": toll.hours or hours,
+                      "toll": toll.as_dict(), "origin": "rule:survival"}],
+            tell=tell, because=intent.because)
+
+    def _op_hunt(self, intent: Intent, partial: dict) -> Outcome:
+        """Look for game: Survival against the get-along DC (CRB p.107, "hunting and
+        foraging"), and on a success an animal that lives on this ground, drawn the way a
+        forage's creature is (`gathering.draw_for`: the bestiary's own ground, the party's
+        encounter budget) and kept to animals. It comes in far off and unaware of the
+        hunter (`_inhabit`, `hostile=False`): the hunter found it first. What happens next
+        — the shot, the stalk, the fight — is the player's next turn. The owner's report of
+        2026-11-17 (#6), "no water or wildlife in the forest"."""
+        from . import gathering
+
+        who = intent.actor or (self.scene.pc().ref if self.scene.pc() else None)
+        actor = self.scene.actors.get(who) if who else None
+        if actor is None:
+            return self._refuse(intent, "There is nobody here to hunt.")
+        if self.scene.in_encounter:
+            return self._refuse(intent, "Not in the middle of a fight: a hunt takes hours.")
+        biome, refused = self._open_ground(intent, actor, "hunting")
+        if refused is not None:
+            return refused
+        if biome in self._NO_WILD:
+            return self._refuse(intent, f"There is no game to hunt here "
+                                        f"({biomes.describe(biome).lower()}).")
+        dc = survival.GET_ALONG_DC
+        roll = self._wild_check(intent, partial, actor, f"hunting ({biome})", dc)
+        toll = self._spend_wild_hours(actor, self.HUNT_HOURS, biome)
+        hours = toll.hours or self.HUNT_HOURS
+        span = f"{hours} hour{'s' if hours != 1 else ''}"
+        got = None
+        if roll.total >= dc:
+            got = gathering.draw_for(
+                biome, max(1, int(getattr(actor, "level", 1) or 1)), self.dice,
+                apl=encounter_budget.party_apl(self.scene),
+                keep=lambda r: r.get("creature_type") == "animal")
+        effects: list[dict] = [{"ref": actor.ref, "kind": "hunt", "biome": biome,
+                                "hours": hours, "origin": "rule:survival"}]
+        if got is None:
+            tell = (f"{actor.name} spends {span} hunting: Survival {roll.total} against "
+                    f"DC {dc}. No game is found.")
+        else:
+            made, _said = self._inhabit(self.here(), row=got.row, count=got.count,
+                                        hostile=False)
+            effects += made
+            tell = (f"{actor.name} spends {span} hunting: Survival {roll.total} against "
+                    f"DC {dc}, and finds game: {gathering._some(got.row['name'], got.count)}, "
+                    f"some way off and not yet aware of {actor.name}.")
+        if toll.checks:
+            tell += f" It cost them: {survival_note(toll)}"
+        return Outcome(
+            intent_id=intent.id, op="hunt", rolls=[roll],
+            dc={"value": dc, "explain": "finding game"},
+            verdict="success" if got is not None else "failure",
+            margin=roll.total - dc, effects=effects, tell=tell, because=intent.because)
+
     # The word for a refused excursion, by op: "No foraging happens."
     _GATHER_NOUN: ClassVar[dict] = {"forage": "foraging", "prospect": "prospecting"}
 
@@ -16985,35 +18171,9 @@ class Engine:
             # happens… You are with…" filed as resolved).
             return self._refuse(intent, f"No {noun} happens. {busy}")
 
-        # Not under a roof. Measured on the owner's 0.2.25 report (2026-11-01): a forage in
-        # the shrine came back with Power leaf and a giant rot grub guarding the patch,
-        # inside the building — `_gather` read the biome (urban) and never asked whether
-        # the party stood indoors. Survival's foraging is "getting along in the wild"
-        # (CRB p.107); a room has no ground to search. Asked of the place the party is in
-        # (`places.is_indoors`), the same question the herb bench asks for its roof.
-        from . import places as places_mod
-
-        try:
-            here = self.here()
-            roofed = here is not None and places_mod.is_indoors(
-                here.id, shape=getattr(here, "shape", None))
-        except Exception:  # noqa: BLE001 - an unnamed place is not known to be indoors
-            here, roofed = None, False
-        if roofed:
-            return self._refuse(
-                intent, f"No {noun} happens. {actor.name} is indoors, at "
-                        f"{getattr(here, 'name', '') or 'a building'}: there is no open "
-                        f"ground under a roof to search. Go outside first.")
-
-        # The ground underfoot, and nothing else. Foraging used to honour a `biome`
-        # parameter, which meant a request could search a forest from the middle of a
-        # city — the bench sent one and the GM could invent one. Where you are is a fact
-        # the scene owns; `travel` is the only thing that changes it.
-        biome = biomes.canonical(str(self.scene.biome or ""))
-        if biome is None:
-            return self._refuse(
-                intent, "The ground here has not been named, so there is nothing to "
-                        "search. Travel somewhere first.")
+        biome, refused = self._open_ground(intent, actor, noun)
+        if refused is not None:
+            return refused
 
         track_id = str(level_track or spec["track"]).strip().lower()
         try:
@@ -17038,9 +18198,15 @@ class Engine:
         if spec.get("source") != "ingredients" and table_of(len(foraging.WEIGHT)).empty:
             # A refusal: no hour is spent and nothing is rolled (filed `resolved` until
             # 2026-11-01, with the forage's other refusal above).
+            # The place stood in, by its name: the ground's description read as a place
+            # ("no stones for foci in barrows, battlefields and cursed ground", playtest
+            # 2026-11-20 #12), and "holds no" spares "there are no ore".
+            here = self.here()
+            where = (here.name if here.terrain == biome
+                     else f"ground like this ({biomes.describe(biome).lower()})")
             return self._refuse(
-                intent, f"{actor.name} looks, and there are no {spec['what']} in "
-                        f"{biomes.describe(biome).lower()} to find.")
+                intent, f"{actor.name} looks, and {where} {english.verb(where, 'holds', 'hold')}"
+                        f" no {spec['what']} to find.")
 
         hours = max(1, int(intent.params.get("hours", 1) or 1))
         dc = gathering.dc_for(spec, biome)
@@ -17134,10 +18300,12 @@ class Engine:
         spoiled = [h["wrecked"] for h in result["hourly"] if h.get("wrecked")]
         if spoiled:
             many = len(spoiled) != 1
-            tell += (f" {len(spoiled)} hour{'s' if many else ''} came to nothing but a "
-                     f"spoiled {spoiled[0]}." if fresh else
-                     f" {len(spoiled)} hour{'s' if many else ''} came to nothing but "
-                     f"{spoiled[0]} broken up and lost in the getting.")
+            # One template, the name lower-cased behind "the": "came to nothing but Water
+            # broken up and lost in the getting" (playtest 2026-11-20 #12).
+            lost = str(spoiled[0]).lower()
+            tell += (f" {len(spoiled)} hour{'s' if many else ''} came to nothing: the "
+                     f"{lost} {english.verb(lost, 'was', 'were')} "
+                     + ("spoiled in the picking." if fresh else "spoiled in the getting."))
         if toll.checks:
             tell += f" It cost them: {survival_note(toll)}"
         if worked < hours:
@@ -17258,21 +18426,27 @@ class Engine:
             return clause
         from . import bestiary as bestiary_mod
 
-        made = self._bring_in(enc.creature["id"], count=1,
+        # As many as the budget sent (`gathering.draw_for`, up to `encounter_budget.MOST`;
+        # the owner, 2026-11-18): the first is the one the records name.
+        made = self._bring_in(enc.creature["id"], count=max(1, int(enc.count or 1)),
                                name=bestiary_mod.kind_word(enc.creature))
-        ref = made[0]["ref"]
-        self._mark_priced([ref], "forage")
-        self.scene.zones[ref] = "far"
-        self.scene.positions.pop(ref, None)
+        refs = [m["ref"] for m in made]
+        ref = refs[0]
+        self._mark_priced(refs, "forage")
+        for r in refs:
+            self.scene.zones[r] = "far"
+            self.scene.positions.pop(r, None)
         if self.scene.grid is not None and self.scene.positions:
-            self.scene.place_by_zone([ref])
+            self.scene.place_by_zone(refs)
         # The ref travels with the record, so the excursion's scene call can find the
         # creature it is setting without matching a name against the room.
         effects[-1]["ref"] = ref
+        effects[-1]["refs"] = refs
         if enc.aggressive and enc.kind == "creature":
             effects[-1]["stance"] = clause.strip()
             if pc is not None and actor.ref == pc.ref:
                 self._ensure_encounter(pc.ref, target=ref)
+                self._enrol_the_rest(refs)
             return clause
         # Everything else that turns up stays where it is: the guardian on its find, and
         # (owner ruling D1, 2026-09-30) the creature that "has the ground you wanted" on
@@ -17289,6 +18463,9 @@ class Engine:
         booked_stock: list = []
         stance = self._hold_ground(ref, spot, f"gathering:{what}@"
                                           f"{self.scene.clock_minutes}")
+        for r in refs[1:]:
+            # The rest hold it beside the first; one stance sentence says it for them.
+            self._hold_ground(r, spot, f"gathering:{what}@{self.scene.clock_minutes}")
         clause += " " + stance
         # What the excursion's scene call is grounded in, as the engine said it.
         effects[-1].update(stance=stance, spot=spot)
@@ -17296,17 +18473,20 @@ class Engine:
             # The patch is booked as an engine record, paid by `_settle_guarded_finds`
             # once the creature is dead or gone and the player is still HERE (`at`).
             self.scene.guarded_finds.append({
-                "guard": ref, "guard_name": str(self.scene.actors[ref].name),
+                "guard": ref, "guards": refs,
+                "guard_name": str(self.scene.actors[ref].name),
                 "what": f"{what} find" if enc.kind == "guarded" else spot,
                 "found": booked_found, "stock": booked_stock, "fresh": fresh,
                 "names": dict((effects[0].get("names") or {}) if effects else {}),
                 "at": self.scene.at,
             })
             if enc.kind == "creature":
-                clause += f" The {spot} it holds is yours once it has gone."
+                clause += (f" The {spot} they hold is yours once they have gone."
+                           if len(refs) > 1 else
+                           f" The {spot} it holds is yours once it has gone.")
         return clause
 
-    def _hold_ground(self, ref: str, spot: str, source: str) -> str:
+    def _hold_ground(self, ref: str, spot: str, source: str, *, lair: bool = False) -> str:
         """Put a creature on the ground it holds, through the one applicator. Returns
         the tell.
 
@@ -17315,6 +18495,9 @@ class Engine:
         without a line of their own. `payload.zone` is how close the player was when it
         took the ground, so `_holding_ground_settles` can tell a player who has CLOSED
         on it from one who has merely stayed put.
+
+        `lair`: a dungeon boss and its company keeping the climax room (rules/dungeons.py
+        `stock_room`). They share `source`, never give way, and wake together.
         """
         who = self.scene.actors.get(ref)
         if who is None:
@@ -17323,9 +18506,33 @@ class Engine:
             name="Holding its ground", kind="condition", key=states.HOLDING_GROUND_KEY,
             source=source, origin="rule:gathering", duration="until-dismissed",
             tags=states.tags_for(states.HOLDING_GROUND_KEY),
-            payload={"spot": spot, "zone": self.scene.zones.get(ref, "far")}))
+            payload={"spot": spot, "zone": self.scene.zones.get(ref, "far"),
+                     **({"lair": True} if lair else {})}))
         return (f"{_the_creature(who.name)} holds the ground between you and the {spot}; it neither "
                 f"comes at you nor gives way.")
+
+    def _wake_the_lair(self, source: str, first: str) -> Outcome:
+        """Everyone keeping the lair `source` stops holding it and comes at the player, in
+        one fight (`_ensure_encounter` from the first, `_enrol_the_rest` for the rest)."""
+        refs = [r for r, a in self.scene.actors.items() if not a.is_down and any(
+            e.source == source and any(states.matches(t, states.HOLDING_GROUND)
+                                       for t in e.tags) for e in a.effects)]
+        for r in refs:
+            self.scene.actors[r].remove_effects(
+                match=lambda e: e.source == source and any(
+                    states.matches(t, states.HOLDING_GROUND) for t in e.tags))
+        pc = self.scene.pc()
+        if pc is not None and not self.scene.in_encounter:
+            self._ensure_encounter(first, target=pc.ref)
+        self._enrol_the_rest(refs)
+        who = _the_creature(self.scene.actors[first].name)
+        return Outcome(intent_id="", op="stance",
+                       effects=[{"ref": first, "kind": "stance", "lifted": "lair",
+                                 "refs": refs}],
+                       tell=(f"{who} stops keeping the lair, and "
+                             + ("all of them come at you." if len(refs) > 1
+                                else "comes at you.")),
+                       because="the player closed on the lair or struck it")
 
     # How close each zone is, for "has the player closed on it?" (intents.ZONES order).
     _CLOSENESS: ClassVar[dict] = {"far": 0, "near": 1, "engaged": 2}
@@ -17383,6 +18590,15 @@ class Engine:
             if held is None:
                 continue
             fighting = any(ref in refs for refs in self.scene.sides.values())
+            if held.payload.get("lair") and not who.is_down:
+                # A boss's lair (the owner, 2026-11-18: the boss room is never an instant
+                # fight, so the player can judge it). No reaction roll and no giving way:
+                # struck, or closed on, the whole lair wakes and comes at you together.
+                was = self._CLOSENESS.get(str(held.payload.get("zone") or "far"), 0)
+                now = self._CLOSENESS.get(str(self.scene.zones.get(ref) or "far"), 0)
+                if fighting or now > was:
+                    out.append(self._wake_the_lair(held.source, ref))
+                continue
             if who.is_down or fighting:
                 who.remove_effects(match=lambda e: e is held)
                 if not who.is_down:
@@ -17642,7 +18858,7 @@ class Engine:
         if parent is None:
             return self._refuse(
                 intent, f"There is no {intent.params.get('parent')} here to found it off. "
-                        f"From here you can reach {', '.join(p.name for p in known)}.")
+                        f"From here you can reach {self._reachable_words() or 'nowhere else'}.")
         there = places_mod.find(known, name)
         if there is not None:
             # Bobby's turns 6 and 7: "I walk to the nearest crossroads" planned a `found`
@@ -17836,7 +19052,32 @@ class Engine:
 
     def _keep_vessel(self, vessel) -> None:
         """Write a vessel back. The one door: a hull's hit points are stored state, and
-        two writers of stored state is how a save and a scene start disagreeing."""
+        two writers of stored state is how a save and a scene start disagreeing.
+
+        Laden here the first time she is kept (`ships.lading`, playtest 2026-11-16 #92),
+        off the trade of the port she sailed from; and a held ship's cargo is her holder's
+        (`_ship_taken`), so it moves to `Scene.cargo` as their lots in her hold, where
+        selling, landing and sinking already know what to do with it."""
+        from . import ships as ships_mod
+        from . import trade as trade_mod
+
+        if vessel.cargo is None:
+            vessel.cargo = ships_mod.lading(
+                vessel.id, vessel.kind,
+                trade_mod.supplied_at(self.world, vessel.came_from or vessel.at))
+        if vessel.held_by and vessel.cargo:
+            for got in vessel.cargo:
+                lot = trade_mod.add_lot(self.scene, got["key"], int(got["units"]),
+                                        vessel.held_by, 0, "", str(got.get("commodity") or ""),
+                                        vessel=vessel.id)
+                # Plunder (owner call, 2026-11-16): a prize's goods are her taker's, the way
+                # Skull & Shackles plunder is the crew's; `plunder` says which ship.
+                lot["plunder"] = vessel.id
+                # And taken from her owners: stolen, as a thing taken is on the props
+                # ledger (docs/items-have-owners.md), so a sentence for the ship gives it
+                # back with her (`trial._confiscate`, playtest 2026-11-16 N3).
+                lot["stolen"] = True
+            vessel.cargo = []
         rows = [dict(v) for v in self.scene.vessels if str(v.get("id")) != vessel.id]
         rows.append(vessel.as_dict())
         self.scene.vessels = rows
@@ -17906,9 +19147,12 @@ class Engine:
             here, places_mod.scale_of(town) if town is not None else "town",
             river=leg.by == "river")
         ship = self.vessel(offered.id) or offered
-        days = ships_mod.days_for(leg.miles if leg.source == "exact" else None,
-                                  ship.kind, leg.days_apart)
-        miles = leg.miles if leg.source == "exact" and leg.miles \
+        days = ships_mod.leg_days(leg, ship.kind)
+        # The fare is for the miles she sails: the world's when it measured them, else
+        # her day's run over the days (which the passage floor may have lengthened past
+        # an unmeasured stated figure). 1 sp a mile, so a fortnight on a sailing ship is
+        # 672 miles, 67 gp 2 sp a head.
+        miles = leg.miles if leg.source == "exact" and leg.miles and leg.measured \
             else days * ships_mod.miles_a_day(ship.kind)
         book = ships_mod.fare_cp(miles, heads)
         # Freight for the party's cargo, by the berth rate for its weight, and feed for
@@ -18293,8 +19537,7 @@ class Engine:
         # shortcut: the whole leg from her home port, whatever she has already sailed of
         # another (a day out to Mirabalos, then two to Elyrielle); a position at sea is the
         # upgrade when a voyage is ever measured as too long.
-        ship.days_left = ship.days_total = ships_mod.days_for(
-            leg.miles if leg.source == "exact" else None, ship.kind, leg.days_apart)
+        ship.days_left = ship.days_total = ships_mod.leg_days(leg, ship.kind)
         ship.river = leg.by == "river"
         self._keep_vessel(ship)
         return ship
@@ -18327,11 +19570,12 @@ class Engine:
         return tuple(sorted(out))
 
     def _sail(self, intent: Intent, ship, want: str = "") -> Outcome:
-        """The ship makes way, a day at a time, until she makes port or the weather turns.
+        """The ship makes way until she makes port or the voyage meets something.
 
-        Each day is the clock's (the ship feeds, waters and beds her passengers, as a
-        camp's night does, `survival.night`) and the weather's, rolled hidden
-        (`ships.day_at_sea`, scaled by the waters' volatility). Days already spent aboard
+        The passage is checked in stretches (`ontheway.sea_stretches`, the storm one of
+        its bands, scaled by the waters' volatility); each day sailed is the clock's (the
+        ship feeds, waters and beds her passengers, as a camp's night does,
+        `survival.night`). Days already spent aboard
         at sea — a night's rest on deck — count: the clock is the voyage's measure. `days`
         caps how many are sailed this turn."""
         from . import ships as ships_mod, volatility
@@ -18378,33 +19622,42 @@ class Engine:
             cap = max(1, int(intent.params.get("days") or 0) or ship.days_left)
         except (TypeError, ValueError):
             cap = ship.days_left            # "a few" is not a number: sail until port
+        astern = self._leave_astern(ship)
         aboard = [self.scene.people[r] for r in ship.passengers if r in self.scene.people]
+        # The passage in stretches (`ontheway.sea_stretches`; the owner, 2026-11-16: "I dont
+        # want it to go day by day when travel could be a month long"): one hidden check a
+        # stretch of days, the weather one of its bands, rolled for the days this turn
+        # sails. Until then every day rolled the storm table and the sea's 20% check, so a
+        # crossing of a fortnight met something in nearly all of them. Not on the day she
+        # makes port: that day ends in harbour.
+        sailing = min(ship.days_left, cap)
+        met = ontheway.sea_stretches(self.dice, sailing, int(getattr(pc, "level", 1) or 1),
+                                     apl=encounter_budget.party_apl(self.scene),
+                                     danger=volatility.factor(level),
+                                     climates=self._waters_climates(ship),
+                                     river=ship.river)
+        if met is not None and met.day >= ship.days_left:
+            met = None
         told: list[str] = []
-        weather, sailed, met = "calm", 0, None
-        while ship.days_left > 0 and sailed < cap:
+        weather, sailed = "calm", 0
+        for _day in range(met.day if met is not None else sailing):
             due = int(ship.sailed_at) + ships_mod.MINUTES_A_DAY
             if self.scene.clock_minutes < due:
                 self.scene.advance(due - self.scene.clock_minutes, charge_body=False)
+            # The night's lines are the last night's: a fortnight of "recovers 1 hit
+            # point" lines told the narrator nothing the last one does not.
+            told = []
             for a in aboard:
                 survival.eat(a)
                 survival.drink(a)
                 if a.is_pc:
                     told.extend(survival.night(a, self.dice))
             ship.sailed_at, ship.days_left, sailed = due, ship.days_left - 1, sailed + 1
-            # The storm table is open water's (ships.py): a river passage is not rolled.
-            weather = "calm" if ship.river else ships_mod.day_at_sea(self.dice, level)
-            if weather != "calm":
-                break
-            # And who else is out on the water (`ontheway.sea`, hidden, once a day, the
-            # danger scaled as the storm is). Open water only, and not on the day she
-            # makes port: that day ends in harbour.
-            if not ship.river and ship.days_left > 0:
-                met = ontheway.sea(self.dice, int(getattr(pc, "level", 1) or 1),
-                                   apl=encounter_budget.party_apl(self.scene),
-                                   danger=volatility.factor(level),
-                                   climates=self._waters_climates(ship))
-                if met is not None:
-                    break
+        if met is not None and met.kind == "storm":
+            # A storm, and one storm in ten is the powerful kind that breaks a ship (the
+            # CRB's Random Weather, `ships.WRECK_PCT_OF_STORMS`).
+            weather = "wreck" if ships_mod.storm_wrecks(self.dice) else "storm"
+            met = None
         self._journeyed = ship.name
         if weather == "wreck":
             return self._wreck(intent, ship, sailed)
@@ -18412,13 +19665,27 @@ class Engine:
                                 "left": ship.days_left, "weather": weather,
                                 "volatility": volatility.word(level)}]
         days_said = f"{sailed} day{'s' if sailed != 1 else ''}"
-        bits = [f"{ship.name[:1].upper()}{ship.name[1:]} "
-                f"{'casts off and ' if cast_off else ''}makes way: {days_said} "
-                f"{'on the river' if ship.river else 'at sea'}."]
+        water_words = "on the river" if ship.river else "at sea"
+        lead = f"{_sentence(ship.name)} {'casts off and ' if cast_off else ''}makes way"
+        if met is not None or weather == "storm":
+            # The quiet days in one line, and then the day it happened (the owner's
+            # "eleven quiet days out of Mirabalos"), counted as her days out of port.
+            # The draft said "1 day at sea. On the next day:" for a meeting on day one.
+            day_out = max(1, int(ship.days_total) - int(ship.days_left))
+            quiet = sailed - 1
+            bits = [lead
+                    + (f": {english.number(quiet)} quiet day{'s' if quiet != 1 else ''} "
+                       f"{water_words}, and" if quiet else ", and")
+                    + f" on her {self._ordinal(day_out)} day out of "
+                      f"{self._settlement_name(ship.came_from)}:"]
+        else:
+            bits = [f"{lead}: {days_said} {water_words}."]
         if weather == "storm":
             bits.append(self._storm_on_deck(aboard, effects))
         if settled:
             bits.insert(0, settled)
+        if astern:
+            bits.insert(0, astern)
         if met is not None:
             said, fx = self._met_at_sea(ship, met)
             bits.append(said)
@@ -18468,7 +19735,9 @@ class Engine:
         effects.append({"kind": "journey", "to": port, "to_name": port_name,
                         "arrived": True, "how": "sea", "place": self.scene.at})
         bits.extend(company)
-        landed = trade_mod.unload(self.scene, ship.id, port)
+        # Her own hold stays her own in a ship the party holds: what is in it is sold from
+        # it at the quay (`trade.reachable`), not swung ashore like freight (#92).
+        landed = [] if held else trade_mod.unload(self.scene, ship.id, port)
         if landed:
             bits.append(f"{_sentence(_and_list(landed))} {'is' if len(landed) == 1 else 'are'}"
                         f" swung onto the quay.")
@@ -18526,10 +19795,12 @@ class Engine:
         (`ontheway.sea`, 20% a check, half its hits a passing sail) is made each watch of
         a cruise instead of once a day: four watches a day is the land's own rate
         (Ultimate Wilderness p.127, four checks a day), because a ship looking for sails
-        sees what a ship holding her course sails past. One day's cruise a turn
-        (`ships.CRUISE_WATCHES`), the day's weather rolled first; it stops at the first
-        sail or creature. A merchant met by a held ship can be closed with and boarded
-        (`_met_at_sea`); everything else is what any voyage meets."""
+        sees what a ship holding her course sails past. Since 2026-11-16 (travel pacing)
+        the cruise runs day after day until something is met, against the voyage table
+        (`ontheway.sea_stretches` at a stretch of one day, the four-watch rate), with the
+        weather one of its bands; quiet days pass in a line. A merchant met by a held ship
+        can be closed with and boarded (`_met_at_sea`); everything else is what any
+        voyage meets."""
         from . import ships as ships_mod, volatility
 
         pc = self.scene.pc()
@@ -18553,41 +19824,68 @@ class Engine:
         # Off any course she held: where she goes next is the player's (`_come_about`).
         ship.bound_for, ship.days_left, ship.lands_at = "", 0, ""
         self.scene.location_id = ship.id
+        astern = self._leave_astern(ship)
         level = volatility.of(self.world, ship.came_from)
         aboard = [a for a in self.scene.people.values()
                   if a.at in {p.id for p in ships_mod.places_of(ship)}
                   and (a.is_pc or a.has_state(states.TRAVELS_WITH_YOU))]
-        weather = ships_mod.day_at_sea(self.dice, level)
-        if weather == "wreck":
-            ship.passengers = list(dict.fromkeys([*ship.passengers, *(a.ref for a in aboard)]))
-            return self._wreck(intent, ship, 0)
-        effects: list[dict] = []
-        met, watches = None, 0
-        while watches < ships_mod.CRUISE_WATCHES and met is None:
-            self.scene.advance(ships_mod.WATCH_MINUTES, charge_body=False)
-            watches += 1
-            met = ontheway.sea(self.dice, int(getattr(pc, "level", 1) or 1),
-                               apl=encounter_budget.party_apl(self.scene),
-                               danger=volatility.factor(level),
-                               climates=self._waters_climates(ship))
+        # Day after day until something is met or `ships.CRUISE_DAYS` pass (2026-11-16:
+        # one day a turn was the day-by-day the owner asked to be rid of). A ship looking
+        # for sails looks every watch, so each day is checked at the four-watch rate,
+        # 1 - 0.8^4, the land's (Ultimate Wilderness p.127), against the voyage table.
+        try:
+            most = max(1, min(ships_mod.CRUISE_DAYS * 4,
+                              int(intent.params.get("days") or 0) or ships_mod.CRUISE_DAYS))
+        except (TypeError, ValueError):
+            most = ships_mod.CRUISE_DAYS
+        daily = 100 * (1 - (1 - ontheway.SEA_PERCENT / 100) ** ships_mod.CRUISE_WATCHES)
+        met = ontheway.sea_stretches(self.dice, most, int(getattr(pc, "level", 1) or 1),
+                                     apl=encounter_budget.party_apl(self.scene),
+                                     danger=volatility.factor(level),
+                                     climates=self._waters_climates(ship),
+                                     every=1, percent=daily)
+        days = met.day if met is not None else most
         told: list[str] = []
-        if watches == ships_mod.CRUISE_WATCHES:
-            # A whole day: the ship feeds, waters and beds her people, as `_sail` does.
+        for _day in range(days):
+            self.scene.advance(ships_mod.MINUTES_A_DAY, charge_body=False)
+            # A whole day: the ship feeds, waters and beds her people, as `_sail` does;
+            # the last night's lines only (`_sail`).
+            told = []
             for a in aboard:
                 survival.eat(a)
                 survival.drink(a)
                 if a.is_pc:
                     told.extend(survival.night(a, self.dice))
+        # The days cruised are spent: `_sail` counts a passage's days from `sailed_at`,
+        # and left at the cruise's start it gave the next voyage those days free (live
+        # 2026-11-18: two days cruised, then "14 days at sea" moved the clock twelve).
+        ship.sailed_at = int(self.scene.clock_minutes)
+        weather = "calm"
+        if met is not None and met.kind == "storm":
+            weather = "wreck" if ships_mod.storm_wrecks(self.dice) else "storm"
+            met = None
+        if weather == "wreck":
+            ship.passengers = list(dict.fromkeys([*ship.passengers, *(a.ref for a in aboard)]))
+            return self._wreck(intent, ship, 0)
+        effects: list[dict] = []
         self._keep_vessel(ship)
         self._journeyed = ship.name
-        hours = watches * ships_mod.WATCH_MINUTES // 60
-        effects.insert(0, {"kind": "cruise", "vessel": ship.id, "watches": watches,
+        effects.insert(0, {"kind": "cruise", "vessel": ship.id, "days": days,
+                           "watches": days * ships_mod.CRUISE_WATCHES,
                            "weather": weather, "volatility": volatility.word(level)})
-        bits = [settled] if settled else []
-        bits.append(f"{_sentence(ship.name)} {'casts off and ' if cast_off else ''}cruises "
-                    f"her waters off {self._settlement_name(ship.came_from)}: "
-                    f"{watches} watch{'es' if watches != 1 else ''}, {hours} hours"
-                    + ("." if met is not None else ", and nothing on the water."))
+        bits = [b for b in (astern, settled) if b]
+        off = self._settlement_name(ship.came_from)
+        lead = (f"{_sentence(ship.name)} {'casts off and ' if cast_off else ''}cruises her "
+                f"waters off {off}")
+        if met is None and weather == "calm":
+            bits.append(f"{lead}: {english.number(days)} quiet day{'s' if days != 1 else ''}, "
+                        f"and nothing on the water.")
+        else:
+            quiet = days - 1
+            bits.append(lead + (f": {english.number(quiet)} quiet day"
+                                f"{'s' if quiet != 1 else ''}, and on the "
+                                f"{self._ordinal(days)}:" if quiet else
+                                ", and on the first day:"))
         if weather == "storm":
             bits.append(self._storm_on_deck(aboard, effects))
         if met is not None:
@@ -18641,6 +19939,8 @@ class Engine:
             return (f"A sail on the horizon, and she comes about to close: {theirs.name}, "
                     f"{english.a(kind)} flying no colours an honest ship flies. Pirates. "
                     f"Sheer off and run, or close with her.", [fx])
+        if met.kind in ontheway.VOYAGE_SCENES:
+            return self._voyage_scene(ship, met, fx)
         made = self._meet_on_the_way(met, zone="near") if met.aggressive else []
         name = str((met.creature or {}).get("name") or "something").lower()
         many = int(met.count or 1) > 1
@@ -18671,6 +19971,160 @@ class Engine:
                     f"alongside her, at the rail.", [fx])
         return (f"{_sentence(what)} {'come' if many else 'comes'} up out of the water and "
                 f"over the rail.", [fx])
+
+    def _voyage_scene(self, ship, met, fx: dict) -> tuple[str, list[dict]]:
+        """The voyage table's scenes (content/rules/journey-events.json, the owner's list of
+        2026-11-16 and the bands added to it): an island a hand wants to put in at, a wreck
+        to board, a survivor in the water, a stowaway, fever, mutinous talk. Every one is
+        real — a place minted off her deck (places must be creatable, 2026-10-03), people
+        brought in by the one door (seen people are real, 2026-10-01), a condition through
+        the one applicator — and the voyage stops on it; sailing on leaves the places
+        astern (`_leave_astern`). Returns the tell and its records."""
+        from . import ships as ships_mod
+        from .gathering import pick_index
+
+        crew = [a for a in self.crew_of(ship) if not a.is_down]
+        master = ships_mod.master_of(crew)
+        hands = [a for a in crew if a is not master] or crew
+
+        def one_of(people):
+            return (people[pick_index(self.dice, len(people), "which of them")]
+                    if people else None)
+
+        if met.kind in ("island", "wreck"):
+            place = self._landfall(ship, met.kind)
+            fx.update(place=place.id)
+            if met.kind == "island":
+                asker = one_of(hands)
+                if asker is not None:
+                    fx["asks"] = asker.ref
+                return (f"Land off the bow: {place.about}. "
+                        + (f"{_sentence(asker.name)} wants her put in there, for fresh "
+                           f"water and a look ashore. " if asker is not None else "")
+                        + f"She lies off {place.name} while you choose: go ashore, or "
+                          f"sail on.", [fx])
+            chest = ontheway.events()["salvage"]
+            return (f"A wreck on the water: {place.about}. Nobody answers a hail. Go "
+                    f"across to {place.name} and see what she still holds ({chest['name']} "
+                    f"is lashed below her break), or sail on.", [fx])
+        if met.kind in ("survivor", "stowaway"):
+            deck = ships_mod.deck_of(ship)
+            made = self._meet_on_the_way(met, zone="near")
+            for m in made:
+                if m["ref"] in self.scene.people:
+                    self.scene.move(m["ref"], deck)
+            fx["refs"] = [m["ref"] for m in made]
+            # Aboard as passengers from here, unpaid: they are not her crew
+            # (`ships.crew_of`), and they go ashore with everybody when she makes port.
+            ship.passengers = list(dict.fromkeys([*ship.passengers, *fx["refs"]]))
+            self._keep_vessel(ship)
+            who = self.scene.people.get(made[0]["ref"]) if made else None
+            if who is None:
+                return "", [fx]
+            if met.kind == "survivor":
+                # Out of the water after hours in it: fatigued, as the wreck's swimmers
+                # are (`_wreck`), through the one applicator.
+                from . import journey as journey_mod
+
+                who.add_condition(journey_mod.MOUNT_FATIGUE,
+                                  rounds=journey_mod.FATIGUE_ROUNDS,
+                                  source="rule:survivor", origin="rule:survivor")
+                return (f"Somebody in the water, clinging to a spar and too far gone to "
+                        f"shout: {who.name} is hauled aboard half drowned, fatigued, and "
+                        f"lies on her deck.", [fx])
+            finder = one_of(hands)
+            return (f"{_sentence(finder.name) if finder is not None else 'Somebody'} "
+                    f"finds a stowaway among the cargo and drags them up on deck: "
+                    f"{who.name}.", [fx])
+        if met.kind == "sickness":
+            sick = one_of(hands)
+            if sick is None:
+                return ("Fever goes through the water casks, and nobody aboard takes "
+                        "it.", [fx])
+            # The condition and its days are the table's (journey-events.json `sickness`).
+            fever = ontheway.events()["sickness"]
+            sick.add_condition(fever["condition"],
+                               rounds=int(fever["days"]) * ships_mod.MINUTES_A_DAY * 10,
+                               source="rule:ship-fever", origin="rule:ship-fever")
+            fx.update(ref=sick.ref, condition=fever["condition"])
+            return (f"Fever below decks: {sick.name} is down with it, sickened, and the "
+                    f"hands keep clear of their hammock.", [fx])
+        # Mutiny: talk, not yet a rising — a real hand, and who it is against.
+        talker = one_of(hands)
+        if talker is None:
+            return "Grumbling below decks about the shares, and nobody will own to it.", [fx]
+        fx["ref"] = talker.ref
+        pc = self.scene.pc()
+        against = (pc.name if pc is not None and ship.held_by == pc.ref
+                   else master.name if master is not None and master is not talker
+                   else "whoever gives the orders")
+        return (f"{_sentence(talker.name)} has been talking low with the hands against "
+                f"{against}: the shares, the course, and who gives the orders aboard her.",
+                [fx])
+
+    def _landfall(self, ship, kind: str):
+        """The island or the wreck a voyage met, as a place off her deck: its id carries
+        her own id, so standing on it is still in her waters (`ships.vessel_of`), and its
+        ground is its own (`journey-events.json` `places`). The same place if met twice."""
+        from . import places as places_mod, ships as ships_mod
+
+        spec = ontheway.events()["places"][kind]
+        deck = ships_mod.deck_of(ship)
+        pid = f"{ship.id}{places_mod.SEP}{spec['terrain']}:{places_mod._slug(spec['label'])}"
+        place = places_mod.Place(id=pid, name=spec["label"], about=spec["about"],
+                                 terrain=spec["terrain"], exits=(), parent=deck,
+                                 origin="found")
+        if not any(str(r.get("id")) == pid for r in self.scene.founded):
+            self.scene.founded.append(place.as_dict())
+        if kind == "wreck" and not any(r.get("at") == pid for r in self.scene.props):
+            # Her salvage: a chest of coin lying aboard her (`holding`: coin is a number
+            # inside a lying thing, Circle's money object), the amount the engine's.
+            from . import holding
+
+            chest = ontheway.events()["salvage"]
+            rec = self.scene.place_prop(chest["name"], state="intact", at=pid,
+                                        turn=int(self.scene.clock_minutes))
+            box = holding.contents(rec)
+            for denom in ("gp", "sp", "cp"):
+                if chest.get(denom):
+                    box["purse"][denom] = int(box["purse"].get(denom, 0)) + self.dice.roll(
+                        chest[denom], label="what the wreck holds", visibility="hidden").total
+        return place
+
+    def _leave_astern(self, ship) -> str:
+        """Sailing on: the island and the wreck a voyage met are left behind (their places
+        and anything lying there go), and the party is back on her deck. The tell, or ""."""
+        from . import places as places_mod, ships as ships_mod
+
+        labels = {places_mod._slug(v["label"]) for v in ontheway.events()["places"].values()
+                  if "label" in v}
+
+        def astern(pid: str) -> bool:
+            return (str(pid).startswith(ship.id + places_mod.SEP)
+                    and str(pid).rsplit(":", 1)[-1].split("/")[0] in labels)
+
+        gone = [r for r in self.scene.founded if astern(str(r.get("id") or ""))]
+        if not gone:
+            return ""
+        deck = ships_mod.deck_of(ship)
+        back = False
+        for ref, a in list(self.scene.people.items()):
+            if not astern(a.at):
+                continue
+            if a.is_pc or a.has_state(states.TRAVELS_WITH_YOU) or ref in ship.passengers:
+                back = back or a.is_pc
+                self.scene.move(ref, deck)
+            elif self._stays_in_the_world(a):
+                self.scene.move(ref, deck)
+            else:
+                self.scene.depart(ref)
+        if back:
+            self.place_party(deck)
+        self.scene.founded = [r for r in self.scene.founded if r not in gone]
+        self.scene.props = [r for r in self.scene.props if not astern(str(r.get("at") or ""))]
+        names = _and_list([str(r.get("name") or "") for r in gone])
+        said = f"{names} {'is' if len(gone) == 1 else 'are'} left astern."
+        return f"Back aboard; {said}" if back else _sentence(said)
 
     def _into_the_water(self, refs) -> list:
         """Stand each swimmer among `refs` in the open water beside the hull (`Grid.water`),
@@ -18812,8 +20266,14 @@ class Engine:
     @staticmethod
     def _ordinal(n: int) -> str:
         n = max(1, int(n))
-        return {1: "first", 2: "second", 3: "third", 4: "fourth", 5: "fifth",
-                6: "sixth", 7: "seventh"}.get(n, f"{n}th")
+        # Weeks-long passages (2026-11-16) reach the twenties: "21th" was the old tail.
+        words = {1: "first", 2: "second", 3: "third", 4: "fourth", 5: "fifth", 6: "sixth",
+                 7: "seventh", 8: "eighth", 9: "ninth", 10: "tenth", 11: "eleventh",
+                 12: "twelfth", 13: "thirteenth", 14: "fourteenth"}
+        if n in words:
+            return words[n]
+        tail = "th" if 10 < n % 100 < 14 else {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
+        return f"{n}{tail}"
 
     def _op_sea(self, intent: Intent, partial: dict) -> Outcome:
         """Two ships, and the distance between them.
@@ -19231,16 +20691,18 @@ class Engine:
         return (f"{who.name} is talking to you." if "they" in str(how)
                 else f"You are in conversation with {who.name}.")
 
-    def end_talk(self, why: str = "", who=None) -> str:
+    def end_talk(self, why: str = "", who=None, keep=()) -> str:
         """End the conversation, for one person or everybody; the tell, or "" if there
-        was none to end."""
+        was none to end. `keep`: the refs whose talk goes on (who walk along with the
+        party)."""
         # Everybody holding the tag, wherever they now stand — not the room. Walking
         # away calls this after the party has moved, when the person left behind is
         # no longer in `scene.actors`; read the room and nobody would be found to
         # leave mid-sentence, and `_settle_talk` would say "no longer here" instead.
         gone = ([who] if who is not None else
                 [a for a in self.scene.people.values() if not a.is_pc])
-        gone = [a for a in gone if a is not None and a.has_state(states.TALKING)]
+        gone = [a for a in gone if a is not None and a.has_state(states.TALKING)
+                and a.ref not in keep]
         for a in gone:
             a.remove_effects(source="talk")
         if not gone:
@@ -19539,9 +21001,105 @@ class Engine:
                       "how": "wage", "from": pc.ref, "to": who.ref,
                       "purse": dict(pc.purse)}],
             tell=(f"{pc.name} pays {who.name} {week_said}: a week's wages in advance, at "
-                  f"{day_said} a day. {who.name} is in your pay"
+                  f"{day_said} a day. {_sentence(who.name)} is in your pay"
                   + (" and comes with you from here." if joined else " from here.")),
             because=intent.because)
+
+    def _op_bout(self, intent: Intent, partial: dict) -> Outcome:
+        """`bout` — the arena's house stages a knockout bout for the player: an opponent
+        at the party's average encounter, a purse, and a real fight in which every blow
+        between the two is nonlethal (rules/arena.py carries the sources and the calls).
+        Written only by the act table from the reader's `challenge` (CODE_ONLY_OPS)."""
+        from . import arena, keepers
+        from .activeeffect import ActiveEffect
+
+        pc = self.scene.pc()
+        at = str(self.scene.at or "")
+        if pc is None or pc.is_down:
+            return self._refuse(intent, "Nobody is fit to fight a bout.")
+        if self.scene.in_encounter:
+            return self._refuse(intent, "There is a fight on already.")
+        founded = getattr(self.scene, "founded", ()) or ()
+        if keepers.kind_of(at, founded) != arena.KIND:
+            return self._refuse(
+                intent, "Nobody stages bouts here. An arena's master of the games does.")
+        master = keepers.keeper_in(self.scene, at)
+        if master is None or master.ref not in self.scene.actors \
+                or not self.scene.conscious(master.ref):
+            return self._refuse(intent, "There is nobody here to stage a bout: the master "
+                                        "of the games is not about.")
+        if not keepers.open_now(at, int(self.scene.clock_minutes), founded):
+            return self._refuse(intent, keepers.shut_line(
+                at, int(self.scene.clock_minutes), founded, master.name)
+                or f"{master.name} stages no bouts at this hour.")
+        hostile = self._will_not_deal(master)
+        if hostile:
+            return self._refuse(intent, hostile)
+        if arena.staged_today(self.scene, at):
+            return self._refuse(
+                intent, f"{master.name} has staged today's bout already. The next is "
+                        f"tomorrow.")
+        picked = arena.opponent(self.scene)
+        if picked is None:
+            return self._refuse(intent, f"{master.name} has nobody fit to put up against "
+                                        f"{pc.name} today.")
+        block, cr = picked
+        made = self._bring_in(str(block["id"]), 1, side="them")
+        if not made:
+            return self._refuse(intent, f"{master.name} has nobody to put up today.")
+        foe = self.scene.actors[made[0]["ref"]]
+        purse = arena.purse_cp(cr)
+        source = f"bout:{at}"
+        for who, other in ((pc, foe), (foe, pc)):
+            who.apply_effect(ActiveEffect(
+                name="in a bout", kind="bond", key=f"{source}:{who.ref}", source=source,
+                origin=source, duration="until-dismissed", tags=(states.IN_A_BOUT,),
+                payload={"purse_cp": purse, "house": master.ref, "against": other.ref,
+                         "at": at}))
+        arena.mark_staged(self.scene, at)
+        self._mark_priced([foe.ref], source)
+        fight = self._run_within(self.validate([{
+            "op": "begin_encounter", "because": "the house stages a bout",
+            "params": {"sides": {"party": [pc.ref], "them": [foe.ref]}}}],
+            origin=source, origin_name="the arena's bout"), partial)
+        coins = self._coins_here()
+        purse_said = goods.purse_line(goods.coins_for(purse), coins)
+        return Outcome(
+            intent_id=intent.id, op="bout", rolls=[r for o in fight for r in o.rolls],
+            effects=[{"kind": "bout", "against": foe.ref, "house": master.ref,
+                      "purse_cp": purse, "cr": cr}]
+                    + [e for o in fight for e in (o.effects or [])],
+            tell=(f"{master.name} puts {pc.name} in the next bout against {foe.name}, a "
+                  f"knockout to the first who cannot go on: every blow is pulled, and the "
+                  f"winner takes a purse of {purse_said}. "
+                  + " ".join(o.tell for o in fight if o.tell)).strip(),
+            because=intent.because)
+
+    def _settle_bout(self) -> str:
+        """The purse to a bout's winner still standing, and the bout's state off both
+        fighters (the second law: nothing outlives the bout). "" when no bout was on."""
+        fighters = [a for a in self.scene.actors.values() if a.has_state(states.IN_A_BOUT)]
+        if not fighters:
+            return ""
+        pc = self.scene.pc()
+        bond = next((e for e in (pc.effects if pc is not None else ())
+                     if states.IN_A_BOUT in (e.tags or ())), None)
+        line = ""
+        if bond is not None:
+            foe = self.scene.actors.get(str(bond.payload.get("against") or ""))
+            house = self.scene.actors.get(str(bond.payload.get("house") or ""))
+            purse = int(bond.payload.get("purse_cp") or 0)
+            if foe is not None and foe.is_down and not pc.is_down and purse:
+                pc.purse = goods.credit(pc.purse, purse)
+                line = (f" {_sentence(house.name) if house is not None else 'The house'} pays "
+                        f"{pc.name} the bout's purse: "
+                        f"{goods.purse_line(goods.coins_for(purse), self._coins_here())}.")
+            elif pc.is_down:
+                line = (f" {pc.name} lost the bout, and the purse goes to "
+                        f"{foe.name if foe is not None else 'the other fighter'}.")
+        for a in fighters:
+            a.remove_effects(match=lambda e: states.IN_A_BOUT in (e.tags or ()))
+        return line
 
     def _company_guard(self, intent: Intent, who) -> Outcome:
         """`company do: guard` — a companion keeps watch over the party's cargo or the
@@ -19585,6 +21143,377 @@ class Engine:
                     else f"{pc.name if pc is not None else 'you'}."),
             because=intent.because)
 
+    def _mint_venture_here(self, kind: str) -> str:
+        """Mint the venture `kind` off where the party stands, as `_op_venture` mints it
+        on entry (`places.venture_set`, seeded off the parent, so going in later finds
+        this one), without going in. Returns the head's name, or "" when this place
+        already holds as many as one place can (`places.MOST_CHILDREN`)."""
+        from . import places as places_mod
+
+        here = self.here()
+        if here is None or kind not in places_mod.VENTURES:
+            return ""
+        made = places_mod.venture_set(here, kind)
+        if places_mod.find(self.places(), made[0].id) is None:
+            if len(places_mod.children_of(self.scene.founded, here.id))                     >= places_mod.MOST_CHILDREN:
+                return ""
+            for pl in made:
+                self.scene.founded.append(pl.as_dict())
+        return made[0].name
+
+    # --- hex travel on the region map (rules/hexes.py, docs/hexcrawl-plan.md) -----------------
+
+    def hex_world(self):
+        """The region grid this campaign plays on, or None with no world to lay out."""
+        if self.world is None:
+            return None
+        from play import atlas as atlas_mod
+        from . import hexes
+
+        at = atlas_mod.atlas(self.world)
+        if not at.get("cities"):
+            return None
+        return hexes.grid(at, hexes.held_layout(self.scene, at))
+
+    def party_hex(self, g=None):
+        """The hex the party stands in: a hex place's own, else its town's. None aboard a
+        ship, at sea, or with no world."""
+        from . import places as places_mod
+
+        g = g or self.hex_world()
+        if g is None or places_mod.terrain_of(self.scene.at) == "deck":
+            return None
+        return g.hex_of_place(self.scene.at or "", self.scene.location_id or "")
+
+    def party_rides(self) -> bool:
+        """Whether the whole party rides (the owner's ruling 8, 2026-11-19): a mount for
+        the PC and one for every companion who travels with them, the journey's own test
+        (`journey.MOUNTS`). One rider short and the party walks, as a journey does."""
+        from . import journey as journey_mod
+
+        mounts = [m for m in journey_mod.owned_mounts(self.scene) if not m.is_down]
+        if not mounts:
+            return False
+        walkers = [a for a in (getattr(self.scene, "people", {}) or {}).values()
+                   if not a.is_pc and not a.is_down
+                   and str(getattr(a, "from_template", "") or "") not in journey_mod.MOUNTS
+                   and (a.has_state(states.TRAVELS_WITH_YOU) or a.has_state(states.HIRED))]
+        return len(mounts) >= 1 + len(walkers)
+
+    def hex_reach(self, g=None) -> list[tuple]:
+        """The hexes a click can move the party to: each land neighbour, and, riding, each
+        land hex two away with a land hex between (plan §3)."""
+        from . import hexes
+
+        g = g or self.hex_world()
+        here = self.party_hex(g)
+        if g is None or here is None:
+            return []
+        out = [h for h in hexes.neighbours(*here) if g.cell(*h)["land"]]
+        if self.party_rides():
+            seen = set(out) | {here}
+            for m in list(out):
+                for h in hexes.neighbours(*m):
+                    if h not in seen and hexes.distance(h, here) == 2 and g.cell(*h)["land"]:
+                        seen.add(h)
+                        out.append(h)
+        return out
+
+    def _hex_touched(self, h) -> dict:
+        from . import hexes
+
+        touched = self.scene.hexes.setdefault("touched", {})
+        return touched.setdefault(hexes.key(*h), {})
+
+    def _hex_explored(self, g, h) -> str:
+        """Pay for an explored hex once (UC: 100 XP, +25 for difficult ground), or "".
+
+        Explored (owner call 1, answered by default 2026-11-19): a hex with a site once the
+        party has stood inside the site; a hex with none once they have spent an hour there.
+        Never from a model: the award is the rule's, through the one XP door."""
+        from . import hexes
+
+        rec = (self.scene.hexes.get("touched") or {}).get(hexes.key(*h))
+        if not rec or rec.get("explored") or "entered" not in rec:
+            return ""
+        site = hexes.site_of(g, *h)
+        if site is not None:
+            if not any(hexes.in_site(p, h) for p in self.scene.places_been()):
+                return ""
+        elif self.scene.clock_minutes - int(rec.get("since", rec["entered"])) \
+                < hexes.EXPLORE_MINUTES:
+            return ""
+        rec["explored"] = self.scene.clock_minutes
+        ground = g.cell(*h)["ground"]
+        xp = hexes.EXPLORED_XP + (hexes.DIFFICULT_XP if ground in hexes.DIFFICULT else 0)
+        return self.award_xp(self.scene.pc(), xp, f"exploring the {ground} hex")
+
+    def _op_hex_move(self, intent: Intent, partial: dict) -> Outcome:
+        """One hex across the region map, or two riding: the owner's hexcrawl (plan §3-6).
+
+        Written only by the board's click (`CODE_ONLY_OPS`). The move costs Ultimate
+        Campaign's hours through a hex (5 on plain, 8 on anything else; half riding, the
+        journey's own `mounted_hours`), paid through the body toll every walk pays, and it is
+        the only time that passes on its own (ruling 2). Each hex crossed is a real place
+        (`hexes.place_doc`) walked into through `travel`, so its hours are checked on the
+        road's table (`ontheway.road`) once, a meeting stops the ride where it happens, and
+        escorts, mounts and the watch behave as on any walk.
+
+        Where the party stops it looks round: the player's Perception, read against the
+        site in its own hex and the six round it (ruling 3); every hex read is searched,
+        whatever the roll (ruling 10). A hex ridden through gets no look (ruling 9)."""
+        from . import hexes, outskirts as outskirts_mod
+        from . import journey as journey_mod
+        from . import places as places_mod
+
+        pc = self.scene.pc()
+        if pc is None:
+            return self._refuse(intent, "Nobody is here to move.")
+        if self.scene.in_encounter:
+            return self._refuse(intent, "Not in the middle of a fight; end it or get clear first.")
+        g = self.hex_world()
+        here = self.party_hex(g)
+        if g is None or here is None:
+            return self._refuse(intent, "The party is not on land the region map shows.")
+        try:
+            to = tuple(int(v) for v in list(intent.params.get("hex") or ())[:2])
+            if len(to) != 2:
+                raise ValueError
+        except (TypeError, ValueError):
+            return self._refuse(intent, "hex_move needs `hex`: the hex's [q, r].")
+        dest = g.cell(*to)
+        far = hexes.distance(here, to)
+        rides = self.party_rides()
+        if far == 0:
+            return self._refuse(intent, f"{pc.name} is in that hex already.")
+        if not dest["land"]:
+            return self._refuse(intent, "That hex is open water. Crossing it waits for a ship.")
+        if far > (2 if rides else 1):
+            if rides:
+                why = "Riding, the party reaches two hexes at most."
+            elif far == 2:
+                why = ("On foot the party moves one hex at a time; with a horse for everyone "
+                       "it could make two.")
+            else:
+                why = "On foot the party moves one hex at a time."
+            return self._refuse(intent, why)
+        path = [to]
+        if far == 2:
+            between = [h for h in hexes.neighbours(*here)
+                       if hexes.distance(h, to) == 1 and g.cell(*h)["land"]]
+            if not between:
+                return self._refuse(intent, "There is no land between here and there to ride over.")
+            # The cheaper ground first (plan §3: plain before rough), the board's order after.
+            between.sort(key=lambda h: hexes.hours_through(g.cell(*h)["ground"]))
+            path = [between[0], to]
+
+        # The look round, the player's own die (the popup, as a track's is), asked before
+        # anything is spent so the re-run with the face finds everything as it was.
+        mods = pc.skill_modifiers("perception")
+        if "player_face" in partial:
+            look = self.dice.given(int(partial.pop("player_face")), mods,
+                                   label=f"{pc.name} Perception (the land around)")
+        else:
+            raise _NeedsPlayerRoll({
+                "label": "Perception check — looking over the land around you",
+                "die": "1d20", "actor": pc.name, "min": 1, "max": 20,
+                "modifier": sum(m.value for m in mods),
+                "breakdown": [m.as_dict() for m in mods],
+                "dc": None, "dc_shown": False, "because": intent.because,
+                "intent_id": intent.id,
+            }, {})
+
+        # The hex being left: explored, if it was (an hour spent, or its site reached).
+        xp_line = self._hex_explored(g, here)
+        tells: list[str] = []
+        effects: list[dict] = []
+        if hexes.in_site(self.scene.at or ""):
+            # Up out of the hex's site first, to the hex itself, the way the party went in:
+            # said as coming out, not as a second arrival (playtest 2026-11-20 #4).
+            up = hexes.place_doc(g, here[0], here[1], "")["id"]
+            site_name = self.here().name
+            self._hex_quiet.add(up)
+            try:
+                walked = self._op_travel(Intent(
+                    op="travel", actor=pc.ref, because=intent.because, params={"place": up},
+                    visibility="hidden", id=intent.id, origin=intent.origin,
+                    origin_name=intent.origin_name), {})
+            finally:
+                self._hex_quiet.discard(up)
+            if walked.status == "refused":
+                return walked
+            tells.append(f"You come out of {site_name}. {walked.tell}".strip())
+            effects.extend(walked.effects)
+            self._journeyed = ""
+        elif places_mod.setting_of(self.scene.at or "") != "outside":
+            # Out through the town's own way out first, as any walk out goes.
+            ring = self._ring(self.world.get(self.scene.location_id) if self.world else None, "")
+            out = next((p for p in ring if p.name == outskirts_mod.OUTSKIRTS), None)
+            if out is None:
+                return self._refuse(intent, "There is no way out of here onto open ground.")
+            # Passed through, not arrived at: no "You are at the outskirts" and its doc
+            # ahead of the day's own lines (#4).
+            self._hex_quiet.add(out.id)
+            try:
+                walked = self._op_travel(Intent(
+                    op="travel", actor=pc.ref, because=intent.because,
+                    params={"place": out.id}, visibility="hidden", id=intent.id,
+                    origin=intent.origin, origin_name=intent.origin_name), {})
+            finally:
+                self._hex_quiet.discard(out.id)
+            if walked.status == "refused":
+                return walked
+            tells.append(walked.tell)
+            effects.extend(walked.effects)
+            self._journeyed = ""
+        stop = here
+        hours = 0
+        for step in path:
+            cell = g.cell(*step)
+            was = g.cell(*stop)
+            set_out = self.scene.clock_minutes
+            doc = hexes.place_doc(g, step[0], step[1], parent=self.scene.at or "")
+            if cell["town"] and self.world is not None:
+                ring = self._ring(self.world.get(cell["town"]), "")
+                out = next((p for p in ring if p.name == outskirts_mod.OUTSKIRTS), None)
+                if out is not None:
+                    doc["exits"] = [out.id]
+            held = next((d for d in self.scene.founded if d.get("id") == doc["id"]), None)
+            if held is None:
+                self.scene.founded.append(doc)
+            elif doc["id"] not in places_mod.up_from(self.scene.founded, doc["parent"]):
+                # Walked into from wherever the party stands now: the parent is the way back.
+                # Never under a place that already hangs off it (playtest 2026-11-20 #3: out
+                # to the grassland and back left the two hexes each other's parent, and the
+                # party trapped in the ruins); a hex up the chain is in the set already.
+                held["parent"] = doc["parent"]
+            hours = hexes.hours_through(cell["ground"])
+            if rides:
+                hours = journey_mod.mounted_hours(hours, "ride")[0]
+            toll = survival.pass_hours(pc, hours, self.dice, biome=cell["ground"])
+            self.scene.advance(max(1, toll.hours) * survival.MINUTES_PER_HOUR, charge_body=False)
+            self._hours_underway[doc["id"]] = hours
+            self._hex_quiet.add(doc["id"])
+            try:
+                moved = self._op_travel(Intent(
+                    op="travel", actor=pc.ref, because=intent.because,
+                    params={"place": doc["id"], **({"pace": "ride"} if rides else {})},
+                    visibility="hidden", id=intent.id, origin=intent.origin,
+                    origin_name=intent.origin_name), {})
+            finally:
+                self._hours_underway.pop(doc["id"], None)
+                self._hex_quiet.discard(doc["id"])
+            self._journeyed = ""
+            if moved.status == "refused":
+                if stop == here:
+                    return self._refuse(intent, moved.tell)
+                break
+            # The day told the way a GM tells a vector of travel (the Alexandrian,
+            # "Hexcrawl Addendum: Describing Travel"): ground, distance and time first, the
+            # cost, then what was seen. The place doc `travel` would add ("Open forest, 12
+            # miles east of Branford, in Faerholt March") is left out: on the 0.4.4 page it
+            # was the whole consequence block and the narrator named the forest after the
+            # nation in it (playtest 2026-11-20 #4).
+            tells.append(f"{english.number(hours).capitalize()} "
+                         f"hour{'s' if hours != 1 else ''} "
+                         + ("riding " if rides else "on foot ")
+                         + hexes.bearing((was["x"], was["y"]), (cell["x"], cell["y"]))
+                         + f" through the {cell['ground']}, to {doc['name']}. "
+                         + hexes.day_said(set_out, self.scene.clock_minutes))
+            if toll.checks:
+                tells.append(f"The way cost them: {survival_note(toll)}")
+            tells.append(moved.tell)
+            effects.extend(moved.effects)
+            if self.scene.at != doc["id"]:
+                break
+            stop = step
+            # On the ground of the town it lies nearest: its nation, coin and law answer.
+            town = places_mod.location_of(self.scene.at or "")
+            if town and town != self.scene.location_id and self.world is not None \
+                    and self.world.get(town) is not None:
+                self.scene.location_id = town
+                self.place_party(self.scene.at)
+            rec = self._hex_touched(stop)
+            rec.setdefault("entered", self.scene.clock_minutes)
+            rec["since"] = self.scene.clock_minutes
+            effects.append({"kind": "hex", "q": stop[0], "r": stop[1], "hours": hours,
+                            "ground": cell["ground"], "origin": "rule:hex-move"})
+            if self.scene.in_encounter:
+                break
+
+        # The look round from where the party stopped, and only there (ruling 9).
+        spotted = self.scene.hexes.setdefault("spotted", {})
+        if stop != here:
+            sp = g.cell(*stop)
+            seen_lines: list[str] = []
+            known_here = ""
+            for h in [stop] + hexes.neighbours(*stop):
+                self._hex_touched(h)["searched"] = self.scene.clock_minutes
+                site = hexes.site_of(g, *h)
+                if site is None:
+                    continue
+                first = hexes.key(*h) not in spotted
+                if not first and h == stop:
+                    # Found before, and it is where the party can go in: said once, short.
+                    known_here = hexes.found_before(site["kind"])
+                if look.total < site["dc"] + (hexes.OWN_HEX_DC if h == stop else 0):
+                    continue
+                spotted[hexes.key(*h)] = site["kind"]
+                effects.append({"kind": "spotted", "q": h[0], "r": h[1], "site": site["kind"],
+                                "first": first, "origin": "rule:hex-look"})
+                if not first:
+                    # Seen before: the board shows it and the page does not say it again
+                    # (#4: the walk back repeated "broken walls show here" word for word).
+                    continue
+                other = g.cell(*h)
+                where = ("in this hex itself" if h == stop else "to the " + hexes.bearing(
+                    (sp["x"], sp["y"]), (other["x"], other["y"])))
+                seen_lines.append(f"{hexes.SEEN_FROM_AFAR[site['kind']]} {where}")
+            # The roll shown the way every other roll is, never a bare total (#4).
+            shown = f"Perception d20 {look.raw}{look.modifier_total:+d} = {look.total}"
+            if seen_lines:
+                tells.append(f"Looking over the land ({shown}): "
+                             + "; ".join(seen_lines) + ".")
+            elif spotted:
+                tells.append(f"Looking over the land ({shown}), nothing new stands out.")
+            else:
+                tells.append(f"Looking over the land ({shown}), nothing stands out.")
+            if known_here:
+                tells.append(known_here)
+        tell = " ".join(t for t in tells if t).strip() + (xp_line or "")
+        return Outcome(intent_id=intent.id, op="hex_move", rolls=[look], effects=effects,
+                       tell=tell, because=intent.because)
+
+    def _op_hex_enter(self, intent: Intent, partial: dict) -> Outcome:
+        """Into the site of the hex the party stands in, once it has been spotted: the
+        venture door (`_op_venture`), which builds the cave, the mine, the ruins or the
+        tower and their story from a seed off the hex's own place, so it is the same site
+        every time. Reaching it explores the hex (`_hex_explored`)."""
+        from . import hexes
+
+        g = self.hex_world()
+        here = self.party_hex(g)
+        if g is None or here is None or hexes.parse_place(self.scene.at or "") is None:
+            return self._refuse(intent, "The party is not out on a hex of open ground.")
+        if hexes.in_site(self.scene.at or "", here):
+            return self._refuse(intent, "The party is inside this hex's site already.")
+        site = hexes.site_of(g, *here)
+        if site is None or hexes.key(*here) not in (self.scene.hexes.get("spotted") or {}):
+            return self._refuse(intent, "Nothing has been found in this hex to go into.")
+        pc = self.scene.pc()
+        actor = intent.actor if intent.actor in self.scene.actors else (pc.ref if pc else None)
+        went = self._op_venture(Intent(
+            op="venture", actor=actor, because=intent.because,
+            params={"kind": site["kind"], "parent": self.scene.at},
+            visibility=intent.visibility, id=intent.id, origin=intent.origin,
+            origin_name=intent.origin_name), partial)
+        if went.status == "refused":
+            return went
+        line = self._hex_explored(g, here)
+        if line:
+            went.tell = (went.tell or "") + line
+        return went
+
     def _op_venture(self, intent: Intent, partial: dict) -> Outcome:
         """Ground gone into: the sewers under the town, a cave in the hills outside it.
         Generated on entry from a seed off the parent's id (the roguelike answer), so the
@@ -19601,8 +21530,10 @@ class Engine:
         kind = str(intent.params.get("kind") or "").strip().lower()
         if kind not in places_mod.VENTURES:
             return self._refuse(
-                intent, f"There is no such ground as {kind or 'that'} to go into. The "
-                        f"kinds are: {', '.join(sorted(places_mod.VENTURES))}.")
+                # No list of kinds: the table voice read "The kinds are: alley, cave,
+                # cellar…" as leads that were not here (playtest 2026-11-20 #45, "a cellar
+                # or a crawlspace"). The planner's prompt holds the kinds already.
+                intent, f"There is no {kind or 'such ground'} here to go into.")
         who = intent.actor or (self.scene.pc().ref if self.scene.pc() else None)
         actor = self.scene.actors.get(who) if who else None
         if actor is None:
@@ -19613,7 +21544,7 @@ class Engine:
         if parent is None:
             return self._refuse(
                 intent, f"There is no {intent.params.get('parent')} here to go in from. "
-                        f"From here you can reach {', '.join(p.name for p in known)}.")
+                        f"From here you can reach {self._reachable_words() or 'nowhere else'}.")
         # You go in from where you are standing. `_parent_place` resolves a NAME against
         # every place in the settlement, and this op then moves the party to whatever it
         # found — so a venture was a way to cross the whole town and go underground in
@@ -19671,6 +21602,13 @@ class Engine:
             fresh = False
         spec = places_mod.VENTURES[kind]
         hours = int(spec["hours"])
+        from . import hexes as hexes_mod
+
+        if hexes_mod.parse_place(parent.id) is not None and not hexes_mod.in_site(parent.id):
+            # The site in the hex the party stands in: the hex's own hours were the walk to
+            # it (UC Exploration costs travel per hex; a landmark is found on entering).
+            # Playtest 2026-11-20 #10 read "the ruins open off the forest..., 2 hours away".
+            hours = 0
         toll_note = ""
         if hours:
             toll = survival.pass_hours(actor, hours, self.dice, biome=head.terrain)
@@ -19690,6 +21628,18 @@ class Engine:
         # 2026-09-22; then it rolled its own check here, at the parent, brought the
         # creature in there and opened the fight, and the travel below ended that fight
         # and shed the creature in the same tell (2026-09-23).
+        # A way deeper (rules/dungeons.py): the venture's own seeded d100, the same every
+        # time, marked on its saved record on a hit. Hidden: the feature is found, not told.
+        # Rolled before the walk in, so a hex site's way down, which lies at the site's
+        # own head, is there for the reactive look on arrival (`dungeons.arrived`).
+        rec = next((p for p in self.scene.founded if p.get("id") == head.id), None)
+        deeper = None
+        if rec is not None:
+            from . import dungeons
+
+            deeper = dungeons.on_entering(self.world, self.scene, rec, kind,
+                                          [m.id for m in made[1:]],
+                                          site=self._is_hex_site(head.id, kind))
         travel = Intent(op="travel", actor=actor.ref, because=intent.because,
                         params={"place": head.id, "with": list(intent.params.get("with") or [])},
                         visibility="hidden", id=intent.id, origin=intent.origin,
@@ -19715,12 +21665,13 @@ class Engine:
         # A whole sentence. The fragment "the crypt, found for the first time, off the
         # graveyard." came back on the page as "You descend into the crypt, … a find of
         # ancient stone" (playtest 2026-11-16 #26): a slot asked to write a fact it cannot
-        # parse writes the fact's words.
+        # parse writes the fact's words. Agreed with its name (#80: "The sewers opens").
         tell = ((walked.tell + " " if walked is not None and walked.tell else "")
-                + f"{head.name[:1].upper()}{head.name[1:]} opens off {parent.name}"
+                + f"{head.name[:1].upper()}{head.name[1:]} "
+                + f"{english.verb(head.name, 'opens', 'open')} off {parent.name}"
                 + (f", {hours} hour{'s' if hours != 1 else ''} away" if hours else "")
-                + (": you have not been inside it before" if fresh else
-                   ": you have been inside it before")
+                + f": you have{' not' if fresh else ''} been inside "
+                + f"{'them' if english.is_plural(head.name) else 'it'} before"
                 + ". " + moved.tell + toll_note)
         # Something may live here. Half the time where nothing rates the ground; a
         # place's stated danger moves it (`volatility.scale`: a third as often on calm
@@ -19733,44 +21684,81 @@ class Engine:
             effects.extend(got)
             if said:
                 tell += " " + said
-        # A way deeper (rules/dungeons.py): the venture's own seeded d100, the same every
-        # time, marked on its saved record on a hit. Hidden: the feature is found, not told.
-        rec = next((p for p in self.scene.founded if p.get("id") == head.id), None)
-        if rec is not None:
-            from . import dungeons
-
-            effects.append(dungeons.on_entering(self.world, self.scene, rec, kind,
-                                                [m.id for m in made[1:]]))
+        if deeper is not None:
+            effects.append(deeper)
         return Outcome(intent_id=intent.id, op="venture", effects=effects, tell=tell,
                        because=intent.because)
 
-    def _inhabit(self, place, *, guarding: bool = False, by=None) -> tuple[list[dict], str]:
+    def _is_hex_site(self, head_id: str, kind: str) -> bool:
+        """Whether a venture's head is the site the world put in its hex
+        (`hexes.site_of`): the ruins or tower spotted on the Region map, not a cave the
+        player went looking for on ground that has none."""
+        from . import hexes
+
+        at = hexes.parse_place(head_id)
+        g = self.hex_world() if at is not None and hexes.in_site(head_id) else None
+        site = hexes.site_of(g, *at) if g is not None else None
+        return bool(site) and site["kind"] == kind
+
+    def _inhabit(self, place, *, guarding: bool = False, by=None, row: dict | None = None,
+                 count: int = 1, name: str | None = None,
+                 hostile: bool | None = None) -> tuple[list[dict], str]:
         """Something that lives here, by the ground, from the bestiary through the party's
         encounter budget (`gathering.creature_for`): brought in, kept far, and the fight
         opened when it is a kind that attacks on sight. A venture's inhabitant and a dungeon
         room's both come in by this door. (effects, tell), both empty when the book has
-        nothing for this ground at the party's budget."""
+        nothing for this ground at the party's budget.
+
+        A dungeon built from a concept (rules/dungeons.py `stock_room`) has already drawn
+        its `row` and `count` from its tag through the same budget, names its leader, and
+        says whether they attack on sight (`hostile`); it comes in by this door too, so
+        there is one way a room's inhabitants arrive."""
         from . import gathering
 
         pc = self.scene.pc()
-        level = getattr(pc, "level", 1) if pc is not None else 1
-        row = gathering.creature_for(place.terrain, max(1, int(level)), self.dice,
+        if row is None:
+            level = getattr(pc, "level", 1) if pc is not None else 1
+            got = gathering.draw_for(place.terrain, max(1, int(level)), self.dice,
                                      guarding=guarding,
                                      apl=encounter_budget.party_apl(self.scene))
+            # How many the budget sent with it (up to `encounter_budget.MOST`, 2026-11-18).
+            row, count = (got.row, got.count) if got is not None else (None, 1)
         if row is None:
             return [], ""
-        born = self._bring_in(row["id"], count=1, name=row["name"])
-        ref = born[0]["ref"]
-        self._mark_priced([ref], "venture")
-        self.scene.zones[ref] = "far"
-        self.scene.positions.pop(ref, None)
-        aggressive = row.get("creature_type") in gathering.AGGRESSIVE
-        tell = (f"Something lives here: {gathering._an(row['name'])}"
-                + (", and it has seen you." if aggressive else ", further in."))
+        born = self._bring_in(row["id"], count=max(1, int(count)), name=name or row["name"])
+        refs = [b["ref"] for b in born]
+        ref = refs[0]
+        self._mark_priced(refs, "venture")
+        for r in refs:
+            self.scene.zones[r] = "far"
+            self.scene.positions.pop(r, None)
+        aggressive = (row.get("creature_type") in gathering.AGGRESSIVE if hostile is None
+                      else bool(hostile))
+        many = len(refs) > 1
+        tell = (f"Something lives here: {gathering._some(row['name'], len(refs))}"
+                + ((", and they have seen you." if many else ", and it has seen you.")
+                   if aggressive else ", further in."))
         if aggressive and pc is not None and (by is None or by.ref == pc.ref):
             self._ensure_encounter(pc.ref, target=ref)
-        return ([{"kind": "gathering", "encounter": "creature", "creature": row["name"],
-                  "aggressive": aggressive, "ref": ref}], tell)
+            self._enrol_the_rest(refs)
+        return ([{"kind": "gathering", "encounter": "creature", "creature": name or row["name"],
+                  "aggressive": aggressive, "ref": ref, "refs": refs}], tell)
+
+    def _enrol_the_rest(self, refs) -> None:
+        """The rest of a group fight beside the one the fight was opened on. Every one of
+        them when the fight was already running (a pursuit brought it into this room,
+        `_op_travel`), else the rest beside the first. A forage's group and a venture's
+        both come in this way (`_gathering_encounter`, `_inhabit`)."""
+        if not self.scene.in_encounter:
+            return
+        for r in refs:
+            if r in self.scene.actors and not any(
+                    r in side for side in self.scene.sides.values()):
+                a = self.scene.actors[r]
+                init = self.dice.d20(a.initiative_modifiers(),
+                                     label=f"{a.name} initiative", visibility="hidden")
+                self.scene.enrol(r, init.total)
+                self.scene.sides.setdefault("them", []).append(r)
 
     def _duration_rounds(self, duration, default_unit: str = "round") -> int | None:
         """A `{amount, unit}` duration in rounds, rolling the amount when it is dice, or
@@ -22173,6 +24161,78 @@ class Engine:
                    f"damage, which rest, the Heal skill's long-term care or a remedy that "
                    f"restores hit points mends." if wounded else ""))
 
+    def _provisions_as_meals(self, intents: list) -> list:
+        """Every `use_item` on a pack's food or drink as its `eat` or `drink`
+        (`_provision_door`), and a bare `eat` or `drink` by the same body in the same list
+        dropped as the same act written twice."""
+        out, fed = [], set()
+        for it in intents:
+            routed = self._provision_door(it)
+            if routed is not None:
+                fed.add((routed.op, routed.actor or "pc"))
+            out.append(routed or it)
+        return [it for it in out
+                if not (it.op in ("eat", "drink") and not it.params.get("item")
+                        and not _yes(it.params.get("fill"))
+                        and (it.op, it.actor or "pc") in fed)]
+
+    def _provision_door(self, intent: Intent) -> Intent | None:
+        """A `use_item` on a pack's food or drink (a gear row's `eat` or `drink`: trail
+        rations, a waterskin, a mug of ale), as the `eat` or `drink` intent it is, or None.
+
+        Owner bug list 2026-11-18, item 17 (jack, turn_log[200]): `use_item waterskin#1
+        how=drink` went to the jar door, which spends any shelf item and answers "ok" to
+        drinking a jar with no effects, so his last full skin was spent for nothing and
+        the `drink` beside it was refused for want of water. Those doors own the need's
+        clock; the jar door owns specs. Asked of the gear row, never the word used."""
+        from . import gear as gear_mod
+
+        if intent.op != "use_item" or intent.params.get("power"):
+            return None
+        how = str(intent.params.get("how", "drink")).strip().lower()
+        actor = self.scene.get(intent.actor) if intent.actor else None
+        said = str(intent.params.get("item") or "").strip()
+        if actor is None or not said or how not in ("drink", "eat"):
+            return None
+        for verb, op, find in (("drink", "drink", gear_mod.drinkable),
+                               ("eat", "eat", gear_mod.food)):
+            c = find(actor, said)
+            if c is not None and (how == verb or not c["row"].get(how)):
+                return Intent(op=op, actor=intent.actor, because=intent.because,
+                              params={"item": str(c["id"])}, visibility=intent.visibility,
+                              id=intent.id, origin=intent.origin,
+                              origin_name=intent.origin_name)
+        return None
+
+    def _read_map(self, intent: Intent, actor, held) -> Outcome:
+        """Read a carried nation's map (rules/maps.py): about ten minutes, and the World and
+        Continent maps know that nation's towns from then on. Not in a fight, and a map of a
+        nation already read teaches nothing. The map is kept: reading spends no copy.
+
+        The tell is how the narrator learns of it (the three laws: the narrator is fed tells
+        and nothing else about mechanics)."""
+        name = str(getattr(held, "base", "") or getattr(held, "name", "") or "")
+        if not maps_mod.is_map(name):
+            return self._refuse(intent, f"The {name} is not something to read.")
+        if self.scene.in_encounter:
+            return self._refuse(intent, f"There is no reading a map in the middle of a fight. "
+                                        f"The {name} stays folded.")
+        nation = maps_mod.nation_named(self.world, name)
+        if not nation:
+            return self._refuse(intent, f"The {name} shows nowhere {actor.name} can place.")
+        if not maps_mod.read(self.scene, nation):
+            return Outcome(intent_id=intent.id, op="use_item", effects=[],
+                           tell=f"{actor.name} looks over the {name}; it shows nothing they "
+                                f"did not already know from the copy they read before.",
+                           because=intent.because)
+        self.scene.advance(maps_mod.READ_MINUTES)
+        return Outcome(intent_id=intent.id, op="use_item",
+                       effects=[{"ref": actor.ref, "kind": "map_read", "nation": nation,
+                                 "item": name, "minutes": maps_mod.READ_MINUTES}],
+                       tell=f"{actor.name} spends about {maps_mod.READ_MINUTES} minutes over "
+                            f"the {name}, learning its towns and the roads between them.",
+                       because=intent.because)
+
     def _op_use_item(self, intent: Intent, partial: dict) -> Outcome:
         """Drink it, throw it, or put it on a blade.
 
@@ -22200,6 +24260,9 @@ class Engine:
         said = str(intent.params["item"]).strip().lower()
         how = str(intent.params.get("how", "drink")).strip().lower()
         target = intent.params.get("to") or intent.actor
+        routed = self._provision_door(intent)
+        if routed is not None:
+            return self._op_eat(routed, partial) if routed.op == "eat"                 else self._op_drink(routed, partial)
 
         # By id, by name, or by the words the player used — "my healing potion" is
         # the Healing Draught. Two jars that both fit are a question, not a guess.
@@ -22230,6 +24293,8 @@ class Engine:
         if target not in self.scene.actors:
             away = self._elsewhere(target)
             return self._refuse(intent, away or f"There is no {target} here to use it on.")
+        if how == "read":
+            return self._read_map(intent, actor, held)
         # In a fight a drink is the turn's standard action, and it provokes
         # (`_drink_refusal`, `_provoked_by_drinking`). A throw is a standard action too and
         # asks only the drink's record: its own attack is the attack op's.
@@ -22325,6 +24390,14 @@ class Engine:
         effects = [{"ref": actor.ref, "kind": "used_item", "item": use.item,
                     "how": how, "left": max(0, held.count),
                     **({"route": route, "to": target} if how == "apply" else {})}]
+        if how == "drink":
+            # A drunk jar is fluid too (owner bug list 2026-11-18, item 17): a tea a cup,
+            # a tincture or a potion a dose (`survival.jar_fluid`, house rule).
+            from . import survival
+
+            sip = survival.jar_fluid(held)
+            effects += self._released(fed, "thirst",
+                                      survival.drink(fed, sip, self.scene.biome))
 
         if how == "throw":
             # Thrown, it is an attack (contracts §7): the `attack` op's splash mode, put
@@ -22703,6 +24776,15 @@ class Engine:
         shut = keepers_mod.shut_here(self.scene, self.scene.actors[seller] if seller else None)
         if shut:
             return self._refuse(intent, shut)
+        # A temple's casting for pay (rules/services.py, playtest 2026-11-16 #70).
+        if item_id.startswith(services_mod.PREFIX):
+            return self._buy_spell(intent, actor, item_id, seller)
+        # A night's stay at an inn or a tavern (rules/lodging.py, playtest 2026-11-17b #10).
+        from . import lodging as lodging_mod
+
+        if item_id.startswith(lodging_mod.PREFIX) or (
+                lodging_mod.lets_beds(self.scene) and lodging_mod.find(item_id) is not None):
+            return self._buy_stay(intent, actor, item_id, seller)
         # Whoever keeps this counter, by name, when the plan named no seller: the panel
         # never does, and "pays the stallholder" read wrong with Azhil Vex standing
         # behind it (live, 2026-09-27).
@@ -22712,6 +24794,11 @@ class Engine:
                else here_keeper.name if here_keeper is not None
                and here_keeper.ref in self.scene.actors
                and keepers_mod.keeps_a_counter(here_keeper) else "the stallholder")
+
+        # Somebody selling what they carry (a carter's cart): their own goods, once each.
+        if seller and self.scene.actors[seller].has_state(states.SELLS_WHAT_THEY_CARRY) \
+                and not keepers_mod.keeps_a_counter(self.scene.actors[seller]):
+            return self._buy_carried(intent, actor, self.scene.actors[seller], item_id, count)
 
         place = str(self.scene.location_id or "nowhere")
         stall = self._stall_here(intent, seller, want=item_id)
@@ -22762,6 +24849,15 @@ class Engine:
         only_one = ""
         if count > 1 and not getattr(found, "staple", False):
             count, only_one = 1, " It was the only one on the counter."
+        # The general store's map is of its own nation (rules/maps.py): named for it as it
+        # changes hands, since the shelf does not know its town.
+        if isinstance(found, goods.Good) and found.key == maps_mod.KEY:
+            from dataclasses import replace as _replace
+
+            called = maps_mod.named(self.world, place)
+            if not called:
+                return self._refuse(intent, f"{who} has no map of these parts to sell.")
+            found = _replace(found, name=called)
 
         # The keeper's own terms and a counter talked round today (`_op_haggle`, the
         # owner's option B) move the price the shelf shows (`tradecraft.counter_terms`).
@@ -22813,6 +24909,170 @@ class Engine:
                  + arrived_tell,
             because=intent.because,
         )
+
+    def _buy_carried(self, intent: Intent, actor, seller, item_id: str, count: int) -> Outcome:
+        """Buy off somebody who sells what they carry (`states.SELLS_WHAT_THEY_CARRY`):
+        the real line moves out of their `goods` and the coin into their purse, at the
+        book's price moved by their own terms (`pricing.seller_percent`). Sold once, never
+        restocked — tbaMUD's `shopping_buy` takes a held object off the keeper with
+        `obj_from_char`, where a shop's "produced" goods are copied for ever. Playtest
+        2026-11-20 #6: the carter's cart had nothing anybody could buy."""
+        from . import pricing
+
+        want = str(item_id).removeprefix("gear:")
+        key = next((k for k, n in seller.goods.items() if int(n or 0) > 0 and (
+            str(getattr(goods.good(k), "id", "")).lower() == str(item_id).lower()
+            or holding.same(k, want))), None) or holding.carried_by(seller, want)
+        good = goods.good(key) if key else None
+        if key not in seller.goods or good is None:
+            on = ", ".join(sorted(str(getattr(goods.good(k), "name", k))
+                                  for k, n in seller.goods.items() if int(n or 0) > 0))
+            return self._refuse(intent, f"{seller.name} has no {want} to sell. Carried: "
+                                        f"{on or 'nothing'}.")
+        if self._will_not_deal(seller):
+            return self._refuse(intent, self._will_not_deal(seller))
+        count = min(max(1, count), int(seller.goods[key]))
+        percent, why = pricing.seller_percent(self.scene, seller)
+        price = tradecraft.buy_price(round(float(good.price_gp) * count, 2), percent)
+        cp = int(round(price * 100))
+        coins = self._coins_here()
+        purse, paid = goods.spend(actor.purse, cp)
+        if not paid:
+            return Outcome(intent_id=intent.id, op="buy", effects=[], because=intent.because,
+                           tell=f"{good.name} is {self._coin_text(price)} and {actor.name} "
+                                f"has {goods.purse_line(actor.purse, coins)}. Nothing "
+                                f"changes hands.")
+        actor.purse = purse
+        seller.purse = goods.credit(seller.purse, cp)
+        seller.goods[key] -= count
+        if seller.goods[key] <= 0:
+            del seller.goods[key]
+        arrived, arrived_tell = goods.deliver(self.scene, actor, good, count)
+        moved = tradecraft.terms_said(seller, percent, why, who=seller.name)
+        return Outcome(
+            intent_id=intent.id, op="buy", because=intent.because,
+            effects=[{"ref": actor.ref, "kind": "bought", "item": good.name, "count": count,
+                      "paid_cp": cp, "from": seller.ref}] + arrived,
+            tell=f"{actor.name} pays {seller.name} {self._coin_text(price)} for "
+                 f"{count}x {good.name}" + (f" ({moved})" if moved else "")
+                 + f". ({goods.purse_line(actor.purse, coins)} left.)" + arrived_tell)
+
+    def _buy_spell(self, intent: Intent, actor, item_id: str, seller) -> Outcome:
+        """A temple's priest casts a spell on the buyer for the book's fee (rules/services.py).
+
+        Priced by the CRB (caster level x spell level x 10 gp, plus the material), moved by
+        the keeper's own terms like every trade (`_cargo_terms`: regard and thrift, the
+        owner's 2026-11-13 ruling), paid from the purse, and cast
+        through the one cast door with no slot (`_op_cast`, `item_cast`), so the healing is
+        the heal path's own roll and tell. Nothing is paid for a casting that is refused."""
+        from . import places as places_mod
+        from . import keepers as keepers_mod
+
+        priest = self.scene.actors.get(seller) if seller else None
+        if priest is None:
+            priest = keepers_mod.keeper_in(self.scene, str(self.scene.at or ""))
+        if priest is None or not services_mod.keeps_a_temple(priest):
+            return self._refuse(intent, "Nobody here keeps a temple, so there is nobody to "
+                                        "cast a spell for pay.")
+        if self._will_not_deal(priest):
+            return self._refuse(intent, self._will_not_deal(priest))
+        loc = self.world.get(self.scene.location_id) if self.world else None
+        scale = places_mod.scale_of(loc) if loc is not None else "town"
+        row = services_mod.find(item_id, scale)
+        if row is None:
+            on = ", ".join(r["spell_name"] for r in services_mod.menu(scale))
+            return self._refuse(intent, f"{_sentence(priest.name)} casts no such spell for "
+                                        f"pay. Cast here: {on or 'nothing'}.")
+        # The keeper's own terms, and never the watch's markup: a temple is sanctuary
+        # (owner call 2026-11-16, `play.views._counter_refusal`).
+        percent, moved, _markup = self._cargo_terms(actor, priest)
+        from . import pricing
+
+        cost = pricing.moved_cp(row["cp"], percent)
+        coins = self._coins_here()
+        price = goods.purse_line(goods.coins_for(cost), coins)
+        spell = spells_mod.get(row["spell"])
+        purse, paid = goods.spend(actor.purse, cost)
+        if not paid:
+            return Outcome(intent_id=intent.id, op="buy", effects=[],
+                           tell=f"{spell.name} is {price} at the temple and {actor.name} has "
+                                f"{goods.purse_line(actor.purse, coins)}. Nothing is cast "
+                                f"and no coin changes hands.", because=intent.because)
+        cast = Intent(op="cast", actor=priest.ref, target=actor.ref,
+                      params={"spell": row["spell"]}, because="a casting paid for")
+        done = self._op_cast(cast, {"item_cast": {
+            "level": row["level"], "cl": row["cl"],
+            # Harmless healing: the DC is the spell level's floor, never a guessed score.
+            "dc": 10 + row["level"], "origin": f"service:{priest.ref}"}})
+        if done.status == "refused":
+            return self._refuse(intent, done.tell)
+        actor.purse = purse
+        return Outcome(
+            intent_id=intent.id, op="buy",
+            effects=[{"ref": actor.ref, "kind": "bought", "item": spell.name, "count": 1,
+                      "paid_cp": cost, "from": priest.ref, "service": row["spell"]}]
+                    + list(done.effects),
+            tell=f"{actor.name} pays {priest.name} {price} for {spell.name}"
+                 + (f" ({moved})" if moved else "") + f". {_sentence(done.tell)} "
+                 f"({goods.purse_line(actor.purse, coins)} left.)",
+            because=intent.because)
+
+    def _buy_stay(self, intent: Intent, actor, item_id: str, seller) -> Outcome:
+        """A night's stay bought at an inn's or a tavern's counter (rules/lodging.py).
+
+        The book's stay (CRB Goods and Services: poor 2 sp, common 5 sp, good 2 gp a day),
+        moved by the keeper's own terms as the rest door's bill is (`_room_bill`), never
+        haggled, paid through `goods.spend` and held for the day through the applicator
+        (`lodging.hold`), so the night slept here after it costs nothing more. A room
+        already held today is not sold twice."""
+        from . import goods
+        from . import keepers as keepers_mod
+        from . import lodging
+        from . import pricing
+
+        at = str(self.scene.at or "")
+        keeper = self.scene.actors.get(seller) if seller else None
+        if keeper is None:
+            keeper = keepers_mod.keeper_in(self.scene, at)
+        if not lodging.lets_beds(self.scene, at) or keeper is None \
+                or keeper.ref not in self.scene.actors:
+            return self._refuse(intent, "Nobody here lets rooms: a bed is let at an inn or "
+                                        "a tavern, by whoever keeps it.")
+        row = lodging.find(item_id)
+        if row is None:
+            return self._refuse(intent, f"{_sentence(keeper.name)} lets no such room. "
+                                        f"Let here: a poor, a common or a good stay.")
+        name = self._place_name(at)
+        if lodging.held(actor, at):
+            return self._refuse(intent, f"{actor.name}'s room at {name} is already paid "
+                                        f"for today.")
+        if self._will_not_deal(keeper):
+            return self._refuse(intent, self._will_not_deal(keeper))
+        percent, why = pricing.seller_percent(self.scene, keeper)
+        cost = pricing.moved_cp(row["cp"], percent)
+        moved = tradecraft.terms_said(keeper, percent, why)
+        coins = self._coins_here()
+        price = goods.purse_line(goods.coins_for(cost), coins)
+        purse, paid = goods.spend(actor.purse, cost)
+        if not paid:
+            return Outcome(intent_id=intent.id, op="buy", effects=[],
+                           tell=f"A {row['quality']} room at {name} is {price} a night and "
+                                f"{actor.name} has {goods.purse_line(actor.purse, coins)}. "
+                                f"Nothing changes hands.", because=intent.because)
+        actor.purse = purse
+        lodging.hold(actor, at, name, self.scene.ROUNDS_PER_MINUTE, row["quality"])
+        return Outcome(
+            intent_id=intent.id, op="buy",
+            effects=[{"ref": actor.ref, "kind": "bought", "item": f"a {row['quality']} room",
+                      "count": 1, "paid_cp": cost, "from": keeper.ref,
+                      "service": "inn-stay", "stay": row["quality"],
+                      "origin": lodging.ORIGIN}],
+            tell=f"{actor.name} pays {keeper.name} {price} for a {row['quality']} room at "
+                 f"{name} for the night ({lodging.ABOUT[row['quality']]})"
+                 + (f" ({moved})" if moved else "")
+                 + f". The room is {actor.name}'s until this time tomorrow. "
+                   f"({goods.purse_line(actor.purse, coins)} left.)",
+            because=intent.because)
 
     def _cargo_terms(self, actor, keeper) -> tuple[int, str, float]:
         """(percent, the reason in words, the law's markup) a bulk trade is moved by: the
@@ -23261,8 +25521,16 @@ class Engine:
         pool = source["pool"] or casting.slot_pool(level)
 
         targets = list(state.get("caught") or [])
-        save = (spell.saving_throw or "").strip()
-        sr = (spell.spell_resistance or "").strip()
+        # The stat block's cross-references are the rulebook's, not the cast's: playtest
+        # 2026-11-17 #9 / 2026-11-16 N9 put "Will half (harmless) (see text), DC 12;
+        # spell resistance yes (harmless) (see text)" on the player's page for a paid
+        # Cure Moderate Wounds. A harmless spell offers its willing target no save to
+        # make, so its save and resistance say nothing about this cast at all.
+        harmless = bool(getattr(spell, "save_harmless", False))
+        save = "" if harmless else re.sub(r"\s*\(see text\)", "",
+                                          spell.saving_throw or "", flags=re.I).strip()
+        sr = "" if harmless else re.sub(r"\s*\(see text\)", "",
+                                        spell.spell_resistance or "", flags=re.I).strip()
 
         bits = [f"caster level {cl}"]
         if save and save.lower() not in ("none", "no", "—", "-"):
@@ -25449,6 +27717,14 @@ class Engine:
             return self._refuse(intent, f"{actor.name} is glued to the floor and cannot "
                                         f"move until they break free (a DC 17 Strength "
                                         f"check, or 15 slashing to the goo).")
+        if square is not None and actor.has_state("state.position.pit") \
+                and tuple(square)[:2] != tuple(self.scene.positions.get(ref) or ())[:2]:
+            from . import dungeons as dungeons_mod
+
+            pit = dungeons_mod.in_pit(actor) or {}
+            return self._refuse(intent, f"{actor.name} is at the bottom of the pit: "
+                                        f"climbing out is a DC {pit.get('climb')} Climb "
+                                        f"check first.", code="in_a_pit")
         if square is not None and self.scene.has_grid:
             from_square = self.scene.positions.get(ref)
             bumped = self._unseen_in_the_way(actor, from_square, tuple(square))
@@ -25493,7 +27769,6 @@ class Engine:
             self.scene.resync_zones()
             zone = self.scene.zones.get(ref, zone)
             cost = self._move_cost(ref, from_square, tuple(square))
-            crossed = f" ({cost} ft)" if cost is not None else ""
             # The move action, spent: a body that crossed the grid in a fight has walked
             # this round, and the closing step before a blow asks (`_closing_step`).
             if self.scene.in_encounter and from_square is not None \
@@ -25501,18 +27776,33 @@ class Engine:
                 self.scene.move_spent[ref] = self.scene.round
             effect = {"ref": ref, "kind": "position", "from": from_square,
                       "to": tuple(square), "feet": cost, "zone": zone}
-            # A zone is a distance from the player, so the player's own walk has none to
-            # name: "Pip moves to near (15 ft)" was read live as near somebody (2026-11-12).
+            # The feet walked, never the zone: "Pip moves to near (15 ft)" was read live as
+            # near somebody (2026-11-12), and "The second lizard moves to near, out in open
+            # ground." went onto the page word for word (playtest 2026-11-20 #107). The zone
+            # stays on the effect for the code that reads it; how far the walk leaves
+            # somebody else from the player is said in feet, below.
             went = (f"{actor.name} moves {cost} ft" if cost is not None else
-                    f"{actor.name} moves") if actor.is_pc else \
-                f"{actor.name} moves to {zone}{crossed}"
+                    f"{actor.name} moves")
             tell = f"{went}."
             # Where in the place, when the square is a fixture's (`fixtures.where_said`).
             from . import fixtures
 
-            onto = fixtures.where_said(self.scene.grid, from_square, tuple(square))
+            from . import places as places_mod
+
+            try:
+                here = self.here()
+                roofed = places_mod.is_indoors(here.id, here.terrain, here.shape)
+            except IndexError:            # no places at all: a bare test scene
+                roofed = False
+            onto = fixtures.where_said(self.scene.grid, from_square, tuple(square),
+                                       indoors=roofed)
             if onto:
                 tell = f"{went}, {onto}."
+            pc = self.scene.pc()
+            gap = (self.scene.distance_between(ref, pc.ref)
+                   if pc is not None and not actor.is_pc else None)
+            if gap is not None:
+                tell += f" {_sentence(actor.name)} is {gap} ft from {pc.name}."
             # The step `_close_before` put in front of a blow: told as what it is, so the
             # narrator hears that the distance was closed before the swing it dresses.
             # `closing_on` is written by code only — the parser refuses it from a model.
@@ -26053,14 +28343,17 @@ class Engine:
         from . import xp as xp_mod
 
         pc = self.scene.pc()
+        # An arena's bout is paid by its purse, and its loser keeps their own gear
+        # (rules/arena.py): settled first, whoever won, and in place of the treasure.
+        bout = self._settle_bout()
         if pc is None or pc.is_down:
-            return ""
+            return bout
         # Settled first and appended to every path out of here. Written as
         # `return line + self._settle_treasure()` on the paying branch only, a creature
         # with a treasure column and no XP price — which is most of the bestiary, since
         # 6,355 of 7,136 entries never had either filled in — dropped its purse on the
         # floor and nobody picked it up.
-        coin = self._settle_treasure() + self._recover_ammunition()
+        coin = (bout or self._settle_treasure()) + self._recover_ammunition()
         total, names = xp_mod.award_for_fallen(self.scene, pc)
         # Paid once. The routed units' debt is remembered on the scene because they are gone
         # from it (`_rout`), and a second fight in the same room must not pay for the first
@@ -26173,7 +28466,7 @@ class Engine:
                 f"({goods_mod.purse_line(pc.purse, coins)} in hand).")
 
     # The origins whose `begin_encounter` a document or the author wrote, not a model.
-    _STAGED_FIGHTS = ("start:", "scheme:", "author:")
+    _STAGED_FIGHTS = ("start:", "scheme:", "author:", "bout:")
 
     def _priced_sides(self, sides: dict) -> dict:
         """A model-proposed fight's sides, its foes priced as one encounter.
@@ -27539,8 +29832,11 @@ class Engine:
             if g.get("at") and g.get("at") != self.scene.at:
                 kept.append(g)
                 continue
-            guard = self.scene.actors.get(g.get("guard", ""))
-            if guard is not None and not guard.is_down and guard.hp > 0:
+            # Every guard of a group (`guards`, 2026-11-18); a booking from before it
+            # names the one.
+            guards = [self.scene.actors.get(r)
+                      for r in (g.get("guards") or [g.get("guard", "")])]
+            if any(x is not None and not x.is_down and x.hp > 0 for x in guards):
                 kept.append(g)
                 continue
             got = []
@@ -27608,11 +29904,11 @@ class Engine:
         """The props record of a container called `name` the taker can reach: in their
         own hands, lying here, or in the hands of somebody here. A pouch carried only as
         a goods line gets its record now, empty — that is what it holds."""
-        if not holding.is_container(name):
+        if not holding.is_box(name, self.scene.props):
             return None
         want = holding.head_of(name)
         recs = [r for r in self.scene.props
-                if holding.is_container(r.get("name"))
+                if (holding.is_container(r.get("name")) or "contents" in r)
                 and (holding.same(r.get("name"), name)
                      or holding.head_of(r.get("name")) == want)]
         ref = getattr(taker, "ref", "") or ""
@@ -27674,31 +29970,9 @@ class Engine:
         return None
 
     def _carried_by(self, holder: Actor, item: str) -> str | None:
-        """The name, as `holder` carries it, of the thing `item` asks for — their goods
-        line, a jar on their shelf, a weapon on their list, or what their own label puts in
-        their hands — or None when they carry nothing it can be. The engine's own lists are
-        the vocabulary; the words are only searched for one of their names
-        (`holding.named_among`), never trusted to name a new thing."""
-        key = holding.key_in(holder.goods, item) or holding.named_among(holder.goods, item)
-        if key:
-            return key
-        shelf = {}
-        for iid, s in (getattr(holder, "stock", None) or {}).items():
-            for n in (getattr(s, "name", ""), getattr(s, "base", ""),
-                      str(iid).split("#")[0].replace("-", " ")):
-                if n:
-                    shelf.setdefault(str(n), str(getattr(s, "name", "") or n))
-        key = holding.key_in(shelf, item) or holding.named_among(shelf, item)
-        if key:
-            return shelf[key]
-        arms = {str(w): str(w) for w in getattr(holder, "weapons", None) or ()
-                if str(w).lower() not in ("unarmed", "improvised")}
-        canon = goods.canonical(item)
-        key = (next((w for w in arms if goods.canonical(w) == canon), None)
-               or holding.named_among(arms, item))
-        if key:
-            return key
-        return holding.label_carries(holder.name, item) or None
+        """The name, as `holder` carries it, of the thing `item` asks for, or None: the one
+        definition is `holding.carried_by`, which the act→op table asks too."""
+        return holding.carried_by(holder, item)
 
     # --- a keeper's counter and till, taken from (playtest 2026-11-15 #7, #14) ---------------
     #
@@ -28024,6 +30298,37 @@ class Engine:
                       "goods": dict(taker.goods),
                       **({"grant": grant["name"]} if grant is not None else {})}])
 
+    def _empty_box(self, intent: Intent, taker, box: dict) -> Outcome:
+        """Everything in a container into the taker's hands: its coin into the purse, its
+        goods into the pack. Playtest 2026-11-17 #42: "I take everything that's in the
+        gaoler's box" was answered "'everything' is a word, not a thing" with 50 gp in it
+        (rules/dungeons.py puts a dungeon's treasure in a box on the props ledger). The
+        contents are the record's, so nothing is minted; an empty box says so. The MUD shape:
+        CircleMUD/tbaMUD's `get all <container>` moves each thing the container holds."""
+        coins = self._coins_here()
+        name = self._the(str(box.get("name") or "the box"))
+        got = holding.empty_coin(box) if holding.coin_in(box) > 0 else {}
+        cp = goods.in_copper(got) if got else 0
+        if cp:
+            taker.purse = goods.credit(taker.purse, cp)
+        inside = (box.get("contents") or {}).get("goods") or {}
+        moved = []
+        for thing, n in list(inside.items()):
+            taker.goods[thing] = taker.goods.get(thing, 0) + int(n or 1)
+            moved.append(f"{n} × {thing}" if int(n or 1) != 1 else str(thing))
+        inside.clear()
+        said = ([goods.purse_line(got, coins)] if cp else []) + moved
+        if not said:
+            return Outcome(intent_id=intent.id, op="give", effects=[], because=intent.because,
+                           tell=f"{_sentence(name)} is empty: there is nothing in it to take.")
+        return Outcome(
+            intent_id=intent.id, op="give", because=intent.because,
+            tell=f"{taker.name} empties {name}: {', '.join(said)}.",
+            effects=[{"ref": taker.ref, "kind": "give", "item": "coin" if cp else moved[0],
+                      "count": cp, "how": "emptied", "from": name, "to": taker.ref,
+                      "items": moved, "purse": dict(taker.purse),
+                      "goods": dict(taker.goods)}])
+
     def _give_money(self, intent: Intent, item: str, taker, giver, source) -> Outcome:
         """Coin with no amount named — "the coins", "the payment", "the money".
 
@@ -28171,6 +30476,13 @@ class Engine:
             return False
         if holding.key_in(getattr(taker, "goods", None) or {}, name):
             return False
+        # The shelf too, where bought gear is filed (`goods.deliver`); and a thing it holds
+        # named among other words ("torch in one hand and dagger in the other", playtest
+        # 2026-11-17 #45, was refused "There is no torch in one hand … here").
+        shelf = getattr(taker, "stock", None) or {}
+        if holding.stock_key(shelf, name) or holding.stock_among(shelf, name) \
+                or holding.named_among(getattr(taker, "goods", None) or {}, name):
+            return False
         if any(r.get("held_by") == taker.ref and holding.same(r.get("name"), name)
                for r in self.scene.props):
             return False
@@ -28201,7 +30513,7 @@ class Engine:
         name = " ".join(str(item or "").split())
         if not name:
             return ""
-        if holding.key_in(getattr(actor, "goods", None) or {}, name):
+        if self._improvised_held(actor, name) is not None:
             return ""
         if any(r.get("held_by") == actor.ref and holding.same(r.get("name"), name)
                for r in self.scene.props):
@@ -28210,6 +30522,22 @@ class Engine:
             return ""
         return (f"{actor.name} has no {holding.plain(name) or name} to swing or throw: it is "
                 f"not in hand and none lies here. Nothing is rolled.")
+
+    @staticmethod
+    def _improvised_held(actor, name: str) -> str | None:
+        """The name the attacker carries the thing under, when the words name it: their
+        goods by `same`, then a carried name standing whole among longer words, then the
+        shelf — `unrecorded_thing`'s own fallbacks, so the pick-up and the throw cannot
+        disagree about what is in the hand. Owner bug list 2026-11-18, item 18: "throw
+        the rock i picked up before" was refused "has no rock" with a rock in jack's goods,
+        because only `key_in` was asked and the phrase is not `same` as "rock"."""
+        goods_ = getattr(actor, "goods", None) or {}
+        hit = holding.key_in(goods_, name) or holding.named_among(goods_, name)
+        if hit:
+            return hit
+        shelf = getattr(actor, "stock", None) or {}
+        sid = holding.stock_key(shelf, name) or holding.stock_among(shelf, name)
+        return str(getattr(shelf[sid], "name", "") or sid) if sid else None
 
     def _op_give(self, intent: Intent, partial: dict) -> Outcome:
         """Something changes hands.
@@ -28287,6 +30615,8 @@ class Engine:
         # is for one thing; and a drop with nobody to take it lays each thing on the
         # ground, as one dropped thing is laid (`_lay_down`).
         if re.search(r"\b(stuff|everything|belongings|wares|inventory)\b", item, re.I):
+            if source is not None and giver is None and taker is not None:
+                return self._empty_box(intent, taker, source)
             # A giver only the actor implied is not a whole pack offered up: "the
             # merchant's stuff" with the player acting was never the player's own.
             if giver is None or (inferred and giver.is_pc):
@@ -28351,6 +30681,15 @@ class Engine:
 
         coins = self._coins_here()
         denom = goods.coin_named(item, coins)
+
+        # The player's coin to a toll-keeper who asks a toll is the toll (`_pay_toll`):
+        # "I pay the toll-keeper his toll" (playtest 2026-11-17 #22) named no sum, and
+        # nothing had a path to pay it. A thing in the pack handed over stays a gift.
+        if giver is not None and giver.is_pc and taker is not None and not taker.is_pc \
+                and self._toll_of(taker) \
+                and (denom or not holding.key_in(giver.goods, item)):
+            return self._pay_toll(intent, giver, taker,
+                                  goods.in_copper({denom: count}) if denom else 0)
 
         # Coin with no amount and no denomination — "the coins", "the payment" — is
         # money, never a goods line. Measured 2026-10-03 (item 3): "I pocket the coins"
@@ -28473,6 +30812,14 @@ class Engine:
                 # "brunt of the weight" in the pack (2026-10-03: the capital B missed
                 # it, and the drop handed the smith a second one instead).
                 held = giver.goods
+                if not giver.is_pc:
+                    # Their pockets made real first (a kit's claim), then what they carry
+                    # that the words mean: "the food" is the rations in their pack
+                    # (`holding.carried_by`, playtest 2026-11-20 #5).
+                    from .bestiary import collapse_kit
+
+                    collapse_kit(giver)
+                    item = self._carried_by(giver, item) or item
                 key = holding.key_in(held, item) or item
                 item = key
             moved = min(count, int(held.get(key, 0)))
@@ -28530,10 +30877,20 @@ class Engine:
                     giver.equipped = "unarmed"
             if not moved and not giver.is_pc and not denom and (
                     taker is not None or taken_from is not None):
-                # Somebody else's pockets are open the way the world is: the clerk
-                # who slides a pouch across was holding one, whether or not anything
-                # wrote it down (`bestiary.collapse_kit` is the same rule for a body).
-                # Coin is not — a number nobody counted out is not money (law 3).
+                # Nobody hands over what they do not hold: Inform's "can't give what you
+                # haven't got rule", and the owner's (playtest 2026-11-20 #5): "an NPC may
+                # only offer what they hold". Until then somebody else's pockets were
+                # open the way the world is, so the carter's "dried meat and some hard
+                # bread", offered from a pack that held nothing, would have been minted
+                # the moment it was accepted. What their own label puts in their hands
+                # ("the merchant with a heavy pack") is held, on the only record there is.
+                # A document's give (`origin` stamped: a start, the author's cheat) is the
+                # document's word, as `_picked_from_nowhere` holds it.
+                if self._carried_by(giver, item) is None \
+                        and not str(getattr(intent, "origin", "") or ""):
+                    return self._refuse(
+                        intent, f"{giver.name} has no {holding.plain(item) or item} to "
+                                f"hand over: nothing changes hands.")
                 moved = count
             if moved and taken_from is None and taker is not None and not denom:
                 # Handed over: if the giver owned it, it is the taker's now; a thing
@@ -30460,13 +32817,14 @@ class Engine:
                          amount=amount, source=str(intent.params.get("source") or
                                                    intent.because or ""))
         self.scene.pools.append(made)
+        from . import fixtures as _fixtures       # the square as the board names it
 
         return Outcome(
             intent_id=intent.id, op="blood_pool",
             effects=[{"ref": actor.ref, "kind": "blood_pool", **made.as_dict(),
                       "pools": len(self.scene.pools)}],
             tell=(f"A pool of {actor.name}'s blood spreads"
-                  + (f" at {where[0]},{where[1]}." if where else " underfoot.")),
+                  + (f" at {_fixtures.square_name(where)}." if where else " underfoot.")),
             because=intent.because,
         )
 
@@ -31040,7 +33398,9 @@ class Engine:
                     id=intent.id, op="wear", actor=actor.ref,
                     params={"item": "unarmed"}, because=intent.because), partial)
             else:
-                return no(f"{actor.name} is wearing nothing called {said or 'that'}.")
+                # Said plainly: a planner's id ("cargo_chest_coins", #48) is no word.
+                return no(f"{actor.name} is wearing nothing called "
+                          f"{holding.plain(said) or 'that'}.")
         worn = str(getattr(actor, kind) or "none")
         if worn == "none":
             return no(f"{actor.name} is wearing no {kind}.")
@@ -31161,7 +33521,17 @@ class Engine:
         if actor is None:
             raise IntentError("rest: nobody here to rest", "refs")
         talking = self.talking_to()
-        if talking and actor.is_pc:
+        # The house's own keeper is no bar to its bed: frag T101 (owner's save 2026-11-17),
+        # "talk to the innkeeper to get a bed so that i can get some rest" was refused
+        # "still in conversation with the innkeeper". Asking the keeper for the bed is how
+        # a bed is had; the talk ends with the night (told in front of the bill).
+        from . import keepers as _keepers
+        from . import lodging as _lodging
+
+        at_here = str(self.scene.at or "")
+        host = _keepers.keeper_in(self.scene, at_here)             if actor.is_pc and _lodging.lets_beds(self.scene, at_here) else None
+        parting = bool(talking) and host is not None and all(a is host for a in talking)
+        if talking and actor.is_pc and not parting:
             return self._refuse(
                 intent, f"You are still in conversation with "
                         f"{_and_list(a.name for a in talking)}. Take your leave first.")
@@ -31180,6 +33550,9 @@ class Engine:
         bill = self._room_bill(intent, actor) if actor.is_pc else None
         if bill is not None and bill.get("refused") is not None:
             return bill["refused"]
+        if parting and bill is not None:
+            host.remove_effects(source="talk")
+            bill["tell"] = f"You take your leave of {host.name}. {bill['tell']}"
 
         # The camp (the owner, 2026-10-01: "a tent should decrease the chance of being
         # attacked in my sleep and protect me from the elements to a degree. A bedroll
@@ -31223,11 +33596,23 @@ class Engine:
         # slept down the short night's path: the hours pass, nothing heals or comes back.
         since = self._since_last_night(actor) if kind == "night" else None
         if since is not None:
+            # The level settles all the same. Playtest 2026-11-17b #2: "Enough to advance —
+            # it will settle with a night's sleep", then eight hours slept inside the 24 were
+            # refused whole, and the level waited with no word of when. The once-a-day rule
+            # is natural healing's and the slots' (CRB Natural Healing, p.191; Preparing
+            # Wizard Spells); the CRB ties a level to no rest at all — "as soon as he earns
+            # enough experience points" (Advancing Your Character). The sleep that settles
+            # it is this app's ruling ("sleeping should initiate the leveling process"), and
+            # any eight hours' sleep is sleep (`Actor.settle_level`).
+            lv = actor.settle_level(self.dice)
+            settled = (f" Level {lv['level']} settles all the same: +{lv['hp']} hp"
+                       + (f", {', '.join(lv['grants'])}" if lv.get("grants") else "") + "."
+                       if lv and lv.get("ok") else "")
             return self._with_bill(self._short_night(
                 intent, actor, camp,
                 why=(f"{actor.name} already had a full night's rest "
                      f"{sky.span_words(max(1, since))} ago: one full night a day, so "
-                     f"nothing heals and nothing is recovered.")), bill)
+                     f"nothing heals and nothing is recovered.{settled}")), bill)
 
         # The whole night through one door (`Actor.sleep_through`), shared with the sleep
         # a body drops into when it will not be refused any longer (`survival._wake`):
@@ -31359,9 +33744,14 @@ class Engine:
                     "effect": {"ref": actor.ref, "kind": "lodging", "place": at, "cp": 0,
                                "paid": 0, "why": "own", "origin": lodging.ORIGIN}}
         if lodging.held(actor, at):
-            return {"tell": f"{actor.name}'s room at {name} is already paid for today.",
+            # With the stay that was bought: frag T109-T111 (owner's save 2026-11-17) paid
+            # for the good room, and the night was narrated on the floor by the hearth.
+            stay = (lodging.room_held(actor) or ("", lodging.DEFAULT_STAY))[1]
+            return {"tell": f"{actor.name}'s {stay} room at {name} "
+                            f"({lodging.ABOUT[stay]}) is already paid for today.",
                     "effect": {"ref": actor.ref, "kind": "lodging", "place": at, "cp": 0,
-                               "paid": 0, "why": "held", "origin": lodging.ORIGIN}}
+                               "paid": 0, "why": "held", "stay": stay,
+                               "origin": lodging.ORIGIN}}
         keeper = keepers.keeper_in(self.scene, at)
         asks = keeper.name if keeper is not None and keeper.at == at else ""
         # The book's stay, moved by the keeper's own terms (owner, 2026-11-13: every
@@ -31445,11 +33835,15 @@ class Engine:
         from . import residency
         from . import trial as trial_mod
 
-        when = residency.time_words(now).split(", ", 1)[-1]
+        # "about 8 in the morning", not "early morning (about 8 in the morning)": a line a
+        # page can carry whole. Playtest 2026-11-16 #99: the backstop pasted this refusal
+        # onto the page, brackets and "the time … meant to sleep until dawn" and all.
+        part, _, about = residency.time_words(now).split(", ", 1)[-1].partition(" (")
         said = until if until.lower().startswith(("until", "till")) else f"until {until}"
+        then = said.split(" ", 1)[1] if " " in said else said
         return self._refuse(
-            intent, (f"It is {when} now: the time {actor.name} meant to sleep {said} has "
-                     f"already come today, so {actor.name} has not lain down. "
+            intent, (f"It is {about.rstrip(')') or part}, and {then} has already "
+                     f"come today, so {actor.name} has not lain down. "
                      + trial_mod.choices(actor.name, [
                          "sleep now, a night's eight hours",
                          f"wait until evening, then sleep {said}"])),
@@ -31884,47 +34278,92 @@ class Engine:
                             + (f" In the pack: {', '.join(eats)}." if eats
                                else " Nothing in the pack is food."))
             n = int((c["row"].get("eat") or {}).get("spends", 1) or 1)
+            lb = float((c["row"].get("eat") or {}).get("lb", 1) or 0)
             left = gear_mod.spend(actor, c, n)
             was = int(getattr(actor, "fed_minutes", 0) or 0) // survival.MINUTES_PER_HOUR
-            freed = survival.eat(actor)
+            # The pound it is, at the book's pound a day (owner bug list 2026-11-18, item
+            # 17): a half-pound loaf is half a day, not "hunger back to nothing".
+            freed = survival.eat(actor, lb, self.scene.biome)
+            due = survival.hours_until_hungry(actor) - int(
+                getattr(actor, "fed_minutes", 0) or 0) // survival.MINUTES_PER_HOUR
             return Outcome(
                 intent_id=intent.id, op="eat",
                 effects=[{"ref": actor.ref, "kind": "eat", "item": c["name"], "spent": n,
-                          "left": left, "origin": f"item:{c['id']}"}]
+                          "lb": lb, "left": left, "origin": f"item:{c['id']}"}]
                         + self._released(actor, "hunger", freed),
-                tell=(f"{actor.name} eats from the {c['name']} ({left} left). "
-                      f"{was} hour{'s' if was != 1 else ''} since the last meal; hunger is "
-                      f"put back to nothing."
+                tell=(f"{actor.name} eats from the {c['name']} ({left} left), "
+                      f"{survival._amount(lb)} lb of food. {was} hour"
+                      f"{'s' if was != 1 else ''} since the last meal; hunger holds off for "
+                      f"{max(0, due)} hours more."
                       + _also(survival.released_said(actor, "hunger", freed))),
                 because=intent.because,
             )
 
     def _op_drink(self, intent: Intent, partial: dict) -> Outcome:
-        """Water: out of the pack (a waterskin's draught, `gear.provide`), else the
-        settlement's own well or cistern, free (`water_at_hand`; the owner's ruling of
-        2026-10-09: the pack first, the well "when their pack runs dry"), else refused.
+        """Water: out of the pack (one unit of a `drink` row, `gear.drinkable`: the
+        named one, else a waterskin first), else the settlement's own well or cistern,
+        free (`water_at_hand`; the owner's ruling of 2026-10-09: the pack first, the well
+        "when their pack runs dry"), else refused.
 
-        It used to reset thirst from nothing at all — "drinks." on the open road with an
-        empty pack (ponytail audit 2026-11-07, smaller findings; the owner had listed
-        "`_op_drink` free" among the survival problems to fix)."""
+        A unit is its gallons' share of a day (CRB p.444, a gallon a day; owner bug list
+        2026-11-18, item 17, answer 5): a 1/2-gallon skin is half a day, a mug of ale an
+        eighth. The well is drunk to the full. It reset thirst in full for any sip until
+        then, and before 2026-11-07 from nothing at all.
+
+        `fill`: the Fill button. Every empty vessel in the pack is filled from the water
+        at hand (`gear.refill`) and nothing is drunk; with no water here, refused."""
         from . import gear as gear_mod
         from . import survival
 
         actor = self._eater(intent)
-        # One draught: the smallest whole unit the pack's water comes in.
-        spent = gear_mod.provide(actor, "water", 1e-6)
-        well = "" if spent else self.water_at_hand()
-        if not spent and not well:
+        # A model mangles booleans ("false" is truthy): only a plain yes fills.
+        if _yes(intent.params.get("fill")):
+            well = self.water_at_hand()
+            if not well:
+                return self._refuse(
+                    intent, f"There is no water here for {actor.name} to fill anything "
+                            f"from: no well, cistern or stream.")
+            n, became = gear_mod.refill(actor)
+            if not n:
+                return self._refuse(intent, f"{actor.name} has nothing empty to fill.")
+            return Outcome(
+                intent_id=intent.id, op="drink",
+                effects=[{"ref": actor.ref, "kind": "fill", "item": became, "count": n,
+                          "at": well}],
+                tell=(f"{actor.name} fills {n} {became}{'s' if n != 1 else ''} at "
+                      f"{well}."),
+                because=intent.because)
+        said = str(intent.params.get("item") or "").strip()
+        c = gear_mod.drinkable(actor, said)
+        if c is None and said:
+            drinks = [x["name"] for x in gear_mod.carried(actor) if x["row"].get("drink")]
+            return self._refuse(
+                intent, f"{actor.name} has no {holding.thing_said(actor, said)} to drink."
+                        + (f" In the pack: {', '.join(drinks)}." if drinks
+                           else " Nothing in the pack is drink."))
+        well = "" if c is not None else self.water_at_hand()
+        if c is None and not well:
             return self._refuse(
                 intent, f"{actor.name} has no water to drink: the pack holds none, and "
                         f"there is no well here.")
-        freed = survival.drink(actor)
-        if spent:
-            what = spent[0]
-            effects = [{"ref": actor.ref, "kind": "drink", "item": what["name"],
-                        "spent": int(what["count"]), "origin": f"item:{what['item']}"}]
-            tell = f"{actor.name} drinks from the {what['name']}."
+        if c is not None:
+            row = c["row"]["drink"]
+            n = int(row.get("spends", 1) or 1)
+            gallons = float(row.get("gallons", 0) or 0)
+            left = gear_mod.spend(actor, c, n)
+            leaves = str(row.get("leaves") or "")
+            if leaves:
+                actor.goods[leaves] = int(actor.goods.get(leaves, 0) or 0) + n
+            freed = survival.drink(actor, gallons, self.scene.biome)
+            due = survival.hours_until_thirsty(actor) - int(
+                getattr(actor, "watered_minutes", 0) or 0) // survival.MINUTES_PER_HOUR
+            effects = [{"ref": actor.ref, "kind": "drink", "item": c["name"], "spent": n,
+                        "gallons": gallons, "left": left, "origin": f"item:{c['id']}"}]
+            tell = (f"{actor.name} drinks the {c['name']}, {survival._amount(gallons)} "
+                    f"gallon{'s' if gallons != 1 else ''}; thirst holds off for "
+                    f"{max(0, due)} hours more.")
         else:
+            freed = survival.drink(actor)
             effects = [{"ref": actor.ref, "kind": "drink", "at": well}]
             tell = f"{actor.name} drinks at {well}."
         return Outcome(
@@ -31992,6 +34431,12 @@ class Engine:
         # The dose first, as a jar's is: a herb that kills the taster has still been eaten.
         if not actor.spend(ing.id, 1):
             actor.take_stock(shelf, 1)
+        # About an ounce of food (owner bug list 2026-11-18, item 17; house rule,
+        # `survival.HERB_FOOD_LB`): on the clock only. A nibble is not a meal, so it
+        # neither resets the hunger checks nor releases what hunger holds.
+        from . import survival
+
+        survival._credit(actor, "food", survival.HERB_FOOD_LB, self.scene.biome)
 
         origin, because = f"item:{ing.id}", intent.because or f"tasting {ing.name}"
         anatomy = hk.anatomy(ing)
@@ -32299,7 +34744,8 @@ class Engine:
                 if rec is None and how == "already_here" and n == 1:
                     rec = population.described_here(self.scene, who)
                 if rec is None:
-                    rec = population.note(self.scene, who, fresh=True)
+                    rec = population.note(self.scene, who, fresh=True,
+                                          work=str(intent.params.get("trade") or ""))
                 actor = population.embody(self.scene, who, template, zone=zone,
                                           world=self.world, rec=rec)
                 made.append({"ref": actor.ref, "name": actor.name})
@@ -32406,7 +34852,7 @@ class Engine:
                         self.world, self.scene.location_id, actor.ref, taken)
                     if not actor.appearance:
                         actor.appearance = names_mod.face_of(
-                            self.world, self.scene.location_id, actor)
+                            self.world, self.scene.location_id, actor, scene=self.scene)
             made.append({"ref": actor.ref, "name": actor.name})
             # Someone who arrives mid-fight rolls in. Without this they were on the
             # board but not in the order, so they never took a turn and the fight could
@@ -32942,6 +35388,11 @@ def _place_key(name) -> str:
     return text[4:] if text.startswith("the ") else text
 
 
+def _yes(v) -> bool:
+    """A flag as a plain yes: True, 1, "true", "yes" (a model's "false" is no)."""
+    return v is True or str(v).strip().lower() in ("1", "true", "yes")
+
+
 def _found_before_travel(intents: list) -> list:
     """Every `found` moved ahead of the first `travel` to the place it makes."""
     out = list(intents)
@@ -33167,8 +35618,11 @@ def survival_note(toll) -> str:
     bits = []
     if toll.nonlethal:
         bits.append(f"{toll.nonlethal} non-lethal")
-    if toll.conditions:
-        bits.append(", ".join(c for c in toll.conditions if c != "asleep"))
+    # Asleep is said below, and a list of nothing but it left an empty clause: "3
+    # non-lethal; ; they fell asleep where they stood" (live, 2026-11-18).
+    awake = ", ".join(c for c in toll.conditions or () if c != "asleep")
+    if awake:
+        bits.append(awake)
     # Three different endings since the sleep ladder (survival.py, 2026-10-05): a failed
     # save stops the work, the third drops them asleep, and non-lethal past their hit
     # points knocks them out. "They went down where they stood" was said for all three,
@@ -33294,6 +35748,33 @@ _DESTROYED_SAID = "is destroyed"
 _BROKEN_SAID = "is broken: inert, but not destroyed"
 
 
+def _silent_end(e) -> bool:
+    """An effect whose ending is bookkeeping, never news: the once-a-day mark of a full
+    night (`Engine._slept_a_night`). jack, owner's save 2026-11-17: it ran out at the end
+    of a 16-hour bench session as "a full night's rest wears off Jack", and the page had
+    him just waking up."""
+    return getattr(e, "origin", "") == "rule:rest" and getattr(e, "key", "") == "rested-tonight"
+
+
+def _ended_records(actor, had) -> list[dict]:
+    """The `effect_ended` record of each effect in `had` the actor no longer carries, by
+    identity, each with its origin. A carried light an item gave (`light.carried`, origin
+    `item:`) says which thing burnt out: playtest 2026-11-17b #1, her torch ran out in her
+    sleep as "Normal light 20 ft, one step brighter out to 40 ft wears off Vesna Kroll",
+    and the page said "You strike a torch, and its flame pushes back the gloom"."""
+    out = []
+    for e in had:
+        if any(e is x for x in actor.effects) or _silent_end(e):
+            continue
+        rec = {"kind": "effect_ended", "ref": actor.ref, "what": e.ended_label,
+               "origin": e.origin}
+        if str(e.origin or "").startswith("item:") and any(
+                states.matches(str(t), "light") for t in e.tags or ()):
+            rec["burnt_out"] = e.source or "light"
+        out.append(rec)
+    return out
+
+
 def _ward_tell(scene: Scene, e: dict) -> str:
     """One thing a standing effect did, in the voice the rest of the log is written in.
 
@@ -33369,6 +35850,8 @@ def _ward_tell(scene: Scene, e: dict) -> str:
             now = attitude_mod.of(who)
             back = f"; {name} is {now} again" if now and now != step else ""
             return f"{name} no longer acts {step}{toward}{back}."
+        if e.get("burnt_out"):
+            return f"{name}'s {e['burnt_out']} burns out, and its light is gone."
         return f"{e.get('what', 'Something')} wears off {name}."
     if kind == "ward_ended":
         return f"{e.get('what') or source} fades."
@@ -33455,11 +35938,19 @@ def left_after(defender) -> str:
     # upright" because the unconscious tag landed after. CRB p.191: non-lethal damage
     # greater than current hit points is unconscious; at or below 0 hit points is
     # disabled or dying; dead at the negative of Constitution.
-    con = int(((getattr(defender, "abilities", None) or {}).get("con", 10)) or 10)
-    if defender.has_state("state.down.dead") or hp <= -con:
+    #
+    # The rungs are the ladder's own (`Actor.apply_hp_state`), never a second copy of it.
+    # Playtest 2026-11-20 #24, shadow-0073: a ghoran left on exactly 0 was banded "down"
+    # while the condition tell beside it said "disabled: still standing" - 0 is disabled
+    # (CRB "Disabled (0 Hit Points)": staggered, one move or standard action a turn), not
+    # down. And an undead or a troop at 0 is destroyed (`death_floor` 0), not "down".
+    # TempusMUD PR #493 was the same bug: the message chose its words before the state.
+    if defender.has_state("state.down.dead") or hp <= defender.death_floor():
         return "dead"
-    if defender.is_down or hp <= 0 or bruised > hp:
+    if defender.is_down or bruised > hp or (hp == 0 and states.breaks_below_zero(defender)):
         return "down"
+    if hp == 0:
+        return "disabled"
     if bruised and hp > 0:
         dazed = bruised / hp
         return "shaken" if dazed < 0.5 else "reeling" if dazed < 1 else "staggering"
@@ -33503,9 +35994,53 @@ def _ac_said(kind: str, base: int, flat_footed: bool, parts=()) -> str:
 # does not. "ask" is kept as the tell's verb: a question is not a statement.
 _TELLS_FRAME = frozenset({"tell", "inform", "assure", "remind", "warn"})
 _ASKS_FRAME = frozenset({"ask"})
+# The speech acts that are the deed itself: "thank the priest" is told "thanks the priest",
+# never "to the effect that thank the priest" (playtest 2026-11-17 #4).
+# "challenge": the #30 replay, 2026-11-18, told "speaks, to the effect that challenge one of
+# the soldiers to a friendly sparring bout".
+_SPEECH_DEEDS = frozenset({"thank", "greet", "welcome", "congratulate", "apologise",
+                           "apologize", "salute", "bless", "challenge"})
 
 
-def reported_speech(who: str, at: str, words: str, heard: str = "") -> str:
+# The speaker's own first person, said of them in a third-person tell, by pronoun set.
+# Subject, object, possessive, possessive pronoun, reflexive, and the verb a contraction or
+# "I am/was/have/do" becomes. Playtest 2026-11-17b #16: "Vesna Kroll asks the clerk where I
+# could hire a sellsword". A set not listed here (a house rule's ze/hir) is left as said.
+_THIRD = {
+    "she": ("she", "her", "her", "hers", "herself", "she's", "is", "was", "has", "does"),
+    "he": ("he", "him", "his", "his", "himself", "he's", "is", "was", "has", "does"),
+    "they": ("they", "them", "their", "theirs", "themselves", "they're", "are", "were",
+             "have", "do"),
+}
+
+
+def _third_person(toks: list[str], pronouns: str) -> list[str]:
+    """`toks` with the speaker's "I", "me", "my" … said as their pronouns. Closed words
+    only: a pronoun and the four verbs that agree with it."""
+    forms = _THIRD.get(str(pronouns or "").split("/")[0].strip().lower())
+    if not forms:
+        return toks
+    subj, obj, poss, mine, refl, contracted, is_, was, has, does = forms
+    swap = {"i": subj, "me": obj, "my": poss, "mine": mine, "myself": refl,
+            "i'm": contracted, "i'll": f"{subj}'ll", "i'd": f"{subj}'d",
+            "i've": f"{subj} {has}"}
+    agree = {"am": is_, "was": was, "have": has, "do": does}
+    out: list[str] = []
+    for k, t in enumerate(toks):
+        core = t.rstrip(",.;:!?")
+        tail = t[len(core):]
+        low = core.lower().replace("’", "'")
+        if low in agree and out and out[-1] == subj and toks[k - 1].lower().strip(",") == "i":
+            out.append(agree[low] + tail)
+        elif low in swap:
+            out.append(swap[low] + tail)
+        else:
+            out.append(t)
+    return out
+
+
+def reported_speech(who: str, at: str, words: str, heard: str = "",
+                    pronouns: str = "") -> str:
     """The tell of a reported `say`. Playtest 2026-11-15 #58: the words came from their own
     verb ("tell the sergeant of the watch that I am the one…") and the tell read "speaks to
     the sergeant of the watch, to the effect that tell the sergeant of the watch that I am
@@ -33513,14 +36048,21 @@ def reported_speech(who: str, at: str, words: str, heard: str = "") -> str:
     its first words: "the sergeant" of "the sergeant of the watch"), then "that", is the
     frame, and it goes; "ask" becomes the tell's own verb ("asks the harbourmaster what
     passage costs"). Anything else is told as before. Words, not meaning: the reader has
-    already decided this is speech and whom it is to."""
+    already decided this is speech and whom it is to.
+
+    Where the tell's own verb carries the words ("asks", a deed), they are the speaker's
+    reported in the third person, so their "I" is said by `pronouns` (`_third_person`,
+    #16). "to the effect that …" keeps the words as said: "I yield" is no clause a
+    pronoun swap could make agree ("she yield")."""
     plain = f"{who} speaks{at}, to the effect that {words}"
     toks = str(words or "").split()
+    verb = toks[0].lower() if toks else ""
+    if verb in _SPEECH_DEEDS and len(toks) > 1:
+        return f"{who} {verb}s " + " ".join(_third_person(toks[1:], pronouns))
     if len(toks) < 3:
         return plain
-    verb = toks[0].lower()
     if verb in _ASKS_FRAME:
-        return f"{who} asks " + " ".join(toks[1:])
+        return f"{who} asks " + " ".join(_third_person(toks[1:], pronouns))
     if verb not in _TELLS_FRAME:
         return plain
     rest = toks[1:]
@@ -33531,6 +36073,15 @@ def reported_speech(who: str, at: str, words: str, heard: str = "") -> str:
     # A name is said by more than its article ("the" alone is not "the sergeant").
     if k and name[:1] in (["the"], ["a"], ["an"]) and k < 2:
         k = 0
+    # Or by its article and a word of the name past it ("the smuggler" of "the starving
+    # smuggler"), or by a pronoun. Playtest 2026-11-16 #64 kept the frame: "to the effect
+    # that tell the smuggler I'll be back for the beast".
+    if not k and len(rest) > 2 and rest[0].lower() in ("the", "a", "an") \
+            and rest[1].lower().strip(",") in set(name[1:]) - {"of", "the", "a", "an"}:
+        k = 2
+    elif not k and len(rest) > 1 and rest[0].lower() in ("him", "her", "them") \
+            and "that" not in (t.lower() for t in rest[:8]):
+        k = 1
     if k and k < len(rest) and rest[k].lower() == "that":
         k += 1
     elif not k and "that" in (t.lower() for t in rest[:8]):
@@ -33549,7 +36100,8 @@ def reported_speech(who: str, at: str, words: str, heard: str = "") -> str:
         subject = _SUBJECT_OF.get(named.lower(), named)
         return f"{who} speaks{at}, to the effect that {subject} {' '.join(rest[j + 1:])}"
     content = " ".join(rest[k:])
-    if not k or not content:
+    # "tell the smith about the sword" is no statement made: told as it was said.
+    if not k or not content or rest[k].lower() == "about":
         return plain
     return f"{who} speaks{at}, to the effect that {content}"
 
@@ -33755,8 +36307,9 @@ def _uses_per_day(row: dict) -> int | None:
 
 
 def _cast_opener(actor, spell, bits: list[str], item: dict | None) -> str:
-    """The cast's first sentence: who cast what, or which item released it."""
-    if item:
+    """The cast's first sentence: who cast what, or which item released it. A paid
+    casting (`Engine._buy_spell`) is the door's no-slot cast with no item to name."""
+    if item and item.get("name"):
         return (f"{actor.name} calls on the {item['name']}: {spell.name} "
                 f"({'; '.join(bits)}).")
     return f"{actor.name} casts {spell.name} ({'; '.join(bits)})."
