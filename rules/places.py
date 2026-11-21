@@ -764,6 +764,9 @@ def from_dict(d: dict) -> Place:
         # Shaped as its kind, not as its name: derived here, like every shape a stored
         # place has, so a save carries the kind and never the floor plan.
         shape=shape_of_kind(kind, str(d.get("terrain") or "")),
+        # A hex of the region map carries how far out of its town it lies
+        # (`hexes.place_doc`); no other stored place has a distance.
+        miles=float(d.get("miles") or 0) if d.get("origin") == "hex" else 0.0,
     )
 
 

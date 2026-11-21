@@ -332,7 +332,9 @@ def biomes_describe(ground: str) -> str:
 
 def is_reach(place) -> bool:
     """Whether this is a reach of the hinterland: a ring place with a distance of its own."""
-    return bool(getattr(place, "miles", 0)) and places_mod.is_ring(getattr(place, "id", ""))
+    # Not a hex of the region map, whose miles are its distance from town (`_hex_hop`).
+    return bool(getattr(place, "miles", 0)) and places_mod.is_ring(getattr(place, "id", "")) \
+        and getattr(place, "origin", "") != "hex"
 
 
 def reach_of(ring_places, ground: str):
@@ -358,6 +360,33 @@ def _pace(ground: str) -> float:
     return journey.pace(ground, "road")[0] or 1.0
 
 
+def _hex_hop(frm, to, speed: int) -> int | None:
+    """A step between a hex of the region map and its town's own places (the ring, the
+    gate, the docks): the hexes between them at Ultimate Campaign's hours a hex
+    (`hexes.hours_through`, Table 3-2), as `Engine._op_hex_move` charges walking them.
+    None for any other step, including one between a hex and what lies inside it (its
+    site and the site's rooms) or between two hexes (`_op_hex_move`'s own hours).
+
+    Live 2026-11-21 on the owner's save: the ruins twelve miles out of Branford to its
+    docks cost no time at all, and the exits row priced the gate "a quarter of an hour";
+    the hex's step to the outskirts was a half-mile ring hop."""
+    from . import hexes
+
+    ends = [p for p in (frm, to) if getattr(p, "origin", "") == "hex"]
+    if len(ends) != 1:
+        return None
+    hexp = ends[0]
+    other = to if hexp is frm else frm
+    oid = str(getattr(other, "id", "") or "")
+    if oid.startswith(str(hexp.id) + "/") or hexes.parse_place(oid) is not None:
+        return None
+    n = round(float(getattr(hexp, "miles", 0) or 0) / hexes.HEX_MILES)
+    if n < 1:
+        return None
+    ground = str(getattr(hexp, "terrain", "") or places_mod.terrain_of(hexp.id))
+    return n * hexes.hours_through(ground, speed) * 60
+
+
 def hop_minutes(frm, to, scale: str, speed_ft: int = 30) -> int:
     """How many minutes one step between two adjacent places takes, at this speed.
 
@@ -379,6 +408,9 @@ def hop_minutes(frm, to, scale: str, speed_ft: int = 30) -> int:
     # told as "a few minutes' walk". Seconds, so no minute is charged and none is said.
     if "ship" in (getattr(frm, "origin", ""), getattr(to, "origin", "")):
         return 0
+    hexed = _hex_hop(frm, to, speed)
+    if hexed is not None:
+        return hexed
     a = places_mod.setting_of(getattr(frm, "id", "") or "")
     b = places_mod.setting_of(getattr(to, "id", "") or "")
     if a != "outside" and b != "outside":
