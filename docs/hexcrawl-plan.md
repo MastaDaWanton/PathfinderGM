@@ -261,7 +261,13 @@ free number:
   one: a later phase.
 - **Road journeys and hexes.** A journey between towns crosses hexes. Phase 2 leaves journeys
   as they are and only updates the party's hex at the end. Spotting along a road is a later
-  question, and must not fight `feat/travel-pacing`.
+  question, and must not fight `feat/travel-pacing`. **Settled 2026-11-21**
+  (docs/research/2026-11-21-travel-pacing.md): the road between towns is the journey, paced
+  in stretches; open ground is the hexes, one check a hex; and the two share one position. A
+  journey set out from a hex joins the road by the share of hexes still between the party
+  and the far town (`Engine.road_share_left`), so ground already walked is never charged or
+  rolled twice. A journey stopped on the road stands on the hex that far along the line
+  between its towns (`Engine.party_hex`, `hexes.along`).
 - **Sea hexes** wait for ships on the board.
 
 ## Owner calls still open

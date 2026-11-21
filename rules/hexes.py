@@ -188,6 +188,24 @@ def distance(a, b) -> int:
     return int((abs(dq) + abs(dr) + abs(dq + dr)) // 2)
 
 
+def along(a, b, frac: float) -> tuple[int, int]:
+    """The hex `frac` of the way from hex a to hex b, on the straight line between them:
+    Red Blob Games' hex line drawing (redblobgames.com/grids/hexagons, cube lerp and
+    round). For a journey stopped on the road (`Engine.party_hex`)."""
+    n = distance(a, b)
+    if not n:
+        return (int(a[0]), int(a[1]))
+    t = round(n * max(0.0, min(1.0, float(frac)))) / n
+    q, r = a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t
+    s = -q - r
+    rq, rr, rs = round(q), round(r), round(s)
+    if abs(rq - q) > abs(rr - r) and abs(rq - q) > abs(rs - s):
+        rq = -rr - rs
+    elif abs(rr - r) > abs(rs - s):
+        rr = -rq - rs
+    return (int(rq), int(rr))
+
+
 def neighbours(q: int, r: int) -> list[tuple[int, int]]:
     return [(q + dq, r + dr) for dq, dr in DIRS]
 
