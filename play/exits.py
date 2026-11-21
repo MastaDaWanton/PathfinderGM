@@ -286,10 +286,20 @@ def _rows_from(engine, here, known, pc, loc, scale, speed, clock,
 
     # Journeys, from where each one leaves.
     if loc is not None:
+        from rules import hexes
+
         head_slug = outskirts.road_head_of(here.id)
+        # Out on a hex of the region map, every road out is joined from where the party
+        # stands (`Engine.road_share_left`), so each is offered here as at its head:
+        # journey-words #1 (2026-11-21), the ruins east of Branford offered no Journey and
+        # typing was the only way onto the road.
+        on_hex = hexes.parse_place(here.id) is not None
         roads = []
         for road in roads_here:
-            if road.how in ("road", ""):
+            if on_hex:
+                # The roads only: a passage is boarded at the docks, a town's ground.
+                mine = road.how in ("road", "")
+            elif road.how in ("road", ""):
                 # The head of this road, or the stretch of it a stopped journey left
                 # the party on (both carry the destination's slug).
                 mine = bool(head_slug) and \
@@ -323,7 +333,10 @@ def _rows_from(engine, here, known, pc, loc, scale, speed, clock,
                 hours, _said, _how = journey_mod.hours_for(leg, speed)
                 # A road half walked is half a road (`_op_journey`'s `resumed`).
                 left = scene.road or {}
-                if left.get("to") == leg.to_id and left.get("from") == scene.location_id:
+                share = engine.road_share_left(leg) if on_hex and here.id == scene.at else None
+                if share is not None:
+                    hours = max(1, round(hours * share))
+                elif left.get("to") == leg.to_id and left.get("from") == scene.location_id:
                     hours = max(1, hours - int(left.get("walked") or 0))
                 if ride and not sea:
                     hours = journey_mod.mounted_hours(hours, "ride")[0]
