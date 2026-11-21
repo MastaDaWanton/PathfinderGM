@@ -20099,14 +20099,14 @@ class Engine:
         fx.update(vessel=theirs.id, nation=nation, flag=flag)
         if not (wanted or prize):
             fx["hostile"] = False
-            return (f"A warship flying the colours of {flag}, {theirs.name}, comes down on "
+            return (f"A warship flying {flag}'s colours, {theirs.name}, comes down on "
                     f"her on patrol, hails her from a cable off, and lets her go.")
         self.scene.sea = {"ours": ship.id, "theirs": theirs.id, "range": "distant",
                           "grappled": False, "hostile": True, "foes": [], "navy": nation}
         fx.update(hostile=True, range="distant", why="wanted" if wanted else "prize")
         why = (f"{pc.name} is wanted in {flag}" if wanted
                else f"{ship.name} was sworn taken in {flag}")
-        return (f"A warship flying the colours of {flag}, {theirs.name}, comes about to "
+        return (f"A warship flying {flag}'s colours, {theirs.name}, comes about to "
                 f"run her down: {why}. Sheer off and run, or close with her.")
 
     def _voyage_scene(self, ship, met, fx: dict) -> tuple[str, list[dict]]:
