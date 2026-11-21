@@ -135,7 +135,8 @@ MILES_A_DAY: dict[str, int] = {"keelboat": 52, "longship": 72, "sailing ship": 4
 # The shortest passage between two settlements, in days, when the world's miles are not
 # marked measured (`journey.Leg.measured`). The owner, 2026-11-16: "over land ... it should
 # be a few days minimum to other cities and over water it should be a few weeks minimum."
-# Two weeks is the app's reading of "a few weeks"; a river runs inside one continent, so
+# Two weeks was the app's first reading of "a few weeks"; the owner raised it to three on
+# 2026-11-21 (release 0.4.9: "travel time over water gets longer"). A river runs inside one continent, so
 # it takes the road's floor (`journey.ROAD_DAYS_AT_LEAST`). Why a floor and not the miles:
 # World Bible's distances are DERIVED from its containment tree and "never measured"
 # (World Bible agent_engine/distance.py, its own words), banded in walking days at 24
@@ -143,12 +144,12 @@ MILES_A_DAY: dict[str, int] = {"keelboat": 52, "longship": 72, "sailing ship": 4
 # the book's sailing ship. for-world-bible ask 32 asks for measured miles at a voyage's
 # scale; a world that marks its miles measured is taken at its word.
 #
-# At sea the floor is a DISTANCE, a fortnight under the CRB's sailing ship (672 miles), as
+# At sea the floor is a DISTANCE, three weeks under the CRB's sailing ship (1,008 miles), as
 # the road's is (`journey.ROAD_DAYS_AT_LEAST`, so a horse still halves a road): a galley
-# makes it in a week and the fare is for the same miles whatever she is. As a floor in
-# days it made a faster ship's fare dearer — measured 2026-11-18, Pangrella's longship
+# makes it in a week and a half and the fare is for the same miles whatever she is. As a
+# floor in days it made a faster ship's fare dearer — measured 2026-11-18, Pangrella's longship
 # asked 100 gp 8 sp for 14 days at 72 miles, over the 100 gp a test party carried.
-PASSAGE_DAYS_AT_LEAST = 14
+PASSAGE_DAYS_AT_LEAST = 21
 PASSAGE_MILES_AT_LEAST = PASSAGE_DAYS_AT_LEAST * 48     # the sailing ship's day (Table 7-9)
 
 # A cruise (`Engine._cruise`): a ship hunting sails looks each watch, four watches a day —
@@ -210,6 +211,10 @@ class Vessel:
     # first `Engine._keep_vessel`); [] once emptied, or once taken — a prize's cargo moves
     # to `Scene.cargo` as the holder's lots in her hold, where selling it already works.
     cargo: list | None = None
+    # Where she lies on the region map's hexes when the party sails her hex by hex
+    # (feat/sea-hexes, 2026-11-21): [q, r] of a water hex, or None at a quay or on a
+    # passage (a voyage is reckoned in days, not hexes, `Engine._sail`).
+    hex: list | None = None
 
     def as_dict(self) -> dict:
         return {"id": self.id, "name": self.name, "kind": self.kind, "hp": self.hp,
@@ -222,7 +227,8 @@ class Vessel:
                 **({"held_by": self.held_by} if self.held_by else {}),
                 **({"sworn": self.sworn} if self.sworn else {}),
                 **({"cargo": [dict(x) for x in self.cargo]} if self.cargo is not None
-                   else {})}
+                   else {}),
+                **({"hex": [int(v) for v in self.hex]} if self.hex else {})}
 
     @classmethod
     def from_dict(cls, d: dict) -> "Vessel | None":
@@ -245,7 +251,9 @@ class Vessel:
                    river=bool(d.get("river")), lands_at=str(d.get("lands_at") or ""),
                    held_by=str(d.get("held_by") or ""), sworn=str(d.get("sworn") or ""),
                    cargo=([dict(x) for x in d["cargo"] if isinstance(x, dict)]
-                          if isinstance(d.get("cargo"), list) else None))
+                          if isinstance(d.get("cargo"), list) else None),
+                   hex=([int(v) for v in d["hex"][:2]] if isinstance(d.get("hex"), list)
+                        and len(d["hex"]) >= 2 else None))
 
     @property
     def row(self) -> dict:
@@ -472,7 +480,9 @@ def days_for(miles: int | None, kind: str, days_apart: int = 1,
         return days
     if river:
         return max(days, journey_mod.ROAD_DAYS_AT_LEAST)
-    return max(days, round(PASSAGE_MILES_AT_LEAST / max(1, per_day)))
+    # Up, never to the nearest: a floor rounded down is a passage quicker than the floor
+    # (a galley's 1,008 / 96 = 10.5 days rounded to 10 was 960 miles, 2026-11-21).
+    return max(days, -(-PASSAGE_MILES_AT_LEAST // max(1, per_day)))
 
 
 def leg_days(leg, kind: str) -> int:

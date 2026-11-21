@@ -604,6 +604,10 @@ function hexBoard(hexes, h, wash, names) {
   byTile.forEach((list, f) => { const t = tileOf(f); if (!t) return; const im = new THREE.InstancedMesh(t.geo, t.mat, list.length); list.forEach((m, n) => im.setMatrixAt(n, m)); im.receiveShadow = true; world.add(im); });
   if (puffs.length) { const im = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 0), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, flatShading: true }), puffs.length);
     puffs.forEach((m, n) => im.setMatrixAt(n, m)); im.castShadow = true; world.add(im); }
+  // Open sea against the coast's own water (rules/hexes.py `sea`): a deep-water wash over the tile.
+  const deep = hexes.filter(x => x.deep && !x.cloud);
+  if (deep.length) { const im = new THREE.InstancedMesh(new THREE.CylinderGeometry(h * .97, h * .97, .05, 6), new THREE.MeshBasicMaterial({ color: 0x1d3a52, transparent: true, opacity: .28, depthWrite: false }), deep.length);
+    deep.forEach((x, n) => im.setMatrixAt(n, new THREE.Matrix4().makeTranslation(x.x, 1.02, x.z))); im.renderOrder = 1; world.add(im); }
   // Ground seen but not searched: a pale haze over the tile, lighter than the clouds of the
   // unknown (ruling 10). The hexes a click can move the party to: a gilt hexagon on each.
   const hazy = hexes.filter(x => x.haze);
@@ -747,7 +751,7 @@ function nationMap(v) {
     if (dq > dr && dq > ds) q0 = -r0 - s0; else if (dr > ds) r0 = -q0 - s0;
     v.hexgrid.hexes.forEach(hx => {
       const [wx, wy] = hexC(hx.q, hx.r, rW), [sx, sz] = hexC(hx.q - q0, hx.r - r0, h);
-      grid.set(key(hx.q, hx.r), { q: hx.q, r: hx.r, x: sx, z: sz, wx, wy, nation: hx.land ? hx.nation : null, ground: hx.ground, town: hx.town });
+      grid.set(key(hx.q, hx.r), { q: hx.q, r: hx.r, x: sx, z: sz, wx, wy, nation: hx.land ? hx.nation : null, ground: hx.ground, town: hx.town, sea: hx.sea || "" });
     });
   } else {
     const span = Math.min(40, Math.ceil((Math.max(...mineC.map(c => Math.hypot(WL.pos[c.id][0] - ctr[0], WL.pos[c.id][1] - ctr[1]))) + 160) * NS / (h * 1.5)));
@@ -841,12 +845,16 @@ function nationMap(v) {
   const HS = (v.KP && v.KP.hexes) || {}, touched = HS.touched || {};
   const reach = new Set(v.hexgrid ? (HS.reach || []).map(([q, r]) => key(q, r)) : []);
   const hexes = [];
-  [...mine, ...ring].forEach(x => {
+  // The nation's waters out from its coast (rules/hexes.py `Grid.region`, feat/sea-hexes): the
+  // engine's grid sends them; under fog like the land until sailed, swum or seen from the shore.
+  const sea = v.hexgrid ? [...grid.values()].filter(x => !x.nation && !ring.has(x)) : [];
+  [...mine, ...ring, ...sea].forEach(x => {
     const k = key(x.q, x.r), isMine = x.nation === v.nation, land = !!x.nation, t = touched[k] || {};
     const kn = known.has(k) || !!t.entered || !!t.searched || reach.has(k);
     const tile = !land ? "hex/water" : TILE_OF[ground.get(k)] || "hex/grass";
     hexes.push({ q: x.q, r: x.r, x: x.x, z: x.z, tile, nation: x.nation, known: kn || !isMine, plate: land && (isMine ? kn : true), plateOpacity: isMine ? .55 : .25,
-                 cloud: isMine && land && !kn, haze: !!v.hexgrid && isMine && land && kn && !t.searched, reach: reach.has(k), ground: ground.get(k) || "" });
+                 cloud: (isMine && land && !kn) || (!!v.hexgrid && !land && !kn), haze: !!v.hexgrid && isMine && land && kn && !t.searched,
+                 deep: !land && x.sea === "open", reach: reach.has(k), ground: ground.get(k) || "" });
   });
   board = { ...hexBoard(hexes, h, wash, { [v.nation]: W.nations[v.nation].name }), knownNations: new Set(), pos: {} };
   const P3 = hx => new THREE.Vector3(hx.x, 1.05, hx.z);
@@ -855,6 +863,8 @@ function nationMap(v) {
   // Only on a hex's own place (`{town}~{ground}:@hex-q-r`, and its site below it): standing in
   // the woods off a town, the figure stays on the woods' piece as it always did.
   if (partyHex && v.pf && String(v.pf.here || "").includes(":@hex-")) board.pos[v.pf.here] = P3(partyHex);
+  // Aboard a ship the PC holds, out on a hex: the figure stands on her hex (the deck has no hex in its id).
+  if (partyHex && v.pf && HS.afloat === "ship" && v.pf.here) board.pos[v.pf.here] = P3(partyHex);
   // A site's rooms hang off its hex's own place (`posOf` walks a room up to its host), so
   // every hex place named is stood on its hex, read off the id (`hexes.slug`: m is minus).
   [...(v.sites || []).map(st => st.host), ...((v.pf && v.pf.nodes) || []).map(n => n.id)].forEach(id => {

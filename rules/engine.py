@@ -15521,6 +15521,15 @@ class Engine:
         """
         from . import journey as journey_mod, places as places_mod
 
+        # Out on a water hex in a rowboat or swimming (feat/sea-hexes): no road starts on
+        # the water. Live 2026-11-21, a party rowed out of Harpost walked its road to
+        # Grotburrow from the boat. Landfall first, on the region map.
+        afloat = self.afloat()[0]
+        if afloat in ("boat", "swim"):
+            return self._refuse(
+                intent, f"{'The rowboat' if afloat == 'boat' else 'The party'} is out on the "
+                        f"water, and no road starts there. Make landfall first: the Region "
+                        f"map's land beside you.")
         # One journey a turn, from this side too (item 35): a plan that walks across
         # town and then takes the road out is the same defect wearing a longer coat,
         # and this one costs days on the clock rather than minutes. A berth booked at
@@ -19240,8 +19249,8 @@ class Engine:
         days = ships_mod.leg_days(leg, ship.kind)
         # The fare is for the miles she sails: the world's when it measured them, else
         # her day's run over the days (which the passage floor may have lengthened past
-        # an unmeasured stated figure). 1 sp a mile, so a fortnight on a sailing ship is
-        # 672 miles, 67 gp 2 sp a head.
+        # an unmeasured stated figure). 1 sp a mile, so three weeks on a sailing ship is
+        # 1,008 miles, 100 gp 8 sp a head.
         miles = leg.miles if leg.source == "exact" and leg.miles and leg.measured \
             else days * ships_mod.miles_a_day(ship.kind)
         book = ships_mod.fare_cp(miles, heads)
@@ -19547,18 +19556,24 @@ class Engine:
                 self.scene.depart(ref)
         return " ".join(told), fx, lost
 
-    def _swim_out(self, a, feet: int, rough: str) -> tuple[bool, int, list[str]]:
+    def _swim_out(self, a, feet: int, rough: str, goal: str = "her",
+                  most_hours: int = 10) -> tuple[bool, int, list[str]]:
         """Swim `feet` of open water, round by round by the Swim skill (CRB): a made check
         moves half your speed (a full-round action), a miss by 4 or less makes no
         progress, a miss by 5 or more puts you under, and a made check brings you up.
         Under, the breath clock and the drowning ladder are the water's own (`breathe`);
         an hour of it asks the hourly fatigue check (`_an_hour_swum`). The swimmer takes
         10 where 10 makes it and rolls where it does not (`_swim_margin`). A swim speed or
-        freedom of movement crosses without a check. (made, rounds, tells)."""
+        freedom of movement crosses without a check. (made, rounds, tells).
+
+        `goal` is what the tells say they swim to; `most_hours` the guard on the clock (a
+        water hex of the region map is twelve miles, eight hours and more, `_water_step`)."""
         speed = water.swim_speed(a)
-        if speed > 0 or water.row_for(a) == water.FREE:
+        # A body that cannot move its limbs does not swim with ease whatever its speed
+        # (live 2026-11-21: an undine out cold from thirst "swam with ease" hex after hex).
+        if (speed > 0 or water.row_for(a) == water.FREE) and not (a.is_down or a.is_helpless):
             rounds = -(-feet // max(5, speed or a.speed_feet))
-            return True, rounds, [f"{a.name} swims out to her with ease."]
+            return True, rounds, [f"{a.name} swims out to {goal} with ease."]
         step = max(5, int(a.speed_feet or 30) // 2)
         dc = water.swim_dc(rough)
         mods = list(a.skill_modifiers("swim"))
@@ -19593,7 +19608,7 @@ class Engine:
             a.remove_effects(match=lambda e: states.UNDER_WATER in (e.tags or ()))
             a.held_breath_rounds = 0
         made = gone >= feet and not a.has_state("state.down.dead")
-        how = f"{a.name} swims out to her" if made else f"{a.name} never reaches her"
+        how = f"{a.name} swims out to {goal}" if made else f"{a.name} never reaches {goal}"
         if went_under:
             how += ", going under " + ("once" if went_under == 1 else
                                        "twice" if went_under == 2 else "again and again")
@@ -19708,6 +19723,9 @@ class Engine:
                                         "with her or sheer off first.")
         pc = self.scene.pc()
         cast_off = ship.sailed_at is None
+        # A voyage is reckoned in days, not hexes: off the region map until she makes port
+        # (feat/sea-hexes; booked passage stays journey segments, the owner's 2026-11-16).
+        ship.hex = None
         if cast_off:
             ship.at, ship.sailed_at = "", int(self.scene.clock_minutes)
             # At sea the ship IS the location: no town's rooms are a walk from her deck.
@@ -19919,6 +19937,7 @@ class Engine:
             ship.sailed_at = int(self.scene.clock_minutes)
         # Off any course she held: where she goes next is the player's (`_come_about`).
         ship.bound_for, ship.days_left, ship.lands_at = "", 0, ""
+        ship.hex = None         # a cruise is days of her waters, not hexes (`_sail`)
         self.scene.location_id = ship.id
         astern = self._leave_astern(ship)
         level = volatility.of(self.world, ship.came_from)
@@ -21333,15 +21352,27 @@ class Engine:
         return hexes.grid(at, hexes.held_layout(self.scene, at))
 
     def party_hex(self, g=None):
-        """The hex the party stands in: a hex place's own, else its town's. None aboard a
-        ship, at sea, or with no world."""
+        """The hex the party stands in: a hex place's own (a rowboat's and the water's
+        too), else its town's. Aboard a ship the PC holds, the hex she lies on, or her
+        quay's town (feat/sea-hexes). None aboard anybody else's, on a passage at sea, or
+        with no world."""
         from . import places as places_mod
 
         from . import hexes, outskirts as outskirts_mod
 
         g = g or self.hex_world()
-        if g is None or places_mod.terrain_of(self.scene.at) == "deck":
+        if g is None:
             return None
+        if places_mod.terrain_of(self.scene.at) == "deck":
+            mine = hexes.parse_place(self.scene.at or "")
+            if mine is not None:
+                return mine
+            ship = self._ship_held_here()
+            if ship is None:
+                return None
+            if ship.at:
+                return g.town_hex.get(ship.at)
+            return tuple(ship.hex) if ship.hex else None
         road = self.scene.road or {}
         if outskirts_mod.is_along(self.scene.at or "") and road.get("of"):
             # A journey stopped on the road stands that far along it on the board, between
@@ -21485,7 +21516,18 @@ class Engine:
         here = self.party_hex(g)
         if g is None or here is None:
             return []
+        if self.afloat(g)[0]:
+            # On the water: every hex beside it the party can make by the way it is going
+            # (`water_ways`), landfall included; never two at a time.
+            return [h for h in hexes.neighbours(*here) if self.water_ways(g, here, h)]
+        # And the water beside the land where the party has a ship or a boat to put out in;
+        # a swim is never lit, it is the player's own choice (`water_ways`).
+        wet = [h for h in hexes.neighbours(*here) if not g.cell(*h)["land"]
+               and any(w != "swim" for w in self.water_ways(g, here, h))]
         out = [h for h in hexes.neighbours(*here) if g.cell(*h)["land"]]
+        if self._ship_held_here() is not None:
+            # On her deck at the quay: the land is walked from the town, not the deck.
+            return wet
         if self.party_rides():
             seen = set(out) | {here}
             for m in list(out):
@@ -21493,7 +21535,7 @@ class Engine:
                     if h not in seen and hexes.distance(h, here) == 2 and g.cell(*h)["land"]:
                         seen.add(h)
                         out.append(h)
-        return out
+        return out + wet
 
     def _hex_touched(self, h) -> dict:
         from . import hexes
@@ -21562,8 +21604,9 @@ class Engine:
         rides = self.party_rides()
         if far == 0:
             return self._refuse(intent, f"{pc.name} is in that hex already.")
-        if not dest["land"]:
-            return self._refuse(intent, "That hex is open water. Crossing it waits for a ship.")
+        if not dest["land"] or self.afloat(g)[0]:
+            # Water in the step: a ship, a boat or a swim, one hex (feat/sea-hexes).
+            return self._hex_water_move(intent, partial, g, here, to)
         if far > (2 if rides else 1):
             if rides:
                 why = "Riding, the party reaches two hexes at most."
@@ -21789,6 +21832,465 @@ class Engine:
         if line:
             went.tell = (went.tell or "") + line
         return went
+
+    # --- water hexes (feat/sea-hexes, docs/research/2026-11-21-sea-hexes.md) ----------------
+    #
+    # The owner, 2026-11-21: "hex travel while on boats or swimming". Ultimate Campaign's
+    # water hex (p.158) says only that without "swim speeds or boats" lakes and oceans are
+    # obstacles to go round, so the party on water is one of three: aboard a ship the PC
+    # holds (`Vessel.held_by`), in a hired rowboat, or in the water. One hex a step,
+    # whichever; a multi-hex walker calls `_water_step` once a hex.
+
+    def afloat(self, g=None) -> tuple[str, object]:
+        """How the party is out on a water hex: ("ship", her) on the deck of a ship the PC
+        holds, lying on a hex; ("boat", None) in a rowboat on one; ("swim", None) in the
+        water of one; else ("", None) (ashore, at a quay, or on a booked passage)."""
+        from . import hexes, places as places_mod
+
+        at = self.scene.at or ""
+        ground = places_mod.terrain_of(at)
+        if ground == "deck" and hexes.parse_place(at) is not None:
+            return "boat", None
+        if ground == "water" and hexes.parse_place(at) is not None:
+            return "swim", None
+        ship = self._ship_held_here() if ground == "deck" else None
+        if ship is not None and ship.hex and not ship.at:
+            return "ship", ship
+        return "", None
+
+    def _ship_held_here(self):
+        """The ship the PC holds whose deck the party stands on, or None."""
+        pc, ship = self.scene.pc(), self.aboard()
+        return ship if ship is not None and pc is not None and ship.held_by == pc.ref \
+            else None
+
+    def _ship_lying_at(self, h):
+        """A ship the PC holds lying off on water hex `h` (she put the party ashore in her
+        boat and waits), or None."""
+        from . import ships as ships_mod
+
+        pc = self.scene.pc()
+        for raw in self.scene.vessels or ():
+            v = ships_mod.Vessel.from_dict(raw)
+            if v is not None and pc is not None and v.held_by == pc.ref and not v.at \
+                    and v.hex and tuple(v.hex) == tuple(h) and v.afloat:
+                return v
+        return None
+
+    def _boats_for_hire(self, g, cell: dict) -> bool:
+        """Whether a boatman rows hired passengers out from this hex: a town's own hex, the
+        town on the coast (a port, or the world's coast fact: the towns with `the shore`,
+        `outskirts`). Ultimate Equipment's rowboat passage, 2 cp a mile a head."""
+        town = g.city.get(cell.get("town") or "") or {}
+        return "coast" in (town.get("near") or ())
+
+    def water_ways(self, g, here, to) -> list[str]:
+        """The ways (`hexes.WAYS`) the party can make the one-hex step from `here` to `to`
+        when water is in it (either end); [] for a step on land, or none to be had. Ashore,
+        swimming is always one of them: the board lights only the others, and a swim is
+        only ever the player's own choice (`hex_move` with `how: "swim"`)."""
+        from . import hexes, journey as journey_mod
+
+        if g is None or here is None or hexes.distance(here, to) != 1:
+            return []
+        how, _ship = self.afloat(g)
+        dest, src = g.cell(*to), g.cell(*here)
+        if how == "ship":
+            if dest["land"]:
+                port = bool(dest["town"]) and journey_mod.is_port(self.world, dest["town"])
+                return ["ship"] if port else ["boat"]
+            return ["ship"]
+        if how:
+            return [how]
+        if dest["land"] or not src["land"]:
+            return []
+        ways = []
+        mine = self._ship_held_here()
+        if mine is not None and mine.at and g.town_hex.get(mine.at) == tuple(here) \
+                and self.party_hex(g) == tuple(here):
+            ways.append("ship")
+        if self._ship_lying_at(to) is not None or self._boats_for_hire(g, src):
+            ways.append("boat")
+        return ways + ["swim"]
+
+    def swim_words(self, g=None) -> str:
+        """What a swim across a water hex costs the PC, said before anyone is in the water:
+        the refusal's words and the board's (CRB Swim: half speed a round; "each hour that
+        you swim, you must make a DC 20 Swim check or take 1d6 points of nonlethal damage
+        from fatigue"; out cold in the water is drowning, `breathe`)."""
+        from . import hexes
+
+        g = g or self.hex_world()
+        pc = self.scene.pc()
+        if g is None or pc is None:
+            return ""
+        hours = hexes.swim_hours(pc.speed_feet, g.sea_miles, water.swim_speed(pc))
+        return (f"Swimming it is about {english.number(max(1, round(hours)))} hours in the "
+                f"water: a DC {water.HOURLY_DC} Swim check every hour or "
+                f"{water.HOURLY_NONLETHAL} nonlethal damage, and anyone knocked out in the "
+                f"water drowns")
+
+    def _hex_water_move(self, intent: Intent, partial: dict, g, here, to) -> Outcome:
+        """`hex_move` with water in the step: one hex, by the way the player named
+        (`how`), else the one the party has that is not swimming. Refused with the reason
+        when there is none: UC p.158, "it is best to treat lakes and oceans as obstacles"
+        without boats or swim speeds, and a swim is never chosen for the player."""
+        from . import hexes, ships as ships_mod
+
+        pc = self.scene.pc()
+        how_now, ship = self.afloat(g)
+        if hexes.distance(here, to) != 1:
+            return self._refuse(intent, "On the water the party goes one hex at a time.")
+        ways = self.water_ways(g, here, to)
+        want = str(intent.params.get("how") or "").strip().lower()
+        if want and want not in ways:
+            if not ways:
+                return self._refuse(intent, "There is no way onto that water from here.")
+            said = _and_list([w if w == "swim" else f"by {w}" for w in ways])
+            return self._refuse(intent, f"Not {'swimming' if want == 'swim' else 'by ' + want}"
+                                        f" from here: the party can go {said}.")
+        # Already in the water, the swim was chosen: swimming on is the way (the board lights
+        # the water round a swimmer, and its click names no way).
+        how = want or next((w for w in ways if w != "swim"), "")             or ("swim" if how_now == "swim" else "")
+        if not how:
+            return self._refuse(
+                intent, "That hex is open water. Crossing it wants a ship you hold, a boat "
+                        "hired where a town meets the sea, or the choice to swim. "
+                        + self.swim_words(g) + ".")
+        if self.scene.sea:
+            return self._refuse(intent, "Another ship is on the water with you: close with "
+                                        "her or sheer off first.")
+        if how == "swim" and (pc.is_down or not pc.can_act()):
+            return self._refuse(intent, f"{pc.name} cannot swim another stroke.")
+        if how == "ship":
+            her = ship or self._ship_held_here()
+            if her is None or not her.afloat:
+                return self._refuse(intent, "There is no ship of yours under the party.")
+            if not ships_mod.crewed(her):
+                return self._refuse(intent, f"{_sentence(her.name)} has too few hands to "
+                                            f"work her.")
+        if how == "boat" and not how_now and self._ship_lying_at(to) is None:
+            heads = 1 + len(self._water_company())
+            fare = ships_mod.rowboat_cp(heads, int(g.sea_miles * 5280))
+            if not goods.spend(pc.purse, fare)[1]:
+                return self._refuse(
+                    intent, f"A boatman rows {heads} out a hex for "
+                            f"{goods.purse_line(goods.coins_for(fare), self._coins_here())} "
+                            f"(2 copper pieces a mile a head), and {pc.name} carries "
+                            f"{goods.purse_line(pc.purse, self._coins_here())}.")
+        xp_line = self._hex_explored(g, here) if g.cell(*here)["land"] else ""
+        tell, effects, _moved = self._water_step(intent, g, here, to, how)
+        return Outcome(intent_id=intent.id, op="hex_move", effects=effects,
+                       tell=(tell + (xp_line or "")).strip(), because=intent.because)
+
+    def _water_company(self) -> list[str]:
+        """Who goes with the party onto the water: everybody travelling with it or hired."""
+        return [r for r, a in self.scene.people.items()
+                if not a.is_pc and not a.is_down
+                and (a.has_state(states.TRAVELS_WITH_YOU) or a.has_state(states.HIRED))]
+
+    def _stand_on_hex(self, doc: dict, company: list[str]) -> None:
+        """The party (and `company`) stood in a hex's place, founded if it is new, filed
+        under its nearest town as every hex place is (`hexes.place_doc`)."""
+        from . import places as places_mod
+
+        if not any(d.get("id") == doc["id"] for d in self.scene.founded):
+            self.scene.founded.append(doc)
+        town = places_mod.location_of(doc["id"])
+        if town and self.world is not None and self.world.get(town) is not None:
+            self.scene.location_id = town
+        self.place_party(doc["id"])
+        for r in company:
+            if r in self.scene.people:
+                self.scene.move(r, doc["id"])
+
+    def _swim_hex(self, refs: list[str], feet: int, goal: str, effects: list[dict]
+                  ) -> tuple[list[str], list[str], int]:
+        """Everybody in `refs` swims `feet` (`_swim_out`, round by round, the hourly
+        fatigue check and the drowning ladder included): (tells, refs who never made it,
+        the longest swim in rounds). Records go on `effects`."""
+        from . import hexes
+
+        rough = water.roughness(self.world, "")
+        said, lost, longest = [], [], 0
+        for ref in refs:
+            a = self.scene.people.get(ref)
+            if a is None:
+                continue
+            had = int(a.nonlethal or 0)
+            made, rounds, words = self._swim_out(a, feet, rough, goal=goal, most_hours=24)
+            fast = water.swim_speed(a)
+            if fast > 0 and feet > 5280:
+                # A swim speed crosses a hex at the land's own Table 3-2 hours for that speed
+                # (`hexes.swim_hours`), the hours the slip states: `_swim_out` moves it its
+                # tactical speed every round, which no walker on land keeps up for a day.
+                rounds = round(hexes.swim_hours(a.speed_feet, feet / 5280, fast) * 600)
+            longest = max(longest, rounds)
+            said.extend(words)
+            taken = int(a.nonlethal or 0) - had
+            effects.append({"kind": "swim", "ref": ref, "made": made, "rounds": rounds,
+                            "water": rough, "origin": "rule:swim"})
+            if taken > 0:
+                effects.append({"kind": "damage", "ref": ref, "amount": taken,
+                                "lethality": "nonlethal", "origin": "rule:swim"})
+                said.append(f"The swim costs {a.name} {taken} nonlethal damage.")
+            if not made:
+                lost.append(ref)
+        return said, lost, longest
+
+    def _water_step(self, intent: Intent, g, here, to, how: str
+                    ) -> tuple[str, list[dict], bool]:
+        """One hex with water in it, by `how` (which `water_ways` has allowed): the time by
+        the book's speeds (`hexes.ship_minutes`, `row_minutes`, the Swim skill), the body's
+        toll, the sea's meeting check on a water hex, the party stood where it ends up.
+        (tell, effects, whether the party reached `to`).
+
+        The step a multi-hex walker calls once a hex: it asks the player no roll and
+        refuses nothing (the caller has asked `water_ways`), and a meeting is told and left
+        standing, so a walker stops on `scene.in_encounter`, a `sea_encounter` record, a
+        `scene.sea` engagement, or a False third value."""
+        from . import hexes, ships as ships_mod
+
+        pc = self.scene.pc()
+        dest, src = g.cell(*to), g.cell(*here)
+        miles = g.sea_miles
+        company = self._water_company()
+        set_out = self.scene.clock_minutes
+        way = hexes.bearing((src["x"], src["y"]), (dest["x"], dest["y"]))
+        tells: list[str] = []
+        effects: list[dict] = []
+        toll = survival.Toll(hours=0)
+        ship = self._ship_held_here()
+        lying = self._ship_lying_at(to) if not dest["land"] else None
+        moved = True
+
+        def hours_said(minutes: float) -> str:
+            n = max(1, round(minutes / 60))
+            return f"{english.number(n)} hour{'s' if n != 1 else ''}"
+
+        if how == "ship" and ship is not None:
+            # Sailing her: the Core Rulebook's day's run (Table 7-9) for the hex's miles.
+            minutes = hexes.ship_minutes(ship.kind, miles)
+            if ship.at:
+                ship.came_from, ship.at = ship.at, ""
+            if ship.sailed_at is None:
+                ship.sailed_at = int(self.scene.clock_minutes)
+            ship.bound_for, ship.days_left, ship.lands_at = "", 0, ""
+            # Her stores feed and water her people, as on any voyage (`_sail`, `_cruise`):
+            # live 2026-11-21, ten hexes under sail left Gage 47 points of thirst damage.
+            rooms = {p.id for p in ships_mod.places_of(ship)}
+            for a in self.scene.people.values():
+                if a.at in rooms and (a.is_pc or a.ref in company):
+                    survival.eat(a)
+                    survival.drink(a)
+            toll = survival.pass_hours(pc, -(-minutes // 60), self.dice)
+            self.scene.advance(minutes, charge_body=False)
+            # Her days are reckoned from here on: a voyage after the hexes (`_sail`) counts
+            # its first day from now, not from when she first put out.
+            ship.sailed_at = int(self.scene.clock_minutes)
+            if dest["land"]:
+                # Into a port: she ties up, and going ashore is the player's own step, as
+                # a held ship making port is (`_sail`).
+                ship.at, ship.hex, ship.sailed_at = dest["town"], None, None
+                ship.came_from = dest["town"]
+                self.scene.location_id = dest["town"]
+                tells.append(f"{_sentence(ship.name)} runs in under sail {way}, "
+                             f"{hours_said(minutes)}, and ties up at "
+                             f"{self._settlement_name(dest['town'])}; {pc.name} is still on "
+                             f"her deck.")
+            else:
+                ship.hex = [int(to[0]), int(to[1])]
+                # At sea the ship is the location, as on any voyage (`_sail`): no town's
+                # rooms are a walk from her deck.
+                self.scene.location_id = ship.id
+                tells.append(f"{_sentence(ship.name)} makes way {way} under sail, "
+                             f"{hours_said(minutes)} across "
+                             f"{hexes.place_doc(g, *to, parent='')['name']}.")
+            self._keep_vessel(ship)
+        elif how == "boat" and ship is not None and dest["land"]:
+            # Ashore from a ship lying off: her boat, as the boat out to a ship lying off a
+            # shore goes (owner ruling 2026-11-14), and she waits where she lies.
+            minutes = ships_mod.rowboat_minutes(1 + len(company))
+            hours = hexes.hours_through(dest["ground"], pc.speed_feet)
+            toll = survival.pass_hours(pc, hours, self.dice, biome=dest["ground"])
+            self.scene.advance(minutes + max(1, toll.hours) * survival.MINUTES_PER_HOUR,
+                               charge_body=False)
+            doc = hexes.place_doc(g, *to, parent="")
+            self._stand_on_hex(doc, company)
+            tells.append(f"{_sentence(ship.name)}'s boat puts the party ashore {way}, and "
+                         f"{hours_said(hours * 60)} on foot cross {doc['name']}; she lies "
+                         f"off and waits.")
+        elif lying is not None:
+            # Back out to her where she lies off: her boat, or swimming the cable.
+            heads = [pc.ref, *company]
+            if how == "boat":
+                minutes, lost = ships_mod.rowboat_minutes(len(heads)), []
+                said = f"Her boat takes the party back out to {lying.name}."
+            else:
+                words, lost, longest = self._swim_hex(heads, ships_mod.ANCHORED_OFF_FT,
+                                                      lying.name, effects)
+                minutes, said = max(1, -(-longest // 10)), " ".join(words)
+            self.scene.advance(minutes, charge_body=False)
+            for ref in lost:
+                if ref != pc.ref and ref in self.scene.people:
+                    self.scene.depart(ref)
+            tells.append(said)
+            if pc.ref in lost:
+                moved = False
+            else:
+                deck = ships_mod.deck_of(lying)
+                self.place_party(deck)
+                for r in company:
+                    if r not in lost and r in self.scene.people:
+                        self.scene.move(r, deck)
+                self.scene.location_id = lying.id
+                tells.append(f"{pc.name} is on {lying.name}'s deck.")
+        elif how == "boat":
+            # A boatman's rowboat (UE: 1-1/2 mph, 2 cp a mile a head), hired where the party
+            # puts out and kept until it comes ashore.
+            ashore = bool(dest["land"])
+            minutes = 0 if ashore else hexes.row_minutes(miles)
+            on_foot = hexes.hours_through(dest["ground"], pc.speed_feet) if ashore else 0
+            if not self.afloat(g)[0] and not ashore:
+                fare = ships_mod.rowboat_cp(1 + len(company), int(miles * 5280))
+                pc.purse, _ok = goods.spend(pc.purse, fare)
+                effects.append({"kind": "give", "ref": pc.ref, "item": "coin", "count": fare,
+                                "how": "boat", "from": pc.ref, "to": "a boatman",
+                                "purse": dict(pc.purse), "goods": dict(pc.goods)})
+                tells.append(f"A boatman takes the party out for "
+                             f"{goods.purse_line(goods.coins_for(fare), self._coins_here())}.")
+            toll = survival.pass_hours(pc, -(-minutes // 60) + on_foot, self.dice,
+                                       biome=dest["ground"] if ashore else "")
+            self.scene.advance(minutes + on_foot * survival.MINUTES_PER_HOUR,
+                               charge_body=False)
+            if ashore:
+                doc = hexes.place_doc(g, *to, parent="")
+                self._stand_on_hex(doc, company)
+                tells.append(f"The boatman runs the rowboat ashore {way}, and "
+                             f"{hours_said(on_foot * 60)} on foot cross {doc['name']}.")
+            else:
+                doc = hexes.place_doc(g, *to, parent=self.scene.at or "", boat=True)
+                self._stand_on_hex(doc, company)
+                tells.append(f"{_sentence(hours_said(minutes))} in the rowboat {way}, a boatman "
+                             f"at the oars; the party sits in the stern, still afloat, out on "
+                             f"{doc['name'][len('a rowboat on '):]}.")
+        elif dest["land"]:
+            # Swimming ashore: out of the water, then the land's own hours across the hex.
+            hours = hexes.hours_through(dest["ground"], pc.speed_feet)
+            toll = survival.pass_hours(pc, hours, self.dice, biome=dest["ground"])
+            self.scene.advance(max(1, toll.hours) * survival.MINUTES_PER_HOUR,
+                               charge_body=False)
+            doc = hexes.place_doc(g, *to, parent="")
+            self._stand_on_hex(doc, company)
+            tells.append(f"{pc.name} comes up out of the water {way} and walks "
+                         f"{hours_said(hours * 60)} across {doc['name']}.")
+        else:
+            # Swimming the hex: twelve miles and more of open water on Swim checks, round
+            # by round, the hourly fatigue and the drowning ladder the water's own.
+            doc = hexes.place_doc(g, *to, parent=self.scene.at or "")
+            words, lost, longest = self._swim_hex([pc.ref, *company], int(miles * 5280),
+                                                  doc["name"], effects)
+            minutes = max(1, -(-longest // 10))
+            toll = survival.pass_hours(pc, -(-minutes // 60), self.dice)
+            self.scene.advance(minutes, charge_body=False)
+            tells.append(f"{_sentence(hours_said(minutes))} swimming {way}.")
+            tells.extend(words)
+            for ref in lost:
+                if ref != pc.ref and ref in self.scene.people:
+                    self.scene.depart(ref)
+                    effects.append({"kind": "lost", "ref": ref, "origin": "rule:swim"})
+            if pc.ref in lost:
+                # Never reached the next hex: still in the water of the one set out from.
+                moved = False
+            else:
+                self._stand_on_hex(doc, [r for r in company if r not in lost])
+        if toll.checks:
+            tells.append(f"The way cost them: {survival_note(toll)}")
+        tells.append(hexes.day_said(set_out, self.scene.clock_minutes))
+        if moved:
+            effects.append({"kind": "hex", "q": int(to[0]), "r": int(to[1]),
+                            "hours": round((self.scene.clock_minutes - set_out) / 60, 1),
+                            "ground": dest["ground"], "how": how,
+                            "origin": {"ship": "rule:hex-sail", "boat": "rule:hex-row",
+                                       "swim": "rule:swim"}[how]})
+            # What is seen from a water hex is the water round it: the board's fog clears
+            # there (no look is rolled: a water hex holds no site, `hexes.site_of`). Never
+            # `entered`, which is what earns a land hex its explored XP (`_hex_explored`).
+            for h in [tuple(to)] + hexes.neighbours(*to):
+                if not g.cell(*h)["land"]:
+                    self._hex_touched(h)["searched"] = self.scene.clock_minutes
+            if dest["land"]:
+                rec = self._hex_touched(to)
+                rec.setdefault("entered", self.scene.clock_minutes)
+                rec["since"] = self.scene.clock_minutes
+            elif not pc.is_down and lying is None:
+                said, fx = self._water_meeting(g, to, how,
+                                               (self.scene.clock_minutes - set_out) / 60)
+                if said:
+                    tells.append(said)
+                effects.extend(fx)
+        return " ".join(t for t in tells if t), effects, moved
+
+    def _water_meeting(self, g, h, how: str, hours: float) -> tuple[str, list[dict]]:
+        """The sea's check for a water hex crossed in `hours`: the voyage table
+        (`ontheway.sea_stretches`) at the cruise's own rate, `ontheway.SEA_PERCENT` a watch
+        of `ontheway.WATCH_HOURS`, pro rata. Aboard a ship the PC holds it is what any
+        voyage meets (`_met_at_sea`; the storm, and the one in ten that wrecks her); in a
+        rowboat or the water only what lives in the sea and the ships that sail it (owner
+        ruling 2026-11-21): a creature comes or looks, a sail passes. (tell, records)."""
+        from . import ships as ships_mod
+
+        pc = self.scene.pc()
+        town = g.cell(*h)["near"]
+        level = volatility.of(self.world, town)
+        pct = 100 * (1 - (1 - ontheway.SEA_PERCENT / 100)
+                     ** (max(0.1, hours) / ontheway.WATCH_HOURS))
+        met = ontheway.sea_stretches(self.dice, 1, int(getattr(pc, "level", 1) or 1),
+                                     apl=encounter_budget.party_apl(self.scene),
+                                     danger=volatility.factor(level),
+                                     climates=self._climates(town), every=1, percent=pct)
+        if met is None:
+            return "", []
+        how_now, ship = self.afloat(g)
+        if how_now == "ship" and ship is not None:
+            rooms = {p.id for p in ships_mod.places_of(ship)}
+            if met.kind == "storm":
+                if ships_mod.storm_wrecks(self.dice):
+                    ship.passengers = list(dict.fromkeys(
+                        [*ship.passengers, *(a.ref for a in self.scene.people.values()
+                                             if a.at in rooms and (
+                                                 a.is_pc or a.has_state(states.TRAVELS_WITH_YOU)))]))
+                    wrecked = self._wreck(Intent(op="sea", actor=pc.ref, params={}), ship, 0)
+                    return wrecked.tell, list(wrecked.effects)
+                fx: list[dict] = [{"kind": "sea_encounter", "met": "storm",
+                                   "origin": "rule:sea-encounter"}]
+                aboard = [a for a in self.scene.people.values() if a.at in rooms]
+                return self._storm_on_deck(aboard, fx), fx
+            return self._met_at_sea(ship, met)
+        fx = {"kind": "sea_encounter", "met": met.kind, "origin": "rule:sea-encounter"}
+        if met.kind in ("merchant", "naval", "pirates"):
+            return (("A sail on the horizon, hull down and holding her own course; nobody "
+                     "comes about for a boat this small." if how == "boat" else
+                     "A sail on the horizon, far off; nobody aboard her sees a swimmer."),
+                    [fx])
+        if met.kind != "creature":
+            # The voyage's scenes and its weather are a ship's (an island a hand wants to
+            # put in at, a stowaway, a storm to ride out): nothing in a rowboat or the sea.
+            return "", []
+        made = self._meet_on_the_way(met, zone="near") if met.aggressive else []
+        name = str((met.creature or {}).get("name") or "something").lower()
+        many = int(met.count or 1) > 1
+        what = f"{met.count} {english.plural(name)}" if many else english.a(name)
+        fx.update(creature=name, count=int(met.count or 1), refs=[m["ref"] for m in made])
+        if not made:
+            return (f"{_sentence(what)} {'surface' if many else 'surfaces'} nearby, "
+                    f"{'look' if many else 'looks'} the party over, and "
+                    f"{'go' if many else 'goes'} down again.", [fx])
+        self._ensure_encounter(pc.ref, target=made[0]["ref"])
+        for m in made[1:]:
+            self.join_fight(m["ref"])
+        return (f"{_sentence(what)} {'come' if many else 'comes'} up out of the water at "
+                f"the party.", [fx])
 
     def _op_venture(self, intent: Intent, partial: dict) -> Outcome:
         """Ground gone into: the sewers under the town, a cave in the hills outside it.

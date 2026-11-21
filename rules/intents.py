@@ -586,7 +586,8 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Hex travel on the region map (rules/hexes.py, 2026-11-19): written only by the
     # board's click (CODE_ONLY_OPS). `hex` is the hex's [q, r]; reach, hours and the look
     # round are the engine's. `hex_enter` goes into the site of the hex the party is in.
-    "hex_move": (("hex",), ("actor",), "player"),
+    # `how` (feat/sea-hexes) is ship / boat / swim when water is in the step.
+    "hex_move": (("hex",), ("actor", "how"), "player"),
     "hex_enter": ((), ("actor",), "player"),
     # Any craft's excursion onto open ground, by the craft panel's key ("alchemist:quarry",
     # "leatherworker:gather", content/rules/gathering.json): the one gathering door

@@ -51,7 +51,13 @@ LAYOUT_VERSION = 1
 # the hexes between two towns is never quicker than the road (docs/research/2026-11-21-
 # hex-scale.md). A save of an older scale is re-keyed on load (`mend_save`).
 GRID_VERSION = 2
+# The coast. 1: every coastal town has its channel down to the sea (`Grid._chart_channels`,
+# feat/sea-hexes 2026-11-21). A save from before it whose party stands on a hex the channel
+# now covers is stood on the nearest land on load (`mend_save`).
+COAST_VERSION = 1
 HEX_MILES = 12
+# How far out from a nation's coast its Region map draws the sea, in hexes.
+WATER_RING = 6
 SQRT3 = math.sqrt(3)
 # The six neighbours, in the board's order (places-board.js `HEX_DIRS`).
 DIRS = ((1, 0), (1, -1), (0, -1), (-1, 0), (-1, 1), (0, 1))
@@ -172,6 +178,7 @@ def held_layout(scene, atlas: dict) -> dict:
         if not held:
             # Laid out for the first time: nothing is keyed to an older grid.
             scene.hexes.setdefault("grid", GRID_VERSION)
+            scene.hexes.setdefault("coast", COAST_VERSION)
         scene.hexes["layout"] = got
     return got
 
@@ -257,7 +264,8 @@ def _miles_per_unit(routes, pos) -> float:
 class Grid:
     """One world's hexes on one layout. Built once and remembered (`grid`)."""
 
-    def __init__(self, atlas: dict, lay: dict, size: float | None = None):
+    def __init__(self, atlas: dict, lay: dict, size: float | None = None,
+                 channels: bool = True):
         self.atlas = atlas
         self.pos = lay["pos"]
         self.cities = [c for c in atlas.get("cities") or [] if c["id"] in self.pos]
@@ -278,6 +286,10 @@ class Grid:
             for k in range(5):
                 a, rad = n * 1.7 + k * 1.26, 70 + (n * 37 + k * 13) % 40
                 self.discs.append((p[0] + math.cos(a) * 30, p[1] + math.sin(a) * 30, rad))
+        # The way down to the sea from every town on the coast (`_chart_channels`): none on
+        # the grid a save of an older coast was played on (`mend_save` rebuilds that one).
+        self._centres = lay.get("centre") or {}
+        self.channels = self._chart_channels() if channels else []
         self._cells: dict = {}
         self._routes_of = {c["id"]: [r for r in self.routes
                                      if (r["a"] == c["id"] or r["b"] == c["id"]) and r.get("crosses")]
@@ -288,6 +300,10 @@ class Grid:
         self.patches = self._patches()
 
     def _place_towns(self) -> None:
+        # A coastal town's own hex is never cut away by its channel: the hex its point falls
+        # in, at this size (the size moves while `_fit` runs, so this is made with it).
+        self._kept = {hex_at(*self.pos[c["id"]], self.size) for c in self.cities}
+        self._land: dict = {}
         self.town_hex: dict[str, tuple] = {}
         self.towns_at: dict[tuple, list] = {}
         for c in sorted(self.cities, key=lambda c: c["id"]):
@@ -329,9 +345,72 @@ class Grid:
             self._place_towns()
 
     # The bare facts of a hex, before ground: land, the nearest town, its nation.
+    def _land_at(self, x: float, y: float) -> bool:
+        return any((x - cx) ** 2 + (y - cy) ** 2 < rad * rad for cx, cy, rad in self.discs)
+
+    def _chart_channels(self) -> list[tuple]:
+        """The water from every coastal town out to the open sea: [((x0, y0), (x1, y1))].
+
+        The land is `landAt`'s discs round every town, seventy to a hundred and ten layout
+        units across, and the hexes are a few units wide after `_fit`, so on the shipped
+        exports not one port of 34 had a water hex within twelve hexes of it (measured
+        2026-11-21: Aurvantis 23 ports, Pangrella 4, the owner's fantasia 7; the synthetic
+        world's one port eleven hexes off). Nothing could put out from a quay. Until World
+        Bible exports a coastline (ask 33), a town the world puts on the coast (`coast`
+        in its near ground: a port, or the export's own coast fact) is given a firth: a
+        channel of water two hexes wide from its gate, straight away from its continent's
+        middle, to where the land stops. A line that would pass within thirty layout units
+        (three to six hexes) of another town's point turns, twenty degrees at a time, up to eighty
+        either way."""
+        out = []
+        towns = [self.pos[c["id"]] for c in self.cities]
+        for c in sorted(self.cities, key=lambda c: c["id"]):
+            if "coast" not in (c.get("near") or ()):
+                continue
+            p = self.pos[c["id"]]
+            mid = self._centres.get(c.get("continent")) or [0.0, 0.0]
+            base = math.atan2(p[1] - mid[1], p[0] - mid[0]) if p != mid else 0.0
+            best = None
+            for turn in (0, 20, -20, 40, -40, 60, -60, 80, -80):
+                a = base + math.radians(turn)
+                dx, dy = math.cos(a), math.sin(a)
+                n = 1
+                while n < 400 and self._land_at(p[0] + dx * n * 5, p[1] + dy * n * 5):
+                    n += 1
+                end = (p[0] + dx * (n * 5 + 10), p[1] + dy * (n * 5 + 10))
+                seg = ((p[0], p[1]), end)
+                clear = all(q is p or _seg_d(q, *seg) > 30 for q in towns)
+                if best is None:
+                    best = seg
+                if clear:
+                    best = seg
+                    break
+            out.append(best)
+        return out
+
+    def _in_channel(self, x: float, y: float, h) -> bool:
+        if h in self._kept:
+            return False
+        # A hex's middle within its circumradius of the line: every hex the line crosses.
+        w = self.size * 1.05
+        return any(_seg_d((x, y), a, b) < w for a, b in self.channels)
+
+    def _is_land(self, q: int, r: int) -> bool:
+        """Land or water, alone: what the sea's inshore/open asks of six neighbours, without
+        the nearest-town search `_base` makes (that made the region's water five times
+        slower to read, measured 2026-11-21: 5.5 s for one Aurvantis nation against 1.0)."""
+        k = (q, r)
+        got = self._land.get(k)
+        if got is None:
+            x, y = centre(q, r, self.size)
+            got = self._land_at(x, y) and not (self.channels and self._in_channel(x, y, k))
+            if len(self._land) < 400_000:
+                self._land[k] = got
+        return got
+
     def _base(self, q: int, r: int) -> tuple:
         x, y = centre(q, r, self.size)
-        land = any((x - cx) ** 2 + (y - cy) ** 2 < rad * rad for cx, cy, rad in self.discs)
+        land = self._is_land(q, r)
         best, near = 1e18, None
         for c in self.cities:
             p = self.pos[c["id"]]
@@ -450,8 +529,18 @@ class Grid:
             return ""
         return self._road_ground(h[0], h[1], x, y, near)
 
+    @property
+    def sea_miles(self) -> float:
+        """The miles a water hex stands for: twelve, or more where the board's sea is
+        narrower than the passages across it (`sea_hex_miles`)."""
+        got = getattr(self, "_sea_miles", None)
+        if got is None:
+            got = self._sea_miles = sea_hex_miles(self.atlas, self.town_hex)
+        return got
+
     def cell(self, q: int, r: int) -> dict:
-        """{"q", "r", "land", "nation", "ground", "near": town id, "town": town id | ""}."""
+        """{"q", "r", "land", "sea": "" | "inshore" | "open", "nation", "ground",
+        "near": town id, "town": town id | ""}."""
         k = (int(q), int(r))
         got = self._cells.get(k)
         if got is not None:
@@ -467,7 +556,11 @@ class Grid:
                 # A river or a lake on land: the bank is ground to stand on.
                 ground = "coast"
         towns = self.towns_at.get(k) or []
-        got = {"q": k[0], "r": k[1], "x": x, "y": y, "land": bool(land),
+        # Water is inshore beside land (a coast's own water, where a boat or a swimmer comes
+        # ashore) and open further out (UC p.158 has one water hex; the two are this app's).
+        sea = "" if land else ("inshore" if any(self._is_land(*h) for h in neighbours(*k))
+                               else "open")
+        got = {"q": k[0], "r": k[1], "x": x, "y": y, "land": bool(land), "sea": sea,
                "nation": near["nation"] if (land and near is not None) else "",
                "ground": ground if land else "water",
                "near": near["id"] if near is not None else "",
@@ -476,8 +569,10 @@ class Grid:
             self._cells[k] = got
         return got
 
-    def region(self, nation: str) -> list[dict]:
-        """The hexes of a nation's map: its land, and a ring of whatever touches it."""
+    def region(self, nation: str, also=()) -> list[dict]:
+        """The hexes of a nation's map: its land, a ring of whatever touches it, its waters
+        `WATER_RING` hexes out from its coast (water whose nearest town is the nation's),
+        and every hex in `also` with the six round it (the water the party has sailed)."""
         mine_c = [c for c in self.cities if c["nation"] == nation]
         if not mine_c:
             return []
@@ -499,6 +594,27 @@ class Grid:
         ring = []
         for c in mine:
             for h in neighbours(c["q"], c["r"]):
+                if h not in seen:
+                    seen.add(h)
+                    ring.append(self.cell(*h))
+        # Its waters, out from the coast a hex at a time (feat/sea-hexes): the sea a ship
+        # puts out onto is on the map it puts out from.
+        edge = [c for c in ring if not c["land"]]
+        own = {c["id"] for c in mine_c}
+        for _ in range(WATER_RING):
+            nxt = []
+            for c in edge:
+                for h in neighbours(c["q"], c["r"]):
+                    if h in seen:
+                        continue
+                    o = self.cell(*h)
+                    if not o["land"] and o["near"] in own:
+                        seen.add(h)
+                        nxt.append(o)
+            ring += nxt
+            edge = nxt
+        for h0 in also:
+            for h in [tuple(h0)] + neighbours(*h0):
                 if h not in seen:
                     seen.add(h)
                     ring.append(self.cell(*h))
@@ -589,9 +705,13 @@ def bearing(frm, to) -> str:
     return _COMPASS[int(round(ang / (math.pi / 4))) % 8]
 
 
-def place_doc(g: Grid, q: int, r: int, parent: str, world=None) -> dict:
+def place_doc(g: Grid, q: int, r: int, parent: str, world=None, boat: bool = False) -> dict:
     """The founded place for standing in hex (q, r): filed under its nearest town, so its
-    nation, coin and law still answer (owner call 3, answered by default 2026-11-19)."""
+    nation, coin and law still answer (owner call 3, answered by default 2026-11-19).
+
+    A water hex is two places: the water itself (`water` ground, where a swimmer is and the
+    Swim rules apply, `rules/water.py`), and, with `boat`, a rowboat on it (`deck`
+    ground, `ships.DECK`: planking, nobody swimming until they go over the side)."""
     from . import outskirts as outskirts_mod
 
     c = g.cell(q, r)
@@ -602,7 +722,14 @@ def place_doc(g: Grid, q: int, r: int, parent: str, world=None) -> dict:
     # town's point instead, the hex beside Ashwatch read "6 miles east" (2026-11-19).
     th = g.town_hex.get(c["near"]) or (q, r)
     miles = max(1, distance(th, (q, r))) * HEX_MILES
-    if c["town"]:
+    if not c["land"]:
+        d = bearing(tp, (c["x"], c["y"]))
+        # "the coastal water" read to the narrator as the coast itself: live 2026-11-21 it
+        # had the party "reach the distant shore" a hex out from Branford, still afloat.
+        what = "the inshore sea" if c.get("sea") == "inshore" else "the open sea"
+        name = f"{what} {miles} miles {d} of {tname}"
+        where = name
+    elif c["town"]:
         name, where = f"the land round {tname}", f"the {c['ground']} round {tname}"
     else:
         d = bearing(tp, (c["x"], c["y"]))
@@ -610,8 +737,14 @@ def place_doc(g: Grid, q: int, r: int, parent: str, world=None) -> dict:
         where = f"open {c['ground']}, {miles} miles {d} of {tname}"
     nation = (g.nations.get(c["nation"]) or {}).get("name") or ""
     about = f"{where[:1].upper()}{where[1:]}" + (f", in {nation}" if nation else "") + "."
-    return {"id": outskirts_mod.ring_id(c["near"], c["ground"], slug(q, r)),
-            "name": name, "about": about, "terrain": c["ground"], "exits": [],
+    ground = c["ground"]
+    if boat and not c["land"]:
+        from . import ships
+
+        ground, name = ships.DECK, f"a rowboat on {name}"
+        about = f"A hired rowboat and its boatman, on {where}."
+    return {"id": outskirts_mod.ring_id(c["near"], ground, slug(q, r)),
+            "name": name, "about": about, "terrain": ground, "exits": [],
             "parent": parent, "owner": "", "origin": "hex", "kind": "",
             # How far out of its town the hex lies (0 for the town's own): what a walk
             # between it and the town's places costs (`outskirts.hop_minutes`).
@@ -622,6 +755,60 @@ def hours_through(ground: str, speed_ft: int = 30) -> int:
     row = next((r for r in reversed(HOURS_BY_SPEED) if int(speed_ft or 30) >= r[0]),
                HOURS_BY_SPEED[0])
     return row[1] if ground in PLAIN else row[2]
+
+
+# --- water hexes (feat/sea-hexes, docs/research/2026-11-21-sea-hexes.md) -------------------
+
+def sea_hex_miles(atlas: dict, town_hex: dict) -> float:
+    """The miles one water hex is reckoned at, so no crossing by hexes beats the passage.
+
+    A passage is reckoned in days (`ships.leg_days`: the world's miles, else the floor of
+    `ships.PASSAGE_MILES_AT_LEAST`, three weeks under a sailing ship, owner 2026-11-21),
+    and the atlas carries each crossing's miles under that reckoning (`sail`). A ship
+    sailing the hexes between the two ports crosses at least as many as lie on the
+    straight line between them, so a water hex is the larger of twelve miles and the
+    worst crossing's miles over its hexes. Measured 2026-11-21: 12.44 on Pangrella (81
+    hexes for 1,008 miles), 12 on Aurvantis and the owner's fantasia, whose narrowest
+    crossings are 107 and 90 hexes. The land's hexes are made fit by shrinking the hex
+    (`Grid._fit`); the sea cannot shrink a grid the land shares, so its hours stretch."""
+    worst = float(HEX_MILES)
+    for rt in atlas.get("routes") or []:
+        miles = float(rt.get("sail") or 0)
+        a, b = town_hex.get(rt.get("a")), town_hex.get(rt.get("b"))
+        if miles <= 0 or a is None or b is None:
+            continue
+        worst = max(worst, miles / max(1, distance(a, b)))
+    return worst
+
+
+# How a party crosses a water hex. A ship's run is the Core Rulebook's Table 7-9 day
+# (`ships.MILES_A_DAY`, the whole day, a ship keeps watches); a rowboat is Ultimate
+# Equipment's "about 1-1/2 miles per hour" (`ships.ROWBOAT_FT_PER_MINUTE`; CRB Table 7-9
+# rows it 15 miles in a ten-hour day, so a hex is inside one rowing day); a swimmer is the
+# Swim skill's half speed a round (`Engine._swim_out`), or a swim speed at the land's own
+# Table 3-2 hours on plain.
+WAYS = ("ship", "boat", "swim")
+
+
+def ship_minutes(kind: str, miles: float) -> int:
+    from . import ships
+
+    return max(1, round(float(miles) * 24 * 60 / ships.miles_a_day(kind)))
+
+
+def row_minutes(miles: float) -> int:
+    from . import ships
+
+    return max(1, round(float(miles) * 5280 / ships.ROWBOAT_FT_PER_MINUTE))
+
+
+def swim_hours(speed_ft: int, miles: float, swim_speed: int = 0) -> float:
+    """Hours to swim `miles`: a swim speed at Table 3-2's plain hours a twelve-mile hex;
+    else the Swim skill's half speed as a full-round action, ten rounds a minute."""
+    if swim_speed > 0:
+        return hours_through("grassland", swim_speed) * float(miles) / HEX_MILES
+    per_round = max(5, int(speed_ft or 30) // 2)
+    return float(miles) * 5280 / per_round / 600
 
 
 # --- what a hex holds ---------------------------------------------------------------------
@@ -734,17 +921,21 @@ def mend_save(data: dict, atlas: dict) -> bool:
 
     s = data.get("scene")
     hx = s.get("hexes") if isinstance(s, dict) else None
-    if not isinstance(hx, dict) or hx.get("grid") == GRID_VERSION:
+    if not isinstance(hx, dict):
         return False
+    if hx.get("grid") == GRID_VERSION:
+        return _mend_coast(data, atlas)
     lay = hx.get("layout")
     if not isinstance(lay, dict) or not atlas.get("cities"):
         # Never laid out: no hex was ever stood in, so nothing is keyed to a grid.
-        hx["grid"] = GRID_VERSION
+        hx["grid"], hx["coast"] = GRID_VERSION, COAST_VERSION
         return False
     lay = held_layout(SimpleNamespace(hexes=hx), atlas)
     routes = [r for r in atlas.get("routes") or []
               if r.get("by") != "sea" and r["a"] in lay["pos"] and r["b"] in lay["pos"]]
-    old = Grid(atlas, lay, size=(HEX_MILES / 2) / _miles_per_unit(routes, lay["pos"]))
+    # The grid as it was played: the old scale, and no channels (they came after it).
+    old = Grid(atlas, lay, size=(HEX_MILES / 2) / _miles_per_unit(routes, lay["pos"]),
+               channels=False)
     new = grid(atlas, lay)
 
     def moved(q: int, r: int) -> tuple[int, int]:
@@ -777,4 +968,38 @@ def mend_save(data: dict, atlas: dict) -> bool:
         # Out on a hex, the party's town is the one that hex now lies nearest.
         s["location_id"] = at.split(":", 1)[0].rsplit("~", 1)[0]
     hx["grid"] = GRID_VERSION
+    _mend_coast(data, atlas)
+    return True
+
+
+def _mend_coast(data: dict, atlas: dict) -> bool:
+    """A save from before the coast's channels (`COAST_VERSION`): a party standing on the
+    open ground of a hex a channel now covers is stood on the nearest land hex, and its
+    place id moved wherever the scene writes it. Inside a hex's site, on a deck or in the
+    water it is left: those places stand whatever the hex beneath them is now."""
+    import json
+    from types import SimpleNamespace
+
+    from . import places as places_mod
+
+    s = data["scene"]
+    hx = s["hexes"]
+    if hx.get("coast") == COAST_VERSION:
+        return False
+    hx["coast"] = COAST_VERSION
+    at = str(s.get("at") or "")
+    h = parse_place(at)
+    if h is None or in_site(at) or places_mod.terrain_of(at) in ("water", "deck")             or not isinstance(hx.get("layout"), dict) or not atlas.get("cities"):
+        return False
+    g = grid(atlas, held_layout(SimpleNamespace(hexes=hx), atlas))
+    if g.cell(*h)["land"]:
+        return False
+    land = next((x for x in _spiral(h, 8) if g.cell(*x)["land"]), None)
+    if land is None:
+        return False
+    doc = place_doc(g, land[0], land[1], parent="")
+    data["scene"] = s = json.loads(json.dumps(s).replace(json.dumps(at), json.dumps(doc["id"])))
+    if not any(d.get("id") == doc["id"] for d in s.get("founded") or []):
+        s.setdefault("founded", []).append(doc)
+    s["location_id"] = doc["id"].split(":", 1)[0].rsplit("~", 1)[0]
     return True

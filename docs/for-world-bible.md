@@ -1711,3 +1711,36 @@ day count, the way Morrowind's engine does it (OpenMW `MoonModel::phase`).
 Every export carries `world.sky.moons`, with at least `name`, `cycle_days` and
 `full_on_day` on each moon, and the fixture worlds' prose agrees with it (Aurvantis: two
 moons).
+
+## 35. Over-water routes at least three weeks under sail
+
+*Asked 2026-11-21 (feat/sea-hexes, release 0.4.9). Optional: without it the app holds every
+unmeasured sea crossing to its own floor, 1,008 miles, three weeks under the Core Rulebook's
+sailing ship (`ships.PASSAGE_DAYS_AT_LEAST = 21` times 48 miles a day,
+`ships.PASSAGE_MILES_AT_LEAST`), which is how every world plays from 0.4.9. This raises the
+sea half of ask 32.*
+
+The owner, 2026-11-21: travel time over water gets longer, three weeks at the least between
+settlements, not two. The app's floor went from 672 miles to 1,008 the same day. The exports
+still band a crossing at 192-216 miles (`agent_engine/distance.py`, world scale), so every one
+of them is now lifted five-fold by the floor, and the world's own miles say nothing a player
+sees. Rivers are not part of this ask: a river runs inside one continent and keeps the road's
+floor (ask 32).
+
+**Shape.** No new field; the sea and river bands change.
+
+| field | what it is |
+|---|---|
+| `miles` on a `by: sea` route | 1,008 miles or more between two settlements (three weeks or more at the sailing ship's 48 miles a day, CRB Table 7-9), unless the route is `measured` |
+| `miles` on a `by: river` route | at least the road band of ask 32 (72 miles or more), at a keelboat's 52 miles a day |
+| `measured` | as ask 32: `true` only where an author or a map measured the miles; such a route is taken at its word, however short |
+
+**Rule 1 still holds.** Miles, never days: a reader who wants days divides by 48 for a
+sailing ship. Anything in the prose that names a crossing's length (a cultures line, a trade
+note) should agree with the miles at that rate.
+
+### Done when
+
+Every unmeasured `by: sea` route in an export is 1,008 miles or more, every `by: river` route
+72 or more, and no description of a sea crossing in the export's prose is shorter than three
+weeks under sail.

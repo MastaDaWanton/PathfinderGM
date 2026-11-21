@@ -248,8 +248,10 @@ def test_a_crossing_never_takes_less_than_a_day():
     assert ships.days_for(1, "galley", measured=True) == 1
     assert ships.days_for(None, "keelboat", 0, measured=True) == 1
     assert ships.days_for(1, "sailing ship") == ships.PASSAGE_DAYS_AT_LEAST
-    # The floor is a fortnight's sailing (672 miles): a galley's 96 a day make it a week.
-    assert ships.days_for(1, "galley") == 7
+    # The floor is three weeks' sailing (1,008 miles, owner 2026-11-21): a galley's 96 a
+    # day make it in 10.5, rounded up to 11 (rounded to the nearest it was 10 days, 960
+    # miles: a passage quicker than the floor).
+    assert ships.days_for(1, "galley") == 11
 
 
 def test_the_wind_is_worth_double_and_says_so():

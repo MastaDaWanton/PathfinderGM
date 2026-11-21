@@ -290,7 +290,7 @@ function placesAtlas(s, then) {
 // through the same popup an excursion's uses, and the table drawn again from the state the
 // move left. `hexEnter` goes into the spotted site underfoot.
 const HEXGO = { busy: false };
-function hexMove(q, r) { return hexAct("/api/hex/move", { hex: [q, r] }); }
+function hexMove(q, r, how) { return hexAct("/api/hex/move", how ? { hex: [q, r], how } : { hex: [q, r] }); }
 function hexEnter() { return hexAct("/api/hex/enter", {}); }
 async function hexAct(url, body) {
   if (HEXGO.busy) return;
