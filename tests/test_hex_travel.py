@@ -138,19 +138,6 @@ def test_a_move_costs_the_hours_of_one_hex_and_nothing_else_passes(worlds, quiet
     assert quiet_road[-1] == hexes.hours_through(g.cell(*nxt)["ground"])
 
 
-def test_on_foot_a_hex_two_away_is_refused(worlds, quiet_road):
-    """Ruling 8: on foot, one hex a move. The refusal names what would make it two."""
-    s, e, pc = _party(worlds)
-    g = e.hex_world()
-    here = e.party_hex(g)
-    two = next(h for h in hexes._spiral(here, 2) if hexes.distance(h, here) == 2
-               and g.cell(*h)["land"])
-    t0 = s.clock_minutes
-    out = _move(e, two)
-    assert out.status == "refused" and "horse" in out.tell
-    assert s.clock_minutes == t0
-
-
 def test_riding_reaches_two_hexes_in_the_hours_of_one_on_foot(worlds, quiet_road):
     """Ruling 8 with the Q13 ruling (riding halves the time): two hexes ridden cost what
     one walked does, the hex between is entered and checked on the road (one meeting roll

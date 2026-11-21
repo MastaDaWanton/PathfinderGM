@@ -224,6 +224,49 @@ def neighbours(q: int, r: int) -> list[tuple[int, int]]:
     return [(q + dq, r + dr) for dq, dr in DIRS]
 
 
+ROUTE_SLACK = 6   # how many hexes a way round water may run past the straight line's
+
+
+def land_route(g, a, b, speed_ft: int = 30) -> list[tuple[int, int]]:
+    """The hexes walked from hex a to land hex b, a excluded, b last; [] when no way over
+    land joins them. Fewest hexes first (each is a real step with its own checks), then
+    the fewest hours (plan §3: plain before rough), then the hexes nearest the straight
+    line (Red Blob Games' hex line, `along`), so open country walks the line the board
+    draws. Dijkstra over land only, as Red Blob's pathfinding notes advise (the neighbour
+    function minus the impassable): a click never routes the party through the sea."""
+    import heapq
+
+    a, b = (int(a[0]), int(a[1])), (int(b[0]), int(b[1]))
+    if a == b or not g.cell(*b)["land"]:
+        return []
+    n = distance(a, b)
+    line = [along(a, b, k / n) for k in range(n + 1)]
+    best = {a: (0, 0, 0)}
+    came: dict = {}
+    todo = [((0, 0, 0), a)]
+    while todo:
+        cost, h = heapq.heappop(todo)
+        if h == b:
+            break
+        if cost > best[h]:
+            continue
+        for m in neighbours(*h):
+            if distance(a, m) + distance(m, b) > n + ROUTE_SLACK or not g.cell(*m)["land"]:
+                continue
+            nxt = (cost[0] + 1, cost[1] + hours_through(g.cell(*m)["ground"], speed_ft),
+                   cost[2] + min(distance(m, x) for x in line))
+            if nxt < best.get(m, (1 << 30,)):
+                best[m] = nxt
+                came[m] = h
+                heapq.heappush(todo, (nxt, m))
+    if b not in came:
+        return []
+    out = [b]
+    while came[out[-1]] != a:
+        out.append(came[out[-1]])
+    return out[::-1]
+
+
 def key(q: int, r: int) -> str:
     return f"{int(q)},{int(r)}"
 

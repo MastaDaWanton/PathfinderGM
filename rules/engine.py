@@ -21537,7 +21537,12 @@ class Engine:
 
         Where the party stops it looks round: the player's Perception, read against the
         site in its own hex and the six round it (ruling 3); every hex read is searched,
-        whatever the roll (ruling 10). A hex ridden through gets no look (ruling 9)."""
+        whatever the roll (ruling 10). A hex ridden through gets no look (ruling 9).
+
+        A hex further off is a destination (click-to-travel, owner 2026-11-21): the party
+        walks `hexes.land_route` to it one such move after another, every hex paying all of
+        the above, and stops short where a meeting, a fight, a new sighting or the end of
+        the travel day happens, the tell naming what stopped it and where."""
         from . import hexes, outskirts as outskirts_mod
         from . import journey as journey_mod
         from . import places as places_mod
@@ -21564,24 +21569,15 @@ class Engine:
             return self._refuse(intent, f"{pc.name} is in that hex already.")
         if not dest["land"]:
             return self._refuse(intent, "That hex is open water. Crossing it waits for a ship.")
-        if far > (2 if rides else 1):
-            if rides:
-                why = "Riding, the party reaches two hexes at most."
-            elif far == 2:
-                why = ("On foot the party moves one hex at a time; with a horse for everyone "
-                       "it could make two.")
-            else:
-                why = "On foot the party moves one hex at a time."
-            return self._refuse(intent, why)
-        path = [to]
-        if far == 2:
-            between = [h for h in hexes.neighbours(*here)
-                       if hexes.distance(h, to) == 1 and g.cell(*h)["land"]]
-            if not between:
-                return self._refuse(intent, "There is no land between here and there to ride over.")
-            # The cheaper ground first (plan §3: plain before rough), the board's order after.
-            between.sort(key=lambda h: hexes.hours_through(g.cell(*h)["ground"], pc.speed_feet))
-            path = [between[0], to]
+        # Click-to-travel (owner 2026-11-21, docs/research/2026-11-21-hex-travel-to.md): a
+        # hex further than a move reaches is a destination, walked over land a move at a
+        # time. Before it, the ruins three hexes out of Branford took three clicks.
+        route = hexes.land_route(g, here, to, pc.speed_feet)
+        if not route:
+            return self._refuse(intent, "There is no way over land from here to there.")
+        # Each move is what one click made before: one hex on foot, two riding (ruling 8),
+        # with its look only where the move ends (ruling 9).
+        legs = [route[i:i + (2 if rides else 1)] for i in range(0, len(route), 2 if rides else 1)]
 
         # The look round, the player's own die (the popup, as a track's is), asked before
         # anything is spent so the re-run with the face finds everything as it was.
@@ -21644,82 +21640,118 @@ class Engine:
             self._journeyed = ""
         stop = here
         hours = 0
-        for step in path:
-            cell = g.cell(*step)
-            was = g.cell(*stop)
-            set_out = self.scene.clock_minutes
-            doc = hexes.place_doc(g, step[0], step[1], parent=self.scene.at or "")
-            if cell["town"] and self.world is not None:
-                ring = self._ring(self.world.get(cell["town"]), "")
-                out = next((p for p in ring if p.name == outskirts_mod.OUTSKIRTS), None)
-                if out is not None:
-                    doc["exits"] = [out.id]
-            held = next((d for d in self.scene.founded if d.get("id") == doc["id"]), None)
-            if held is None:
-                self.scene.founded.append(doc)
-            elif doc["id"] not in places_mod.up_from(self.scene.founded, doc["parent"]):
-                # Walked into from wherever the party stands now: the parent is the way back.
-                # Never under a place that already hangs off it (playtest 2026-11-20 #3: out
-                # to the grassland and back left the two hexes each other's parent, and the
-                # party trapped in the ruins); a hex up the chain is in the set already.
-                held["parent"] = doc["parent"]
-            hours = hexes.hours_through(cell["ground"], pc.speed_feet)
-            if rides:
-                hours = journey_mod.mounted_hours(hours, "ride")[0]
-            toll = survival.pass_hours(pc, hours, self.dice, biome=cell["ground"])
-            self.scene.advance(max(1, toll.hours) * survival.MINUTES_PER_HOUR, charge_body=False)
-            self._hours_underway[doc["id"]] = hours
-            self._hex_quiet.add(doc["id"])
-            try:
-                moved = self._op_travel(Intent(
-                    op="travel", actor=pc.ref, because=intent.because,
-                    params={"place": doc["id"], **({"pace": "ride"} if rides else {})},
-                    visibility="hidden", id=intent.id, origin=intent.origin,
-                    origin_name=intent.origin_name), {})
-            finally:
-                self._hours_underway.pop(doc["id"], None)
-                self._hex_quiet.discard(doc["id"])
-            self._journeyed = ""
-            if moved.status == "refused":
-                if stop == here:
-                    return self._refuse(intent, moved.tell)
-                break
-            # The day told the way a GM tells a vector of travel (the Alexandrian,
-            # "Hexcrawl Addendum: Describing Travel"): ground, distance and time first, the
-            # cost, then what was seen. The place doc `travel` would add ("Open forest, 12
-            # miles east of Branford, in Faerholt March") is left out: on the 0.4.4 page it
-            # was the whole consequence block and the narrator named the forest after the
-            # nation in it (playtest 2026-11-20 #4).
-            tells.append(f"{english.number(hours).capitalize()} "
-                         f"hour{'s' if hours != 1 else ''} "
-                         + ("riding " if rides else "on foot ")
-                         + hexes.bearing((was["x"], was["y"]), (cell["x"], cell["y"]))
-                         + f" through the {cell['ground']}, to {doc['name']}. "
-                         + hexes.day_said(set_out, self.scene.clock_minutes))
-            if toll.checks:
-                tells.append(f"The way cost them: {survival_note(toll)}")
-            tells.append(moved.tell)
-            effects.extend(moved.effects)
-            if self.scene.at != doc["id"]:
-                break
-            stop = step
-            # On the ground of the town it lies nearest: its nation, coin and law answer.
-            town = places_mod.location_of(self.scene.at or "")
-            if town and town != self.scene.location_id and self.world is not None \
-                    and self.world.get(town) is not None:
-                self.scene.location_id = town
-                self.place_party(self.scene.at)
-            rec = self._hex_touched(stop)
-            rec.setdefault("entered", self.scene.clock_minutes)
-            rec["since"] = self.scene.clock_minutes
-            effects.append({"kind": "hex", "q": stop[0], "r": stop[1], "hours": hours,
-                            "ground": cell["ground"], "origin": "rule:hex-move"})
-            if self.scene.in_encounter:
-                break
-
-        # The look round from where the party stopped, and only there (ruling 9).
+        rolls = [look]
+        on_the_way = 0      # this click's hours walked, against the travel day
+        why, cut = "", ""   # what stopped the walk short of `to` (a code, and its words)
         spotted = self.scene.hexes.setdefault("spotted", {})
-        if stop != here:
+        for n_leg, path in enumerate(legs):
+            if n_leg:
+                # A later move's look is the engine's own d20 (the player rolled the first,
+                # on the popup): a popup a hex would be the clicks this saves, by another
+                # name. Shown in the tell as the first is.
+                look = self.dice.d20(mods, label=f"{pc.name} Perception (the land around)",
+                                     visibility="player")
+                rolls.append(look)
+            leg_from = stop
+            for step in path:
+                cell = g.cell(*step)
+                was = g.cell(*stop)
+                set_out = self.scene.clock_minutes
+                doc = hexes.place_doc(g, step[0], step[1], parent=self.scene.at or "")
+                if cell["town"] and self.world is not None:
+                    ring = self._ring(self.world.get(cell["town"]), "")
+                    out = next((p for p in ring if p.name == outskirts_mod.OUTSKIRTS), None)
+                    if out is not None:
+                        doc["exits"] = [out.id]
+                held = next((d for d in self.scene.founded if d.get("id") == doc["id"]), None)
+                if held is None:
+                    self.scene.founded.append(doc)
+                elif doc["id"] not in places_mod.up_from(self.scene.founded, doc["parent"]):
+                    # Walked into from wherever the party stands now: the parent is the way
+                    # back. Never under a place that already hangs off it (playtest
+                    # 2026-11-20 #3: out to the grassland and back left the two hexes each
+                    # other's parent, and the party trapped in the ruins); a hex up the
+                    # chain is in the set already.
+                    held["parent"] = doc["parent"]
+                hours = hexes.hours_through(cell["ground"], pc.speed_feet)
+                if rides:
+                    hours = journey_mod.mounted_hours(hours, "ride")[0]
+                toll = survival.pass_hours(pc, hours, self.dice, biome=cell["ground"])
+                self.scene.advance(max(1, toll.hours) * survival.MINUTES_PER_HOUR,
+                                   charge_body=False)
+                self._hours_underway[doc["id"]] = hours
+                self._hex_quiet.add(doc["id"])
+                try:
+                    moved = self._op_travel(Intent(
+                        op="travel", actor=pc.ref, because=intent.because,
+                        params={"place": doc["id"], **({"pace": "ride"} if rides else {})},
+                        visibility="hidden", id=intent.id, origin=intent.origin,
+                        origin_name=intent.origin_name), {})
+                finally:
+                    self._hours_underway.pop(doc["id"], None)
+                    self._hex_quiet.discard(doc["id"])
+                self._journeyed = ""
+                if moved.status == "refused":
+                    if stop == here:
+                        return self._refuse(intent, moved.tell)
+                    why, cut = "refused", moved.tell.rstrip(".")
+                    break
+                # The day told the way a GM tells a vector of travel (the Alexandrian,
+                # "Hexcrawl Addendum: Describing Travel"): ground, distance and time first,
+                # the cost, then what was seen. The place doc `travel` would add ("Open
+                # forest, 12 miles east of Branford, in Faerholt March") is left out: on the
+                # 0.4.4 page it was the whole consequence block and the narrator named the
+                # forest after the nation in it (playtest 2026-11-20 #4).
+                tells.append(f"{english.number(hours).capitalize()} "
+                             f"hour{'s' if hours != 1 else ''} "
+                             + ("riding " if rides else "on foot ")
+                             + hexes.bearing((was["x"], was["y"]), (cell["x"], cell["y"]))
+                             + f" through the {cell['ground']}, to {doc['name']}. "
+                             + hexes.day_said(set_out, self.scene.clock_minutes))
+                if toll.checks:
+                    tells.append(f"The way cost them: {survival_note(toll)}")
+                tells.append(moved.tell)
+                effects.extend(moved.effects)
+                if self.scene.at != doc["id"]:
+                    why, cut = "stopped", "something on the way held you"
+                    break
+                stop = step
+                on_the_way += hours
+                # On the ground of the town it lies nearest: its nation, coin and law answer.
+                town = places_mod.location_of(self.scene.at or "")
+                if town and town != self.scene.location_id and self.world is not None \
+                        and self.world.get(town) is not None:
+                    self.scene.location_id = town
+                    self.place_party(self.scene.at)
+                rec = self._hex_touched(stop)
+                rec.setdefault("entered", self.scene.clock_minutes)
+                rec["since"] = self.scene.clock_minutes
+                effects.append({"kind": "hex", "q": stop[0], "r": stop[1], "hours": hours,
+                                "ground": cell["ground"], "origin": "rule:hex-move"})
+                # A meeting stops the walk where it happens (plan §3), a peaceful one too:
+                # `travel` names who stopped you in `met_refs` (walked past is not met).
+                if self.scene.in_encounter:
+                    why, cut = "fight", "a fight"
+                    break
+                if any(isinstance(x, dict) and x.get("met_refs") for x in moved.effects):
+                    why, cut = "met", "someone met on the way"
+                    break
+                # The body gave out on the way (a failed save against sleep, asleep, out
+                # cold): live 2026-11-21, a walk through the night went on past "they
+                # could not keep going".
+                if toll.collapsed or toll.fell_asleep or toll.knocked_out:
+                    why, cut = "spent", "they could not keep going"
+                    break
+                # The travel day: CRB overland, eight hours a day (`journey.HOURS_PER_DAY`;
+                # past it is a forced march). A hex begun inside the day is finished, so on
+                # foot two plain hexes make the day, the CRB's 24 miles at 30 ft.
+                if on_the_way >= journey_mod.HOURS_PER_DAY and step != to:
+                    why, cut = "day", "the day's travelling is done"
+                    break
+
+            # The look round from where the move stopped, and only there (ruling 9).
+            if stop == leg_from:
+                break
             sp = g.cell(*stop)
             seen_lines: list[str] = []
             known_here = ""
@@ -21756,8 +21788,23 @@ class Engine:
                 tells.append(f"Looking over the land ({shown}), nothing stands out.")
             if known_here:
                 tells.append(known_here)
+            if stop == to or why:
+                break
+            if seen_lines:
+                # Something new to head for: the player chooses, not the click made before.
+                why, cut = "sighted", "something new is in sight"
+                break
+        if why and stop != to:
+            left = hexes.distance(stop, to)
+            tells.append(f"The walk stops on {self.here().name}, {english.number(left)} "
+                         f"hex{'es' if left != 1 else ''} short of where you were going: "
+                         f"{cut}.")
+        if len(route) > 1:
+            effects.append({"kind": "hex_walk", "to": list(to), "stopped": list(stop),
+                            "hexes": len(route), "why": why if stop != to else "",
+                            "hours": on_the_way, "origin": "rule:hex-walk"})
         tell = " ".join(t for t in tells if t).strip() + (xp_line or "")
-        return Outcome(intent_id=intent.id, op="hex_move", rolls=[look], effects=effects,
+        return Outcome(intent_id=intent.id, op="hex_move", rolls=rolls, effects=effects,
                        tell=tell, because=intent.because)
 
     def _op_hex_enter(self, intent: Intent, partial: dict) -> Outcome:

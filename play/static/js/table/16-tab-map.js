@@ -84,17 +84,27 @@ function hexBearing(a, b) {
   const c = (q, r) => [Math.sqrt(3) * (q + r / 2), 1.5 * r], p = c(a[0], a[1]), t = c(b[0], b[1]);
   return HEX_COMPASS[((Math.round(Math.atan2(t[1] - p[1], t[0] - p[0]) / (Math.PI / 4)) % 8) + 8) % 8];
 }
+function hexDistance(a, b) { return Math.max(Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1]), Math.abs(b[0] + b[1] - a[0] - a[1])); }
 // The slip's travel buttons: the keyboard's way onto the hexes the board lights.
 function hexSlip(v) {
   const HS = (v.KP && v.KP.hexes) || {};
   if (!v.hexgrid || !HS.party || v.homeNation !== v.nation) return "";
   const at = {}; v.hexgrid.hexes.forEach(h => { at[h.q + "," + h.r] = h; });
   const hours = g => { const walk = g === "grassland" || g === "farmland" ? 5 : 8; return HS.rides ? Math.ceil(walk / 2) : walk; };
-  const btns = (HS.reach || []).map(([q, r]) => { const h = at[q + "," + r] || {}, far = Math.max(Math.abs(q - HS.party[0]), Math.abs(r - HS.party[1]), Math.abs(q + r - HS.party[0] - HS.party[1]));
+  const btns = (HS.reach || []).map(([q, r]) => { const h = at[q + "," + r] || {}, far = hexDistance(HS.party, [q, r]);
     const where = h.town ? ((v.W.cities.find(c => c.id === h.town) || {}).name || "a town") : h.ground || "open ground";
     return `<button type="button" class="v2-btn" data-hexgo="${esc(q)},${esc(r)}">${esc(upFirst(hexBearing(HS.party, [q, r])))}${far > 1 ? " ×2" : ""}: ${esc(where)}, ${far > 1 ? "about " : ""}${far > 1 ? hours(h.ground) * 2 : hours(h.ground)} h</button>`; });
+  // Click-to-travel's chips (owner 2026-11-21): each spotted site further than a move, walked
+  // to a hex at a time; any other seen hex is pressed on the board.
+  const SITE_IS = { tower: "the tower", ruins: "the ruins", mine: "the old mine", cave: "the cave" };
+  const reachK = new Set((HS.reach || []).map(([q, r]) => q + "," + r));
+  Object.entries(HS.spotted || {}).forEach(([k, kind]) => {
+    const [q, r] = k.split(",").map(Number), far = hexDistance(HS.party, [q, r]);
+    if (far < 1 || reachK.has(k)) return;
+    btns.push(`<button type="button" class="v2-btn" data-hexgo="${esc(q)},${esc(r)}">Walk to ${esc(SITE_IS[kind] || "the site")}: ${esc(far)} hexes ${esc(hexBearing(HS.party, [q, r]))}</button>`);
+  });
   const site = HS.site_here && !HS.in_site ? `<p><button type="button" class="v2-btn" data-hexenter="1">Go into ${esc({ tower: "the tower", ruins: "the ruins", mine: "the old mine", cave: "the cave" }[HS.site_here] || "the site")}</button></p>` : "";
-  return `<div class="mapnote hextravel"><h3>Travel</h3><p>${HS.rides ? "Riding, two hexes a move" : "On foot, one hex a move"}: five hours across open plain, eight across rougher ground${HS.rides ? ", half that riding" : ""}. Where you stop you look round, and every hex the look covers clears on the map.</p>
+  return `<div class="mapnote hextravel"><h3>Travel</h3><p>${HS.rides ? "Riding, two hexes a move" : "On foot, one hex a move"}: five hours across open plain, eight across rougher ground${HS.rides ? ", half that riding" : ""}. Where you stop you look round, and every hex the look covers clears on the map. Press any hex you have seen to walk there a hex at a time: a meeting, something new in sight or the day's end stops you on the way.</p>
     <p class="hexgo">${btns.join(" ")}</p>${site}</div>`;
 }
 
