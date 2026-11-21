@@ -15213,6 +15213,18 @@ class Engine:
             # checked at. A place with no entrance at all falls back to the first, which
             # is what every location did before.
             here_now = self.places()
+            from . import hexes
+
+            if hexes.parse_place(self.scene.at or "") is not None:
+                # Out on a hex of the region map the party sees that hex alone
+                # (`places._out_in_a_hex`), so a journey set out from one "arrived" in it:
+                # the far town became the location and the party stood on open desert a
+                # hex from the town it had left (measured 2026-11-21, every fixture world).
+                found = self.world.get(self.scene.location_id) if self.world else None
+                here_now = places_mod.for_scene(
+                    found or self.scene.location_id, "",
+                    terrain_hint=self._terrain_hint(found), founded=self.scene.founded,
+                    ring=self._ring(found, ""))
             target = next(
                 (p for p in here_now
                  if " ".join(str(p.name or "").split()).lower() in places_mod.ENTRANCES),
@@ -15628,7 +15640,20 @@ class Engine:
         # journey left behind, and it is only good for the road it was left on: setting
         # out for somewhere else, or from somewhere else, is a new journey at full cost.
         resumed = 0
-        if (self.scene.road.get("to") == leg.to_id
+        # Out on the region map's hexes, the board is where the party is: the road is
+        # joined that far along it, and the hexes walked toward the far town count as road
+        # behind them (away from it, as road to make up: `resumed` goes negative). Each hex
+        # walked already paid its own hours and rolled its own check (`_op_hex_move`), so
+        # the road's stretches roll only over what is left — never the whole road again.
+        # Measured 2026-11-21 before this: one hex out of town toward Vylthysia, the
+        # journey still charged all four days of road. A road record from a stretch of
+        # road walked off onto the hexes is superseded by the board.
+        share = self.road_share_left(leg) if sea_leg is None else None
+        if share is not None:
+            self.scene.road = {}
+            resumed = hours - max(1, round(hours * share))
+            hours -= resumed
+        elif (self.scene.road.get("to") == leg.to_id
                 and self.scene.road.get("from") == self.scene.location_id):
             resumed = max(0, int(self.scene.road.get("walked") or 0))
             # A bridge down on this road (`ontheway` band "bridge") is the long way
@@ -15782,7 +15807,10 @@ class Engine:
                                # progress: they cost the clock and the body and move
                                # nobody an inch nearer the far end. And they are hours
                                # ON FOOT, whatever the pace was.
-                               "walked": resumed + walked_units}
+                               "walked": max(0, resumed + walked_units),
+                               # The whole road on foot: where on the region map the
+                               # stretch of road stands (`party_hex`).
+                               "of": on_foot}
             if met is not None and met.kind == "bridge":
                 self.scene.road["detour"] = int(
                     ontheway.events().get("bridge_detour_hours", 8))
@@ -15794,7 +15822,7 @@ class Engine:
             total = max(1, on_foot)
             if crosses:
                 ground = crosses[min(len(crosses) - 1,
-                                     int(len(crosses) * (resumed + walked_units) / total))]
+                                     int(len(crosses) * max(0, resumed + walked_units) / total))]
             else:
                 ground = places_mod.terrain_of(self.scene.at) or "grassland"
             if ground == places_mod.URBAN:
@@ -15812,7 +15840,10 @@ class Engine:
             # this said the far town, which they had just been told they did not reach.
             self._journeyed = self.here().name
         else:
-            self.place_party()
+            # Turned back: out on a hex, back to that hex, not to the town's gate.
+            from . import hexes
+
+            self.place_party(self.scene.at if hexes.parse_place(self.scene.at or "") else "")
 
         # Whoever came along comes along. `place_party` writes the PARTY's place — the
         # PC and anybody who has no place at all — so an escort kept by `with` was left
@@ -15911,13 +15942,16 @@ class Engine:
                          .replace(" on the road", ""))
             start = (getattr(self.world.get(self.scene.location_id), 'name', 'town')
                      if self.world else 'town')
-            quiet = (ontheway.quiet_days(met.day - 1, start, further=bool(resumed))
+            # "more" only for a road taken up again: from open country (`share`) the live
+            # 2026-11-21 tell read "A quiet day more on the road" on the first day out.
+            quiet = (ontheway.quiet_days(met.day - 1, start,
+                                         further=resumed > 0 and share is None)
                      if met.day > 1 else "")
             bits = [(f"{quiet}; on the {self._ordinal(met.day)} day the road to "
                      f"{leg.to_name} stops being yours." if quiet else
                      f"{out_words} on foot out of {start} on the road to {leg.to_name}"
                      + (f" ({hours} hour{'s' if hours != 1 else ''} of it this time)"
-                        if resumed else "")
+                        if resumed > 0 else "")
                      + ", and the road stops being yours."),
                     ontheway.describe(met, who=[self.scene.actors[m["ref"]].name
                                                 for m in made
@@ -15956,7 +15990,14 @@ class Engine:
         elif met is not None:
             # Met on the last watch: the road ended at the same time.
             bits.append(ontheway.describe(met))
-        if resumed:
+        if share is not None and resumed:
+            # Joined from open country (`road_share_left`): said, so the page does not
+            # tell the road as walked from the gate.
+            n = abs(resumed)
+            bits.append(f"From open country: {n} hour{'s' if n != 1 else ''} of the road "
+                        + ("already behind them, walked across the hexes." if resumed > 0
+                           else "more, to make up the ground walked away from it."))
+        elif resumed > 0:
             bits.append(f"The {resumed} hour{'s' if resumed != 1 else ''} of it already "
                         f"behind them counted: only the rest was walked today.")
         if how == "derived":
@@ -21180,10 +21221,39 @@ class Engine:
         ship, at sea, or with no world."""
         from . import places as places_mod
 
+        from . import hexes, outskirts as outskirts_mod
+
         g = g or self.hex_world()
         if g is None or places_mod.terrain_of(self.scene.at) == "deck":
             return None
+        road = self.scene.road or {}
+        if outskirts_mod.is_along(self.scene.at or "") and road.get("of"):
+            # A journey stopped on the road stands that far along it on the board, between
+            # its two towns' hexes, not on the town it left: until 2026-11-21 a party two
+            # days down the road stepped off onto the hexes beside the gate.
+            a, b = g.town_hex.get(str(road.get("from"))), g.town_hex.get(str(road.get("to")))
+            if a is not None and b is not None:
+                h = hexes.along(a, b, int(road.get("walked") or 0) / max(1, int(road["of"])))
+                if g.cell(*h)["land"]:
+                    return h
         return g.hex_of_place(self.scene.at or "", self.scene.location_id or "")
+
+    def road_share_left(self, leg) -> float | None:
+        """Out on a hex of the region map, how much of the road to `leg`'s town is still
+        to go: the hexes from the party to that town over the hexes between the two towns
+        (more than 1 when the party walked away from it). None anywhere but a hex (a town,
+        a stretch of road, a deck), where the road is the whole road or its own record."""
+        from . import hexes
+
+        if hexes.parse_place(self.scene.at or "") is None:
+            return None
+        g = self.hex_world()
+        here = self.party_hex(g) if g is not None else None
+        a = g.town_hex.get(self.scene.location_id or "") if g is not None else None
+        b = g.town_hex.get(leg.to_id) if g is not None else None
+        if here is None or a is None or b is None or a == b:
+            return None
+        return hexes.distance(here, b) / hexes.distance(a, b)
 
     def party_rides(self) -> bool:
         """Whether the whole party rides (the owner's ruling 8, 2026-11-19): a mount for
