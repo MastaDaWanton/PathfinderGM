@@ -2785,9 +2785,11 @@ def handed(text: str) -> dict | None:
     return _HANDED.pop(_key(text), None)
 
 
-def _road_to(phrase, scene) -> bool:
+def _road_to(phrase, scene, *, heads: bool = False) -> bool:
     """Whether the phrase names a settlement a road from here reaches — the world's own
-    legs (`journey.legs_from`, `journey.find`), never the words' meaning."""
+    legs (`journey.legs_from`, `journey.named`), never the words' meaning. With `heads`,
+    the name of that road's head counts too ("the road to Brackgate"): asked only where
+    no place here is called that, i.e. out on a hex, where the ring's road heads are not."""
     from rules import journey, residency
 
     world = residency._world(None)
@@ -2802,8 +2804,7 @@ def _road_to(phrase, scene) -> bool:
     pc = scene.pc() if hasattr(scene, "pc") else None
     if ship is not None and pc is not None and ship.held_by == pc.ref:
         legs = list(legs) + ships.her_waters(world, ship)
-    want = " ".join(str(phrase).split()).lower().removeprefix("the ")
-    return any(leg.to_name.lower() == want or leg.to_id == phrase for leg in legs)
+    return journey.named(legs, phrase, heads=heads) is not None
 
 
 def _board_square(a: dict, scene) -> bool:
@@ -2883,6 +2884,11 @@ def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
                     a["here"] = ref
             if p is not None and p.id != here:
                 add("travel")
+            elif p is None and _road_to(a["place"], scene, heads=True):
+                # The head of a road out, named where no place is called that: out on a
+                # hex, the ring's road heads are not among the places. A journey, not a
+                # walk to a road head founded in the ruins (journey-words #1, 2026-11-21).
+                add("journey")
             elif p is None and _outward(a["place"]) and _has_outside(places):
                 # "the nearest crossroads", "the path away from town": a phrase no place
                 # here is called, which names the ground outside (Bobby, turns 6 and 7).

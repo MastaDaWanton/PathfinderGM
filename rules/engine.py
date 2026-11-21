@@ -4092,6 +4092,21 @@ class Engine:
                     f"roll it: check skill=diplomacy, check skill=intimidate, or "
                     f"check skill=bluff for a lie about who you are, the only lie that "
                     f"moves a listener.", "legality", index, code="mind_ungated")
+        if intent.op == "found" and intent.params.get("name"):
+            # A real town, or the head of the road to it, founded where the scene holds no
+            # such place: the way there is the journey (journey-words #1, 2026-11-21, a
+            # plan founded "the road to Brackgate" in the ruins and walked into it).
+            # Refused here so the retry writes the journey; `_op_found` refuses it too.
+            from . import places as places_mod
+
+            name = str(intent.params["name"])
+            far = None if places_mod.find(self.places(), name) else self.far_town_named(name)
+            if far is not None:
+                raise IntentError(
+                    f"found: {name!r} is the way to {far.to_name}, another settlement, and "
+                    f"going there is a journey of days: {{\"op\": \"journey\", \"actor\": "
+                    f"\"pc\", \"params\": {{\"to\": \"{far.to_name}\"}}}} — and nothing "
+                    f"is founded.", "schema", code="far_town")
         if intent.op == "travel" and intent.params.get("place"):
             # A destination the scene does not hold is refused HERE, where the plan's
             # repair loop reads the message and names a real one — not in `run`,
@@ -4114,6 +4129,14 @@ class Engine:
                         known, str(intent.params["place"]), self.scene.at or "",
                         str(getattr(found_here, "name", "") or "")) is None \
                     and places_mod.find(outside, str(intent.params["place"])) is None:
+                far = self.far_town_named(str(intent.params["place"]))
+                if far is not None:
+                    raise IntentError(
+                        f"travel: {intent.params['place']!r} is the way to {far.to_name}, "
+                        f"another settlement, and going there is a journey of days, not a "
+                        f"walk: {{\"op\": \"journey\", \"actor\": \"pc\", \"params\": "
+                        f"{{\"to\": \"{far.to_name}\"}}}} — and nothing is founded.",
+                        "schema", code="far_town")
                 # The found example names `parent`. It taught leaving it out until
                 # 2026-09-30 (item 9, turn_log row 102): "I head toward the back streets
                 # to find the Velvet Veil" founded the Veil with no parent, so it went
@@ -18905,6 +18928,14 @@ class Engine:
                 intent, f"There is no {intent.params.get('parent')} here to found it off. "
                         f"From here you can reach {self._reachable_words() or 'nowhere else'}.")
         there = places_mod.find(known, name)
+        far = self.far_town_named(name) if there is None else None
+        if far is not None:
+            # A real town of the world, or the head of the road to it, is not a place to
+            # make here: journey-words #1 (2026-11-21) founded "the road to Brackgate" in
+            # the ruins east of Branford and walked into it.
+            return self._refuse(intent, f"{name} is the way to {far.to_name}, another "
+                                        f"settlement: going there is a journey, and "
+                                        f"nothing is founded for it.")
         if there is not None:
             # Bobby's turns 6 and 7: "I walk to the nearest crossroads" planned a `found`
             # of one. Vormoor has a crossroads now (the ring), and the refusal says to go
@@ -21308,6 +21339,19 @@ class Engine:
                 if g.cell(*h)["land"]:
                     return h
         return g.hex_of_place(self.scene.at or "", self.scene.location_id or "")
+
+    def far_town_named(self, name: str):
+        """The road out whose far town `name` names whole — the town or the head of its
+        road (`journey.named`) — or None. Asked of a place the scene does not hold: out on
+        a hex the ring's road heads are not among the places, and a plan that walked to
+        one founded it (journey-words #1, 2026-11-21). A real town is never minted as a
+        place here; the way there is the journey."""
+        from . import journey as journey_mod
+
+        if self.world is None or not str(name or "").strip():
+            return None
+        return journey_mod.named(journey_mod.legs_from(self.world, self.scene.location_id),
+                                 name)
 
     def road_share_left(self, leg) -> float | None:
         """Out on a hex of the region map, how much of the road to `leg`'s town is still

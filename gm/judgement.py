@@ -5825,7 +5825,10 @@ def inject_travel(raw_intents, player_text: str, scene, world=None) -> list:
         return raw_intents
     if "?" in player_text:
         return raw_intents
-    if any(str(r.get("op", "")).lower() == "travel"
+    # A journey moves the ground too: journey-words #2 (2026-11-21), with the plan's walk
+    # ashore struck beside a booked passage, this added a travel "Back within Branford"
+    # and the leaving-in-place check refused all seven attempts.
+    if any(str(r.get("op", "")).lower() in ("travel", "journey")
            for r in raw_intents if isinstance(r, dict)):
         return raw_intents
 

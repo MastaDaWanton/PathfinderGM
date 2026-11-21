@@ -513,6 +513,30 @@ def find(legs: list[Leg], name: str) -> Leg | None:
     for leg in legs:
         if want in leg.to_name.lower():
             return leg
+    # "the road to Brackgate": the head of the road, named for the town it goes to.
+    return named(legs, name)
+
+
+def named(legs, phrase, *, heads: bool = True) -> Leg | None:
+    """The leg whose far town `phrase` names whole: the town's own name or id, or (with
+    `heads`) the name the ring gives the head of its road (`outskirts`: "the road to
+    {To}", "the way to {To}"). Equality against the world's own names, never a reading
+    of the words (owner 2026-10-03, models read and code validates).
+
+    Unlike `find` there is no substring match: "Brack" is not Brackgate. Playtest of the
+    owner's save 2026-11-21 (journey-words #1): from the ruins east of Branford, a plan's
+    travel to "the road to Brackgate" was founded as a new place in the ruins."""
+    def bare(s) -> str:
+        return " ".join(str(s or "").split()).lower().removeprefix("the ")
+
+    want = bare(phrase)
+    if not want:
+        return None
+    for leg in legs:
+        names = {leg.to_name} | ({f"the road to {leg.to_name}", f"the way to {leg.to_name}"}
+                                 if heads else set())
+        if want in {bare(n) for n in names} or str(phrase).strip() == leg.to_id:
+            return leg
     return None
 
 

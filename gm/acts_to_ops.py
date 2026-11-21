@@ -1281,6 +1281,22 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 row.intents.remove(b)
                 row.note = "giving themselves up once this turn already"
             given = True
+    # A journey is the turn's one move, and it walks the party out from wherever it stands
+    # (`Engine._op_journey`: the docks, the quay, the road head, a hex). A walk owed beside
+    # it is the same leaving twice, and the engine refuses whichever comes second ("One
+    # journey a turn"). Playtest of the owner's save 2026-11-21 (journey-words #1): "I leave
+    # the ruins and set out on the road to Brackgate" was read `leave` + `journey`; the
+    # leave's travel ran first, founded "the road to Brackgate" in the ruins, walked 8
+    # minutes into it, and the journey was refused.
+    if any("journey" in r.ops for r in rows):
+        for row in rows:
+            if "travel" in row.ops:
+                row.ops.remove("travel")
+                row.note = row.note or "the journey is the way out"
+            walks = [b for b in row.intents if b.get("op") in ("travel", "found")]
+            if walks:
+                row.intents = [b for b in row.intents if b not in walks]
+                row.note = row.note or "the journey is the way out"
     return rows
 
 
@@ -3486,7 +3502,11 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
     # was planned as a travel to "the outskirts" AND the journey; the travel walked the
     # party a day back to the town they had left, shed the caravan, and the journey was
     # then refused as the turn's second.
-    journeying = any(r.act == "go" and "journey" in r.ops for r in rows)
+    # Any act's journey, since journey-words #2 (2026-11-21): "book passage to Balgrim" and
+    # "set sail for Balgrim" are read `journey`, the plan wrote a travel ashore to the docks
+    # (or to the deck) beside each, and the walk took the party off the ship it had just
+    # boarded, so sailing cost a turn more.
+    journeying = any("journey" in r.ops for r in rows)
     # A walk the table carried on (`_carry_on`) is the turn's walk: the plan's own travel
     # beside it would walk twice, or somewhere else.
     carrying_on = any(b.get("op") == "travel" for b in built)
@@ -3654,9 +3674,11 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
             if notes is not None:
                 notes.append(f"the plan's {op} replaced by the walk home together")
             continue
-        if journeying and op == "travel":
+        if journeying and op in ("travel", "found"):
+            # And the found the travel was written for: a place minted for a walk that
+            # never happens (journey-words #1, "the road to Brackgate" in the ruins).
             if notes is not None:
-                notes.append("the plan's travel struck: the reading's go is a journey")
+                notes.append(f"the plan's {op} struck: the reading's go is a journey")
             continue
         if op == "attack" and stolen_from and str((r or {}).get("target")) in stolen_from \
                 and str((r or {}).get("actor") or pc.ref) in (pc.ref, "pc"):
