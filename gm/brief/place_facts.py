@@ -20,6 +20,9 @@ SLOT = "place"
 # Only the separator is fixed: the keys and their values are the world's own words.
 SCAFFOLD = ()
 
+# The keys that say what the settlement looks like, left out when the party is past its
+# streets (`places.off_its_streets`): its social and law keys still hold out there.
+LOOKS_KEYS = frozenset({"Urban Life", "Architecture", "Daily Life"})
 KEYS = ("Urban Life", "Social Classes", "Architecture", "Governance",
         "Formal Power", "Shadow Power", "Tension", "Daily Norms")
 # What other exports call the same things (R0, 2026-09-28), read after the eight.
@@ -33,9 +36,14 @@ def section(ctx) -> tuple[str, dict]:
     location = ctx.location
     if not location:
         return "", {}
+    from rules import places
+
     scale = stated_scale(location)
     lines, printed = [], {}
+    away = places.off_its_streets(location, getattr(getattr(ctx, "scene", None), "at", "") or "")
     for key in KEYS + MORE_KEYS:
+        if away and key in LOOKS_KEYS:
+            continue
         if location.fact(key):
             said = geography.in_its_own_words(str(location.fact(key)), scale)
             shown = geography.display_key(key)

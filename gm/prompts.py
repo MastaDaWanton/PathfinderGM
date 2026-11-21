@@ -1004,6 +1004,16 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
         # oak desk you just searched" — the study from worked example ten. Two
         # paragraphs, capped, because the brief is a budget.
         told = place_in_its_own_words(location)
+        # A settlement's words describe its streets, not the land it owns: out past them
+        # (the fields, a road, a hex of the region map and the site in it, all filed under
+        # the nearest town) the party is not in what they describe, and nothing the world
+        # exports describes a hex. Owner's save, 2026-11-21: in a ruins hex the brief said
+        # "Branford runs on priest-scribes …", and the planned see block put that line
+        # beside the ask. A wild site the world wrote is its own location: its words stay.
+        from rules import places as _places
+
+        if _places.off_its_streets(location, getattr(scene, "at", "") or ""):
+            told = ""
         if told:
             lines.append(f"  THE PLACE, IN ITS OWN WORDS: {told}")
         parents = [e.name for e in world.ancestors(location.id) if e.kind != "WORLD"]
