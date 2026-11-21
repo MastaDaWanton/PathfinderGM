@@ -57,22 +57,3 @@ def plural(noun: str) -> str:
     else:
         pl = last + "s"
     return " ".join(words[:-1] + [pl])
-
-
-_ONES = ("zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine",
-         "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen",
-         "seventeen", "eighteen", "nineteen")
-_TENS = ("", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety")
-
-
-def number(n: int) -> str:
-    """A whole number in words, 0 to 99 ("eleven", "twenty-three"); digits past that.
-    For the journey's quiet days (`ontheway.quiet_days`): a tell says "eleven quiet days",
-    as the owner did, never "11"."""
-    n = int(n)
-    if 0 <= n < 20:
-        return _ONES[n]
-    if 20 <= n < 100:
-        tens, ones = divmod(n, 10)
-        return _TENS[tens] + (f"-{_ONES[ones]}" if ones else "")
-    return str(n)
