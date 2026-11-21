@@ -231,7 +231,12 @@ def test_a_second_click_cannot_walk_a_second_day_unasked(worlds, quiet_road, mon
 
 def test_pushing_on_is_a_forced_march_with_its_checks(worlds, quiet_road, monkeypatch):
     """Chosen (`march`), the walk goes on, and every hour past eight is a Constitution
-    check at DC 10, +2 an hour, named in the tell; the hours keep counting."""
+    check at DC 10, +2 an hour; the hours keep counting.
+
+    The checks live in the effects and the turn's rolls, never the tell: the owner's
+    screenshot (2026-11-21) showed five "Shadow Constitution 15 vs DC 10, holds up" lines
+    in the story, and the ruling put every check in the GM's section. The tell carries one
+    sentence for the march (`march_said`), with no figure in it."""
     s, e, pc = _party(worlds)
     monkeypatch.setattr(hexes, "site_of", lambda *a, **k: None)
     g = e.hex_world()
@@ -245,17 +250,19 @@ def test_pushing_on_is_a_forced_march_with_its_checks(worlds, quiet_road, monkey
     out = [o for o in (e.resume(1) if r.awaiting else r).outcomes if o.op == "hex_move"][0]
     assert out.status == "resolved", out.tell
     assert e.travelled_today() > before
-    import re
-
-    dcs = [int(x) for x in re.findall(r"vs DC (\d+)", out.tell)]
-    assert "a forced march" in out.tell and dcs
+    assert "a forced march" in out.tell.lower()
+    assert "vs DC" not in out.tell and "Constitution" not in out.tell
+    # As data, not English (owner ruling 2026-11-21: the numbers go to the GM's section,
+    # routed by structure): one record a check, with its roll and its toll.
+    marched = [x for x in out.effects if x.get("kind") == "forced_march"]
+    dcs = [x["dc"] for x in marched]
+    assert marched
     # Hour n past eight is DC 10 + 2(n-1): the first hour marched here is hour before+1.
     assert min(dcs) == 10 + 2 * (max(before, journey.HOURS_PER_DAY) + 1
                                  - journey.HOURS_PER_DAY - 1)
-    # As data, not only English (owner ruling 2026-11-21: the numbers go to the GM's
-    # section, routed by structure): one record a check, with its roll and its toll.
-    marched = [x for x in out.effects if x.get("kind") == "forced_march"]
-    assert marched and sorted({x["dc"] for x in marched}) == sorted(set(dcs))
+    # Each walker's check is a roll in the turn's dice log, the Rolls panel's source.
+    checks = [x for x in marched if not x["mount"]]
+    assert len([r for r in out.rolls if "forced march" in r.label.lower()]) == len(checks)
     for x in marched:
         assert x["ability"] == "con" and x["who"] and isinstance(x["passed"], bool)
         assert x["hour"] > journey.HOURS_PER_DAY and x["rolled"]["faces"]

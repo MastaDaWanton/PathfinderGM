@@ -21558,9 +21558,8 @@ class Engine:
                        and (a.has_state(states.TRAVELS_WITH_YOU) or a.has_state(states.HIRED))))]
         mounts = [m for m in journey_mod.owned_mounts(self.scene) if not m.is_down] \
             if rides else []
-        out, fx = [], []
+        fx = []
         for hour in range(first, last + 1):
-            said = []
             for a in walkers + mounts:
                 if a.is_down:
                     continue
@@ -21572,7 +21571,6 @@ class Engine:
                     a.add_condition(journey_mod.MOUNT_FATIGUE,
                                     rounds=journey_mod.FATIGUE_ROUNDS,
                                     source="forced march (mount)")
-                said.append(line)
                 got = toll.checks[0] if toll.checks else {}
                 fx.append({"kind": "forced_march", "ref": a.ref, "who": a.name,
                            "ability": "con", "hour": hour, "extra_hour": hour - day,
@@ -21584,9 +21582,31 @@ class Engine:
                            "conditions": [*toll.conditions,
                                           *([journey_mod.MOUNT_FATIGUE] if mount else [])],
                            "origin": "rule:forced-march"})
-            out.append(f"Hour {english.number(hour)} on the way, a forced march: "
-                       + "; ".join(said) + ".")
-        return out, fx
+        # One sentence for the night, no figure in it (owner ruling 2026-11-21: checks go to
+        # the GM's section). The hourly lines it replaced put five "Shadow Constitution 15
+        # vs DC 10, holds up" in the story; the figures stay in the effects above and the
+        # rolls `march_rolls` hands the Rolls panel.
+        from . import march_said
+
+        said = march_said.said(fx)
+        return ([said] if said else []), fx
+
+    @staticmethod
+    def march_rolls(fx: list[dict]) -> list:
+        """The forced march's Constitution checks as Rolls for the turn's dice log (the
+        Rolls panel), rebuilt from each effect's `rolled` record. A mount rolls nothing."""
+        out = []
+        for e in fx:
+            r = e.get("rolled") if isinstance(e, dict) else None
+            if not r:
+                continue
+            out.append(Roll(
+                die=r["die"], faces=list(r["faces"]),
+                modifiers=[Modifier(m["value"], m["source"], m.get("type", ""))
+                           for m in r.get("modifiers") or []],
+                label=f"{e.get('who') or ''}: {r.get('label') or 'forced march'}".strip(": "),
+                visibility=r.get("visibility") or "player"))
+        return out
 
     def hex_reach(self, g=None) -> list[tuple]:
         """The hexes a click can move the party to: each land neighbour, and, riding, each
@@ -21851,6 +21871,7 @@ class Engine:
                     tells.append(f"The way cost them: {survival_note(toll)}")
                 tells.extend(marched)
                 effects.extend(march_fx)
+                rolls.extend(self.march_rolls(march_fx))
                 tells.append(moved.tell)
                 effects.extend(moved.effects)
                 if self.scene.at != doc["id"]:
