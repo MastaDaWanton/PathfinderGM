@@ -338,9 +338,17 @@
   // footer, where the footer's button is. On a phone: the width of the screen.
   function place() {
     if (!isOpen()) return;
-    panel.style.left = panel.style.top = panel.style.right = panel.style.bottom = "";
+    panel.style.left = panel.style.top = panel.style.right = panel.style.bottom = panel.style.maxHeight = "";
     if (inBench || window.innerWidth <= 760) return;      // the stylesheet places these
     var w = panel.offsetWidth, h = panel.offsetHeight;
+    // Clear of the pen when there is room above it: level with a low door at 800x600 the
+    // panel (310-690 x 406-584) lay over the pen, Continue and Craft action (phase 6 hit
+    // test). Its list scrolls inside, so it may be shortened down to 160px to fit.
+    var pen = document.getElementById("sayform");
+    var room = pen && pen.offsetParent ? pen.getBoundingClientRect().top - 12 - 16 : 0;
+    if (room >= Math.min(h, 160)) {
+      if (h > room) { panel.style.maxHeight = room + "px"; h = room; }
+    } else room = 0;
     // Beside the column the door is in, clear of its gilt frame and clasps, not beside the
     // door itself: 14px from the door laid the panel over the column's own ring.
     var beside = opener && document.contains(opener) ? (opener.closest(".side") || opener) : null;
@@ -349,7 +357,7 @@
     var left = r ? r.right + 24 : 16;
     if (left + w > window.innerWidth - 16) left = Math.max(16, window.innerWidth - 16 - w);
     var top = o ? o.top - 20 : 72;
-    top = Math.max(16, Math.min(top, window.innerHeight - 16 - h));
+    top = Math.max(16, Math.min(top, window.innerHeight - 16 - h, room ? 16 + room - h : Infinity));
     panel.style.left = Math.round(left) + "px";
     panel.style.top = Math.round(top) + "px";
   }

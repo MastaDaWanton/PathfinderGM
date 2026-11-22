@@ -1208,6 +1208,12 @@
     .tr-cards { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
     .tr-credit { margin-bottom: 4px; }
   }
+  /* A short window: the pinned deal (190px) was taller than the scroller it pins to
+     (127px at 800x600), so it lay over every ware at every scroll and four cards
+     measured under its total. There it scrolls with the page, last, as on a desktop. */
+  @media (max-width: 1000px) and (max-height: 759.98px) {
+    .tradedeal { position: static; }
+  }
   @media (max-width: 420px) {
     .tr-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
     .tr-card { min-height: 150px; padding: 10px 8px 8px; }
@@ -2112,6 +2118,15 @@
       grid-template-rows: minmax(calc(32% + 11.5px), 1fr) minmax(0, auto); }
     body.mode-map .stage:has(#combatbar:not([hidden])) {
       grid-template-rows: minmax(calc(36% + 13px), 1fr) minmax(0, auto); }
+    /* That 36% is 179px at 800x600: the head's controls wrapped to three lines (115px)
+       and left the ground 8px, so its foot (90px) spilled 66px out of the frame over the
+       combat bar, whose Full attack, Ability and Cast it covered (phase 6 hit test). The
+       controls keep one line that scrolls sideways, and the ground scrolls inside its own
+       well: the frame itself must stay overflow-visible for its clasps (theme-v2.css). */
+    body.mode-map .stage:has(#combatbar:not([hidden])) :is(.boardctl, .groundctl) { flex-wrap: nowrap; }
+    body.mode-map .stage:has(#combatbar:not([hidden])) .boardctl { overflow-x: auto; }
+    body.mode-map .stage:has(#combatbar:not([hidden])) #mapwrap {
+      overflow-y: auto; grid-template-rows: minmax(160px, 1fr) auto; }
   }
 
   /* --- The sides: tooled leather in a gilt edge, scrolled on their own ---------------- */

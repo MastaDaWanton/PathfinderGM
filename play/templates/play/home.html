@@ -72,7 +72,10 @@
   .tab b { display: inline-block; margin-left: 7px; color: var(--dim);
            font: 600 11px/1 var(--body); }
 
-  main { flex: 1; min-height: 0; overflow-y: auto; padding: 22px 30px 40px; }
+  /* overflow-x hidden: a card's clasp layer (.card::after, inset -35px) reaches past the
+     30px gutter, and with a scrollbar it made main scroll sideways 4px at 1024x700 (sw 1013,
+     cw 1009). Its painted brass sits inside the gutter, so nothing visible is clipped. */
+  main { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 22px 30px 40px; }
   .wrap { max-width: 1180px; margin: 0 auto; }
 
   /* --- continue --- */

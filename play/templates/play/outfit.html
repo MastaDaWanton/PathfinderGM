@@ -1,4 +1,5 @@
 {% load static assets %}
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Outfitting — Pathfinder GM</title>
 <!-- The shared materials (theme v2), ahead of this page's styles so its palette stands. -->
 <link rel="stylesheet" href="{% asset 'css/theme-v2.css' %}">
@@ -70,6 +71,15 @@
   tr.unprof td:first-child { color: var(--dim); }
   .cols { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
   @media (max-width: 900px) { .cols { grid-template-columns: 1fr; } }
+  /* A phone over the LAN (character creation ends here). With no viewport tag the page laid
+     out 980px wide and shrank to a third; with one, Begin the sandbox and Keep on the shelf
+     sat at 310-462px, past a 375px screen. The rows wrap and the page scrolls as one. */
+  @media (max-width: 600px) {
+    header { flex-wrap: wrap; padding: 12px 16px; }
+    main { height: auto; overflow: visible; padding: 16px 16px 60px; }
+    .purse, .sortbar { flex-wrap: wrap; }
+    .purse { gap: 8px 14px; }
+  }
   .banner { margin: 10px 0 0; padding: 9px 12px; border-radius: 2px; font-size: 13.5px; }
   .banner.ok { color: var(--brew); border-left: 3px solid var(--brew); background: rgba(31,110,63,.12); }
   .banner.bad { color: #d08a7c; border-left: 3px solid var(--alarm); background: rgba(110,31,31,.14); }

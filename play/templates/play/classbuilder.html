@@ -293,6 +293,12 @@
     .ability { grid-template-columns: 1fr; }
     .ability .lbl { display: none; }
   }
+  /* A phone: the heading's nowrap held its line of small print to 622px, and the page
+     scrolled sideways to 652 on a 375px screen. */
+  @media (max-width: 600px) {
+    header { padding: 0 16px; }
+    h1 small { white-space: normal; }
+  }
 </style>
 </head>
 <body class="page-backdrop-leather">
