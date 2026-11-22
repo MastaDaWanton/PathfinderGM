@@ -2545,9 +2545,35 @@
   #combatbar { margin: 0; background: rgba(30, 12, 10, .55); box-shadow: var(--sunken); }
   #combatbar .cb-acts .v2-btn { min-height: 34px; }
   #combatbar .cb-acts .v2-btn[hidden] { display: none; }
-  #combatbar .cb-opts[hidden] { display: none; }
-  #combatbar .cb-opts .v2-btn { min-height: 30px; }
-  #combatbar .cb-opts .v2-btn[aria-pressed="true"], #cb-menu [data-offhand][aria-pressed="true"] {
+  /* Declare: a labelled band of its own between the plan and the actions, in the bar's
+     materials — a gilt rule over it and the display face for its name, so a declared
+     option never reads as one more action button. */
+  #combatbar .cb-decl { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 14px;
+    margin: 0 0 8px; padding: 7px 0 0; border-top: 1px solid rgba(201, 162, 39, .28); }
+  #combatbar .cb-decl[hidden], #combatbar .cb-decl-grp[hidden] { display: none; }
+  #combatbar .cb-decl-h { flex-basis: 100%; color: var(--accent);
+    font: 400 12px/1 var(--display); letter-spacing: .08em; text-transform: uppercase; }
+  #combatbar .cb-decl-grp { display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    min-width: 0; }
+  #combatbar .cb-decl-k { color: var(--dim); font-size: 12px; margin-right: 2px; }
+  #combatbar .cb-decl-btns { display: contents; }
+  #combatbar .cb-decl .v2-btn { min-height: 30px; display: inline-flex; flex-direction: column;
+    align-items: flex-start; gap: 1px; line-height: 1.15; text-align: left; }
+  /* The numbers in the prose face, not the button's small capitals: "−3 to hit" read as
+     "−3TO HIT" in Cinzel at 11px. */
+  #combatbar .cb-decl .v2-btn small { color: var(--dim); font: italic 400 12px/1.15 var(--body);
+    letter-spacing: 0; text-transform: none; font-variant: normal; white-space: nowrap; }
+  #combatbar .cb-decl .v2-btn[aria-disabled="true"] { opacity: .5; cursor: help; }
+  #combatbar .cb-decl .v2-btn[aria-pressed="true"] small { color: #e8d9ae; }
+  /* A short or narrow window: each group one row that scrolls sideways, as the actions
+     row does on a phone. Measured at 800x600 with four feats: wrapped, the section stood
+     318px tall in a bar the desk shows 90px of. */
+  @media (max-width: 760px), (max-height: 759.98px) {
+    #combatbar .cb-decl-grp { flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto;
+      padding-bottom: 4px; }
+    #combatbar .cb-decl-grp > *, #combatbar .cb-decl .v2-btn { flex: none; }
+  }
+  #combatbar .cb-decl .v2-btn[aria-pressed="true"], #cb-menu [data-offhand][aria-pressed="true"] {
     color: #f4e6c0; border-color: var(--accent); transform: translate(1px, 2px);
     box-shadow: inset 2px 3px 5px rgba(0, 0, 0, .7), inset 0 -2px 0 var(--accent); }
 
@@ -3894,15 +3920,8 @@
         </div>
         <div class="cb-row" id="cb-targets" data-tut="cb-targets"></div>
         <div class="cb-row" id="cb-plan"></div>
-        <!-- The attack options the character may declare (feats, the monk's flurry):
-             toggles that ride the action picked after them (04-combat-and-turns.js). -->
-        <div class="cb-row cb-opts" id="cb-opts" hidden></div>
         <div class="cb-row cb-acts">
           <button type="button" class="v2-btn is-small" id="cb-strike" data-tut="cb-strike">Strike</button>
-          <button type="button" class="v2-btn is-small" id="cb-vital" hidden
-            title="The attack action: one blow that rolls the weapon's damage dice again">Vital Strike</button>
-          <button type="button" class="v2-btn is-small" id="cb-cleave" hidden
-            title="One blow; on a hit, another at a foe beside them. AC -2 until your next turn">Cleave</button>
           <button type="button" class="v2-btn is-small" id="cb-fullatk" data-tut="cb-fullatk">Full attack…</button>
           <!-- A carried flask thrown (alchemy, "also as thrown flasks"): offered only while
                one is carried (`attacks.flasks`, play/views.py `_flasks`). -->
@@ -3924,6 +3943,23 @@
           <button type="button" class="v2-btn is-small is-quiet" id="cb-clear" data-tut="cb-clear">Clear</button>
           <button type="button" class="v2-btn is-small is-go" id="cb-commit" data-tut="cb-commit">Commit turn</button>
           <button type="button" class="v2-btn is-small is-quiet" id="cb-end" data-tut="cb-end">End turn</button>
+        </div>
+        <!-- Declare (the owner, 2026-11-22: "a section for feats like power attack or
+             cleave that must be declared to be used"): every option the engine says this
+             character may declare, each with its numbers, in three groups by what it
+             rides. Under the actions, so the turn's own buttons keep their place: above
+             them it pushed Commit turn under the fold of the desk on a phone. Filled by
+             04-combat-and-turns.js `renderOptions` from `attacks.options`; nothing here
+             names an option. -->
+        <div class="cb-decl" id="cb-declared" data-tut="cb-declared" role="group"
+             aria-labelledby="cb-decl-h" hidden>
+          <span class="cb-decl-h" id="cb-decl-h">Declare</span>
+          <div class="cb-decl-grp" data-group="blow" data-tut="cb-decl-blow" hidden>
+            <span class="cb-decl-k">With the blow</span><span class="cb-decl-btns"></span></div>
+          <div class="cb-decl-grp" data-group="act" data-tut="cb-decl-act" hidden>
+            <span class="cb-decl-k">As the action</span><span class="cb-decl-btns"></span></div>
+          <div class="cb-decl-grp" data-group="move" data-tut="cb-decl-move" hidden>
+            <span class="cb-decl-k">With the move</span><span class="cb-decl-btns"></span></div>
         </div>
         <div class="cb-menu" id="cb-menu" hidden></div>
         <div class="sub" id="cb-hint">Pick a target, click a lit square to move, or just

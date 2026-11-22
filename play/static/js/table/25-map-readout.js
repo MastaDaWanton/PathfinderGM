@@ -85,7 +85,13 @@ function mapForActor(a) {
   // never do. A two-line name on a phone pushed the attack bonus below the box's fold.
   const out = [`<p class="mr-h mr-one mr-who"><span class="mr-name" title="${esc(a.name)}">${esc(a.name)}</span><span class="mr-dim">${
     esc(a.hp)}/${esc(a.hp_max)}${a.nonlethal ? `, ${esc(a.nonlethal)} non-lethal` : ""}${where}${a.hp <= 0 ? ", down" : ""}${cv}</span>${caught ? `<span class="mr-spell">caught</span>` : ""}</p>`];
-  const rows = (T.attack || {})[a.ref] || [];
+  // With the Declare section's toggles in (04-combat-and-turns.js `declaredTerms`): Power
+  // Attack on, the readout's first swing is the one the dice popup will add up.
+  const rows = ((T.attack || {})[a.ref] || []).map(w => {
+    const more = typeof declaredTerms === "function" ? declaredTerms(w.weapon) : [];
+    return more.length ? { ...w, bonus: w.bonus + more.reduce((n, [, v]) => n + v, 0),
+                           terms: [...(w.terms || []), ...more] } : w;
+  });
   // Weapons that come to the same bonus by the same terms are one line ("Rapier or dagger
   // +5"): the box has two lines on a phone, and a repeat spends one.
   const groups = new Map();

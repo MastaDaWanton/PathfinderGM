@@ -347,7 +347,25 @@ OFF_HAND_FULL_STRENGTH = "two_weapon.off_hand.full_strength"
 # class-feature document's `choice` names and whose numbers that document carries. The
 # feat each is first offered by, for the refusal's name; `can_choose` reads the documents.
 ATTACK_CHOICES = ("power_attack", "deadly_aim", "piranha_strike", "combat_expertise",
-                  "vital_strike", "cleave", "rapid_shot", "flurry")
+                  "fighting_defensively", "vital_strike", "cleave", "rapid_shot", "flurry")
+# The options nobody needs a feat for (combat bar round 2, 2026-11-22). CRB, Combat
+# ("Fighting Defensively as a Standard Action"): "You can choose to fight defensively when
+# attacking" — anyone, with any attack. Its numbers are `defensive_dodge` and the stance
+# the engine lays (`Engine._stance_terms`).
+UNIVERSAL_CHOICES = frozenset({"fighting_defensively"})
+
+
+def defensive_dodge(actor, total: bool = False) -> int:
+    """The dodge bonus to AC of fighting defensively (+2) or total defense (+4).
+
+    CRB, Combat: fighting defensively gives "a +2 dodge bonus to AC until the start of
+    your next turn"; total defense "a +4 dodge bonus to your AC for 1 round". CRB,
+    Acrobatics: "If you have 3 or more ranks in Acrobatics, you gain a +3 dodge bonus to
+    AC when fighting defensively instead of the usual +2", and +6 for total defense."""
+    trained = int((getattr(actor, "ranks", None) or {}).get("acrobatics", 0) or 0) >= 3
+    if total:
+        return 6 if trained else 4
+    return 3 if trained else 2
 ATTACK_CHOICE_FEATS = {"power_attack": "power-attack", "deadly_aim": "deadly-aim",
                        "piranha_strike": "piranha-strike",
                        "combat_expertise": "combat-expertise", "vital_strike": "vital-strike",
@@ -3920,6 +3938,8 @@ class Actor:
         from . import classfeatures
         from . import feats as feats_mod
 
+        if choice in UNIVERSAL_CHOICES:
+            return None
         doc = self.choice_feat(choice)
         if doc is None:
             if choice in classfeatures.choices_of(self):

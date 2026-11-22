@@ -20,7 +20,7 @@ from gm import (client, intimate as intimate_mod, judgement, ledger as ledger_mo
                 narration as narration_mod, prompts, speech as speech_mod, watcher)
 from gm.agent import GMAgent, TurnPlan
 from gm.client import ModelUnavailable, available
-from rules import awareness, biomes, grid
+from rules import awareness, biomes, grid, skilluses
 from rules import places as places_mod
 from rules.intents import CARGO_COUNT_MAX, IntentError
 
@@ -719,7 +719,7 @@ def _tactics(c, shown: dict, reachable: list) -> dict:
         if asked[same]:
             provokes[f"{x},{y}"] = asked[same]
     unseen = _unseen_from(g, here)
-    weapons = _attack_slots(pc)["weapons"]
+    weapons = _attack_slots(pc, declare=False)["weapons"]
     # The engine lends itself to the scene (`Scene._engine`, `_dice`); a preview must not
     # leave a fresh one behind in place of whatever the turn was using.
     lent = (scene._dice, scene._engine)
@@ -756,8 +756,11 @@ def _tactics(c, shown: dict, reachable: list) -> dict:
             "attack": attack, "hunches": hunches}
 
 
-def _attack_slots(pc) -> dict:
+def _attack_slots(pc, declare: bool = True) -> dict:
     """The shape of this character's full attack, and whether abilities may stand in.
+
+    `declare`: measure the combat bar's Declare section (`_attack_options`), which only
+    a fight shows — about 0.1 s of sheet arithmetic a render that nothing out of one reads.
 
     Replacement is Blood Bond's clause — "Abilities can replace each attack action
     within a standard action or a full-round action" — so it is keyed off the class
@@ -789,21 +792,28 @@ def _attack_slots(pc) -> dict:
         # The attack options this character may declare (lane D, 2026-11-22): each feat's
         # or the flurry's, offered only while `Actor.can_choose` says yes, so the bar
         # offers what the player can do and nothing the engine would refuse.
-        **_attack_options(pc),
+        **(_attack_options(pc) if declare
+           else {"options": [], "off_hands": [], "plans": {}}),
     }
 
 
-# What each declared option is on the combat bar: `swing` rides every blow (a toggle),
-# `full` changes what a full attack is made of (a toggle the Full attack menu reads), and
-# `strike` is its own one-blow action beside Strike. The words are the book's benefit,
-# short; the numbers are never here — the dice popup names them from the documents.
+# What each declared option is on the combat bar's Declare section: `swing` rides every
+# blow (a toggle), `full` changes what a full attack is made of (a toggle the Full attack
+# menu reads), `strike` is its own one-blow attack action, `act` is a whole action of its
+# own (total defense, a feint) and `move` rides the move (a tumble). The words are the
+# book's benefit, short; every number is measured off the engine (`_option_numbers`).
+# Which options exist is the engine's (ATTACK_CHOICES, `Actor.can_choose`); this is only
+# how each is shown, and tests/test_combat_bar_declared.py holds it to ATTACK_CHOICES.
 _OPTION_SHAPES = {
     "power_attack": ("swing", "Power Attack", "Less to hit, more damage, in melee."),
     "deadly_aim": ("swing", "Deadly Aim", "Less to hit, more damage, with ranged weapons."),
     "piranha_strike": ("swing", "Piranha Strike",
-                       "Less to hit, more damage, with a light weapon. Not with Power Attack."),
+                       "Less to hit, more damage, with a light weapon."),
     "combat_expertise": ("swing", "Combat Expertise",
                          "Less to hit in melee, harder to hit until your next turn."),
+    "fighting_defensively": ("swing", "Fight defensively",
+                             "Every attack this round less sure, harder to hit until your "
+                             "next turn."),
     "rapid_shot": ("full", "Rapid Shot",
                    "A full attack: one more shot at your best bonus, all a little less sure."),
     "flurry": ("full", "Flurry of blows",
@@ -813,31 +823,73 @@ _OPTION_SHAPES = {
     "cleave": ("strike", "Cleave",
                "One blow, and on a hit another at a foe beside them. Guard down until "
                "your next turn."),
+    "total_defense": ("act", "Total defense",
+                      "Your standard action spent guarding: no attacks, and no attacks of "
+                      "opportunity."),
+    "feint": ("act", "Feint", "Bluff against the target's guard: they lose their "
+                              "Dexterity against your next melee blow."),
+    "tumble": ("move", "Tumble", "Acrobatics against each foe's CMD, so the move past "
+                                 "them provokes nothing."),
 }
 
 
-def _attack_options(pc) -> dict:
-    """The bar's option buttons and what a full attack is made of under each.
+def _signed(n: int) -> str:
+    return f"+{n}" if n >= 0 else f"−{-n}"
 
-    `options`: [{id, name, text, shape}] for `Actor.attack_choices()`. `off_hands`: what
-    may swing in the off hand beside the weapon in hand (`Engine._off_hand_refusal`, the
-    engine's own rule). `plans`: for a full attack with no option, with each `full`
-    option, and with each off hand (`off:<key>`), the swings in order as
-    {bonus, weapon, hand} — the bonus the swing's own total (`attack_modifiers` with the
-    declared options), so the slot builder shows the number the roll will carry."""
+
+def _option_numbers(atk=0, dmg=0, ac=0, dice=0, swings=0) -> str:
+    """"−2 to hit, +4 damage": what an option does, from the engine's own numbers."""
+    bits = []
+    if swings:
+        bits.append(f"{_signed(swings)} {'attack' if abs(swings) == 1 else 'attacks'}")
+    if atk:
+        bits.append(f"{_signed(atk)} to hit" + (" on every attack" if swings else ""))
+    if dmg:
+        bits.append(f"{_signed(dmg)} damage")
+    if dice:
+        bits.append(f"weapon dice ×{dice + 1}")
+    if ac:
+        bits.append(f"{_signed(ac)} AC until your next turn")
+    return ", ".join(bits)
+
+
+def _attack_options(pc) -> dict:
+    """The combat bar's Declare section, and what a full attack is made of under each.
+
+    `options`: [{id, name, text, shape, says, why, refuse, bonus, excludes, ...}] — every
+    attack option the character holds (ATTACK_CHOICES through `Actor.can_choose`; one held
+    with its prerequisites unmet comes with `why`), then the book's own actions any
+    fighter may declare (total defense, a feint, a tumble). `says` is what it does in the
+    engine's numbers, measured as the difference it makes to the sheet: Power Attack's
+    "−2 to hit, +4 damage" at BAB 4 with a one-handed blade, Combat Expertise's AC with
+    the stance laid on a copy (`Engine._lay_attack_stances`), total defense's off the
+    effect the op lays (`Engine.total_defense_effect`). `refuse`: the engine's refusal
+    (`Engine._attack_choice_refusal`) for a single blow and a full attack, so the bar
+    greys an option the planned action cannot carry. `bonus`: per weapon, what a `swing`
+    option adds to each attack roll, so the full attack's slots show the number the dice
+    popup will (lane D left the toggles out of the slots). `excludes`: the options the
+    engine refuses beside this one (Piranha Strike and Power Attack).
+
+    `off_hands`: what may swing in the off hand beside the weapon in hand
+    (`Engine._off_hand_refusal`, the engine's own rule). `plans`: for a full attack with
+    no option, with each `full` option, and with each off hand (`off:<key>`), the swings
+    in order as {bonus, weapon, hand} — the bonus the swing's own total (`attack_modifiers`
+    with the declared options), so the slot builder shows the number the roll will carry."""
+    from rules import sheet as sheet_mod
+    from rules.dice import stack
     from rules.engine import Engine
 
     held = (pc.equipped or "unarmed")
     try:
-        chosen = pc.attack_choices()
+        chosen = [c for c in sheet_mod.ATTACK_CHOICES
+                  if pc.can_choose(c) is None or pc.choice_feat(c) is not None]
     except Exception:  # noqa: BLE001 — a sheet the documents cannot read offers nothing
         chosen = []
-    options = [{"id": c, "name": _OPTION_SHAPES[c][1], "text": _OPTION_SHAPES[c][2],
-                "shape": _OPTION_SHAPES[c][0]} for c in chosen if c in _OPTION_SHAPES]
     candidates = list(dict.fromkeys([*(pc.weapons or ()), "unarmed"]
                                     + (["shield"] if pc.shield_bash("shield") else [])))
     off_hands = [k for k in candidates if k != held
-                 and not Engine._off_hand_refusal(pc, held, k)]         if not pc.has_state("state.held") else []
+                 and not Engine._off_hand_refusal(pc, held, k)] \
+        if not pc.has_state("state.held") else []
 
     def plan(choices=(), off="") -> list[dict]:
         out = []
@@ -856,11 +908,103 @@ def _attack_options(pc) -> dict:
         return out
 
     plans = {"": plan()}
-    for o in options:
-        if o["shape"] == "full":
-            plans[o["id"]] = plan((o["id"],))
+    for c in chosen:
+        if _OPTION_SHAPES.get(c, ("",))[0] == "full" and pc.can_choose(c) is None:
+            try:
+                plans[c] = plan((c,))
+            except Exception:  # noqa: BLE001 — a plan the sheet cannot lay is not offered
+                pass
     for k in off_hands:
         plans[f"off:{k}"] = plan((), k)
+    arms = sorted({p["weapon"] for rows in plans.values() for p in rows} | {held})
+
+    def twin(choice=None, effect=None):
+        """A copy of the sheet with the option's stance laid, so nothing the bar measures
+        touches the character it measures."""
+        t = sheet_mod.from_dict(sheet_mod.to_dict(pc), ref=pc.ref)
+        if choice:
+            Engine._lay_attack_stances(t, (choice,))
+        if effect is not None:
+            t.apply_effect(effect)
+        return t
+
+    plain: dict[str, int] = {}
+
+    def to_hit(who, key, choices=()):
+        if who is pc and not choices and key in plain:
+            return plain[key]
+        n = sum(m.value for m in who.attack_modifiers(key, 0, choices=choices))
+        if who is pc and not choices:
+            plain[key] = n
+        return n
+
+    def dmg(who, key, choices=()):
+        return sum(m.value for m in stack(who.damage_modifiers(key, choices=choices)))
+
+    base_ac = pc.ac()
+    options = []
+    for c in chosen:
+        shape, name, text = _OPTION_SHAPES[c]
+        why = pc.can_choose(c) or ""
+        opt = {"id": c, "name": name, "text": text, "shape": shape, "says": "", "why": why,
+               "refuse": {"strike": Engine._attack_choice_refusal(pc, held, {c: True}),
+                          "full": Engine._attack_choice_refusal(
+                              pc, held, {c: True, "full_attack": True})},
+               "bonus": {}, "excludes": []}
+        if not why:
+            try:
+                stanced = twin(c) if any(c == s[0] for s in Engine._ATTACK_STANCES) else pc
+                swings = atk = 0
+                if shape == "full" and c in plans:
+                    swings = len(plans[c]) - len(plans[""])
+                    atk = plans[c][0]["bonus"] - plans[""][0]["bonus"]
+                else:
+                    atk = to_hit(stanced, held, (c,)) - to_hit(pc, held)
+                    opt["bonus"] = {k: to_hit(stanced, k, (c,)) - to_hit(pc, k) for k in arms}
+                opt["says"] = _option_numbers(
+                    atk=atk, dmg=dmg(stanced, held, (c,)) - dmg(pc, held),
+                    ac=stanced.ac() - base_ac, swings=swings,
+                    dice=pc.weapon_dice(held, (c,)) - pc.weapon_dice(held))
+            except Exception:  # noqa: BLE001 — unmeasured is said as such, never guessed
+                opt["says"] = ""
+            if not opt["says"]:
+                opt["why"] = f"{name} changes nothing with the {pc.weapon(held)['name']}."
+        options.append(opt)
+    # Two options the engine will not take together, where each alone is fine.
+    for a in options:
+        for b in options:
+            if a is b or a["why"] or b["why"]:
+                continue
+            shapes = [s for s in ("strike", "full")
+                      if not a["refuse"][s] and not b["refuse"][s]]
+            if shapes and all(Engine._attack_choice_refusal(
+                    pc, held, {a["id"]: True, b["id"]: True, "full_attack": s == "full"})
+                    for s in shapes):
+                a["excludes"].append(b["id"])
+
+    def own(key, says, why="", **extra):
+        shape, name, text = _OPTION_SHAPES[key]
+        options.append({"id": key, "name": name, "text": text, "shape": shape,
+                        "says": says, "why": why, "refuse": {"strike": "", "full": ""},
+                        "bonus": {}, "excludes": [], **extra})
+
+    def skill(name):
+        try:
+            return sum(m.value for m in stack(pc.skill_modifiers(name)))
+        except Exception:  # noqa: BLE001
+            return 0
+
+    guard = Engine.total_defense_effect(pc)
+    own("total_defense", _option_numbers(ac=twin(effect=guard).ac() - base_ac),
+        action="standard", op={"op": "total_defense"})
+    feint = skilluses.row(skilluses.FEINT)
+    own("feint", f"Bluff {_signed(skill('bluff'))} against the target's guard",
+        action=skilluses._action_of(pc, feint),
+        op={"op": "check", "params": {"skill": "bluff", "feint": True}})
+    own("tumble", f"Acrobatics {_signed(skill('acrobatics'))} against each foe's CMD",
+        why=("Armour that slows you cannot tumble past foes."
+             if skilluses._armour_slows(pc) else ""),
+        op={"op": "check", "params": {"skill": "acrobatics", "tumble": True}})
     return {"options": options, "off_hands": off_hands, "plans": plans}
 
 
@@ -1289,7 +1433,7 @@ def _state(c) -> dict:
         # What a full attack is made of, for the combat panel's slot builder. The
         # penalties are the display; the engine recomputes them from the same table
         # when the swing actually happens.
-        "attacks": _attack_slots(pc),
+        "attacks": _attack_slots(pc, declare=bool(c.scene.in_encounter)),
         # The player sees their own rolls and nobody else's. Hidden rolls are stripped
         # here, at the edge, rather than in the template — a number that never reaches
         # the browser cannot be read out of the page source either.
@@ -3980,7 +4124,12 @@ def _put_back_free_actions(c, pending: list) -> None:
 # here, so a player on fire from a thrown flask, or glued by a tanglefoot bag, could only
 # type it and hope the planner sampled it. The bar offers each only while it applies.
 _COMBAT_OPS = {"attack", "move", "use_ability", "use_item", "manoeuvre", "cast",
-               "extinguish", "break_free", "escape"}
+               "extinguish", "break_free", "escape", "total_defense", "check"}
+# The checks the bar's Declare section may post (combat bar round 2, 2026-11-22): a feint
+# and a tumble, each to its own door (`skilluses.OWN_DOORS`). Any other check is a spoken
+# turn's, so `check` is not a door to every skill.
+_COMBAT_CHECKS = {(skill, flag) for (skill, flag) in skilluses.OWN_DOORS
+                  if flag in ("feint", "tumble")}
 
 
 @require_POST
@@ -4040,6 +4189,12 @@ def combat_act(request):
         if op not in _COMBAT_OPS:
             return JsonResponse({"error": f"{op!r} is not a combat-panel action"},
                                 status=400)
+        if op == "check":
+            p = a.get("params") or {}
+            if not any(p.get("skill") == skill and p.get(flag) is True
+                       for skill, flag in _COMBAT_CHECKS):
+                return JsonResponse({"error": "The combat panel makes only a feint or a "
+                                              "tumble; say any other check."}, status=400)
         raw.append({
             "op": op, "actor": pc.ref,
             "target": a.get("target"),
