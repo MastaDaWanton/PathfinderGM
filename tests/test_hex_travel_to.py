@@ -317,3 +317,30 @@ def test_a_night_s_rest_starts_a_new_travel_day(worlds, quiet_road, monkeypatch)
     s.clock_minutes += 8 * 60
     pc.awake_minutes = 0                       # slept the night
     assert e.travelled_today() == 0
+
+
+def test_the_travel_slip_numbers_are_the_engines(worlds, monkeypatch):
+    """The Travel slip typed its own numbers ("five hours ... eight", "past eight", "DC 10,
+    2 more each hour", "1d6") while `rules/hexes.py` charged a 20-foot walker 8 and 12 a
+    hex: the slip told that party 5 and 8. The hex state now carries the engine's numbers
+    for this party and the slip prints them; no digit of them is left in the script."""
+    from pathlib import Path
+
+    from play import atlas
+    from rules import survival
+
+    s, e, pc = _party(worlds)
+    for speed in (20, 30):
+        monkeypatch.setattr(type(pc), "speed_feet", property(lambda self, n=speed: n))
+        hs = atlas.known_places(e, worlds)["hexes"]
+        assert hs["hex_hours"] == {"plain": hexes.hours_through("grassland", speed),
+                                   "rough": hexes.hours_through("forest", speed)}
+    assert hs["plain"] == sorted(hexes.PLAIN)
+    assert hs["march"] == {"march_free_hours": journey.HOURS_PER_DAY,
+                           "march_dc_first": survival.forced_march_dc(1),
+                           "march_dc_step": survival.forced_march_dc(2) - survival.forced_march_dc(1),
+                           "march_damage": survival.FORCED_MARCH_DAMAGE}
+    js = (Path(__file__).resolve().parents[1] / "play" / "static" / "js" / "table"
+          / "16-tab-map.js").read_text(encoding="utf-8")
+    for typed in ("past eight", "DC 10", "1d6", "five hours", "? 5 : 8", ">= 8;"):
+        assert typed not in js, typed

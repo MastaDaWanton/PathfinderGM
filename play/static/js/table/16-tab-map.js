@@ -92,7 +92,10 @@ function hexSlip(v) {
   const HS = (v.KP && v.KP.hexes) || {};
   if (!v.hexgrid || !HS.party || v.homeNation !== v.nation) return "";
   const at = {}; v.hexgrid.hexes.forEach(h => { at[h.q + "," + h.r] = h; });
-  const hours = g => { const walk = g === "grassland" || g === "farmland" ? 5 : 8; return HS.rides ? Math.ceil(walk / 2) : walk; };
+  // The engine's own numbers (play/atlas.py `_hexes`): a hex's hours for this party, riding
+  // and speed in, and the forced march. Typed here they drifted from the speed table.
+  const HH = HS.hex_hours || {}, MARCH = HS.march || {};
+  const hours = g => ((HS.plain || []).includes(g) ? HH.plain : HH.rough) || 0;
   const ways = HS.ways || {}, wayHours = w => (HS.way_hours || {})[w] || 0;
   const btns = (HS.reach || []).map(([q, r]) => { const h = at[q + "," + r] || {}, far = Math.max(Math.abs(q - HS.party[0]), Math.abs(r - HS.party[1]), Math.abs(q + r - HS.party[0] - HS.party[1]));
     const where = h.town ? ((v.W.cities.find(c => c.id === h.town) || {}).name || "a town") : h.land === false ? (h.sea === "open" ? "open sea" : "coastal water") : h.ground || "open ground";
@@ -121,15 +124,15 @@ function hexSlip(v) {
   });
   // The day since the last rest (rules: Engine.travelled_today). Spent, a move is refused
   // unless the player pushes on: the button arms one forced march for the next press.
-  const spent = (HS.today || 0) >= 8;
+  const spent = (HS.today || 0) >= (MARCH.march_free_hours || Infinity);
   const march = !spent ? "" : HEXGO.march
     ? `<p class="hexmarch"><strong>Forced march:</strong> press where to go. <button type="button" class="v2-btn" data-hexmarch="0" data-tut="hex-stop">Stop for the day</button></p>`
-    : `<p class="hexmarch">${esc(HS.today)} hours on the way since you last rested: the day's travelling is done. Going on is a forced march, a Constitution check every hour past eight (DC 10, 2 more each hour), 1d6 non-lethal and fatigued on a failure. <button type="button" class="v2-btn" data-hexmarch="1" data-tut="hex-march">Push on (forced march)</button></p>${
+    : `<p class="hexmarch">${esc(HS.today)} hours on the way since you last rested: the day's travelling is done. Going on is a forced march, a Constitution check every hour past ${esc(MARCH.march_free_hours)} (DC ${esc(MARCH.march_dc_first)}, ${esc(MARCH.march_dc_step)} more each hour), ${esc(MARCH.march_damage)} non-lethal and fatigued on a failure. <button type="button" class="v2-btn" data-hexmarch="1" data-tut="hex-march">Push on (forced march)</button></p>${
       window.Tutorials && Tutorials.inline ? Tutorials.inline("map.march") : ""}`;
   const site = HS.site_here && !HS.in_site ? `<p><button type="button" class="v2-btn" data-hexenter="1" data-tut="hex-enter">Go into ${esc({ tower: "the tower", ruins: "the ruins", mine: "the old mine", cave: "the cave" }[HS.site_here] || "the site")}</button></p>` : "";
   if (HS.afloat) return `<div class="mapnote hextravel" data-tut="travel-panel"><h3>Travel</h3><p data-tut="sea-way">${esc(afloatNote)}</p>
     <p class="hexgo">${btns.join(" ")}</p></div>`;
-  return `<div class="mapnote hextravel" data-tut="travel-panel"><h3>Travel</h3><p>${HS.rides ? "Riding, two hexes a move" : "On foot, one hex a move"}: five hours across open plain, eight across rougher ground${HS.rides ? ", half that riding" : ""}. Where you stop you look round, and every hex the look covers clears on the map. Press any hex you have seen to walk there a hex at a time: a meeting, something new in sight or the day's end stops you on the way.</p>
+  return `<div class="mapnote hextravel" data-tut="travel-panel"><h3>Travel</h3><p>${HS.rides ? "Riding, two hexes a move" : "On foot, one hex a move"}: ${esc(HH.plain)} hours across open plain, ${esc(HH.rough)} across rougher ground. Where you stop you look round, and every hex the look covers clears on the map. Press any hex you have seen to walk there a hex at a time: a meeting, something new in sight or the day's end stops you on the way.</p>
     ${march}<p class="hexgo">${btns.join(" ")}</p>${swimNote}${site}</div>`;
 }
 

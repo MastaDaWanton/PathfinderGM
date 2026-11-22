@@ -34,7 +34,7 @@ writes the map down; places_found.py cites the same refusal). There is no forget
 """
 from __future__ import annotations
 
-from rules import geography, journey, ships
+from rules import geography, journey, ships, tutorialfacts
 
 _MEMO: dict = {}
 
@@ -207,12 +207,34 @@ def _hexes(engine) -> dict:
             # Hours on the way since the last rest, against the day's eight: past them
             # the slip offers a forced march (owner 2026-11-21).
             "today": engine.travelled_today(),
+            # The slip's numbers, from the engine that applies them: a hex's hours for this
+            # party (speed and riding, as the hex move charges them), which grounds are
+            # plain, and the forced march. 16-tab-map.js typed its own copy ("five hours",
+            # "DC 10, 2 more each hour, 1d6") and so never followed the speed table.
+            "hex_hours": _hex_hours_now(engine),
+            "plain": sorted(hexes.PLAIN),
+            "march": {k: tutorialfacts.FACTS[k]() for k in
+                      ("march_free_hours", "march_dc_first", "march_dc_step", "march_damage")},
             "touched": {k: {"entered": "entered" in v, "searched": "searched" in v,
                             "explored": bool(v.get("explored"))}
                         for k, v in (held.get("touched") or {}).items()},
             "spotted": dict(held.get("spotted") or {}),
             "in_site": hexes.in_site(engine.scene.at or "", here),
             "site_here": (held.get("spotted") or {}).get(hexes.key(*here), "")}
+
+
+def _hex_hours_now(engine) -> dict:
+    """{"plain": h, "rough": h}: a hex's hours for the party, as the hex move charges them."""
+    from rules import hexes
+
+    pc = engine.scene.pc()
+    speed = getattr(pc, "speed_feet", 30) if pc is not None else 30
+    rides = engine.party_rides()
+    out = {}
+    for name, ground in (("plain", sorted(hexes.PLAIN)[0]), ("rough", "forest")):
+        h = hexes.hours_through(ground, speed)
+        out[name] = journey.mounted_hours(h, "ride")[0] if rides else h
+    return out
 
 
 def _sites(engine, been: set) -> list[dict]:
