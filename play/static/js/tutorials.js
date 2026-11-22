@@ -514,7 +514,7 @@
   function welcome() {
     if (!D || D.off || D.welcome_dismissed) return "";
     return '<p class="tut-welcome"><span>Tips will show the first time you open each part of the game. ' +
-      'You can turn them off in Settings, or read the <a href="/manual">Manual</a>.</span>' +
+      'You can turn them off in Settings, or read the <a href="/manual#tips">Manual</a>.</span>' +
       '<button type="button" class="v2-btn is-quiet is-small" data-tut-welcome>Got it</button></p>';
   }
 
