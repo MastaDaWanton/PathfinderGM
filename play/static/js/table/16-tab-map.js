@@ -124,8 +124,8 @@ function hexSlip(v) {
   const spent = (HS.today || 0) >= 8;
   const march = !spent ? "" : HEXGO.march
     ? `<p class="hexmarch"><strong>Forced march:</strong> press where to go. <button type="button" class="v2-btn" data-hexmarch="0" data-tut="hex-stop">Stop for the day</button></p>`
-    : `<p class="hexmarch">${esc(HS.today)} hours on the way since you last rested: the day's travelling is done. Going on is a forced march, a Constitution check every hour past eight (DC 10, 2 more each hour), 1d6 non-lethal and fatigued on a failure. <button type="button" class="v2-btn" data-hexmarch="1" data-tut="hex-march">Push on (forced march)</button>${
-      window.Tutorials && Tutorials.inline ? Tutorials.inline("map.march") : ""}</p>`;
+    : `<p class="hexmarch">${esc(HS.today)} hours on the way since you last rested: the day's travelling is done. Going on is a forced march, a Constitution check every hour past eight (DC 10, 2 more each hour), 1d6 non-lethal and fatigued on a failure. <button type="button" class="v2-btn" data-hexmarch="1" data-tut="hex-march">Push on (forced march)</button></p>${
+      window.Tutorials && Tutorials.inline ? Tutorials.inline("map.march") : ""}`;
   const site = HS.site_here && !HS.in_site ? `<p><button type="button" class="v2-btn" data-hexenter="1" data-tut="hex-enter">Go into ${esc({ tower: "the tower", ruins: "the ruins", mine: "the old mine", cave: "the cave" }[HS.site_here] || "the site")}</button></p>` : "";
   if (HS.afloat) return `<div class="mapnote hextravel" data-tut="travel-panel"><h3>Travel</h3><p data-tut="sea-way">${esc(afloatNote)}</p>
     <p class="hexgo">${btns.join(" ")}</p></div>`;

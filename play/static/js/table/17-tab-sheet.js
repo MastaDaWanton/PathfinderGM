@@ -23,10 +23,25 @@ function sheetInto(tab) {
   SHEET_TAB = tab;
   // The page opens at its top: on a phone the Sheet tab is one scroll, who first, as the
   // design lays it out, and a stage left scrolled from the last visit opened mid-sheet.
+  // The panel's "?" shows the open tab's tips (js/tutorials.js).
+  const help = document.querySelector('#sheetnote [data-tut-help]');
+  if (help) help.dataset.tutHelp = "tab." + tab;
   Promise.resolve(openSheet()).then(() => {
     const stage = document.getElementById("stage");
     if (tab === "sheet" && stage && window.matchMedia("(max-width: 760px)").matches) stage.scrollTop = 0;
+    // The tab's first-time card, once its page is drawn; and on the Sheet, the level's own
+    // card when one is ready to take or its choices are owed.
+    if (!window.Tutorials || SHEET_TAB !== tab) return;
+    Tutorials.arrive("tab." + tab, { entered: true });
+    const xp = STATE && STATE.pc && STATE.pc.xp;
+    if (tab === "sheet" && ((xp && xp.ready) || document.getElementById("lvpicks"))) {
+      Tutorials.arrive("tab.levelup", { entered: true });
+    }
   });
+}
+if (window.Tutorials) {
+  ["sheet", "equipment", "spells", "journal"].forEach(t => Tutorials.reach("tab." + t, () => Shell.show(t)));
+  Tutorials.reach("tab.levelup", () => Shell.show("sheet"));
 }
 
 function sheetOutOf() {

@@ -137,6 +137,11 @@ function clockHide() {
   if (!pop) return;
   pop.classList.remove("on", "going");
   pop.hidden = true;
+  // The clock's first-time card (js/tutorials.js), once the face has gone: a card about a
+  // four-second face would be about nothing by the time it was read, so it points at the
+  // line under the place's name, where the day and hour stay.
+  if (CLOCK.shown && window.Tutorials) Tutorials.arrive("table.clock", { still: () => pop.hidden });
+  CLOCK.shown = false;
 }
 
 function clockLater(ms, fn) { CLOCK.timers.push(setTimeout(fn, ms)); }
@@ -163,6 +168,7 @@ function clockShow(before, after, part) {
   smear.setAttribute("opacity", "0");
   pop.classList.remove("going");
   pop.hidden = false;
+  CLOCK.shown = true;
 
   if (CLOCK_STILL && CLOCK_STILL.matches) {
     // Still: the end face, and the ground the hour hand covered drawn as an arc.

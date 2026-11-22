@@ -27,6 +27,10 @@ function showDeath(d) {
     </div>`).join("") : "";
   // The last option: back to the shelf, the save untouched (table.html says why it is a link).
   $("#deathhome").hidden = false;
+  // The first death's line (js/tutorials.js `inline`): the veil is already a dialog, so a
+  // sentence in it rather than a card over it.
+  document.querySelectorAll("#deathveil .tut-inline").forEach(x => x.remove());
+  if (window.Tutorials) $("#deathtext").insertAdjacentHTML("afterend", Tutorials.inline("table.death"));
   $("#deathveil").classList.add("on");
 }
 
@@ -284,7 +288,7 @@ function render(s, hold) {
       atTable(b) ? " attable" : ""}${
       i >= seen ? " fresh" : ""}"${hiddenBeat(b)}>${tableTag(b)}${chips(b)}${
       atTable(b) ? tableSaid(b.text) : said(b.text)}${benchDoor(b)}</p>${record(b)}${
-      b.who === "gm" && b.kind === "setup" ? `<div class="beatfix" data-beat="${i}"></div>` : ""}`
+      b.who === "gm" && b.kind === "setup" ? `<div class="beatfix" data-tut="beatfix" data-beat="${i}"></div>` : ""}`
   ).join("");
   window._beatsSeen = s.transcript.length;
   // Where the page opens is the book's (15-book.js `storyLand`, a render hook): the new
@@ -354,7 +358,16 @@ function render(s, hold) {
   if (s && s.ended && typeof showDeath === "function") showDeath(s);
 
   if (hold) return;
-  if (s.awaiting) showPopup(s.awaiting); else $("#veil").classList.remove("on");
+  if (s.awaiting) { showPopup(s.awaiting); diceTip(); } else $("#veil").classList.remove("on");
+}
+
+// The dice mat's first-time line (js/tutorials.js `inline`, docs/tutorials-plan.md §3.1):
+// one sentence on the mat, never a card over it. In the mat's note, which every new roll
+// clears (dice3d.js `resetMat`), so it never stays on a roll it is not about. Called after
+// each `showPopup` that asks the player (here and 04's next die).
+function diceTip() {
+  const note = document.getElementById("d3d-note");
+  if (note && window.Tutorials) note.insertAdjacentHTML("beforeend", Tutorials.inline("table.dice"));
 }
 
 // The conversation panel. Each person in it with the step they are at and their regard
@@ -380,11 +393,11 @@ function renderTalk(s) {
       <p class="talkwho">In conversation with <b>${esc(t.name)}</b>${
         how.length ? ` <small>${esc(how.join(", "))}</small>` : ""}</p>
       <button type="button" class="v2-btn is-quiet is-small talkignore" data-ignore="${esc(t.ref)}"
-              title="Do not answer them">Ignore</button>${has ? `
+              data-tut="talk-ignore" title="Do not answer them">Ignore</button>${has ? `
       <div class="regard" role="img" aria-label="Regard ${esc(t.regard)} of ${esc(max)}"><i style="width:${
         pct}%"></i></div>` : ""}
     </div>`;
-  }).join("") + `<button type="button" class="v2-btn is-quiet" id="takeleave"
+  }).join("") + `<button type="button" class="v2-btn is-quiet" id="takeleave" data-tut="talk-leave"
       title="End the conversation">Take your leave</button>`;
 }
 

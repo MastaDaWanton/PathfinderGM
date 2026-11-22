@@ -256,3 +256,45 @@ if (window.Tutorials) {
   // The minigames' old per-browser marks move into the store, once (tutorials.js).
   Tutorials.migrateGames();
 }
+
+// The table's other first-time cards (content/tutorials/table.json, phase 3 of
+// docs/tutorials-plan.md): each the first time its part has something in it or is
+// pressed. Each waits in tutorials.js's queue behind the Table's own card, and is dropped
+// from it when its part leaves the screen (a bench opening over the side it is about).
+const TUT_ON_STAGE = () => SHELL_ON_STAGE.includes(Shell.mode());
+// After the draw, not in it: the book's head (15) and the panels draw in later hooks.
+onRender(s => setTimeout(() => tableTipsMore(s), 0));
+function tableTipsMore(s) {
+  if (!window.Tutorials || !TUT_ON_STAGE()) return;
+  // Somebody in the scene (T3).
+  if (!document.getElementById("here").hidden) Tutorials.arrive("table.here", { still: TUT_ON_STAGE });
+  // The body's grace run out on a clock (T6): the right side is where it says so.
+  if (((s && s.pc && s.pc.needs) || []).some(n => n.danger)) Tutorials.arrive("table.right", { still: TUT_ON_STAGE });
+  // The first roll in the Rolls panel (T7), and the GM view filled by its house rule (T8).
+  if (document.querySelector("#rolls .who")) Tutorials.arrive("table.panels", { still: TUT_ON_STAGE });
+  if (document.getElementById("gmview").children.length) Tutorials.arrive("table.gmview", { still: TUT_ON_STAGE });
+}
+// The two sides (T5, T6): the first press or focus inside one. A press on a bench door
+// opens the bench over the side, and the queue drops the card until next time.
+["click", "focusin"].forEach(ev => document.addEventListener(ev, e => {
+  if (!window.Tutorials || !e.target.closest) return;
+  if (e.target.closest("#side-who")) Tutorials.arrive("table.left", { entered: true });
+  else if (e.target.closest("#panels")) Tutorials.arrive("table.right", { entered: true });
+}));
+// The craft action's panel, opened (T4): after 03's own listener has toggled it.
+document.addEventListener("click", e => {
+  if (!window.Tutorials || !e.target.closest || !e.target.closest("#craftaction")) return;
+  const panel = document.getElementById("craftpanel");
+  if (panel && !panel.hidden) Tutorials.arrive("table.craft", { entered: true, still: () => !panel.hidden });
+});
+// Show me, from Settings: go to the part first.
+if (window.Tutorials) {
+  ["table.here", "table.left", "table.right", "table.panels", "table.gmview", "table.clock"]
+    .forEach(id => Tutorials.reach(id, () => Shell.show("table")));
+  Tutorials.reach("table.craft", () => {
+    Shell.show("table");
+    const panel = document.getElementById("craftpanel");
+    if (panel && panel.hidden) document.getElementById("craftaction").click();
+  });
+  Tutorials.reach("table.talk", () => openTalk({ focus: false }));
+}

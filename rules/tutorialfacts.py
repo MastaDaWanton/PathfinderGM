@@ -85,6 +85,12 @@ def _perk_picks() -> int:
     return int(_perk_track().endless.get("picks_per_level", worldclass.PICKS_PER_LEVEL))
 
 
+def _haggle_max() -> int:
+    # The haggle's cap, Ultimate Campaign's 75% floor (content/rules/trade-uses.json).
+    from . import tradecraft
+    return int(tradecraft.row("haggle")["max_percent"])
+
+
 FACTS = {
     "hex_hours_open": lambda: _hex_hours(0),
     "hex_hours_rough": lambda: _hex_hours(1),
@@ -99,6 +105,7 @@ FACTS = {
     "alchemy_in_progress_hours": _alchemy_in_progress_hours,
     "perk_from_level": _perk_from_level,
     "perk_picks": _perk_picks,
+    "haggle_max_percent": _haggle_max,
 }
 
 _FIELD = re.compile(r"\{([a-z_]+)\}")

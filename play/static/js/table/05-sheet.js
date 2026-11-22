@@ -294,7 +294,7 @@ function skillsCard(s) {
   return sheetCard("sc-skills", "Skills", `
     <p class="cardline"><span class="why">${trained} trained. Untrained-only skills that
       cannot be tried are greyed.</span>
-      <button type="button" class="v2-btn is-quiet is-small" id="skillterms"
+      <button type="button" class="v2-btn is-quiet is-small" id="skillterms" data-tut="skill-terms"
               aria-pressed="${SKILL_TERMS}">What each is made of</button></p>
     <dl class="skills${SKILL_TERMS ? " showterms" : ""}" id="skilllist">${s.skills.map(k => `
       <div class="${k.usable ? "" : "dim"}">
@@ -314,7 +314,7 @@ function workCard(s) {
   setTimeout(fillWorkOffer, 0);
   return sheetCard("sc-work", "Earn a living", `
     <p class="cardline" id="workoffer"><span class="why">Asking what work there is here…</span></p>
-    <p class="cardline"><button type="button" class="v2-btn is-small" data-work="1">Work a day</button>
+    <p class="cardline"><button type="button" class="v2-btn is-small" data-work="1" data-tut="work">Work a day</button>
       <button type="button" class="v2-btn is-small" data-work="7">Work a week</button></p>
     <p class="cardline" id="worksaid" role="status" aria-live="polite"></p>`);
 }
@@ -488,7 +488,7 @@ function owedPicksBlock(s) {
     house.bonus_ability_points && house.bonus_ability_points !== "off"
       ? `2 ability points at ${HOUSE_RHYTHM[house.bonus_ability_points]}` : "",
   ].filter(Boolean).join("; ");
-  return `<section id="lvpicks" aria-labelledby="lvpicks-h">
+  return `<section id="lvpicks" aria-labelledby="lvpicks-h" data-tut="lvpicks">
     <h3 class="cardsub" id="lvpicks-h">To choose from your levels</h3>
     ${houseNote ? `<p class="why"><b>House rule</b> (Rulesets bench): ${esc(houseNote)},
       on top of the book's.</p>` : ""}
@@ -983,7 +983,7 @@ function tabClass(s) {
   // than named here: a class with columns this app has never heard of still shows
   // them, which is the whole point of the classes being data.
   const cols = [...new Set(p.rows.flatMap(r => Object.keys(r.columns || {})))];
-  return `<div class="twocol">
+  return `<div class="twocol" data-tut="class-card">
     <div>
       <h3 class="cardsub">${esc(p.class)}</h3>
       ${p.summary ? `<p class="why">${esc(p.summary)}</p>` : ""}
@@ -1055,7 +1055,7 @@ function tabClass(s) {
           <span class="why">CRB p.31: every level in your favoured class gives one or the
             other.</span>
         </fieldset>
-        <button type="button" class="v2-btn is-go" id="levelup">Take level ${esc(p.next.level)}</button>
+        <button type="button" class="v2-btn is-go" id="levelup" data-tut="levelup">Take level ${esc(p.next.level)}</button>
         <div id="levelerr" class="why" role="status"></div>`
         : `<p class="why">Twentieth level. There is no more table.</p>`}
     </div>
@@ -1521,7 +1521,7 @@ function casterStats(sp) {
         || String(sp.ability || "").toUpperCase())}</b></div>
       <div class="t"><span>Highest spell level</span><b>${esc(sp.highest)}</b></div>
     </div>
-    <h4 class="sx-sub">Spell slots</h4>
+    <h4 class="sx-sub" data-tut="spell-slots">Spell slots</h4>
     ${sockets ? `<ul class="sockets">${sockets}</ul>` : tabEmpty("No slots at this level.")}
     ${specialSlotsBlock(sp)}
     ${(sp.domains || []).length ? `
@@ -1730,7 +1730,7 @@ function preparedToday(sp) {
 
   const cantripRows = [...cantrips.values()].sort((a, b) => a.name.localeCompare(b.name));
   const heading = prepared ? "Prepared today" : "Known";
-  return `<section class="v2-framed v2-card-leather sx-card sx-today" id="sx-today"
+  return `<section class="v2-framed v2-card-leather sx-card sx-today" id="sx-today" data-tut="spells-today"
       data-drop="${prepared ? "prepare" : "learn"}"
       aria-labelledby="sx-today-h" aria-describedby="sx-today-hint">
     <i class="v2-rim" aria-hidden="true"></i>
@@ -1824,7 +1824,7 @@ function grimoireIndex(sp) {
   const groups = sp.choose_from || [];
   const schools = [...new Set(groups.flatMap(g => g.spells.map(s => schoolKey(s.school))))]
     .sort();
-  return `<section class="v2-framed v2-card-leather sx-card sx-index" aria-labelledby="sx-index-h">
+  return `<section class="v2-framed v2-card-leather sx-card sx-index" aria-labelledby="sx-index-h" data-tut="spells-index">
     <i class="v2-rim" aria-hidden="true"></i>
     <h3 id="sx-index-h">${prepared ? "Grimoire index" : "What can be learned"}</h3>
     ${groups.length ? `
@@ -2281,7 +2281,7 @@ function pageEquipment(s) {
   const chosen = EQ_FIT && EQ_FIT !== "hand" ? eqSlots(s).find(x => x.key === EQ_FIT) : null;
 
   return `<div class="eq">
-    <nav class="eqrail" id="eq-rail" role="tablist" aria-orientation="vertical"
+    <nav class="eqrail" id="eq-rail" data-tut="eq-rail" role="tablist" aria-orientation="vertical"
          aria-label="What you carry, by kind">${rail}</nav>
     <section class="eqlist" id="eq-list" role="tabpanel" aria-labelledby="eq-listhead">
       <div class="eqlisthead"><h2 id="eq-listhead">${esc(head)}</h2>
@@ -2295,7 +2295,7 @@ function pageEquipment(s) {
         rel="noopener">game-icons.net</a>, <a href="https://creativecommons.org/licenses/by/3.0/"
         target="_blank" rel="noopener">CC BY 3.0</a>, recoloured.</p>
     </section>
-    <aside class="doll v2-tooled-leather v2-gilt-edge" aria-labelledby="doll-head">
+    <aside class="doll v2-tooled-leather v2-gilt-edge" aria-labelledby="doll-head" data-tut="eq-doll">
       <h2 id="doll-head">Worn and wielded</h2>
       <div class="hands">${slotBtn("hand", "In hand", held ? held.name : "", held ? eqIcon(held) : "")}
         <div class="slotbtn v2-btn empty offhand" role="note"
@@ -2879,7 +2879,7 @@ function journalNotes() {
       <label class="vh" for="jr-write-text">What to write</label>
       <textarea id="jr-write-text" class="v2-well" rows="3" maxlength="4000"
         placeholder="Write a note"${off}></textarea>
-      <div><button type="button" class="v2-btn is-small is-go" data-jrwrite="note"${off}>Write it down</button>
+      <div><button type="button" class="v2-btn is-small is-go" data-jrwrite="note" data-tut="jr-write"${off}>Write it down</button>
         <button type="button" class="v2-btn is-small" data-jrwrite="map"${off}>Draw a map of where you have been</button></div>
       <p class="why${JR_WRITE_BAD ? " bad" : ""}" role="status">${esc(JR_WRITE_SAY || (w.can_write ? "" : w.why))}</p>
     </div>`;

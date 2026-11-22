@@ -953,6 +953,7 @@ async function sendRoll(face, shown) {
     if (typeof Dice3D.next === "function") Dice3D.next(state.awaiting.label || "Another roll");
     await closing;
     showPopup(state.awaiting);
+    diceTip();   // the mat's first-time line (02-state.js)
   } else if (state) {
     render(state);
   }

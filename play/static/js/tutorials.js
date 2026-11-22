@@ -432,25 +432,6 @@
     setTimeout(function () { present(id, all, false, from || document.activeElement); }, reach[id] ? 120 : 0);
   }
 
-  // --- the inline first-time line (plan §3.1) ---------------------------------------------
-  // For what is already a prompt (the forced-march line): one sentence inside it, where a
-  // card would be a card over a card. The caller writes the returned HTML into its own
-  // markup. Due and tips on, it is marked seen the first time it is drawn and kept for the
-  // rest of this page, so a redraw of the prompt does not snatch it away mid-read. The "?"
-  // and Show me still show it as a card. Written by phase 4 in the shape §3.1 gives; phase 3
-  // builds the same helper for the dice popup, and the merge keeps one.
-  var inlined = {};             // id -> the line, once drawn on this page
-  function inline(id) {
-    var t = D && BY[id];
-    if (!t) return "";
-    if (!(id in inlined)) {
-      if (D.off || !t.due.length) return "";
-      inlined[id] = t.due.map(function (k) { return t.steps[k].words || ""; }).join(" ");
-      t.seen = true; t.due = []; t.updated = false;
-      post({ seen: [id] });
-    }
-    return '<span class="tut-inline">' + esc(inlined[id]) + "</span>";
-  }
 
   document.addEventListener("click", function (e) {
     var b = e.target.closest && e.target.closest("[data-tut-help]");
@@ -466,6 +447,32 @@
       if (line) line.remove();
       post({ welcome: true });
     }
+  });
+
+  // --- the inline first-time line (plan §3.1) ---------------------------------------------
+  // For a section that is itself a popup or a narrow strip (the dice mat, That's wrong, a
+  // death): one sentence inside it, never a card over it, since a card over a modal is a
+  // card over a card. `inline(id)` gives the line's HTML for the caller's own renderer, or
+  // "" when tips are off, the words have not arrived or it was seen. Seen is marked the
+  // first time it is drawn; the line then stays for the rest of this page load, because
+  // the renderers that hold it redraw on every state, until its Got it puts it away.
+  var lines = {};   // id -> the words drawn this load, "" once put away
+  function inline(id) {
+    if (!(id in lines)) {
+      var t = BY[id];
+      if (!D || !t || D.off || !t.due.length) return "";
+      lines[id] = t.due.map(function (k) { return t.steps[k].words || ""; }).join(" ");
+      t.seen = true; t.due = []; t.updated = false;
+      post({ seen: [id] });
+    }
+    return lines[id] ? '<div class="tut-inline" role="note" data-tut-inline="' + esc(id) + '"><span>' + esc(lines[id]) +
+      '</span> <button type="button" class="tut-link" data-tut-inline-done>Got it</button></div>' : "";
+  }
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest && e.target.closest("[data-tut-inline-done]");
+    if (!b) return;
+    var p = b.closest("[data-tut-inline]");
+    if (p) { lines[p.dataset.tutInline] = ""; p.remove(); }
   });
 
   // --- Settings, Tutorials (the index) ----------------------------------------------------
@@ -534,8 +541,8 @@
     load: load,
     ready: function () { return !!D; },
     arrive: arrive,
-    show: show,
     inline: inline,
+    show: show,
     reach: function (id, fn) { reach[id] = fn; },
     isOpen: function () { return open ? open.id : ""; },
     close: function () { if (open) finish(open.auto ? "later" : "close"); },

@@ -16,6 +16,9 @@ Shell.tab("trade", {
     const who = (STATE && STATE.merchant) || "";
     const none = document.getElementById("trade-none");
     if (none) none.hidden = !!who;
+    // The tab's first-time card (js/tutorials.js), at a counter or at the page saying
+    // there is none: both are the tab, and the card says which is which.
+    if (window.Tutorials) setTimeout(() => Tutorials.arrive("tab.trade", { entered: true }), 0);
     if (who) { openTrade(); return; }
     const why = document.getElementById("trade-none-why");
     if (why) why.textContent = NO_COUNTER;
@@ -26,6 +29,8 @@ Shell.tab("trade", {
     leaveCounter();
   },
 });
+
+if (window.Tutorials) Tutorials.reach("tab.trade", () => Shell.show("trade"));
 
 // The other half of the owner's ruling, said where it is used: "Buy and sell here. What
 // you buy goes into your pack, and you put it on from Equipment." Its button goes there.
