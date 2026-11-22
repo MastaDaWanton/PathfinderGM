@@ -43,7 +43,10 @@ MAX_BUTTON_WORDS = 14
 # bench without a tutorial is a failing test, not a forgotten one: add its id here and a
 # tutorial (or a "none" reason) for it. PENDING is the later phases' list: each lane takes
 # its own ids out as it writes them, and phase 6 leaves it empty.
-SECTIONS = {"table", "map.places", "map.region", "bench.herbalism"}
+SECTIONS = {"table", "map.places", "map.region", "bench.herbalism",
+            # phase 5, feat/tutorials-benches
+            "bench.forge", "bench.enchant", "bench.alchemy", "bench.leather", "bench.games",
+            "bench.perks", "bench.works", "bench.harvest", "bench.craftpage"}
 PENDING = {
     # phase 2, feat/tutorials-home
     "home.worlds", "home.campaign", "home.import", "home.homebrew", "home.characters",
@@ -58,9 +61,6 @@ PENDING = {
     # phase 4, feat/tutorials-maps-fights
     "map.ground", "map.march", "map.world", "map.sea", "map.site",
     "fight.bar", "fight.order", "fight.nonlethal",
-    # phase 5, feat/tutorials-benches
-    "bench.forge", "bench.enchant", "bench.alchemy", "bench.leather", "bench.games",
-    "bench.perks", "bench.works", "bench.harvest", "bench.craftpage",
 }
 
 

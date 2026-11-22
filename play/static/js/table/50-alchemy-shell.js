@@ -299,6 +299,8 @@
   A.say = core.say;
   A.refocus = core.refocus;
 
+  if (window.Tutorials) Tutorials.reach("bench.alchemy", function () { if (!A.open) A.openBench($id("open-alchemy")); });
+
   // /play/#alchemy, the old /craft/ tab's "Open the alchemy bench" (craft.html), opens it on
   // load.
   function fromHash() { if (location.hash === "#alchemy" && !A.open) A.openBench($id("open-alchemy")); }
@@ -338,6 +340,8 @@
       var at = document.activeElement;
       if (!at || at === document.body || at.id === "alchemy-close") core.focusFirst();
       mountStage();
+      // The first-time card, now its methods and shelf are drawn to point at.
+      if (window.Tutorials) Tutorials.arrive("bench.alchemy", { entered: true, still: function () { return A.open; } });
     }).catch(function (err) {
       A.loading = false;
       A.error = err.message || String(err);
@@ -1451,9 +1455,11 @@
       picks: t && t.picks_banked,
       // Manuals when an alchemy manual or formulary is carried (the server's `state.manuals`).
       buttons: ((s && s.manuals && s.manuals.length)
-                 ? '<button type="button" class="bf-btn" data-alchemy-manuals aria-haspopup="dialog">Manuals</button>' : "") +
-               '<button type="button" class="bf-btn" data-alchemy-formulary aria-haspopup="dialog">Formulary</button>' +
-               '<button type="button" class="bf-btn" data-alchemy-codex aria-haspopup="dialog">Codex</button>',
+                 ? '<button type="button" class="bf-btn" data-alchemy-manuals data-tut="alchemy-manuals" aria-haspopup="dialog">Manuals</button>' : "") +
+               '<button type="button" class="bf-btn" data-alchemy-formulary data-tut="alchemy-formulary" aria-haspopup="dialog">Formulary</button>' +
+               '<button type="button" class="bf-btn" data-alchemy-codex data-tut="alchemy-codex" aria-haspopup="dialog">Codex</button>' +
+               // The bench's tips again (js/tutorials.js), as the herb bench's footer has them.
+               '<button type="button" class="tut-help" data-tut="help-alchemy" data-tut-help="bench.alchemy" aria-label="Show the tips for this bench">?</button>',
     };
   }
   function renderFoot() { core.renderFoot(); }

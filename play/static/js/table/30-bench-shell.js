@@ -194,6 +194,8 @@
   function focusFirst() { core.focusFirst(); }
 
   if (window.Tutorials) Tutorials.reach("bench.herbalism", function () { if (!B.open) B.openBench($id("open-bench")); });
+  // The bench games' card (B6) points at Steady mode, which every bench's foot carries.
+  if (window.Tutorials) Tutorials.reach("bench.games", function () { if (!B.open) B.openBench($id("open-bench")); });
 
   // /play/#bench, the old bench's "Open the herbalism bench" (craft.html), opens it on load.
   function fromHash() { if (location.hash === "#bench" && !B.open) B.openBench($id("open-bench")); }

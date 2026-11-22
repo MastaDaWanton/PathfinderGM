@@ -389,11 +389,12 @@ def test_the_forge_picker_offers_its_four_perks_with_the_servers_words(served):
 
 
 # The herb picker's first two draws and its post, as the pre-change 36-bench-perks.js built
-# them for HERB_TRACK (generated from a218b3a's file through this same harness).
+# them for HERB_TRACK (generated from a218b3a's file through this same harness), with the
+# tutorials' anchors and the picker's own "?" added on purpose in 0.5.0 (feat/tutorials-benches).
 HERB_FIRST = (
     '<div class="bench-scrim"></div><div class="bench-dialog bench-perks v2-framed v2-card-leather">'
     '<i class="v2-rim" aria-hidden="true"></i><h3 id="bench-perks-t">Pick two perks</h3>'
-    '<p>Herbalist 4. The same perk twice is allowed.</p><div class="pk-grid">'
+    '<p>Herbalist 4. The same perk twice is allowed.</p><div class="pk-grid" data-tut="perk-grid">'
     '<button type="button" class="pk" data-perk="potency" aria-pressed="false"><span class="pk-main"><b>Potency</b>'
     '<span class="pk-next">+5% to the strength of what you make, total +10%</span><span class="pk-taken">Taken 1 time</span></span></button>'
     '<button type="button" class="pk" data-perk="duration" aria-pressed="false"><span class="pk-main"><b>Duration</b>'
@@ -402,10 +403,11 @@ HERB_FIRST = (
     '<span class="pk-next">Your ceiling rises one rung.</span><span class="pk-taken">Not taken yet</span></span></button>'
     '<button type="button" class="pk" data-perk="yield" aria-pressed="false"><span class="pk-main"><b>Extra yield</b>'
     '<span class="pk-next">A chance of an extra dose from each batch.</span><span class="pk-taken">Not taken yet</span></span></button>'
-    '</div><p class="pk-left" role="status">2 to pick</p><div class="bench-dialog-acts">'
-    '<button type="button" class="v2-btn is-quiet" data-pk="later">Later</button>'
-    '<button type="button" class="v2-btn is-quiet" data-pk="clear" disabled>Clear</button>'
-    '<button type="button" class="v2-btn is-go" data-pk="ok" disabled>Confirm</button></div></div>')
+    '</div><p class="pk-left" role="status">2 to pick</p><div class="bench-dialog-acts" data-tut="perk-acts">'
+    '<button type="button" class="tut-help" data-tut="help-perks" data-tut-help="bench.perks" aria-label="Show the tips for perks">?</button>'
+    '<button type="button" class="v2-btn is-quiet" data-pk="later" data-tut="perk-later">Later</button>'
+    '<button type="button" class="v2-btn is-quiet" data-pk="clear" data-tut="perk-clear" disabled>Clear</button>'
+    '<button type="button" class="v2-btn is-go" data-pk="ok" data-tut="perk-ok" disabled>Confirm</button></div></div>')
 
 
 def test_the_herb_picker_is_byte_for_byte_what_it_was():

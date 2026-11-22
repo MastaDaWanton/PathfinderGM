@@ -255,6 +255,8 @@
   E.say = core.say;
   E.refocus = core.refocus;
 
+  if (window.Tutorials) Tutorials.reach("bench.enchant", function () { if (!E.open) E.openBench($id("open-enchant")); });
+
   // /play/#enchant, the old /craft/ tab's "Open the circle" (craft.html), opens it on load.
   function fromHash() { if (location.hash === "#enchant" && !E.open) E.openBench($id("open-enchant")); }
   window.addEventListener("hashchange", fromHash);
@@ -281,6 +283,8 @@
       var at = document.activeElement;
       if (!at || at === document.body || at.id === "enchant-close") core.focusFirst();
       mountStage();
+      // The first-time card, now its methods and shelf are drawn to point at.
+      if (window.Tutorials) Tutorials.arrive("bench.enchant", { entered: true, still: function () { return E.open; } });
     }).catch(function (err) {
       E.loading = false;
       E.error = err.message || String(err);
@@ -1400,9 +1404,11 @@
       picks: t && t.picks_banked,
       // Manuals when an enchanting manual is carried (the server's `state.manuals`).
       buttons: ((s && s.manuals && s.manuals.length)
-                 ? '<button type="button" class="bf-btn" data-enchant-manuals aria-haspopup="dialog">Manuals</button>' : "") +
-               (L && typeof L.recipes === "function" ? '<button type="button" class="bf-btn" data-enchant-recipes>Recipes</button>' : "") +
-               (L && typeof L.journal === "function" ? '<button type="button" class="bf-btn" data-enchant-ledger>Ledger</button>' : ""),
+                 ? '<button type="button" class="bf-btn" data-enchant-manuals data-tut="enchant-manuals" aria-haspopup="dialog">Manuals</button>' : "") +
+               (L && typeof L.recipes === "function" ? '<button type="button" class="bf-btn" data-enchant-recipes data-tut="enchant-recipes">Recipes</button>' : "") +
+               (L && typeof L.journal === "function" ? '<button type="button" class="bf-btn" data-enchant-ledger data-tut="enchant-ledger">Ledger</button>' : "") +
+               // The circle's tips again (js/tutorials.js), as the herb bench's footer has them.
+               '<button type="button" class="tut-help" data-tut="help-enchant" data-tut-help="bench.enchant" aria-label="Show the tips for the circle">?</button>',
     };
   }
   function renderFoot() { core.renderFoot(); }

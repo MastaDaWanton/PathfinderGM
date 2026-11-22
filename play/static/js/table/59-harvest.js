@@ -132,13 +132,15 @@
     layer.setAttribute("aria-labelledby", "harvest-title");
     layer.hidden = true;
     layer.innerHTML =
-      '<section class="hv-sheet v2-framed v2-card-leather" aria-describedby="harvest-sub">' +
+      '<section class="hv-sheet v2-framed v2-card-leather" data-tut="harvest-sheet" aria-describedby="harvest-sub">' +
         '<i class="v2-rim" aria-hidden="true"></i>' +
         '<header class="hv-head">' +
           '<h2 class="hv-title" id="harvest-title">Harvest the carcass</h2>' +
-          '<button type="button" class="v2-btn is-quiet bench-close" id="harvest-close">Close</button>' +
+          // The sheet's tips again (js/tutorials.js).
+          '<button type="button" class="tut-help" data-tut="help-harvest" data-tut-help="bench.harvest" aria-label="Show the tips for harvesting">?</button>' +
+          '<button type="button" class="v2-btn is-quiet bench-close" id="harvest-close" data-tut="harvest-close">Close</button>' +
         '</header>' +
-        '<div class="hv-body" id="harvest-body"></div>' +
+        '<div class="hv-body" id="harvest-body" data-tut="harvest-body"></div>' +
         // Where the harvest game rises (contracts §11.1), inside the sheet and outside its
         // scrolled body, so the strip is always on screen while the list above it shrinks.
         '<div class="bench-gamebay hv-game" id="harvest-game" hidden></div>' +
@@ -229,6 +231,8 @@
       render();
       core.renderFoot();
       core.focusFirst();
+      // The first-time card, once a carcass's rows are drawn to point at (js/tutorials.js).
+      if (window.Tutorials && H.sheet) Tutorials.arrive("bench.harvest", { entered: true, still: function () { return core.open && !!H.sheet; } });
     }, function (err) {
       H.busy = false;
       H.sheet = null;
@@ -379,7 +383,7 @@
         (first ? " You will be asked before the knife goes in." : " The deed is already done on this body.") + "</p>";
     }
     var busy = H.busy || !!H.live || !s.harvestable;
-    out += '<button type="button" class="v2-btn is-go hv-take" data-hv-take="' + esc(r.key) + '"' +
+    out += '<button type="button" class="v2-btn is-go hv-take" data-tut="harvest-take" data-hv-take="' + esc(r.key) + '"' +
       (busy ? " disabled" : "") + ' aria-label="Take the ' + esc(String(r.name).toLowerCase()) + '">Take</button>';
     return out + "</li>";
   }

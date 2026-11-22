@@ -1,6 +1,42 @@
 {
+ "bench.alchemy": {
+  "hash": "3b8f9fcc2f05d535",
+  "v": 1
+ },
+ "bench.craftpage": {
+  "hash": "7d8a341e11b4f700",
+  "v": 1
+ },
+ "bench.enchant": {
+  "hash": "790d7d1f1fea7ffa",
+  "v": 1
+ },
+ "bench.forge": {
+  "hash": "3b4ba95ee4631882",
+  "v": 1
+ },
+ "bench.games": {
+  "hash": "deb0f72e5377d2b4",
+  "v": 1
+ },
+ "bench.harvest": {
+  "hash": "4f62f2ce51c9843e",
+  "v": 1
+ },
  "bench.herbalism": {
   "hash": "77d242d37fe349f6",
+  "v": 1
+ },
+ "bench.leather": {
+  "hash": "03983923d304f03d",
+  "v": 1
+ },
+ "bench.perks": {
+  "hash": "7a30a21a9ef39a60",
+  "v": 1
+ },
+ "bench.works": {
+  "hash": "6d4b7fc06c1f340d",
   "v": 1
  },
  "map.places": {
