@@ -425,6 +425,8 @@
       if (!list.length) return;
       var first = list[0], last = list[list.length - 1];
       var at = document.activeElement;
+      // A first-time card over a bench's dialog keeps its own Tab (js/tutorials.js).
+      if (at && at.closest && at.closest(".tut-card")) return;
       if (!root.contains(at)) { e.preventDefault(); first.focus(); return; }
       if (e.shiftKey && at === first) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && at === last) { e.preventDefault(); first.focus(); }

@@ -148,7 +148,7 @@
         '<i class="v2-rim" aria-hidden="true"></i>' +
         '<h3 id="' + titleId + '">' + (need === 1 ? "Pick a perk" : "Pick two perks") + '</h3>' +
         '<p>' + esc(row.title) + ' ' + esc(t.level) + '. The same perk twice is allowed.</p>' +
-        '<div class="pk-grid">' + PERKS.map(function (p, i) {
+        '<div class="pk-grid" data-tut="perk-grid">' + PERKS.map(function (p, i) {
           var mine = picks.filter(function (x) { return x === p.id; }).length;
           var taken = (t.perks && t.perks[p.id]) || 0;
           var next = info[p.id] && info[p.id].next ? info[p.id].next : p.words;
@@ -163,9 +163,12 @@
         }).join("") + '</div>' +
         '<p class="pk-left" role="status">' + (picks.length < need ? (need - picks.length) + " to pick" : "Ready to confirm") + '</p>' +
         (err ? '<p class="bench-warnline">' + esc(err) + '</p>' : "") +
-        '<div class="bench-dialog-acts"><button type="button" class="v2-btn is-quiet" data-pk="later">Later</button>' +
-        '<button type="button" class="v2-btn is-quiet" data-pk="clear"' + (picks.length ? "" : " disabled") + '>Clear</button>' +
-        '<button type="button" class="v2-btn is-go" data-pk="ok"' + (picks.length === need ? "" : " disabled") + '>Confirm</button></div></div>';
+        '<div class="bench-dialog-acts" data-tut="perk-acts">' +
+        // The picker's tips again (js/tutorials.js); the same "?" as every bench's foot.
+        '<button type="button" class="tut-help" data-tut="help-perks" data-tut-help="bench.perks" aria-label="Show the tips for perks">?</button>' +
+        '<button type="button" class="v2-btn is-quiet" data-pk="later" data-tut="perk-later">Later</button>' +
+        '<button type="button" class="v2-btn is-quiet" data-pk="clear" data-tut="perk-clear"' + (picks.length ? "" : " disabled") + '>Clear</button>' +
+        '<button type="button" class="v2-btn is-go" data-pk="ok" data-tut="perk-ok"' + (picks.length === need ? "" : " disabled") + '>Confirm</button></div></div>';
       var f = focusId ? wrap.querySelector(focusId) : wrap.querySelector(".pk");
       if (f && !f.disabled) f.focus(); else { var any = wrap.querySelector(".pk"); if (any) any.focus(); }
     };
@@ -200,6 +203,9 @@
       }
     });
     draw();
+    // The first-time card about perks, over the picker it is about: js/tutorials.js lets a
+    // card show over a bench's dialog only when the card's own section is that dialog.
+    if (window.Tutorials) Tutorials.arrive("bench.perks", { entered: true, still: function () { return openNow === wrap; } });
     return wrap;
   }
   window.BenchPerks = { open: open, tracks: TRACKS, isOpen: function () { return !!openNow; } };

@@ -300,6 +300,8 @@
   L.say = core.say;
   L.refocus = core.refocus;
 
+  if (window.Tutorials) Tutorials.reach("bench.leather", function () { if (!L.open) L.openBench($id("open-leather")); });
+
   // /play/#leather (the old /craft/ tab's card, lane U7) opens it on load.
   function fromHash() { if (location.hash === "#leather" && !L.open) L.openBench($id("open-leather")); }
   window.addEventListener("hashchange", fromHash);
@@ -354,6 +356,8 @@
       var at = document.activeElement;
       if (!at || at === document.body || at.id === "leather-close") core.focusFirst();
       mountStage();
+      // The first-time card, now its methods and rack are drawn to point at.
+      if (window.Tutorials) Tutorials.arrive("bench.leather", { entered: true, still: function () { return L.open; } });
     }).catch(function (err) {
       L.loading = false;
       L.error = err.message || String(err);
@@ -1316,8 +1320,10 @@
                    need: t.to_next && t.to_next.need, have: t.to_next && t.to_next.have } : null,
       picks: t && t.picks_banked,
       buttons: ((s && s.manuals && s.manuals.length)
-        ? '<button type="button" class="bf-btn" data-leather-manuals aria-haspopup="dialog">Manuals</button>' : "") +
-        '<button type="button" class="bf-btn" data-leather-ledger aria-haspopup="dialog">Ledger</button>',
+        ? '<button type="button" class="bf-btn" data-leather-manuals data-tut="leather-manuals" aria-haspopup="dialog">Manuals</button>' : "") +
+        '<button type="button" class="bf-btn" data-leather-ledger data-tut="leather-ledger" aria-haspopup="dialog">Ledger</button>' +
+        // The bench's tips again (js/tutorials.js), as the herb bench's footer has them.
+        '<button type="button" class="tut-help" data-tut="help-leather" data-tut-help="bench.leather" aria-label="Show the tips for this bench">?</button>',
     };
   }
   function renderFoot() { core.renderFoot(); }

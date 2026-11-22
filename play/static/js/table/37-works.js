@@ -212,19 +212,19 @@
     } else {
       var collect = "";
       if (ready && r.can_collect) {
-        collect = '<button type="button" class="v2-btn is-small is-go" data-works-collect="' + esc(r.key) +
+        collect = '<button type="button" class="v2-btn is-small is-go" data-tut="works-collect" data-works-collect="' + esc(r.key) +
           '">Collect</button>';
       } else if (ready) {
         collect = '<button type="button" class="v2-btn is-small" aria-disabled="true" aria-describedby="' +
           id + '-why" data-works-collect="' + esc(r.key) + '">Collect</button>' +
           '<span class="wk-why" id="' + id + '-why">' + esc(r.why_not || "It cannot be collected here") + '</span>';
       }
-      var stop = r.can_stop ? '<button type="button" class="v2-btn is-small is-quiet" data-works-stop="' +
+      var stop = r.can_stop ? '<button type="button" class="v2-btn is-small is-quiet" data-tut="works-stop" data-works-stop="' +
         esc(r.key) + '">Stop</button>' : "";
       // Wait for it, where the bench that made it registered how to wait (`W.waiters`) and
       // the server says the player can stay with it here (`can_wait`).
       var wait = (!ready && r.can_wait && typeof W.waiters[r.craft] === "function")
-        ? '<button type="button" class="v2-btn is-small" data-works-wait="' + esc(r.key) +
+        ? '<button type="button" class="v2-btn is-small" data-tut="works-wait" data-works-wait="' + esc(r.key) +
           '">Wait for it</button>' : "";
       if (collect || wait || stop) acts = '<div class="wk-acts">' + collect + wait + stop + '</div>';
     }
@@ -288,8 +288,10 @@
     panel.hidden = true;
     panel.innerHTML = '<i class="v2-rim" aria-hidden="true"></i>' +
       '<header class="wk-head"><h2 class="wk-title" id="works-title">In progress</h2>' +
-      '<button type="button" class="v2-btn is-quiet is-small" data-works-close>Close</button></header>' +
-      '<div class="wk-body" id="works-body"></div>' +
+      // The panel's tips again (js/tutorials.js).
+      '<button type="button" class="tut-help" data-tut="help-works" data-tut-help="bench.works" aria-label="Show the tips for In progress">?</button>' +
+      '<button type="button" class="v2-btn is-quiet is-small" data-tut="works-close" data-works-close>Close</button></header>' +
+      '<div class="wk-body" id="works-body" data-tut="works-panel"></div>' +
       '<p class="wk-said" id="works-said" role="status" aria-live="polite"></p>';
     document.body.appendChild(panel);
     home = document.body;
@@ -381,7 +383,11 @@
     var first = panel.querySelector("[data-works-collect]:not([aria-disabled])") || panel.querySelector("[data-works-close]");
     if (first) first.focus();
     load();
+    // The first-time card, beside the panel it is about (js/tutorials.js).
+    if (window.Tutorials) Tutorials.arrive("bench.works", { entered: true, still: isOpen });
   };
+  // Settings' Show me: open the panel from the table's own door when this page has one.
+  if (window.Tutorials) Tutorials.reach("bench.works", function () { if (!isOpen()) W.open($id("open-works")); });
   W.close = function (quiet) {
     if (!isOpen()) return;
     panel.hidden = true;

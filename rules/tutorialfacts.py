@@ -57,6 +57,34 @@ def _knockout_dice() -> str:
     return coup_de_grace.KNOCKOUT_DICE
 
 
+def _forge_in_progress_hours() -> int:
+    # The forge's own threshold (rules/blacksmith.py plan: `minutes >= in_progress_after`).
+    from . import blacksmith
+    return max(1, round(int(blacksmith.bench_rules().get("in_progress_after", 60)) / 60))
+
+
+def _alchemy_in_progress_hours() -> int:
+    # Alchemy's (rules/alchemist.py: a step *longer than* this waits, and every Transmute).
+    from . import alchemist
+    return max(1, round(int(alchemist.bench_rules().get("in_progress_after", 480)) / 60))
+
+
+def _perk_track():
+    # Every craft's endless levels start and pay alike today (each track's `endless`
+    # block); the herbalist's is read as the card's.
+    from . import worldclass
+    return worldclass.get("herbalist")
+
+
+def _perk_from_level() -> int:
+    return int(_perk_track().max_level)
+
+
+def _perk_picks() -> int:
+    from . import worldclass
+    return int(_perk_track().endless.get("picks_per_level", worldclass.PICKS_PER_LEVEL))
+
+
 FACTS = {
     "hex_hours_open": lambda: _hex_hours(0),
     "hex_hours_rough": lambda: _hex_hours(1),
@@ -67,6 +95,10 @@ FACTS = {
     "march_damage": _march_damage,
     "herb_in_progress_hours": _herb_in_progress_hours,
     "knockout_dice": _knockout_dice,
+    "forge_in_progress_hours": _forge_in_progress_hours,
+    "alchemy_in_progress_hours": _alchemy_in_progress_hours,
+    "perk_from_level": _perk_from_level,
+    "perk_picks": _perk_picks,
 }
 
 _FIELD = re.compile(r"\{([a-z_]+)\}")

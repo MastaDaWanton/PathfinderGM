@@ -54,6 +54,374 @@
           ]
         }
       ]
+    },
+    {
+      "id": "bench.forge",
+      "v": 1,
+      "title": "The forge",
+      "manual": "forge",
+      "root": "forge-methods",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "forge-methods",
+          "title": "Methods",
+          "words": "The steps of smithing run along the top, and the number keys pick them too. A locked step says what opens it: a higher Blacksmith level, or a smithy's furnace, which a field kit does not have.",
+          "source": {"file": "rules/blacksmith.py", "literal": "reason = \"Needs a smithy\""}
+        },
+        {
+          "since": 1,
+          "anchor": "forge-rack",
+          "title": "Your rack",
+          "words": "On the left is what you carry that the forge can work: ore, bars, fuel and fittings. Drag one into the work order, or press Enter on it. A material's card holds Assay, which tests it to learn what it does."
+        },
+        {
+          "since": 1,
+          "anchor": "forge-order",
+          "title": "The work order",
+          "words": "On the right are the slots this step needs and, for Forge, the shape to make, with its bars and its DC. The paper tag under them shows the best quality your level allows."
+        },
+        {
+          "since": 1,
+          "anchor": "forge-roll",
+          "title": "Roll Craft",
+          "words": "Roll Craft throws your Craft check against the DC shown. On a success a short game at the anvil sets the quality. A bad miss ruins half of what was on the anvil, the cheaper things first.",
+          "controls": [{"tut": "forge-roll", "label": "Roll Craft"}]
+        },
+        {
+          "since": 1,
+          "anchor": "forge-foot",
+          "title": "Long work",
+          "words": "A step of {forge_in_progress_hours} hour or longer goes In progress. Worked at a smithy it waits there for you to collect; worked from a field kit, you carry it. The line at the foot says where you are working.",
+          "controls": [{"tut": "works", "label": "In progress"}],
+          "source": {"file": "rules/blacksmith.py", "literal": "if waits and plan.minutes >= int(rules.get(\"in_progress_after\", 60)):"}
+        },
+        {
+          "since": 1,
+          "anchor": "forge-foot",
+          "title": "Buttons along the foot",
+          "buttons": [
+            {"tut": "forge-manuals", "label": "Manuals", "words": "Read a smithing manual you carry."},
+            {"tut": "forge-ledger", "label": "Ledger", "words": "Every material you have met."},
+            {"tut": "works", "label": "In progress", "words": "Long work from every craft."},
+            {"tut": "bench-perks", "label": "perks to pick", "words": "Perks past the top level."},
+            {"tut": "bench-steady", "label": "Steady mode", "words": "Slower, gentler games."},
+            {"tut": "help-forge", "label": "?", "words": "Shows these tips again."},
+            {"tut": "forge-close", "label": "Close", "words": "Back to the table; Esc too."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bench.enchant",
+      "v": 1,
+      "title": "The enchanting circle",
+      "manual": "enchanting",
+      "root": "enchant-methods",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "enchant-methods",
+          "title": "Three steps in order",
+          "words": "Prepare lays a circle round a vessel, Attune seats essences on it, and Bind makes it magic. Read, Identify and Unbind work beside them. The number keys pick a method; a locked one says the level that opens it."
+        },
+        {
+          "since": 1,
+          "anchor": "enchant-shelf",
+          "title": "Your shelf",
+          "words": "On the left are the vessels, circle materials and essences you carry, each essence with its motes. Drag one into the working, or press Enter on it. A worn or held item cannot go in the circle: take it off first."
+        },
+        {
+          "since": 1,
+          "anchor": "enchant-working",
+          "title": "The working",
+          "words": "On the right is the working: the vessel, the circle's line, ink and treatment, then the seats the essences sit in. It shows the DC and what makes it up, and the paper tag shows your quality ceiling."
+        },
+        {
+          "since": 1,
+          "anchor": "enchant-roll",
+          "title": "The roll",
+          "words": "Under the circle you are told what a miss would cost before you roll. On a success a short game sets the step's quality. Each essence family has its hour of the day: bind inside it and the game's windows are wider.",
+          "controls": [{"tut": "enchant-roll", "label": "Roll"}]
+        },
+        {
+          "since": 1,
+          "anchor": "enchant-foot",
+          "title": "Binding takes days",
+          "words": "A Bind that lands goes In progress for the book's time, and you need not stand over it. Stop it early and the item comes back as it was, but the essences are spent.",
+          "controls": [{"tut": "works", "label": "In progress"}],
+          "source": {"file": "rules/enchanter.py", "literal": "\"state\": \"in_progress\""}
+        },
+        {
+          "since": 1,
+          "anchor": "enchant-foot",
+          "title": "Buttons along the foot",
+          "words": "Close, or Esc, goes back to the table.",
+          "buttons": [
+            {"tut": "enchant-manuals", "label": "Manuals", "words": "Read an enchanting manual you carry."},
+            {"tut": "enchant-recipes", "label": "Recipes", "words": "The recipes you know."},
+            {"tut": "enchant-ledger", "label": "Ledger", "words": "Your essences, in the Journal."},
+            {"tut": "works", "label": "In progress", "words": "Long work from every craft."},
+            {"tut": "bench-perks", "label": "perks to pick", "words": "Perks past the top level."},
+            {"tut": "bench-steady", "label": "Steady mode", "words": "Slower, gentler games."},
+            {"tut": "help-enchant", "label": "?", "words": "Shows these tips again."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bench.alchemy",
+      "v": 1,
+      "title": "The alchemy bench",
+      "manual": "alchemy",
+      "root": "alchemy-methods",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "alchemy-methods",
+          "title": "Methods",
+          "words": "The methods run along the top, and the number keys pick them too. Most work starts with Dissolve and ends with Bottle, and a bottled product never goes back in. A locked method says the level that opens it."
+        },
+        {
+          "since": 1,
+          "anchor": "alchemy-shelf",
+          "title": "Your shelf",
+          "words": "On the left are the reagents, solvents and vessels you carry. Drag one onto the formula card, or press Enter on it. The ? beside a reagent opens its card: what you know of it, and Assay to learn more."
+        },
+        {
+          "since": 1,
+          "anchor": "alchemy-card",
+          "title": "The formula card",
+          "words": "On the right: what goes in, the vessel, the formula or Experiment, and the traits it will carry. Bottle with no formula chosen and you experiment; a mix that fits one formula within your reach is written into your Formulary."
+        },
+        {
+          "since": 1,
+          "anchor": "alchemy-roll",
+          "title": "Roll Craft",
+          "words": "The mishap a miss would bring is said under the glass before you roll. On a success a short game sets the quality, up to the ceiling on the paper tag. Distill, Sublime, Transmute and rare reagents need a laboratory.",
+          "controls": [{"tut": "alchemy-roll", "label": "Roll Craft"}]
+        },
+        {
+          "since": 1,
+          "anchor": "alchemy-foot",
+          "title": "Long work",
+          "words": "A step longer than {alchemy_in_progress_hours} hours, and every Transmute, goes In progress. You need not stand over it: it is ready when the clock reaches its time, and the line at the foot says where you are working.",
+          "controls": [{"tut": "works", "label": "In progress"}],
+          "source": {"file": "rules/alchemist.py", "literal": "after = int(rules.get(\"in_progress_after\", 480))"}
+        },
+        {
+          "since": 1,
+          "anchor": "alchemy-foot",
+          "title": "Buttons along the foot",
+          "words": "Close, or Esc, goes back to the table.",
+          "buttons": [
+            {"tut": "alchemy-manuals", "label": "Manuals", "words": "Read an alchemy manual you carry."},
+            {"tut": "alchemy-formulary", "label": "Formulary", "words": "The formulae you know."},
+            {"tut": "alchemy-codex", "label": "Codex", "words": "Every reagent you have met."},
+            {"tut": "works", "label": "In progress", "words": "Long work from every craft."},
+            {"tut": "bench-perks", "label": "perks to pick", "words": "Perks past the top level."},
+            {"tut": "bench-steady", "label": "Steady mode", "words": "Slower, gentler games."},
+            {"tut": "help-alchemy", "label": "?", "words": "Shows these tips again."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bench.leather",
+      "v": 1,
+      "title": "The leather bench",
+      "manual": "leatherworking",
+      "root": "leather-methods",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "leather-methods",
+          "title": "From hide to piece",
+          "words": "The steps from a green hide to a finished piece run along the top: flense, tan, cut, stitch and assemble, and more as you level. The number keys pick them too. A locked step says the level that opens it."
+        },
+        {
+          "since": 1,
+          "anchor": "leather-rack",
+          "title": "Your rack",
+          "words": "On the left is what you carry: green hides first, each with its grade and how long before it spoils. Salt or tan a green hide in time. Drag anything into the work order, or press Enter on it."
+        },
+        {
+          "since": 1,
+          "anchor": "leather-order",
+          "title": "The work order",
+          "words": "On the right are the slots this step needs and the paper tag. The worst hide grade on the bench caps the quality, and the tag shows that ceiling before you roll. Green hides come from Harvest the carcass, in Craft action."
+        },
+        {
+          "since": 1,
+          "anchor": "leather-roll",
+          "title": "Roll Craft",
+          "words": "Roll Craft throws your Craft check against the DC shown. On a success a short game at the beam sets the quality. A bad miss ruins half of what was on the bench.",
+          "controls": [{"tut": "leather-roll", "label": "Roll Craft"}]
+        },
+        {
+          "since": 1,
+          "anchor": "leather-foot",
+          "title": "Tanning takes days",
+          "words": "A tanning that soaks goes In progress: in your pack, or in a tannery's vat if begun there. The line at the foot says where you are working, and what a tannery charges.",
+          "controls": [{"tut": "works", "label": "In progress"}],
+          "source": {"file": "rules/leatherworker.py", "literal": "got = inprogress.begin(actor, key, craft=TRACK_ID"}
+        },
+        {
+          "since": 1,
+          "anchor": "leather-foot",
+          "title": "Buttons along the foot",
+          "buttons": [
+            {"tut": "leather-manuals", "label": "Manuals", "words": "Read a manual you carry."},
+            {"tut": "leather-ledger", "label": "Ledger", "words": "Every hide and supply you have met."},
+            {"tut": "works", "label": "In progress", "words": "Long work from every craft."},
+            {"tut": "bench-perks", "label": "perks to pick", "words": "Perks past the top level."},
+            {"tut": "bench-steady", "label": "Steady mode", "words": "Slower, gentler games."},
+            {"tut": "help-leather", "label": "?", "words": "Shows these tips again."},
+            {"tut": "leather-close", "label": "Close", "words": "Back to the table; Esc too."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bench.games",
+      "v": 1,
+      "title": "The bench games",
+      "manual": "craft-levels",
+      "root": "bench-steady",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "bench-steady",
+          "title": "A short game after the roll",
+          "words": "After a good roll at any bench a short game plays, and how well you play sets the quality. Each game shows its own first card until you play it well, and the ? on the game's strip pauses it."
+        },
+        {
+          "since": 1,
+          "anchor": "bench-steady",
+          "title": "Steady mode",
+          "words": "Steady mode, at the foot of every bench, slows every game and turns every hold into a press. It is the same switch as Steady mode in Settings, under Sound and motion.",
+          "controls": [{"tut": "bench-steady", "label": "Steady mode"}]
+        }
+      ]
+    },
+    {
+      "id": "bench.perks",
+      "v": 1,
+      "title": "Perks",
+      "manual": "craft-levels",
+      "root": "perk-grid",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "perk-grid",
+          "title": "Levels that never stop",
+          "words": "Past level {perk_from_level} a craft keeps levelling, and each level gives {perk_picks} picks from its perks; the same perk may be picked twice. Each choice says what it will do at your next pick.",
+          "source": {"file": "rules/worldclass.py", "literal": "per = int(track.endless.get(\"picks_per_level\", PICKS_PER_LEVEL))"}
+        },
+        {
+          "since": 1,
+          "anchor": "perk-acts",
+          "title": "Choosing",
+          "buttons": [
+            {"tut": "perk-later", "label": "Later", "words": "Keeps the picks banked; perks to pick at the foot opens this again."},
+            {"tut": "perk-clear", "label": "Clear", "words": "Takes back the picks made so far."},
+            {"tut": "perk-ok", "label": "Confirm", "words": "Takes the picks; they count from your next step."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bench.works",
+      "v": 1,
+      "title": "In progress",
+      "manual": "craft-levels",
+      "root": "works-panel",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "works-panel",
+          "title": "Long work, every craft",
+          "words": "Work from every bench that takes a long while waits here: what is ready to collect first, then what is still working, soonest first. The countdown runs on the story's clock, so it moves only as time passes in the game."
+        },
+        {
+          "since": 1,
+          "anchor": "works-panel",
+          "title": "Where it opens",
+          "words": "In progress opens this panel from under the bench doors on the left side, and from the foot of every bench. The count beside it says how many are ready.",
+          "controls": [{"tut": "works", "label": "In progress"}]
+        },
+        {
+          "since": 1,
+          "anchor": "works-panel",
+          "title": "Buttons on a row",
+          "buttons": [
+            {"tut": "works-collect", "label": "Collect", "words": "Takes finished work into your pack, or says why not from here."},
+            {"tut": "works-wait", "label": "Wait for it", "words": "Lets time pass until the work is ready."},
+            {"tut": "works-stop", "label": "Stop", "words": "Ends the work early; it says first what you lose."},
+            {"tut": "works-close", "label": "Close", "words": "Folds the panel away. Esc does the same."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bench.harvest",
+      "v": 1,
+      "title": "Harvest the carcass",
+      "manual": "leatherworking",
+      "root": "harvest-sheet",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "harvest-body",
+          "title": "Every craft at once",
+          "words": "This sheet lists what you can take from this body for every craft you have, grouped by craft. Each row says the check it takes, what comes off and how long it takes."
+        },
+        {
+          "since": 1,
+          "anchor": "harvest-take",
+          "title": "Take",
+          "words": "Take rolls for that one part. The first part off a dangerous body faces its dangers first, a die for each, and the danger is said before you roll. A hide is then cut off in a short game that sets its grade.",
+          "controls": [{"tut": "harvest-take", "label": "Take"}]
+        },
+        {
+          "since": 1,
+          "anchor": "harvest-body",
+          "title": "Salt and deeds",
+          "words": "A green hide spoils unless it is salted or tanned, and its row says whether you carry enough curing salt. Taking from a good outsider or a good dragon is a deed, and you are asked first.",
+          "buttons": [
+            {"tut": "works", "label": "In progress", "words": "Long work from every craft."},
+            {"tut": "bench-steady", "label": "Steady mode", "words": "Slower, gentler games."},
+            {"tut": "help-harvest", "label": "?", "words": "Shows these tips again."},
+            {"tut": "harvest-close", "label": "Close", "words": "Back to the table; Esc too."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "bench.craftpage",
+      "v": 1,
+      "title": "The crafting page",
+      "manual": "benches",
+      "root": "craft-tabs",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "craft-tabs",
+          "title": "One tab a craft",
+          "words": "Each tab is one craft, with your level in it, or not yet. The benches stand at the table now, so each tab is one card with one button: it takes you to the table with that bench open."
+        },
+        {
+          "since": 1,
+          "anchor": "craft-main",
+          "title": "Time at a bench",
+          "words": "A bench works in the scene where your character stands, and each step takes its time on the story's clock.",
+          "buttons": [
+            {"tut": "craft-back", "label": "back to the table", "words": "Back to your game, as you left it."},
+            {"tut": "craft-home", "label": "worlds & characters", "words": "Back to the shelf of worlds and characters."},
+            {"tut": "help-craftpage", "label": "?", "words": "Shows these tips again."}
+          ]
+        }
+      ]
     }
   ]
 }

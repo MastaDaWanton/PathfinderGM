@@ -53,15 +53,15 @@ SECTIONS = {"table", "map.places", "map.region", "bench.herbalism",
             "create.outfit", "create.classbuilder", "create.racebuilder", "create.spellbuilder",
             # phase 4, feat/tutorials-maps-fights
             "map.ground", "map.march", "map.world", "map.sea", "map.site",
-            "fight.bar", "fight.order", "fight.nonlethal"}
+            "fight.bar", "fight.order", "fight.nonlethal",
+            # phase 5, feat/tutorials-benches
+            "bench.forge", "bench.enchant", "bench.alchemy", "bench.leather", "bench.games",
+            "bench.perks", "bench.works", "bench.harvest", "bench.craftpage"}
 PENDING = {
     # phase 3, feat/tutorials-table
     "table.here", "table.craft", "table.left", "table.right", "table.panels", "table.gmview",
     "table.wrong", "table.dice", "table.clock", "table.talk", "table.music", "table.death",
     "tab.sheet", "tab.levelup", "tab.equipment", "tab.spells", "tab.trade", "tab.journal",
-    # phase 5, feat/tutorials-benches
-    "bench.forge", "bench.enchant", "bench.alchemy", "bench.leather", "bench.games",
-    "bench.perks", "bench.works", "bench.harvest", "bench.craftpage",
 }
 
 

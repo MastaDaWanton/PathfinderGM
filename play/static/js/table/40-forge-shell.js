@@ -288,6 +288,8 @@
   F.say = core.say;
   F.refocus = core.refocus;
 
+  if (window.Tutorials) Tutorials.reach("bench.forge", function () { if (!F.open) F.openForge($id("open-forge")); });
+
   // /play/#forge, the old /craft/ tab's "Open the forge" (craft.html), opens it on load.
   function fromHash() { if (location.hash === "#forge" && !F.open) F.openForge($id("open-forge")); }
   window.addEventListener("hashchange", fromHash);
@@ -317,6 +319,8 @@
       if (!at || at === document.body || at.id === "forge-close") core.focusFirst();
       mountStage();
       maybeAmbience();
+      // The first-time card, now its methods and rack are drawn to point at.
+      if (window.Tutorials) Tutorials.arrive("bench.forge", { entered: true, still: function () { return F.open; } });
     }).catch(function (err) {
       F.loading = false;
       F.error = err.message || String(err);
@@ -1019,9 +1023,11 @@
       picks: t && t.picks_banked,
       // Manuals when a smithing manual is carried (the server's `state.manuals`).
       buttons: ((s && s.manuals && s.manuals.length)
-        ? '<button type="button" class="bf-btn" data-forge-manuals aria-haspopup="dialog">Manuals</button>' : "") +
+        ? '<button type="button" class="bf-btn" data-forge-manuals data-tut="forge-manuals" aria-haspopup="dialog">Manuals</button>' : "") +
         (window.ForgeLedger && typeof ForgeLedger.journal === "function"
-        ? '<button type="button" class="bf-btn" data-forge-ledger>Ledger</button>' : ""),
+        ? '<button type="button" class="bf-btn" data-forge-ledger data-tut="forge-ledger">Ledger</button>' : "") +
+        // The forge's tips again (js/tutorials.js), as the herb bench's footer has them.
+        '<button type="button" class="tut-help" data-tut="help-forge" data-tut-help="bench.forge" aria-label="Show the tips for the forge">?</button>',
     };
   }
   function renderFoot() { core.renderFoot(); }

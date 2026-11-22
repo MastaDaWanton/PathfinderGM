@@ -9,6 +9,8 @@
      The three panels are built by script, so they read the theme's tokens under their
      own selectors rather than taking its classes. -->
 <link rel="stylesheet" href="{% asset 'css/theme-v2.css' %}">
+<!-- The first-time card for this page (js/tutorials.js), as the table and home load it. -->
+<link rel="stylesheet" href="{% asset 'css/tutorials.css' %}">
 <style>
   @font-face {
     font-family: "Cinzel"; font-style: normal; font-weight: 400; font-display: swap;
@@ -262,12 +264,14 @@
 
 <header>
   <h1>Crafting</h1>
-  <nav id="tabs"></nav>
-  <a class="back" href="/play/">← back to the table</a>
-  <a class="back" href="/" style="margin-left:0">worlds &amp; characters</a>
+  <nav id="tabs" data-tut="craft-tabs"></nav>
+  <a class="back" href="/play/" data-tut="craft-back">← back to the table</a>
+  <a class="back" href="/" style="margin-left:0" data-tut="craft-home">worlds &amp; characters</a>
+  <button type="button" class="tut-help" data-tut="help-craftpage" data-tut-help="bench.craftpage"
+          aria-label="Show the tips for this page">?</button>
 </header>
 
-<main id="main"></main>
+<main id="main" data-tut="craft-main"></main>
 
 <footer>
   <span id="err"></span>
@@ -431,6 +435,9 @@ selectCraft(CRAFT);
 <!-- The heartbeat that lets the packaged exe tell an open window from a closed
      one. Every page carries it; tests/test_packaging.py fails if one does not. -->
 <!-- The soundtrack carries on here from the table (music.js resumes the same song). -->
+<script src="{% asset 'js/tutorials.js' %}"></script>
+<!-- The page's first-time card, now its tabs are drawn (the script waits for its words). -->
+<script nonce="{{ request.csp_nonce }}">window.Tutorials && Tutorials.arrive("bench.craftpage", { entered: true });</script>
 <script src="{% asset 'js/prefs.js' %}"></script>
 <script src="{% asset 'js/music.js' %}"></script>
 <script nonce="{{ request.csp_nonce }}">window.Music && Music.start("ambient");</script>

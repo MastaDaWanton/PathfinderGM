@@ -114,27 +114,36 @@
     var t = BY[id];
     return !!(t && anchorEl(t.root));
   }
-  // Something the player is in the middle of, which no automatic card may interrupt.
-  function blocked() {
+  // Something the player is in the middle of, which no automatic card may interrupt. A
+  // bench's own dialog blocks every card but the one about that dialog (the perk picker's).
+  function blocked(q) {
     if (!D || D.off) return true;
     var pen = document.getElementById("input");
     if (pen && pen.value.trim() && visible(pen)) return true;   // unsent words: wait for Say or an empty pen
     if (document.querySelector("#d3d-mat.on, #deathveil.on")) return true;
     var set = document.getElementById("settingslayer");
     if (set && !set.hidden) return true;
-    if (document.querySelector(".bench:not([hidden]) .bench-gamebay:not([hidden]), .bench:not([hidden]) .bench-modal:not([hidden])")) return true;
+    if (document.querySelector(".bench:not([hidden]) .bench-gamebay:not([hidden])")) return true;
+    var modal = document.querySelector(".bench:not([hidden]) .bench-modal:not([hidden])");
+    if (modal) {
+      var root = q && BY[q.id] && anchorEl(BY[q.id].root);
+      if (!root || !modal.contains(root)) return true;
+    }
     return false;
   }
 
   // --- the queue --------------------------------------------------------------------------
   function pump() {
     if (open) {
-      if (!open.auto || still(open.id, open.opts)) return;
+      // An asked-for card stays put unless the section it was shown on has gone (the perk
+      // picker's "?" card stayed over the bench after Later, phase 5).
+      if (!open.auto ? !(open.rooted && !anchorEl(BY[open.id].root)) : still(open.id, open.opts)) return;
       hide();   // its section went away under it: it waits for the next arrival
     }
     queue = queue.filter(function (q) { return still(q.id, q.opts); });
-    if (!queue.length || blocked()) return;
-    var q = queue.shift(), t = BY[q.id];
+    var k = queue.findIndex(function (x) { return !blocked(x); });
+    if (k < 0) return;
+    var q = queue.splice(k, 1)[0], t = BY[q.id];
     if (t && t.due.length && !snoozed[q.id]) present(q.id, t.due, true, null, q.opts);
   }
 
@@ -211,7 +220,7 @@
     if (open) hide();
     var a = anchorEl(t.root) || anchorEl(t.steps[steps[0]].anchor);
     var host = (a && a.closest(".bench:not([hidden])")) || document.body;
-    open = { id: id, steps: steps, i: 0, auto: auto, from: from || null, opts: opts || {} };
+    open = { id: id, steps: steps, i: 0, auto: auto, from: from || null, opts: opts || {}, rooted: !!anchorEl(t.root) };
     ensureCard(host);
     showStep(!auto);
     say((auto ? "Tip: " : "") + t.steps[steps[0]].title + ". " + (t.steps[steps[0]].words || ""));
@@ -236,8 +245,16 @@
     if (!ringed) return;
     ringed.classList.add("tut-ring");
     var r = ringed.getBoundingClientRect();
-    if (r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) {
-      ringed.scrollIntoView({ block: "nearest", inline: "nearest" });
+    // Off the window, or on it but under something else: a bench's strip lies over its
+    // scrolled frame, and the forge's Roll Craft sat ringed beneath it (phase 5, 1024x700).
+    var cx = (r.left + r.right) / 2, cy = (r.top + r.bottom) / 2;
+    // What lies there under the card itself, which is about to move.
+    var over = cx >= 0 && cx < innerWidth && cy >= 0 && cy < innerHeight
+      ? document.elementsFromPoint(cx, cy).filter(function (e) { return !(card && card.contains(e)); })[0] : null;
+    var hid = !over || !(ringed.contains(over) || over.contains(ringed));
+    // Centred, not "nearest": nearest leaves it at the top edge, under that strip.
+    if (hid || r.bottom < 0 || r.top > innerHeight || r.right < 0 || r.left > innerWidth) {
+      ringed.scrollIntoView({ block: "center", inline: "nearest" });
     }
   }
 
@@ -319,7 +336,11 @@
   function guarded() {
     var out = [];
     MUST_SHOW.forEach(function (s) {
-      document.querySelectorAll(s).forEach(function (el) { if (visible(el)) out.push(rectOf(el)); });
+      // Inert under a bench still counts: the release hit test holds the card off the pen and
+      // Say whatever lies between (the circle's card sat on both at 1024x700, phase 5).
+      document.querySelectorAll(s).forEach(function (el) {
+        if (el.getClientRects().length && !el.closest("[hidden]")) out.push(rectOf(el));
+      });
     });
     var f = document.activeElement;
     if (f && f !== document.body && !(card && card.contains(f)) && visible(f)) out.push(rectOf(f));
@@ -344,7 +365,11 @@
     var h = Math.min(card.scrollHeight, maxH);
     var a = ringed ? rectOf(ringed) : null;
     var keep = guarded(), ctl = controls();
-    if (a) keep.push(a);
+    // The control it points at is never covered; a whole panel it points at (a bench's work
+    // order, stacked at 1024x700 to fill the window) may be, at a price, since no place
+    // beside it was left and the card fell to the top over the method strip (phase 5).
+    var big = a && (a.r - a.l) * (a.b - a.t) > W * H / 4;
+    if (a && !big) keep.push(a);
     var cands = [];
     var clampX = function (x) { return Math.max(G, Math.min(W - G - w, x)); };
     var clampY = function (y) { return Math.max(G, Math.min(H - G - h, y)); };
@@ -365,13 +390,18 @@
       // window, and the open stage under it holds no controls), then the corners.
       if (a) cands.push([(W - w) / 2, a.b + 10], [(W - w) / 2, a.t - 10 - h]);
       cands.push([W - G - w, 64], [G, 64], [(W - w) / 2, 64], [W - G - w, H - G - h], [G, H - G - h]);
+      // Then a sweep down the window. At 1024x700 the forge stacks its columns, and with the
+      // foot ringed every place beside it lay over the rack's full-width search box (seen
+      // live, phase 5); the open text higher up held no control at all.
+      for (var gy = G; gy <= H - G - h; gy += 32) cands.push([G, gy], [(W - w) / 2, gy], [W - G - w, gy]);
     }
     var best = null;
     cands.forEach(function (c) {
       var x = clampX(c[0]), y = clampY(c[1]);
       var box = { l: x, t: y, r: x + w, b: y + h };
       if (keep.some(function (k) { return overlap(box, k) > 0; })) return;
-      var cost = ctl.reduce(function (n, k) { return n + (overlap(box, k) > 0 ? 1 : 0); }, 0);
+      var cost = ctl.reduce(function (n, k) { return n + (overlap(box, k) > 0 ? 1 : 0); }, 0) +
+        (big && overlap(box, a) > 0 ? 0.5 : 0);
       // Nearer the control it is about is better, all else equal.
       var dist = a ? Math.abs((x + w / 2) - (a.l + a.r) / 2) + Math.abs((y + h / 2) - (a.t + a.b) / 2) : 0;
       var score = cost * 10000 + dist;
