@@ -62,7 +62,7 @@ from . import provocation as _provocation
 from . import intents as intents_mod
 from .intents import AMOUNT_OPS, Intent, IntentError, parse_all
 from .sheet import (MAGIC_SUPPRESSED, QUICK_DRAW, Actor, _mean_amount, _said_rounds,
-                    _when_holds,
+                    _when_holds, UNIVERSAL_CHOICES, defensive_dodge,
                     attacker_traits, current_moment, situated)
 from . import words as english
 from .tables import (
@@ -3928,7 +3928,8 @@ class Engine:
         # no actor, or any of them with a name for a ref, was a KeyError at resolution —
         # a 502 and the player's line popped — where this refusal gets its retry.
         needs_actor = intent.op in ("check", "save", "attack", "move", "cast",
-                                    "sell", "buy", "use_item", "extinguish", "break_free")
+                                    "sell", "buy", "use_item", "extinguish", "break_free",
+                                    "total_defense")
         if needs_actor and not self._known(intent.actor, extra):
             self._refuse_ref(intent, index, intent.actor, "actor", extra)
         # `_op_condition` lands on `to`, else the actor, else the target. `to` and the
@@ -7226,7 +7227,7 @@ class Engine:
     # action (or any other strenuous action) you take 1 point of damage after completing
     # the act"). The ops that are a standard action or more.
     _STRENUOUS = frozenset({"attack", "cast", "escape", "use_item", "break_free",
-                            "extinguish"})
+                            "extinguish", "total_defense"})
 
     def _disabled_strain(self, intent: Intent, outcome) -> "Outcome | None":
         """The hit point a disabled creature's standard action costs, after the act.
@@ -25016,7 +25017,8 @@ class Engine:
             return ""
         return ""
 
-    def _attack_choice_refusal(self, actor: Actor, key: str, params: dict) -> str:
+    @staticmethod
+    def _attack_choice_refusal(actor: Actor, key: str, params: dict) -> str:
         """Why this swing may not carry the attack options it declares, or "".
 
         Lane D, 2026-11-22. Each option is a feat's (or the monk's flurry), held with its
@@ -25082,7 +25084,7 @@ class Engine:
                 return ("A flurry of blows already strikes as if with two weapons; it takes "
                         "no off hand and no Rapid Shot.")
         if off:
-            return self._off_hand_refusal(actor, key, off)
+            return Engine._off_hand_refusal(actor, key, off)
         return ""
 
     # The stances an attack option lays: (choice, condition key whose tag the feat
@@ -25094,6 +25096,12 @@ class Engine:
          "sure with the blade, until their next turn."),
         ("cleave", "cleaving", "Cleave",
          "{name} swings wide to cleave, leaving their guard open until their next turn."),
+        # CRB, Combat: "a -4 penalty on all attacks in a round to gain a +2 dodge bonus
+        # to AC until the start of your next turn" (+3 with 3 ranks of Acrobatics). No
+        # feat document holds it, so the effect carries its own terms (`_stance_terms`).
+        ("fighting_defensively", "fighting defensively", "Fighting defensively",
+         "{name} fights defensively: harder to hit, and less sure of every blow, until "
+         "their next turn."),
         # Two-Weapon Defense (CRB): "When wielding a double weapon or two weapons (not
         # including natural weapons or unarmed strikes), you gain a +1 shield bonus to
         # your AC." The off hand is declared with the full attack, so the wielding is
@@ -25102,7 +25110,8 @@ class Engine:
          "{name} keeps the second blade up as a guard."),
     )
 
-    def _lay_attack_stances(self, actor: Actor, choices) -> list[str]:
+    @classmethod
+    def _lay_attack_stances(cls, actor: Actor, choices) -> list[str]:
         """Lay the one-round stance of each declared option that has one, and say so.
 
         The effect carries only its tag (`states.COMBAT_EXPERTISE`, `states.CLEAVING`):
@@ -25110,20 +25119,87 @@ class Engine:
         (`when.bearer.state`), so the document is the one place Combat Expertise's
         "+1 dodge per four base attack" is written, and the effect's end takes it away."""
         said: list[str] = []
-        for choice, key, name, tell in self._ATTACK_STANCES:
+        for choice, key, name, tell in cls._ATTACK_STANCES:
             if choice not in choices:
                 continue
             doc = actor.choice_feat(choice) or {"id": "two-weapon-defense"}
+            origin = (f"rule:{key.replace(' ', '-')}" if choice in UNIVERSAL_CHOICES
+                      else f"rule:feat-{doc.get('id') or choice}")
             # Already held this round (the bar's full attack posts a swing an op): kept
             # and refreshed, said once.
             again = actor.has_state(states.tags_for(key)[0])
             actor.apply_effect(ActiveEffect(
-                name=key, kind="buff", key=key, source=name,
-                origin=f"rule:feat-{doc.get('id') or choice}",
-                duration="rounds", rounds_left=1, tags=states.tags_for(key)))
+                name=key, kind="buff", key=key, source=name, origin=origin,
+                duration="rounds", rounds_left=1, tags=states.tags_for(key),
+                modifiers=cls._stance_terms(actor, choice)))
             if not again:
                 said.append(tell.format(name=actor.name))
         return said
+
+    @staticmethod
+    def _stance_terms(actor: Actor, choice: str) -> list[dict]:
+        """The numbers a stance carries itself - only a choice no document holds.
+
+        Fighting defensively (CRB, Combat): "-4 penalty on all attacks in a round", a
+        combat manoeuvre being an attack roll, and the dodge bonus (`defensive_dodge`).
+        A feat's stance carries only its tag; the feat document holds its terms."""
+        if choice != "fighting_defensively":
+            return []
+        why = "fighting defensively"
+        return [{"kind": "combat_mod", "target": "attack", "amount": -4, "bonus_type": "",
+                 "note": why},
+                {"kind": "combat_mod", "target": "cmb", "amount": -4, "bonus_type": "",
+                 "note": why},
+                {"kind": "combat_mod", "target": "ac", "amount": defensive_dodge(actor),
+                 "bonus_type": "dodge", "note": why}]
+
+    @staticmethod
+    def total_defense_effect(actor: Actor) -> ActiveEffect:
+        """Total defense's one-round stance (CRB, Combat): "a +4 dodge bonus to your AC
+        for 1 round" (+6 with 3 ranks of Acrobatics, `defensive_dodge`), and "you can't
+        make attacks of opportunity while using total defense" - the stance's
+        `reactions.none` tag, which `reactions.reactions_for` asks. Built here for the
+        op and for the combat bar's preview, so the numbers are written once."""
+        key = "total defense"
+        return ActiveEffect(
+            name=key, kind="buff", key=key, source="Total defense",
+            origin="rule:total-defense", duration="rounds", rounds_left=1,
+            tags=states.tags_for(key),
+            modifiers=[{"kind": "combat_mod", "target": "ac",
+                        "amount": defensive_dodge(actor, total=True),
+                        "bonus_type": "dodge", "note": "total defense"}])
+
+    def _op_total_defense(self, intent: Intent, partial: dict) -> Outcome:
+        """Total defense (CRB, Combat): "You can defend yourself as a standard action ...
+        You can't combine total defense with fighting defensively or with the benefit of
+        the Combat Expertise feat." Combat bar round 2, 2026-11-22: the book's action,
+        which no op carried. The standard action is the round's one record
+        (`skilluses._spend_action`), so a blow already struck this turn refuses it."""
+        from . import skilluses
+
+        actor = self.scene.actors[intent.actor]
+        if not self.scene.in_encounter:
+            return self._refuse(intent, "Total defense is a stance in a fight, and no "
+                                        "fight is on.")
+        for held in (states.FIGHTING_DEFENSIVELY, states.COMBAT_EXPERTISE):
+            if actor.has_state(held):
+                return self._refuse(intent, f"{actor.name} is already fighting guardedly "
+                                            f"this round; total defense cannot be combined "
+                                            f"with it.")
+        spent = skilluses._no_action_left(self, actor, "standard", "total defense")
+        if spent:
+            return self._refuse(intent, spent, code="action_spent")
+        skilluses._spend_action(self, actor, "standard")
+        effect = self.total_defense_effect(actor)
+        actor.apply_effect(effect)
+        n = effect.modifiers[0]["amount"]
+        return Outcome(
+            intent_id=intent.id, op="total_defense",
+            effects=[{"ref": actor.ref, "kind": "condition", "condition": "total defense",
+                      "rounds": 1, "origin": "rule:total-defense"}],
+            tell=f"{actor.name} gives up attacking to guard (total defense): +{n} armour "
+                 f"class until their next turn, and no attacks of opportunity.",
+            because=intent.because)
 
     def _cleave_next(self, actor: Actor, defender: Actor, weapon_key: str,
                      intent: Intent, hit: bool) -> tuple[dict | None, str]:

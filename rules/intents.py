@@ -358,7 +358,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                     # the document's. `off_hand` names the weapon a two-weapon full
                     # attack swings in the other hand (`Engine._off_hand_refusal`).
                     "deadly_aim", "combat_expertise", "piranha_strike", "vital_strike",
-                    "cleave", "rapid_shot", "flurry", "off_hand"), "player"),
+                    "cleave", "rapid_shot", "flurry", "off_hand",
+                    # Fighting defensively (CRB, Combat; combat bar round 2): anyone's,
+                    # its stance laid by `Engine._lay_attack_stances`.
+                    "fighting_defensively"), "player"),
     # `lethality` because a Blood Bender paying for an ability in non-lethal
     # damage and one taking a sword are not in the same trouble.
     # `when`: the "against X only" clause a jar's or a flask's document carries (alchemy
@@ -431,6 +434,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # against the fire's DC, +2 (the fire's own `smother_bonus`) when they roll on the
     # ground — `roll` true, the player's words. Water they stand in smothers it outright.
     "extinguish": ((), ("roll",), "player"),
+    # Total defense (CRB, Combat): a standard action, +4 dodge AC (+6 with 3 ranks of
+    # Acrobatics) and no attacks of opportunity until the next turn. Nothing to roll; the
+    # combat bar's (`Engine._op_total_defense`), not offered to the reader.
+    "total_defense": ((), (), "hidden"),
     # Tearing loose of a tanglefoot bag's goo: `how` is "strength" (a DC 17 Strength
     # check) or "slash" (15 points of slashing damage dealt to the goo, which is hit
     # automatically). The engine owns both numbers (CRB, Goods and Services).
@@ -832,6 +839,7 @@ PARAM_ALIASES = {
     "piranha strike": "piranha_strike",
     "vital strike": "vital_strike",
     "rapid shot": "rapid_shot",
+    "fighting defensively": "fighting_defensively",
     "flurry of blows": "flurry",
     "off hand": "off_hand",
     "opposed": "opposed_by",
@@ -1070,7 +1078,8 @@ FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "faile
                          "coup_de_grace", "search", "diversion", "follow", "deliberate",
                          "immersed", "feint", "tumble", "care", "display",
                          "deadly_aim", "combat_expertise", "piranha_strike",
-                         "vital_strike", "cleave", "rapid_shot", "flurry"})
+                         "vital_strike", "cleave", "rapid_shot", "flurry",
+                         "fighting_defensively"})
 from .skilluses import OWN_DOORS as _OWN_DOORS  # noqa: E402 — the uses with their own door
 
 

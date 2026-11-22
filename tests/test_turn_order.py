@@ -227,7 +227,8 @@ def test_the_plan_keeps_an_order_and_commit_posts_in_it():
 
     src = table_source()
     assert "order: []," in src and "function planOrder()" in src
-    assert "const STEP_RANK = { move: 0, swift: 1, free: 2, standard: 3 };" in src
+    # `moveact` (combat bar round 2): a move action that is not a walk, an Improved Feint.
+    assert "const STEP_RANK = { move: 0, moveact: 0.5, swift: 1, free: 2, standard: 3 };" in src
     body = src[src.index("async function commitTurn("):]
     body = body[:body.index("\n}\n")]
     assert "for (const key of planOrder())" in body

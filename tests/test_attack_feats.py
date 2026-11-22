@@ -394,11 +394,14 @@ def test_the_combat_bar_offers_each_option_only_to_its_holder():
     not hold, and the two-weapon plan is drawn from the engine's own rule."""
     from play.views import _attack_slots
 
+    # What anybody may declare (combat bar round 2): fighting defensively, total defense,
+    # a feint and a tumble. No feat's option is offered without its feat.
+    anyone = {"fighting_defensively", "total_defense", "feint", "tumble"}
     bare = _attack_slots(_pc(weapons=("longsword",)))
-    assert bare["options"] == []
+    assert {o["id"] for o in bare["options"]} == anyone
     held = _attack_slots(_pc(feats=["Power Attack", "Vital Strike", "Two-Weapon Fighting"],
                              level=8, weapons=("longsword", "shortsword")))
-    assert {o["id"] for o in held["options"]} == {"power_attack", "vital_strike"}
+    assert {o["id"] for o in held["options"]} == {"power_attack", "vital_strike"} | anyone
     assert "shortsword" in held["off_hands"]
     twf = held["plans"]["off:shortsword"]
     assert [p["hand"] for p in twf] == ["primary", "primary", "off"]

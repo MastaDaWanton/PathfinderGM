@@ -5,7 +5,7 @@
   "tutorials": [
     {
       "id": "fight.bar",
-      "v": 1,
+      "v": 2,
       "title": "The fight",
       "manual": "combat",
       "root": "combat-bar",
@@ -70,6 +70,33 @@
               "tut": "cb-clear",
               "label": "Clear",
               "words": "Empties the plan to start the turn again."
+            }
+          ]
+        },
+        {
+          "since": 2,
+          "anchor": "cb-declared",
+          "title": "Declare",
+          "words": "Declare holds what you choose before the blow: feats such as Power Attack or Cleave, and anyone's Fight defensively, Total defense, Feint and Tumble. Each shows what it does in numbers; a grey one says why the planned action cannot carry it.",
+          "source": {
+            "file": "play/static/js/table/04-combat-and-turns.js",
+            "literal": "the planned action cannot carry it, is greyed with"
+          },
+          "buttons": [
+            {
+              "tut": "cb-decl-blow",
+              "label": "With the blow",
+              "words": "Toggles that ride every attack you stage, such as Power Attack."
+            },
+            {
+              "tut": "cb-decl-act",
+              "label": "As the action",
+              "words": "An action of its own: Vital Strike, Cleave, Total defense, Feint."
+            },
+            {
+              "tut": "cb-decl-move",
+              "label": "With the move",
+              "words": "Tumble: an Acrobatics roll so the move past foes provokes nothing."
             }
           ]
         },
