@@ -136,6 +136,9 @@ def test_the_full_attack_slots_carry_the_toggled_options():
         assert row["bonus"] + o["power_attack"]["bonus"][key] == rolled
     js = (ROOT / "play/static/js/table/04-combat-and-turns.js").read_text(encoding="utf-8")
     assert "declaredBonus(w || slotWeapon(i), true)" in js
+    # A full-attack option (Rapid Shot, a flurry) is greyed in the surprise round with
+    # its rule, as Full attack itself is refused (impl2/surprise's `surprise_round`).
+    assert 'o.shape === "full" && STATE && STATE.scene && STATE.scene.surprise_round' in js
 
 
 def test_the_page_names_no_option_and_the_shapes_cover_the_engines_list():

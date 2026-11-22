@@ -41,6 +41,11 @@ function plannedShape() {
 // nothing planned it is grey only when the engine refuses it every way.
 function optionRefusal(o, shape = plannedShape()) {
   if (o.why) return o.why;
+  // The surprise round (impl2/surprise, `scene.surprise_round`): one standard or move
+  // action, so an option that is a full attack cannot be declared, as Full attack is not.
+  if (o.shape === "full" && STATE && STATE.scene && STATE.scene.surprise_round) {
+    return "Surprise round: one standard or move action. A full attack takes the whole round.";
+  }
   const r = o.refuse || {};
   if (shape) return r[shape] || "";
   return r.strike && r.full ? r.strike : "";
