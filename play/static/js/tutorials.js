@@ -383,9 +383,12 @@
   }
   window.addEventListener("resize", function () { if (open) place(); });
 
-  // Another try for anything waiting, after the things that can unblock it.
-  ["input", "submit", "click", "keyup"].forEach(function (ev) {
-    document.addEventListener(ev, function () { if (queue.length) setTimeout(pump, 0); }, true);
+  // Another try for anything waiting, after the things that can unblock it; and a look at
+  // the open card, whose section a bench opening over it may have just taken away (seen
+  // live on the LAN phone: the Table's card stayed up over the herb bench). Focus moves
+  // when any layer opens, so `focusin` catches what a click alone did not.
+  ["input", "submit", "click", "keyup", "focusin"].forEach(function (ev) {
+    document.addEventListener(ev, function () { if (queue.length || open) setTimeout(pump, 0); }, true);
   });
 
   // --- asked for: the "?" and Show me ---------------------------------------------------
