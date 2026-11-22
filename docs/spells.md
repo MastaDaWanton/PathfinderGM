@@ -11,6 +11,7 @@ Three files hold it:
 | --- | --- |
 | `content/spells/spells.json` | The Spell Codex as imported. 3,040 entries, descriptive. Never rewritten. |
 | `content/spells/spells-mechanics.json` | The mechanical half read out of the prose: 354 entries carrying `scaling` and `effects`. Layers over the above by id. |
+| `content/spells/mechanics/part-21.json` | The 354 spells only the file above covered, read by hand (lane B, 2026-11-22). Wins over it, so no spell runs on the regex's reading any more (`tests/test_spell_readings.py`). |
 | `rules/spells.py` | The schema, the derivations, the conversion, and `validate_spell` for a UI to call. |
 
 ---
@@ -408,6 +409,10 @@ Both were hit by real spells and both are one line:
    Writing `resistance fire` would invent a choice the caster makes, so it is a `narrative`
    spec instead. A `choice_at_cast` field, or a `resistance` whose target may be a list, would
    make it executable.
+   **Closed 2026-11-22 (lane B):** resist energy is a `choose_one` of five `resistance`
+   options (the cast's `choose` param picks), and `resistance.amount` takes a formula, so
+   10 / 20 at caster level 7 / 30 at 11 is data (content/spells/mechanics/part-21.json).
+   Applying the chosen resistance on the caster's target is lane A's rider wiring.
 
 Neither is urgent. Both are recorded because the alternative was a silently wrong number.
 

@@ -1025,7 +1025,11 @@ CATEGORIES: list[Category] = [
             # which is why these could not be stated before.
             EffectType("resistance", "Energy resistance", "Resist fire 10", [
                 Field("target", "Against", "choice", vocab="damage_type"),
-                Field("amount", "Points", "int"),
+                # A formula as well as a number (lane B, 2026-11-22): resist energy is 10,
+                # 20 at caster level 7 and 30 at 11 (CRB), and an int could say only one of
+                # the three. An integer still validates exactly as before.
+                Field("amount", "Points", "signed_formula",
+                      hint="10, or a formula: min(30, max(10, 10 * ((caster_level + 1) / 4)))."),
             ], blocked="Granted with a clock or without one, and applied in 1e's own "
                        "order by `take_damage`. Two resistances against one energy do "
                        "not stack — the better applies."),

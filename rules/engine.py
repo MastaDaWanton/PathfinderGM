@@ -6994,6 +6994,46 @@ class Engine:
                        tell=f"{actor.name} breaks free of {holder.name}'s grapple ({said}); "
                             f"the grapple ends for both.", because=intent.because)
 
+    @staticmethod
+    def _spell_hold(actor):
+        """The hold with no holder a spell laid on this creature that a check ends — web's
+        "grappled by the sticky fibers" — carried as `ends_when.escape` {"dc"}, or None."""
+        return next((e for e in actor.effects if isinstance(
+            ((e.payload or {}).get("ends_when") or {}).get("escape"), dict)), None)
+
+    def _escape_spell_hold(self, intent: Intent, actor, held, partial: dict,
+                           how: str = "") -> Outcome:
+        """Web (CRB): "a creature can escape or burst the web with a successful combat
+        maneuver check or Escape Artist check" against the spell's DC, a standard action.
+        The better of the two, as `_escape_from` picks for a creature's hold; success ends
+        that one effect through the applicator. Lane B 2026-11-22: web laid `grappled` with
+        nobody holding, and `escape` answered "Nobody is holding" for its whole duration."""
+        dc = int(held.payload["ends_when"]["escape"].get("dc") or 0)
+        cmb = list(actor.cmb_modifiers("escape"))
+        art = list(actor.skill_modifiers("escape artist"))
+        how = str(how or "").strip().lower()
+        if how not in ("cmb", "escape artist"):
+            how = ("escape artist" if sum(m.value for m in art) > sum(m.value for m in cmb)
+                   else "cmb")
+        what = str(held.source or held.name or held.key)
+        what = what[4:] if what.startswith("the ") else what
+        roll = self._roll_or_suspend(intent, actor, art if how == "escape artist" else cmb,
+                                     f"{'Escape Artist' if how == 'escape artist' else 'Combat manoeuvre'}"
+                                     f" to break free of the {what}", dc, partial)
+        made = d20_succeeds(roll, dc) if how == "cmb" else roll.total >= dc
+        self._judge(roll, made)
+        said = (f"{'Escape Artist' if how == 'escape artist' else 'CMB'} {roll.total} "
+                f"against DC {dc}")
+        if made:
+            actor.remove_effects(match=lambda e: e is held)
+        return Outcome(intent_id=intent.id, op=intent.op, rolls=[roll],
+                       verdict="success" if made else "failure",
+                       effects=[{"ref": actor.ref, "kind": "escape", "from": what,
+                                 "how": how, "made": bool(made)}],
+                       tell=(f"{actor.name} tears free of the {what} ({said})." if made else
+                             f"{actor.name} strains against the {what} and it holds ({said})."),
+                       because=intent.because)
+
     def _op_surrender(self, intent: Intent, partial: dict) -> Outcome:
         """`surrender`: the player gives themselves up to the law — yields mid-fight,
         hands themselves in, owns up to a crime (`trial.give_up`: the fight stops and
@@ -7045,6 +7085,10 @@ class Engine:
         if wanted is not None and self._holds(wanted, actor):
             holder = wanted
         if holder is None:
+            stuck = self._spell_hold(actor)
+            if stuck is not None:
+                return self._escape_spell_hold(intent, actor, stuck, partial,
+                                               str(intent.params.get("how") or ""))
             # Held by the watch, not by a grapple (rules/trial.py): out of the cell, or out
             # of the escort's hands on the walk to the gallows.
             from . import trial as trial_mod
@@ -22884,7 +22928,8 @@ class Engine:
                        {"ends_when": _shared_ends(ends)}
                        if isinstance(ends, dict) and (ends.get("acts") or ends.get("group")
                                                       or ends.get("save_each_turn")
-                                                      or ends.get("wounded"))
+                                                      or ends.get("wounded")
+                                                      or ends.get("escape"))
                        else {})
             cond = target.add_condition(key, rounds, source=intent.because,
                                          origin=intent.origin, payload=payload)
@@ -24364,6 +24409,22 @@ class Engine:
                                        "condition": key, "rounds_left": cond.rounds_left,
                                        "origin": origin, "charmed": True},
                             "tell": attitude_mod.said(defender.name, was, key)})
+            elif kind in ("ability_damage", "ability_drain"):
+                # Through the one door score damage has (`_op_ability_damage`), stamped
+                # with the gate's origin, which an amount-op needs.
+                res = self._run_within(self.validate([{
+                    "op": "ability_damage", "visibility": "hidden", "because": f"the {what}",
+                    "params": {"to": defender.ref,
+                               "ability": str(branch.get("target") or "con"),
+                               "amount": str(branch.get("dice") or "1"),
+                               "drain": kind == "ability_drain"}}],
+                    origin=origin, origin_name=what))
+                for o in res:
+                    for e in o.effects or []:
+                        out.append({"effect": e, "tell": ""})
+                    if o.tell:
+                        out.append({"effect": {"ref": defender.ref,
+                                               "kind": "item_rider_said"}, "tell": o.tell})
             elif kind == "apply_condition":
                 params = {"condition": str(branch.get("target") or ""), "to": defender.ref}
                 dur = branch.get("duration")
@@ -24378,11 +24439,13 @@ class Engine:
                 # turns at this gate's own DC (hold person), or a wound (sleep).
                 ends = branch.get("ends_when") if isinstance(branch.get("ends_when"),
                                                              dict) else {}
-                if ends.get("save_each_turn") or ends.get("wounded"):
+                if ends.get("save_each_turn") or ends.get("wounded") or ends.get("escape"):
                     params["ends_when"] = _shared_ends({
                         "save_each_turn": ({"save": save, "dc": dc}
                                            if ends.get("save_each_turn") else None),
-                        "wounded": bool(ends.get("wounded"))})
+                        "wounded": bool(ends.get("wounded")),
+                        # A check against the gate's DC ends it (web; `_escape_spell_hold`).
+                        "escape": {"dc": dc} if ends.get("escape") else None})
                 res = self._run_within(self.validate([{
                     "op": "condition", "visibility": "hidden", "because": f"the {what}",
                     "params": params}], origin=origin, origin_name=what))
@@ -26674,6 +26737,20 @@ class Engine:
             if missed:
                 live = [r for r in live if r not in missed]
                 cast_effect["missed"] = sorted(missed)
+        if dice and plan.get("when"):
+            # Damage the spell deals to one kind of creature only, from the document's
+            # own `when` (`sheet._when_holds`, the reader every typed bonus asks): disrupt
+            # undead's "undead only", destroy robot's robots. Lane B 2026-11-22: read
+            # correctly, these still rolled 12d6 at a thug, because nothing asked.
+            from .sheet import _when_holds
+
+            untouched = [r for r in live if not _when_holds(
+                plan["when"], {"target_actor": self.scene.actors[r]})]
+            if untouched and state["stage"] == "dice":
+                for r in untouched:
+                    state["tells"].append(f"{self.scene.actors[r].name} is not what "
+                                          f"{spell.name} harms, and is untouched by it.")
+            live = [r for r in live if r not in untouched]
         if dice and live and state["stage"] == "dice":
             roll = self._roll_or_suspend_stage(
                 intent, actor, [],
@@ -27570,6 +27647,19 @@ class Engine:
         riders = [r for r in plan.get("riders") or () if isinstance(r, dict)
                   and spells_mod._is_the_spells_own(r)]
         gates = [r for r in riders if str(r.get("type") or "") == "save_gate"]
+        # The chosen option of a choice, when it is a gate (blindness/deafness, command):
+        # its save is this cast's to roll, as a top-level gate's is. Only once chosen — an
+        # unchosen choice applies nothing (`_choose`), so it calls for no save either.
+        chosen = intent.params.get("choose")
+        for r in riders:
+            if str(r.get("type") or "") != "choose_one" or chosen in (None, ""):
+                continue
+            try:
+                opt = (r.get("options") or [])[int(chosen) - 1]
+            except (TypeError, ValueError, IndexError):
+                continue
+            if isinstance(opt, dict) and str(opt.get("type") or "") == "save_gate":
+                gates.append(opt)
         ctx = {"spell_save": str(spell.save or ""),
                "spell_save_effect": str(spell.save_effect or ""),
                "spell_harmless": bool(spell.save_harmless), "source": spell.name,
@@ -27699,6 +27789,11 @@ class Engine:
         """Whether `_magic_gate` applies this branch: a failure's condition or slaying, or
         a success's condition with a duration of its own."""
         kind = str(branch.get("type") or "")
+        # Ability damage on either branch: a success branch that names one is what a made
+        # save still costs (green caress, foul waters). Lane B, 2026-11-22: 14 spells told
+        # their score damage on a failed save and never dealt it.
+        if kind in ("ability_damage", "ability_drain"):
+            return True
         if not saved:
             return kind in ("apply_condition", "slay", "attitude")
         dur = branch.get("duration")
@@ -36558,6 +36653,15 @@ def _shared_ends(ends: dict) -> dict:
             pass
     if ends.get("wounded"):
         out["wounded"] = True
+    # `escape` — {"dc"}: a combat manoeuvre or Escape Artist check against it ends the hold
+    # (web, CRB), the `escape` op's answer when nobody holds the creature
+    # (`Engine._escape_spell_hold`). Lane B, 2026-11-22.
+    escape = ends.get("escape")
+    if isinstance(escape, dict):
+        try:
+            out["escape"] = {"dc": int(escape.get("dc") or 0)}
+        except (TypeError, ValueError):
+            pass
     return out
 
 

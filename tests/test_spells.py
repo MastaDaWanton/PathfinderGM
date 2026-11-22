@@ -349,7 +349,10 @@ def test_a_hand_written_effect_is_not_flagged_as_unreviewed():
     twelve written by hand are not waiting for anybody, and a bench that cannot tell the two
     apart is asking somebody to trust a parse."""
     assert spells.get("bless").effects_converted is False
-    assert spells.get("fireball").effects_converted is True
+    # Fireball was the regex's until lane B read the layer by hand (2026-11-22,
+    # content/spells/mechanics/part-21.json): none is left a machine's guess.
+    assert spells.get("fireball").effects_converted is False
+    assert spells.get("fireball").effects_read is True
     assert spells.get("bull-s-strength").effects[0] == {
         "type": "ability_mod", "amount": 4, "bonus_type": "enhancement", "target": "str"}
 

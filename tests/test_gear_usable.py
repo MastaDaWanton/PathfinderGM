@@ -552,7 +552,11 @@ def test_every_ac_spell_is_applied_or_told_and_the_counts_are_recorded():
         assert must in applied, must
     for never in ("aspect-of-the-stag", "rage", "protection-from-technology"):
         assert never not in applied, never
-    assert len(applied) >= 50, len(applied)
+    # 50 until lane B read the regex layer (2026-11-22): five of those grants were the
+    # regex's misreadings — judgment light's +2 needs the protection judgment, veil of
+    # heaven's counts only against evil outsiders, shining cord's only while tethered —
+    # and two more now carry the condition their text sets (shock shield, hedging weapons).
+    assert len(applied) >= 45, len(applied)
 
 
 # --- U: the Equipment tab ----------------------------------------------------------------------
