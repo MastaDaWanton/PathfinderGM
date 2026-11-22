@@ -65,13 +65,28 @@
       "action": "free", "cost": {"pool": "wooden fist", "amount": 1},
       "drain": {"pool": "wooden fist", "amount": 1},
       "toggle": {"key": "wooden fist"},
-      "self": {"tags": ["buff.stance.wooden-fist"],
+      "self": {"tags": ["buff.stance.wooden-fist", "lethality.either.unarmed"],
                "modifiers": [{"type": "combat_mod", "target": "damage", "bonus_type": "untyped",
                               "formula": "max(1, floor(level / 2))",
                               "when": {"weapon": {"key": "unarmed"}}}]},
       "tell": "{name}'s hands harden like wood.",
       "tell_off": "{name}'s hands soften again.",
-      "not_yet": ["Lethal unarmed damage without the -4, and no attack of opportunity for striking unarmed: neither rides the stance yet."]
+      "not_yet": ["No attack of opportunity for striking unarmed: no rule makes an unarmed strike provoke yet, so there is nothing to waive (Improved Unarmed Strike's own line says the same)."]
+    },
+    {
+      "key": "might of the gods", "ability_type": "su", "power": "might of the gods",
+      "name": "Might of the Gods", "level": 8,
+      "source": "Strength domain (CRB; d20pfsrd.com Strength domain, read 2026-11-22): 'At 8th level, you can add your cleric level as an enhancement bonus to your Strength score for a number of rounds per day equal to your cleric level. These rounds do not need to be consecutive.' The book names no action; free, as a stance's start (lane F, 2026-11-22).",
+      "text": "+ your level (enhancement) to Strength, a round a round.",
+      "action": "free", "cost": {"pool": "might of the gods", "amount": 1},
+      "drain": {"pool": "might of the gods", "amount": 1},
+      "toggle": {"key": "might of the gods"},
+      "self": {"tags": ["buff.stance.might-of-the-gods"],
+               "modifiers": [
+                 {"type": "ability_mod", "target": "str", "bonus_type": "enhancement",
+                  "formula": "level"}]},
+      "tell": "The strength of the gods fills {name}.",
+      "tell_off": "{name}'s borrowed strength ebbs."
     },
     {
       "key": "dazing touch", "ability_type": "sp",
@@ -161,10 +176,45 @@
             "target": "all",
             "bonus_type": "sacred",
             "formula": "max(1, floor(level / 2))"
+          },
+          {
+            "type": "combat_mod",
+            "target": "str_check",
+            "bonus_type": "sacred",
+            "formula": "max(1, floor(level / 2))"
+          },
+          {
+            "type": "combat_mod",
+            "target": "dex_check",
+            "bonus_type": "sacred",
+            "formula": "max(1, floor(level / 2))"
+          },
+          {
+            "type": "combat_mod",
+            "target": "con_check",
+            "bonus_type": "sacred",
+            "formula": "max(1, floor(level / 2))"
+          },
+          {
+            "type": "combat_mod",
+            "target": "int_check",
+            "bonus_type": "sacred",
+            "formula": "max(1, floor(level / 2))"
+          },
+          {
+            "type": "combat_mod",
+            "target": "wis_check",
+            "bonus_type": "sacred",
+            "formula": "max(1, floor(level / 2))"
+          },
+          {
+            "type": "combat_mod",
+            "target": "cha_check",
+            "bonus_type": "sacred",
+            "formula": "max(1, floor(level / 2))"
           }
         ]
       },
-      "not_yet": ["The bonus on ability checks: no roll reads an ability check yet (skills, saves and attacks take it)."],
       "tell": "{name} lays a blessing on {target}.",
       "cost": {
         "pool": "touch of good",
@@ -248,10 +298,45 @@
             "target": "all",
             "bonus_type": "morale",
             "amount": 2
+          },
+          {
+            "type": "combat_mod",
+            "target": "str_check",
+            "bonus_type": "morale",
+            "amount": 2
+          },
+          {
+            "type": "combat_mod",
+            "target": "dex_check",
+            "bonus_type": "morale",
+            "amount": 2
+          },
+          {
+            "type": "combat_mod",
+            "target": "con_check",
+            "bonus_type": "morale",
+            "amount": 2
+          },
+          {
+            "type": "combat_mod",
+            "target": "int_check",
+            "bonus_type": "morale",
+            "amount": 2
+          },
+          {
+            "type": "combat_mod",
+            "target": "wis_check",
+            "bonus_type": "morale",
+            "amount": 2
+          },
+          {
+            "type": "combat_mod",
+            "target": "cha_check",
+            "bonus_type": "morale",
+            "amount": 2
           }
         ]
       },
-      "not_yet": ["The bonus on ability checks: no roll reads an ability check yet (skills, saves and attacks take it)."],
       "tell": "{name}'s words lift {target}'s heart.",
       "cost": {
         "pool": "inspiring word",
@@ -418,10 +503,15 @@
             "target": "swim",
             "bonus_type": "enhancement",
             "formula": "max(1, floor(level / 2))"
+          },
+          {
+            "type": "combat_mod",
+            "target": "str_check",
+            "bonus_type": "enhancement",
+            "formula": "max(1, floor(level / 2))"
           }
         ]
       },
-      "not_yet": ["Strength checks (not attacks, skills or manoeuvres): no roll reads an ability check yet. Climb and Swim are the Strength skills, and take it."],
       "tell": "Strength floods into {target} at {name}'s touch.",
       "cost": {
         "pool": "strength surge",

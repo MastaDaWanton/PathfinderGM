@@ -19,6 +19,7 @@
       "radius_ft": 30,
       "aim": "self",
       "roll": {"count": "floor((level + 1) / 2)", "die": 6},
+      "selective": {"requires": "channel.selective", "count": "cha_mod"},
       "energy_choice": "channel energy",
       "choice": {
         "kind": "mode",
@@ -37,6 +38,7 @@
                                "positive energy at the undead"]},
           "harm the living": {"living": true, "undead_only": false, "roll_as": "damage",
                               "harmful": true, "damage_type": "negative",
+                              "bonus_from": "channel.harm-living",
                               "healed_instead": "channel.negative.heals",
                               "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod",
                                        "success": "half"},
@@ -62,7 +64,7 @@
       "tell": "{name} channels divine energy.",
       "not_yet": [
         "With no map, everyone in the scene is in the burst.",
-        "Excluding chosen creatures (Selective Channeling): the burst takes everyone it reaches, as the book does."
+        "Selective Channeling's targets are the player's choice in the book; the engine spares the wrong side (allies from harm, foes from healing), nearest first, because the use names no list."
       ]
     }
   ]

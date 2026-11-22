@@ -5,6 +5,14 @@
     "passive immunity lives here: its spells, nature bond and wild shape are other lanes'",
     "(docs/class-audit.md §8)."
   ],
+  "nature-sense": {
+    "name": "Nature sense",
+    "source": "CRB, Druid: \"A druid gains a +2 bonus on Knowledge (nature) and Survival checks.\" (aonprd.com, read 2026-11-22.)",
+    "modifiers": [
+      {"type": "skill_mod", "target": "knowledge (nature)", "amount": 2, "bonus_type": "untyped"},
+      {"type": "skill_mod", "target": "survival", "amount": 2, "bonus_type": "untyped"}
+    ]
+  },
   "venom-immunity": {
     "name": "Venom immunity",
     "source": "CRB, Druid: \"At 9th level, a druid gains immunity to all poisons.\" (d20pfsrd.com/classes/core-classes/druid, checked 2026-10-04.)",

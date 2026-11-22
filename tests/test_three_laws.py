@@ -1039,7 +1039,8 @@ def test_the_best_only_channels_never_add_up():
 # each into a document field. Counted rather than forbidden outright because the number
 # is the work remaining, and it may only go down.
 _NAMED_IN_ENGINE = {
-    "rules/engine.py": 3,     # 'control blood' x1, 'swift strikes' x2 — stage 9
+    "rules/engine.py": 1,     # 'control blood' x1 — stage 9. 'swift strikes' x2 went
+                              # 2026-11-22: the passive's `repeat_swings` field.
     "rules/sheet.py": 1,      # 'blood bending' x1 — stage 9. Stage 8c retired the
                               # eleven feat names: every feat is a document now.
 }
@@ -1067,6 +1068,35 @@ def test_the_shared_engine_names_fewer_classes_and_feats_than_it_did():
         assert hits >= ceiling - 1 or ceiling == 0, (
             f"{path} is down to {hits} — lower the ceiling in _NAMED_IN_ENGINE to "
             f"{hits} so the ratchet keeps its grip")
+
+
+# The core classes' own ability names, guarded since 2026-11-22 (audit §3.5: "Rage,
+# smite, channel, wild shape and ki are unguarded. The engine is clean of them today;
+# nothing keeps it so"). Whole words, in code and string literals, docstrings and
+# comments aside. Ceiling 0: every one of them is a document in content/class-abilities.
+_CORE_ABILITY_WORDS = (r"rage", r"smite", r"channel", r"wild shape", r"lay on hands",
+                       r"bardic performance", r"stunning fist", r"sneak attack",
+                       r"(?<![.\w-])ki(?![\w-])")
+_CORE_NAMED = {"rules/engine.py": 3,   # 'sneak attack' x3: the dice popup's term label
+               "rules/sheet.py": 0}
+
+
+def test_the_engine_names_no_core_class_ability():
+    """A rage, smite, channel, wild shape or ki that needs an engine branch needs a field
+    in the class-ability grammar instead (`Engine._use_class_ability` reads fields; the
+    lookup by name went from `precision.py` and the Swift Strikes branch on 2026-11-22).
+    A ratchet: it may only fall."""
+    for path, ceiling in _CORE_NAMED.items():
+        source = Path(path).read_text(encoding="utf-8")
+        source = re.sub(r'"""(?:.|\n)*?"""', "", source)
+        code = "\n".join(re.sub(r"#.*$", "", line) for line in source.splitlines()).lower()
+        hits = sum(len(re.findall(rf"(?<![\w-]){w}(?![\w-])", code))
+                   for w in _CORE_ABILITY_WORDS)
+        assert hits <= ceiling, (
+            f"{path} names a core class ability {hits} times against a ceiling of "
+            f"{ceiling}. Read a field of its document (content/class-abilities/), "
+            f"never its name.")
+        assert hits >= ceiling, f"{path} is down to {hits}; lower _CORE_NAMED to {hits}"
 
 
 # --- persistence: what the save forgets -----------------------------------------------

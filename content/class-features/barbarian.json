@@ -34,7 +34,7 @@
        "when": {"against": "trap"}}
     ],
     "not_yet": [
-      "against: trap — no save or attack roll says it comes from a trap yet (the hazard op's saves pass no descriptor), so both terms are dropped, never applied"
+      "the dodge bonus to AC against attacks made by traps: no trap makes an attack roll (a dungeon trap's Reflex save does carry against: trap, and the save bonus applies), so the AC term is dropped"
     ]
   }
 }

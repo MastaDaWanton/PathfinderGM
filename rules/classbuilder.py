@@ -1113,7 +1113,36 @@ def _validate_grants(d: dict, path: dict, at: str, resolved_names: set,
 # key, and the homebrew editor has offered feats an `effects` field for a year that
 # `feats.from_dict` dropped on the floor.
 _FEAT_DOC_KEYS = frozenset({"modifiers", "tags", "budget", "choice", "attack_ability",
-                            "cmb_ability", "not_yet", "requires", "requires_not"})
+                            "cmb_ability", "not_yet", "requires", "requires_not",
+                            "stacks"})
+
+
+def _feat_funnel_targets() -> set[str]:
+    """The combat targets a feat may aim at beyond the sheet's own vocabulary: every
+    pool's maximum (`pool.<id>`, read by `resources.max_bonus`) and every channel's
+    `bonus_from` prefix with `.dc` / `.damage` (read by `Engine._bonus_from`). Derived
+    from the documents, so a target that nothing reads is refused at load."""
+    from . import class_abilities, classes as classes_mod
+
+    out: set[str] = set()
+    for cls in classes_mod.all_classes().values():
+        out |= {f"pool.{str(p.get('id')).strip().lower()}" for p in cls.get("pools") or ()}
+
+    def walk(node):
+        if isinstance(node, dict):
+            if isinstance(node.get("pool"), dict) and node["pool"].get("id"):
+                out.add(f"pool.{str(node['pool']['id']).strip().lower()}")
+            prefix = node.get("bonus_from")
+            if isinstance(prefix, str) and prefix.strip():
+                out.update({f"{prefix.strip()}.dc", f"{prefix.strip()}.damage"})
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+
+    walk(class_abilities.documents())
+    return out
 _FEAT_MOD_KEYS = frozenset({"type", "target", "amount", "formula", "bonus_type", "scope",
                             "when", "note"})
 
@@ -1176,6 +1205,16 @@ def validate_feat_document(feat_id: str, doc) -> list[str]:
                                 f"parenthetical names the skill. A weapon is bound with "
                                 f"scope {{\"weapon\": \"$target\"}}.")
             probe["target"] = "perception"
+        aimed = str(probe.get("target", ""))
+        if kind == "combat_mod" and aimed in _feat_funnel_targets():
+            probe["target"] = "attack"        # a funnel target a class document reads
+        elif kind == "combat_mod" and aimed.startswith(("pool.", "channel.")):
+            problems.append(
+                f"{mat}: {aimed!r} is read by nothing. A pool's maximum is "
+                f"\"pool.<id>\" for a pool a class or class ability defines, and a "
+                f"channel's is its `bonus_from` plus .dc or .damage. Known: "
+                f"{', '.join(sorted(_feat_funnel_targets()))}.")
+            probe["target"] = "attack"
         if probe.get("formula"):
             # A skill term's formula may ask `ranks` (the skill's own ranks, supplied by
             # the reader), which the generic check does not know; checked here with it.

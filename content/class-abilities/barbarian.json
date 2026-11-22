@@ -24,7 +24,10 @@
            "by_level": {"1": 4, "11": 6, "20": 8}},
           {"type": "save_mod", "target": "will", "bonus_type": "morale",
            "by_level": {"1": 2, "11": 3, "20": 4}},
-          {"type": "combat_mod", "target": "ac", "bonus_type": "untyped", "amount": -2}
+          {"type": "combat_mod", "target": "ac", "bonus_type": "untyped", "amount": -2},
+          {"type": "save_mod", "target": "will", "bonus_type": "untyped",
+           "by_level": {"14": 4}, "when": {"against": "enchantment"},
+           "_source": "CRB, indomitable will (14th): \"+4 bonus on Will saves to resist enchantment spells\" while raging, stacking with rage's own. Asked by a save against an enchantment spell (effectspec.spell_against)."}
         ],
         "ends_when": {"holder": ["state.down"]},
         "forbids": {"skills": {"abilities": ["cha", "dex", "int"],
@@ -57,13 +60,21 @@
             "formula": "2 + floor(level / 4)", "when": {"against": "spell"}},
            {"type": "save_mod", "target": "will", "bonus_type": "morale",
             "formula": "2 + floor(level / 4)", "when": {"against": "spell"}}
-         ]}
+         ]},
+        {"choice": "rage power", "pick": "low-light vision",
+         "_source": "CRB rage power: low-light vision while raging.",
+         "tags": ["sense.low-light"]},
+        {"choice": "rage power", "pick": "night vision",
+         "_source": "CRB rage power: darkvision 60 ft while raging.",
+         "tags": ["sense.darkvision.60"]},
+        {"choice": "rage power", "pick": "scent",
+         "_source": "CRB rage power: the scent ability while raging.",
+         "tags": ["sense.scent"]}
       ],
       "tell": "{name} flies into a rage.",
       "tell_off": "{name}'s rage burns out.",
       "not_yet": [
         "\"Any ability that requires patience or concentration\": only skills are refused while it holds; casting and concentration are not.",
-        "Indomitable will's +4 against enchantment: saves carry no enchantment descriptor yet.",
         "Rounds only drain in played rounds; a rage begun out of a fight holds until it is ended."
       ]
     },
@@ -116,6 +127,44 @@
       "affects": "self",
       "roll": {"count": "1 + floor((level - 4) / 4)", "die": 8, "bonus": "con_mod", "as": "heal"},
       "tell": "{name}'s fury closes their wounds."
+    },
+    {
+      "key": "powerful blow",
+      "name": "Powerful Blow",
+      "level": 1,
+      "requires_choice": {"choice": "rage power", "pick": "powerful blow"},
+      "source": "CRB rage power: +1 on a single damage roll, +1 for every 4 levels; a swift action before the roll to hit; once per rage.",
+      "text": "+1 damage on your next blow (+1 per 4 levels), once per rage.",
+      "action": "swift",
+      "requires": ["buff.stance.rage"],
+      "requires_said": "only while raging",
+      "pool": {"id": "powerful blow", "max": "1", "refresh": "stance.end.rage"},
+      "cost": {"pool": "powerful blow", "amount": 1},
+      "aim": "foe",
+      "charge": {"spent_on": "swing",
+                 "modifiers": [{"type": "combat_mod", "target": "damage",
+                                "bonus_type": "untyped",
+                                "formula": "1 + floor(level / 4)"}]},
+      "tell": "{name} winds up a mighty blow."
+    },
+    {
+      "key": "surprise accuracy",
+      "name": "Surprise Accuracy",
+      "level": 1,
+      "requires_choice": {"choice": "rage power", "pick": "surprise accuracy"},
+      "source": "CRB rage power: +1 morale on one attack roll, +1 for every 4 levels; a swift action before the roll; once per rage.",
+      "text": "+1 morale to hit on your next attack (+1 per 4 levels), once per rage.",
+      "action": "swift",
+      "requires": ["buff.stance.rage"],
+      "requires_said": "only while raging",
+      "pool": {"id": "surprise accuracy", "max": "1", "refresh": "stance.end.rage"},
+      "cost": {"pool": "surprise accuracy", "amount": 1},
+      "aim": "foe",
+      "charge": {"spent_on": "swing",
+                 "modifiers": [{"type": "combat_mod", "target": "attack",
+                                "bonus_type": "morale",
+                                "formula": "1 + floor(level / 4)"}]},
+      "tell": "{name}'s eyes narrow on an opening."
     }
   ]
 }

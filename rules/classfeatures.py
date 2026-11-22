@@ -104,6 +104,9 @@ EVASION = f"{FAMILY}.evasion"
 # may the fist strike lethal without the -4 — for a monk who never picked the feat.
 UNARMED_STRIKE = f"{FAMILY}.unarmed-strike"
 IMPROVED_EVASION = f"{FAMILY}.improved-evasion"
+# The rogue's "sneak attack 3d6" ladder, read by `rules/precision.py` through the tag and
+# `rung_dice` — never a regex over the grant's English (audit 2026-11-22, law 1).
+SNEAK_ATTACK = f"{FAMILY}.sneak-attack"
 
 # Evasion is for people who can move: "can be used only if the rogue is wearing light
 # armor or no armor", and "a helpless rogue does not gain the benefit of evasion"
@@ -144,6 +147,16 @@ def rung_number(grant: str) -> int | None:
         if m:
             return int(m.group(1))
     return None
+
+
+def rung_dice(grant: str) -> str:
+    """The dice a rung carries, read off what `_NUMBER` strips: "sneak attack 3d6" ->
+    "3d6", "(1d6)" -> "1d6", "trap sense +2" -> ""."""
+    for part in reversed(_split(grant)[1]):
+        m = re.search(r"\d+d\d+", part)
+        if m:
+            return m.group(0)
+    return ""
 
 
 def rung_bypass(grant: str) -> str:

@@ -909,6 +909,12 @@ def take_choice(actor, choice_id: str, body: dict) -> tuple[list[str], list[str]
                       + (f" ({p['variant']})" if p.get("variant") else "") for p in picks]
     if entry_out:
         actor.class_choices = sync_raises(cid, {**answers, key: entry_out})
+        # A pick that hands over a feat (Finesse Rogue's Weapon Finesse) writes it now,
+        # the way a level's granted feats are written (`leveling.grant_class_feats`).
+        from . import leveling
+
+        said_words += [f"{line.title()} (a bonus feat)"
+                       for line in leveling.grant_class_feats(actor)]
     return said_words, []
 
 

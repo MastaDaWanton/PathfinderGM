@@ -10,7 +10,7 @@
       "aliases": ["inspire", "courage"],
       "level": 1,
       "source": "CRB p.36 Inspire Courage: allies who can hear the bard gain +1 competence on attack and weapon damage rolls (and +1 morale on saves against charm and fear), +2 at 5th, +3 at 11th, +4 at 17th.",
-      "text": "Allies: +1 competence on attack and weapon damage (+2 at 5th, +3 at 11th, +4 at 17th).",
+      "text": "Allies: +1 competence on attack and weapon damage, +1 morale on saves against charm and fear (+2 at 5th, +3 at 11th, +4 at 17th).",
       "action": {"1": "standard", "7": "move", "13": "swift"},
       "cost": {"pool": "bardic performance", "amount": 1},
       "drain": {"pool": "bardic performance", "amount": 1},
@@ -22,13 +22,25 @@
           {"type": "combat_mod", "target": "attack", "bonus_type": "competence",
            "by_level": {"1": 1, "5": 2, "11": 3, "17": 4}},
           {"type": "combat_mod", "target": "damage", "bonus_type": "competence",
-           "by_level": {"1": 1, "5": 2, "11": 3, "17": 4}}
+           "by_level": {"1": 1, "5": 2, "11": 3, "17": 4}},
+          {"type": "save_mod", "target": "fort", "bonus_type": "morale",
+           "by_level": {"1": 1, "5": 2, "11": 3, "17": 4}, "when": {"against": "charm"}},
+          {"type": "save_mod", "target": "ref", "bonus_type": "morale",
+           "by_level": {"1": 1, "5": 2, "11": 3, "17": 4}, "when": {"against": "charm"}},
+          {"type": "save_mod", "target": "will", "bonus_type": "morale",
+           "by_level": {"1": 1, "5": 2, "11": 3, "17": 4}, "when": {"against": "charm"}},
+          {"type": "save_mod", "target": "fort", "bonus_type": "morale",
+           "by_level": {"1": 1, "5": 2, "11": 3, "17": 4}, "when": {"against": "fear"}},
+          {"type": "save_mod", "target": "ref", "bonus_type": "morale",
+           "by_level": {"1": 1, "5": 2, "11": 3, "17": 4}, "when": {"against": "fear"}},
+          {"type": "save_mod", "target": "will", "bonus_type": "morale",
+           "by_level": {"1": 1, "5": 2, "11": 3, "17": 4}, "when": {"against": "fear"}}
         ]
       },
       "tell": "{name} strikes up a rousing performance.",
       "tell_off": "{name}'s performance ends.",
       "not_yet": [
-        "The morale bonus on saves against charm and fear: saves carry no charm or fear descriptor yet.",
+        "The morale bonus on saves against charm and fear holds against a spell of that subschool or descriptor (effectspec.spell_against); a creature's fear aura or a class ability's does not say so yet.",
         "Hearing: everyone on the bard's side in the scene is inspired; distance and deafness are not read."
       ]
     },

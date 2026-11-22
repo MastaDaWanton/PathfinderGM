@@ -54,7 +54,7 @@
        "when": {"against": "enchantment"}}
     ],
     "not_yet": [
-      "against: enchantment — spell saves pass only \"spell\", never the school, so the term is dropped, never applied"
+      "against: enchantment — a save against an enchantment SPELL carries it (effectspec.spell_against); an enchantment class ability or creature effect does not yet, and the term is dropped there"
     ]
   },
   "ki-strike": {

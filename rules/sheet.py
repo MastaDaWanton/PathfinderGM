@@ -2983,9 +2983,12 @@ class Actor:
                     best = (name, int(total))
         return best
 
-    def skill_modifiers(self, skill: str, opposed: bool = False) -> list[Modifier]:
+    def skill_modifiers(self, skill: str, opposed: bool = False,
+                        ctx: dict | None = None) -> list[Modifier]:
         """`opposed`: the check is rolled against another creature's (Perception against
-        Stealth or Sleight of Hand), which is where blinded's Perception penalty lands."""
+        Stealth or Sleight of Hand), which is where blinded's Perception penalty lands.
+        `ctx` is the roll's context for a term with a `when`, as `save_modifiers` takes
+        it: the track op's `{"against": "tracks"}` is what the ranger's Track asks."""
         skill = skill.strip().lower()
         if skill not in SKILLS:
             raise KeyError(f"no such skill {skill!r}")
@@ -2998,7 +3001,11 @@ class Actor:
             mods.extend(self._shifted(ability))
         else:
             rank = self.ranks.get(skill, 0)
-            if trained_only and rank == 0:
+            # A class feature's `skill.untrained.<skill>` or `skill.untrained.all` tag
+            # waives "trained only" (bardic knowledge's Knowledge, jack-of-all-trades).
+            if trained_only and rank == 0 and not (
+                    self.has_state("skill.untrained.all")
+                    or self.has_state(f"skill.untrained.{skill.split(' (')[0]}")):
                 raise IllegalSheet(
                     f"{self.name} cannot attempt {skill} untrained"
                 )
@@ -3041,12 +3048,12 @@ class Actor:
         mods.extend(self._condition_mods(f"skill_{skill}"))
         if opposed:
             mods.extend(self._condition_mods(f"opposed_skill_{skill}"))
-        mods.extend(self._buff_mods("skill_mod", skill))
+        mods.extend(self._buff_mods("skill_mod", skill, ctx))
         # "On all skill checks": a skill_mod aimed at `all` — Touch of Good, Inspiring
         # Word, Diviner's Fortune, Aura of Despair. Foundry PF1's change target `skills`
         # ("All Skills") is the same idea. Before it, each of those documents could name
         # one skill only and the bonus said on the sheet never reached a roll.
-        mods.extend(self._buff_mods("skill_mod", ALL_SKILLS))
+        mods.extend(self._buff_mods("skill_mod", ALL_SKILLS, ctx))
         return stack(mods)
 
     # --- saves ----------------------------------------------------------------------
@@ -6181,7 +6188,9 @@ class Actor:
                 if not doc:
                     continue
                 key = (doc["id"], str(doc.get("target") or ""))
-                if key in seen:
+                # "Its effects stack" (Extra Rage, Extra Ki …): the document says so with
+                # `stacks`, and each copy on the sheet adds its terms again.
+                if key in seen and not doc.get("stacks"):
                     continue
                 seen.add(key)
                 for spec in doc.get("modifiers") or ():
@@ -7666,6 +7675,11 @@ def _document_effect_text(doc: dict) -> str:
             str(spec.get("type") or ""))
         what = (effectspec._vocab_name(vocab, target).lower() if vocab
                 else target.replace("_", " "))
+        # The funnel targets a class document reads (`classbuilder._feat_funnel_targets`).
+        if target.startswith("pool."):
+            what = f"{target[5:]} a day"
+        elif target.endswith(".dc"):
+            what = f"{target.split('.')[0]} save DC"
         if spec.get("type") == "save_mod":
             what += " saves"
         typed = str(spec.get("bonus_type") or "")
@@ -8303,6 +8317,13 @@ def _when_holds(when, ctx: dict | None) -> bool:
             for op, bound in want.items():
                 if op not in ops or not ops[op](have, bound):
                     return False
+        elif key == "against" and isinstance(ctx.get("against"), (tuple, list, frozenset,
+                                                                    set)):
+            # A save is against SEVERAL things at once: cause fear is a spell, a
+            # necromancy and a fear effect, so bravery's "against fear" and a cloak's
+            # "against spells" both answer it (`effectspec.spell_against`).
+            if want not in ctx["against"]:
+                return False
         else:
             if ctx.get(key) != want:
                 return False
@@ -9266,14 +9287,17 @@ def validate(actor: Actor) -> None:
         # bestiary creature's printed feats (on the sheet since 2026-11-15) are the book's
         # own block, shown on the bestiary page; a note per undocumented feat on every
         # monster would only fill its notes.
+        note = f"[feat '{f}' is carried as flavour; engine applies nothing]"
         if feats_mod.document(f) or actor.from_template:
+            # A feat that gained a document since the note was written (Extra Rage,
+            # 2026-11-22: a saved barbarian's notes still said "applies nothing").
+            actor.notes = actor.notes.replace("\n" + note, "").replace(note, "")
             continue
         # Not fatal: an unrecognised feat contributes nothing and says so, which is
         # better than silently pretending it applied.
         #
         # Guarded against re-appending, because the campaign save round-trips through
         # here on every load and an unguarded += grows the note without bound.
-        note = f"[feat '{f}' is carried as flavour; engine applies nothing]"
         if note not in actor.notes:
             actor.notes += f"\n{note}"
     # Armour and a shield are stored by their table key and nothing else: `wear` writes

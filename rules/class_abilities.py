@@ -29,7 +29,8 @@ The grammar, one ability:
 
 - `key`, `name`, `level` (the class level it arrives at), `aliases`, `source` (the page
   the numbers came from), `text` (one line for the bar), `action` (free, swift, move,
-  standard, full-round — or `{"1": "standard", "7": "move"}` by level).
+  standard, full-round — or `{"1": "standard", "7": "move"}` by level); `self_action`
+  the action when the user aims it at herself (lay on hands: swift).
 - `requires`, `requires_not`: tag queries against the one vocabulary (`Actor.has_state`).
 - `requires_choice`: `{"choice": "rage power", "pick": "renewed vigor"}` — the ability
   exists only for a character who chose it (lane 1's class choices, read by `chosen`).
@@ -71,8 +72,14 @@ The grammar, one ability:
   laid over; `"kind": "form"` reads the animal
   catalogue; `"kind": "skill"` aims a skill modifier; `"kind": "condition"` picks a rung.
 - `addons`: `[{"choice": "rage power", "pick": ..., "modifiers": [...],
-  "natural_weapons": [...]}]` — what a chosen rage power adds to the stance it rides.
+  "natural_weapons": [...], "tags": [...]}]` — what a chosen rage power adds to the
+  stance it rides (a sense while raging is a tag: `sense.darkvision.60`).
+- `pool.refresh` may be `stance.end.<toggle key>`: refilled when that stance ends
+  (`Scene.stance_ended`) — the book's "once per rage".
 - `not_yet`: what the book says that nothing here does yet, said out loud.
+- `selective`: `{"requires": <tag>, "count": <formula>}` — a user holding the tag spares
+  that many of the wrong side from the burst (Selective Channeling,
+  `Engine._selective_spares`).
 - `ability_type`: `"ex"`, `"su"` or `"sp"` (CRB, Special Abilities) — what a class's
   prohibition suspends (`classfeatures.refusal`; the druid in metal loses `su` and `sp`).
 
@@ -257,9 +264,12 @@ def rung_at(rungs: dict, level: int):
     return got
 
 
-def action_of(doc: dict, actor) -> str:
-    """The action this takes at this level — bardic performance quickens at 7 and 13."""
-    act = doc.get("action") or "standard"
+def action_of(doc: dict, actor, on_self: bool = False) -> str:
+    """The action this takes at this level — bardic performance quickens at 7 and 13 —
+    and, `on_self`, the document's `self_action` when it names one: lay on hands is "a
+    standard action, unless the paladin targets herself, in which case it is a swift
+    action" (CRB p.61). Audit 2026-11-22: `self_action` was read by nothing."""
+    act = (doc.get("self_action") if on_self else None) or doc.get("action") or "standard"
     if isinstance(act, dict):
         act = rung_at(act, level_of(actor)) or "standard"
     return str(act)
@@ -287,6 +297,25 @@ def modifiers(specs, actor) -> list[dict]:
         out.append(m)
     return out
 
+
+# Every field a document may carry, each with a reader (audit 2026-11-22: lay on hands'
+# `self_action` sat in its document read by nothing, because nothing refused a field the
+# executor did not know — class-features' `DOC_KEYS` already did). A key starting with
+# "_" is a note. A field added to the grammar is added here with its reader.
+DOC_KEYS = frozenset({
+    "ability_type", "action", "addons", "affects", "after", "aim", "aliases", "area",
+    "attack", "bonus_from", "by_level", "charge", "choice", "cost", "count", "damage_type",
+    "drain", "effect", "energy_choice", "entry", "evil_only", "harmful", "healed_instead",
+    "hit_dice", "key", "level", "lifts", "living", "name", "negative", "not_yet", "only",
+    "pool", "power", "radius_ft", "range_ft", "reach_ft", "removes", "requires",
+    "requires_choice", "requires_not", "requires_said", "roll", "roll_as", "save",
+    "selective", "self", "self_action", "source", "target_requires",
+    "target_requires_said", "tell", "tell_off", "text", "toggle", "undead",
+    "undead_only", "charge_condition", "charge_rounds", "charge_rounds_dice"})
+SELF_KEYS = frozenset({"ends_when", "forbids", "modifiers", "natural_weapons", "rounds",
+                       "strikes_as", "tags", "vs_target"})
+EFFECT_KEYS = frozenset({"condition", "modifiers", "on", "rounds", "skill_modifiers",
+                         "tags", "temp_hp", "vulnerable"})
 
 AREA_SHAPES = ("cone", "line", "burst")
 _AREA_WORDS = re.compile(r"^\s*(\d+)\s*-?\s*(?:foot|feet|ft\.?)\s*-?\s*(?:radius\s+)?"
@@ -588,6 +617,7 @@ def uses_left(actor, doc: dict) -> tuple[int | None, int | None, str]:
             most = resources.evaluate(spec.get("max", 0), actor)
         except resources.FormulaError:
             most = 0
+        most += resources.max_bonus(actor, pid)
         return most, most, pid
     return 0, 0, pid
 
@@ -657,9 +687,12 @@ def usable(actor) -> list[dict]:
             continue
         left, most, pid = uses_left(actor, doc)
         held = holding(actor, doc)
+        act = action_of(doc, actor)
+        if doc.get("self_action") and action_of(doc, actor, True) != act:
+            act = f"{act} ({action_of(doc, actor, True)} on yourself)"
         entry = {"name": str(doc["name"]), "class": str(doc.get("class") or ""),
                  "action": action_of(doc, actor),
-                 "text": f"{action_of(doc, actor)} — {doc.get('text') or ''}".strip(" —"),
+                 "text": f"{act} — {doc.get('text') or ''}".strip(" —"),
                  "aim": str(doc.get("aim") or ("self" if (doc.get("affects") or "self")
                                                 in ("self", "allies") else "foe")),
                  "origin": origin_of(doc)}
@@ -786,9 +819,11 @@ def validate_documents(docs: dict | None = None) -> list[str]:
             if not doc.get("source"):
                 problems.append(f"{at}: say where the numbers came from in `source`.")
             act = doc.get("action") or "standard"
-            for a in (act.values() if isinstance(act, dict) else [act]):
+            said = list(act.values()) if isinstance(act, dict) else [act]
+            for a in said + ([doc["self_action"]] if doc.get("self_action") else []):
                 if a not in ACTIONS:
                     problems.append(f"{at}: action {a!r} is not one of {', '.join(ACTIONS)}.")
+            problems += _unknown_keys(at, doc)
             # The book's kind of special ability (CRB, Special Abilities). Read by a class
             # prohibition (`classfeatures.refusal`): a druid in metal loses her
             # supernatural and spell-like abilities, never an extraordinary one.
@@ -851,6 +886,22 @@ def validate_documents(docs: dict | None = None) -> list[str]:
             for layer in overlays:
                 problems += _shape_problems(at + " (a choice's overlay)", layer)
     return problems
+
+
+def _unknown_keys(at: str, doc: dict) -> list[str]:
+    """Fields the executor has no reader for, refused with the grammar named."""
+    out = []
+    for where, got, allowed in (("", doc, DOC_KEYS), (".self", doc.get("self"), SELF_KEYS),
+                                (".effect", doc.get("effect"), EFFECT_KEYS)):
+        if not isinstance(got, dict):
+            continue
+        bad = sorted(k for k in got if not str(k).startswith("_") and k not in allowed)
+        if bad:
+            out.append(f"{at}{where}: unknown field(s) {', '.join(bad)} — nothing reads "
+                       f"them, so the ability would quietly do less than it says. The "
+                       f"grammar is rules/class_abilities.py's docstring; add a reader "
+                       f"before the field.")
+    return out
 
 
 _TELL_FIELDS = re.compile(r"\{([^{}]*)\}")
@@ -921,6 +972,11 @@ def _shape_problems(at: str, doc: dict) -> list[str]:
     for key in ("bonus_from", "healed_instead"):
         if doc.get(key) is not None and not str(doc.get(key) or "").strip():
             out.append(f"{at}: {key} is a non-empty string.")
+    saving = doc.get("save") or {}
+    if isinstance(saving, dict) and saving.get("success") not in (None, "negates", "half",
+                                                                  "none"):
+        out.append(f"{at}: save.success is \"negates\", \"half\" or \"none\" (the roll "
+                   f"lands whole and the save is only against `effect.on` \"failed\").")
     effect = doc.get("effect") or {}
     if effect.get("on") not in (None, "failed"):
         out.append(f"{at}: effect.on is \"failed\" (lands only on a failed save) or absent.")

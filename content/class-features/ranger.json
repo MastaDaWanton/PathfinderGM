@@ -50,6 +50,14 @@
     ],
     "not_yet": ["\"A ranger traveling through his favored terrain normally leaves no trail\": no tracking op"]
   },
+  "track": {
+    "name": "Track",
+    "source": "CRB, Ranger: \"A ranger adds half his level (minimum 1) to Survival skill checks made to follow or identify tracks.\" (aonprd.com, read 2026-11-22.)",
+    "modifiers": [
+      {"type": "skill_mod", "target": "survival", "formula": "max(1, class_level // 2)",
+       "bonus_type": "untyped", "when": {"against": "tracks"}}
+    ]
+  },
   "evasion": {
     "name": "Evasion",
     "source": "CRB, Ranger: \"This ability can only be used if the ranger is wearing light armor, medium armor, or no armor.\" (The rogue's and monk's is light or none.)",
