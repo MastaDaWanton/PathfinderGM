@@ -345,19 +345,30 @@ def test_a_converted_spell_says_so_and_a_hand_written_one_does_not():
     assert cast(e2, "magic-missile").outcomes[0].effects[0]["effects_converted"] is False
 
 
-def test_a_buff_is_shown_to_the_gm_rather_than_invented():
-    """Bless's +1 morale bonus is real and is not applied, because applying it needs the
-    spell's duration as a number of rounds and "minutes/level (1)" is still prose. Shown
-    on the tell instead of given an invented hour — see `spells.casting_plan`."""
+def test_a_buff_is_applied_for_the_spells_own_rounds():
+    """Audit 2026-11-22: bless cast at caster level 5 gave +0 to hit while a potion of it
+    gave +1 morale, under a pin that said the duration "is still prose" — it had been read
+    into rounds since 2026-09-30. Now the +1 lands as a timed, typed ActiveEffect stamped
+    `spell:bless` for 50 rounds (minutes/level), and the thug on the other side gets none.
+    Its "+1 Will against fear" carries a note no reader asks, so it is still told."""
     c = cleric(level=5, book=("bless",), prepared={"bless": 1})
     s, e = table(c)
+    before = sum(m.value for m in s.actors["pc"].attack_modifiers())
     out = cast(e, "bless", at="pc").outcomes[0]
 
     assert not damage_effects(out)
-    assert "+1 Attack rolls" in out.tell
+    pc = s.actors["pc"]
+    assert sum(m.value for m in pc.attack_modifiers()) == before + 1
+    held = [x for x in pc.effects if x.kind == "buff" and x.source == "Bless"]
+    assert len(held) == 1 and held[0].rounds_left == 50
+    assert held[0].origin == "spell:bless"
+    assert held[0].modifiers[0]["bonus_type"] == "morale"
+    assert not [x for x in s.actors["c1"].effects if x.source == "Bless"]
+    assert "+1 on attack rolls for 5 minute(s) (Bless)" in out.tell
+    assert "told rather than applied" in out.tell
     plan = spells_mod.casting_plan(spells_mod.get("bless"), 5)
     assert plan["dice"] == "" and len(plan["riders"]) == 2
-    assert "duration" in plan["note"]
+    assert "still prose" not in plan["note"]
 
 
 # --- what a converted formula must never be ---------------------------------------------------------

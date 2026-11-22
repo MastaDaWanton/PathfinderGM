@@ -372,14 +372,16 @@ The `cast` effect carries `element`, `dice` (the scaled notation), `range_feet`,
 `effects` themselves, and `effects_converted` — which is the one a GM most needs, because
 354 of these numbers were read by a machine and nobody has checked them.
 
-**Still not applied: the non-damage riders.** Bless's +1 morale bonus, barkskin's natural
-armour, the six ability boosts. `casting_plan` returns them under `riders` and `_op_cast`
-renders them onto the tell for the GM rather than applying them, because `_op_buff` needs a
-duration in **rounds** and a spell's duration is still prose — `"minutes/level (1)"`. The
-next contained step is a `duration_value` on the spell, derived from that line the way
-`range_value` is derived from the range line; then the riders can go through
-`consumables._spec_to_intents` as sub-intents, exactly as `_op_use_item` already does, with
-no second copy of the spec→intent mapping.
+**Applied since 2026-11-22: the numeric riders.** Bless's +1 morale bonus, the six ability
+boosts, aid's temporary hit points, prayer, heroism, enlarge person and the rest land through
+`Engine._cast_buff`: `consumables._spec_to_intents` (the potion door, no second mapping),
+timed by `spells.duration_rounds`, stamped `spell:<id>`, typed through `dice.stack`, with a
+tell on landing and an ended record on expiry. A spec is still only told when it cannot be
+honest: a `note` qualifying it in words (the fix is a `when` or a formula in the data), a
+`uses: once` bonus (true strike), no rounds to time it, or a recipient other than the
+target, the area or the caster. In an area a bonus lands on the caster's side and a penalty
+on the other; a save gate whose failure branch is only buffs with something positive in it
+(enlarge person) is forgone by a willing friend (`Engine._willing`). `tests/test_spell_buffs.py`.
 
 ### 5.2 The play page
 

@@ -12808,11 +12808,7 @@ class Engine:
                        bonus_type=str(intent.params.get("bonus_type", "")),
                        origin=intent.origin,
                        when=dict(when) if isinstance(when, dict) and when else None)
-        span = ""
-        if rounds:
-            span = f" for {rounds // 600} hour(s)" if rounds >= 600 else \
-                   f" for {rounds // 10} minute(s)" if rounds >= 10 else \
-                   f" for {rounds} round(s)"
+        span = _span(rounds)
         return Outcome(
             intent_id=intent.id, op="buff",
             effects=[{"ref": actor.ref, "kind": "buff", "type": kind, "target": target,
@@ -13132,7 +13128,12 @@ class Engine:
             amount = roll.total
 
         source = str(intent.params.get("source") or intent.because or "").strip()
-        result = target.gain_temp_hp(amount, source, origin=intent.origin)
+        # A spell's temporary hit points last the spell (aid, false life); a draught's
+        # carry no duration and keep the pool's old open end.
+        duration = intent.params.get("duration")
+        rounds = (self._duration_rounds(duration) if isinstance(duration, dict)
+                  and duration.get("amount") else None)
+        result = target.gain_temp_hp(amount, source, rounds=rounds, origin=intent.origin)
         if "ignored" in result:
             tell = (f"{target.name} already has {result['temp_hp']} temporary hit points "
                     f"from {result['source'] or 'another source'}; these do not stack.")
@@ -26893,18 +26894,21 @@ class Engine:
 
         # The riders, in two piles. The ones the engine can run — a manifestation, a
         # summon, an operation on another spell, anything waiting on a trigger — are run;
-        # everything else keeps the path it had, rendered for the GM. A bless's +1 is
-        # still not applied, and that is a separate argument with its own test: applying
-        # it needs a decision about stacking that this change is not making.
+        # everything else keeps the path it had, rendered for the GM. A bless's +1 has
+        # been applied since 2026-11-22 (`_cast_buff`); the stacking decision it waited
+        # on is the typed funnel's, `dice.stack`, which the potion path already used.
         cast_ctx = self._cast_context(actor, spell, cl, level, dc, live, plan, intent)
         if item:
             cast_ctx["origin"] = item["origin"]
         cast_ctx.update({"saved": {k: bool(v["saved"])
                                    for k, v in (state.get("saved") or {}).items()},
-                         "spared": dict(state.get("spared") or {})})
+                         "spared": dict(state.get("spared") or {}),
+                         "area_measured": bool((state.get("area") or {}).get("measured"))})
+        cast_ctx["buffs_said"] = {}
         ran, said = self._run_specs(plan["riders"], cast_ctx)
         effects.extend(ran)
         tells.extend(said)
+        tells.extend(self._buffs_said(cast_ctx))
         for spec in plan["riders"]:
             if not self._executes(spec):
                 tells.append(effectspec.render(spec) + ".")
@@ -26951,8 +26955,12 @@ class Engine:
             guts[target.ref] = {"origins": gut["origins"]}
             state["rolls"].extend(gut["rolls"])
             state["tells"].extend(gut["tells"])
+        # A fear spell's save is against a spell AND against fear: bless's and aid's +1
+        # morale "against fear effects" asks the second (`when: {"against": "fear"}`).
+        against = ("spell", "fear") if "fear" in {str(d).lower() for d in
+                                                  spell.descriptors or ()} else "spell"
         with self._guttered(guts[target.ref]["origins"]):
-            save_mods = target.save_modifiers(save, {"against": "spell"}) + list(extra)
+            save_mods = target.save_modifiers(save, {"against": against}) + list(extra)
         roll = self._roll_or_suspend_stage(
             intent, target, save_mods, f"{SAVES[save]} save against {spell.name}", dc,
             partial, state, "1d20", state_key="cast_state")
@@ -27328,6 +27336,9 @@ class Engine:
         aim = self._cast_aim(intent, actor)
         return {
             "caster": actor.ref, "targets": live, "caster_level": cl,
+            # An area spell's buff lands by side (`_cast_buff`): bless's burst is "you and
+            # your allies", bane's the enemies in it.
+            "area": bool(plan.get("area")),
             # Whom the spell was cast ON, as against everyone its area caught: an
             # invisibility sphere's centre (`_lay_condition`).
             "recipient": aim.value if aim.kind == "ref" else actor.ref,
@@ -27362,14 +27373,13 @@ class Engine:
     #
     # Deliberately narrow, and the narrowness is the design. `casting_plan` already owns
     # the rolled dice and the save, and the 6,476 specs the corpus carried before these
-    # types existed keep the exact path they had: a bless's +1 is still rendered for the
-    # GM rather than applied, because applying it is a separate argument with its own
-    # test pinning the current answer.
+    # types existed kept the exact path they had until each was given an executor.
     #
     # What runs here is what could not be *said* at all before — a manifestation, a
     # summon, an operation on another spell, a miss chance, damage to gear — plus any
     # effect whose trigger is not "immediately", which is the repeating and retributive
-    # family. Nothing that used to be narrated silently starts happening.
+    # family, and since 2026-11-22 the numeric buffs (`_BUFFS`, `_cast_buff`): a bless's
+    # +1 lands now, timed and typed, and says so.
 
     _EXECUTES = ("manifest", "summon", "spell_operation", "concealment", "object_damage",
                  "choose_one", "bundle", "attitude", "spell_resistance",
@@ -27387,6 +27397,12 @@ class Engine:
                  # A spell's immunity (shield against magic missile, fiery body against
                  # fire): rendered and never granted until 2026-11-15. `_grant_immunity`.
                  "immunity")
+    # The numeric buffs (audit 2026-11-22, lane A): bless, aid, heroism, the six animal
+    # buffs and every other modifier a spell lays, through the door potions already use
+    # (`consumables._spec_to_intents`), timed by the spell's own rounds. `_cast_buff`.
+    _BUFFS = ("ability_mod", "save_mod", "skill_mod", "combat_mod", "speed", "temp_hp",
+              "resistance", "damage_reduction", "fast_healing", "remove_condition")
+    _EXECUTES = _EXECUTES + _BUFFS
 
     def _executes(self, spec: dict) -> bool:
         # An ITEM's trigger (hit, crit, first_wound_daily, carried — contracts §2) is not a
@@ -27395,7 +27411,10 @@ class Engine:
         trigger = str(spec.get("trigger") or "on_cast")
         from .effectspec import ITEM_TRIGGERS
 
-        return (str(spec.get("type", "")) in self._EXECUTES
+        kind = str(spec.get("type", ""))
+        if kind in self._BUFFS and trigger in ITEM_TRIGGERS:
+            return False                       # a worn ring's fast healing is the item's
+        return (kind in self._EXECUTES
                 or (trigger != "on_cast" and trigger not in ITEM_TRIGGERS)
                 or _ac_grant(spec) is not None)
 
@@ -27621,9 +27640,12 @@ class Engine:
         if lays and ctx["spell_save"] and not ctx["spell_harmless"] \
                 and ctx["spell_save_effect"] == "negates":
             kinds.append(spells_mod.save_key(ctx["spell_save"]))
+        # A friend forgoes the save of a gate it would willingly take (`_willing`).
+        willing = {ref for ref in others if gates and not lays and all(
+            self._willing(actor, self.scene.actors[ref], g) for g in gates)}
         for save in dict.fromkeys(k for k in kinds if k in SAVES):
             for ref in others:
-                if ref in state["spared"]:
+                if ref in state["spared"] or ref in willing:
                     continue
                 target = self.scene.actors[ref]
                 first = f"{save}:{ref}" not in (state.get("saved") or {})
@@ -27662,13 +27684,28 @@ class Engine:
         source = str(ctx.get("source") or "the spell")
         effects: list[dict] = []
         tells: list[str] = []
-        for ref in ctx.get("targets") or ():
+        targets = list(ctx.get("targets") or ())
+        if not targets and ctx.get("self_ok") and caster is not None:
+            targets = [caster.ref]              # "I cast enlarge person" said at nobody
+        for ref in targets:
             target = self.scene.actors.get(ref)
-            if target is None or ref in spared or ref == ctx.get("caster"):
+            if target is None or ref in spared:
                 continue
-            made = saved.get(f"{save}:{ref}")
+            willing = self._willing(caster, target, spec)
+            if ref == ctx.get("caster") and not willing:
+                continue
+            # "A creature can voluntarily forgo a saving throw and willingly accept a
+            # spell's result" (CRB, Magic): enlarge person on the caster or an ally lands
+            # with no roll (`_rider_saves` rolled none). Audit 2026-11-22: it never landed.
+            made = False if willing else saved.get(f"{save}:{ref}")
             if made is None:
                 continue
+            if not made:
+                for b in spec.get("on_failure") or ():
+                    if isinstance(b, dict) and str(b.get("type") or "") in self._BUFFS:
+                        got, said = self._cast_buff(b, ctx, only=[ref])
+                        effects.extend(got)
+                        tells.extend(said)
             gate = spec
             # A spell that does more to fewer Hit Dice (`spells.HD_TIERS`: color spray's
             # phases), laid as its table says in place of the document's one-round floor,
@@ -27690,9 +27727,28 @@ class Engine:
                 if got.get("tell"):
                     tells.append(got["tell"])
             for b in gate.get("on_success" if made else "on_failure") or ():
-                if isinstance(b, dict) and not self._gate_applies(b, made):
+                if isinstance(b, dict) and not self._gate_applies(b, made)                         and not (not made and str(b.get("type") or "") in self._BUFFS):
                     tells.append(f"On {target.name}: {fx.render(b)}.")
         return effects, tells
+
+    # What a save gate's failure branch may hold for a creature to accept it willingly:
+    # numbers and words. A condition, a slaying or a charm is never "accepted" by an ally
+    # on the engine's say-so — hold person on a friend still asks for the save.
+    _BENIGN_BRANCH = _BUFFS + ("narrative",)
+
+    def _willing(self, caster: Actor | None, target: Actor, gate: dict) -> bool:
+        """Whether `target` forgoes this gate's save and takes its failure branch: the
+        caster's own side (`_against`), and a branch of buffs (`_BENIGN_BRANCH`) —
+        enlarge person, reduce person and their masses on a friend."""
+        if caster is None or self._against(caster, target):
+            return False
+        branch = [b for b in gate.get("on_failure") or () if isinstance(b, dict)]
+        if not branch or not all(str(b.get("type") or "") in self._BENIGN_BRANCH
+                                 for b in branch):
+            return False
+        # Something in it must be worth having: enlarge person's +2 Strength beside its
+        # -2 Dexterity is taken; crushing despair's penalties alone are saved against.
+        return any(_signed(b.get("amount")) > 0 for b in branch)
 
     @staticmethod
     def _gate_applies(branch: dict, saved: bool) -> bool:
@@ -27738,6 +27794,9 @@ class Engine:
             return self._grant_immunity(spec, ctx)
         if _ac_grant(spec) is not None:
             return self._grant_ac(spec, ctx)
+        # A buff that waits on a trigger is a ward's (`_stand_by`), not a cast's.
+        if kind in self._BUFFS and str(spec.get("trigger") or "on_cast") == "on_cast":
+            return self._cast_buff(spec, ctx)
         return self._stand_by(spec, ctx)
 
     def _grant_ac(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
@@ -27798,6 +27857,144 @@ class Engine:
                 f"{who.name}'s armour class stays {before}: {source}'s {amount:+d} {word} "
                 f"does not stack with the {word} bonus already held.")
         return effects, tells
+
+    def _cast_buff(self, spec: dict, ctx: dict,
+                   only: list[str] | None = None) -> tuple[list[dict], list[str]]:
+        """A spell's numeric buff — bless's +1 morale to hit, bull's strength's +4
+        enhancement to Strength, aid's 1d8 + caster level temporary hit points, stoneskin's
+        damage reduction, remove fear's end of fear — landed on whoever it was cast on for
+        the spell's own rounds, through the door a potion of the same spell already uses
+        (`consumables._spec_to_intents`, then the `buff`/`temp_hp`/`defence`/`grant`/
+        `condition` ops). One `ActiveEffect` per term, typed, so `dice.stack` decides what
+        stacks; the op's tell on landing, `_ended_records` when the rounds run out.
+
+        Audit 2026-11-22: none of the ten types ran on a cast. Bless at caster level 1 gave
+        +0 to hit while a potion of it gave +1, under a note that a spell's duration "is
+        still prose" — it had been rolled into rounds by `_cast_context` since 2026-09-30.
+
+        Told rather than applied, each with the reason, when the spec cannot be honest:
+          * a `note` — "against fear effects", "+1 per three caster levels" — is the
+            document qualifying the number in words no reader asks. The fix is in the
+            data (a `when`, a formula), never a reading of the English here;
+          * `uses: once` — true strike's +20 is for ONE roll, and nothing spends it;
+          * no rounds to time it (an instantaneous spell's bonus), except an ending;
+          * a recipient other than the target, the area or the caster.
+        In an area (bless's burst, prayer's) a bonus lands on the caster's side and a
+        penalty on the other: bless is "you and your allies", bane is "enemies", prayer
+        both. `only` is the save gate's one creature (`_gate_rider`)."""
+        from . import effectspec as fx
+
+        kind = str(spec.get("type") or "")
+        source = str(ctx.get("source") or "the spell")
+        origin = str(ctx.get("origin") or "")
+        told = fx.render(spec)
+        if str(spec.get("note") or "").strip():
+            return [], [f"{told} — its note qualifies it in words, so it is told rather "
+                        f"than applied."]
+        if str(spec.get("uses") or "").strip().lower() == "once":
+            return [], [f"{told} — it is spent on a single roll, so it is told rather "
+                        f"than applied."]
+        recipient = str(spec.get("recipient") or "target")
+        if recipient not in ("target", "area", "self", "caster"):
+            return [], [told + "."]
+        own = spec.get("duration")
+        if isinstance(own, dict) and own.get("amount") \
+                and str(own.get("unit") or "round") in ("round", "minute", "hour", "day"):
+            rounds = self._duration_rounds(own)
+        else:
+            rounds = ctx.get("rounds")
+        if not rounds and kind != "remove_condition":
+            return [], [f"{told} — its duration is not a number of rounds, so it is told "
+                        f"rather than applied."]
+        doc = dict(spec)
+        doc.pop("note", None)
+        variables = ctx.get("vars") or {}
+        if "amount" in doc and fx.is_formula(doc["amount"]):
+            doc["amount"] = int(fx.evaluate(doc["amount"], variables))
+        if kind == "temp_hp" and doc.get("bonus") is not None:
+            # Aid's "1d8 + caster level (maximum +10)": the dice roll as the op rolls
+            # them, the per-caster part evaluated here, where the caster level is known.
+            plus = int(fx.evaluate(doc.pop("bonus"), variables))
+            dice = str(doc.get("dice") or "0").strip()
+            if dice.isdigit():
+                doc["dice"] = str(int(dice) + plus)        # divine power's flat 1/level
+            elif plus > 0 and re.fullmatch(r"\d+d\d+", dice):
+                doc["dice"] = f"{dice}+{plus}"
+        try:
+            penalty = int(doc.get("amount") or 0) < 0
+        except (TypeError, ValueError):
+            penalty = False
+
+        caster = self.scene.actors.get(str(ctx.get("caster") or ""))
+        spared = ctx.get("spared") or {}
+        if only is not None:
+            refs = list(only)
+        elif recipient in ("self", "caster"):
+            refs = [str(ctx.get("caster") or "")]
+        else:
+            refs = [str(r) for r in ctx.get("targets") or ()]
+            if not refs and ctx.get("self_ok"):
+                refs = [str(ctx.get("caster") or "")]
+            if ctx.get("area") and not refs and not ctx.get("area_measured"):
+                # No map: the scene is one room's worth of space, as `_op_use_item`'s
+                # burst reads it — bless said with no board blesses everybody here on
+                # the caster's side (`areas.caught` catches only a named aim).
+                refs = list(self.scene.actors)
+            if ctx.get("area") and caster is not None:
+                refs = [r for r in refs if r in self.scene.actors and r not in spared
+                        and self._against(caster, self.scene.actors[r]) == penalty]
+        effects: list[dict] = []
+        tells: list[str] = []
+        for ref in refs:
+            who = self.scene.actors.get(ref)
+            if who is None or who.is_dead:
+                continue
+            made = consumables._spec_to_intents(doc, ref, 1.0, source)
+            if not made:
+                tells.append(told + ".")
+                continue
+            for i in made:
+                i["visibility"] = "hidden"
+                params = i.setdefault("params", {})
+                params.setdefault("to", ref)
+                # The spell's name is the source, so a second bless refreshes the first
+                # and two different spells' terms meet in the typed funnel. The potion
+                # door names them all "the preparation", which here would let heroism
+                # overwrite bless.
+                if "source" in params or i.get("op") in ("buff", "temp_hp", "defence"):
+                    params["source"] = source
+                if rounds and not params.get("ends"):
+                    params["duration"] = {"amount": int(rounds), "unit": "round"}
+            before = who.hp_max
+            res = self._run_within(self.validate(made, origin=origin, origin_name=source))
+            who._follow_con(before)
+            said = ctx.get("buffs_said")
+            for o in res:
+                effects.extend(o.effects or [])
+                landed = [e for e in o.effects or () if e.get("kind") == "buff"]
+                if o.op == "buff" and landed and isinstance(said, dict):
+                    # One sentence per creature for the whole cast (`_buffs_said`):
+                    # crushing despair's twelve terms were twelve sentences.
+                    e = landed[0]
+                    label = _buff_label(str(e.get("type")), str(e.get("target")))
+                    against = (doc.get("when") or {}).get("against")                         if isinstance(doc.get("when"), dict) else None
+                    if against:
+                        label += f" against {against}"
+                    said.setdefault((who.name, e.get("rounds"), source), []).append(
+                        f"{int(e['amount']):+d} {label}")
+                elif o.tell:
+                    tells.append(o.tell)
+        return effects, tells
+
+    @staticmethod
+    def _buffs_said(ctx: dict) -> list[str]:
+        """The cast's buff landings, one sentence per creature: "Kesst Vayr gains +1 on
+        attack rolls and +1 Will saves for 5 minute(s) (Aid)." """
+        out = []
+        for (name, rounds, source), parts in (ctx.pop("buffs_said", None) or {}).items():
+            listed = parts[0] if len(parts) == 1 else                 ", ".join(parts[:-1]) + " and " + parts[-1]
+            out.append(f"{name} gains {listed}{_span(rounds)} ({source}).")
+        return out
 
     def _grant_sr(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
         """A spell's spell resistance — the spell resistance spell's "12 + caster level" —
@@ -37216,6 +37413,41 @@ _AC_SCALING = re.compile(
     r"\+1 (?:more )?(?:per|for every) (?P<step>\w+) caster levels?"
     r"(?: above (?P<above>\d+))?\w*,? (?:to a )?maximum (?:of )?\+(?P<cap>\d+)", re.I)
 _NUMBER_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5, "six": 6}
+
+
+def _span(rounds) -> str:
+    """How long a timed bonus lasts, in the words a tell uses."""
+    if not rounds:
+        return ""
+    return (f" for {rounds // 600} hour(s)" if rounds >= 600 else
+            f" for {rounds // 10} minute(s)" if rounds >= 10 else f" for {rounds} round(s)")
+
+
+def _buff_label(kind: str, target: str) -> str:
+    """A buff's channel in words for its tell: "+1 Will saves", not "+1 will"."""
+    t = str(target).lower()
+    if kind == "ability_mod" and t in ABILITY_FULL:
+        return ABILITY_FULL[t]
+    if kind == "save_mod" and t in SAVES:
+        return f"{SAVES[t]} saves"
+    if kind == "skill_mod":
+        return "skill checks" if t == "all" else f"{t} checks"
+    if kind == "speed":
+        return f"feet of {t} speed"
+    if kind == "combat_mod":
+        if t.endswith("_check") and t[:3] in ABILITY_FULL:
+            return f"{ABILITY_FULL[t[:3]]} checks"
+        return {"attack": "on attack rolls", "damage": "on damage rolls",
+                "ac": "armour class"}.get(t, t)
+    return t
+
+
+def _signed(value) -> int:
+    """A spec's whole-number amount, 0 for a formula or nothing."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _ac_grant(spec: dict):
