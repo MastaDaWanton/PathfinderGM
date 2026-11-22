@@ -424,7 +424,7 @@
      "type": "speed",
      "target": "land",
      "amount": 10,
-     "note": "enhancement bonus to base speed"
+     "bonus_type": "enhancement"
     }
    ],
    "duration": {

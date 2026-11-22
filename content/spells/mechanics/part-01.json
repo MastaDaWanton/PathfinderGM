@@ -711,17 +711,37 @@
      "target": "attack"
     },
     {
+     "type": "temp_hp",
+     "dice": "1d8",
+     "source": "aid",
+     "bonus": "min(caster_level, 10)"
+    },
+    {
+     "type": "save_mod",
+     "amount": 1,
+     "bonus_type": "morale",
+     "target": "fort",
+     "when": {
+      "against": "fear"
+     }
+    },
+    {
+     "type": "save_mod",
+     "amount": 1,
+     "bonus_type": "morale",
+     "target": "ref",
+     "when": {
+      "against": "fear"
+     }
+    },
+    {
      "type": "save_mod",
      "amount": 1,
      "bonus_type": "morale",
      "target": "will",
-     "note": "against fear effects"
-    },
-    {
-     "type": "temp_hp",
-     "dice": "1d8",
-     "source": "aid",
-     "note": "1d8 + caster level, to a maximum of 1d8+10 at caster level 10th"
+     "when": {
+      "against": "fear"
+     }
     }
    ],
    "scaling": {

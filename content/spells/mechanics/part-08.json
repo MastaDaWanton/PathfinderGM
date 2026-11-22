@@ -1813,14 +1813,43 @@
      "type": "combat_mod",
      "amount": 2,
      "bonus_type": "morale",
-     "target": "damage",
-     "note": "weapon damage rolls"
+     "target": "damage"
     },
     {
-     "type": "situational_mod",
+     "type": "combat_mod",
      "amount": 2,
      "bonus_type": "morale",
-     "target": "ability checks"
+     "target": "str_check"
+    },
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "bonus_type": "morale",
+     "target": "dex_check"
+    },
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "bonus_type": "morale",
+     "target": "con_check"
+    },
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "bonus_type": "morale",
+     "target": "int_check"
+    },
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "bonus_type": "morale",
+     "target": "wis_check"
+    },
+    {
+     "type": "combat_mod",
+     "amount": 2,
+     "bonus_type": "morale",
+     "target": "cha_check"
     },
     {
      "type": "skill_mod",
@@ -3052,7 +3081,7 @@
      "type": "speed",
      "target": "land",
      "amount": 30,
-     "note": "an enhancement bonus, capped at twice the subject's normal speed for that mode; it affects jumping distance as increased speed normally does"
+     "bonus_type": "enhancement"
     },
     {
      "type": "permission",
@@ -3062,6 +3091,10 @@
     {
      "type": "narrative",
      "target": "Every other mode of movement the creature already has — burrow, climb, fly and swim — also increases by 30 feet, to the same maximum of twice its normal speed for that mode. Any condition that costs you your Dexterity bonus to AC also costs you dodge bonuses. Multiple haste effects do not stack. Haste dispels and counters slow."
+    },
+    {
+     "type": "narrative",
+     "target": "The speed bonus cannot more than double the subject's normal speed for that mode, and it lengthens jumps as increased speed does."
     }
    ],
    "duration": {
