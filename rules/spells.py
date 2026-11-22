@@ -554,6 +554,8 @@ def roll_duration(spell, caster_level: int, dice) -> int | None:
         if per:
             rolled = dice.roll(str(d.get("dice") or "1"), label="duration",
                                visibility="hidden").total
+            # Extend Spell on a rolled length: "twice as long" (rules/metamagic.py).
+            rolled *= int(d.get("times", 1) or 1)
             base = int(d.get("base", 0) or 0) * _ROUNDS_PER.get(
                 str(d.get("base_unit")), 0)
             return max(1, base + rolled * per)

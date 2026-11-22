@@ -703,6 +703,9 @@ VOCAB: dict[str, list[dict]] = {
     "side": [{"id": k, "name": n} for k, n in (
         ("caster", "The caster"), ("target", "The target"),
         ("nobody", "Nobody — it acts on its own"))],
+    # The summon tables (content/spells/summon-tables.json, rules/summons.py).
+    "summon_table": [{"id": "summon-monster", "name": "Summon monster"},
+                     {"id": "summon-nature-s-ally", "name": "Summon nature's ally"}],
     # A yes/no that is a dropdown rather than a checkbox, because the generated form
     # renders `choice` and has no widget for a boolean. Two entries beat a text box that
     # accepts "true", "y", "Yes" and "1" and means something different for each.
@@ -1055,6 +1058,12 @@ CATEGORIES: list[Category] = [
             EffectType("immunity", "Immunity", "Immune to fire for 2 hours", [
                 Field("target", "To what", "text",
                       hint="fire damage, poison, gaze attacks."),
+                # Protection from energy: "temporary immunity" that "absorbs 12 points of
+                # energy damage per caster level ... and is then discharged" (CRB).
+                Field("absorbs", "Discharges after (points)", "signed_formula",
+                      required=False,
+                      hint="Empty for an immunity that holds for its whole duration. A "
+                           "spell's formula: min(12 * caster_level, 120)."),
             ], blocked="Damage immunity is granted and applied, with a clock or "
                        "without. An immunity to something that is not a damage type — "
                        "paralysis, a gaze — is recorded and read by the condition ops, "
@@ -1391,9 +1400,19 @@ CATEGORIES: list[Category] = [
             EffectType(
                 "summon", "A creature arrives", "Summons one celestial dog for 5 rounds",
                 [
-                    Field("creature", "Which creature", "text",
+                    Field("creature", "Which creature", "text", required=False,
                           hint="By its name on the Bestiary bench — 782 stat blocks plus "
-                               "guildhand, watchman, thug and guard dog."),
+                               "guildhand, watchman, thug and guard dog. Empty when a "
+                               "table is named: the caster picks from it at the cast."),
+                    # Summon monster and summon nature's ally: the creature is the cast's
+                    # choice (`cast` param `creature`), from this table at this level or
+                    # more of one kind from a lower one (rules/summons.py).
+                    Field("table", "Chosen from the table", "choice", vocab="summon_table",
+                          required=False,
+                          hint="The caster names the creature when the spell is cast, "
+                               "from the table's list."),
+                    Field("level", "Table level", "int", required=False,
+                          hint="The spell's own number: 3 for summon monster III."),
                     Field("count", "How many", "int", required=False, default=1),
                     Field("side", "Fights for", "choice", vocab="side",
                           required=False, default="caster",
@@ -2123,6 +2142,23 @@ def validate(spec: dict, path: str = "effect", *, inherits_window: bool = False)
                 f"{path}: a shape that changes its squares needs a size in feet — "
                 f"without one there is nothing to write onto the map.")
 
+    if type_id == "summon":
+        # One or the other: a named creature, or a table the cast picks from. Both is
+        # two answers to one question; neither summons nothing and says nothing.
+        if bool(str(spec.get("creature") or "").strip()) == bool(spec.get("table")):
+            problems.append(
+                f"{path}: a summon names a creature (\"celestial dog\") or a table to "
+                f"choose from at the cast (\"table\": \"summon-monster\", \"level\": 3) — "
+                f"exactly one of them.")
+        elif spec.get("table"):
+            try:
+                ok = 1 <= int(spec.get("level")) <= 9
+            except (TypeError, ValueError):
+                ok = False
+            if not ok:
+                problems.append(f"{path}: a table summon needs its level, 1 to 9 — the "
+                                f"spell's own number (3 for summon monster III).")
+
     return problems
 
 
@@ -2767,11 +2803,14 @@ def render(spec: dict, *, against: bool = False) -> str:
         # "Resist fire 0" is not a rating, it is a missing one. The source often says
         # "resistance to fire damage" without a number, and a zero on the card reads as
         # a value somebody chose.
-        body = f"Resist {target}" + (f" {amount}" if amount else "")
+        body = f"Resist {target or 'the chosen energy'}" + (f" {amount}" if amount else "")
     elif t == "damage_reduction":
         body = f"DR {amount}/{spec.get('bypass') or '—'}"
     elif t == "immunity":
-        body = f"Immune to {target}"
+        # Unbound, a choice at the cast reads as one (`choice_key`); `absorbs` is the
+        # protection-from-energy discharge.
+        body = f"Immune to {target or 'the chosen energy'}" + (
+            f" until it has absorbed {spec['absorbs']}" if spec.get("absorbs") else "")
     elif t == "sense":
         rng = f" {spec['range']} ft" if spec.get("range") else ""
         body = f"{_label(etype, target)}{rng}"
@@ -2811,7 +2850,12 @@ def render(spec: dict, *, against: bool = False) -> str:
             body += " · on entering: " + ", ".join(hazard)
     elif t == "summon":
         n = int(spec.get("count") or 1)
-        body = f"Summons {n} {spec.get('creature') or 'creature'}" + ("s" if n > 1 else "")
+        if spec.get("table"):
+            body = (f"Summons a creature of the caster's choice from the "
+                    f"{_vocab_name('summon_table', spec.get('table')).lower()} "
+                    f"{spec.get('level')} list, or more of one kind from a lower list")
+        else:
+            body = f"Summons {n} {spec.get('creature') or 'creature'}" + ("s" if n > 1 else "")
     elif t == "spell_operation":
         what = str(spec.get("target") or "a magical effect")
         body = f"{_vocab_name('spell_operation', spec.get('operation'))}: {what}"

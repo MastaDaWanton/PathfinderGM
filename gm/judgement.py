@@ -7325,6 +7325,8 @@ def _cast_the_attached(raw_intents, scene, chip: dict, player_text: str = "") ->
             params["spell"] = str(chip["id"])
             if chip.get("aim") and not params.get("aim"):
                 params["aim"] = str(chip["aim"])
+            # The player's own pick from the refusal's picker beats the plan's (lane C).
+            params.update({k: str(chip[k]) for k in ("creature", "energy") if chip.get(k)})
             r = dict(r, params=params, actor=r.get("actor") or pc.ref)
             done = True
         out.append(r)
@@ -7332,6 +7334,7 @@ def _cast_the_attached(raw_intents, scene, chip: dict, player_text: str = "") ->
         params = {"spell": str(chip["id"])}
         if chip.get("aim"):
             params["aim"] = str(chip["aim"])
+        params.update({k: str(chip[k]) for k in ("creature", "energy") if chip.get(k)})
         out.append({"op": "cast", "actor": pc.ref, "params": params,
                     "because": "the player attached the spell"})
     if player_text:

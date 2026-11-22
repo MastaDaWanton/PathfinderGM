@@ -2335,8 +2335,14 @@
   "summon-monster-1": {
    "effects": [
     {
+     "type": "summon",
+     "table": "summon-monster",
+     "level": 1,
+     "side": "caster"
+    },
+    {
      "type": "narrative",
-     "target": "Summon one extraplanar creature of your choice from the 1st-level list. It appears where you designate and acts at once on your turn, attacking your enemies as well as it can; if you can communicate with it you may direct it otherwise."
+     "target": "It appears where you designate and acts at once on your turn, attacking your enemies as well as it can; if you can communicate with it you may direct it otherwise."
     },
     {
      "type": "narrative",
@@ -2354,7 +2360,7 @@
     "dismissible": false
    },
    "converted_by": "read",
-   "notes": "The creature lists themselves (Table 10-1) are not in the description and are not reproduced here."
+   "notes": "The creature lists (CRB Table 10-1) are content/spells/summon-tables.json, read by rules/summons.py: the cast names the creature (param `creature`), from level 1 for one."
   },
   "summon-monster-2": {
    "effects": [
@@ -2364,8 +2370,10 @@
      "note": "all of summon monster 1's standing rules apply"
     },
     {
-     "type": "narrative",
-     "target": "Summon one creature from the 2nd-level list, or 1d3 creatures of the same kind from the 1st-level list."
+     "type": "summon",
+     "table": "summon-monster",
+     "level": 2,
+     "side": "caster"
     }
    ],
    "duration": {
@@ -2374,7 +2382,8 @@
     "unit": "round",
     "dismissible": false
    },
-   "converted_by": "read"
+   "converted_by": "read",
+   "notes": "The creature lists (CRB Table 10-1) are content/spells/summon-tables.json, read by rules/summons.py: the cast names the creature (param `creature`), from level 2 for one, level 1 for 1d3 of one kind."
   },
   "summon-monster-3": {
    "effects": [
@@ -2384,8 +2393,10 @@
      "note": "all of summon monster 1's standing rules apply"
     },
     {
-     "type": "narrative",
-     "target": "Summon one creature from the 3rd-level list, 1d3 of the same kind from the 2nd-level list, or 1d4+1 of the same kind from the 1st-level list."
+     "type": "summon",
+     "table": "summon-monster",
+     "level": 3,
+     "side": "caster"
     }
    ],
    "duration": {
@@ -2394,7 +2405,8 @@
     "unit": "round",
     "dismissible": false
    },
-   "converted_by": "read"
+   "converted_by": "read",
+   "notes": "The creature lists (CRB Table 10-1) are content/spells/summon-tables.json, read by rules/summons.py: the cast names the creature (param `creature`), from level 3 for one, level 2 for 1d3 of one kind, any lower level for 1d4+1."
   },
   "summon-monster-4": {
    "effects": [
@@ -2404,8 +2416,10 @@
      "note": "all of summon monster 1's standing rules apply"
     },
     {
-     "type": "narrative",
-     "target": "Summon one creature from the 4th-level list, 1d3 of the same kind from the 3rd-level list, or 1d4+1 of the same kind from any lower-level list."
+     "type": "summon",
+     "table": "summon-monster",
+     "level": 4,
+     "side": "caster"
     }
    ],
    "duration": {
@@ -2414,7 +2428,8 @@
     "unit": "round",
     "dismissible": false
    },
-   "converted_by": "read"
+   "converted_by": "read",
+   "notes": "The creature lists (CRB Table 10-1) are content/spells/summon-tables.json, read by rules/summons.py: the cast names the creature (param `creature`), from level 4 for one, level 3 for 1d3 of one kind, any lower level for 1d4+1."
   },
   "summon-monster-5": {
    "effects": [
@@ -2424,8 +2439,10 @@
      "note": "all of summon monster 1's standing rules apply"
     },
     {
-     "type": "narrative",
-     "target": "Summon one creature from the 5th-level list, 1d3 of the same kind from the 4th-level list, or 1d4+1 of the same kind from any lower-level list."
+     "type": "summon",
+     "table": "summon-monster",
+     "level": 5,
+     "side": "caster"
     }
    ],
    "duration": {
@@ -2434,7 +2451,8 @@
     "unit": "round",
     "dismissible": false
    },
-   "converted_by": "read"
+   "converted_by": "read",
+   "notes": "The creature lists (CRB Table 10-1) are content/spells/summon-tables.json, read by rules/summons.py: the cast names the creature (param `creature`), from level 5 for one, level 4 for 1d3 of one kind, any lower level for 1d4+1."
   },
   "summon-monster-6": {
    "effects": [
@@ -2444,8 +2462,10 @@
      "note": "all of summon monster 1's standing rules apply"
     },
     {
-     "type": "narrative",
-     "target": "Summon one creature from the 6th-level list, 1d3 of the same kind from the 5th-level list, or 1d4+1 of the same kind from any lower-level list."
+     "type": "summon",
+     "table": "summon-monster",
+     "level": 6,
+     "side": "caster"
     }
    ],
    "duration": {
@@ -2454,7 +2474,8 @@
     "unit": "round",
     "dismissible": false
    },
-   "converted_by": "read"
+   "converted_by": "read",
+   "notes": "The creature lists (CRB Table 10-1) are content/spells/summon-tables.json, read by rules/summons.py: the cast names the creature (param `creature`), from level 6 for one, level 5 for 1d3 of one kind, any lower level for 1d4+1."
   },
   "summon-monster-7": {
    "effects": [
@@ -2464,8 +2485,10 @@
      "note": "all of summon monster 1's standing rules apply"
     },
     {
-     "type": "narrative",
-     "target": "Summon one creature from the 7th-level list, 1d3 of the same kind from the 6th-level list, or 1d4+1 of the same kind from any lower-level list."
+     "type": "summon",
+     "table": "summon-monster",
+     "level": 7,
+     "side": "caster"
     }
    ],
    "duration": {
@@ -2474,7 +2497,8 @@
     "unit": "round",
     "dismissible": false
    },
-   "converted_by": "read"
+   "converted_by": "read",
+   "notes": "The creature lists (CRB Table 10-1) are content/spells/summon-tables.json, read by rules/summons.py: the cast names the creature (param `creature`), from level 7 for one, level 6 for 1d3 of one kind, any lower level for 1d4+1."
   },
   "summon-monster-8": {
    "effects": [
@@ -2484,8 +2508,10 @@
      "note": "all of summon monster 1's standing rules apply"
     },
     {
-     "type": "narrative",
-     "target": "Summon one creature from the 8th-level list, 1d3 of the same kind from the 7th-level list, or 1d4+1 of the same kind from any lower-level list."
+     "type": "summon",
+     "table": "summon-monster",
+     "level": 8,
+     "side": "caster"
     }
    ],
    "duration": {
@@ -2494,7 +2520,8 @@
     "unit": "round",
     "dismissible": false
    },
-   "converted_by": "read"
+   "converted_by": "read",
+   "notes": "The creature lists (CRB Table 10-1) are content/spells/summon-tables.json, read by rules/summons.py: the cast names the creature (param `creature`), from level 8 for one, level 7 for 1d3 of one kind, any lower level for 1d4+1."
   },
   "summon-monster-9": {
    "effects": [
@@ -2504,8 +2531,10 @@
      "note": "all of summon monster 1's standing rules apply"
     },
     {
-     "type": "narrative",
-     "target": "Summon one creature from the 9th-level list, 1d3 of the same kind from the 8th-level list, or 1d4+1 of the same kind from any lower-level list."
+     "type": "summon",
+     "table": "summon-monster",
+     "level": 9,
+     "side": "caster"
     }
    ],
    "duration": {
@@ -2514,13 +2543,20 @@
     "unit": "round",
     "dismissible": false
    },
-   "converted_by": "read"
+   "converted_by": "read",
+   "notes": "The creature lists (CRB Table 10-1) are content/spells/summon-tables.json, read by rules/summons.py: the cast names the creature (param `creature`), from level 9 for one, level 8 for 1d3 of one kind, any lower level for 1d4+1."
   },
   "summon-nature-s-ally-1": {
    "effects": [
     {
+     "type": "summon",
+     "table": "summon-nature-s-ally",
+     "level": 1,
+     "side": "caster"
+    },
+    {
      "type": "narrative",
-     "target": "Summon one natural creature of your choice from the 1st-level list — animal, fey, magical beast, elemental outsider or giant. It appears where you designate and acts at once on your turn, attacking your enemies as well as it can; if you can communicate with it you may direct it otherwise."
+     "target": "It appears where you designate and acts at once on your turn, attacking your enemies as well as it can; if you can communicate with it you may direct it otherwise."
     },
     {
      "type": "narrative",
@@ -2538,7 +2574,7 @@
     "dismissible": false
    },
    "converted_by": "read",
-   "notes": "The creature lists themselves (Table 10-2) are not in the description and are not reproduced here."
+   "notes": "The creature lists (CRB Table 10-2) are content/spells/summon-tables.json, read by rules/summons.py: the cast names the creature (param `creature`), from level 1 for one."
   },
   "summon-nature-s-ally-2": {
    "effects": [
@@ -2548,8 +2584,10 @@
      "note": "all of summon nature's ally 1's standing rules apply"
     },
     {
-     "type": "narrative",
-     "target": "Summon one 2nd-level creature, or 1d3 1st-level creatures of the same kind."
+     "type": "summon",
+     "table": "summon-nature-s-ally",
+     "level": 2,
+     "side": "caster"
     }
    ],
    "duration": {
@@ -2558,7 +2596,8 @@
     "unit": "round",
     "dismissible": false
    },
-   "converted_by": "read"
+   "converted_by": "read",
+   "notes": "The creature lists (CRB Table 10-2) are content/spells/summon-tables.json, read by rules/summons.py: the cast names the creature (param `creature`), from level 2 for one, level 1 for 1d3 of one kind."
   },
   "summon-nature-s-ally-3": {
    "effects": [
@@ -2568,8 +2607,10 @@
      "note": "all of summon nature's ally 1's standing rules apply"
     },
     {
-     "type": "narrative",
-     "target": "Summon one 3rd-level creature, 1d3 2nd-level creatures of the same kind, or 1d4+1 1st-level creatures of the same kind."
+     "type": "summon",
+     "table": "summon-nature-s-ally",
+     "level": 3,
+     "side": "caster"
     }
    ],
    "duration": {
@@ -2578,7 +2619,8 @@
     "unit": "round",
     "dismissible": false
    },
-   "converted_by": "read"
+   "converted_by": "read",
+   "notes": "The creature lists (CRB Table 10-2) are content/spells/summon-tables.json, read by rules/summons.py: the cast names the creature (param `creature`), from level 3 for one, level 2 for 1d3 of one kind, any lower level for 1d4+1."
   },
   "summon-nature-s-ally-4": {
    "effects": [
@@ -2588,8 +2630,10 @@
      "note": "all of summon nature's ally 1's standing rules apply"
     },
     {
-     "type": "narrative",
-     "target": "Summon one 4th-level creature, 1d3 3rd-level creatures of the same kind, or 1d4+1 lower-level creatures of the same kind."
+     "type": "summon",
+     "table": "summon-nature-s-ally",
+     "level": 4,
+     "side": "caster"
     }
    ],
    "duration": {
@@ -2598,7 +2642,8 @@
     "unit": "round",
     "dismissible": false
    },
-   "converted_by": "read"
+   "converted_by": "read",
+   "notes": "The creature lists (CRB Table 10-2) are content/spells/summon-tables.json, read by rules/summons.py: the cast names the creature (param `creature`), from level 4 for one, level 3 for 1d3 of one kind, any lower level for 1d4+1."
   },
   "summon-nature-s-ally-5": {
    "effects": [
@@ -2608,8 +2653,10 @@
      "note": "all of summon nature's ally 1's standing rules apply"
     },
     {
-     "type": "narrative",
-     "target": "Summon one 5th-level creature, 1d3 4th-level creatures of the same kind, or 1d4+1 lower-level creatures of the same kind."
+     "type": "summon",
+     "table": "summon-nature-s-ally",
+     "level": 5,
+     "side": "caster"
     }
    ],
    "duration": {
@@ -2618,7 +2665,8 @@
     "unit": "round",
     "dismissible": false
    },
-   "converted_by": "read"
+   "converted_by": "read",
+   "notes": "The creature lists (CRB Table 10-2) are content/spells/summon-tables.json, read by rules/summons.py: the cast names the creature (param `creature`), from level 5 for one, level 4 for 1d3 of one kind, any lower level for 1d4+1."
   },
   "summon-nature-s-ally-6": {
    "effects": [
@@ -2628,8 +2676,10 @@
      "note": "all of summon nature's ally 1's standing rules apply"
     },
     {
-     "type": "narrative",
-     "target": "Summon one 6th-level creature, 1d3 5th-level creatures of the same kind, or 1d4+1 lower-level creatures of the same kind."
+     "type": "summon",
+     "table": "summon-nature-s-ally",
+     "level": 6,
+     "side": "caster"
     }
    ],
    "duration": {
@@ -2638,7 +2688,8 @@
     "unit": "round",
     "dismissible": false
    },
-   "converted_by": "read"
+   "converted_by": "read",
+   "notes": "The creature lists (CRB Table 10-2) are content/spells/summon-tables.json, read by rules/summons.py: the cast names the creature (param `creature`), from level 6 for one, level 5 for 1d3 of one kind, any lower level for 1d4+1."
   },
   "summon-nature-s-ally-7": {
    "effects": [
@@ -2648,8 +2699,10 @@
      "note": "all of summon nature's ally 1's standing rules apply"
     },
     {
-     "type": "narrative",
-     "target": "Summon one 7th-level creature, 1d3 6th-level creatures of the same kind, or 1d4+1 lower-level creatures of the same kind."
+     "type": "summon",
+     "table": "summon-nature-s-ally",
+     "level": 7,
+     "side": "caster"
     }
    ],
    "duration": {
@@ -2658,7 +2711,8 @@
     "unit": "round",
     "dismissible": false
    },
-   "converted_by": "read"
+   "converted_by": "read",
+   "notes": "The creature lists (CRB Table 10-2) are content/spells/summon-tables.json, read by rules/summons.py: the cast names the creature (param `creature`), from level 7 for one, level 6 for 1d3 of one kind, any lower level for 1d4+1."
   },
   "summon-nature-s-ally-8": {
    "effects": [
@@ -2668,8 +2722,10 @@
      "note": "all of summon nature's ally 1's standing rules apply"
     },
     {
-     "type": "narrative",
-     "target": "Summon one 8th-level creature, 1d3 7th-level creatures of the same kind, or 1d4+1 lower-level creatures of the same kind."
+     "type": "summon",
+     "table": "summon-nature-s-ally",
+     "level": 8,
+     "side": "caster"
     }
    ],
    "duration": {
@@ -2678,7 +2734,8 @@
     "unit": "round",
     "dismissible": false
    },
-   "converted_by": "read"
+   "converted_by": "read",
+   "notes": "The creature lists (CRB Table 10-2) are content/spells/summon-tables.json, read by rules/summons.py: the cast names the creature (param `creature`), from level 8 for one, level 7 for 1d3 of one kind, any lower level for 1d4+1."
   },
   "summon-nature-s-ally-9": {
    "effects": [
@@ -2688,8 +2745,10 @@
      "note": "all of summon nature's ally 1's standing rules apply"
     },
     {
-     "type": "narrative",
-     "target": "Summon one 9th-level creature, 1d3 8th-level creatures of the same kind, or 1d4+1 lower-level creatures of the same kind."
+     "type": "summon",
+     "table": "summon-nature-s-ally",
+     "level": 9,
+     "side": "caster"
     }
    ],
    "duration": {
@@ -2698,7 +2757,8 @@
     "unit": "round",
     "dismissible": false
    },
-   "converted_by": "read"
+   "converted_by": "read",
+   "notes": "The creature lists (CRB Table 10-2) are content/spells/summon-tables.json, read by rules/summons.py: the cast names the creature (param `creature`), from level 9 for one, level 8 for 1d3 of one kind, any lower level for 1d4+1."
   },
   "summon-ship": {
    "effects": [

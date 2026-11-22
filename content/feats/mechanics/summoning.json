@@ -1,0 +1,22 @@
+{
+ "_about": "Lane C, 2026-11-22: the summoning feats. `summoned` lays its modifiers on each creature the bearer summons, for the spell's duration (Engine._augment_summoned); `summon_extra` adds creatures to a summons of more than one (Engine._summon_count). Read from the CRB/Ultimate Magic feat text in content/feats/feats.json.",
+ "augment-summoning": {
+  "summoned": [
+   {
+    "type": "ability_mod",
+    "target": "str",
+    "amount": 4,
+    "bonus_type": "enhancement"
+   },
+   {
+    "type": "ability_mod",
+    "target": "con",
+    "amount": 4,
+    "bonus_type": "enhancement"
+   }
+  ]
+ },
+ "superior-summoning": {
+  "summon_extra": 1
+ }
+}

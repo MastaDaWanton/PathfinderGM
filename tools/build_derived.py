@@ -5,7 +5,8 @@ Two lists, each with its reason:
 - **Summonable creatures.** CRB Table 10-1, "Summon Monster" (p. 351, read 2026-10-28): every
   entry marked * "is summoned with the celestial template if you are good, or the fiendish
   template if you are evil" — 61 bases across spell levels 1-7, of which 58 are in the
-  shipped Bestiaries (the giant soldier and drone ants and the giant lizard are not).
+  shipped Bestiaries (the giant soldier and drone ants are not; the monitor lizard joined
+  2026-11-22 for the summon tables).
   Each is declared both ways.
 - **The common raised dead.** Zombies and skeletons of the creatures a GM most often raises
   — the everyday beasts and humanoids of the Bestiary — replacing the adventures' own
@@ -41,7 +42,7 @@ SUMMONED = [
     "giant ant", "giant centipede", "giant frog", "giant spider", "goblin dog", "horse",
     "hyena", "octopus", "squid", "wolf",
     "gorilla", "aurochs", "boar", "cheetah", "constrictor snake", "crocodile", "dire bat",
-    "electric eel", "leopard", "shark", "wolverine",
+    "electric eel", "leopard", "monitor lizard", "shark", "wolverine",
     "bison", "deinonychus", "dire ape", "dire boar", "dire wolf", "giant scorpion",
     "giant wasp", "grizzly bear", "lion", "pteranodon", "rhinoceros",
     "ankylosaurus", "orca", "dire lion", "giant moray eel", "woolly rhinoceros",

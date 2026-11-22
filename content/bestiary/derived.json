@@ -380,6 +380,20 @@
    "why": "CRB Table 10-1 (summon monster)"
   },
   {
+   "base": "lizard-monitor",
+   "templates": [
+    "celestial"
+   ],
+   "why": "CRB Table 10-1 (summon monster)"
+  },
+  {
+   "base": "lizard-monitor",
+   "templates": [
+    "fiendish"
+   ],
+   "why": "CRB Table 10-1 (summon monster)"
+  },
+  {
    "base": "shark",
    "templates": [
     "celestial"

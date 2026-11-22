@@ -1771,6 +1771,19 @@ function preparedToday(sp) {
   </section>`;
 }
 
+// Prepare a copy with a metamagic feat (lane C, rules/metamagic.py): a wizard "must
+// prepare the spell with the feat applied", in the slot of the raised level. The copy is
+// then a card of its own ("Mage Armor (extended)"); the server refuses what cannot be.
+function metaPrepare(k) {
+  const feats = (((SHEET || {}).spells || {}).metamagic) || [];
+  if (!feats.length || (k.metamagic || []).length) return "";
+  return `<select class="sx-metasel" aria-label="Metamagic for ${esc(k.name)}">${
+    feats.map(f => `<option value="${esc(f.id)}">${esc(f.name)} (+${esc(f.levels)})</option>`)
+      .join("")}</select><button type="button" class="spbtn quiet" data-spell="${esc(k.id)}"
+      data-action="prepare" data-meta="1" data-name="${esc(k.name)}"
+      aria-label="Prepare ${esc(k.name)} with the chosen metamagic">Prepare with it</button>`;
+}
+
 // `off` is the level's blocked slot row (`prepBlocked`) or null: Prepare is disabled and
 // described by the level's reason line, so the button that does nothing says why.
 function spellCard(k, off, prepared) {
@@ -1808,7 +1821,7 @@ function spellCard(k, off, prepared) {
                 off ? ` disabled aria-describedby="${prepNoteId(k.level)}"` : ""}>Prepare</button>
         <button type="button" class="spbtn quiet" data-spell="${esc(k.id)}"
                 data-action="unprepare" data-name="${esc(k.name)}"
-                aria-label="Unprepare one ${esc(k.name)}">Unprepare</button>` : ""}
+                aria-label="Unprepare one ${esc(k.name)}">Unprepare</button>${metaPrepare(k)}` : ""}
       ${detailsButton(k)}
     </div>
   </article>`;
@@ -2619,8 +2632,11 @@ async function prepareSpell(spell, action, name, from = null) {
                    ? { spell: document.activeElement.dataset.spell,
                        action: document.activeElement.dataset.action || "" } : null };
   const who = name || spell;
+  const metaSel = from && from.dataset && from.dataset.meta
+    && from.parentElement && from.parentElement.querySelector(".sx-metasel");
   try {
-    SHEET = await post("/api/spells/prepare", {action, spell});
+    SHEET = await post("/api/spells/prepare", metaSel
+      ? { action, spell, metamagic: [metaSel.value] } : { action, spell });
   } catch (e) {
     spellsRefused(spell, e.message || String(e), from);
     return;

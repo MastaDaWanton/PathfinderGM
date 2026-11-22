@@ -60,10 +60,15 @@ function chipKind(c) {
   return c.kind === "spell" ? "Spell" : (c.label || "Go");
 }
 
+const CAST_CHOICES = ["creature", "energy"];
+
 function currentAttachments() {
   return SPELLS.chips.map(c => {
     const out = { kind: c.kind, id: c.id, name: c.name };
     if (c.aim && AIM_RE.test(c.aim)) out.aim = c.aim;
+    // A cast-time choice picked from the refusal's list (lane C): the creature a summons
+    // calls, the energy a ward is against. The engine checks it against the spell.
+    for (const k of CAST_CHOICES) if (c[k]) out[k] = c[k];
     if (c.kind === "place" && c.journey) out.confirmed = true;
     return out;
   });
@@ -77,6 +82,7 @@ function attachmentsForSay() {
   return currentAttachments().map(a => {
     const out = { kind: a.kind, id: a.id };
     if (a.aim) out.aim = a.aim;
+    for (const k of CAST_CHOICES) if (a[k]) out[k] = a[k];
     if (a.confirmed) out.confirmed = true;
     return out;
   });
@@ -552,6 +558,14 @@ function showRefusal(refusal) {
   } else if (fix && fix.kind === "go" && fix.place) {
     button = `<button type="button" class="quiet errfix" data-fix="go"
       data-place="${esc(fix.place)}">Go to ${esc(fix.place)}</button>`;
+  } else if (fix && fix.kind === "choose" && fix.param && (fix.options || []).length) {
+    // A cast-time choice (lane C): the spell's own list, picked here and carried on the
+    // chip, and the turn sent again with the same words.
+    const what = fix.param === "creature" ? "Creature" : "Energy";
+    button = `<label class="errpick">${what} <select data-param="${esc(fix.param)}">${
+      fix.options.map(o => `<option value="${esc(o)}">${esc(String(o).replace(/-/g, " "))
+      }</option>`).join("")}</select></label><button type="button" class="quiet errfix"
+      data-fix="choose" data-spell="${esc(fix.spell || "")}">Cast with this</button>`;
   }
   err.className = "hint";
   err.innerHTML = `<span class="errtext">${esc((refusal && refusal.text)
@@ -562,6 +576,19 @@ document.addEventListener("click", async e => {
   const fix = e.target.closest("#err .errfix");
   if (!fix) return;
   fix.disabled = true;
+  if (fix.dataset.fix === "choose") {
+    const pick = document.querySelector("#err .errpick select");
+    if (!pick) return;
+    if (!SPELLS.chips.some(c => c.kind === "spell") && fix.dataset.spell) {
+      attachChip({ kind: "spell", id: fix.dataset.spell, name: spellNameFor(fix.dataset.spell) },
+                 { first: "", again: "" });
+    }
+    const chip = SPELLS.chips.find(c => c.kind === "spell");
+    if (!chip) return;
+    chip[pick.dataset.param] = pick.value;
+    $("#sayform").requestSubmit();
+    return;
+  }
   if (fix.dataset.fix === "go") {
     // The words and the chip stay in the box for the turn after this one.
     takeTurn({ text: `I go to ${fix.dataset.place}.` }, false);

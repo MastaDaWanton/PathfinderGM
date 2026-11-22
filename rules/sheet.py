@@ -2152,7 +2152,7 @@ class Actor:
     def grant_defence(self, kind: str, against: str, amount: int = 0,
                       bypass: str = "", source: str = "",
                       rounds: int | None = None, origin: str = "",
-                      stacks_with: str = "") -> ActiveEffect:
+                      stacks_with: str = "", absorbs: int = 0) -> ActiveEffect:
         """Put a defence on this creature — innate when `rounds` is None, timed when not.
 
         The one door for all four. A stat block's `Immune cold` and a potion of fire
@@ -2173,7 +2173,10 @@ class Actor:
             rounds_left=rounds,
             payload={"against": str(against), "amount": int(amount),
                      "bypass": str(bypass or ""),
-                     **({"stacks_with": str(stacks_with)} if stacks_with else {})}))
+                     **({"stacks_with": str(stacks_with)} if stacks_with else {}),
+                     # An immunity that discharges (protection from energy): the points
+                     # it has left, spent by `take_damage` (`_spend_ward`).
+                     **({"absorbs": int(absorbs)} if absorbs else {})}))
 
     @property
     def immunities(self) -> list[str]:
@@ -2206,8 +2209,11 @@ class Actor:
 
     @property
     def innate_immunities(self) -> list[str]:
-        """The immunities held as effects — the stat block's line and anything applied."""
-        return [str(e.payload.get("against", "")) for e in self._defence("immunity")]
+        """The immunities held as effects — the stat block's line and anything applied.
+        Not a ward that discharges (`absorbs`): that is immune only until it is spent, and
+        `take_damage` asks it apart (`_spend_ward`)."""
+        return [str(e.payload.get("against", "")) for e in self._defence("immunity")
+                if not e.payload.get("absorbs")]
 
     @immunities.setter
     def immunities(self, values) -> None:
@@ -4741,6 +4747,20 @@ class Actor:
         return (any(normalise_damage_type(t) == want for t in self.immunities)
                 or self.has_state(f"immune.{want}"))
 
+    def _spend_ward(self, dtype: str, amount: int) -> tuple[int, str]:
+        """(points absorbed, by what) from a discharging immunity to this energy; the ward
+        goes when it is spent, the way a temporary hit point pool does."""
+        want = normalise_damage_type(dtype)
+        for e in self._defence("immunity"):
+            left = int(e.payload.get("absorbs", 0) or 0)
+            if left and normalise_damage_type(str(e.payload.get("against", ""))) == want:
+                take = min(left, amount)
+                e.payload["absorbs"] = left - take
+                if not e.payload["absorbs"]:
+                    self.remove_effects(match=lambda x, e=e: x is e)
+                return take, e.source or e.name
+        return 0, ""
+
     def immune_to_nonlethal(self) -> bool:
         """Whether nonlethal damage simply does not land on this creature.
 
@@ -5059,6 +5079,12 @@ class Actor:
         # Immunity is the whole packet or none of it, and it is checked first so nothing
         # below has to consider a zero it cannot explain.
         immune = self.immune_to(dtype)
+        # A ward that discharges — protection from energy's "temporary immunity" until it
+        # "has absorbed 12 points of energy damage per caster level" (CRB) — takes what it
+        # can before anything else, and what gets past an exhausted ward goes on through
+        # the ordinary order: resist energy "takes over once the protection is exhausted".
+        warded, warded_by = (0, "") if immune else self._spend_ward(dtype, rolled)
+        rolled -= warded
         # Undead and constructs are "not subject to nonlethal damage" (Bestiary,
         # creature types) — a lethality, not a damage type, so it is its own question.
         immune_nonlethal = (lethality == "nonlethal" and not immune
@@ -5118,12 +5144,13 @@ class Actor:
         if self.troop is not None:
             self.size = _troops.size_for(self.troop.members or 1)
         return {
-            "rolled": rolled, "type": normalise_damage_type(dtype),
+            "rolled": rolled + warded, "type": normalise_damage_type(dtype),
             # Reported even when they did nothing, because the visible bookkeeping is the
             # point: "20 fire, half again for vulnerability, 30" has to be readable back.
             "immune": immune, "vulnerable": vulnerable, "resisted": resisted,
             "reduced": reduced, "reduced_by": dr.label if dr and reduced else "",
             "factored": factored, "factored_by": factored_by if factored else "",
+            "warded": warded, "warded_by": warded_by,
             "absorbed": absorbed, "taken": taken, "lethality": lethality,
             "immune_nonlethal": immune_nonlethal, "overflow": overflow,
             "hp": self.hp, "hp_max": self.hp_max, "temp_hp": self.temp_hp,
@@ -7528,25 +7555,32 @@ def _background_sheet(actor: Actor) -> dict | None:
 
 def _spell_sheet(actor: Actor) -> dict | None:
     """The spellcasting half of the sheet, or None for everybody who does not cast."""
-    from . import casting, domains as domains_mod, spells as spells_mod
+    from . import casting, domains as domains_mod, metamagic, spells as spells_mod
 
     if not casting.is_caster(actor):
         return None
     data = casting.caster_data(actor)
 
     def entry(spell_id: str) -> dict:
+        # A copy prepared with metamagic ("fireball+empower-spell") is its own row, at
+        # the slot level it fills, named with what was applied (rules/metamagic.py).
+        base, meta = casting.split_metamagic_key(spell_id)
         try:
-            spell = spells_mod.get(spell_id)
+            spell = spells_mod.get(base)
         except KeyError:
             # A book naming a spell this build does not ship is worth showing as a gap
             # rather than dropping: a silently shorter list is not a thing anyone notices.
             return {"id": spell_id, "name": spell_id, "missing": True}
-        return {"id": spell.id, "name": spell.name, "line": spell.line,
-                "level": casting.spell_level_for(actor, spell),
+        return {"id": spell_id, "name": metamagic.named(spell.name, meta),
+                "line": spell.line,
+                "level": casting._level(actor, spell_id) if meta
+                else casting.spell_level_for(actor, spell),
                 "school": spell.school, "range": spell.range,
                 "duration": spell.duration, "save": spell.saving_throw,
                 "components": spell.components,
-                "prepared": casting.prepared_count(actor, spell.id)}
+                "prepared": casting.prepared_count(actor, spell_id),
+                **({"metamagic": meta} if meta else {}),
+                **({"choice": choice} if (choice := _cast_choice(spell)) else {})}
 
     known = sorted(
         (entry(sid) for sid in _reachable_spells(actor, data)),
@@ -7560,6 +7594,11 @@ def _spell_sheet(actor: Actor) -> dict | None:
         "caster_level": casting.caster_level(actor),
         "highest": casting.highest_spell_level(actor),
         "note": data.get("note", ""),
+        # The metamagic feats this caster holds (rules/metamagic.py), for the tab's
+        # "prepare with" / "cast with" choices; the engine checks each at the door.
+        "metamagic": [{"id": fid, "name": doc["name"],
+                       "levels": int(doc["metamagic"]["levels"])}
+                      for fid, doc in sorted(metamagic.held(actor).items())],
         # `held`, `open` and `blocked` are the room rule's own answers (casting.open_slots,
         # casting.prepare_refusal), so the Spells tab draws spent / ready / open sockets
         # and disables Prepare with the endpoint's sentence rather than re-deriving the
@@ -7638,6 +7677,31 @@ def _choosable(actor: Actor) -> list[dict]:
                        for sp in shown],
         })
     return out
+
+
+def _cast_choice(spell) -> dict | None:
+    """The choice a cast of this spell must carry, for the page's picker: which creature
+    answers a summons, which energy a ward is against (`Engine._check_cast_choices` asks
+    the same two questions at the door). `{"param", "options": [{"id", "name"}]}`."""
+    from . import bestiary, summons
+    from .tables import ENERGY_DAMAGE
+
+    table = summons.table_spec(spell)
+    if table is not None:
+        opts = summons.options(table["table"], int(table.get("level") or 1))
+        return {"param": "creature", "options": [
+            {"id": o["creature"],
+             "name": str((bestiary.lookup(o["creature"]) or {}).get("name")
+                         or o["creature"]) + ("" if o["count"] == "1" else f" ×{o['count']}")}
+            for o in opts]}
+    from .engine import _chooses_energy, _energy_options
+
+    energies = (list(ENERGY_DAMAGE) if _chooses_energy(spell.effects)
+                else _energy_options(spell.effects))
+    if energies:
+        return {"param": "energy",
+                "options": [{"id": e, "name": e.capitalize()} for e in energies]}
+    return None
 
 
 def _reachable_spells(actor: Actor, data: dict) -> list[str]:
@@ -8617,10 +8681,11 @@ def _castable_summary(actor: Actor) -> list[dict]:
     for sid in sorted(set(book) | set(prepared)):
         left = prepared.get(sid)
         try:
-            from . import spells as spells_mod
+            from . import metamagic, spells as spells_mod
 
-            spell = spells_mod.get(sid)
-            name, summary = spell.name, spell.line
+            base, meta = casting.split_metamagic_key(sid)
+            spell = spells_mod.get(base)
+            name, summary = metamagic.named(spell.name, meta), spell.line
         except KeyError:
             name, summary = sid, ""
         # Cantrips too, since 2026-09-29: a prepared caster casts the cantrips prepared

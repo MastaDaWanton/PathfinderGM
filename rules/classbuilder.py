@@ -1112,9 +1112,14 @@ def _validate_grants(d: dict, path: dict, at: str, resolved_names: set,
 # does less than its author wrote — `effectspec.validate` never rejected an unknown
 # key, and the homebrew editor has offered feats an `effects` field for a year that
 # `feats.from_dict` dropped on the floor.
+# `summoned` (lane C, 2026-11-22): modifiers laid on each creature the bearer summons, for
+# the spell's duration (Augment Summoning; `Engine._augment_summoned`), never on the bearer.
+# `summon_extra`: creatures added to a summons of more than one (Superior Summoning).
+# `metamagic`: the transform a metamagic feat applies to a copy of the spell at the cast
+# (rules/metamagic.py), and the slot levels it costs.
 _FEAT_DOC_KEYS = frozenset({"modifiers", "tags", "budget", "choice", "attack_ability",
                             "cmb_ability", "not_yet", "requires", "requires_not",
-                            "stacks"})
+                            "stacks", "summoned", "summon_extra", "metamagic"})
 
 
 def _feat_funnel_targets() -> set[str]:
@@ -1168,8 +1173,9 @@ def validate_feat_document(feat_id: str, doc) -> list[str]:
             f"{', '.join(sorted(_FEAT_DOC_KEYS))}.")
     from . import classfeatures
 
-    for i, spec in enumerate(doc.get("modifiers") or []):
-        mat = f"{at}.modifiers[{i}]"
+    for field_name, i, spec in [(f, i, m) for f in ("modifiers", "summoned")
+                                for i, m in enumerate(doc.get(f) or [])]:
+        mat = f"{at}.{field_name}[{i}]"
         kind = str(spec.get("type", "")) if isinstance(spec, dict) else ""
         if kind == "speed":
             # Fleet's "+5 feet to base speed": the class documents' own speed channel,
@@ -1262,6 +1268,13 @@ def validate_feat_document(feat_id: str, doc) -> list[str]:
         if got is not None and (not isinstance(got, (list, tuple))
                                 or any(not str(q).strip() for q in got)):
             problems.append(f"{at}.{field_name}: a list of strings.")
+    extra = doc.get("summon_extra")
+    if extra is not None and (not isinstance(extra, int) or extra < 1):
+        problems.append(f"{at}.summon_extra: a whole number of creatures, 1 or more.")
+    if doc.get("metamagic") is not None:
+        from . import metamagic
+
+        problems.extend(metamagic.document_problems(at, doc["metamagic"]))
     budget = doc.get("budget")
     if budget is not None:
         bad = (not isinstance(budget, dict) or not budget

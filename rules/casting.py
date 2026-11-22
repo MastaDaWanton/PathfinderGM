@@ -1273,12 +1273,37 @@ def unprepare(actor, spell_id: str, count: int = 1) -> int:
 # change it at any time out of a fight, as it always could.
 
 def _level(actor, spell_id: str) -> int | None:
+    """The slot level a prepared key fills: the spell's, raised by any metamagic it was
+    prepared with ("fireball+empower-spell" fills a 5th-level slot)."""
     from . import spells as spells_mod
 
+    sid, meta = split_metamagic_key(spell_id)
     try:
-        return spell_level_for(actor, spells_mod.get(str(spell_id)))
+        lvl = spell_level_for(actor, spells_mod.get(str(sid)))
     except KeyError:
         return None
+    if lvl is None or not meta:
+        return lvl
+    from . import metamagic
+
+    return lvl + metamagic.document_levels(meta)
+
+
+# A spell prepared with metamagic is its own prepared copy, in the slot of the raised
+# level: CRB Metamagic Feats, "a wizard must prepare the spell with the feat applied ...
+# the spell uses up a spell slot of the higher level". Keyed in `prepared` as the spell id
+# and the feats joined with "+" ("fireball+empower-spell"), feats in a fixed order so one
+# preparation has one key. Not a ":" key: those are the domain and school slots, held
+# apart from the ordinary ones; a metamagic copy fills an ordinary slot.
+def metamagic_key(spell_id: str, meta) -> str:
+    return "+".join([str(spell_id)] + sorted(str(m) for m in meta))
+
+
+def split_metamagic_key(key) -> tuple[str, list[str]]:
+    """("fireball", ["empower-spell"]) for "fireball+empower-spell"; no feats for a plain
+    id."""
+    sid, *meta = str(key).split("+")
+    return sid, meta
 
 
 def remember_loadout(actor) -> None:
@@ -1498,7 +1523,7 @@ def ensure_prepared(actor, *, kept: dict | None = None, reason: str = "rest") ->
             if lvl is None or lvl < 0:
                 continue
             if data.get("prepare_from") in ("spellbook", "known") \
-                    and sid not in (actor.spellbook or []):
+                    and split_metamagic_key(sid)[0] not in (actor.spellbook or []):
                 continue
             while prepared_count(actor, sid) < want and add(sid, lvl):
                 pass
@@ -1595,7 +1620,7 @@ def pool_left(actor, pool_id: str) -> int:
     return int(pool.current) if pool else 0
 
 
-def cast_source(actor, spell) -> dict | None:
+def cast_source(actor, spell, meta=()) -> dict | None:
     """Where a cast of this spell comes from: `{"pool", "key", "cost", "level"}` — the
     slot pool to spend, the prepared copy to use up ("" for none), how many slots, the
     level cast at. None for a prepared caster with no copy of it prepared anywhere.
@@ -1603,11 +1628,24 @@ def cast_source(actor, spell) -> dict | None:
     A prepared caster's copy is found in the ordinary slots first, then a domain slot,
     then the specialist's school slot; an opposition-school spell spends the two slots it
     was prepared into. A spontaneous caster casts from the ordinary slot of its level.
+
+    `meta`, the metamagic feats the cast applies (rules/metamagic.py): the slot is the
+    one the feats raise it to ("an extended spell uses up a spell slot one level higher"),
+    and a prepared caster's copy is the one prepared with those feats
+    (`metamagic_key`); `level` stays the spell's own, which is what its DC reads.
     """
     lvl = spell_level_for(actor, spell)
     if spell is None or lvl is None:
         return None
     data = caster_data(actor)
+    if meta:
+        from . import metamagic
+
+        at = lvl + metamagic.levels(actor, meta)
+        key = metamagic_key(spell.id, meta) if data.get("kind") == "prepared" else ""
+        if at > highest_spell_level(actor) or (key and prepared_count(actor, key) <= 0):
+            return None
+        return {"pool": slot_pool(at), "key": key, "cost": 1, "level": lvl, "slot": at}
     if data.get("kind") != "prepared":
         return {"pool": "" if at_will(lvl) else slot_pool(lvl), "key": "",
                 "cost": 0 if at_will(lvl) else 1, "level": lvl}
