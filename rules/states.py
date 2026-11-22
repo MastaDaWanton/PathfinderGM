@@ -493,6 +493,7 @@ TAGS: dict[str, tuple[str, ...]] = {
     # as a one-round effect so the feat document's terms can ask for it by tag.
     "combat expertise": ("buff.stance.combat-expertise",),
     "cleaving":         ("buff.stance.cleaving",),
+    "two-weapon guard": ("buff.stance.two-weapon-guard",),
     # The price of coming back: somebody paid the priests, and now the debt sits
     # on the character. Clockless — the world decides when it is called in.
     "life debt": ("state.obligation.life-debt",),

@@ -9986,8 +9986,10 @@ class Engine:
             # Expertise, Cleave): one round on the one ticker, its numbers the feat
             # document's, asked by tag.
             # A cleave's later blows are the same attack action: its stance is laid once.
+            guard = ("two_weapon",) if (off_key and off_key != "unarmed"
+                                         and actor.has_state("two_weapon.defense")) else ()
             state["tells"].extend(self._lay_attack_stances(
-                actor, () if intent.params.get("cleaving") else choices))
+                actor, () if intent.params.get("cleaving") else choices + guard))
             state["seen"] = seen
             # Down when the blow comes (`Actor.is_down`: dying, unconscious): insensible to
             # who struck. Not helpless — a bound man awake sees who hits him. Kept from
@@ -24708,6 +24710,12 @@ class Engine:
          "sure with the blade, until their next turn."),
         ("cleave", "cleaving", "Cleave",
          "{name} swings wide to cleave, leaving their guard open until their next turn."),
+        # Two-Weapon Defense (CRB): "When wielding a double weapon or two weapons (not
+        # including natural weapons or unarmed strikes), you gain a +1 shield bonus to
+        # your AC." The off hand is declared with the full attack, so the wielding is
+        # known for that round; `two_weapon` is passed for it by `_op_attack`.
+        ("two_weapon", "two-weapon guard", "Two-Weapon Defense",
+         "{name} keeps the second blade up as a guard."),
     )
 
     def _lay_attack_stances(self, actor: Actor, choices) -> list[str]:
@@ -24721,7 +24729,7 @@ class Engine:
         for choice, key, name, tell in self._ATTACK_STANCES:
             if choice not in choices:
                 continue
-            doc = actor.choice_feat(choice) or {}
+            doc = actor.choice_feat(choice) or {"id": "two-weapon-defense"}
             # Already held this round (the bar's full attack posts a swing an op): kept
             # and refreshed, said once.
             again = actor.has_state(states.tags_for(key)[0])

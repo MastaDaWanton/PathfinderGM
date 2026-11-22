@@ -244,6 +244,23 @@
       }
     ]
   },
+  "two-weapon-defense": {
+    "tags": ["two_weapon.defense"],
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 1,
+        "bonus_type": "shield",
+        "when": {"bearer": {"state": "buff.stance.two-weapon-guard"}},
+        "note": "while wielding two weapons: the round of a two-weapon full attack"
+      }
+    ],
+    "not_yet": [
+      "Wielding two weapons is known only on the round a two-weapon full attack is declared; a turn spent otherwise with two weapons in hand gives no +1.",
+      "Fighting defensively or total defense with it (+2): neither action is built."
+    ]
+  },
   "double-slice": {
     "tags": ["two_weapon.off_hand.full_strength"]
   }

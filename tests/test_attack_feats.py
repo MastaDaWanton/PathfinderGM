@@ -417,3 +417,21 @@ def test_the_validators_refuse_a_malformed_threat_range_and_attack_choice():
     bad = classfeatures.validate("monk", {"flurry-of-blows": {
         "name": "x", "source": "y", "attack_choice": {"id": "flurrry"}}})
     assert any("attack_choice" in p for p in bad)
+
+
+def test_two_weapon_defense_is_a_shield_point_on_the_round_two_blades_are_out():
+    """CRB: "When wielding a double weapon or two weapons (not including natural weapons
+    or unarmed strikes), you gain a +1 shield bonus to your AC." Known on the round the
+    two-weapon full attack is declared; a fist in the off hand gives nothing."""
+    s, e, a, (thug,) = _fight(_pc(feats=["Two-Weapon Fighting", "Two-Weapon Defense"],
+                                  weapons=("longsword", "shortsword")))
+    ac = a.ac()
+    _run(e, [{"op": "attack", "actor": a.ref, "target": thug.ref,
+              "params": {"full_attack": True, "off_hand": "shortsword"}}])
+    assert a.ac() == ac + 1
+    a.tick_effects()
+    s, e, a, (thug,) = _fight(_pc(feats=["Two-Weapon Fighting", "Two-Weapon Defense"],
+                                  weapons=("longsword",)))
+    _run(e, [{"op": "attack", "actor": a.ref, "target": thug.ref,
+              "params": {"full_attack": True, "off_hand": "unarmed"}}])
+    assert a.ac() == ac
