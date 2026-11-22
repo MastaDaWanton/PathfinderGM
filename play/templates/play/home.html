@@ -951,11 +951,11 @@
 
 <header>
   <h1>Pathfinder GM<small>a world by World Bible, played here</small></h1>
-  <nav id="tabs"></nav>
+  <nav id="tabs" data-tut="home-tabs"></nav>
   <!-- In the header rather than a tab: the person who most needs it is the one who has
        just opened the app for the first time, and they do not yet know what any of the
        tabs are. -->
-  <a href="/manual" class="manuallink">Manual</a>
+  <a href="/manual" class="manuallink" data-tut="manual-link">Manual</a>
 </header>
 
 <!-- The first launch's one line (owner decision D1): tips come as you go. Kept out of
@@ -1134,7 +1134,7 @@ function continueBlock() {
   }
   const c = STATE.continue;
   if (!c) return "";
-  return `<div class="continue">
+  return `<div class="continue" data-tut="home-continue" data-tut-arrive="home.campaign">
     <div class="who">
       <b>${esc(c.character)}</b>
       <span>${esc(c.world)}${c.location ? ` · ${esc(c.location)}` : ""}${
@@ -1142,9 +1142,11 @@ function continueBlock() {
         ${esc(c.turns)} turn${c.turns === 1 ? "" : "s"} played</span>
     </div>
     ${c.ended ? `<span class="pill dead">this game has ended</span>`
-              : `<a class="go" href="/play/">Continue</a>`}
+              : `<a class="go" href="/play/" data-tut="home-continue-go">Continue</a>`}
     <a class="go" style="color:var(--gold);border-color:var(--gold-dim);
-       background:linear-gradient(#2a2114,#1a140c)" href="/craft/">Crafting bench</a>
+       background:linear-gradient(#2a2114,#1a140c)" href="/craft/" data-tut="home-craft">Crafting bench</a>
+    <button type="button" class="tut-help" data-tut="help-campaign" data-tut-help="home.campaign"
+            aria-label="Show the tips for your game">?</button>
   </div>`;
 }
 
@@ -1152,21 +1154,24 @@ function paneWorlds() {
   if (WORLD) return paneOneWorld();
   return continueBlock() + `
     <div style="margin:-14px 0 26px">
-      <button class="go" data-forge>Create a character</button>
+      <button class="go" data-forge data-tut="home-create">Create a character</button>
       <span class="note" style="margin-left:12px">Point buy, all ${esc(STATE.class_count)} classes,
         the world's own races and the Core seven — validated by the rules as you go.</span>
     </div>
-    <h2 class="sect">Worlds on the shelf</h2>
+    <h2 class="sect" data-tut="home-worlds" data-tut-arrive="home.worlds">Worlds on the shelf<button type="button"
+      class="tut-help" data-tut="help-worlds" data-tut-help="home.worlds" aria-label="Show the tips for the shelf">?</button></h2>
     <p class="note">World Bible writes these; this app plays in them.</p>
     <div style="margin:-6px 0 20px">
-      <button class="go" data-import>Import a world</button>
+      <button class="go" data-import data-tut="home-import">Import a world</button>
+      <button type="button" class="tut-help" data-tut="help-import" data-tut-help="home.import"
+              aria-label="Show the tips for importing a world">?</button>
       <span class="note" style="margin-left:12px">A World Bible export (<code>.json</code>).
         It is read and checked before it lands, so a file this build cannot play is
         refused here rather than halfway through a session.</span>
       <!-- Hidden and driven by the button. A bare file input cannot be styled to match
            anything, and the packaged app has no terminal to drop a path into. -->
       <input type="file" id="worldfile" accept=".json,application/json" hidden>
-      <div class="note" id="importsay" style="margin-top:10px"></div>
+      <div class="note" id="importsay" data-tut="import-say" style="margin-top:10px"></div>
     </div>
     <div class="cards">${STATE.worlds.map(w => `
       <button class="card pick ${w.playable ? "" : "bad"}" data-world="${esc(w.id)}">
@@ -1185,7 +1190,8 @@ function paneWorlds() {
 function paneOneWorld() {
   const w = WORLD, d = DETAIL || { campaigns: [], characters: [], pregens: [] };
   return `<button class="quiet" data-back="1">← all worlds</button>
-    <h2 class="sect">${esc(w.name)}</h2>
+    <h2 class="sect" data-tut="home-worlds" data-tut-arrive="home.worlds">${esc(w.name)}<button type="button"
+      class="tut-help" data-tut-help="home.worlds" aria-label="Show the tips for the shelf">?</button></h2>
     <p class="note">${esc(w.premise || "")} — ${esc(w.entities)} entities, ${esc(w.events)} events.
       ${w.peoples.length ? "Peoples: " + w.peoples.map(esc).join(", ") + "." : ""}</p>
 
@@ -1233,7 +1239,7 @@ function paneOneWorld() {
         <input type="radio" name="startwhere" value="choose" disabled>
         Choose the town and the start <span class="pill soon">not built yet</span></label>
     </fieldset>
-    <button class="go" data-start="${esc(w.id)}" ${PICKED ? "" : "disabled"}
+    <button class="go" data-start="${esc(w.id)}" data-tut="world-begin" ${PICKED ? "" : "disabled"}
             style="${PICKED ? "" : "opacity:.4;cursor:not-allowed"}">
       Begin a sandbox${PICKED ? "" : " — pick somebody first"}</button>
     <div id="err"></div>`;
@@ -1506,8 +1512,9 @@ const OWN_LISTING = ["spells"];
 function paneHomebrew() {
   if (BENCH) {
     const b = BENCH.bench;
-    return `<button class="quiet" data-backbench="1">← all benches</button>
-      <h2 class="sect">${esc(b.name)}</h2>
+    return `<button class="quiet" data-backbench="1" data-tut="hb-back">← all benches</button>
+      <h2 class="sect" data-tut="home-homebrew" data-tut-arrive="home.homebrew">${esc(b.name)}<button type="button"
+        class="tut-help" data-tut-help="home.homebrew" aria-label="Show the tips for homebrew">?</button></h2>
       <p class="note">${esc(b.blurb)}</p>
       ${b.waiting ? `<div class="waiting" style="margin-bottom:14px">${esc(b.waiting)}</div>` : ""}
       <p class="note"><b style="color:var(--ink)">${esc(b.yours || "nothing")}</b> authored by
@@ -1517,7 +1524,7 @@ function paneHomebrew() {
         padding:8px 14px;border:1px solid var(--gold-dim);border-radius:2px;
         color:var(--gold);text-decoration:none;cursor:pointer;
         background:linear-gradient(#2a2114,#1a140c)"
-        href="${esc(b.builder_url)}">${b.id === "spells"
+        href="${esc(b.builder_url)}" data-tut="hb-builder">${b.id === "spells"
           ? "Write a spell →" : b.id === "races" ? "Open the race editor →" : "Open the class builder →"}</a></p>
         <p class="note">${b.id === "spells"
           ? "Every field a spell has, on a page of its own — and you can start from any spell that already exists rather than typing thirty fields again."
@@ -1546,10 +1553,11 @@ function paneHomebrew() {
           stale copy of yours.</p>` : ""}`
         : (OWN_LISTING.includes(b.id) ? "" : `<p class="note">Nothing here yet.</p>`)}`;
   }
-  return `<h2 class="sect">Workbenches</h2>
+  return `<h2 class="sect" data-tut="home-homebrew" data-tut-arrive="home.homebrew">Workbenches<button type="button"
+      class="tut-help" data-tut="help-homebrew" data-tut-help="home.homebrew" aria-label="Show the tips for homebrew">?</button></h2>
     <p class="note">Content you author sits over what ships, never replacing it. The rules
       a homebrew class brings with it are specified in docs/homebrew-rules.md.</p>
-    <div class="cards">${STATE.benches.map(b => `
+    <div class="cards" data-tut="hb-benches">${STATE.benches.map(b => `
       <button class="card ${b.ready ? "pick" : ""}" data-bench="${esc(b.id)}"
               ${b.ready ? "" : "disabled"} style="${b.ready ? "" : "opacity:.45"}">
         <h3>${esc(b.name)}</h3>
@@ -1783,12 +1791,12 @@ function setupPanel() {
          <div class="top">
            <code>${esc(SETUP.host)}</code>
            ${SETUP.state === "not-installed"
-             ? `<button class="go" data-install="1" ${busyInstall ? "disabled" : ""}>${
+             ? `<button class="go" data-install="1" data-tut="setup-install" ${busyInstall ? "disabled" : ""}>${
                   busyInstall ? "Installing…" : "Install Ollama"}</button>
                 <a class="quiet" href="${esc(SETUP.download)}" target="_blank"
                    rel="noopener noreferrer">or get it yourself</a>`
              : ""}
-           <button class="quiet" data-setup="recheck">Check again</button>
+           <button class="quiet" data-setup="recheck" data-tut="setup-recheck">Check again</button>
          </div>
          ${busyInstall
            ? `<div class="bar"><i id="bar-fill"></i></div>
@@ -1807,7 +1815,7 @@ function setupPanel() {
         <span class="pill">${esc(label)}</span>
         ${n.required ? "" : `<span class="pill soon">optional</span>`}
         ${n.present || SETUP.state !== "missing-models" ? "" :
-          `<button class="go" data-pull="${esc(n.model)}" ${busy ? "disabled" : ""}>
+          `<button class="go" data-pull="${esc(n.model)}" data-tut="setup-pull" ${busy ? "disabled" : ""}>
              ${busy ? "Downloading…" : "Download"}</button>`}
       </div>
       ${busy ? `<div class="bar"><i id="bar-fill"></i></div>
@@ -2017,7 +2025,7 @@ function soundPanel() {
   const flour = prefGet("flourishes", "full");
   return setGroup("set-sound", "Sound and motion", `
     <p class="note">Kept on this machine, and saved as you change them.</p>
-    <div class="rolecard">
+    <div class="rolecard" data-tut="sound-card">
       <h3>Sound</h3>
       <div class="why">Every sound effect is made by the app as it plays, and the music is
         the soundtrack's own. Let go of a slider to hear its level.</div>
@@ -2027,9 +2035,9 @@ function soundPanel() {
       <label class="prefrow"><input type="checkbox" data-pref="sound.mute"
         ${muted ? "checked" : ""}><span>Mute all sound</span></label>
     </div>
-    <div class="rolecard">
+    <div class="rolecard" data-tut="motion-card">
       <h3>Motion</h3>
-      <label class="prefrow"><input type="checkbox" data-pref="steady"
+      <label class="prefrow" data-tut="pref-steady"><input type="checkbox" data-pref="steady"
         ${prefGet("steady", false) ? "checked" : ""}>
         <span>Steady mode<div class="why">Slower minigames, and every hold becomes a
           press.</div></span></label>
@@ -2042,7 +2050,7 @@ function soundPanel() {
       </div>
       <div class="prefnote">Short keeps the sounds and the words, and leaves out the shake
         and the sparks. It is chosen for you when your system asks for less motion.</div>
-    </div>`);
+    </div>`, SET_TUT.sound);
 }
 
 // Live while dragging: the level changes under the finger, and the number beside it.
@@ -2097,10 +2105,27 @@ function soundSample(name) {
 
 // One group of options on the light leather (`.card.setgroup`, the style block's note):
 // its heading is the pane's own section heading, with the id a report link scrolls to.
-function setGroup(id, title, body) {
+function setGroup(id, title, body, tut) {
   return `<section class="card setgroup" aria-labelledby="${id}">
-    <h2 class="sect" id="${id}">${title}</h2>${body}</section>`;
+    <h2 class="sect" id="${id}" ${tut ? tut.at : ""}>${title}${tut ? tut.q : ""}</h2>${body}</section>`;
 }
+
+// The first-time card of each group (js/tutorials.js, content/tutorials/home.json): the
+// heading it arrives on, and its "?". Written out whole, because tests/test_tutorials.py
+// finds every data-tut by its literal text in the page's source.
+const SET_TUT = {
+  setup: { at: 'data-tut="set-setup" data-tut-arrive="settings.setup"',
+           q: '<button type="button" class="tut-help" data-tut="help-setup" data-tut-help="settings.setup" aria-label="Show the tips for this">?</button>' },
+  phone: { at: 'data-tut="set-phone" data-tut-arrive="settings.phone"',
+           q: '<button type="button" class="tut-help" data-tut="help-phone" data-tut-help="settings.phone" aria-label="Show the tips for this">?</button>' },
+  narration: { at: 'data-tut="set-narration" data-tut-arrive="settings.narrator"',
+           q: '<button type="button" class="tut-help" data-tut="help-narrator" data-tut-help="settings.narrator" aria-label="Show the tips for this">?</button>' },
+  gm: { at: 'data-tut="set-gm"', q: "" },
+  sound: { at: 'data-tut="set-sound" data-tut-arrive="settings.sound"',
+           q: '<button type="button" class="tut-help" data-tut="help-sound" data-tut-help="settings.sound" aria-label="Show the tips for this">?</button>' },
+  report: { at: 'data-tut="set-report" data-tut-arrive="settings.report"',
+           q: '<button type="button" class="tut-help" data-tut="help-report" data-tut-help="settings.report" aria-label="Show the tips for this">?</button>' },
+};
 
 // Settings, Tutorials: every card, seen or not, with Show me; Show all tips again and
 // Turn tips off (js/tutorials.js draws the list and answers its buttons).
@@ -2114,7 +2139,77 @@ document.addEventListener("tutorials:change", () => {
   if (box && window.Tutorials) box.innerHTML = Tutorials.index();
   const line = document.getElementById("tutwelcome");
   if (line && window.Tutorials) line.innerHTML = EMBEDDED ? "" : Tutorials.welcome();
+  if (TUT_WELCOMED === null && window.Tutorials && Tutorials.ready()) TUT_WELCOMED = !!(line && line.innerHTML);
+  tutWatch();
 });
+
+// --- The first-time cards on this page (content/tutorials/home.json, creation.json) ---------
+// A part of the page "arrives" when its heading (`data-tut-arrive`) comes into the upper
+// two thirds of the window, which is the first time the player meets it: Settings and the
+// creator are one long scroll each, and a card for a group still below the fold is a card
+// about something the player has not reached (plan §3.2: never several at once). Queued,
+// a card waits only while its heading stays in view; shown, it stays while its heading is
+// drawn at all, so reading it while scrolling the section does not put it away.
+//
+// The shelf itself (the welcome line's page) gives no card on the load the welcome line
+// showed: owner decision D1, "one home-page line" on first launch. Opening a world is the
+// player's own move, so the shelf's card may follow that.
+let TUT_WELCOMED = null;
+function tutInView(id) {
+  const el = document.querySelector(`[data-tut-arrive="${id}"]`);
+  if (!el || !el.getClientRects().length) return false;
+  const r = el.getBoundingClientRect();
+  return r.bottom > 0 && r.top < innerHeight;
+}
+function tutArrive(id) {
+  if (!window.Tutorials || !Tutorials.ready() || (TAB === "settings" && !SETTINGS && !FORGE)) return;
+  if ((id === "home.worlds" || id === "home.campaign") && TUT_WELCOMED !== false && !WORLD) return;
+  Tutorials.arrive(id, { still: () => Tutorials.isOpen() === id
+    ? !!document.querySelector(`[data-tut-arrive="${id}"]`) : tutInView(id) });
+}
+const tutIO = window.IntersectionObserver ? new IntersectionObserver(entries => entries.forEach(e => {
+  if (e.isIntersecting) tutArrive(e.target.dataset.tutArrive);
+}), { rootMargin: "0px 0px -35% 0px" }) : null;
+// The last group on a page can never rise into that zone: Settings' "Report a problem"
+// heading stops at 625px of a 900px window with the page scrolled to its foot (measured
+// 2026-11-21). At the foot, whatever heading is on screen has been reached. The page
+// scrolls inside `main`, not the window, so the scroll is caught on its way down.
+document.addEventListener("scroll", e => {
+  const box = e.target === document ? document.documentElement : e.target;
+  if (!box.scrollHeight || box.scrollTop + box.clientHeight < box.scrollHeight - 4) return;
+  document.querySelectorAll("#pane [data-tut-arrive]").forEach(el => {
+    if (tutInView(el.dataset.tutArrive)) tutArrive(el.dataset.tutArrive);
+  });
+}, { capture: true, passive: true });
+// After every draw: the pane is rebuilt from strings, so the headings are new nodes.
+function tutWatch() {
+  if (!tutIO) return;
+  tutIO.disconnect();
+  // (Settings draws its sound and report groups before the model settings arrive, and
+  // then the whole pane again above them: `tutArrive` waits for the real layout.)
+  document.querySelectorAll("#pane [data-tut-arrive]").forEach(el => tutIO.observe(el));
+  if (window.Tutorials) Tutorials.refresh();
+}
+if (window.Tutorials) {
+  // Show me from Settings, Tutorials: go to the part and show its card. Settings' own
+  // groups are on the page already; the tabs only when this is the shelf itself, not the
+  // Settings panel the table opens over the game (embedded), which has no tabs.
+  // Already there (a world or a bench open on that tab, where its "?" is pressed): stay put.
+  const toTab = t => () => {
+    if (TAB === t && !FORGE) return;
+    FORGE = null; WORLD = null; BENCH = null; TAB = t; render();
+  };
+  const toGroup = id => () => { const el = document.getElementById(id); if (el) el.scrollIntoView({ block: "start" }); };
+  [["settings.setup", "set-setup"], ["settings.phone", "set-phone"], ["settings.jobs", "set-jobs"],
+   ["settings.narrator", "set-narration"], ["settings.sound", "set-sound"], ["settings.report", "reporthead"]]
+    .forEach(([tid, el]) => Tutorials.reach(tid, toGroup(el)));
+  if (!EMBEDDED) {
+    ["home.worlds", "home.campaign", "home.import"].forEach(tid => Tutorials.reach(tid, toTab("worlds")));
+    Tutorials.reach("home.homebrew", toTab("homebrew"));
+    Tutorials.reach("home.characters", toTab("characters"));
+    Tutorials.reach("home.manual", () => {});
+  }
+}
 
 function paneSettings() {
   if (!SETTINGS) {
@@ -2123,12 +2218,13 @@ function paneSettings() {
   }
   const byId = Object.fromEntries(SETTINGS.providers.map(p => [p.id, p]));
   return `<div class="setcol">
-    ${setGroup("set-setup", "Before you can play", setupPanel())}
+    ${setGroup("set-setup", "Before you can play", setupPanel(), SET_TUT.setup)}
 
-    ${setGroup("set-phone", "Play on your phone", phonePanel())}
+    ${setGroup("set-phone", "Play on your phone", phonePanel(), SET_TUT.phone)}
 
     <section class="card setgroup" aria-labelledby="set-jobs">
-    <h2 class="sect" id="set-jobs">Who does which job</h2>
+    <h2 class="sect" id="set-jobs" data-tut="set-jobs" data-tut-arrive="settings.jobs">Who does which job<button type="button"
+      class="tut-help" data-tut="help-jobs" data-tut-help="settings.jobs" aria-label="Show the tips for this">?</button></h2>
     <p class="note">Four jobs, and they are genuinely different work. Everything ships
       pointed at Ollama on this machine, which needs no key and sends nothing anywhere;
       a hosted provider needs a key below.</p>
@@ -2136,7 +2232,7 @@ function paneSettings() {
       <div class="rolecard">
         <h3>${esc(r.label)}</h3>
         <div class="why">${esc(r.why)}</div>
-        <div class="rolefields">
+        <div class="rolefields" data-tut="job-fields">
           <label>Provider
             <select data-role="${esc(r.id)}" data-field="provider">
               ${SETTINGS.providers.map(p => `<option value="${esc(p.id)}"
@@ -2158,7 +2254,7 @@ function paneSettings() {
       .map(m => `<option value="${esc(m)}">`).join("")}</datalist>
 
     <!-- The keys share the roles' card and its Save: one button saves both. -->
-    <h3 class="subsect">API keys</h3>
+    <h3 class="subsect" data-tut="job-keys">API keys</h3>
     <p class="note">Kept in a file beside your campaigns, on this machine only, never
       in the app's own folder. A saved key is never sent back to this page — you see
       that one is set and its last four characters. Type <code>clear</code> to remove
@@ -2174,7 +2270,7 @@ function paneSettings() {
     }).join("")}
 
     <div style="margin-top:18px">
-      <button class="go" id="savemodels">Save</button>
+      <button class="go" id="savemodels" data-tut="models-save">Save</button>
       <span class="note" id="modelsaid" style="margin-left:12px"></span>
     </div>
     <div id="modelerr"></div>
@@ -2210,7 +2306,7 @@ function narrationPanel() {
         .catch(() => { narrationPanel.asked = false; });
     }
     return setGroup("set-narration", "How the narrator writes",
-      `<p class="note">Reading the setting…</p>`);
+      `<p class="note">Reading the setting…</p>`, SET_TUT.narration);
   }
   const mode = RULES.rules.narration || "planned";
   // The grid is held in 34px a side (`.narrcards`): the card frames' ironmongery reaches
@@ -2228,7 +2324,7 @@ function narrationPanel() {
         <h3>${label}</h3>
         <em>${em}</em>
       </button>`).join("")}</div>
-    <div id="ruleserr"></div>`);
+    <div id="ruleserr"></div>`, SET_TUT.narration);
 }
 
 /* The GM at the table (owner, 2026-11-05; play/table_talk.py): how often the person behind
@@ -2258,14 +2354,14 @@ function gmPanel() {
         <h3>${label}</h3>
         <em>${em}</em>
       </button>`).join("")}</div>
-    <h3 class="subsect">Which GM</h3>
+    <h3 class="subsect" data-tut="gm-which">Which GM</h3>
     <p class="note">Also the voice that answers your /gm questions.</p>
     <div class="cards narrcards">${(RULES.dm_voices || []).map(d => `
       <button class="card pick ${voice === d.id ? "on" : ""}" data-hbdmvoice="${esc(d.id)}"
               aria-pressed="${voice === d.id}">
         <h3>${esc(d.name)}</h3>
         <em>${esc(d.blurb)}</em>
-      </button>`).join("")}</div>`);
+      </button>`).join("")}</div>`, SET_TUT.gm);
 }
 
 /* --- Playing from a phone -------------------------------------------------------
@@ -2289,7 +2385,7 @@ function phonePanel() {
     return `<p class="note">The game listens only to this machine until you say
       otherwise. Open the door and this page shows a code your phone's camera can
       follow — you stay on your own Wi-Fi and nothing goes to the internet.</p>
-      <button class="go" id="lanopen">Open the door</button>`;
+      <button class="go" id="lanopen" data-tut="lan-open">Open the door</button>`;
   }
   const extra = (LAN.addresses || []).slice(1);
   return `<div class="phonewrap">
@@ -2303,7 +2399,7 @@ function phonePanel() {
       ${extra.length ? `<p class="note">This machine has more than one address. If the
         first does not work, try:${extra.map(a =>
           `<br><span class="lanalt">${esc(a)}</span>`).join("")}</p>` : ""}
-      <button class="quiet" id="lanclose">Close the door</button>
+      <button class="quiet" id="lanclose" data-tut="lan-close">Close the door</button>
     </div>
   </div>`;
 }
@@ -2350,7 +2446,7 @@ let REPORT_NODE = null;
 const IN_DESKTOP_APP = /Electron\//.test(navigator.userAgent);
 
 function reportSlot() {
-  return setGroup("reporthead", "Report a problem", `<div id="reportslot"></div>`);
+  return setGroup("reporthead", "Report a problem", `<div id="reportslot"></div>`, SET_TUT.report);
 }
 
 function reportSize(n) {
@@ -2367,7 +2463,7 @@ function buildReportNode() {
       game's logs, the game you are playing, and what you say happened. Nothing is sent
       from here. You choose how to send it afterwards.</p>
     <p class="note" id="fixline" hidden></p>
-    <button type="button" class="quiet" id="reportopen" aria-expanded="false"
+    <button type="button" class="quiet" id="reportopen" data-tut="report-open" aria-expanded="false"
       aria-controls="reportcard">Make a report for the developer</button>
     <div class="rolecard reportcard" id="reportcard" hidden>
       <label class="reportlabel" for="reportwords">What went wrong?</label>
@@ -2375,7 +2471,7 @@ function buildReportNode() {
         happened instead.</div>
       <textarea id="reportwords" rows="5" aria-describedby="reporthint"></textarea>
       <div class="reportapp" id="reportapp" hidden></div>
-      <label class="prefrow"><input type="checkbox" id="reportsave" checked>
+      <label class="prefrow" data-tut="report-save"><input type="checkbox" id="reportsave" checked>
         <span>Include the save<div class="why">The whole game as it stands, and the
           beats you marked wrong, so the developer sees what you saw. Untick it to keep
           the game to yourself.</div></span>
@@ -2385,15 +2481,15 @@ function buildReportNode() {
       <p class="prefnote">Never in it: your API keys, this app's secret key, the phone
         pass, or your Windows user name, wherever a log or a path held them.</p>
       <div class="reportgo">
-        <button type="button" class="go" id="reportmake">Save the report</button>
+        <button type="button" class="go" id="reportmake" data-tut="report-make">Save the report</button>
         <span class="note" id="reportsaid" role="status" aria-live="polite"></span>
       </div>
       <div id="reporterr"></div>
       <div class="reportsend" id="reportsend" hidden>
         <p class="where" id="reportwhere"></p>
         <div class="reportsendrow">
-          <a class="quiet" id="reportgithub" target="_blank" rel="noopener">Open a GitHub issue</a>
-          <a class="quiet" id="reportmail" target="_blank" rel="noopener">Email it</a>
+          <a class="quiet" id="reportgithub" target="_blank" rel="noopener" data-tut="report-github">Open a GitHub issue</a>
+          <a class="quiet" id="reportmail" target="_blank" rel="noopener" data-tut="report-mail">Email it</a>
         </div>
         <p class="prefnote">Both open with the details filled in and send nothing by
           themselves. Attach the zip yourself: drag it into the issue, or attach it to
@@ -2440,7 +2536,7 @@ async function paintFixLine() {
        with what replaced it, to train the narrator. `
     : `Beats you mark wrong at the table are kept here, to train the narrator. None yet. `)
     + (IN_DESKTOP_APP || location.hostname === "127.0.0.1" || location.hostname === "localhost"
-       ? `<button type="button" class="quiet" id="fixopen">Open the folder</button>` : "")
+       ? `<button type="button" class="quiet" id="fixopen" data-tut="fix-open">Open the folder</button>` : "")
     + (FIXLOG.said ? ` <span class="why">${esc(FIXLOG.said)}</span>` : "");
 }
 
@@ -2615,7 +2711,7 @@ async function saveModelSettings() {
 }
 
 function paneCharacters() {
-  const forge = `<button class="go" data-forge style="margin-bottom:18px">
+  const forge = `<button class="go" data-forge data-tut="home-forge" style="margin-bottom:18px">
     Forge a character</button>`;
   // Said plainly, and only once. A button whose whole effect is a row further down a
   // page you were not looking at is a button that reads as broken.
@@ -2625,7 +2721,8 @@ function paneCharacters() {
     <em>Play as ${esc(made.name)}</em> below, or pick a world from the shelf.</div>` : "";
   if (!STATE.recent.length) return forge + `<p class="note">Nobody has been played yet.</p>`;
   return banner + continueBlock() + forge + `
-    <h2 class="sect">Everyone played</h2>
+    <h2 class="sect" data-tut="home-characters" data-tut-arrive="home.characters">Everyone played<button type="button"
+      class="tut-help" data-tut="help-characters" data-tut-help="home.characters" aria-label="Show the tips for the roster">?</button></h2>
     <p class="note">The dead stay on the roster — they are the reason the next game went
       the way it did.</p>
     <div class="cards">${STATE.recent.map(c => `
@@ -2642,7 +2739,7 @@ function paneCharacters() {
                no way to play them, rather than the whole page being a 500 — which is
                what one of these used to do to every other character on the roster. -->
           ${c.unreadable ? `<span class="pill dead">the sheet cannot be read</span>` : ""}
-          ${c.playable ? `<button class="quiet" data-resume="${esc(c.id)}">${
+          ${c.playable ? `<button class="quiet" data-resume="${esc(c.id)}" data-tut="char-play">${
             c.active ? "Go to the table" : "Play as " + esc(c.name)
           }</button>` : ""}
           <!-- Back to the shop on purpose. The outfitter was reachable only on the way
@@ -2654,9 +2751,9 @@ function paneCharacters() {
                is closed to them (the roster and the running sheet drifted apart), and
                gear is bought from the shops and stalls in town. -->
           ${c.playable && !c.unreadable && !c.begun ? `<button class="quiet"
-            data-outfit="${esc(c.id)}" data-outfit-world="${esc(c.world_source || "")}"
+            data-outfit="${esc(c.id)}" data-outfit-world="${esc(c.world_source || "")}" data-tut="char-outfit"
             title="Spend what is left of their purse">Outfit</button>` : ""}
-          ${c.active ? "" : `<button class="quiet danger"
+          ${c.active ? "" : `<button class="quiet danger" data-tut="char-delete"
             data-remove="${esc(c.id)}" data-name="${esc(c.name)}"
             title="Take them off the roster">Delete</button>`}
         </div>
@@ -2856,9 +2953,9 @@ function featPicker() {
     <p class="note"><b>${got.open.length}</b> of ${got.open.length + got.shut.length}
       feats are open to ${esc(f.name || "them")} right now. The rest need something they
       do not have yet.</p>
-    <input type="text" id="featsearch" data-cr="featsearch" value="${esc(FORGE.featq || "")}"
+    <input type="text" id="featsearch" data-cr="featsearch" data-tut="cr-featsearch" value="${esc(FORGE.featq || "")}"
       placeholder="Narrow the list — armour, dodge, spell…" autocomplete="off">
-    <label class="note" style="display:block;margin:6px 0">
+    <label class="note" style="display:block;margin:6px 0" data-tut="cr-showshut">
       <input type="checkbox" data-crshowshut ${FORGE.showShutFeats ? "checked" : ""}>
       Show the ones they cannot take yet, and why</label>
     <div id="featmatches">${featMatches()}</div>`;
@@ -2985,8 +3082,9 @@ function spellMatches() {
 function paneForgeChoices() {
   const { opts, form: f } = FORGE;
   return `<div class="forge">
-    <button class="quiet" data-crpage="who">← back to who they are</button>
-    <h2 class="sect">What ${esc(f.name || "they")} can take</h2>
+    <button class="quiet" data-crpage="who" data-tut="cr-back2">← back to who they are</button>
+    <h2 class="sect" data-tut="cr-choices" data-tut-arrive="create.feats">What ${esc(f.name || "they")} can take<button type="button"
+      class="tut-help" data-tut="help-feats" data-tut-help="create.feats" aria-label="Show the tips for this part">?</button></h2>
     <div id="choicesbody">
       ${featPicker()}
       ${(opts.domains || []).length && takesAllDomains(f) ? `
@@ -3009,8 +3107,8 @@ function paneForgeChoices() {
     </div>
     <div id="forgeproblems"></div>
     <div style="display:flex;gap:12px;margin-top:18px">
-      <button class="go" data-crsubmit="begin">Create &amp; outfit →</button>
-      <button class="quiet" data-crsubmit="">Create for the roster</button>
+      <button class="go" data-crsubmit="begin" data-tut="cr-make">Create &amp; outfit →</button>
+      <button class="quiet" data-crsubmit="" data-tut="cr-roster">Create for the roster</button>
     </div>
   </div>`;
 }
@@ -3248,8 +3346,9 @@ function paneForgeWho() {
   const rb = ranksBudget(f, opts), fb = featBudget(f, opts), sc = spellCap(f, opts);
   const abfinal = ab => finalAbility(f, opts, ab);
   return `<div class="forge">
-    <button class="quiet" data-unforge>← back</button>
-    <h2 class="sect">Who are they?</h2>
+    <button class="quiet" data-unforge data-tut="cr-back">← back</button>
+    <h2 class="sect" data-tut="cr-who" data-tut-arrive="create.who">Who are they?<button type="button"
+      class="tut-help" data-tut="help-who" data-tut-help="create.who" aria-label="Show the tips for this part">?</button></h2>
     <div class="two">
       <div><input type="text" data-cr="name" value="${esc(f.name)}"
         placeholder="Their name"></div>
@@ -3279,13 +3378,13 @@ function paneForgeWho() {
         ? esc(PRONOUNS_FOR[f.gender] || f.gender) : "&nbsp;"}</span>
     </div>
 
-    <h2 class="sect">World</h2>
+    <h2 class="sect" data-tut="cr-world">World</h2>
     <p class="note">Which world this character is for — its own peoples are the races on offer.</p>
     <div style="display:flex;gap:8px;flex-wrap:wrap">${STATE.worlds.filter(w => w.playable).map(w => `
       <button class="quiet" data-crworld="${esc(w.id)}" style="${
         FORGE.world === w.id ? "border-color:var(--accent);color:#f0dcae" : ""}">${esc(w.name)}</button>`).join("")}</div>
 
-    <h2 class="sect">Race</h2>
+    <h2 class="sect" data-tut="cr-race">Race</h2>
     ${FORGE.dropped ? `<div class="problems"><div>${esc(FORGE.dropped)} is not one of
       this world's peoples, so it has been unset — choose again below.</div></div>` : ""}
     ${opts.races.some(r => r.of) ? `<p class="note">The peoples of
@@ -3303,7 +3402,7 @@ function paneForgeWho() {
           || (r.choose || []).map(c => `${c.amount > 0 ? "+" : ""}${esc(c.amount)} ${esc(c.from)}`).join(", ")
           || "no adjustments"} · ${esc(r.rp)} RP</div>
         <div class="traits clip">${(r.trait_lines || r.traits || []).map(esc).join(" · ")}</div>
-        <span class="quiet cardinfo" data-crinfo="${esc(r.id)}" title="the whole card">details</span>
+        <span class="quiet cardinfo" data-crinfo="${esc(r.id)}" data-tut="cr-details" title="the whole card">details</span>
       </button>`).join("")}</div>
     ${race && (race.choose || []).length ? `
       <p class="note" style="margin-top:44px">A ${esc(race.name.toLowerCase())} places ${race.choose.length === 1
@@ -3331,7 +3430,8 @@ function paneForgeWho() {
           f.heritage === h.name ? "border-color:var(--accent);color:#f0dcae" : ""
         }" title="${esc(h.summary || "")}">${esc(h.name)}</button>`).join(" ")}</div>` : ""}
 
-    <h2 class="sect">Before this</h2>
+    <h2 class="sect" data-tut="cr-before" data-tut-arrive="create.class">Before this<button type="button"
+      class="tut-help" data-tut="help-class" data-tut-help="create.class" aria-label="Show the tips for this part">?</button></h2>
     <p class="note">Where they were before the first turn. Optional, and worth taking:
       a background is worth at most two points of skill, and what it really gives is
       somebody in this world who already knows you. The names below fill in from the
@@ -3350,12 +3450,12 @@ function paneForgeWho() {
           </button>`).join("")}</div>
       </div>`).join("")}
     <div style="margin-top:10px">
-      <button class="quiet" data-crbackground=""
+      <button class="quiet" data-crbackground="" data-tut="cr-nobg"
               style="${f.background ? "" : "border-color:var(--accent);color:#f0dcae"}">
         No background — they came from nowhere in particular</button>
     </div>
 
-    <h2 class="sect">Class</h2>
+    <h2 class="sect" data-tut="cr-class">Class</h2>
     <div class="cards">${opts.classes.map(c => `
       <button class="card pick ${f.class === c.id ? "on" : ""}" data-crclass="${esc(c.id)}">
         <h3>${esc(c.name)}</h3>
@@ -3367,7 +3467,7 @@ function paneForgeWho() {
       </button>`).join("")}</div>
 
     ${cls && (cls.paths || []).length ? `
-      <h2 class="sect">Paths</h2>
+      <h2 class="sect" data-tut="cr-paths">Paths</h2>
       <p class="note">A ${esc(cls.name)} follows two paths, and the order is the
         choice. The <b>first</b> you pick is <b>Path A</b> — you begin with it and
         take its Control Blood 1 abilities at 1st level. The <b>second</b> is
@@ -3400,12 +3500,13 @@ function paneForgeWho() {
 
     ${classChoiceSection(cls, f)}
 
-    <h2 class="sect">Abilities</h2>
+    <h2 class="sect" data-tut="cr-abilities" data-tut-arrive="create.abilities">Abilities<button type="button"
+      class="tut-help" data-tut="help-abilities" data-tut-help="create.abilities" aria-label="Show the tips for this part">?</button></h2>
     <p class="note">Point buy, ${opts.point_budget ? `${esc(opts.point_budget)} points — the Rulesets bench under Homebrew sets the tier, Unlimited included` : "unlimited"}. The race lands after.
       ${opts.ability_cap
         ? `No score above ${esc(opts.ability_cap)} before race.`
         : `No ceiling on a single score — the budget is the only wall.`}</p>
-    <div class="budget ${opts.point_budget && spent > opts.point_budget ? "over" : ""}">
+    <div class="budget ${opts.point_budget && spent > opts.point_budget ? "over" : ""}" data-tut="cr-spent">
       <span>spent</span><b>${esc(spent)} / ${esc(opts.point_budget || "∞")}</b></div>
     ${["str","dex","con","int","wis","cha"].map(ab => `
       <div class="abrow"><b>${ab.toUpperCase()}</b>
@@ -3436,7 +3537,7 @@ function paneForgeWho() {
             housePointsPlaced(f) >= opts.level_one.points ? "disabled" : ""}>+</button>
         </div>`).join("")}` : ""}
 
-    <h2 class="sect">Favoured class</h2>
+    <h2 class="sect" data-tut="cr-fav">Favoured class</h2>
     <p class="note">Your class is your favoured class. Every level in it gives one of these
       (CRB p.31); you choose again at each level, on the Class tab.</p>
     <div class="favoured">
@@ -3446,8 +3547,9 @@ function paneForgeWho() {
         f.favoured_bonus === "skill" ? "checked" : ""}> +1 skill rank</label>
     </div>
 
-    <h2 class="sect">Skills</h2>
-    <div class="budget ${f.skills.length > rb ? "over" : ""}">
+    <h2 class="sect" data-tut="cr-skills" data-tut-arrive="create.skills">Skills<button type="button"
+      class="tut-help" data-tut="help-skills" data-tut-help="create.skills" aria-label="Show the tips for this part">?</button></h2>
+    <div class="budget ${f.skills.length > rb ? "over" : ""}" data-tut="cr-ranks">
       <span>ranks${cls ? ` (${esc(cls.skill_ranks)} class${esc((() => {
         // Asked of the race document, as `ranksBudget` is — `f.race === "human"` named
         // one race and a world's own skilled people never showed their rank here.
@@ -3457,7 +3559,7 @@ function paneForgeWho() {
       })())} + Int)` : ""}. More arrive with every level, on the Class tab.</span>
       <b>${f.skills.length} / ${rb}</b></div>
     <p class="note">Hover over or press a skill's ? to see what it does in this game.</p>
-    <div class="skillgrid">${opts.skills.map(s => SkillHelp.row(s, `
+    <div class="skillgrid" data-tut="cr-skillgrid">${opts.skills.map(s => SkillHelp.row(s, `
       <label class="${cls && cls.class_skills.includes(s) ? "classskill" : ""}">
         <input type="checkbox" data-crskill="${esc(s)}" ${
           f.skills.includes(s) ? "checked" : ""}${SkillHelp.descId(s)
@@ -3465,7 +3567,7 @@ function paneForgeWho() {
 
     <div id="forgeproblems"></div>
     <div style="display:flex;gap:12px;margin-top:18px">
-      <button class="go" data-crpage="choices">Spells &amp; feats →</button>
+      <button class="go" data-crpage="choices" data-tut="cr-next">Spells &amp; feats →</button>
     </div>
     <p class="note">What they can take depends on the race, the class and the scores
       above, so those are asked first.</p>
@@ -3538,6 +3640,7 @@ function render() {
     : paneCharacters());
   // The report card is a kept node, put back into its slot after every redraw.
   mountReport();
+  tutWatch();
 }
 
 document.addEventListener("input", e => {
@@ -4203,6 +4306,8 @@ document.addEventListener("change", async e => {
   const tell = (text, bad) => {
     const say = document.getElementById("importsay");
     if (say) { say.textContent = text; say.style.color = bad ? "var(--alarm)" : "var(--brew)"; }
+    // The first import's answer is when the card about importing means something.
+    if (window.Tutorials && !text.startsWith("Reading ")) Tutorials.arrive("home.import");
   };
   tell(`Reading ${file.name}…`, false);
 

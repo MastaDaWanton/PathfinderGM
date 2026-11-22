@@ -1,0 +1,489 @@
+{
+  "_note": "Tutorials for making a character: the creator on the home page (each part arrives when its heading comes into view), the outfitter, and the three homebrew builders (docs/tutorials-plan.md §2, K1-K7). K7 is three cards, one per builder page, because the three pages share no buttons (D3: every button named). The same rules as table.json's note.",
+  "order": 2,
+  "group": "Creating a character",
+  "tutorials": [
+    {
+      "id": "create.who",
+      "v": 1,
+      "title": "Who, world and race",
+      "manual": "character",
+      "root": "cr-who",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "cr-who",
+          "title": "Who are they?",
+          "words": "Their name, and a heritage if you like. Woman or man sets their pronouns and how the narration describes their body; a world whose people this does not fit adds its own choices in the house rules."
+        },
+        {
+          "since": 1,
+          "anchor": "cr-world",
+          "title": "World",
+          "words": "Pick the world they are for. The races on offer are that world's own peoples first, then the Core Rulebook's, unless the table has turned those off."
+        },
+        {
+          "since": 1,
+          "anchor": "cr-race",
+          "title": "The world's own peoples",
+          "words": "A world's people is its own, even one named after a rulebook race: read its card, not the book. RP is race points, the Race Builder's price; a race above this table's limit is greyed out.",
+          "source": {
+            "file": "play/templates/play/home.html",
+            "literal": "above this table's ${esc(opts.race_rp)} RP tier"
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "cr-race",
+          "title": "Buttons here",
+          "buttons": [
+            {
+              "tut": "cr-details",
+              "label": "details",
+              "words": "A race's whole card: its traits, languages and peoples."
+            },
+            {
+              "tut": "cr-back",
+              "label": "← back",
+              "words": "Leaves the creator; what you chose here is not kept."
+            },
+            {
+              "tut": "help-who",
+              "label": "?",
+              "words": "Shows these tips again."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "create.class",
+      "v": 1,
+      "title": "Background, class and paths",
+      "manual": "character",
+      "root": "cr-before",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "cr-before",
+          "title": "Before this",
+          "words": "A background is optional and worth taking: a little skill, and above all somebody in this world who already knows you. The names fill in from the world when the game begins.",
+          "controls": [
+            {
+              "tut": "cr-nobg",
+              "label": "No background"
+            }
+          ]
+        },
+        {
+          "since": 1,
+          "anchor": "cr-class",
+          "title": "Class",
+          "words": "Each card shows the class's hit die, attack bonus, skill ranks and whether it casts. Homebrew classes are here too. Crafts such as herbalism are not picked here: they grow by use beside any class."
+        },
+        {
+          "since": 1,
+          "anchor": "cr-paths",
+          "title": "Paths and choices",
+          "words": "Some classes follow paths. The first you pick is Path A, from first level; the second is Path B, which opens at the level its slot names. Below come any other choices the class makes at first level.",
+          "buttons": [
+            {
+              "tut": "help-class",
+              "label": "?",
+              "words": "Shows these tips again."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "create.abilities",
+      "v": 1,
+      "title": "Abilities",
+      "manual": "character",
+      "root": "cr-abilities",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "cr-spent",
+          "title": "Point buy",
+          "words": "Raise or lower each score with its + and −. Spent counts the cost against this table's budget, which the Rulesets bench sets; it turns red when you are over. The race's adjustments land after, shown as becomes."
+        },
+        {
+          "since": 1,
+          "anchor": "cr-abilities",
+          "title": "Checked by the rules",
+          "words": "The counts here keep pace as you go. The rules check the whole character when you make them, and list everything wrong with its reason; nothing is made until it is put right.",
+          "source": {
+            "file": "play/templates/play/home.html",
+            "literal": "the submit round-trips the whole form and renders every problem at once"
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "cr-fav",
+          "title": "Favoured class",
+          "words": "Your class is your favoured class: each level in it gives a hit point or a skill rank, your choice, and you choose again at every level.",
+          "buttons": [
+            {
+              "tut": "help-abilities",
+              "label": "?",
+              "words": "Shows these tips again."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "create.skills",
+      "v": 1,
+      "title": "Skills",
+      "manual": "character",
+      "root": "cr-skills",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "cr-ranks",
+          "title": "Ranks",
+          "words": "Tick a skill to put a rank in it. The count says how many you have: your class's ranks plus your Intelligence, and more for some peoples. Your class skills are in gold, and more ranks come with every level."
+        },
+        {
+          "since": 1,
+          "anchor": "cr-skillgrid",
+          "title": "The ?",
+          "words": "Hover over or press a skill's ? to see what it does in this game, not only in the book: what makes the engine roll it, and what it does not do yet."
+        },
+        {
+          "since": 1,
+          "anchor": "cr-next",
+          "title": "On to the next page",
+          "buttons": [
+            {
+              "tut": "cr-next",
+              "label": "Spells & feats →",
+              "words": "On to feats and spells, worked out from everything above."
+            },
+            {
+              "tut": "help-skills",
+              "label": "?",
+              "words": "Shows these tips again."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "create.feats",
+      "v": 1,
+      "title": "Feats and spells",
+      "manual": "character",
+      "root": "cr-choices",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "cr-choices",
+          "title": "Only what they can take",
+          "words": "This page asks the rules what this character qualifies for, so the list holds only feats they can take now. Tick the box to see the rest too, each with what it still needs.",
+          "controls": [
+            {
+              "tut": "cr-showshut",
+              "label": "Show the ones they cannot take yet"
+            }
+          ],
+          "source": {
+            "file": "play/templates/play/home.html",
+            "literal": "what the SERVER said this character qualifies for"
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "cr-featsearch",
+          "title": "Finding one",
+          "words": "Narrow the list by typing here, or with the chips, which count each kind; previous and next turn its pages. Press a feat to take it, and its ✕ above to give it back. The count says how many feats you have."
+        },
+        {
+          "since": 1,
+          "anchor": "cr-choices",
+          "title": "Spells and domains",
+          "words": "A caster with spells known picks them below, with a count for each spell level; what they prepare is chosen at the table each morning. A cleric, who prepares from the whole list, picks only domains here."
+        },
+        {
+          "since": 1,
+          "anchor": "cr-make",
+          "title": "Making them",
+          "buttons": [
+            {
+              "tut": "cr-make",
+              "label": "Create & outfit →",
+              "words": "Makes them, then on to spending their starting purse."
+            },
+            {
+              "tut": "cr-roster",
+              "label": "Create for the roster",
+              "words": "Makes them and puts them on the roster for later."
+            },
+            {
+              "tut": "cr-back2",
+              "label": "← back to who they are",
+              "words": "Back to the first page; nothing chosen is lost."
+            },
+            {
+              "tut": "help-feats",
+              "label": "?",
+              "words": "Shows these tips again."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "create.outfit",
+      "v": 1,
+      "title": "Outfitting",
+      "manual": "character",
+      "root": "outfit-purse",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "outfit-purse",
+          "title": "Purse and basket",
+          "words": "Their starting purse is all the gear they get. Put things in the basket with + and −, and the bar shows what would be left. What is not spent stays in the purse for the road.",
+          "source": {
+            "file": "play/templates/play/outfit.html",
+            "literal": "What is not spent stays in the purse."
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "outfit-sort",
+          "title": "The shelves",
+          "words": "Weapons, armour, shields and gear at the rulebook's prices. Something they are not trained in is still for sale and says so; it fights at a penalty. Sort can put what they are trained in first.",
+          "controls": [
+            {
+              "tut": "outfit-sort",
+              "label": "Sort weapons, armour and shields"
+            }
+          ]
+        },
+        {
+          "since": 1,
+          "anchor": "outfit-pack",
+          "title": "Only before the first turn",
+          "words": "Carrying shows what they already have. This page is for a new character only: once their game begins it closes to them, and gear comes from the shops and stalls in town.",
+          "source": {
+            "file": "play/outfit_views.py",
+            "literal": "the outfitter is closed to them"
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "outfit-purse",
+          "title": "Buttons along the bar",
+          "buttons": [
+            {
+              "tut": "outfit-buy",
+              "label": "Buy the basket",
+              "words": "Pays for everything in it. Buy or empty it before leaving."
+            },
+            {
+              "tut": "outfit-begin",
+              "label": "Begin the sandbox →",
+              "words": "Starts the game; the opening scene can take a minute to write."
+            },
+            {
+              "tut": "outfit-shelf",
+              "label": "Keep on the shelf",
+              "words": "Back home; their game can start later."
+            },
+            {
+              "tut": "help-outfit",
+              "label": "?",
+              "words": "Shows these tips again."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "create.classbuilder",
+      "v": 1,
+      "title": "Class builder",
+      "manual": "homebrew",
+      "root": "cb-strip",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "cb-strip",
+          "title": "Start from",
+          "words": "Start from a template, or open a class that already exists. A simple class fills in the first sections and stops; the ones under Advanced are for classes that need them.",
+          "controls": [
+            {
+              "tut": "cb-load",
+              "label": "Load template"
+            },
+            {
+              "tut": "cb-open",
+              "label": "Open"
+            }
+          ]
+        },
+        {
+          "since": 1,
+          "anchor": "cb-nav",
+          "title": "The sections",
+          "words": "Down the side are the class's sections, field by field. A number beside one is how many problems it has. JSON, at the foot, is the file exactly as it will be written; paste one in and press Apply."
+        },
+        {
+          "since": 1,
+          "anchor": "cb-problems",
+          "title": "Sound or not",
+          "words": "The box at the top checks the class as you work. Sound means it loads, a character can be made in it, and it levels all the way. Press a problem to go to its section; nothing is kept until they are gone.",
+          "source": {
+            "file": "play/templates/play/classbuilder.html",
+            "literal": "Nothing is kept until they are gone."
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "cb-save",
+          "title": "Buttons here",
+          "buttons": [
+            {
+              "tut": "cb-save",
+              "label": "Keep this class",
+              "words": "Saves it to your homebrew, once it is sound."
+            },
+            {
+              "tut": "cb-back",
+              "label": "← the shelf",
+              "words": "Back to the home page."
+            },
+            {
+              "tut": "help-classbuilder",
+              "label": "?",
+              "words": "Shows these tips again."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "create.racebuilder",
+      "v": 1,
+      "title": "Race editor",
+      "manual": "homebrew",
+      "root": "rb-start",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "rb-start",
+          "title": "Start from a race",
+          "words": "Pick a race that exists and load it: everything is copied but the name. The shipped file is never changed; editing one writes your own copy beside it.",
+          "controls": [
+            {
+              "tut": "rb-load",
+              "label": "Load as a starting point"
+            }
+          ]
+        },
+        {
+          "since": 1,
+          "anchor": "rb-form",
+          "title": "Everything is picked",
+          "words": "You type only the name. Type, size, speed, the Race Builder's ability options, a bonus feat or skill rank, and languages are all picked. The anatomy is the eidolon's evolutions, and free here."
+        },
+        {
+          "since": 1,
+          "anchor": "rb-summary",
+          "title": "The summary",
+          "words": "The summary adds the race up as the sheet will read it. This table's race point limit, set on the Rulesets bench, is said beneath it."
+        },
+        {
+          "since": 1,
+          "anchor": "rb-save",
+          "title": "Buttons here",
+          "buttons": [
+            {
+              "tut": "rb-save",
+              "label": "Save to my homebrew",
+              "words": "Saves it, or says what is missing first."
+            },
+            {
+              "tut": "rb-fresh",
+              "label": "Start fresh",
+              "words": "Empties the form."
+            },
+            {
+              "tut": "rb-back",
+              "label": "← the shelf",
+              "words": "Back to the home page."
+            },
+            {
+              "tut": "help-racebuilder",
+              "label": "?",
+              "words": "Shows these tips again."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "create.spellbuilder",
+      "v": 1,
+      "title": "Spell builder",
+      "manual": "homebrew",
+      "root": "sb-start",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "sb-start",
+          "title": "Start from a spell",
+          "words": "Search by name, pick a spell and load it: every field is copied but the name, which is yours to give. Or leave the list on an empty spell and begin from nothing.",
+          "controls": [
+            {
+              "tut": "sb-load",
+              "label": "Load as a starting point"
+            }
+          ]
+        },
+        {
+          "since": 1,
+          "anchor": "sb-form",
+          "title": "Every field",
+          "words": "Every field a spell has, a star on the ones it must have. The engine casts it with real slots, caster level and save DC; what it does beyond that stays its own words, which the engine does not turn into numbers.",
+          "source": {
+            "file": "play/homebrew.py",
+            "literal": "the engine will not read"
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "sb-save",
+          "title": "Buttons here",
+          "buttons": [
+            {
+              "tut": "sb-save",
+              "label": "Save to my homebrew",
+              "words": "Saves it, castable at once and marked as yours, or says what is missing."
+            },
+            {
+              "tut": "sb-fresh",
+              "label": "Start fresh",
+              "words": "Empties the form."
+            },
+            {
+              "tut": "sb-back",
+              "label": "← the shelf",
+              "words": "Back to the home page."
+            },
+            {
+              "tut": "help-spellbuilder",
+              "label": "?",
+              "words": "Shows these tips again."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

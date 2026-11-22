@@ -13,7 +13,9 @@
   "paneForgeWho::ab.toUpperCase()": "an element of POOLS, the constant ability lists in this file",
   "fn:abfinal": "finalAbility: arithmetic on ability scores",
   "fn:housePointsPlaced": "a sum of numbers",
-  "fn:ranksBudget": "ranksBudget: arithmetic"
+  "fn:ranksBudget": "ranksBudget: arithmetic",
+  "setGroup::tut.at": "SET_TUT, a constant table of data-tut attributes in this file",
+  "setGroup::tut.q": "SET_TUT, a constant table of the groups' \"?\" buttons in this file"
  },
  "play/static/js/skillhelp.js": {
   "fn:slug": "lower-cased and reduced to [a-z0-9-] by its own regex"

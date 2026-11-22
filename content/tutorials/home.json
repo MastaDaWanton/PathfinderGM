@@ -1,0 +1,532 @@
+{
+  "_note": "Tutorials for the home page: the shelf, homebrew, the roster, Settings and the Manual (docs/tutorials-plan.md §2, H1-H12). The same rules as table.json's note. Each part arrives when its heading comes into view (home.html tutWatch); the shelf gives no card on the load the welcome line shows (owner decision D1). home.manual is never shown by itself: it is the Manual's own entry in Settings, Tutorials.",
+  "order": 1,
+  "group": "Home and Settings",
+  "tutorials": [
+    {
+      "id": "home.worlds",
+      "v": 1,
+      "title": "Available worlds",
+      "manual": "worlds",
+      "root": "home-worlds",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "home-worlds",
+          "title": "Worlds on the shelf",
+          "words": "World Bible writes these worlds and this app plays in them. A card shows the world's premise, a few of its towns, and its size in people and events, which is not how hard it is. Press a world to open it."
+        },
+        {
+          "since": 1,
+          "anchor": "home-create",
+          "title": "Create a character",
+          "words": "Create a character builds someone from nothing: their world, people, class, scores, skills and feats, checked by the rules. They wait on the roster until you start a game with them.",
+          "controls": [
+            {
+              "tut": "home-create",
+              "label": "Create a character"
+            }
+          ]
+        },
+        {
+          "since": 1,
+          "anchor": "world-begin",
+          "title": "Inside a world",
+          "words": "A world's page lists the games played there and who you could start as: someone ready-made, or Someone new. Pick one, then Begin a sandbox. There is no set plot; the world goes on around what you do.",
+          "controls": [
+            {
+              "tut": "world-begin",
+              "label": "Begin a sandbox"
+            }
+          ]
+        },
+        {
+          "since": 1,
+          "anchor": "home-tabs",
+          "title": "Along the top",
+          "words": "Homebrew holds your own classes, races, spells and rules. Recent characters is everyone you have made or played. Settings holds the models, sound, these tips and a problem report. The Manual, at the right, is the whole reference.",
+          "buttons": [
+            {
+              "tut": "help-worlds",
+              "label": "?",
+              "words": "Shows these tips again."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "home.campaign",
+      "v": 1,
+      "title": "Your game",
+      "manual": "first",
+      "root": "home-continue",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "home-continue-go",
+          "title": "Continue",
+          "words": "Your last game, where you left it: who, where, their hit points and the turns played. Continue takes you back to the table. A game that has ended says so instead.",
+          "controls": [
+            {
+              "tut": "home-continue-go",
+              "label": "Continue"
+            }
+          ]
+        },
+        {
+          "since": 1,
+          "anchor": "home-craft",
+          "title": "Crafting bench",
+          "words": "Crafting bench opens the same benches the table has, without playing a turn. It is the same work on the same character, and the time each step takes still passes in their scene.",
+          "controls": [
+            {
+              "tut": "home-craft",
+              "label": "Crafting bench"
+            }
+          ],
+          "source": {
+            "file": "play/templates/play/craft.html",
+            "literal": "the time each step takes passes in the scene"
+          }
+        }
+      ]
+    },
+    {
+      "id": "home.import",
+      "v": 1,
+      "title": "Importing a world",
+      "manual": "worlds",
+      "root": "home-import",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "home-import",
+          "title": "Import a world",
+          "words": "Import a world takes a World Bible export, a .json file. It is read and checked before it lands, so a world this version cannot play is refused here and not halfway through a game.",
+          "controls": [
+            {
+              "tut": "home-import",
+              "label": "Import a world"
+            }
+          ]
+        },
+        {
+          "since": 1,
+          "anchor": "import-say",
+          "title": "Refused whole",
+          "words": "A refused file is refused whole, with the reason under the button; nothing half-imports. A world that lands is on the shelf at once: press it to start a game there.",
+          "source": {
+            "file": "play/home_views.py",
+            "literal": "The file is refused with the loader's own reason"
+          }
+        }
+      ]
+    },
+    {
+      "id": "home.homebrew",
+      "v": 1,
+      "title": "Homebrew",
+      "manual": "homebrew",
+      "root": "home-homebrew",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "hb-benches",
+          "title": "Workbenches",
+          "words": "Each workbench holds one kind of content: classes, races, spells, creatures, feats, weapons, ingredients and more. What you make sits over what ships and never replaces it. A bench marked not built yet cannot be opened."
+        },
+        {
+          "since": 1,
+          "anchor": "home-homebrew",
+          "title": "Inside a bench",
+          "words": "A bench lists what it holds, yours and shipped, and names the folder yours are kept in. Press a row to open it; editing something that ships writes your own copy beside it.",
+          "controls": [
+            {
+              "tut": "hb-back",
+              "label": "← all benches"
+            }
+          ]
+        },
+        {
+          "since": 1,
+          "anchor": "hb-builder",
+          "title": "The builders",
+          "words": "Classes, races and spells are too big for a form, so each has a page of its own: Open the class builder, Open the race editor, Write a spell. Each checks the work and names what is wrong.",
+          "controls": [
+            {
+              "tut": "hb-builder",
+              "label": "Open the class builder"
+            },
+            {
+              "tut": "hb-builder",
+              "label": "Open the race editor"
+            },
+            {
+              "tut": "hb-builder",
+              "label": "Write a spell"
+            }
+          ]
+        },
+        {
+          "since": 1,
+          "title": "Rulesets",
+          "words": "The Rulesets bench holds this table's own rules: the point-buy budget, the race point limit, the ability ceiling, extra feats and ability points, whether magic stacks, the GM view, what the GM may tell you, and intimate scenes.",
+          "buttons": [
+            {
+              "tut": "help-homebrew",
+              "label": "?",
+              "words": "Shows these tips again."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "home.characters",
+      "v": 1,
+      "title": "Recent characters",
+      "manual": "character",
+      "root": "home-characters",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "home-characters",
+          "title": "Everyone played",
+          "words": "Everyone you have made or played is here, the dead included: they are why the next game went the way it did. A character whose sheet cannot be read says so, and cannot be played until it is fixed."
+        },
+        {
+          "since": 1,
+          "anchor": "char-play",
+          "title": "On each card",
+          "buttons": [
+            {
+              "tut": "home-forge",
+              "label": "Forge a character",
+              "words": "Make someone new, the same as Create a character."
+            },
+            {
+              "tut": "char-play",
+              "label": "Play as",
+              "words": "Start or resume a game as them."
+            },
+            {
+              "tut": "char-play",
+              "label": "Go to the table",
+              "words": "Shown instead for the one in play now."
+            },
+            {
+              "tut": "char-outfit",
+              "label": "Outfit",
+              "words": "Spend their starting purse; closed once their game has begun."
+            },
+            {
+              "tut": "char-delete",
+              "label": "Delete",
+              "words": "Asks first, then removes them and deletes their game for good."
+            },
+            {
+              "tut": "help-characters",
+              "label": "?",
+              "words": "Shows these tips again."
+            }
+          ],
+          "source": {
+            "file": "play/outfit_views.py",
+            "literal": "the outfitter is closed to them"
+          }
+        }
+      ]
+    },
+    {
+      "id": "settings.setup",
+      "v": 1,
+      "title": "Before you can play",
+      "manual": "need",
+      "root": "set-setup",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "set-setup",
+          "title": "A model on your machine",
+          "words": "The GM runs on a model on your own computer, through Ollama. Nothing is sent anywhere and nothing costs money. This group says whether Ollama is installed and running, and whether the models it needs are downloaded."
+        },
+        {
+          "since": 1,
+          "anchor": "set-setup",
+          "title": "Slow on purpose",
+          "words": "The models are a large download, once; they stay on your machine. The first turn after a start is slow while the model is read into memory, and every local turn takes longer than a hosted service would. That is the price of privacy.",
+          "buttons": [
+            {
+              "tut": "setup-install",
+              "label": "Install Ollama",
+              "words": "Fetches Ollama's own installer and opens it; you agree to it there."
+            },
+            {
+              "tut": "setup-recheck",
+              "label": "Check again",
+              "words": "Looks again after you install or start Ollama."
+            },
+            {
+              "tut": "setup-pull",
+              "label": "Download",
+              "words": "Fetches a missing model, with a bar showing how far it has got."
+            },
+            {
+              "tut": "help-setup",
+              "label": "?",
+              "words": "Shows these tips again."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "settings.phone",
+      "v": 1,
+      "title": "Play on your phone",
+      "manual": "need",
+      "root": "set-phone",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "set-phone",
+          "title": "Play on your phone",
+          "words": "The game listens only to this computer until you open the door. Then a code appears: point your phone's camera at it, on the same Wi-Fi. Nothing goes to the internet, and Windows may ask to let the app through its firewall."
+        },
+        {
+          "since": 1,
+          "anchor": "set-phone",
+          "title": "The pass",
+          "words": "If the camera will not focus, type the address shown. The pass in it is new every time you open the door. The phone plays the same game: a tip dismissed there is dismissed here.",
+          "buttons": [
+            {
+              "tut": "lan-open",
+              "label": "Open the door",
+              "words": "Lets a phone on your Wi-Fi reach the game."
+            },
+            {
+              "tut": "lan-close",
+              "label": "Close the door",
+              "words": "Back to this computer only."
+            },
+            {
+              "tut": "help-phone",
+              "label": "?",
+              "words": "Shows these tips again."
+            }
+          ],
+          "source": {
+            "file": "play/tutorials.py",
+            "literal": "One file means a card dismissed on the phone is dismissed on the desktop."
+          }
+        }
+      ]
+    },
+    {
+      "id": "settings.jobs",
+      "v": 1,
+      "title": "Who does which job",
+      "manual": "need",
+      "root": "set-jobs",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "set-jobs",
+          "title": "The jobs",
+          "words": "The game asks models for different kinds of work, and each job here has its own model. Everything starts pointed at Ollama on this computer, which needs no key. A hosted provider is always optional, and needs a key."
+        },
+        {
+          "since": 1,
+          "anchor": "job-fields",
+          "title": "Provider, Model, Host",
+          "words": "Provider is who runs the job. Model is which model, and the list offers the ones Ollama already has. Host is where to reach it; picking a provider fills in its usual host."
+        },
+        {
+          "since": 1,
+          "anchor": "job-keys",
+          "title": "API keys",
+          "words": "A key is kept in a file beside your campaigns, on this computer only, and is never shown again: you see that it is set and its last few characters. Type clear in its box to remove one.",
+          "source": {
+            "file": "play/templates/play/home.html",
+            "literal": "A saved key is never sent back to this page"
+          },
+          "buttons": [
+            {
+              "tut": "models-save",
+              "label": "Save",
+              "words": "Saves the jobs and the keys together; the next turn uses them."
+            },
+            {
+              "tut": "help-jobs",
+              "label": "?",
+              "words": "Shows these tips again."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "settings.narrator",
+      "v": 1,
+      "title": "The narrator and the GM",
+      "manual": "playing",
+      "root": "set-narration",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "set-narration",
+          "title": "How the narrator writes",
+          "words": "Planned: the engine lays out what happened and the narrator writes only that, with fewer mistakes, plainer and shorter. Free: the narrator writes the whole beat, richer and more often wrong. An intimate scene is always written the free way.",
+          "source": {
+            "file": "play/templates/play/home.html",
+            "literal": "An intimate scene is always written the"
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "set-gm",
+          "title": "Your GM at the table",
+          "words": "The GM's own voice, out of character, under the story. Off is the story only. Big moments speaks up for a refusal, a natural twenty or one, someone down, or a fight starting or ending. Always speaks after every turn."
+        },
+        {
+          "since": 1,
+          "anchor": "gm-which",
+          "title": "Which GM",
+          "words": "Which GM is the personality behind that voice, and the one that answers your /gm questions. Everything here changes from the next beat, and the table's Settings button opens this same page, so you can change it mid-game.",
+          "buttons": [
+            {
+              "tut": "help-narrator",
+              "label": "?",
+              "words": "Shows these tips again."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "settings.sound",
+      "v": 1,
+      "title": "Sound and motion",
+      "manual": "playing",
+      "root": "set-sound",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "sound-card",
+          "title": "Sound",
+          "words": "A slider for each kind of sound, and Master over them all; let go of one to hear its level. Play music turns the soundtrack on or off. Mute all sound silences everything and keeps your levels for later."
+        },
+        {
+          "since": 1,
+          "anchor": "motion-card",
+          "title": "Motion",
+          "words": "Steady mode makes every bench minigame slower and turns each hold into a press. Flourishes, Short keeps the sounds and words and leaves out the shake and sparks. These are kept on this computer, and saved as you change them.",
+          "controls": [
+            {
+              "tut": "pref-steady",
+              "label": "Steady mode"
+            }
+          ],
+          "buttons": [
+            {
+              "tut": "help-sound",
+              "label": "?",
+              "words": "Shows these tips again."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "settings.report",
+      "v": 1,
+      "title": "Report a problem",
+      "manual": "wrong",
+      "root": "set-report",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "report-open",
+          "title": "Make a report",
+          "words": "When something goes wrong, this saves one file for the developer: the game's logs, the game you are playing, and your own words on what happened. Nothing is sent from here; you choose how to send it afterwards.",
+          "controls": [
+            {
+              "tut": "report-open",
+              "label": "Make a report for the developer"
+            }
+          ]
+        },
+        {
+          "since": 1,
+          "anchor": "report-open",
+          "title": "What goes in",
+          "words": "Include the save adds the whole game, so the developer sees what you saw; untick it to keep the game to yourself. Your API keys, the app's secret key, the phone pass and your Windows user name never go in.",
+          "controls": [
+            {
+              "tut": "report-save",
+              "label": "Include the save"
+            }
+          ],
+          "source": {
+            "file": "play/templates/play/home.html",
+            "literal": "Never in it: your API keys, this app's secret key"
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "report-open",
+          "title": "Sending it",
+          "buttons": [
+            {
+              "tut": "report-make",
+              "label": "Save the report",
+              "words": "Saves the file; the desktop app puts it in Downloads."
+            },
+            {
+              "tut": "report-github",
+              "label": "Open a GitHub issue",
+              "words": "Opens an issue to send it, already filled in."
+            },
+            {
+              "tut": "report-mail",
+              "label": "Email it",
+              "words": "Opens an email to send it, already filled in."
+            },
+            {
+              "tut": "fix-open",
+              "label": "Open the folder",
+              "words": "Opens where the beats you marked wrong are kept, to train the narrator."
+            },
+            {
+              "tut": "help-report",
+              "label": "?",
+              "words": "Shows these tips again."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "home.manual",
+      "v": 1,
+      "title": "The Manual",
+      "manual": "need",
+      "root": "manual-link",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "manual-link",
+          "title": "The Manual",
+          "words": "The Manual, at the top right of the home page, is the whole reference: what you need, the first run, worlds, your character, playing, fights, the benches, homebrew, and what to do when something goes wrong. Every tip card links into it.",
+          "controls": [
+            {
+              "tut": "manual-link",
+              "label": "Manual"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

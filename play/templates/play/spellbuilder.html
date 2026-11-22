@@ -2,6 +2,8 @@
 <title>Spell builder — Pathfinder GM</title>
 <!-- The shared materials (theme v2), ahead of this page's styles so its palette stands. -->
 <link rel="stylesheet" href="{% asset 'css/theme-v2.css' %}">
+<!-- The first-time card (js/tutorials.js, content/tutorials/creation.json). -->
+<link rel="stylesheet" href="{% asset 'css/tutorials.css' %}">
 <style>
   /* The app's own vocabulary, taken from the craft bench and the class builder rather
      than re-invented — a page that looks like a different application is the thing the
@@ -93,14 +95,16 @@
   <h1>Spell builder</h1>
   <small>Every field a spell has. Start from one that exists, or from nothing.</small>
   <span class="spacer"></span>
-  <a class="back" href="/">← the shelf</a>
+  <button type="button" class="tut-help" data-tut="help-spellbuilder" data-tut-help="create.spellbuilder"
+          aria-label="Show the tips for the spell builder">?</button>
+  <a class="back" href="/" data-tut="sb-back">← the shelf</a>
 </header>
 
 <main>
   <div class="leaf v2-card-leather v2-gilt-edge">
     <!-- Start from an existing spell. Everything is copied except the name, because a
          copied name would make Save overwrite the spell being learned from. -->
-    <div class="startfrom">
+    <div class="startfrom" data-tut="sb-start">
       <div class="grow">
         <label for="find">Start from an existing spell</label>
         <p class="note">Copies everything except the name — that one is yours to give.</p>
@@ -111,16 +115,16 @@
         <select id="pick" style="margin-top:6px">
           <option value="">— begin with an empty spell —</option></select>
       </div>
-      <button type="button" id="load">Load as a starting point</button>
+      <button type="button" id="load" data-tut="sb-load">Load as a starting point</button>
     </div>
     <p class="note" id="pickcount"></p>
     <div id="startnote"></div>
 
-    <div id="form"></div>
+    <div id="form" data-tut="sb-form"></div>
 
     <div style="margin-top:22px;display:flex;gap:10px;align-items:center">
-      <button type="button" class="go" id="save">Save to my homebrew</button>
-      <button type="button" id="fresh">Start fresh</button>
+      <button type="button" class="go" id="save" data-tut="sb-save">Save to my homebrew</button>
+      <button type="button" id="fresh" data-tut="sb-fresh">Start fresh</button>
       <span id="msg"></span>
     </div>
     <div id="banner"></div>
@@ -262,4 +266,9 @@ fillPicker();
 </script>
 <!-- The heartbeat that lets the packaged exe tell an open window from a closed
      one. Every page carries it; tests/test_packaging.py fails if one does not. -->
+<script src="{% asset 'js/tutorials.js' %}"></script>
+<script nonce="{{ request.csp_nonce }}">
+// This page's first-time card, once its own controls are drawn.
+window.Tutorials && Tutorials.arrive("create.spellbuilder");
+</script>
 <script src="{% static 'js/keepalive.js' %}"></script>

@@ -57,6 +57,9 @@
   color: var(--dim, #93866e); font: 600 12px/20px var(--body, Georgia, serif); text-align: center;
 }
 .tut-help:hover, .tut-help:focus-visible { color: var(--gold, #ddc48e); border-color: var(--gold, #ddc48e); }
+/* In a section's heading (the home page, the creator, Settings' groups) or a page's header
+   (the outfitter, the builders): beside the words, not pushed to the edge. */
+h2 > .tut-help, header > .tut-help { margin-left: 8px; vertical-align: middle; align-self: center; letter-spacing: 0; text-transform: none; }
 @media (pointer: coarse) {
   .tut-help { position: relative; }
   .tut-help::after { content: ""; position: absolute; top: -10px; right: -10px; bottom: -10px; left: -10px; }
