@@ -2343,8 +2343,7 @@
        "type": "combat_mod",
        "amount": -2,
        "bonus_type": "untyped",
-       "target": "damage",
-       "note": "weapon damage rolls"
+       "target": "damage"
       },
       {
        "type": "save_mod",
@@ -2365,8 +2364,46 @@
        "target": "will"
       },
       {
-       "type": "narrative",
-       "target": "The same -2 penalty also applies to all ability checks and all skill checks."
+       "type": "combat_mod",
+       "amount": -2,
+       "bonus_type": "untyped",
+       "target": "str_check"
+      },
+      {
+       "type": "combat_mod",
+       "amount": -2,
+       "bonus_type": "untyped",
+       "target": "dex_check"
+      },
+      {
+       "type": "combat_mod",
+       "amount": -2,
+       "bonus_type": "untyped",
+       "target": "con_check"
+      },
+      {
+       "type": "combat_mod",
+       "amount": -2,
+       "bonus_type": "untyped",
+       "target": "int_check"
+      },
+      {
+       "type": "combat_mod",
+       "amount": -2,
+       "bonus_type": "untyped",
+       "target": "wis_check"
+      },
+      {
+       "type": "combat_mod",
+       "amount": -2,
+       "bonus_type": "untyped",
+       "target": "cha_check"
+      },
+      {
+       "type": "skill_mod",
+       "amount": -2,
+       "bonus_type": "untyped",
+       "target": "all"
       }
      ]
     },

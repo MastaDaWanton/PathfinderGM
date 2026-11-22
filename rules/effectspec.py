@@ -910,6 +910,11 @@ CATEGORIES: list[Category] = [
             ]),
             EffectType("temp_hp", "Temporary hit points", "10 temporary hp for 8 hours", [
                 Field("dice", "How many", "dice"),
+                # Aid's "1d8 + caster level (maximum +10)", false life's "1d10 + 1 per
+                # caster level (maximum +10)": dice cannot carry a caster's level, so the
+                # per-caster half is a formula beside them (`Engine._cast_buff`).
+                Field("bonus", "Plus", "signed_formula", required=False,
+                      hint="Added to the dice: caster_level, min(caster_level, 10)."),
                 Field("source", "Source name", "text", required=False,
                       hint="Two sources do not stack; the name is how the sheet tells "
                            "them apart."),

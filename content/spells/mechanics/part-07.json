@@ -212,7 +212,11 @@
      "type": "speed",
      "target": "land",
      "amount": 30,
-     "note": "enhancement bonus to base land speed; no effect on burrow, climb, fly or swim. It also increases jumping distance."
+     "bonus_type": "enhancement"
+    },
+    {
+     "type": "narrative",
+     "target": "Only base land speed rises; burrow, climb, fly and swim are unchanged. It also lengthens jumps as increased speed does."
     }
    ],
    "converted_by": "read",
@@ -699,7 +703,7 @@
      "type": "temp_hp",
      "dice": "1d10",
      "source": "false life",
-     "note": "plus 1 temporary hit point per caster level, maximum +10"
+     "bonus": "min(caster_level, 10)"
     }
    ],
    "converted_by": "read",

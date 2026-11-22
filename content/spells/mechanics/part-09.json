@@ -436,8 +436,10 @@
      "target": "fear effects"
     },
     {
-     "type": "narrative",
-     "target": "The target gains temporary hit points equal to your caster level, maximum 20"
+     "type": "temp_hp",
+     "dice": "0",
+     "bonus": "min(caster_level, 20)",
+     "source": "greater heroism"
     }
    ],
    "duration": {

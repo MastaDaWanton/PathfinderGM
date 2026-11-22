@@ -227,17 +227,15 @@
    "effects": [
     {
      "type": "combat_mod",
-     "amount": 1,
+     "amount": "max(1, min(3, caster_level/3))",
      "bonus_type": "luck",
-     "target": "attack",
-     "note": "+1 per three caster levels, minimum +1, maximum +3"
+     "target": "attack"
     },
     {
      "type": "combat_mod",
-     "amount": 1,
+     "amount": "max(1, min(3, caster_level/3))",
      "bonus_type": "luck",
-     "target": "damage",
-     "note": "+1 per three caster levels, minimum +1, maximum +3; does not apply to spell damage"
+     "target": "damage"
     }
    ],
    "duration": {
@@ -253,34 +251,35 @@
    "effects": [
     {
      "type": "combat_mod",
-     "amount": 1,
+     "amount": "max(1, min(6, caster_level/3))",
      "bonus_type": "luck",
-     "target": "attack",
-     "note": "+1 per three caster levels, maximum +6"
+     "target": "attack"
     },
     {
      "type": "combat_mod",
-     "amount": 1,
+     "amount": "max(1, min(6, caster_level/3))",
      "bonus_type": "luck",
-     "target": "damage",
-     "note": "+1 per three caster levels, maximum +6; weapon damage only"
+     "target": "damage"
     },
     {
-     "type": "situational_mod",
-     "amount": 1,
+     "type": "combat_mod",
+     "amount": "max(1, min(6, caster_level/3))",
      "bonus_type": "luck",
-     "target": "Strength checks and Strength-based skill checks",
-     "note": "+1 per three caster levels, maximum +6"
+     "target": "str_check"
     },
     {
      "type": "temp_hp",
-     "dice": "1",
+     "dice": "0",
      "source": "divine power",
-     "note": "1 temporary hit point per caster level"
+     "bonus": "caster_level"
     },
     {
      "type": "permission",
      "target": "On a full-attack action, make one additional attack at your full base attack bonus plus any appropriate modifiers. This does not stack with haste or a weapon's speed property."
+    },
+    {
+     "type": "narrative",
+     "target": "The same luck bonus applies to Strength-based skill checks."
     }
    ],
    "duration": {
@@ -2268,8 +2267,7 @@
        "type": "ability_mod",
        "amount": -2,
        "bonus_type": "size",
-       "target": "dex",
-       "note": "to a minimum Dexterity of 1"
+       "target": "dex"
       },
       {
        "type": "combat_mod",
@@ -2286,6 +2284,10 @@
       {
        "type": "narrative",
        "target": "The humanoid's height doubles and its weight multiplies by 8, moving it one size category up — a creature that becomes Large has a 10-foot space and 10-foot natural reach. Speed is unchanged. With too little room it grows as far as it can and may make a Strength check with its new score to burst any enclosure; failing that it is held without harm, since the spell cannot crush a creature by growing it. Worn and carried equipment grows too and melee weapons deal more damage, but any enlarged item that leaves its possession — including a thrown weapon or projectile — snaps back to normal size at once, so thrown and projectile weapons deal normal damage. Magical properties are not increased and size-increasing effects do not stack."
+      },
+      {
+       "type": "narrative",
+       "target": "The ability penalty cannot lower the score below 1."
       }
      ]
     }
@@ -2316,8 +2318,7 @@
        "type": "ability_mod",
        "amount": -2,
        "bonus_type": "size",
-       "target": "dex",
-       "note": "to a minimum Dexterity of 1"
+       "target": "dex"
       },
       {
        "type": "combat_mod",
@@ -2334,6 +2335,10 @@
       {
        "type": "narrative",
        "target": "As enlarge person: each humanoid doubles in height, multiplies its weight by 8 and rises one size category, gaining the space and reach of that size, with equipment enlarged alongside it and speed unchanged."
+      },
+      {
+       "type": "narrative",
+       "target": "The ability penalty cannot lower the score below 1."
       }
      ]
     }

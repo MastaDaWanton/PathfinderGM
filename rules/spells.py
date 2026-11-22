@@ -980,12 +980,12 @@ def casting_plan(spell, caster_level: int) -> dict:
             plan["riders"].append(spec)
 
     if plan["riders"]:
-        # Said out loud rather than left as an empty list somewhere. A +4 enhancement to
-        # Strength needs a duration in rounds to be applied, and a spell's duration is
-        # still prose — "minutes/level (1)" — so applying one would mean inventing how
-        # long it lasts. Shown to the GM instead of guessed at.
-        plan["note"] = ("recorded for the GM: applying these needs the spell's duration "
-                        "as a number of rounds, which is still prose")
+        # Said out loud rather than left as an empty list somewhere. Until 2026-11-22 this
+        # said a rider could not be applied because a spell's duration "is still prose";
+        # `duration_rounds` has read it into rounds since 2026-09-30, and the engine now
+        # runs every rider it can (`Engine._run_specs`, the buffs in `_cast_buff`).
+        plan["note"] = ("run by the engine where it can (Engine._run_specs); the rest is "
+                        "told for the GM")
     plan["missiles"] = missiles_at(getattr(spell, "id", ""), caster_level)
     return plan
 

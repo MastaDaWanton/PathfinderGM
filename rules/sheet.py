@@ -8331,7 +8331,11 @@ def _when_holds(when, ctx: dict | None) -> bool:
             if want not in ctx["against"]:
                 return False
         else:
-            if ctx.get(key) != want:
+            have = ctx.get(key)
+            # A roll may be against two things at once — a fear spell's save is against
+            # a spell and against fear (`Engine._cast_save`) — so a tuple answers by
+            # membership.
+            if (want not in have) if isinstance(have, tuple) else (have != want):
                 return False
     return True
 
