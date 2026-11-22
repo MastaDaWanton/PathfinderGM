@@ -6181,7 +6181,9 @@ class Actor:
                 if not doc:
                     continue
                 key = (doc["id"], str(doc.get("target") or ""))
-                if key in seen:
+                # "Its effects stack" (Extra Rage, Extra Ki …): the document says so with
+                # `stacks`, and each copy on the sheet adds its terms again.
+                if key in seen and not doc.get("stacks"):
                     continue
                 seen.add(key)
                 for spec in doc.get("modifiers") or ():

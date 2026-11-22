@@ -588,6 +588,7 @@ def uses_left(actor, doc: dict) -> tuple[int | None, int | None, str]:
             most = resources.evaluate(spec.get("max", 0), actor)
         except resources.FormulaError:
             most = 0
+        most += resources.max_bonus(actor, pid)
         return most, most, pid
     return 0, 0, pid
 

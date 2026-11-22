@@ -238,6 +238,24 @@ def from_dict(d: dict) -> Pool:
     )
 
 
+def max_bonus(actor, pid: str) -> int:
+    """What the funnel adds to a pool's maximum: the `pool.<id>` combat target.
+
+    Extra Rage's "6 additional rounds per day", Extra Ki's "+2", Extra Channel's "two
+    additional times" (content/feats/mechanics/pools.json). Audit 2026-11-22: a saved
+    barbarian held Extra Rage and raged 4 + Con rounds like one without it — the class
+    file's formula was the whole maximum and no feat could reach it. A term through
+    `_buff_mods` and `dice.stack`, so a timed effect or an item could raise a pool the
+    same way, and dropping the feat drops the rounds on the next load.
+    """
+    from .dice import stack
+
+    reader = getattr(actor, "_buff_mods", None)
+    if reader is None:
+        return 0
+    return sum(m.value for m in stack(reader("combat_mod", f"pool.{pid}")))
+
+
 def define(actor, spec: dict) -> Pool:
     """Create or recompute a pool on an actor from its definition.
 
@@ -247,6 +265,7 @@ def define(actor, spec: dict) -> Pool:
     """
     pid = str(spec["id"]).strip().lower()
     maximum = evaluate(spec.get("max", 0), actor) if spec.get("max") not in (None, "") else 0
+    maximum += max_bonus(actor, pid)
     pool = actor.pools.get(pid)
     if pool is None:
         pool = Pool(id=pid)

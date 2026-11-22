@@ -1,0 +1,54 @@
+{
+  "_about": "Lane F, 2026-11-22 (docs/implementation-audit-2026-11-22.md §5, Lane F). The Extra-X feats raise a pool's maximum through the funnel's `pool.<id>` target (rules/resources.py `max_bonus`, read by `resources.define` on every load and by the ability bar). `stacks` is the book's 'You can gain this feat multiple times. Its effects stack.' Improved Channel lands on the `bonus_from` prefixes the channel documents read (`Engine._bonus_from`). Numbers from the Core Rulebook feat text (aonprd.com / d20pfsrd.com Feats, read 2026-11-22).",
+  "extra-rage": {
+    "stacks": true,
+    "modifiers": [
+      {"type": "combat_mod", "target": "pool.rage", "amount": 6, "bonus_type": "untyped",
+       "note": "CRB: 'You can rage for 6 additional rounds per day.'"}
+    ]
+  },
+  "extra-ki": {
+    "stacks": true,
+    "modifiers": [
+      {"type": "combat_mod", "target": "pool.ki", "amount": 2, "bonus_type": "untyped",
+       "note": "CRB: 'Your ki pool increases by 2.'"}
+    ]
+  },
+  "extra-performance": {
+    "stacks": true,
+    "modifiers": [
+      {"type": "combat_mod", "target": "pool.bardic performance", "amount": 6,
+       "bonus_type": "untyped",
+       "note": "CRB: 'You can use bardic performance for 6 additional rounds per day.'"}
+    ]
+  },
+  "extra-lay-on-hands": {
+    "stacks": true,
+    "modifiers": [
+      {"type": "combat_mod", "target": "pool.lay on hands", "amount": 2,
+       "bonus_type": "untyped",
+       "note": "CRB: 'You can use your lay on hands ability two additional times per day.'"}
+    ]
+  },
+  "extra-channel": {
+    "stacks": true,
+    "modifiers": [
+      {"type": "combat_mod", "target": "pool.channel energy", "amount": 2,
+       "bonus_type": "untyped",
+       "note": "CRB: 'You can channel energy two additional times per day.'"}
+    ],
+    "not_yet": [
+      "A paladin's version: four more uses of lay on hands that may only be spent channelling positive energy. Her uses are one pool, so these are not added."
+    ]
+  },
+  "improved-channel": {
+    "modifiers": [
+      {"type": "combat_mod", "target": "channel.harm-undead.dc", "amount": 2,
+       "bonus_type": "untyped",
+       "note": "CRB: 'Add 2 to the DC of saving throws made to resist the effects of your channel energy ability.'"},
+      {"type": "combat_mod", "target": "channel.harm-living.dc", "amount": 2,
+       "bonus_type": "untyped",
+       "note": "The same +2 on negative energy that harms the living."}
+    ]
+  }
+}

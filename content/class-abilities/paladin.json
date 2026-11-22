@@ -95,7 +95,7 @@
                    "aliases": ["heal", "healing", "heal the living", "heal the wounded",
                                "positive energy to heal", "mend", "restore"]},
           "harm": {"undead_only": true, "roll_as": "damage", "harmful": true,
-                   "damage_type": "positive",
+                   "damage_type": "positive", "bonus_from": "channel.harm-undead",
                    "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod",
                             "success": "half"},
                    "aliases": ["harm", "hurt", "harm undead", "harm the undead",

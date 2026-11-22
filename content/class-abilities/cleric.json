@@ -37,6 +37,7 @@
                                "positive energy at the undead"]},
           "harm the living": {"living": true, "undead_only": false, "roll_as": "damage",
                               "harmful": true, "damage_type": "negative",
+                              "bonus_from": "channel.harm-living",
                               "healed_instead": "channel.negative.heals",
                               "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod",
                                        "success": "half"},
