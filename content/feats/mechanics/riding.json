@@ -1,0 +1,11 @@
+{
+  "_about": [
+    "Round 2, skills-body lane (2026-11-22): the feats that change a body or movement use",
+    "with its own row in content/rules/skill-uses.json. Each grants the standing tag the use's",
+    "door asks (rules/bodyskills.py), named for the use id as lane E's skills.json does.",
+    "Loaded beside core.json by rules/feats.py; nothing here is in core.json."
+  ],
+  "mounted-combat": {
+    "tags": ["skill.ride.mounted-combat"]
+  }
+}

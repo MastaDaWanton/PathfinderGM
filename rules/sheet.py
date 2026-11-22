@@ -1895,6 +1895,10 @@ class Actor:
             roll = dice.d20(self.save_modifiers(save, {"against": kind}),
                             label=f"{SAVES.get(save, save)} save against {e.name}",
                             visibility="hidden")
+            # A healer's treatment helps the one save it was made for (rules/bodyskills.py).
+            from .bodyskills import spend_treatment
+
+            spend_treatment(self, kind)
             made = d20_succeeds(roll, dc)
             step["streak"] = int(step.get("streak") or 0) + 1 if made else 0
             cure = aff.get("cure")

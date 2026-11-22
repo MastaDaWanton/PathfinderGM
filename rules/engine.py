@@ -874,9 +874,14 @@ class Scene:
 
         looker = self.actors.get(seen_by) if seen_by else None
 
+        from .bodyskills import rides_with
+
         out: set[tuple[int, int]] = set()
         for ref, anchor in self.positions.items():
             if ref == ignore or ref not in self.actors:
+                continue
+            # A rider and the steed under them share its square: neither blocks the other.
+            if ignore and rides_with(self, ref, ignore):
                 continue
             actor = self.actors[ref]
             if actor.has_condition("dead"):
@@ -8505,6 +8510,14 @@ class Engine:
             if str(skill).lower() == named_skill and intent.params.get(flag) \
                     and helped is None:
                 return getattr(skilluses, resolve)(self, intent, actor, mods, partial)
+        # The body and movement uses (rules/bodyskills.py): a jump, a climb, a fall eased,
+        # a net slipped, a flier's manoeuvre, the saddle, a poison treated — the row's DC
+        # and the consequence through the applicator, never the plan's number alone.
+        from . import bodyskills
+
+        body_door = bodyskills.door_for(self, intent, actor) if helped is None else None
+        if body_door is not None:
+            return body_door(self, intent, actor, mods, partial)
         opposed = intent.params.get("opposed_by")
         # A creature's Perception with no DC and nobody named, while somebody here is
         # hidden from it: that is searching ("Intentionally searching for stimulus is a
@@ -10470,6 +10483,18 @@ class Engine:
                             state["ammo_missed"] = int(state.get("ammo_missed", 0)) + 1
                         state["i"] += 1
                         continue
+                # Mounted Combat (CRB feat): the rider's Ride against the attack roll, once
+                # a round, negates a hit on the steed (rules/bodyskills.py).
+                from . import bodyskills
+
+                negated = bodyskills.mounted_combat(self, actor, defender, atk, state)
+                if negated:
+                    self._judge(atk, False)
+                    state["tells"].append(negated)
+                    if counts_ammo:
+                        state["ammo_missed"] = int(state.get("ammo_missed", 0)) + 1
+                    state["i"] += 1
+                    continue
                 state["hit_total"] = atk.total
                 self._judge(atk, True)
                 if many and state["i"] == 0 and state.get("manyshot_at") is None:
@@ -29663,6 +29688,12 @@ class Engine:
         )
 
     def _op_move(self, intent: Intent, partial: dict) -> Outcome:
+        # A mounted rider moves on the steed's legs (rules/bodyskills.py `ridden_move`).
+        from . import bodyskills
+
+        ridden = bodyskills.ridden_move(self, intent, partial)
+        if ridden is not None:
+            return ridden
         ref = intent.params.get("who") or intent.actor
         actor = self.scene.actors[ref]
         was = self.scene.zones.get(ref, "near")
@@ -29710,6 +29741,11 @@ class Engine:
             return self._refuse(intent, f"{actor.name} is glued to the floor and cannot "
                                         f"move until they break free (a DC 17 Strength "
                                         f"check, or 15 slashing to the goo).")
+        if square is not None and actor.has_state(bodyskills.WIND_HELD) \
+                and tuple(square)[:2] != tuple(self.scene.positions.get(ref) or ())[:2]:
+            # Checked by a high wind (CRB, Fly): "a DC 20 Fly check to move at all".
+            return self._refuse(intent, f"The wind holds {actor.name} where they are this "
+                                        f"round: moving at all needs a DC 20 Fly check.")
         if square is not None and actor.has_state("state.position.pit") \
                 and tuple(square)[:2] != tuple(self.scene.positions.get(ref) or ())[:2]:
             from . import dungeons as dungeons_mod
@@ -29756,6 +29792,7 @@ class Engine:
                              f"get up (Climb {climbed.total} against DC {climb[1]}).",
                         rolls=[climbed], because=intent.because)
             self.scene.positions[ref] = tuple(square)
+            bodyskills.carry_rider(self.scene, ref)
             self.scene.settle_levels()
             # The zone is now measured rather than taken on trust. The GM may still have
             # said "near"; if the square it also gave is forty feet away, the square wins.
@@ -35661,6 +35698,11 @@ class Engine:
         result = actor.sleep_through(kind, self.dice, slept=int(camp.get("hours") or 0) or None)
         levelled, refilled, prep_said = (result["levelled"], result["refilled"],
                                          result["prepared"])
+        # The company sleeps the same night and heals by the same rule (CRB p.191), long-
+        # term care doubling it (`Actor.rest` reads `care.long-term`). Until 2026-11-22
+        # only the sleeper rested, so a companion's wounds never closed and the Heal
+        # skill's long-term care on them did nothing anybody could see.
+        mates_said = self._company_rests(actor, kind) if result["hours"] else []
         # Everyone, not only the sleeper. Rest ticked the resting actor alone, so an
         # NPC standing in the same scene kept every timed buff through an eight-hour
         # night. `advance` also leaves the body alone: `Actor.rest` has already called
@@ -35717,6 +35759,7 @@ class Engine:
             bits.append(f"{actor.name} is on their feet again.")
         if refilled:
             bits.append("Recovered: " + ", ".join(refilled) + ".")
+        bits.extend(mates_said)
         # What the night ended is told behind this by `_ended_settles`, like every door
         # that moves the clock.
         if prep_said:
@@ -35749,6 +35792,24 @@ class Engine:
                     if levelled and levelled.get("ok") else ""),
             because=intent.because,
         ), bill)
+
+    def _company_rests(self, sleeper, kind: str) -> list[str]:
+        """Everyone travelling with the sleeper rests the night too (`Actor.rest`, the
+        body's half only: a hireling or a horse has no slots to refill or level to settle
+        here). The sentence for each one the night healed."""
+        if not sleeper.is_pc:
+            return []
+        said = []
+        for mate in self.scene.actors.values():
+            if mate is sleeper or mate.is_pc or mate.is_dead \
+                    or not mate.has_state(states.TRAVELS_WITH_YOU):
+                continue
+            healed = int(mate.rest(kind).get("healed") or 0)
+            if healed:
+                said.append(f"{mate.name} heals {healed} hit point{'s' if healed != 1 else ''} "
+                            f"in the night "
+                            f"({mate.hp}/{mate.hp_max}).")
+        return said
 
     def _room_bill(self, intent: Intent, actor) -> dict | None:
         """The bill for a bed where the party stands, before the night is slept: None

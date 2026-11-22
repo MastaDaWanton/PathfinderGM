@@ -397,6 +397,11 @@ TAGS: dict[str, tuple[str, ...]] = {
     "paralyzed":   ("state.unable.paralyzed", "state.held", "state.helpless", "state.exposed"),
     "pinned":      ("state.held.pinned", "recovery.rest", "state.exposed"),
     "grappled":    ("state.held.grappled", "recovery.rest"),
+    # Tied up (CRB, Grapple: "Tie Up ... This works like a pin effect, but the DC to escape
+    # the bonds is equal to 20 + your CMB") and manacled (Escape Artist: DC 30). Slipped by
+    # Escape Artist (rules/bodyskills.py `bonds`); never swept by a night's sleep.
+    "bound":       ("state.held.bound", "state.exposed"),
+    "manacled":    ("state.held.bound.manacles",),
     "stunned":     ("state.unable.stunned", "state.exposed"),
     "dazed":       ("state.unable.dazed", "recovery.rest"),
     "cowering":    ("state.unable.cowering", "recovery.rest", "state.exposed"),
@@ -898,6 +903,9 @@ BLOCKS: dict[str, frozenset[str]] = {
     CURSE_BARS_ANY: frozenset(("cast", "cast.arcane", "cast.divine")),
     CURSE_BARS_ARCANE: frozenset(("cast.arcane",)),
     CURSE_BARS_DIVINE: frozenset(("cast.divine",)),
+    # Hanging along a mount's flank (CRB, Ride: "You can't attack or cast spells while
+    # using your mount as cover"; rules/bodyskills.py `cover`).
+    "state.position.mount-cover": frozenset(("attack", "cast")),
 }
 
 

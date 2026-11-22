@@ -3845,6 +3845,23 @@ def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...],
                 "properties": {"value": {"type": "string", "enum": sorted(CIRCUMSTANCE)},
                                "why": {"type": "string", "minLength": 8}},
                 "required": ["value", "why"]}
+        # The body and movement use (rules/bodyskills.py): the declared skill's own closed
+        # words when the words named one, every skill's otherwise — the model chooses,
+        # the engine validates (`intents.parse`). Its feet are whole numbers.
+        from rules.bodyskills import USES, WINDS
+
+        if "use" in props and skill and skill not in USES:
+            for name in ("use", "distance_ft", "height_ft", "wind"):
+                props.pop(name, None)     # a skill with no such uses offers none
+        elif "use" in props:
+            words = USES.get(skill) if skill else None
+            props["use"] = {"type": "string", "enum": list(words or dict.fromkeys(
+                u for us in USES.values() for u in us))}
+        for feet in ("distance_ft", "height_ft"):
+            if feet in props:
+                props[feet] = {"type": "integer", "minimum": 0}
+        if "wind" in props:
+            props["wind"] = {"type": "string", "enum": list(WINDS)}
     if op == "cast" and "aim" in props:
         from rules import areas
 

@@ -329,6 +329,15 @@ CONDITIONS: dict[str, dict] = {
         "name": "Pinned", "ac": -4, "lose_dex_to_ac": True, "attack": -4,
         "note": "-4 AC, loses Dex to AC, tightly bound and barely able to act",
     },
+    # Tied up works "like a pin effect" (CRB, Grapple, Tie Up): the pin's numbers.
+    "bound": {
+        "name": "Bound", "ac": -4, "lose_dex_to_ac": True, "attack": -4,
+        "note": "tied up: as pinned; slipped with Escape Artist at 20 + the binder's CMB",
+    },
+    "manacled": {
+        "name": "Manacled",
+        "note": "wrists in manacles; slipped with a DC 30 Escape Artist check",
+    },
     "paralyzed": {
         "name": "Paralyzed", "lose_dex_to_ac": True, "helpless": True,
         "note": "Str and Dex reduced to 0, helpless, cannot move or act",
