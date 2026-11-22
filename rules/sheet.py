@@ -7675,6 +7675,11 @@ def _document_effect_text(doc: dict) -> str:
             str(spec.get("type") or ""))
         what = (effectspec._vocab_name(vocab, target).lower() if vocab
                 else target.replace("_", " "))
+        # The funnel targets a class document reads (`classbuilder._feat_funnel_targets`).
+        if target.startswith("pool."):
+            what = f"{target[5:]} a day"
+        elif target.startswith("channel.") and target.endswith(".dc"):
+            what = "channel energy save DC"
         if spec.get("type") == "save_mod":
             what += " saves"
         typed = str(spec.get("bonus_type") or "")
@@ -9282,14 +9287,17 @@ def validate(actor: Actor) -> None:
         # bestiary creature's printed feats (on the sheet since 2026-11-15) are the book's
         # own block, shown on the bestiary page; a note per undocumented feat on every
         # monster would only fill its notes.
+        note = f"[feat '{f}' is carried as flavour; engine applies nothing]"
         if feats_mod.document(f) or actor.from_template:
+            # A feat that gained a document since the note was written (Extra Rage,
+            # 2026-11-22: a saved barbarian's notes still said "applies nothing").
+            actor.notes = actor.notes.replace("\n" + note, "").replace(note, "")
             continue
         # Not fatal: an unrecognised feat contributes nothing and says so, which is
         # better than silently pretending it applied.
         #
         # Guarded against re-appending, because the campaign save round-trips through
         # here on every load and an unguarded += grows the note without bound.
-        note = f"[feat '{f}' is carried as flavour; engine applies nothing]"
         if note not in actor.notes:
             actor.notes += f"\n{note}"
     # Armour and a shield are stored by their table key and nothing else: `wear` writes

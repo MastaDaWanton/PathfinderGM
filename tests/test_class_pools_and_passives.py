@@ -293,3 +293,20 @@ def test_crippling_strike_and_slow_reactions_ride_a_sneak_attack():
     assert reactions.reactions_for(s2.actors["c1"])
     _swing(e2, "c1", face=19)
     assert not reactions.reactions_for(s2.actors["c1"])
+
+
+def test_a_saved_note_that_a_documented_feat_does_nothing_is_dropped_on_load():
+    """Live, 2026-11-22, the owner's saved barbarian (owner-1120-data, frag.json): after
+    Extra Rage got its document the pool read 9/15, and the sheet still carried "feat
+    'extra rage' is carried as flavour; engine applies nothing" in its notes, and the feat
+    line read "+6 pool.rage". The stale note goes on load; the line says "rage a day"."""
+    from rules.sheet import from_dict, load_pc, to_dict
+
+    d = to_dict(load_pc("fixtures/pc-kesst.json"))
+    d.update({"class": "barbarian", "level": 1, "feats": ["extra rage"], "ranks": {},
+              "notes": "[feat 'extra rage' is carried as flavour; engine applies nothing]"})
+    pc = from_dict(d, ref="pc")
+    assert "extra rage" not in pc.notes
+    from rules.sheet import _document_effect_text
+
+    assert "+6 rage a day" in _document_effect_text(feats_mod.document("extra rage"))
