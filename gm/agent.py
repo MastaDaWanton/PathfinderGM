@@ -5103,6 +5103,22 @@ class GMAgent:
                     isinstance(r, dict) and str(r.get("op", "")).lower() == "check"
                     and str((r.get("params") or {}).get("skill") or "").lower() == skill
                     for r in raw)):
+                if op == "check":
+                    # The declared body's use and its feet are the sampler's required
+                    # answers (gm/prompts.py `_declared_op`); the plan's own check of the
+                    # same skill keeps its band and takes them. Measured live 2026-11-22:
+                    # the plan's "jump across the ten-foot gap" check stood in for the
+                    # declared one and the jump was rolled at "average", gap unread.
+                    own = next((r for r in raw if isinstance(r, dict)
+                                and str(r.get("op", "")).lower() == "check"
+                                and (not skill or str((r.get("params") or {}).get("skill")
+                                                      or "").lower() == skill)), None)
+                    if own is not None and params.get("use") not in (None, "", "none"):
+                        mine = dict(own.get("params") or {})
+                        for key in ("use", "distance_ft", "height_ft", "wind"):
+                            if key in params and mine.get(key) in (None, ""):
+                                mine[key] = params[key]
+                        own["params"] = mine
                 # A plan's check of another skill is not the declared one (playtest
                 # 2026-11-16 #37: the plan's own Stealth stood in for a declared Climb).
                 if op == "travel" and params.get("place"):

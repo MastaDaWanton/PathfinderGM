@@ -11,10 +11,11 @@ quotes), the row's action, and the consequence through the one applicator.
 
 How a use is chosen: the check's `use` param, a closed word per skill (`USES`), which the
 declared-op schema offers the plan as an enum (gm/prompts.py `_declared_op`) — models
-read, code validates. Three are the engine's own default when no `use` is named, because
+read, code validates. Four are the engine's own default when no `use` is named, because
 the skill has only the one thing it can mean in that state (`default_use`): a Climb check
 is climbing, an Escape Artist check by somebody tied or netted is slipping the bonds, a
-Heal check at somebody poisoned or diseased (and not dying) is treating it.
+Heal check at somebody poisoned or diseased (and not dying) is treating it, and a Ride
+check with a mount here and nobody in its saddle is getting on.
 
 The fiction's one scalar: a jump's `distance_ft`, and the `height_ft` of a climb, a drop or
 a fall — the same sanctioned shape as the `hazard` op's `distance_ft` (content/rules/
@@ -68,12 +69,22 @@ def _held(actor, tag: str):
 
 
 def default_use(engine, intent, actor) -> str:
-    """The use a check means when it names none, read off the engine's state — or ""."""
+    """The use a check means when it names none, read off the engine's state — or "".
+    Climb is climbing; Escape Artist by somebody tied or netted is slipping it; Heal at
+    somebody poisoned or diseased (and not dying) is treating it; Ride with a mount here
+    and nobody in its saddle is getting on."""
     skill = str(intent.params.get("skill") or "").lower()
     if skill == "climb" and not actor.has_state("state.position.pit"):
         return "move"
     if skill == "escape artist" and _bonds_on(actor) is not None:
         return "bonds"
+    if skill == "ride" and mount_of(engine.scene, actor) is None:
+        # Not in the saddle, with a mount here to get on: the Ride check is getting on.
+        # Measured live 2026-11-22: "I mount my horse, the bay mare." planned a plain
+        # Ride check at "average" and nobody sat on the horse.
+        steed = _steed_here(engine, intent, actor)
+        if steed is not None and not _rideable(actor, steed):
+            return "mount"
     if skill == "heal":
         from . import firstaid
 
@@ -395,7 +406,8 @@ def climb(engine, intent, actor, mods, partial):
                 actor.remove_effects(source=CLIMB_SOURCE)
                 fx.append({"ref": actor.ref, "kind": "climb", "made": True, "top": True})
                 bits.append(f"{actor.name} climbs{dc_mod.by(margin)} and reaches the top"
-                            + (f", {top} feet up." if top else "."))
+                            + (f", {top} feet up" if top else "")
+                            + (f", after {len(rolls) + 1} Climb checks." if rolls else "."))
                 break
             if scene.in_encounter:
                 _cling(actor, at=at, top=top, dc=value)
@@ -711,7 +723,8 @@ def mount(engine, intent, actor, mods, partial):
     if why:
         return engine._refuse(intent, why + " Nothing is done.")
     gap = engine._gap_ft(actor, steed)
-    if gap is not None and gap > 5:
+    # Out of a fight the rider walks over to it first; in one the walk is a move of its own.
+    if gap is not None and gap > 5 and scene.in_encounter:
         return engine._refuse(intent, f"{steed.name} is {int(gap)} feet away: get beside it "
                                       f"first. Nothing is done.")
     roll, how, refused = _fast(engine, actor, mods, "mount")

@@ -1489,13 +1489,15 @@ def _check_params(intent: Intent, index: int) -> None:
         from .bodyskills import USES as _BODY_USES, WINDS as _WINDS
 
         body_use = str(p.get("use") or "").strip().lower()
-        if body_use:
-            allowed = _BODY_USES.get(str(p.get("skill") or "").strip().lower(), ())
-            if body_use not in allowed:
-                raise IntentError(
-                    f"check: use {body_use!r} is not a use of {p.get('skill')!r}. "
-                    + (f"Use one of {', '.join(allowed)}, or drop use." if allowed
-                       else "Drop use."), "schema", index)
+        allowed = _BODY_USES.get(str(p.get("skill") or "").strip().lower(), ())
+        if body_use and body_use not in allowed:
+            # "none" is the sampler's word for a plain check (gm/prompts.py `_declared_op`
+            # asks the use of every declared check whose skill the words did not name),
+            # and a use of another skill is the same plain check: dropped, never a turn
+            # sent back to be written again for a word that changes nothing else.
+            p.pop("use", None)
+            body_use = ""
+        elif body_use:
             p["use"] = body_use
         for key, top in (("distance_ft", 100), ("height_ft", 500)):
             if p.get(key) in (None, ""):

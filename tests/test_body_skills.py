@@ -84,12 +84,14 @@ def test_every_declarable_use_has_a_row_and_a_door():
             assert uid in bodyskills.DOORS, uid
 
 
-def test_a_use_of_another_skill_is_refused_at_the_parse_with_the_fix_named():
+def test_the_parse_keeps_only_a_use_of_the_skill_named_and_bounds_the_feet():
     from rules.intents import IntentError
 
     scene, engine, pc = _scene()
-    with pytest.raises(IntentError, match="not a use of 'perception'"):
-        engine.validate([_check(skill="perception", use="jump")])
+    # A use of another skill, or the sampler's "none", is a plain check of the skill named.
+    for use in ("jump", "none"):
+        got = engine.validate([_check(skill="perception", use=use, dc={"band": "easy"})])
+        assert "use" not in got[0].params
     with pytest.raises(IntentError, match="distance_ft is from 0 to 100"):
         engine.validate([_check(skill="acrobatics", use="jump", distance_ft=400)])
 
@@ -235,8 +237,11 @@ def test_in_a_fight_a_climber_holds_the_wall_and_loses_dexterity():
 
 def test_a_tied_body_slips_its_ropes_with_escape_artist_and_the_bond_comes_off():
     scene, engine, pc = _scene(faces={"Escape Artist": 20})
-    pc.add_condition("bound", source="the bandits' rope")
-    assert pc.has_state("state.held.bound") and pc.loses_dex_to_ac
+    # Tied up (CRB, Grapple, Tie Up): no door ties anybody yet, so the restraint is laid
+    # as the effect a tie-up would lay; the escape reads the tag, never a name.
+    pc.apply_effect(ActiveEffect(name="the bandits' rope", kind="situation", key="bound",
+                                 source="t", origin="author:test",
+                                 tags=("state.held.bound", "state.exposed")))
     out = _run(engine, _check(skill="escape artist", dc={"band": "tough"}))[0]
     assert out.dc["value"] == 20 and out.verdict == "success"
     assert not pc.has_state("state.held.bound")
@@ -244,12 +249,22 @@ def test_a_tied_body_slips_its_ropes_with_escape_artist_and_the_bond_comes_off()
 
 def test_manacles_are_dc_thirty_and_out_of_reach_of_a_low_bonus():
     scene, engine, pc = _scene()
-    pc.add_condition("manacled", source="the watch")
+    pc.apply_effect(ActiveEffect(name="manacles", kind="situation", key="manacled",
+                                 source="t", origin="author:test",
+                                 tags=("state.held.bound.manacles",)))
     out = _run(engine, _check(skill="escape artist", dc={"band": "easy"}))[0]
     if _total(pc, "escape artist") < 10:
         assert out.status == "refused" and "DC 30" in out.tell
     else:
         assert out.dc["value"] == 30
+
+
+def test_a_net_is_slipped_at_dc_twenty_as_a_full_round_action():
+    scene, engine, pc = _scene(faces={"Escape Artist": 20})
+    pc.add_condition("entangled", source="a net")
+    out = _run(engine, _check(skill="escape artist", dc={"band": "easy"}))[0]
+    assert out.dc["value"] == 20 and out.verdict == "success"
+    assert not pc.has_state("state.held.entangled")
 
 
 def test_squeezing_through_is_dc_thirty_and_a_minute():
@@ -424,3 +439,46 @@ def test_companions_heal_in_the_night_and_long_term_care_doubles_it():
     assert plain > 0 and any("the bay heals" in s for s in said), said
     cared, _ = night(True)
     assert cared == 2 * plain
+
+
+def test_a_ride_check_by_somebody_out_of_the_saddle_with_a_mount_here_is_getting_on():
+    """Measured live 2026-11-22: "I mount my horse, the bay mare." planned a plain Ride check
+    at "average"; it was made by 33 and nobody sat on the horse. The engine reads the use
+    off its state: not mounted, one mount here."""
+    scene, engine, pc, horse = _stable()
+    out = _run(engine, _check(skill="ride", dc={"band": "average"}))[0]
+    assert "mounts the bay" in out.tell and bodyskills.mount_of(scene, pc) is horse
+
+
+# --- the route from the words ----------------------------------------------------------------
+
+def test_an_athletics_deed_owes_a_check_whose_use_and_feet_the_sampler_must_fill():
+    """Measured live 2026-11-22 on gemma-4-12B: "I take a running start and jump across the
+    ten-foot gap between the two rooftops" read `athletics`, owed no op, and the plan's own
+    Acrobatics check rolled at "average" (DC 10 less 2 for "only ten feet"). Owed, the
+    declared check carries the use and the feet as required answers; the reply came back
+    `use: jump, distance_ft: 10` and the jump's own DC ran."""
+    from gm import interpret, prompts
+
+    frame = {"actions": [{"act": "athletics", "commit": "done",
+                          "span": "jump across the ten-foot gap", "place": "the gap"}]}
+    assert interpret.ops_for(frame) == ["check"]
+    schema = prompts.turn_schema(must_contain=("check",))
+    body = schema["properties"]["declared"]["properties"]["check"]["properties"]["params"]
+    assert {"use", "distance_ft", "height_ft"} <= set(body["required"])
+    assert "none" in body["properties"]["use"]["enum"]
+    named = prompts.turn_schema(must_contain=("check",), skill="perception")
+    body = named["properties"]["declared"]["properties"]["check"]["properties"]["params"]
+    assert "use" not in body["properties"], "a skill with no such uses is asked none"
+
+
+def test_the_declared_use_rides_onto_the_plans_own_check_of_that_skill():
+    from gm.agent import GMAgent
+
+    raw = [{"op": "check", "actor": "pc", "params": {"skill": "acrobatics",
+                                                      "dc": {"band": "average"}}}]
+    merged = GMAgent._merge_declared(raw, {"check": {"params": {
+        "skill": "acrobatics", "use": "jump", "distance_ft": 10, "height_ft": 0}}}, "pc")
+    checks = [r for r in merged if r["op"] == "check"]
+    assert len(checks) == 1
+    assert checks[0]["params"]["use"] == "jump" and checks[0]["params"]["distance_ft"] == 10

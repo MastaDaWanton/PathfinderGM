@@ -397,11 +397,6 @@ TAGS: dict[str, tuple[str, ...]] = {
     "paralyzed":   ("state.unable.paralyzed", "state.held", "state.helpless", "state.exposed"),
     "pinned":      ("state.held.pinned", "recovery.rest", "state.exposed"),
     "grappled":    ("state.held.grappled", "recovery.rest"),
-    # Tied up (CRB, Grapple: "Tie Up ... This works like a pin effect, but the DC to escape
-    # the bonds is equal to 20 + your CMB") and manacled (Escape Artist: DC 30). Slipped by
-    # Escape Artist (rules/bodyskills.py `bonds`); never swept by a night's sleep.
-    "bound":       ("state.held.bound", "state.exposed"),
-    "manacled":    ("state.held.bound.manacles",),
     "stunned":     ("state.unable.stunned", "state.exposed"),
     "dazed":       ("state.unable.dazed", "recovery.rest"),
     "cowering":    ("state.unable.cowering", "recovery.rest", "state.exposed"),
