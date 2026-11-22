@@ -24409,6 +24409,22 @@ class Engine:
                                        "condition": key, "rounds_left": cond.rounds_left,
                                        "origin": origin, "charmed": True},
                             "tell": attitude_mod.said(defender.name, was, key)})
+            elif kind in ("ability_damage", "ability_drain"):
+                # Through the one door score damage has (`_op_ability_damage`), stamped
+                # with the gate's origin, which an amount-op needs.
+                res = self._run_within(self.validate([{
+                    "op": "ability_damage", "visibility": "hidden", "because": f"the {what}",
+                    "params": {"to": defender.ref,
+                               "ability": str(branch.get("target") or "con"),
+                               "amount": str(branch.get("dice") or "1"),
+                               "drain": kind == "ability_drain"}}],
+                    origin=origin, origin_name=what))
+                for o in res:
+                    for e in o.effects or []:
+                        out.append({"effect": e, "tell": ""})
+                    if o.tell:
+                        out.append({"effect": {"ref": defender.ref,
+                                               "kind": "item_rider_said"}, "tell": o.tell})
             elif kind == "apply_condition":
                 params = {"condition": str(branch.get("target") or ""), "to": defender.ref}
                 dur = branch.get("duration")
@@ -27631,6 +27647,19 @@ class Engine:
         riders = [r for r in plan.get("riders") or () if isinstance(r, dict)
                   and spells_mod._is_the_spells_own(r)]
         gates = [r for r in riders if str(r.get("type") or "") == "save_gate"]
+        # The chosen option of a choice, when it is a gate (blindness/deafness, command):
+        # its save is this cast's to roll, as a top-level gate's is. Only once chosen — an
+        # unchosen choice applies nothing (`_choose`), so it calls for no save either.
+        chosen = intent.params.get("choose")
+        for r in riders:
+            if str(r.get("type") or "") != "choose_one" or chosen in (None, ""):
+                continue
+            try:
+                opt = (r.get("options") or [])[int(chosen) - 1]
+            except (TypeError, ValueError, IndexError):
+                continue
+            if isinstance(opt, dict) and str(opt.get("type") or "") == "save_gate":
+                gates.append(opt)
         ctx = {"spell_save": str(spell.save or ""),
                "spell_save_effect": str(spell.save_effect or ""),
                "spell_harmless": bool(spell.save_harmless), "source": spell.name,
@@ -27760,6 +27789,11 @@ class Engine:
         """Whether `_magic_gate` applies this branch: a failure's condition or slaying, or
         a success's condition with a duration of its own."""
         kind = str(branch.get("type") or "")
+        # Ability damage on either branch: a success branch that names one is what a made
+        # save still costs (green caress, foul waters). Lane B, 2026-11-22: 14 spells told
+        # their score damage on a failed save and never dealt it.
+        if kind in ("ability_damage", "ability_drain"):
+            return True
         if not saved:
             return kind in ("apply_condition", "slay", "attitude")
         dur = branch.get("duration")

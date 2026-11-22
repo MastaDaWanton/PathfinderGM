@@ -226,3 +226,64 @@ def test_resist_energy_is_a_choice_of_five_with_the_books_steps(cl, points):
     assert got == {"acid", "cold", "electricity", "fire", "sonic"}
     for o in choice["options"]:
         assert effectspec.evaluate(o["amount"], {"caster_level": cl}) == points
+
+
+# --- save-or-condition, finished -----------------------------------------------------------
+
+def _failed(out, save):
+    return f"fails the {save} save" in out.tell
+
+
+def test_a_failed_save_deals_the_ability_damage_its_branch_names():
+    """Audit 2026-11-22: 14 spells' failure branch held `ability_damage` (chill touch's
+    1 Strength, haunting mists' 1d2 Wisdom) and `_magic_gate` applied only conditions, so
+    the score damage was told and never dealt. Chill touch, read: 1d6 negative always, and
+    1 Strength damage on a failed Fortitude save."""
+    hit = 0
+    for seed in range(1, 30):
+        s, e = table(caster(["chill-touch"], level=1), seed=seed)
+        out = cast(e, "chill-touch").outcomes[0]
+        if _failed(out, "Fortitude"):
+            assert "takes 1 Strength damage" in out.tell, out.tell
+            hit += 1
+        elif "makes the Fortitude save" in out.tell:
+            assert "takes 1 Strength damage" not in out.tell, out.tell
+    assert hit, "no failed save in 29 seeds"
+
+
+def test_blindness_deafness_blinds_whom_the_caster_chose_on_a_failed_save():
+    """Blindness/deafness (CRB): blinded or deafened, chosen at casting, Fortitude negates,
+    permanent. It was a narrative because no type held the choice; `choose_one` does, and
+    the chosen option's save is the cast's to roll (`_rider_saves`)."""
+    for seed in range(1, 30):
+        s, e = table(caster(["blindness-deafness"]), seed=seed)
+        out = cast(e, "blindness-deafness", choose=1).outcomes[0]
+        thug = s.actors["c1"]
+        if _failed(out, "Fortitude"):
+            assert thug.has_state("state.senses.blinded"), out.tell
+            assert not thug.has_state("state.senses.deafened")
+            return
+        assert not thug.has_state("state.senses.blinded"), out.tell
+    pytest.fail("no failed save in 29 seeds")
+
+
+def test_an_unchosen_blindness_deafness_lays_nothing_and_rolls_no_save():
+    s, e = table(caster(["blindness-deafness"]))
+    out = cast(e, "blindness-deafness").outcomes[0]
+    assert not s.actors["c1"].has_state("state.senses")
+    assert "Fortitude save" not in out.tell
+    assert "Nothing is applied until one is chosen" in out.tell
+
+
+def test_command_halt_dazes_for_one_round_on_a_failed_will_save():
+    """Command (CRB): "Halt: The subject stands in place for 1 round. It may not take any
+    actions but is not considered helpless" — the book's dazed ("can take no actions, but
+    has no penalty to AC"). It was a narrative under a Will gate; halt and fall now lay."""
+    for seed in range(1, 30):
+        s, e = table(caster(["command"], level=3, klass="cleric", stat="wis"), seed=seed)
+        out = cast(e, "command", choose=5).outcomes[0]
+        thug = s.actors["c1"]
+        if _failed(out, "Will"):
+            assert thug.has_state("state.unable.dazed"), out.tell
+            return
+    pytest.fail("no failed save in 29 seeds")

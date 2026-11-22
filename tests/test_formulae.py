@@ -199,7 +199,10 @@ def test_a_first_level_potion_is_in_reach_at_alchemist_one():
     """Contracts §5 wrote a derived row's level as max(1, 2n): 2 for a 1st-level spell,
     which the owner's cap opens at Alchemist 1 (Q6.1: 1st-level potions at level 1)."""
     assert [formulae.level_for_spell_level(n) for n in (0, 1, 2, 3, 9)] == [1, 1, 4, 6, 18]
-    row = formulae.get("potion-of-burning-hands")
+    # Shocking grasp, not burning hands: read by hand (lane B, 2026-11-22), burning hands
+    # carries a told part (what its flames set alight), and a spell with a told part is
+    # not bottled (`_executable_all`). The regex had hidden it.
+    row = formulae.get("potion-of-shocking-grasp")
     assert row["level"] == 1 and formulae.within_reach(row, 1)
     haste = formulae.get("potion-of-haste")
     assert not formulae.within_reach(haste, 5)
@@ -268,7 +271,7 @@ def test_a_derived_formula_exists_only_for_a_spell_whose_effects_all_execute():
 def test_a_harmful_spell_yields_a_thrown_flask_and_says_who_it_takes():
     """Owner, open point 5: drunk, the drinker is the target; it may also go into a
     thrown flask, the struck creature the target. The row names its forms."""
-    row = formulae.get("potion-of-burning-hands")
+    row = formulae.get("potion-of-shocking-grasp")
     assert row["harmful"] and row["families"] == ["potion", "splash"]
     assert row["delivers"] == {"potion": "the drinker", "splash": "the creature it strikes"}
     mage = formulae.get("potion-of-mage-armor")

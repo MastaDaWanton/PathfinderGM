@@ -447,13 +447,13 @@
       "effects": [
         {
           "type": "combat_mod",
-          "amount": "min(5, 2 + max(0, (caster_level - 3) / 3))",
+          "amount": 2,
           "bonus_type": "natural armour",
           "target": "ac",
-          "note": "an enhancement to natural armour: it stacks with natural armour but not other natural-armour enhancements"
+          "note": "+1 more per three caster levels above 3rd, maximum +5"
         }
       ],
-      "notes": "Formula: +2, +3 at 6, +4 at 9, +5 at 12.",
+      "notes": "Kept as spells.CURATED wrote it: its note is the caster-level scaling Engine._ac_grant reads (+2, rising to +5), which the reader's formula duplicated.",
       "converted_by": "read"
     },
     "battering-blast": {
@@ -782,7 +782,6 @@
         {
           "type": "concealment",
           "miss_chance": 50,
-          "recipient": "self",
           "note": "against physical attacks; only 20% if the attacker can strike ethereal creatures or see invisible"
         },
         {
@@ -3436,7 +3435,6 @@
         {
           "type": "apply_condition",
           "target": "invisible",
-          "recipient": "self",
           "note": "as an ethereal creature, to those on the Material Plane"
         },
         {
@@ -3754,8 +3752,7 @@
         {
           "type": "resistance",
           "target": "fire",
-          "amount": 5,
-          "recipient": "self"
+          "amount": 5
         },
         {
           "type": "narrative",
@@ -4618,7 +4615,6 @@
           "amount": "min(5, 1 + max(0, (caster_level - 2) / 4))",
           "bonus_type": "deflection",
           "target": "ac",
-          "recipient": "self",
           "note": "one weapon, more at 6th and every 4 levels; each weapon thrown lowers it by 1"
         },
         {
@@ -8190,12 +8186,13 @@
       "effects": [
         {
           "type": "combat_mod",
-          "amount": "min(5, 2 + caster_level / 6)",
+          "amount": 2,
           "bonus_type": "deflection",
-          "target": "ac"
+          "target": "ac",
+          "note": "+1 more per six caster levels, maximum +5"
         }
       ],
-      "notes": "Formula gives +2, +3 at 6, +4 at 12, +5 at 18.",
+      "notes": "Kept as spells.CURATED wrote it: its note is the caster-level scaling Engine._ac_grant reads (+2, rising to +5), which the reader's formula duplicated.",
       "converted_by": "read"
     },
     "shillelagh": {
@@ -8245,7 +8242,6 @@
           "amount": 2,
           "bonus_type": "shield",
           "target": "ac",
-          "recipient": "self",
           "note": "applies against incorporeal touch attacks"
         },
         {
@@ -9871,15 +9867,13 @@
           "type": "situational_mod",
           "amount": 2,
           "bonus_type": "sacred",
-          "target": "AC against attacks by evil outsiders",
-          "recipient": "self"
+          "target": "AC against attacks by evil outsiders"
         },
         {
           "type": "situational_mod",
           "amount": 2,
           "bonus_type": "sacred",
-          "target": "saves against effects created by evil outsiders",
-          "recipient": "self"
+          "target": "saves against effects created by evil outsiders"
         },
         {
           "type": "narrative",
@@ -10306,6 +10300,132 @@
         }
       ],
       "notes": "Each-round damage is told: a per-level window cannot be written on an each_round spec without inventing a number, and an on-cast spec would hit the wrong creatures. No damage type is printed.",
+      "converted_by": "read"
+    },
+    "blindness-deafness": {
+      "effects": [
+        {
+          "type": "choose_one",
+          "note": "blinded or deafened, chosen as the spell is cast",
+          "options": [
+            {
+              "type": "save_gate",
+              "target": "fort",
+              "dc": "10 + spell level + casting ability modifier",
+              "on_failure": [
+                {
+                  "type": "apply_condition",
+                  "target": "blinded"
+                }
+              ],
+              "on_success": []
+            },
+            {
+              "type": "save_gate",
+              "target": "fort",
+              "dc": "10 + spell level + casting ability modifier",
+              "on_failure": [
+                {
+                  "type": "apply_condition",
+                  "target": "deafened"
+                }
+              ],
+              "on_success": []
+            }
+          ]
+        },
+        {
+          "type": "narrative",
+          "target": "Permanent until removed (remove blindness/deafness, or the caster dismisses it). Only living creatures."
+        }
+      ],
+      "notes": "CRB: Fortitude negates, permanent. Was a narrative in part-02 because no type held the choice; choose_one does, and the chosen option's save is rolled by _rider_saves (lane B, 2026-11-22). Overrides part-02.",
+      "converted_by": "read"
+    },
+    "command": {
+      "effects": [
+        {
+          "type": "choose_one",
+          "note": "the one-word command, chosen as the spell is cast",
+          "options": [
+            {
+              "type": "save_gate",
+              "target": "will",
+              "dc": "10 + spell level + casting ability modifier",
+              "on_failure": [
+                {
+                  "type": "narrative",
+                  "target": "Approach: on its turn it moves toward you as directly as it can, doing nothing else."
+                }
+              ],
+              "on_success": []
+            },
+            {
+              "type": "save_gate",
+              "target": "will",
+              "dc": "10 + spell level + casting ability modifier",
+              "on_failure": [
+                {
+                  "type": "narrative",
+                  "target": "Drop: it drops whatever it holds and cannot pick it up until its next turn."
+                }
+              ],
+              "on_success": []
+            },
+            {
+              "type": "save_gate",
+              "target": "will",
+              "dc": "10 + spell level + casting ability modifier",
+              "on_failure": [
+                {
+                  "type": "apply_condition",
+                  "target": "prone",
+                  "duration": {
+                    "amount": 1,
+                    "unit": "round"
+                  },
+                  "note": "Fall: it falls prone and stays prone for the round"
+                }
+              ],
+              "on_success": []
+            },
+            {
+              "type": "save_gate",
+              "target": "will",
+              "dc": "10 + spell level + casting ability modifier",
+              "on_failure": [
+                {
+                  "type": "narrative",
+                  "target": "Flee: on its turn it moves away from you as fast as it can, doing nothing else."
+                }
+              ],
+              "on_success": []
+            },
+            {
+              "type": "save_gate",
+              "target": "will",
+              "dc": "10 + spell level + casting ability modifier",
+              "on_failure": [
+                {
+                  "type": "apply_condition",
+                  "target": "dazed",
+                  "duration": {
+                    "amount": 1,
+                    "unit": "round"
+                  },
+                  "note": "Halt: it stands in place and takes no actions, but is not helpless — the book's dazed"
+                }
+              ],
+              "on_success": []
+            }
+          ]
+        },
+        {
+          "type": "narrative",
+          "target": "If it cannot carry out the command on its next turn, the spell fails."
+        }
+      ],
+      "notes": "CRB command: Will negates, 1 round, one of five commands. Fall lays prone and Halt lays dazed (dazed: 'can take no actions, but has no penalty to AC' — the same as halt's 'may not take any actions but is not considered helpless'). Approach, Drop and Flee have no condition in the vocabulary and stay told. Overrides part-04 (lane B, 2026-11-22).",
       "converted_by": "read"
     }
   }
