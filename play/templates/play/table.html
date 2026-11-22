@@ -2545,6 +2545,11 @@
   #combatbar { margin: 0; background: rgba(30, 12, 10, .55); box-shadow: var(--sunken); }
   #combatbar .cb-acts .v2-btn { min-height: 34px; }
   #combatbar .cb-acts .v2-btn[hidden] { display: none; }
+  #combatbar .cb-opts[hidden] { display: none; }
+  #combatbar .cb-opts .v2-btn { min-height: 30px; }
+  #combatbar .cb-opts .v2-btn[aria-pressed="true"], #cb-menu [data-offhand][aria-pressed="true"] {
+    color: #f4e6c0; border-color: var(--accent); transform: translate(1px, 2px);
+    box-shadow: inset 2px 3px 5px rgba(0, 0, 0, .7), inset 0 -2px 0 var(--accent); }
 
   /* The spell picker and the chip, in the desk's own materials. */
   #spellpop { background: linear-gradient(#211a13, #15110c); box-shadow: var(--bevel), var(--sh-3); }
@@ -3889,8 +3894,15 @@
         </div>
         <div class="cb-row" id="cb-targets" data-tut="cb-targets"></div>
         <div class="cb-row" id="cb-plan"></div>
+        <!-- The attack options the character may declare (feats, the monk's flurry):
+             toggles that ride the action picked after them (04-combat-and-turns.js). -->
+        <div class="cb-row cb-opts" id="cb-opts" hidden></div>
         <div class="cb-row cb-acts">
           <button type="button" class="v2-btn is-small" id="cb-strike" data-tut="cb-strike">Strike</button>
+          <button type="button" class="v2-btn is-small" id="cb-vital" hidden
+            title="The attack action: one blow that rolls the weapon's damage dice again">Vital Strike</button>
+          <button type="button" class="v2-btn is-small" id="cb-cleave" hidden
+            title="One blow; on a hit, another at a foe beside them. AC -2 until your next turn">Cleave</button>
           <button type="button" class="v2-btn is-small" id="cb-fullatk" data-tut="cb-fullatk">Full attack…</button>
           <!-- A carried flask thrown (alchemy, "also as thrown flasks"): offered only while
                one is carried (`attacks.flasks`, play/views.py `_flasks`). -->

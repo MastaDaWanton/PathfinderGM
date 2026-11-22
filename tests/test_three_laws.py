@@ -430,6 +430,14 @@ _REACHES = {
     ("combat_mod", "concentration"):
         lambda a: sum(m.value for m in a.concentration_modifiers()),
     ("combat_mod", "spell_dc"): lambda a: _spell_dc(a),
+    # Lane D, 2026-11-22: the attack-shape feats' targets, each read by one sheet reader.
+    ("combat_mod", "bab"): lambda a: sum(m.value for m in a.attack_modifiers()),
+    ("combat_mod", "extra_attacks"): lambda a: len(a.attack_sequence()),
+    ("combat_mod", "off_hand_attacks"):
+        lambda a: len(a.attack_sequence(full_attack=True)),
+    ("combat_mod", "weapon_dice"): lambda a: a.weapon_dice(),
+    ("combat_mod", "crit_confirm"): lambda a: sum(m.value for m in a.confirm_modifiers()),
+    ("combat_mod", "ac_moving"): lambda a: a.ac(provoked_by="movement"),
 }
 
 

@@ -782,7 +782,82 @@ def _attack_slots(pc) -> dict:
         # Where a melee strike with what is in hand reaches each foe from (`_reach_from`),
         # so the plan can warn before a move and a strike are committed together.
         "reach": _reach_from(pc),
+        # The attack options this character may declare (lane D, 2026-11-22): each feat's
+        # or the flurry's, offered only while `Actor.can_choose` says yes, so the bar
+        # offers what the player can do and nothing the engine would refuse.
+        **_attack_options(pc),
     }
+
+
+# What each declared option is on the combat bar: `swing` rides every blow (a toggle),
+# `full` changes what a full attack is made of (a toggle the Full attack menu reads), and
+# `strike` is its own one-blow action beside Strike. The words are the book's benefit,
+# short; the numbers are never here — the dice popup names them from the documents.
+_OPTION_SHAPES = {
+    "power_attack": ("swing", "Power Attack", "Less to hit, more damage, in melee."),
+    "deadly_aim": ("swing", "Deadly Aim", "Less to hit, more damage, with ranged weapons."),
+    "piranha_strike": ("swing", "Piranha Strike",
+                       "Less to hit, more damage, with a light weapon. Not with Power Attack."),
+    "combat_expertise": ("swing", "Combat Expertise",
+                         "Less to hit in melee, harder to hit until your next turn."),
+    "rapid_shot": ("full", "Rapid Shot",
+                   "A full attack: one more shot at your best bonus, all a little less sure."),
+    "flurry": ("full", "Flurry of blows",
+               "A full attack of extra blows with unarmed strikes or monk weapons."),
+    "vital_strike": ("strike", "Vital Strike",
+                     "One blow that rolls the weapon's dice again. The attack action."),
+    "cleave": ("strike", "Cleave",
+               "One blow, and on a hit another at a foe beside them. Guard down until "
+               "your next turn."),
+}
+
+
+def _attack_options(pc) -> dict:
+    """The bar's option buttons and what a full attack is made of under each.
+
+    `options`: [{id, name, text, shape}] for `Actor.attack_choices()`. `off_hands`: what
+    may swing in the off hand beside the weapon in hand (`Engine._off_hand_refusal`, the
+    engine's own rule). `plans`: for a full attack with no option, with each `full`
+    option, and with each off hand (`off:<key>`), the swings in order as
+    {bonus, weapon, hand} — the bonus the swing's own total (`attack_modifiers` with the
+    declared options), so the slot builder shows the number the roll will carry."""
+    from rules.engine import Engine
+
+    held = (pc.equipped or "unarmed")
+    try:
+        chosen = pc.attack_choices()
+    except Exception:  # noqa: BLE001 — a sheet the documents cannot read offers nothing
+        chosen = []
+    options = [{"id": c, "name": _OPTION_SHAPES[c][1], "text": _OPTION_SHAPES[c][2],
+                "shape": _OPTION_SHAPES[c][0]} for c in chosen if c in _OPTION_SHAPES]
+    candidates = list(dict.fromkeys([*(pc.weapons or ()), "unarmed"]
+                                    + (["shield"] if pc.shield_bash("shield") else [])))
+    off_hands = [k for k in candidates if k != held
+                 and not Engine._off_hand_refusal(pc, held, k)]         if not pc.has_state("state.held") else []
+
+    def plan(choices=(), off="") -> list[dict]:
+        out = []
+        whole = pc.attack_plan(held, True, choices, off)
+        first_off = len(pc.attack_plan(held, True, choices)) if off else len(whole)
+        light = bool(off) and (off == "unarmed"
+                               or bool((pc.shield_bash(off) or pc.weapon(off)).get("light")))
+        for n, (key, it) in enumerate(whole):
+            hand = ("off" if n >= first_off else "primary") if off else ""
+            try:
+                total = sum(m.value for m in pc.attack_modifiers(
+                    key, it, choices=choices, hand=hand, off_light=light))
+            except Exception:  # noqa: BLE001 — the engine recomputes at the swing
+                total = 0
+            out.append({"bonus": total, "weapon": key, "hand": hand})
+        return out
+
+    plans = {"": plan()}
+    for o in options:
+        if o["shape"] == "full":
+            plans[o["id"]] = plan((o["id"],))
+    for k in off_hands:
+        plans[f"off:{k}"] = plan((), k)
+    return {"options": options, "off_hands": off_hands, "plans": plans}
 
 
 def _strike_out_of_reach(scene, pc, raw: list) -> str:

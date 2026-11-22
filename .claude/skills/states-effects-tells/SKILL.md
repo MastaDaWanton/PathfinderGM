@@ -195,7 +195,13 @@ is reported, not applied (negative levels stay `engine=False`), and 358 rider do
 `unsupported` with a reason; the grapple is maintained (`Engine.grapple_turn`, damage only —
 no move/pin/tie-up), escaped (`escape` op and reader act) and ended (`_grapples_settle`,
 `Scene.end_encounter`) since 2026-11-01, tests/test_grapple_held.py; feat actions
-(Cleave, Vital Strike) have no `find_ability` branch; no level-up feat writer exists;
+(Cleave, Vital Strike) are CLOSED since 2026-11-22 as declared attack options, not
+`find_ability` branches — a document's `choice` (Power Attack's shape) checked by
+`Actor.can_choose` and `Engine._attack_choice_refusal`, a "until your next turn" stance
+laid as a one-round tagged effect the document asks for (`when.bearer.state`), extra
+swings as `extra_attacks`/`off_hand_attacks` counts in `Actor.attack_sequence`, a
+cleave's next blow engine-written into the queue (`Engine._cleave_next`;
+tests/test_attack_feats.py); no level-up feat writer exists;
 the claims scrubber let prose describe a struck target after a `cast` that never
 resolved (measured once, before the actor fill); "I set off the trap" came back as
 `hazard rule=acid` — a cited rule, sanctioned, not the narration the plan predicted.

@@ -1,0 +1,250 @@
+{
+  "_about": [
+    "Lane D, 2026-11-22: the attack-shape combat feats, in the grammar core.json uses",
+    "(rules/classbuilder.py validate_feat_document). Benefit text from content/feats/",
+    "feats.json (the Core Rulebook's, checked against aonprd.com/FeatDisplay.aspx).",
+    "A declared option is a `choice` (a boolean on the attack op, Power Attack's shape);",
+    "a stance that lasts 'until your next turn' is a one-round ActiveEffect the engine lays",
+    "and these terms ask for by tag (`when.bearer.state`); extra swings are `extra_attacks`",
+    "and `off_hand_attacks` counts read by Actor.attack_sequence; Vital Strike's dice are",
+    "`weapon_dice`, Critical Focus `crit_confirm`, Mobility `ac_moving`. Loaded before",
+    "core.json (sorted order), which therefore wins any id both carry — none do."
+  ],
+  "combat-expertise": {
+    "choice": "combat_expertise",
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "formula": "-(1 + bab // 4)",
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {"state": "buff.stance.combat-expertise"},
+          "weapon": {"ranged": false}
+        },
+        "note": "on melee attack rolls until your next turn"
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "formula": "-(1 + bab // 4)",
+        "bonus_type": "untyped",
+        "when": {"bearer": {"state": "buff.stance.combat-expertise"}}
+      },
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "formula": "1 + bab // 4",
+        "bonus_type": "dodge",
+        "when": {"bearer": {"state": "buff.stance.combat-expertise"}}
+      }
+    ]
+  },
+  "deadly-aim": {
+    "choice": "deadly_aim",
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "formula": "-(1 + bab // 4)",
+        "bonus_type": "untyped",
+        "when": {"choice": "deadly_aim", "weapon": {"ranged": true}}
+      },
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "formula": "2 * (1 + bab // 4)",
+        "bonus_type": "untyped",
+        "when": {"choice": "deadly_aim", "weapon": {"ranged": true}}
+      }
+    ],
+    "not_yet": [
+      "Until your next turn: the penalty and bonus ride the declared shot, and a later ranged attack in the same round declares it again."
+    ]
+  },
+  "piranha-strike": {
+    "choice": "piranha_strike",
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "formula": "-(1 + bab // 4)",
+        "bonus_type": "untyped",
+        "when": {"choice": "piranha_strike", "weapon": {"light": true, "ranged": false}}
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "formula": "-(1 + bab // 4)",
+        "bonus_type": "untyped",
+        "when": {"choice": "piranha_strike"}
+      },
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "formula": "2 * (1 + bab // 4)",
+        "bonus_type": "untyped",
+        "when": {"choice": "piranha_strike",
+                 "weapon": {"light": true, "ranged": false, "strength_share": 1.0}}
+      },
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "formula": "1 + bab // 4",
+        "bonus_type": "untyped",
+        "when": {"choice": "piranha_strike",
+                 "weapon": {"light": true, "ranged": false, "strength_share": 0.5}},
+        "note": "halved with an off-hand weapon or secondary natural weapon"
+      }
+    ]
+  },
+  "vital-strike": {
+    "choice": "vital_strike",
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "weapon_dice",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {"choice": "vital_strike"},
+        "note": "the weapon's dice twice"
+      }
+    ]
+  },
+  "improved-vital-strike": {
+    "choice": "vital_strike",
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "weapon_dice",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {"choice": "vital_strike"},
+        "note": "three times, with Vital Strike's"
+      }
+    ]
+  },
+  "greater-vital-strike": {
+    "choice": "vital_strike",
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "weapon_dice",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {"choice": "vital_strike"},
+        "note": "four times, with the two before"
+      }
+    ]
+  },
+  "cleave": {
+    "choice": "cleave",
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": -2,
+        "bonus_type": "untyped",
+        "when": {"bearer": {"state": "buff.stance.cleaving"}},
+        "note": "until your next turn"
+      }
+    ]
+  },
+  "great-cleave": {
+    "choice": "cleave",
+    "tags": ["attack.cleave.great"]
+  },
+  "rapid-shot": {
+    "choice": "rapid_shot",
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": -2,
+        "bonus_type": "untyped",
+        "when": {"choice": "rapid_shot", "weapon": {"ranged": true}}
+      },
+      {
+        "type": "combat_mod",
+        "target": "extra_attacks",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {"choice": "rapid_shot", "full_attack": true, "weapon": {"ranged": true}},
+        "note": "one more shot at the highest bonus, on a full attack"
+      }
+    ]
+  },
+  "manyshot": {
+    "tags": ["attack.manyshot"]
+  },
+  "improved-critical": {
+    "crit_range": {"multiply": 2, "scope": {"weapon": "$target"}}
+  },
+  "critical-focus": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "crit_confirm",
+        "amount": 4,
+        "bonus_type": "circumstance"
+      }
+    ]
+  },
+  "mobility": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "ac_moving",
+        "amount": 4,
+        "bonus_type": "dodge"
+      }
+    ]
+  },
+  "two-weapon-fighting": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {"two_weapon": "primary"},
+        "note": "the primary hand's penalty lessens by 2"
+      },
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 6,
+        "bonus_type": "untyped",
+        "when": {"two_weapon": "off"},
+        "note": "the off hand's lessens by 6"
+      }
+    ]
+  },
+  "improved-two-weapon-fighting": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "off_hand_attacks",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {"two_weapon": "off"},
+        "note": "a second off-hand attack, at -5"
+      }
+    ]
+  },
+  "greater-two-weapon-fighting": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "off_hand_attacks",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {"two_weapon": "off"},
+        "note": "a third off-hand attack, at -10"
+      }
+    ]
+  },
+  "double-slice": {
+    "tags": ["two_weapon.off_hand.full_strength"]
+  }
+}
