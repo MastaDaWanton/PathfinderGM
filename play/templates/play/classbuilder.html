@@ -7,6 +7,8 @@
 <title>Class builder — Pathfinder GM</title>
 <!-- The shared materials (theme v2), ahead of this page's styles so its palette stands. -->
 <link rel="stylesheet" href="{% asset 'css/theme-v2.css' %}">
+<!-- The first-time card (js/tutorials.js, content/tutorials/creation.json). -->
+<link rel="stylesheet" href="{% asset 'css/tutorials.css' %}">
 <style>
   /* The bench's own vocabulary, not a second one. Everything below is the craft page's
      and the shelf's: the same two faces, the same palette, the same leather writing
@@ -299,25 +301,27 @@
     <small>Everything a Pathfinder class is, as fields. A simple class fills in the first
       sections and stops; Blood Bending fills in all nine.</small></h1>
   <div class="who" id="where"></div>
-  <a class="back" href="/">← the shelf</a>
+  <button type="button" class="tut-help" data-tut="help-classbuilder" data-tut-help="create.classbuilder"
+          aria-label="Show the tips for the class builder">?</button>
+  <a class="back" href="/" data-tut="cb-back">← the shelf</a>
 </header>
 
-<div class="strip">
+<div class="strip" data-tut="cb-strip">
   <label>Start from</label>
   <select id="scaffold"></select>
-  <button class="quiet" id="load-scaffold">Load template</button>
+  <button class="quiet" id="load-scaffold" data-tut="cb-load">Load template</button>
   <label>or open</label>
   <select id="existing"></select>
-  <button class="quiet" id="load-existing">Open</button>
+  <button class="quiet" id="load-existing" data-tut="cb-open">Open</button>
   <span class="grow"></span>
   <span id="saved"></span>
-  <button class="go" id="save">Keep this class</button>
+  <button class="go" id="save" data-tut="cb-save">Keep this class</button>
 </div>
 
 <main>
-  <nav id="nav"></nav>
+  <nav id="nav" data-tut="cb-nav"></nav>
   <section class="leaf v2-card-leather v2-gilt-edge">
-    <div id="problems" class="clean">Checking…</div>
+    <div id="problems" class="clean" data-tut="cb-problems">Checking…</div>
     <div id="body"></div>
   </section>
 </main>
@@ -1027,6 +1031,11 @@ $("#save").onclick = save;
 </script>
 <!-- The heartbeat that lets the packaged exe tell an open window from a closed
      one. Every page carries it; tests/test_packaging.py fails if one does not. -->
+<script src="{% asset 'js/tutorials.js' %}"></script>
+<script nonce="{{ request.csp_nonce }}">
+// This page's first-time card, once its own controls are drawn.
+window.Tutorials && Tutorials.arrive("create.classbuilder");
+</script>
 <script src="{% static 'js/keepalive.js' %}"></script>
 </body>
 </html>

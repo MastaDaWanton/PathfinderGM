@@ -3,12 +3,96 @@
   "hash": "77d242d37fe349f6",
   "v": 1
  },
+ "create.abilities": {
+  "hash": "c9844630fdd224b5",
+  "v": 1
+ },
+ "create.class": {
+  "hash": "ede3e28825418218",
+  "v": 1
+ },
+ "create.classbuilder": {
+  "hash": "d03d9c8b1c7c3edd",
+  "v": 1
+ },
+ "create.feats": {
+  "hash": "0a1e585c92a78ef6",
+  "v": 1
+ },
+ "create.outfit": {
+  "hash": "283d22ef0f1e76c0",
+  "v": 1
+ },
+ "create.racebuilder": {
+  "hash": "83df17977f040a17",
+  "v": 1
+ },
+ "create.skills": {
+  "hash": "8a003b6c3cde3ac6",
+  "v": 1
+ },
+ "create.spellbuilder": {
+  "hash": "f88910d48e530cad",
+  "v": 1
+ },
+ "create.who": {
+  "hash": "25e09b636330fb72",
+  "v": 1
+ },
+ "home.campaign": {
+  "hash": "24afa6eebcf0ae8a",
+  "v": 1
+ },
+ "home.characters": {
+  "hash": "bb51008c9edcbbb8",
+  "v": 1
+ },
+ "home.homebrew": {
+  "hash": "802f4e72d062e5df",
+  "v": 1
+ },
+ "home.import": {
+  "hash": "b07a4125545d3834",
+  "v": 1
+ },
+ "home.manual": {
+  "hash": "7497f7e9ba984802",
+  "v": 1
+ },
+ "home.worlds": {
+  "hash": "384ab14b3ce49952",
+  "v": 1
+ },
  "map.places": {
   "hash": "0fd7ed84a46e129f",
   "v": 1
  },
  "map.region": {
   "hash": "d6f840e2b097941b",
+  "v": 1
+ },
+ "settings.jobs": {
+  "hash": "c1df777e7f59c8ab",
+  "v": 1
+ },
+ "settings.narrator": {
+  "hash": "367f2db0c14e655e",
+  "v": 1
+ },
+ "settings.phone": {
+  "hash": "c49d5d8884b719ea",
+  "v": 1
+ },
+ "settings.report": {
+  "hash": "79f2b6dd39600622",
+  "v": 1
+ },
+ "settings.setup": {
+  "hash": "12bfddc049b3d967",
+  "v": 1
+ },
+ "settings.sound": {
+  "hash": "e662ba00b83dec5e",
   "v": 1
  },
  "table": {

@@ -43,14 +43,15 @@ MAX_BUTTON_WORDS = 14
 # bench without a tutorial is a failing test, not a forgotten one: add its id here and a
 # tutorial (or a "none" reason) for it. PENDING is the later phases' list: each lane takes
 # its own ids out as it writes them, and phase 6 leaves it empty.
-SECTIONS = {"table", "map.places", "map.region", "bench.herbalism"}
+SECTIONS = {"table", "map.places", "map.region", "bench.herbalism",
+            # phase 2: home and Settings (H1-H12) and making a character (K1-K7; K7 is
+            # one card per builder page, which share no buttons)
+            "home.worlds", "home.campaign", "home.import", "home.homebrew", "home.characters",
+            "settings.setup", "settings.phone", "settings.jobs", "settings.narrator",
+            "settings.sound", "settings.report", "home.manual",
+            "create.who", "create.class", "create.abilities", "create.skills", "create.feats",
+            "create.outfit", "create.classbuilder", "create.racebuilder", "create.spellbuilder"}
 PENDING = {
-    # phase 2, feat/tutorials-home
-    "home.worlds", "home.campaign", "home.import", "home.homebrew", "home.characters",
-    "settings.setup", "settings.phone", "settings.jobs", "settings.narrator", "settings.sound",
-    "settings.report", "home.manual",
-    "create.who", "create.class", "create.abilities", "create.skills", "create.feats",
-    "create.outfit", "create.builders",
     # phase 3, feat/tutorials-table
     "table.here", "table.craft", "table.left", "table.right", "table.panels", "table.gmview",
     "table.wrong", "table.dice", "table.clock", "table.talk", "table.music", "table.death",
@@ -352,6 +353,27 @@ def test_both_pages_load_the_cards():
     for name in ("table.html", "home.html"):
         page = (ROOT / "play" / "templates" / "play" / name).read_text(encoding="utf-8")
         assert "js/tutorials.js" in page and "css/tutorials.css" in page, name
+
+
+def test_the_creation_pages_load_the_cards_and_say_they_are_there():
+    """Phase 2: the outfitter and the three builders are pages of their own, so each loads
+    the cards and says it has arrived; without the script a page's "?" would do nothing."""
+    for name, tid in (("outfit.html", "create.outfit"), ("classbuilder.html", "create.classbuilder"),
+                      ("racebuilder.html", "create.racebuilder"), ("spellbuilder.html", "create.spellbuilder")):
+        page = (ROOT / "play" / "templates" / "play" / name).read_text(encoding="utf-8")
+        assert "js/tutorials.js" in page and "css/tutorials.css" in page, name
+        assert f'Tutorials.arrive("{tid}")' in page and f'data-tut-help="{tid}"' in page, name
+
+
+def test_every_arrival_and_question_mark_names_a_tutorial():
+    """A `data-tut-arrive` or `data-tut-help` with a mistyped id is a section whose card
+    never shows and a "?" that does nothing, silently: the page asks for an id the server
+    does not have. The home page and the creator carry most of them."""
+    ids = set(_ids())
+    for p, lines in _sources().items():
+        for i, line in enumerate(lines):
+            for m in re.finditer(r'data-tut-(?:arrive|help)="([a-z.]+)"', line):
+                assert m.group(1) in ids, f"{p.name}:{i + 1} names {m.group(1)!r}, which no tutorial has"
 
 
 def test_the_shipped_build_carries_the_words():

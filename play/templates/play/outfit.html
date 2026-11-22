@@ -2,6 +2,8 @@
 <title>Outfitting — Pathfinder GM</title>
 <!-- The shared materials (theme v2), ahead of this page's styles so its palette stands. -->
 <link rel="stylesheet" href="{% asset 'css/theme-v2.css' %}">
+<!-- The first-time card (js/tutorials.js, content/tutorials/creation.json). -->
+<link rel="stylesheet" href="{% asset 'css/tutorials.css' %}">
 <style>
   :root {
     --ink: #e6dcc6; --dim: #9a8b6f; --gold: #d9c08a; --gold-dim: #7a6543;
@@ -99,23 +101,25 @@
   <h1>Outfitting</h1>
   <small>Spend the starting gold before the road. What is not spent stays in the purse.</small>
   <span class="spacer"></span>
+  <button type="button" class="tut-help" data-tut="help-outfit" data-tut-help="create.outfit"
+          aria-label="Show the tips for outfitting">?</button>
   <a class="back" href="/">← the shelf</a>
 </header>
 
 <main>
   <div class="leaf v2-card-leather v2-gilt-edge">
-    <div class="purse">
+    <div class="purse" data-tut="outfit-purse">
       <span>Purse <b id="purse">…</b></span>
       <span>Basket <b id="basket">0 gp</b></span>
       <span id="left" class="note"></span>
       <span class="spacer" style="flex:1"></span>
-      <button type="button" class="go" id="buy">Buy the basket</button>
-      <button type="button" class="go" id="begin">Begin the sandbox →</button>
-      <button type="button" id="shelf">Keep on the shelf</button>
+      <button type="button" class="go" id="buy" data-tut="outfit-buy">Buy the basket</button>
+      <button type="button" class="go" id="begin" data-tut="outfit-begin">Begin the sandbox →</button>
+      <button type="button" id="shelf" data-tut="outfit-shelf">Keep on the shelf</button>
     </div>
     <div id="banner"></div>
 
-    <div class="sortbar">
+    <div class="sortbar" data-tut="outfit-sort">
       <label for="sort">Sort weapons, armour and shields</label>
       <select id="sort">
         <option value="type">by type — simple, martial, exotic</option>
@@ -126,7 +130,7 @@
     <div class="cols">
       <div>
         <h2 class="sect">Carrying</h2>
-        <div class="pack" id="pack">…</div>
+        <div class="pack" id="pack" data-tut="outfit-pack">…</div>
         <h2 class="sect">Weapons</h2>
         <p class="note">The Core Rulebook's prices. A weapon you are not proficient with swings at −4.</p>
         <input type="text" id="wfind" placeholder="find a weapon — longbow, dagger, glaive">
@@ -297,6 +301,12 @@ $("#shelf").addEventListener("click", () => go(false));
 
 load();
 </script>
+<script src="{% asset 'js/tutorials.js' %}"></script>
+<script nonce="{{ request.csp_nonce }}">
+// This page's first-time card, once its own controls are drawn.
+window.Tutorials && Tutorials.arrive("create.outfit");
+</script>
+
 <!-- The heartbeat that lets the packaged exe tell an open window from a closed
      one. Every page carries it; tests/test_packaging.py fails if one does not. -->
 <script src="{% static 'js/keepalive.js' %}"></script>

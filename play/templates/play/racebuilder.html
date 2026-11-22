@@ -2,6 +2,8 @@
 <title>Race editor — Pathfinder GM</title>
 <!-- The shared materials (theme v2), ahead of this page's styles so its palette stands. -->
 <link rel="stylesheet" href="{% asset 'css/theme-v2.css' %}">
+<!-- The first-time card (js/tutorials.js, content/tutorials/creation.json). -->
+<link rel="stylesheet" href="{% asset 'css/tutorials.css' %}">
 <style>
   /* The spell builder's vocabulary, so the three builder pages read as one application. */
   :root {
@@ -100,27 +102,29 @@
   <h1>Race editor</h1>
   <small>Pick everything; type only the name. The anatomy is the eidolon's evolutions, free.</small>
   <span class="spacer"></span>
-  <a class="back" href="/">← the shelf</a>
+  <button type="button" class="tut-help" data-tut="help-racebuilder" data-tut-help="create.racebuilder"
+          aria-label="Show the tips for the race editor">?</button>
+  <a class="back" href="/" data-tut="rb-back">← the shelf</a>
 </header>
 
 <main>
   <div class="leaf v2-card-leather v2-gilt-edge">
-    <div class="startfrom">
+    <div class="startfrom" data-tut="rb-start">
       <div class="grow">
         <label for="pick">Start from a race that exists</label>
         <p class="note">Copies everything except the name. The shipped file is never changed.</p>
         <select id="pick"><option value="">— begin with an empty race —</option></select>
       </div>
-      <button type="button" id="load">Load as a starting point</button>
+      <button type="button" id="load" data-tut="rb-load">Load as a starting point</button>
     </div>
     <div id="startnote"></div>
 
-    <div id="form"></div>
-    <div id="summary" class="summary"></div>
+    <div id="form" data-tut="rb-form"></div>
+    <div id="summary" class="summary" data-tut="rb-summary"></div>
 
     <div style="margin-top:22px;display:flex;gap:10px;align-items:center">
-      <button type="button" class="go" id="save">Save to my homebrew</button>
-      <button type="button" id="fresh">Start fresh</button>
+      <button type="button" class="go" id="save" data-tut="rb-save">Save to my homebrew</button>
+      <button type="button" id="fresh" data-tut="rb-fresh">Start fresh</button>
     </div>
     <div id="banner"></div>
   </div>
@@ -377,4 +381,9 @@ if (STATE.open) { open(STATE.open, true).catch(err => {
 </script>
 <!-- The heartbeat that lets the packaged exe tell an open window from a closed
      one. Every page carries it; tests/test_packaging.py fails if one does not. -->
+<script src="{% asset 'js/tutorials.js' %}"></script>
+<script nonce="{{ request.csp_nonce }}">
+// This page's first-time card, once its own controls are drawn.
+window.Tutorials && Tutorials.arrive("create.racebuilder");
+</script>
 <script src="{% static 'js/keepalive.js' %}"></script>

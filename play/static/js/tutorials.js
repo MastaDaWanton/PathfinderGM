@@ -512,6 +512,18 @@
       };
     },
     card: function () { return card; },
+    // A page that draws itself again from strings (home.html's `render`) throws away the
+    // ringed control with the rest: ring its new copy, without scrolling, and place again.
+    refresh: function () {
+      if (!open || !card) return;
+      var el = anchorEl(BY[open.id].steps[open.steps[open.i]].anchor);
+      if (el !== ringed) {
+        if (ringed) ringed.classList.remove("tut-ring");
+        ringed = el || null;
+        if (ringed) ringed.classList.add("tut-ring");
+      }
+      place();
+    },
   };
 
   load();
