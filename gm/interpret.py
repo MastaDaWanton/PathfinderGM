@@ -124,7 +124,13 @@ ESCAPE_WAYS = ("either", "force", "slip")
 # AC, whatever the words, because nothing told the two apart but a regex in the free
 # narrator's door (`judgement.is_finishing_blow`). The reader reads the words; whether the
 # one struck IS helpless is the engine's state, never the reader's (`acts_to_ops.victims`).
-BLOWS = ("ordinary", "finishing", "shove", "grab", "trip", "disarm")
+BLOWS = ("ordinary", "finishing", "shove", "grab", "trip", "disarm", "feint")
+# `feint` since 2026-11-22 (lane E, the implementation audit's first skill gap): a feint
+# was aliased to a plain Bluff and rolled with no consequence. A feint is a false move to
+# draw a foe's guard (CRB, Bluff: Feint), the Bluff the engine rolls at the foe's own DC
+# with the target denied Dexterity against the next melee blow (`acts_to_ops.victims`
+# builds the check; rules/skilluses.py `feint`). The reader reads the words; whether the
+# feint can be made (a fight, a mind to fool, an action left) is the engine's.
 # `shove`, `grab`, `trip` and `disarm` since 2026-11-15 (playtest #18, #52): "shove him
 # against the wall" was read `attack` and no rule was applied, and "shove him out of my
 # way" a plain Strength check against nobody. A shove is a bull rush, a grab a grapple, a
@@ -563,20 +569,20 @@ ACT_SLOTS: dict[str, tuple[str, ...]] = {
 }
 
 _WHAT_EACH_IS = """\
-go        walk somewhere within reach (a place in town, the crossroads, the fields, into
-          the trees, back to the gate); walking OUT INTO somewhere named is go, not leave.
+go        walk somewhere within reach (a place in town, the fields, into the trees);
+          walking OUT INTO somewhere named is go, not leave. `tumble`: rolling past foes.
           `within_place` is true for a move inside the place you are in (across the
           room, to the hearth, a corner, the bar, the window), false for anywhere else;
           `fixture` is which fixture the walk is to (counter for a bar, bookshelf, stair,
           barrel…; gallery for upstairs, a landing, loft, balcony;
-          floor for back down to the ground), or none. The object is what or who you
+          floor for back down), or none. The object is what or who you
           take along: a thing carried, or a person you lead or who comes with you
 journey   take the road or a ship to another town; book or take passage, board a ship
           bound somewhere, set sail, sail on, or order a ship's crew to sail somewhere
 leave     walk or climb out of where you are — a building, ground gone down into (a
-          cellar, a crypt, the sewers, a cave), or the settlement itself — with nowhere
+          cellar, a crypt, a cave), or the settlement itself — with nowhere
           else named
-look      look, watch, listen, read, examine
+look      look, watch, listen, read, examine; `recall`: recalling a creature's lore
 search    look for a THING or a PLACE (a way in, somewhere to sleep). `where` is
           here for going over where you are or a part of it (a room, its walls or
           floor, a ship's hold, the ground here) for anything hidden or lost, else
@@ -609,6 +615,7 @@ attack    hit, punch, stab, shoot, assault, pick a fight with, run amok, finish 
           throat, put out of its misery, the killing stroke; shove for shoving or pushing
           a person (against a wall, out of the way, over); grab for seizing or holding a
           person; trip for tripping them; disarm for knocking a weapon from their hand;
+          feint for a fake;
           else ordinary
 threaten  threaten somebody to make them do something: "your purse or your life", "yield
           or die", a blade held to a throat, menacing or scaring somebody into it.
@@ -1282,6 +1289,9 @@ _DEMOS = [
      {"question": False, "claims": [], "actions": [
          {"span": "shove the drunk out of the doorway", "target": "the drunk",
           "place": "the doorway", "blow": "shove", "cost": "quick", "act": "attack"}]}),
+    # Lane E (2026-11-22): no demonstration of its own. The reader's prompt sits at its
+    # budget (tests/test_playtest_2026_11_17_reader_budget.py); feint, tumble and recall
+    # were read right from their glosses alone (live, gemma-4-12B, 2026-11-22).
     ("I strip the drowned sailor's corpse.",
      {"question": False, "claims": [], "actions": [
          {"span": "strip the drowned sailor's corpse",
@@ -1490,6 +1500,11 @@ def per_act_schema() -> dict:
                  # place's own words, as `until` follows the time's: a closed answer the
                  # walk-to-nowhere refusal reads (`acts_to_ops._nowhere`), never English.
                  **({"within_place": {"type": "boolean"}} if act == "go" else {}),
+                 # Whether the move tumbles past somebody's reach (lane E), a closed
+                 # boolean after the place's words, as `within_place`.
+                 **({"tumble": {"type": "boolean"}} if act == "go" else {}),
+                 # Whether a look is recalling what a creature is (lane E, monster lore).
+                 **({"recall": {"type": "boolean"}} if act == "look" else {}),
                  # Which fixture of the room the walk is to (`fixture_kinds`), a closed
                  # enum after `within_place`: the map places one the room lacks
                  # (rules/fixtures.name_one), never a word read out of the sentence.
@@ -1555,7 +1570,13 @@ def _demo_reply(frame: dict) -> str:
                         if a["act"] == "threaten" else {}),
                      **({"within_place": bool(a.get("within_place")),
                          "fixture": a.get("fixture") or "none"}
-                        if a["act"] == "go" else {}), **cost, **means})
+                        if a["act"] == "go" else {}),
+                     # Lane E's two booleans only where a demonstration says true: written
+                     # false on all 40-odd walks and looks they cost the prompt ~600
+                     # characters it does not have, and the grammar writes them anyway.
+                     **({"tumble": True} if a["act"] == "go" and a.get("tumble") else {}),
+                     **({"recall": True} if a["act"] == "look" and a.get("recall") else {}),
+                     **cost, **means})
     # Compact JSON (playtest 2026-11-16 N4): the reader's prompt was 50,142 characters,
     # 15,850 tokens of a 16,384 window (Ollama's prompt_eval_count, measured 2026-11-17),
     # over its budget, so its first demonstration was cut on every reading. The spaces
@@ -1715,6 +1736,12 @@ def ground(frame: dict, sentence: str) -> tuple[dict, list[str]]:
             # The demand is the enum's, or obey: a threat outside it still frightens.
             demand = str(a.get("demand") or "").strip().lower()
             kept["demand"] = demand if demand in DEMANDS else DEMANDS[-1]
+        if kept["act"] in ("go", "look"):
+            # The tumble and the recall (lane E): kept only when they say so, and only the
+            # boolean itself, as `within_place` below.
+            flag = "tumble" if kept["act"] == "go" else "recall"
+            if a.get(flag) is True:
+                kept[flag] = True
         if kept["act"] == "go" and a.get("within_place") is True:
             # A walk inside the place (`within_place`): kept only when it says so, as
             # `blow` is. Only the boolean itself: a hosted provider's "yes" is not it.
@@ -2059,7 +2086,7 @@ _AID_DEMOS = [
 
 def aid_messages(span: str, patient: str) -> list[dict]:
     system = ("In a role-playing game, the player's character does something to a person "
-              "who is lying on the ground dying, bleeding out. Answer one question: is the "
+              "who is dying or bleeding from a wound. Answer one question: is the "
               "player trying to keep them alive — first aid, binding or stitching the "
               "wound, stopping the bleeding, tending them — or doing something else?")
     out = [{"role": "system", "content": system}]

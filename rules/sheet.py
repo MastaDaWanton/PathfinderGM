@@ -6545,6 +6545,12 @@ class Actor:
             return {"healed": 0, "hours": 0, "woke": False, "note": "the dead do not rest"}
 
         per_level = 2 if kind == "bed rest" else 1
+        # Long-term care (Heal, CRB): "the patient recovers hit points ... at twice the
+        # normal rate" — the healer's made check, laid as `care.long-term` by
+        # `skilluses.long_term_care` and spent by the rest it doubles.
+        if self.has_state("care.long-term"):
+            per_level *= 2
+            self.remove_effects(source="rule:long-term-care")
         hours = 24 if kind == "bed rest" else 8
         slept = max(hours, int(slept)) if slept is not None else hours
 

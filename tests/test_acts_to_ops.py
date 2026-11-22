@@ -516,7 +516,11 @@ def test_the_per_act_schema_offers_each_act_only_its_own_slots():
                                           # and `seeking` (2026-11-20,
                                           # tests/test_search_for.py).
                                           *(["where", "take", "seeking"] if act == "search"
-                                            else [])}
+                                            else []),
+                                          # And `tumble` on a go and `recall` on a look
+                                          # (2026-11-22, lane E, tests/test_skill_uses.py).
+                                          *(["tumble"] if act == "go" else []),
+                                          *(["recall"] if act == "look" else [])}
         assert alt["required"] == list(alt["properties"])
         assert alt["additionalProperties"] is False
 

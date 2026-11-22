@@ -6310,8 +6310,13 @@ class Engine:
             return []
 
         start = self.scene.positions.get(ref)
-        return self._swings_at(ref, reactions.provoked_by_move(
-            self.scene, ref, start, tuple(square)))
+        fired = reactions.provoked_by_move(self.scene, ref, start, tuple(square))
+        mover = self.scene.actors.get(ref)
+        if mover is not None:
+            from . import skilluses
+
+            skilluses.spend_tumble(mover)    # a tumble covers the one move it was rolled for
+        return self._swings_at(ref, fired)
 
     def _swings_at(self, ref: str, fired) -> list[dict]:
         """The reaction intents owed to `ref` by these (watcher, reaction) pairs, each
@@ -6583,12 +6588,16 @@ class Engine:
 
     def _standard_spent_refusal(self, intent: Intent, actor) -> "Outcome | None":
         """A blow or a spell after a drink this round, refused: the drink was the turn's
-        standard action (`Scene.standard_spent`). Never an attack of opportunity."""
+        standard action (`Scene.standard_spent`). Never an attack of opportunity. A feint
+        and a dazzling display write the same record (rules/skilluses.py), so the words
+        no longer name the drink."""
         if not self.scene.in_encounter or intent.params.get("reaction") \
                 or self.scene.standard_spent.get(actor.ref) != self.scene.round:
             return None
+        moved = self.scene.move_spent.get(actor.ref) == self.scene.round
         return self._refuse(intent, f"{actor.name} has already used this turn's standard "
-                                    f"action on a drink. A move is still theirs to take.",
+                                    + ("and move actions." if moved else
+                                       "action. A move is still theirs to take."),
                             code="standard_spent")
 
     def _coup_provokes(self, intent: Intent, actor, defender, weapon_key: str) -> None:
@@ -8453,6 +8462,14 @@ class Engine:
             # 10" and left nothing on the character, while the same words a turn later
             # rolled nothing at all.
             return self._op_disguise(intent, partial)
+        # The skill uses with their own row (rules/skilluses.py, content/rules/
+        # skill-uses.json, lane E 2026-11-22): the DC, the action and the consequence are
+        # the row's, never the plan's. Monster lore first: the creature's type picks the
+        # Knowledge, so the plan's own Knowledge is not asked for training here.
+        from . import skilluses
+
+        if helped is None and skilluses.is_lore_subject(self, intent, actor):
+            return skilluses.monster_lore(self, intent, actor, [], partial)
         if ability:
             mods = actor.ability_check_modifiers(ability)
         else:
@@ -8460,6 +8477,10 @@ class Engine:
                 intent, actor, skill, opposed=bool(intent.params.get("opposed_by")))
             if refused is not None:
                 return refused
+        for (named_skill, flag), resolve in skilluses.OWN_DOORS.items():
+            if str(skill).lower() == named_skill and intent.params.get(flag) \
+                    and helped is None:
+                return getattr(skilluses, resolve)(self, intent, actor, mods, partial)
         opposed = intent.params.get("opposed_by")
         # A creature's Perception with no DC and nobody named, while somebody here is
         # hidden from it: that is searching ("Intentionally searching for stimulus is a
@@ -9948,6 +9969,17 @@ class Engine:
             current_moment().guttered.update(def_gutter)
 
         flat_footed = self._flat_footed(defender) or self._unseen_attacker(defender, actor)
+        # A feint this attacker landed (rules/skilluses.py): "the next melee attack you make
+        # against the target does not allow him to use his Dexterity bonus to AC" (CRB,
+        # Combat, Feint) — this blow's first swing only, uncanny dodge or not. Asked once
+        # and kept in the attack's state, so a resume from the dice popup still has it.
+        from . import skilluses
+
+        unfeinted_ff = flat_footed
+        feint_on = (bool(held.get("feinted")) if held is not None
+                    else skilluses.feinted(defender, actor, weapon))
+        feinted = feint_on and not flat_footed     # spent either way; it only matters so
+        flat_footed = flat_footed or feinted
         # A creature floundering in water is easier to hit and keeps no guard: the book
         # gives its opponents +2 and takes its Dexterity off its own AC. Both are facts
         # about the DEFENDER's footing, so they are read here where the defender is known
@@ -9960,6 +9992,10 @@ class Engine:
         # paladin's deflection is against the creature she smote (`_effect_scope_holds`).
         target_ac = defender.ac(against=weapon["category"],
                                 flat_footed=flat_footed or bool(flounders), attacker=actor)
+        # What the feint took off, given back to every swing after the first (the loop).
+        feint_gain = (defender.ac(against=weapon["category"],
+                                  flat_footed=unfeinted_ff or bool(flounders), attacker=actor)
+                      - target_ac) if feinted else 0
         # The AC's parts past the sheet's own number, (what, how much), so the tell can
         # state the number the roll was judged on and say what made it (`_ac_said`).
         sheet_ac, ac_parts = target_ac, []
@@ -10022,6 +10058,12 @@ class Engine:
             state["def_gutter"] = list(def_gutter)
             state["rolls"].extend(gutter_rolls)
             state["tells"].extend(def_gutter_said)
+            state["feinted"] = feint_on
+            if feint_on:
+                skilluses.spend_feint(defender, actor)
+            if feinted:
+                state["tells"].append(f"{actor.name}'s feint has drawn {defender.name}'s "
+                                      f"guard: the blow finds them without their Dexterity.")
             if defending_said:
                 state["tells"].append(defending_said)
             if caught_said:
@@ -10142,6 +10184,11 @@ class Engine:
                 state["ammo_key"] = shot["key"]
                 state["ammo_left"] = shot["left"]
                 state["ammo_spent"] = int(state.get("ammo_spent", 0)) + 1
+            if feint_gain and state["i"] > 0:
+                # The feint was the first swing's: the rest of a full attack meets the guard.
+                target_ac, flat_footed = target_ac + feint_gain, unfeinted_ff
+                ac_note = _ac_said("AC", sheet_ac + feint_gain, flat_footed, ac_parts)
+                feint_gain = 0
             swing_key, iteration = sequence[state["i"]]
             # Each swing its own weapon: the bite of a claw-claw-bite full attack rolls
             # the bite's printed bonus and dice, not the claw's. The named weapon keeps
@@ -12976,6 +13023,16 @@ class Engine:
         crossed = [{"ref": target.ref, "kind": "condition", "condition": k,
                     "from": "hit points"} for k in written]
         tell += self._hp_state_tell(crossed)
+        # Magical healing stops a bleed (Bleed: "any spell that cures hit point damage",
+        # the bleed tell's own promise): a spell, a ward, a power. A draught or a herb is
+        # chemistry (`sheet.MAGIC_ORIGINS`' reading) and leaves it running.
+        stanched = []
+        if not intent.params.get("nonlethal") and str(intent.origin or "").startswith(
+                ("spell:", "ward:", "ability:")):
+            from . import firstaid
+
+            said, stanched = firstaid.stanch(target, "magical healing")
+            tell = f"{tell} {said}".strip()
 
         return Outcome(
             intent_id=intent.id, op="heal", rolls=[roll] if roll else [],
@@ -12985,7 +13042,7 @@ class Engine:
                       "origin": intent.origin}
                      | ({"nonlethal_withheld": target.withheld_nonlethal()} if held else {})]
                     + [{"ref": target.ref, "kind": "condition", "condition": k,
-                        "ends": True} for k in lifted] + crossed,
+                        "ends": True} for k in lifted] + crossed + stanched,
             tell=tell,
             because=intent.because,
         )
@@ -26941,6 +26998,13 @@ class Engine:
                     "origin": item["origin"] if item else f"spell:{spell.id}"})
                 state["tells"].append(
                     f"{target.name} recovers {healed} hit points.")
+                # A spell that cures hit point damage stops a bleed (Bleed, CRB).
+                from . import firstaid
+
+                said, stanched = firstaid.stanch(target, "magical healing")
+                if said:
+                    state["tells"].append(said)
+                    state["effects"].extend(stanched)
                 # Not even magic (CRB p.444): what thirst or hunger holds stays.
                 held = survival.unmended(target, amount, had)
                 if held:

@@ -1750,6 +1750,23 @@ def inject_fight(raw_intents, player_text: str, scene, *, rows=(), frame=None,
                 and str(r.get("actor") or "") in ("", "pc", "None", pc.ref))
 
     built = [i for r in blows for i in r.intents]
+    # A feint the reading built (lane E, `acts_to_ops.victims`) is a Bluff, not a blow: it
+    # goes in front of the player's first blow of the plan, and with no blow read beside
+    # it the plan's own blow at the same foe is dropped — "I feint at him" strikes nobody,
+    # and a blow first would spend the action the feint needs.
+    feints = [b for b in built if b.get("op") == "check"]
+    built = [b for b in built if b.get("op") != "check"]
+    if feints:
+        if not built:
+            at = {b["target"] for b in feints}
+            dropped = [r for r in out if mine(r) and str(r.get("target") or "") in at]
+            out = [r for r in out if not any(r is d for d in dropped)]
+            if dropped and notes is not None:
+                notes.append("the plan's blow dropped: the player feints and strikes nothing")
+        first = next((k for k, r in enumerate(out) if mine(r)), len(out))
+        out[first:first] = [dict(b) for b in feints]
+        if not built:
+            return out
     if built:
         aimed = [b["target"] for b in built]
         if len(built) == 1:

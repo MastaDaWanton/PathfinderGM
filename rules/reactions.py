@@ -64,6 +64,8 @@ TRIGGERS = {
 # for "mythic combat reflexes"), and so a homebrew ability or a monster's racial trait
 # that waives it is a document line, not an engine change.
 UNPROVOKING = "maneuver.unprovoking"
+# The movement twin (lane E, 2026-11-22): a won tumble past one watcher, ref in the leaf.
+TUMBLED_PAST = "movement.unprovoking"
 
 
 def unprovoking_tag(maneuver: str) -> str:
@@ -353,6 +355,10 @@ def provoked_by_move(scene, mover_ref: str, start, end) -> list[tuple[str, React
         # man in the apron took an attack of opportunity as he stepped in, knocked him
         # unconscious, and was drawn into a fight the scene had kept him out of.
         if watcher.has_state(states.BYSTANDER) or _cannot_see(scene, ref, mover_ref):
+            continue
+        # Tumbled past (Acrobatics against this watcher's CMD, `skilluses.tumble`): the
+        # waiver is the mover's tag, `movement.unprovoking.<watcher>`, spent by the move.
+        if mover.has_state(f"{TUMBLED_PAST}.{ref}"):
             continue
         # Squares this watcher threatened that the mover has now vacated. Comparing
         # against the squares it *left* rather than the ones it crossed is deliberate: the
