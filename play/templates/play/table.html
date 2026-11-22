@@ -3861,21 +3861,24 @@
            any frees — then committed once. The say box below stays live the whole time
            for anything unconventional; a panel that closed the door on "I kick the
            brazier into his face" would be the wrong kind of order. -->
-      <div id="combatbar" hidden>
+      <div id="combatbar" data-tut="combat-bar" hidden>
         <div class="cb-head">
-          <b id="cb-round"></b>
+          <b id="cb-round" data-tut="cb-round"></b>
           <span id="cb-turn"></span>
+          <!-- The fight's tips again (js/tutorials.js), at the end of the bar's head. -->
+          <button type="button" class="tut-help" data-tut="help-fight" data-tut-help="fight.bar"
+                  aria-label="Show the tips for the fight">?</button>
         </div>
-        <div class="cb-row" id="cb-targets"></div>
+        <div class="cb-row" id="cb-targets" data-tut="cb-targets"></div>
         <div class="cb-row" id="cb-plan"></div>
         <div class="cb-row cb-acts">
-          <button type="button" class="v2-btn is-small" id="cb-strike">Strike</button>
-          <button type="button" class="v2-btn is-small" id="cb-fullatk">Full attack…</button>
+          <button type="button" class="v2-btn is-small" id="cb-strike" data-tut="cb-strike">Strike</button>
+          <button type="button" class="v2-btn is-small" id="cb-fullatk" data-tut="cb-fullatk">Full attack…</button>
           <!-- A carried flask thrown (alchemy, "also as thrown flasks"): offered only while
                one is carried (`attacks.flasks`, play/views.py `_flasks`). -->
           <button type="button" class="v2-btn is-small" id="cb-throw" hidden
             title="A ranged touch attack; it splashes everyone within 5 feet, and a miss breaks nearby">Throw…</button>
-          <button type="button" class="v2-btn is-small" id="cb-coup" hidden
+          <button type="button" class="v2-btn is-small" id="cb-coup" data-tut="cb-coup" hidden
             title="Full round: no roll to hit, an automatic critical, and a Fortitude save or death">Coup de grâce</button>
           <button type="button" class="v2-btn is-small" id="cb-extinguish" hidden
             title="Full round: a Reflex save to put the fire out — rolling on the ground helps">Put out the flames…</button>
@@ -3883,14 +3886,14 @@
             title="Heave free with Strength, or hack the goo off with a slashing weapon">Tear free…</button>
           <button type="button" class="v2-btn is-small" id="cb-escape" hidden
             title="Standard action: a combat manoeuvre or Escape Artist against the holder's CMD">Break free…</button>
-          <button type="button" class="v2-btn is-small" id="cb-ability">Ability…</button>
-          <button type="button" class="v2-btn is-small" id="cb-cast" aria-controls="spellpop"
+          <button type="button" class="v2-btn is-small" id="cb-ability" data-tut="cb-ability">Ability…</button>
+          <button type="button" class="v2-btn is-small" id="cb-cast" data-tut="cb-cast" aria-controls="spellpop"
                   aria-haspopup="dialog" aria-expanded="false">Cast…</button>
-          <button type="button" class="v2-btn is-small" id="cb-swift">Swift…</button>
-          <button type="button" class="v2-btn is-small" id="cb-free">Free…</button>
-          <button type="button" class="v2-btn is-small is-quiet" id="cb-clear">Clear</button>
-          <button type="button" class="v2-btn is-small is-go" id="cb-commit">Commit turn</button>
-          <button type="button" class="v2-btn is-small is-quiet" id="cb-end">End turn</button>
+          <button type="button" class="v2-btn is-small" id="cb-swift" data-tut="cb-swift">Swift…</button>
+          <button type="button" class="v2-btn is-small" id="cb-free" data-tut="cb-free">Free…</button>
+          <button type="button" class="v2-btn is-small is-quiet" id="cb-clear" data-tut="cb-clear">Clear</button>
+          <button type="button" class="v2-btn is-small is-go" id="cb-commit" data-tut="cb-commit">Commit turn</button>
+          <button type="button" class="v2-btn is-small is-quiet" id="cb-end" data-tut="cb-end">End turn</button>
         </div>
         <div class="cb-menu" id="cb-menu" hidden></div>
         <div class="sub" id="cb-hint">Pick a target, click a lit square to move, or just

@@ -124,9 +124,10 @@ function hexSlip(v) {
   const spent = (HS.today || 0) >= 8;
   const march = !spent ? "" : HEXGO.march
     ? `<p class="hexmarch"><strong>Forced march:</strong> press where to go. <button type="button" class="v2-btn" data-hexmarch="0" data-tut="hex-stop">Stop for the day</button></p>`
-    : `<p class="hexmarch">${esc(HS.today)} hours on the way since you last rested: the day's travelling is done. Going on is a forced march, a Constitution check every hour past eight (DC 10, 2 more each hour), 1d6 non-lethal and fatigued on a failure. <button type="button" class="v2-btn" data-hexmarch="1" data-tut="hex-march">Push on (forced march)</button></p>`;
+    : `<p class="hexmarch">${esc(HS.today)} hours on the way since you last rested: the day's travelling is done. Going on is a forced march, a Constitution check every hour past eight (DC 10, 2 more each hour), 1d6 non-lethal and fatigued on a failure. <button type="button" class="v2-btn" data-hexmarch="1" data-tut="hex-march">Push on (forced march)</button>${
+      window.Tutorials && Tutorials.inline ? Tutorials.inline("map.march") : ""}</p>`;
   const site = HS.site_here && !HS.in_site ? `<p><button type="button" class="v2-btn" data-hexenter="1" data-tut="hex-enter">Go into ${esc({ tower: "the tower", ruins: "the ruins", mine: "the old mine", cave: "the cave" }[HS.site_here] || "the site")}</button></p>` : "";
-  if (HS.afloat) return `<div class="mapnote hextravel" data-tut="travel-panel"><h3>Travel</h3><p>${esc(afloatNote)}</p>
+  if (HS.afloat) return `<div class="mapnote hextravel" data-tut="travel-panel"><h3>Travel</h3><p data-tut="sea-way">${esc(afloatNote)}</p>
     <p class="hexgo">${btns.join(" ")}</p></div>`;
   return `<div class="mapnote hextravel" data-tut="travel-panel"><h3>Travel</h3><p>${HS.rides ? "Riding, two hexes a move" : "On foot, one hex a move"}: five hours across open plain, eight across rougher ground${HS.rides ? ", half that riding" : ""}. Where you stop you look round, and every hex the look covers clears on the map. Press any hex you have seen to walk there a hex at a time: a meeting, something new in sight or the day's end stops you on the way.</p>
     ${march}<p class="hexgo">${btns.join(" ")}</p>${swimNote}${site}</div>`;
@@ -214,15 +215,17 @@ function mapPaint() {
   // The "?" shows the tips for the map on screen (js/tutorials.js).
   const help = frame.querySelector && frame.querySelector("[data-tut-help]");
   if (help) help.dataset.tutHelp = mapTutorial() || "map.places";
+  // The ground's own card: 03 calls this after every drawing of the ground, so here is
+  // where the ground is known to be drawn.
+  if (!places && typeof Shell === "object" && Shell.mode() === "map") mapArrive();
 }
 
-// Which first-time card the map on screen has: the town's Places, or the Region's travel
-// on the nation the party stands in. The ground board's own card is phase 4's.
+// Which first-time card the map on screen has: the ground's, the town's Places, the
+// Region's travel, the Continent and World's, or the Site's.
+const MAP_TUTORIALS = { town: "map.places", nation: "map.region", continent: "map.world", world: "map.world", site: "map.site" };
 function mapTutorial() {
-  if (!MAPV.places) return "";
-  if (MAPV.level === "town") return "map.places";
-  if (MAPV.level === "nation") return "map.region";
-  return "";
+  if (!MAPV.places) return "map.ground";
+  return MAP_TUTORIALS[MAPV.level] || "";
 }
 // Told once the map's slip is drawn, so the card's pointers have their controls to ring.
 function mapArrive() {
@@ -232,10 +235,23 @@ function mapArrive() {
   // Entered: a map opened by the player, which brings back a card put off with "Not now".
   Tutorials.arrive(id, { entered: MAPV.entered, still: shown });
   MAPV.entered = false;
+  const fighting = () => !!(STATE && STATE.scene && STATE.scene.in_encounter);
+  // The ground in a fight: whose turn, and the squares a foe threatens (the fight's second card).
+  if (id === "map.ground" && fighting()) Tutorials.arrive("fight.order", { still: () => shown() && fighting() });
+  // Afloat, the sea's own card (the harbourmaster's berths tell it too, 11-exits.js).
+  if (id === "map.region" && document.querySelector('#placeswrap [data-tut="sea-way"]')) Tutorials.arrive("map.sea");
 }
 if (window.Tutorials) {
   Tutorials.reach("map.places", () => { Shell.show("map"); mapShowPlaces(true); if (MAPV.level !== "town") mapOpen("town"); });
   Tutorials.reach("map.region", () => { Shell.show("map"); mapShowPlaces(true); if (MAPV.level !== "nation") mapOpen("nation"); });
+  Tutorials.reach("map.ground", () => { Shell.show("map"); mapShowPlaces(false); });
+  Tutorials.reach("map.world", () => { Shell.show("map"); mapShowPlaces(true); if (MAPV.level !== "continent" && MAPV.level !== "world") mapOpen("continent"); });
+  // A site only when one is known; else the card says its words with nothing to point at.
+  Tutorials.reach("map.site", () => {
+    const st = mapSites(STATE)[0];
+    if (!st) return;
+    Shell.show("map"); mapShowPlaces(true); if (MAPV.level !== "site") mapOpen("site", st.id);
+  });
 }
 
 // --- the chart ---------------------------------------------------------------------------
@@ -393,7 +409,7 @@ function mapCitySlip(v, id) {
   const way = l => (l.by === "sea" ? "by sea" : `${l.miles ? `${l.miles} miles` : ""}${l.by === "river" ? " by river" : ""}`);
   const buttons = [
     MAPV.level === "continent" ? `<button type="button" class="v2-btn" data-maplevel="nation" data-maparg="${esc(c.nation)}">Open ${esc((W.nations[c.nation] || {}).name || "")}</button>` : "",
-    id === v.home ? `<button type="button" class="v2-btn" data-maplevel="town" data-maparg="">Open the town map</button>` : "",
+    id === v.home ? `<button type="button" class="v2-btn" data-maplevel="town" data-maparg="" data-tut="map-open-town">Open the town map</button>` : "",
   ].join("");
   return `<div class="mapnote"><h3>${esc(c.name)}${id === v.home ? " <small>you are here</small>" : h.by === "been" ? "" : " <small>not yet visited</small>"}</h3>
     <p>${mapHow(v, h)}</p><p>${esc((W.nations[c.nation] || {}).name || "")}, ${esc(W.continents[c.continent] || "")}.</p>${
@@ -450,7 +466,7 @@ function siteSlip(st, pf) {
   return said + `<div class="mapnote"><h3>${esc(upFirst(st.name))}</h3>
     ${here ? `<p>You are in ${esc(here.name)}${here.about ? `: ${esc(here.about)}` : ""}.</p>` : ""}
     <p>${Number(entered)} ${entered === 1 ? "room" : "rooms"} entered${seen ? `, ${Number(seen)} seen and not yet entered` : ""}. Press a room for the way there.</p>
-    <p><button type="button" class="v2-btn" data-maplevel="${esc(siteUp(st, pf))}" data-maparg="">Back up${host ? ` to ${esc(host.name)}` : ""}</button></p></div>`;
+    <p><button type="button" class="v2-btn" data-maplevel="${esc(siteUp(st, pf))}" data-maparg="" data-tut="site-up">Back up${host ? ` to ${esc(host.name)}` : ""}</button></p></div>`;
 }
 function siteAbout(st) {
   return "Rooms entered are built; rooms only seen are chalk outlines. Underground, the hour makes no difference. Zoom out past the site to go back up.";

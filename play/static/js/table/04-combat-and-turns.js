@@ -87,6 +87,14 @@ function renderCombat(s) {
     || `<span class="sub">Nobody left standing against you.</span>`;
 
   renderPlan();
+  // The fight's first cards (js/tutorials.js): the bar on the player's own turn, when it is
+  // needed and the card covers nothing the turn needs; non-lethal the first time anyone
+  // carries some. Each waits while the dice mat is up.
+  if (window.Tutorials) {
+    const fighting = () => !!(STATE && STATE.scene && STATE.scene.in_encounter && !STATE.scene.pc_down);
+    if (up) Tutorials.arrive("fight.bar", { still: fighting });
+    if ((s.scene.actors || []).some(a => a.nonlethal > 0)) Tutorials.arrive("fight.nonlethal", { still: fighting });
+  }
 }
 
 // --- the plan, in the order the player chose ---------------------------------------------

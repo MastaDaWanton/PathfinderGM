@@ -1,0 +1,205 @@
+{
+  "_note": "Tutorials for a fight: the combat bar, whose turn it is and the threatened squares, and non-lethal damage. The same rules as table.json's note; the numbers come from rules/tutorialfacts.py.",
+  "order": 6,
+  "group": "Fights",
+  "tutorials": [
+    {
+      "id": "fight.bar",
+      "v": 1,
+      "title": "The fight",
+      "manual": "combat",
+      "root": "combat-bar",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "combat-bar",
+          "title": "Build a turn",
+          "words": "In a fight you build your turn here, then commit it. A turn holds one standard action and one move, or a full attack in place of both, with a swift action and free ones beside. Anything the buttons cannot say, write in the pen.",
+          "source": {
+            "file": "play/static/js/table/04-combat-and-turns.js",
+            "literal": "One turn, built then committed"
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "cb-targets",
+          "title": "Aim and move",
+          "words": "Press a foe's name to aim at them. On the Map, press a lit square to move there. Each step joins the plan below the names; drag a step, or use its arrows, to strike first and step away after.",
+          "source": {
+            "file": "play/static/js/table/04-combat-and-turns.js",
+            "literal": "the earlier/later\n// arrows on each chip"
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "cb-strike",
+          "title": "The actions",
+          "words": "Throw, Coup de grâce, Put out the flames, Tear free and Break free show only while they apply.",
+          "buttons": [
+            {
+              "tut": "cb-strike",
+              "label": "Strike",
+              "words": "One blow at the target, with the weapon you choose."
+            },
+            {
+              "tut": "cb-fullatk",
+              "label": "Full attack…",
+              "words": "Every attack you have, standing where you are."
+            },
+            {
+              "tut": "cb-ability",
+              "label": "Ability…",
+              "words": "A class or race ability: a standard, full-round or move action."
+            },
+            {
+              "tut": "cb-cast",
+              "label": "Cast…",
+              "words": "A spell you have ready."
+            },
+            {
+              "tut": "cb-swift",
+              "label": "Swift…",
+              "words": "A swift or immediate ability, beside the rest of the turn."
+            },
+            {
+              "tut": "cb-free",
+              "label": "Free…",
+              "words": "Free actions, such as starting a rage."
+            },
+            {
+              "tut": "cb-clear",
+              "label": "Clear",
+              "words": "Empties the plan to start the turn again."
+            }
+          ]
+        },
+        {
+          "since": 1,
+          "anchor": "cb-commit",
+          "title": "Commit or pass",
+          "words": "Committing with nothing planned is refused, so you never pass by accident.",
+          "source": {
+            "file": "play/static/js/table/04-combat-and-turns.js",
+            "literal": "Commit turn with nothing planned is not a pass."
+          },
+          "buttons": [
+            {
+              "tut": "cb-commit",
+              "label": "Commit turn",
+              "words": "Carries out the plan in its order; then the others act."
+            },
+            {
+              "tut": "cb-end",
+              "label": "End turn",
+              "words": "Passes, using nothing; the plan is put away."
+            },
+            {
+              "tut": "help-fight",
+              "label": "?",
+              "words": "Shows these tips again."
+            }
+          ]
+        },
+        {
+          "since": 1,
+          "anchor": "combat-bar",
+          "title": "What the rules hold you to",
+          "words": "A blow at someone out of reach is refused, and says the square to move to first. Drinking a potion is your standard action, and it provokes an attack from anyone who threatens you.",
+          "source": {
+            "file": "rules/engine.py",
+            "literal": "# --- a drink in a fight: a standard action that provokes"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fight.order",
+      "v": 1,
+      "title": "Whose turn, and where",
+      "manual": "combat",
+      "root": "combat-bar",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "cb-round",
+          "title": "Who goes when",
+          "words": "Everyone rolled for initiative when the fight began, and acts in that order each round. The bar says whose turn it is; the others act after you commit or end yours. In the scene, at the side, lists the order.",
+          "source": {
+            "file": "play/static/js/table/02-state.js",
+            "literal": "// Turn order, only while a fight is on."
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "ground-board",
+          "title": "Threatened squares",
+          "words": "A hatched square is one a foe threatens. Leaving one provokes an attack of opportunity. Press a square before you move: the line under the board says how far it is, who threatens it and whether going there provokes.",
+          "source": {
+            "file": "play/static/js/table/25-map-readout.js",
+            "literal": "Threatened there by"
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "map-key",
+          "title": "Safe and risky",
+          "words": "On your turn the squares you can reach are lit in two colours: moves that are safe, and moves that provoke. The Key names both.",
+          "controls": [
+            {
+              "tut": "map-key",
+              "label": "Key"
+            }
+          ],
+          "source": {
+            "file": "play/static/js/table/03-offers-and-map.js",
+            "literal": "sw(\"k-risky\", \"Move, provokes\")"
+          }
+        }
+      ]
+    },
+    {
+      "id": "fight.nonlethal",
+      "v": 1,
+      "title": "Non-lethal damage",
+      "manual": "combat",
+      "root": "combat-bar",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "combat-bar",
+          "title": "Knocked out, not killed",
+          "words": "Fists and saps deal non-lethal damage, and so does a lethal weapon pulled at a cost to hit: say so in the pen. When it reaches someone's hit points they are staggered; past them, they drop. It never kills.",
+          "source": {
+            "file": "rules/sheet.py",
+            "literal": "1e: at your current hit points you are staggered, past them you are unconscious."
+          }
+        },
+        {
+          "since": 1,
+          "title": "Seeing it",
+          "words": "Press someone on the Map and the line under the board shows their non-lethal damage beside their hit points. It heals by the hour.",
+          "source": {
+            "file": "rules/coup_de_grace.py",
+            "literal": "the hourly non-lethal healing"
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "combat-bar",
+          "title": "A blow at the helpless",
+          "words": "A coup de grâce struck to subdue is a Fortitude save or out cold for {knockout_dice} hours, never death. Struck to kill, a failed save is death.",
+          "controls": [
+            {
+              "tut": "cb-coup",
+              "label": "Coup de grâce"
+            }
+          ],
+          "source": {
+            "file": "rules/coup_de_grace.py",
+            "literal": "but a failure is never death"
+          }
+        }
+      ]
+    }
+  ]
+}

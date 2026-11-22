@@ -94,6 +94,287 @@
           ]
         }
       ]
+    },
+    {
+      "id": "map.ground",
+      "v": 1,
+      "title": "The ground",
+      "manual": "playing",
+      "root": "ground-board",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "ground-board",
+          "title": "The ground",
+          "words": "This is the ground you stand on, square by square. Everyone in the scene has a square from the moment they arrive and keeps it until they move. Press a square or a person, and the line under the board says what is there."
+        },
+        {
+          "since": 1,
+          "anchor": "map-flat",
+          "title": "How to look at it",
+          "words": "Where a room has more than one level, Looking at picks the floor you see; people on another floor are faded, not hidden. With the figures, Turn left and Turn right swing the board round.",
+          "buttons": [
+            {
+              "tut": "map-flat",
+              "label": "Flat",
+              "words": "The ground from above, every square lettered and numbered along the edges."
+            },
+            {
+              "tut": "map-3d",
+              "label": "3D",
+              "words": "The same ground as figures on a table."
+            },
+            {
+              "tut": "places-btn",
+              "label": "Places",
+              "words": "The town as you know it, under its fog."
+            }
+          ]
+        },
+        {
+          "since": 1,
+          "anchor": "map-zoom",
+          "title": "Zoom and pan",
+          "words": "The wheel zooms where you point. Drag, or hold the middle button, to pan. With the figures, drag with the right button, or press Q and E, to turn the board any way you like.",
+          "buttons": [
+            {
+              "tut": "zoom-in",
+              "label": "+",
+              "words": "Zoom in; the plus key too."
+            },
+            {
+              "tut": "zoom-out",
+              "label": "−",
+              "words": "Zoom out; the minus key too."
+            },
+            {
+              "tut": "zoom-fit",
+              "label": "Fit",
+              "words": "The whole board in view again."
+            },
+            {
+              "tut": "zoom-me",
+              "label": "You",
+              "words": "Centre the board on you."
+            }
+          ]
+        },
+        {
+          "since": 1,
+          "anchor": "map-key",
+          "title": "The Key",
+          "words": "Key opens over the board and names the colours: you, allies, foes and bystanders, and in a fight whose turn it is, the squares a foe threatens and the moves that would provoke.",
+          "controls": [
+            {
+              "tut": "map-key",
+              "label": "Key"
+            }
+          ],
+          "buttons": [
+            {
+              "tut": "help-map",
+              "label": "?",
+              "words": "Shows the tips for the map you are looking at."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "map.march",
+      "v": 1,
+      "title": "Forced march",
+      "manual": "playing",
+      "root": "hex-march",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "hex-march",
+          "title": "Push on",
+          "words": "Push on only arms the march: nothing happens until you press the hex to go to, and Stop for the day takes it back.",
+          "controls": [
+            {
+              "tut": "hex-march",
+              "label": "Push on (forced march)"
+            },
+            {
+              "tut": "hex-stop",
+              "label": "Stop for the day"
+            }
+          ],
+          "source": {
+            "file": "play/static/js/table/16-places-world.js",
+            "literal": "sent with\n// the next move only, then disarmed"
+          }
+        }
+      ]
+    },
+    {
+      "id": "map.world",
+      "v": 1,
+      "title": "Continent and World",
+      "manual": "playing",
+      "root": "places-board",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "places-board",
+          "title": "The world's shape",
+          "words": "The Continent shows its nations and the cities you know in them; the World shows its continents. Point at the land to light it, then press it or zoom in on it to go in. Zoom out past a map to open the one above."
+        },
+        {
+          "since": 1,
+          "anchor": "places-slip",
+          "title": "Cities you know",
+          "words": "A city is drawn once you know of it: stood in, signed on a road out of a town, heard of in talk, or read on a map. Press one for how you know it.",
+          "source": {
+            "file": "play/static/js/table/16-tab-map.js",
+            "literal": "const HOW_WORDS = { been: \"stood in\", road: \"from road signs\", heard: \"heard of\", map: \"from maps\" };"
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "places-slip",
+          "title": "How far",
+          "words": "A city's card lists each leg of the way by the roads you know, with its miles and the days it takes. Journeys set out from the road out of town. A city no road you know reaches says so.",
+          "source": {
+            "file": "play/static/js/table/16-tab-map.js",
+            "literal": "Journeys set out from the road out of town."
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "places-slip",
+          "title": "By sea",
+          "words": "On a continent, By sea from lists where ships sail from every port you have stood in. A passage is booked with the harbourmaster in that port.",
+          "buttons": [
+            {
+              "tut": "map-open-town",
+              "label": "Open the town map",
+              "words": "From the city you are in, back down to its streets."
+            },
+            {
+              "tut": "help-map",
+              "label": "?",
+              "words": "Shows the tips for the map you are looking at."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "map.sea",
+      "v": 1,
+      "title": "Ships and the sea",
+      "manual": "playing",
+      "root": "sea-way",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "sea-way",
+          "title": "What the sea holds",
+          "words": "At sea you meet only what lives in salt water, and other ships: merchants, pirates and the navy of a real nation. An island, a wreck, a survivor or a stowaway may turn up as well.",
+          "source": {
+            "file": "rules/ontheway.py",
+            "literal": "at sea, only\n    aquatic creatures and ships"
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "sea-way",
+          "title": "Passage",
+          "words": "While you talk with a harbourmaster, the berths they offer show as buttons. Press one to attach it to your turn, and Say books it. The days of a passage pass aboard, not on the road.",
+          "controls": [
+            {
+              "tut": "sea-way",
+              "label": "Book passage to"
+            }
+          ],
+          "source": {
+            "file": "play/static/js/table/11-exits.js",
+            "literal": "`_passage_offer`). Measured live 2026-11-13"
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "sea-way",
+          "title": "Afloat",
+          "words": "Aboard your own ship the Region moves her a hex at a time under sail. Land beside her is reached in her boat, or she ties up at a port. From a hired rowboat, land beside you is a landfall.",
+          "source": {
+            "file": "play/static/js/table/16-tab-map.js",
+            "literal": "Land beside her is reached in her boat, or she ties up at a port."
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "sea-way",
+          "title": "No dock",
+          "words": "A town with no docks has its ships lie off the shore. You reach one in a small boat or by swimming out; a swim says what it will cost you before you press it.",
+          "source": {
+            "file": "rules/engine.py",
+            "literal": "A ship lying off this town's own shore (no docks)"
+          }
+        }
+      ]
+    },
+    {
+      "id": "map.site",
+      "v": 1,
+      "title": "Below ground",
+      "manual": "playing",
+      "root": "places-board",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "places-board",
+          "title": "Below ground",
+          "words": "This is the site under the place where you found the way down. Rooms you have entered are built; rooms you have only seen are chalk outlines. Underground, the hour makes no difference.",
+          "source": {
+            "file": "play/static/js/table/16-tab-map.js",
+            "literal": "Rooms entered are built; rooms only seen are chalk outlines."
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "places-board",
+          "title": "A quest and a mark",
+          "words": "Finding the way down into a dungeon opens a quest in the Journal and marks the place, so you can come back. Below ground, on the town and Region maps, lists every site you know.",
+          "source": {
+            "file": "rules/dungeons.py",
+            "literal": "finding the way down gives the quest (see `open_quest`)"
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "places-board",
+          "title": "When it is done",
+          "words": "The quest is done when whatever holds the last room is beaten, or when every room is entered, its creatures dealt with and its trap disarmed or sprung, whichever comes first.",
+          "source": {
+            "file": "rules/dungeons.py",
+            "literal": "def completion(engine, head_id: str) -> str:"
+          }
+        },
+        {
+          "since": 1,
+          "anchor": "places-slip",
+          "title": "Going through",
+          "words": "Press a room for the way there, then Walk there: the walk goes through rooms you have stood in. Back up, or zooming out past the site, goes back to the map above.",
+          "controls": [
+            {
+              "tut": "walk-there",
+              "label": "Walk there"
+            },
+            {
+              "tut": "site-up",
+              "label": "Back up"
+            }
+          ],
+          "source": {
+            "file": "play/static/js/table/16-tab-map.js",
+            "literal": "the engine walks to it through rooms\n// stood in only"
+          }
+        }
+      ]
     }
   ]
 }

@@ -62,6 +62,16 @@
   .tut-help::after { content: ""; position: absolute; top: -10px; right: -10px; bottom: -10px; left: -10px; }
 }
 
+/* The fight's "?", at the far end of the combat bar's head. */
+#combatbar .cb-head .tut-help { margin-left: auto; align-self: center; }
+
+/* The inline first-time line (Tutorials.inline): one sentence inside a prompt, the
+   welcome line's accent edge, never a box of its own over anything. */
+.tut-inline {
+  display: block; margin: 6px 0 0; padding: 2px 0 2px 10px;
+  border-left: 2px solid var(--accent, #cfa964); color: var(--ink, #e8ddc4); font-size: 13.5px;
+}
+
 /* Settings, Tutorials. */
 .tut-row { display: flex; align-items: center; gap: 10px; padding: 5px 0;
   border-bottom: 1px solid rgba(125, 104, 69, .22); }

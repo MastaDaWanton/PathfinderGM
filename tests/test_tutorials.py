@@ -43,7 +43,10 @@ MAX_BUTTON_WORDS = 14
 # bench without a tutorial is a failing test, not a forgotten one: add its id here and a
 # tutorial (or a "none" reason) for it. PENDING is the later phases' list: each lane takes
 # its own ids out as it writes them, and phase 6 leaves it empty.
-SECTIONS = {"table", "map.places", "map.region", "bench.herbalism"}
+SECTIONS = {"table", "map.places", "map.region", "bench.herbalism",
+            # phase 4, feat/tutorials-maps-fights
+            "map.ground", "map.march", "map.world", "map.sea", "map.site",
+            "fight.bar", "fight.order", "fight.nonlethal"}
 PENDING = {
     # phase 2, feat/tutorials-home
     "home.worlds", "home.campaign", "home.import", "home.homebrew", "home.characters",
@@ -55,9 +58,6 @@ PENDING = {
     "table.here", "table.craft", "table.left", "table.right", "table.panels", "table.gmview",
     "table.wrong", "table.dice", "table.clock", "table.talk", "table.music", "table.death",
     "tab.sheet", "tab.levelup", "tab.equipment", "tab.spells", "tab.trade", "tab.journal",
-    # phase 4, feat/tutorials-maps-fights
-    "map.ground", "map.march", "map.world", "map.sea", "map.site",
-    "fight.bar", "fight.order", "fight.nonlethal",
     # phase 5, feat/tutorials-benches
     "bench.forge", "bench.enchant", "bench.alchemy", "bench.leather", "bench.games",
     "bench.perks", "bench.works", "bench.harvest", "bench.craftpage",
@@ -357,3 +357,23 @@ def test_both_pages_load_the_cards():
 def test_the_shipped_build_carries_the_words():
     spec = (ROOT / "pathfindergm.spec").read_text(encoding="utf-8")
     assert '"tutorials",' in spec
+
+
+def test_the_march_prompt_carries_its_line_inside_it():
+    """Plan §3.1: a prompt that is already on screen (the forced-march line under Travel)
+    gets one sentence inside it, never a card over it, and the line is marked seen the
+    first time it is drawn. Phase 4 wrote the helper; phase 3 writes the dice popup's."""
+    js = (ROOT / "play" / "static" / "js" / "tutorials.js").read_text(encoding="utf-8")
+    assert "inline: inline," in js and "post({ seen: [id] })" in js
+    m = (ROOT / "play" / "static" / "js" / "table" / "16-tab-map.js").read_text(encoding="utf-8")
+    assert 'Tutorials.inline("map.march")' in m
+    assert len(_by("map.march")["steps"]) == 1, "an inline line is one step"
+
+
+def test_the_fight_cards_are_told_by_the_bar():
+    """F1-F3 fire from the fight itself: the bar on the player's own turn, non-lethal the
+    first time anyone carries some, whose-turn when the ground is looked at in a fight."""
+    bar = (ROOT / "play" / "static" / "js" / "table" / "04-combat-and-turns.js").read_text(encoding="utf-8")
+    assert 'Tutorials.arrive("fight.bar"' in bar and 'Tutorials.arrive("fight.nonlethal"' in bar
+    m = (ROOT / "play" / "static" / "js" / "table" / "16-tab-map.js").read_text(encoding="utf-8")
+    assert 'Tutorials.arrive("fight.order"' in m and 'Tutorials.arrive("map.sea")' in m
