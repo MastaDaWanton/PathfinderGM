@@ -905,7 +905,7 @@ def casting_plan(spell, caster_level: int) -> dict:
     different damage.
     """
     plan = {"dice": "", "kind": "", "damage_type": "untyped", "lethality": "lethal",
-            "save": "", "save_effect": "", "riders": [], "note": "",
+            "save": "", "save_effect": "", "riders": [], "note": "", "when": {},
             # Whether this spell fills an AREA or picks out a number of creatures. Both
             # come off the spell's own text and both are troop rules (item 33): a troop
             # "takes half again as much damage (+50%) from spells or effects that affect an
@@ -921,6 +921,9 @@ def casting_plan(spell, caster_level: int) -> dict:
         plan["dice"] = str(core.get("dice") or "")
         plan["damage_type"] = str(core.get("damage_type") or "untyped")
         plan["lethality"] = str(core.get("lethality") or "lethal")
+        # Only these creatures take it (disrupt undead's undead), asked per target by
+        # `Engine._op_cast` through `sheet._when_holds`. Empty is everyone.
+        plan["when"] = dict(core.get("when") or {})
 
     for spec in specs:
         kind = str(spec.get("type", ""))
@@ -940,12 +943,32 @@ def casting_plan(spell, caster_level: int) -> dict:
                 continue
             take(core)
             plan["save"] = str(spec.get("target") or "")
+            # The rest of the gate stays a rider, under the same save: frigid touch's
+            # staggered and sirocco's fatigue were thrown away with the damage taken out
+            # of their branch (audit 2026-11-22: 13 spells). The rider's save is the
+            # damage's own roll, cached by `Engine._cast_save`, never a second one.
+            rest = {**spec,
+                    "on_failure": [e for e in spec.get("on_failure") or () if e is not core],
+                    "on_success": [e for e in spec.get("on_success") or ()
+                                   if e.get("type") not in ("damage", "heal")]}
+            if rest["on_failure"] or rest["on_success"]:
+                plan["riders"].append(rest)
             # The printed line is the authority on what a success does; the branches only
             # say what the converter could express. A gate whose success branch is empty
             # is "negates" if the line says negates and "partial" if it says partial, and
             # those are not the same thing to the creature saving.
+            #
+            # A person's reading is the exception (`effects_read`): there the branches
+            # say what the text says. Thundering drums prints "Fortitude partial" and
+            # halves on a save, and the printed line gave it 0 (lane B, 2026-11-22: 29
+            # read spells halve under a "partial" or "negates" line).
             printed = getattr(spell, "save_effect", "") or ""
-            if printed in ("half", "negates", "partial"):
+            success = [e for e in spec.get("on_success") or ()
+                       if e.get("type") in ("damage", "heal")]
+            if getattr(spell, "effects_read", False) and (
+                    not success or all(e.get("scales") == "half" for e in success)):
+                plan["save_effect"] = "half" if success else "negates"
+            elif printed in ("half", "negates", "partial"):
                 plan["save_effect"] = printed
             else:
                 plan["save_effect"] = "half" if any(
@@ -2025,6 +2048,12 @@ def _layer_read_mechanics(folder: Path, raw: dict[str, dict]) -> dict[str, dict]
                     continue
                 entry[fname] = value
             if got.get("effects"):
+                # A machine's formula does not outlive the reading that replaced its
+                # effects: web kept the regex's "2d4 fire" and with it a fire element,
+                # after a person had read it as entangling (lane B, 2026-11-22). A reading
+                # that scales says so with its own `scaling`.
+                if entry.get("effects_converted") and not got.get("scaling"):
+                    entry.pop("scaling", None)
                 # Flagged as read rather than converted: `effects_converted` means "a
                 # machine guessed this and nobody has checked it", and that is no longer
                 # true of a spell somebody sat down and read.
@@ -2061,6 +2090,7 @@ def _build_spells() -> tuple[dict[str, Spell], dict]:
     raw: dict[str, dict] = {}
     last_file: dict[str, Path] = {}     # the file to name when an entry will not build
     meta: dict = {}
+    authored: dict[str, dict] = {}      # what the owner's own spell files say, which wins
     for folder in (Path(settings.BASE_DIR) / "content" / "spells",
                    Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "spells"):
         if not folder.is_dir():
@@ -2084,6 +2114,9 @@ def _build_spells() -> tuple[dict[str, Spell], dict]:
                     base.update({k: v for k, v in e.items() if v not in (None, "")})
                     raw[e["id"]] = base
                     last_file[e["id"]] = path
+                    if folder.name == "spells" and folder.parent.name == "homebrew":
+                        authored[e["id"]] = {k: e[k] for k in _READ_FIELDS
+                                             if e.get(k) not in (None, "", [], {})}
             if isinstance(data, dict) and data.get("descriptors"):
                 meta = {"descriptors": data["descriptors"],
                          "classes": data.get("classes", []),
@@ -2096,6 +2129,13 @@ def _build_spells() -> tuple[dict[str, Spell], dict]:
     for folder in (Path(settings.BASE_DIR) / "content" / "spells" / "mechanics",
                    Path(settings.CAMPAIGN_DIR).parent / "homebrew" / "spell-mechanics"):
         raw = _layer_read_mechanics(folder, raw)
+        if folder.name == "mechanics":
+            # The owner's own spell file beats the shipped reading of it: a homebrew
+            # fireball to 12d6 lost to part-21's reading once fireball had one (lane B,
+            # 2026-11-22). Their mechanics folder, next, is theirs too.
+            for sid, fields in authored.items():
+                if sid in raw:
+                    raw[sid].update(fields)
     _class_spell_lists(raw)
     # Normalised after the merge rather than per file, because the mechanics file and
     # the Codex file each hold half of what a derivation needs — an element read from

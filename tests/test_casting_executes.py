@@ -334,11 +334,13 @@ def test_the_outcome_carries_what_a_gm_and_a_player_both_need():
 
 
 def test_a_converted_spell_says_so_and_a_hand_written_one_does_not():
-    """354 of these numbers were read by a machine and nobody has checked them. A GM who
-    cannot tell a conversion from a person's answer is being asked to trust a parse."""
+    """354 of these numbers were read by a machine and nobody had checked them. A GM who
+    cannot tell a conversion from a person's answer is being asked to trust a parse.
+    Lane B read all 354 by hand on 2026-11-22 (part-21.json), so fireball is a person's
+    answer now, and the flag on the outcome says so."""
     w = wizard(level=10)
     _, e = table(w)
-    assert cast(e, "fireball").outcomes[0].effects[0]["effects_converted"] is True
+    assert cast(e, "fireball").outcomes[0].effects[0]["effects_converted"] is False
 
     w2 = wizard(level=10)
     _, e2 = table(w2)
@@ -374,6 +376,20 @@ def test_a_buff_is_shown_to_the_gm_rather_than_invented():
     ("fire-of-judgment", "per round"),
     ("seer-s-bane", "burns the diviner, not the target"),
     ("blood-crow-strike", "the 2d6 is inside a worked example"),
+    # Lane B 2026-11-22, the regex layer read by hand: the audit's misreadings, each of
+    # which rolled at its target (web "2d4 fire", wall of iron 10d6, forbiddance 6d6).
+    ("web", "entangling strands; the fire is what burning webs do"),
+    ("dimension-door", "the 1d6 is an arrival mishap"),
+    ("meld-into-stone", "the 5d6 is being expelled from the stone"),
+    ("blink", "the 1d6 is being shunted out of solid matter"),
+    ("snare", "a trap, sprung later"),
+    ("shillelagh", "a better club, not a blow"),
+    ("wall-of-iron", "the crush is a tipped wall, optional and later"),
+    ("forbiddance", "hurts those who enter, by alignment"),
+    ("ethereal-jaunt", "the caster's own mishap"),
+    ("glyph-of-warding", "a trap, set off later"),
+    ("dust-form", "damage to the caster in too small a space"),
+    ("creeping-doom", "the swarms' own attacks, each round"),
 ])
 def test_a_formula_the_spell_prints_but_does_not_deal_is_refused(spell_id, why):
     """Thirty-one of these were converted and invisible for as long as nothing rolled them.
