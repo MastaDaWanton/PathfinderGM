@@ -1,0 +1,174 @@
+{
+  "_about": [
+    "A class's passive features as documents (rules/classfeatures.py), keyed by the slug of the grant on the class table. Lane F, 2026-11-22 (docs/implementation-audit-2026-11-22.md §5): the bard's plain bonuses. Rules from the Core Rulebook bard (aonprd.com/ClassDisplay.aspx?ItemName=Bard, d20pfsrd.com/classes/core-classes/bard, read 2026-11-22)."
+  ],
+  "bardic-knowledge": {
+    "name": "Bardic knowledge",
+    "source": "CRB, Bard: \"A bard adds half his class level (minimum 1) to all Knowledge skill checks and may make all Knowledge skill checks untrained.\"",
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "knowledge (arcana)",
+        "formula": "max(1, class_level // 2)",
+        "bonus_type": "untyped"
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (dungeoneering)",
+        "formula": "max(1, class_level // 2)",
+        "bonus_type": "untyped"
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (engineering)",
+        "formula": "max(1, class_level // 2)",
+        "bonus_type": "untyped"
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (geography)",
+        "formula": "max(1, class_level // 2)",
+        "bonus_type": "untyped"
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (history)",
+        "formula": "max(1, class_level // 2)",
+        "bonus_type": "untyped"
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (local)",
+        "formula": "max(1, class_level // 2)",
+        "bonus_type": "untyped"
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (nature)",
+        "formula": "max(1, class_level // 2)",
+        "bonus_type": "untyped"
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (nobility)",
+        "formula": "max(1, class_level // 2)",
+        "bonus_type": "untyped"
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (planes)",
+        "formula": "max(1, class_level // 2)",
+        "bonus_type": "untyped"
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (religion)",
+        "formula": "max(1, class_level // 2)",
+        "bonus_type": "untyped"
+      }
+    ],
+    "tags": [
+      "skill.untrained.knowledge"
+    ]
+  },
+  "well-versed": {
+    "name": "Well-versed",
+    "source": "CRB, Bard: \"At 2nd level, the bard becomes resistant to the bardic performance of others, and to sonic effects in general. The bard gains a +4 bonus on saving throws made against bardic performance, sonic, and language-dependent effects.\"",
+    "modifiers": [
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "bardic_performance"
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "bardic_performance"
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "will",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "bardic_performance"
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "sonic"
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "sonic"
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "will",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "sonic"
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "language-dependent"
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "language-dependent"
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "will",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "language-dependent"
+        }
+      }
+    ],
+    "not_yet": [
+      "Only a save against a spell says it is sonic or language-dependent (the spell's own descriptors); no creature's bardic performance calls for a save against this bard yet."
+    ]
+  },
+  "jack-of-all-trades": {
+    "name": "Jack-of-all-trades",
+    "source": "CRB, Bard: \"At 10th level, the bard can use any skill, even if the skill normally requires him to be trained. At 16th level, the bard considers all skills to be class skills. At 19th level, the bard can take 10 on any skill check, even if it is not normally allowed.\"",
+    "tags": [
+      "skill.untrained.all"
+    ],
+    "not_yet": [
+      "16th: every skill a class skill; 19th: taking 10 on any check — no level-up writer and no take-10 rule read them."
+    ]
+  }
+}

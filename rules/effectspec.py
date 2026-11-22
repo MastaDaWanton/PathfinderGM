@@ -2408,7 +2408,34 @@ AGAINST: dict[str, str] = {
                     "(survival.forced_march)",
     "spell_resistance": "the caster level check to overcome spell resistance "
                         "(Engine._resists)",
+    # 2026-11-22, lane F: a spell's save is against its school, subschool and descriptors
+    # as well as against "spell" (`spell_against`), so bravery (fear), still mind
+    # (enchantment) and well-versed (sonic, language-dependent) are asked by the cast.
+    "charm": "a charm (the enchantment subschool)",
+    "compulsion": "a compulsion (the enchantment subschool)",
+    "mind-affecting": "a mind-affecting effect",
+    "sonic": "a sonic effect",
+    "language-dependent": "a language-dependent effect",
+    "bardic_performance": "a bard's performance (a class ability's `against`)",
+    "tracks": "a Survival check to follow or identify tracks (Engine track op)",
 }
+
+
+def spell_against(spell) -> tuple[str, ...]:
+    """What a save against this spell is made against: "spell", the school, the
+    subschool and each descriptor, lower-cased — the spell's own data, so the trigger
+    is never the model's (classfeatures' docstring: a descriptor on the save op would
+    put it in the model's hands). Audit 2026-11-22: every spell save passed "spell"
+    alone, so bravery, still mind and well-versed were dropped against cause fear,
+    charm person and sound burst."""
+    words = ["spell"]
+    said = [getattr(spell, "school", ""), getattr(spell, "subschool", "")]
+    for w in said + list(getattr(spell, "descriptors", None) or ()):
+        for part in str(w or "").lower().replace(";", ",").split(","):
+            part = part.strip()
+            if part and part not in words:
+                words.append(part)
+    return tuple(words)
 
 # The situations a concentration check is made in (`Engine._concentrate`), as the
 # Core Rulebook's Table 8-5 names them and as far as the engine makes them.

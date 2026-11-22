@@ -134,10 +134,45 @@
       "target": "all",
       "bonus_type": "insight",
       "formula": "max(1, floor(level / 2))"
+     },
+     {
+      "type": "combat_mod",
+      "target": "str_check",
+      "bonus_type": "insight",
+      "formula": "max(1, floor(level / 2))"
+     },
+     {
+      "type": "combat_mod",
+      "target": "dex_check",
+      "bonus_type": "insight",
+      "formula": "max(1, floor(level / 2))"
+     },
+     {
+      "type": "combat_mod",
+      "target": "con_check",
+      "bonus_type": "insight",
+      "formula": "max(1, floor(level / 2))"
+     },
+     {
+      "type": "combat_mod",
+      "target": "int_check",
+      "bonus_type": "insight",
+      "formula": "max(1, floor(level / 2))"
+     },
+     {
+      "type": "combat_mod",
+      "target": "wis_check",
+      "bonus_type": "insight",
+      "formula": "max(1, floor(level / 2))"
+     },
+     {
+      "type": "combat_mod",
+      "target": "cha_check",
+      "bonus_type": "insight",
+      "formula": "max(1, floor(level / 2))"
      }
     ]
    },
-   "not_yet": ["The bonus on ability checks: no roll reads an ability check yet (skills, saves and attacks take it)."],
    "tell": "{name} touches {target}, and fate leans their way.",
    "cost": {
     "pool": "touch of destiny",

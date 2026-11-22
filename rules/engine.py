@@ -1381,6 +1381,10 @@ class Scene:
                             "rounds": rounds, "from": f"the end of {e.name}",
                             "origin": e.origin})
             said.append(f"{actor.name} is {cond} for {rounds} rounds.")
+        # "Once per rage" (Powerful Blow, Surprise Accuracy): a pool that refreshes on
+        # `stance.end.<key>` comes back when the stance of that key ends, however it ended.
+        if e.key:
+            actor.refresh_pools(f"stance.end.{e.key}")
         return records, said
 
     # --- things standing in the scene ------------------------------------------------
@@ -9278,6 +9282,14 @@ class Engine:
         # A save a spell document called for is a save against a spell (the provenance
         # stamp, stage 8), which null skymetal's `when: {"against": "spell"}` asks.
         ctx = {"against": "spell"} if str(intent.origin or "").startswith("spell:") else None
+        if ctx is not None:
+            # ...and against the spell's school and descriptors: a save the document of
+            # cause fear called for is a save against fear (`effectspec.spell_against`).
+            try:
+                ctx = {"against": effectspec.spell_against(
+                    spells_mod.get(str(intent.origin).split(":", 1)[1]))}
+            except KeyError:
+                pass
         # And a poison's own gate (`consumables._gate_intent`, label `poison-N`) is a save
         # against poison — which antitoxin's +5 asks (`when: {"against": "poison"}`,
         # alchemy plan §16.7). Unasked until alchemy lane C, so the clause had no reader.
@@ -10399,6 +10411,7 @@ class Engine:
                             intent, actor, [], f"Sneak attack ({sneak_dice})",
                             None, partial, state, sneak_dice)
                         state["sneak_total"] = sneak_roll.total
+                        state["sneak_dice"] = sneak_dice
                         state["rolls"].append(sneak_roll.as_dict())
                     dmg_mods = dmg_mods + [
                         Modifier(state["sneak_total"], f"sneak attack ({sneak_dice})")]
@@ -10549,7 +10562,8 @@ class Engine:
                                              "why": harmless})
                     for key in [k for k in state if k.startswith(("magic_", "extra_"))]:
                         state.pop(key, None)
-                    for key in ("rider_total", "sneak_total", "sneak_said", "fortified"):
+                    for key in ("rider_total", "sneak_total", "sneak_said", "fortified",
+                            "sneak_dice"):
                         state.pop(key, None)
                     state["i"] += 1
                     state["stage"] = "attack"
@@ -10703,6 +10717,12 @@ class Engine:
                               else self._natural_riders(actor, defender, weapon_key)):
                     state["effects"].append(extra["effect"])
                     state["tells"].append(extra["tell"])
+                # What the rogue's talents make of a sneak attack that landed: bleeding
+                # attack, crippling strike, slow reactions (`_sneak_riders`).
+                for extra in ([] if dancing else self._sneak_riders(
+                        intent, actor, defender, state)):
+                    state["effects"].append(extra["effect"])
+                    state["tells"].append(extra["tell"])
                 # A swarm's automatic damage nauseates what it damaged unless a
                 # Fortitude save shakes it off (`_distraction`).
                 for extra in self._distraction(actor, defender, printed):
@@ -10744,7 +10764,8 @@ class Engine:
                 # attack (4d6)" once, and added the same +13 to both damage rolls; the
                 # player was never asked for the second sneak die, and the opening was
                 # found once. Each hit rolls its own in 1e.
-                for key in ("rider_total", "sneak_total", "sneak_said", "fortified"):
+                for key in ("rider_total", "sneak_total", "sneak_said", "fortified",
+                            "sneak_dice"):
                     state.pop(key, None)
                 state["i"] += 1
                 state["stage"] = "attack"
@@ -17983,7 +18004,7 @@ class Engine:
             raise IntentError("track: nobody here to look", "refs")
         surface, base = tracking.ground(self.scene)
         light = self.scene.ambient_light()
-        mods = actor.skill_modifiers("survival")
+        mods = actor.skill_modifiers("survival", ctx={"against": "tracks"})
         dc_shown = base + tracking.LIGHT_DC.get(light, 0)
         if actor.is_pc:
             if "player_face" in partial:
@@ -23315,6 +23336,61 @@ class Engine:
                  "tell": f"{defender.name} fails ({said}) against {actor.name}'s {word} "
                          f"and is {name} for {made_cond.rounds_left} rounds."}]
 
+    # The tags a rogue talent's catalogue entry carries (content/class-options/
+    # rogue-talents.json, held through `standing_tags`), in the order the engine picks one
+    # when more than one is held: "Only one talent marked sneak_attack may apply to a
+    # given attack, chosen before the roll" (CRB). The player names none, so the first
+    # held is the one applied (owner call, lane F 2026-11-22).
+    SNEAK_RIDERS = ("sneak_attack.bleed", "sneak_attack.ability_damage",
+                    "sneak_attack.no_reactions")
+
+    def _sneak_riders(self, intent: Intent, actor: Actor, defender: Actor,
+                      state: dict) -> list[dict]:
+        """What a talent adds to a sneak attack that dealt its dice, as tags asked with
+        `has_state` — never a talent's name. Audit 2026-11-22: all 23 rogue talents were
+        NARRATED; Bleeding Attack's "bleed each round for as many points as you have sneak
+        attack dice" ran nowhere though the bleed executor did. Bleeding Attack lays the
+        `bleed` rider (`_rider_bleed`); Crippling Strike's 2 Strength damage goes through
+        `Actor.damage_ability`; Slow Reactions' "cannot make attacks of opportunity for 1
+        round" is the `reactions.none` condition `reactions.reactions_for` asks."""
+        dice = str(state.get("sneak_dice") or "")
+        if not dice or defender.is_dead:
+            return []
+        held = next((t for t in self.SNEAK_RIDERS if actor.has_state(t)), "")
+        if not held:
+            return []
+        origin = f"ability:{actor.char_class}/{held.split('.')[1]}"
+        count = int(dice.split("d", 1)[0] or 1)
+        if held == "sneak_attack.bleed":
+            return self._rider_bleed(intent, actor, defender, {"amount": str(count)},
+                                     origin, state)
+        if held == "sneak_attack.ability_damage":
+            tag = next(t for t in actor.standing_tags()
+                       if t.startswith("sneak_attack.ability_damage."))
+            _, _, ab, amount = (tag.split(".") + ["", "", "", "0"])[:4]
+            why = states.ability_harm_refused(defender, ab)
+            if why:
+                return [{"effect": {"ref": defender.ref, "kind": "rider_refused",
+                                    "rider": "ability_damage", "origin": origin},
+                         "tell": f"{defender.name} is {why}; the crippling cut finds "
+                                 f"nothing to cripple."}]
+            got = defender.damage_ability(ab, int(amount or 0))
+            return [{"effect": {"ref": defender.ref, "kind": "ability_damage",
+                                "ability": ab, "amount": int(amount or 0),
+                                "origin": origin, **{k: v for k, v in got.items()
+                                                     if k == "hp_change"}},
+                     "tell": f"The cut cripples {defender.name}: {int(amount or 0)} "
+                             f"{ab.title()} damage."}]
+        defender.apply_effect(ActiveEffect(
+            name="No reactions", kind="condition", key="slowed reactions",
+            source=f"{actor.name}'s blow", origin=origin, duration="rounds",
+            rounds_left=1, tags=("reactions.none",)))
+        return [{"effect": {"ref": defender.ref, "kind": "condition",
+                            "condition": "slowed reactions", "rounds": 1,
+                            "origin": origin},
+                 "tell": f"{defender.name} reels from the blow and can make no attacks "
+                         f"of opportunity for a round."}]
+
     def _rider_bleed(self, intent: Intent, actor: Actor, defender: Actor, rule: dict,
                      origin: str, state: dict) -> list[dict]:
         """"Wounds that continue to bleed, dealing additional damage each round at the
@@ -26958,7 +27034,8 @@ class Engine:
             state["rolls"].extend(gut["rolls"])
             state["tells"].extend(gut["tells"])
         with self._guttered(guts[target.ref]["origins"]):
-            save_mods = target.save_modifiers(save, {"against": "spell"}) + list(extra)
+            save_mods = target.save_modifiers(
+                save, {"against": effectspec.spell_against(spell)}) + list(extra)
         roll = self._roll_or_suspend_stage(
             intent, target, save_mods, f"{SAVES[save]} save against {spell.name}", dc,
             partial, state, "1d20", state_key="cast_state")
@@ -32882,7 +32959,10 @@ class Engine:
                     if ev == "half":
                         share = share // 2
                         tells.append(ev_said)
-                    elif made and share is not None:
+                    elif made and share is not None and \
+                            saving.get("success", "negates") != "none":
+                        # success "none": the save is against the rider (`effect.on`
+                        # "failed") and the roll lands whole (Heart-Seeker Spike's stun).
                         share = share // 2
                 landed.append(other)
                 if share is not None:
@@ -33510,10 +33590,14 @@ class Engine:
         mods = ca.modifiers(spec.get("modifiers"), actor)
         weapons: list[dict] = []
         said: list[str] = []
+        add_tags: list[str] = []
         for add in doc.get("addons") or ():
             if ca._norm(add.get("pick")) in ca.chosen(actor, add.get("choice", "")):
                 mods += ca.modifiers(add.get("modifiers"), actor)
                 weapons += [_sized_weapon(w, actor.size) for w in add.get("natural_weapons") or ()]
+                # A rage power's sense while raging (low-light vision, night vision,
+                # scent): tags on the one stance effect, gone when it goes.
+                add_tags += [str(t) for t in add.get("tags") or ()]
                 said.append(str(add.get("pick")).title())
         form = doc.get("form")
         if form:
@@ -33544,6 +33628,7 @@ class Engine:
         rounds = ca.amount(spec.get("rounds"), actor) if spec.get("rounds") else None
         tags = tuple(states.tags_for(key)) if key else ()
         tags += tuple(str(t) for t in spec.get("tags") or () if str(t) not in tags)
+        tags += tuple(t for t in add_tags if t not in tags)
         if form:
             tags += (f"form.{ca._norm(form['key']).replace(' ', '-')}",)
         payload: dict = {}

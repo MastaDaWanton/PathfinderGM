@@ -120,6 +120,10 @@ def reactions_for(actor) -> list[Reaction]:
     # reaction never passes `validate`, so this is the only gate it meets.
     if actor.blocking_key("attack"):
         return []
+    # Slow Reactions' "cannot make attacks of opportunity for 1 round" (CRB rogue talent):
+    # a timed effect's tag, gone when the effect ends (`Engine._sneak_riders`).
+    if actor.has_state("reactions.none"):
+        return []
     return [attack_of_opportunity(actor)]
 
 

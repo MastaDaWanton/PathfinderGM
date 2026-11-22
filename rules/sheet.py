@@ -2983,9 +2983,12 @@ class Actor:
                     best = (name, int(total))
         return best
 
-    def skill_modifiers(self, skill: str, opposed: bool = False) -> list[Modifier]:
+    def skill_modifiers(self, skill: str, opposed: bool = False,
+                        ctx: dict | None = None) -> list[Modifier]:
         """`opposed`: the check is rolled against another creature's (Perception against
-        Stealth or Sleight of Hand), which is where blinded's Perception penalty lands."""
+        Stealth or Sleight of Hand), which is where blinded's Perception penalty lands.
+        `ctx` is the roll's context for a term with a `when`, as `save_modifiers` takes
+        it: the track op's `{"against": "tracks"}` is what the ranger's Track asks."""
         skill = skill.strip().lower()
         if skill not in SKILLS:
             raise KeyError(f"no such skill {skill!r}")
@@ -2998,7 +3001,11 @@ class Actor:
             mods.extend(self._shifted(ability))
         else:
             rank = self.ranks.get(skill, 0)
-            if trained_only and rank == 0:
+            # A class feature's `skill.untrained.<skill>` or `skill.untrained.all` tag
+            # waives "trained only" (bardic knowledge's Knowledge, jack-of-all-trades).
+            if trained_only and rank == 0 and not (
+                    self.has_state("skill.untrained.all")
+                    or self.has_state(f"skill.untrained.{skill.split(' (')[0]}")):
                 raise IllegalSheet(
                     f"{self.name} cannot attempt {skill} untrained"
                 )
@@ -3041,12 +3048,12 @@ class Actor:
         mods.extend(self._condition_mods(f"skill_{skill}"))
         if opposed:
             mods.extend(self._condition_mods(f"opposed_skill_{skill}"))
-        mods.extend(self._buff_mods("skill_mod", skill))
+        mods.extend(self._buff_mods("skill_mod", skill, ctx))
         # "On all skill checks": a skill_mod aimed at `all` — Touch of Good, Inspiring
         # Word, Diviner's Fortune, Aura of Despair. Foundry PF1's change target `skills`
         # ("All Skills") is the same idea. Before it, each of those documents could name
         # one skill only and the bonus said on the sheet never reached a roll.
-        mods.extend(self._buff_mods("skill_mod", ALL_SKILLS))
+        mods.extend(self._buff_mods("skill_mod", ALL_SKILLS, ctx))
         return stack(mods)
 
     # --- saves ----------------------------------------------------------------------
@@ -8305,6 +8312,13 @@ def _when_holds(when, ctx: dict | None) -> bool:
             for op, bound in want.items():
                 if op not in ops or not ops[op](have, bound):
                     return False
+        elif key == "against" and isinstance(ctx.get("against"), (tuple, list, frozenset,
+                                                                    set)):
+            # A save is against SEVERAL things at once: cause fear is a spell, a
+            # necromancy and a fear effect, so bravery's "against fear" and a cloak's
+            # "against spells" both answer it (`effectspec.spell_against`).
+            if want not in ctx["against"]:
+                return False
         else:
             if ctx.get(key) != want:
                 return False

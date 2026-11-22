@@ -13,7 +13,7 @@
        "when": {"against": "fear"}}
     ],
     "not_yet": [
-      "against: fear — no save yet says it is against fear (spell saves pass only \"spell\"), so the term is dropped, never applied"
+      "against: fear — a save against a spell with the [fear] descriptor carries it (effectspec.spell_against); a class ability's or a creature's fear effect does not yet, and the term is dropped there"
     ]
   },
   "armor-training": {

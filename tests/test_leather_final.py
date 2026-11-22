@@ -409,8 +409,10 @@ def test_every_domain_power_says_its_ability_type():
     doc = json.loads(_read(ROOT / "content" / "class-abilities" / "domains.json"))
     kinds = {a["key"]: a.get("ability_type") for a in doc["abilities"]}
     assert all(v in ("su", "sp") for v in kinds.values()), kinds
+    # Might of the Gods (Strength, 8th) joined 2026-11-22 (lane F): Su in the CRB.
     assert sorted(k for k, v in kinds.items() if v == "su") == [
-        "aura of madness", "aura of protection", "destructive smite", "wooden fist"]
+        "aura of madness", "aura of protection", "destructive smite", "might of the gods",
+        "wooden fist"]
 
 
 def test_the_forge_api_runs_alone():

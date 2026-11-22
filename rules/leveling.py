@@ -840,6 +840,28 @@ def granted_feats(class_id: str, level: int) -> list[str]:
     return out
 
 
+def choice_feats(actor) -> list[str]:
+    """Feat ids a class-choice pick hands over by its catalogue entry's `bonus_feat`:
+    Finesse Rogue's Weapon Finesse (content/class-options/rogue-talents.json). Audit
+    2026-11-22: the key had no reader, so the talent was taken and nothing came of it."""
+    import json
+
+    from . import feats as feats_mod
+
+    out: list[str] = []
+    for ch in classes_mod.choices_for(getattr(actor, "char_class", "") or "",
+                                      int(getattr(actor, "level", 1) or 1)):
+        for pick in classes_mod.chosen(actor, str(ch.get("id") or "")):
+            fid = str((pick.get("entry") or {}).get("bonus_feat") or "").strip().lower()
+            # Weapon Training's Weapon Focus names a weapon the pick does not carry;
+            # written bare it would bind nowhere, so it waits for the pick to say one.
+            if "$target" in json.dumps(feats_mod.documents().get(fid) or {}):
+                continue
+            if fid and fid not in out:
+                out.append(fid)
+    return out
+
+
 def grant_class_feats(actor) -> list[str]:
     """Write onto the sheet any feat the class has granted by now and the sheet lacks.
 
@@ -859,7 +881,7 @@ def grant_class_feats(actor) -> list[str]:
     # Scroll, Nobility's Leadership at 8th: rules/grantedpowers.py, lane 2).
     for fid in granted_feats(getattr(actor, "char_class", "") or "",
                              int(getattr(actor, "level", 1) or 1)) \
-            + grantedpowers.granted_feats(actor):
+            + grantedpowers.granted_feats(actor) + choice_feats(actor):
         if fid in feats_mod._held(actor):
             continue
         try:

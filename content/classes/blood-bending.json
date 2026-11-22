@@ -586,11 +586,12 @@
       },
       "needs": {
         "Blood Mine": [
-          "a save DC computed from level and Constitution",
-          "targeting a particular Blood Pool on the map"
+          "targeting a particular Blood Pool on the map",
+          "a trap laid in a square that a creature's step sets off"
         ],
         "Blood Boil": [
-          "a save DC computed from level and Constitution"
+          "Constitution damage dealt by a class ability (the ability executor deals hit-point damage only)",
+          "aiming only at a creature that carries a blood stack, and spending one of them"
         ],
         "Pumping": [
           "a value that scales with Control Blood level"
@@ -598,15 +599,28 @@
         "Pool Resonance": [
           "targeting a particular Blood Pool on the map"
         ],
-        "Heart-Seeker Spike": [
-          "a save DC computed from level and Constitution"
-        ]
+        "Heart-Seeker Spike": []
       },
       "effects_converted": true,
       "passive": [
         "Blood Pool Manifestation"
       ],
       "grants": {
+        "Heart-Seeker Spike": {
+          "action": "standard",
+          "affects": "target",
+          "attack": "ranged",
+          "range_ft": 60,
+          "harmful": true,
+          "hp_cost": {"dice": "4d10"},
+          "roll": {"column": "blood", "times": 4, "as": "damage", "type": "piercing"},
+          "save": {"save": "fort", "dc": "10 + floor(level/2) + con_mod", "success": "none"},
+          "effect": {"on": "failed", "condition": "stunned", "rounds": 1},
+          "stacks": {"pool": "blood stack", "amount": 3},
+          "tell": "{name} looses a homing spike of blood at {target}.",
+          "not_yet": ["'ignores cover': no cover is measured on the map yet, so there is none to ignore"],
+          "_note": "'Cost 4d10 Non-Lethal damage to fire a homing spike that ignores cover. Deals Blood DMG x4, applies 3 blood stacks, and forces a Fortitude Save (DC 10+12LVL+CONmod) or the target is Stunned for 1 round.' The damage lands whether or not the save is made (success none); the save is only against the stun. Rolled to hit as Blood Spike Projectile is (a physical spike, ranged against full AC) — 'homing' is read as the cover clause, not as an automatic hit (owner call, lane F 2026-11-22). Audit 2026-11-22: refused before payment for 'a save DC computed from level and Constitution', which the effects already carried."
+        },
         "Blood Spike Projectile": {
           "action": "standard",
           "affects": "target",
@@ -849,7 +863,7 @@
       },
       "needs": {
         "Aggressive Draw": [
-          "a save DC computed from level and Constitution"
+          "a compulsion to attack the bender, or take -4 to attack anyone else"
         ],
         "Caustic Blood": [
           "targeting a particular Blood Pool on the map"
@@ -864,10 +878,11 @@
           "a trigger when the bender is hit or takes damage"
         ],
         "Hemophormic Retribution": [
-          "a save DC computed from level and Constitution"
+          "a trigger when the bender is critically hit or their temporary hit points run out"
         ],
         "Exsanguinating Taunt": [
-          "a save DC computed from level and Constitution"
+          "a compulsion to attack the bender for 1d4 rounds",
+          "temporary hit points counted from the creatures it caught"
         ]
       },
       "effects_converted": true,
@@ -1044,7 +1059,8 @@
       },
       "needs": {
         "Blood Siphon": [
-          "a save DC computed from level and Constitution"
+          "a link held between the bender and each creature it reached, healing each turn",
+          "aiming only at creatures that carry blood stacks, and spending them"
         ],
         "Blood Transfusion": [
           "a link held between two creatures, paid each turn"
@@ -1232,9 +1248,7 @@
         ]
       },
       "needs": {
-        "Blood Burst": [
-          "a save DC computed from level and Constitution"
-        ],
+        "Blood Burst": [],
         "Rupture Self": [
           "targeting a particular Blood Pool on the map"
         ],

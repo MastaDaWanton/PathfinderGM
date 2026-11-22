@@ -18,7 +18,7 @@
       "name": "Bleeding Attack",
       "text": "Your sneak attacks open wounds that bleed each round for as many points as you have sneak attack dice.",
       "requires": [],
-      "sneak_attack": true
+      "sneak_attack": true, "tags": ["sneak_attack.bleed"]
     },
     {
       "id": "combat-trick",
@@ -89,7 +89,7 @@
       "name": "Slow Reactions",
       "text": "Foes hurt by your sneak attack cannot make attacks of opportunity for 1 round.",
       "requires": [],
-      "sneak_attack": true
+      "sneak_attack": true, "tags": ["sneak_attack.no_reactions"]
     },
     {
       "id": "stand-up",
@@ -123,7 +123,7 @@
       "min_level": 10,
       "requires": [],
       "advanced": true,
-      "sneak_attack": true
+      "sneak_attack": true, "tags": ["sneak_attack.ability_damage.str.2"]
     },
     {
       "id": "defensive-roll",

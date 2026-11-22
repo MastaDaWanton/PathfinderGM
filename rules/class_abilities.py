@@ -72,7 +72,10 @@ The grammar, one ability:
   laid over; `"kind": "form"` reads the animal
   catalogue; `"kind": "skill"` aims a skill modifier; `"kind": "condition"` picks a rung.
 - `addons`: `[{"choice": "rage power", "pick": ..., "modifiers": [...],
-  "natural_weapons": [...]}]` — what a chosen rage power adds to the stance it rides.
+  "natural_weapons": [...], "tags": [...]}]` — what a chosen rage power adds to the
+  stance it rides (a sense while raging is a tag: `sense.darkvision.60`).
+- `pool.refresh` may be `stance.end.<toggle key>`: refilled when that stance ends
+  (`Scene.stance_ended`) — the book's "once per rage".
 - `not_yet`: what the book says that nothing here does yet, said out loud.
 - `selective`: `{"requires": <tag>, "count": <formula>}` — a user holding the tag spares
   that many of the wrong side from the burst (Selective Channeling,
@@ -969,6 +972,11 @@ def _shape_problems(at: str, doc: dict) -> list[str]:
     for key in ("bonus_from", "healed_instead"):
         if doc.get(key) is not None and not str(doc.get(key) or "").strip():
             out.append(f"{at}: {key} is a non-empty string.")
+    saving = doc.get("save") or {}
+    if isinstance(saving, dict) and saving.get("success") not in (None, "negates", "half",
+                                                                  "none"):
+        out.append(f"{at}: save.success is \"negates\", \"half\" or \"none\" (the roll "
+                   f"lands whole and the save is only against `effect.on` \"failed\").")
     effect = doc.get("effect") or {}
     if effect.get("on") not in (None, "failed"):
         out.append(f"{at}: effect.on is \"failed\" (lands only on a failed save) or absent.")
