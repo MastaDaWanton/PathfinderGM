@@ -77,3 +77,25 @@ def test_improved_channel_raises_the_channel_dc_by_two():
         out, _ = _use(e, "Channel Energy (harm)")
         dcs.append(next(x["dc"] for x in out.effects if x.get("kind") == "save"))
     assert dcs[1] == dcs[0] + 2, dcs
+
+
+def _heals(outcome, ref):
+    return [x for x in outcome.effects if x.get("kind") == "heal" and x.get("ref") == ref]
+
+
+def test_selective_channeling_spares_the_foe_in_a_healing_burst():
+    """Audit 2026-11-22: Selective Channeling had no document; a cleric's healing burst
+    healed the wounded thug beside her as well as her friend. With the feat (Cha 14, so
+    up to 2 spared) the foe is held out and the ally is still healed; without it both are."""
+    got = {}
+    for feats in ([], ["selective channeling"]):
+        pc = _pc("cleric", 3, feats=feats, cha=14)
+        s, e = _board(pc, ("thug", (6, 5)), ("thug", (4, 5)), face=10)
+        s.sides = {"pc": ["pc", "c2"], "them": ["c1"]}
+        for ref in ("c1", "c2"):
+            s.actors[ref].hp = 1
+        out, _ = _use(e, "Channel Energy (heal)")
+        got[bool(feats)] = out
+    assert _heals(got[False], "c1") and _heals(got[False], "c2")
+    assert not _heals(got[True], "c1") and _heals(got[True], "c2"), got[True].tell
+    assert "holds the energy back from the thug 1" in got[True].tell

@@ -86,6 +86,7 @@
       "affects": "all",
       "radius_ft": 30,
       "aim": "self",
+      "selective": {"requires": "channel.selective", "count": "cha_mod"},
       "roll": {"count": "floor((level + 1) / 2)", "die": 6},
       "choice": {
         "kind": "mode",
@@ -107,7 +108,7 @@
       "tell": "{name} channels positive energy.",
       "not_yet": [
         "With no map, everyone in the scene is in the burst.",
-        "Excluding chosen creatures (Selective Channeling): the burst takes everyone it reaches, as the book does."
+        "Selective Channeling's targets are the player's choice in the book; the engine spares the wrong side (allies from harm, foes from healing), nearest first, because the use names no list."
       ]
     }
   ]

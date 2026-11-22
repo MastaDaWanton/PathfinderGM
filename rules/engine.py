@@ -32709,6 +32709,7 @@ class Engine:
             who, problem = self._class_ability_reach(intent, actor, doc, name)
         if problem:
             return self._refuse(intent, problem, code="ability_reach")
+        who, spared = self._selective_spares(actor, doc, who)
         target = who[0] if (doc.get("affects") or "self") in ("target", "ally") and who \
             else None
         aimed = target
@@ -32738,6 +32739,11 @@ class Engine:
                             **area.as_dict(), "caught": [a.ref for a in who],
                             "origin": origin})
             tells.append(self._area_said(area, actor, who, aimed))
+        if spared:
+            records.append({"ref": actor.ref, "kind": "spared", "ability": shown,
+                            "spared": [a.ref for a in spared], "origin": origin})
+            tells.append(f"{actor.name} holds the energy back from "
+                         f"{_and_list([a.name for a in spared])}.")
         cost = doc.get("cost") or {}
         pool_start = None
         if cost.get("pool"):
@@ -33160,6 +33166,31 @@ class Engine:
                                      self.scene.distance_between(actor.ref, a.ref) or 0))
             pool = pool[:count]
         return pool, ""
+
+    def _selective_spares(self, actor: Actor, doc: dict,
+                          who: list[Actor]) -> tuple[list[Actor], list[Actor]]:
+        """(still reached, spared): Selective Channeling's "choose a number of targets in
+        the area up to your Charisma modifier. These targets are not affected" (CRB).
+
+        Read off the document's `selective` (the tag the user must hold, the count as a
+        formula), never the feat's name. Audit 2026-11-22: a cleric's healing burst
+        healed the thug beside her ally, feat or no feat. The book leaves the choice to the
+        player and the use op carries no list of names, so the engine chooses as a table
+        would: the wrong side first — her own side out of a harmful burst, her foes out of
+        a healing one — nearest first, up to the count. Owner call, lane F report.
+        """
+        rule = doc.get("selective") or {}
+        if not rule or not who or not actor.has_state(str(rule.get("requires") or "")):
+            return who, []
+        from . import class_abilities as ca
+
+        most = max(0, ca.amount(rule.get("count"), actor))
+        harmful = bool(doc.get("harmful"))
+        wrong = [a for a in who if a is not actor
+                 and self._against(actor, a) != harmful]
+        wrong.sort(key=lambda a: self.scene.distance_between(actor.ref, a.ref) or 0)
+        spared = wrong[:most]
+        return [a for a in who if a not in spared], spared
 
     @staticmethod
     def _class_ability_fits(doc: dict):
