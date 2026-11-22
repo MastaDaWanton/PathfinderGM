@@ -65,6 +65,7 @@
         {
           "key": "tracks",
           "secret": true,
+          "kept_by": ["elder"],
           "title": "What the tracks actually say",
           "facts": [
             "It is not a wolf and $elder half knows it: the spacing is wrong, and so is the depth.",

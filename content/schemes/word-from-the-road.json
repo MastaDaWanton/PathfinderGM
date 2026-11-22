@@ -58,6 +58,7 @@
         {
           "key": "tally",
           "secret": true,
+          "kept_by": ["factor"],
           "title": "Why $overdue is not coming back",
           "facts": [
             "$overdue is out past $wild and in no trouble at all: the wagons went the other way on purpose.",

@@ -82,6 +82,7 @@
         {
           "key": "plan",
           "secret": true,
+          "kept_by": ["giver"],
           "title": "$giver's plan",
           "facts": [
             "$giver is paid by $patron to see $victim dead and an outsider blamed for it.",

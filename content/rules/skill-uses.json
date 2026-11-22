@@ -185,5 +185,223 @@
     "source": "CRB, Climb: the pit's own DC.",
     "action": "move",
     "resolved_by": {"file": "rules/dungeons.py", "find": "def climb_out(engine, intent, actor, partial: dict):"}
+  },
+  "skill.sense-motive.hunch": {
+    "name": "a hunch",
+    "skill": "sense motive",
+    "source": "CRB, Sense Motive (d20pfsrd.com/skills/sense-motive): 'Hunch: This use of the skill involves making a gut assessment of the social situation. You can get the feeling from another's behavior that something is wrong, such as when you're talking to an impostor. Alternatively, you can get the feeling that someone is trustworthy.' DC 20. 'Trying to gain information with Sense Motive generally takes at least 1 minute.' Retry: 'No, though you may make a Sense Motive check for each Bluff check made against you.'",
+    "dc": "20",
+    "action": "time",
+    "outcome": {
+      "tag": "knows.sensed.$of",
+      "rounds": 14400
+    },
+    "resolved_by": {
+      "file": "rules/skilluses.py",
+      "find": "def sense_motive(engine, intent, actor, mods, partial)"
+    }
+  },
+  "skill.sense-motive.enchantment": {
+    "name": "sense enchantment",
+    "skill": "sense motive",
+    "source": "CRB, Sense Motive: 'You can use Sense Motive to tell that someone's behavior is being influenced by an enchantment effect even if that person isn't aware of it. The usual DC is 25, but if the target is dominated (see dominate person), the DC is only 15 because of the limited range of the target's activities.'",
+    "dc": "25 - 10 * dominated",
+    "dc_names": [
+      "dominated"
+    ],
+    "action": "time",
+    "outcome": {
+      "tag": "knows.enchanted.$of"
+    },
+    "resolved_by": {
+      "file": "rules/skilluses.py",
+      "find": "def _enchanted_by(target):"
+    }
+  },
+  "skill.sense-motive.lie": {
+    "name": "catch a lie",
+    "skill": "sense motive",
+    "source": "CRB, Bluff and Sense Motive: Bluff 'is an opposed skill check against your opponent's Sense Motive skill'; 'A successful check lets you avoid being bluffed.' Who is keeping something back is the scheme document's own kept_by on its secret card (rules/schemes.py keeps_secret), never a model's word.",
+    "action": "time",
+    "outcome": {
+      "tag": "knows.lying.$of"
+    },
+    "resolved_by": {
+      "file": "rules/schemes.py",
+      "find": "def keeps_secret(scene, ref: str) -> bool:"
+    }
+  },
+  "skill.knowledge.answer": {
+    "name": "answer a question",
+    "skill": "knowledge",
+    "source": "CRB, Knowledge (d20pfsrd.com/skills/knowledge): 'Answering a question within your field of study has a DC of 10 (for really easy questions), 15 (for basic questions), or 20 to 30 (for really tough questions).' Action: 'Usually none.' Retry: 'No. The check represents what you know, and thinking about a topic a second time doesn't let you know something that you never learned in the first place.' 'You cannot make an untrained Knowledge check with a DC higher than 10.' The tiers are the world record's own (play/gm_search.py tier_of) at Knowledge (local)'s DCs: rulers and laws 10, common rumour 15, hidden organisations 20. The fields are the CRB's subskill list read against World Bible's fact keys.",
+    "action": "free",
+    "tiers": {
+      "really_easy": 10,
+      "basic": 10,
+      "tough": 15,
+      "really_tough": 20
+    },
+    "most_facts": 3,
+    "never": [
+      "secret",
+      "secrets"
+    ],
+    "fields": {
+      "history": "knowledge (history)",
+      "eras": "knowledge (history)",
+      "cataclysms": "knowledge (history)",
+      "shifts": "knowledge (history)",
+      "founding": "knowledge (history)",
+      "milestones": "knowledge (history)",
+      "legacy": "knowledge (history)",
+      "myths": "knowledge (history)",
+      "founding story": "knowledge (history)",
+      "turning point": "knowledge (history)",
+      "geography": "knowledge (geography)",
+      "biomes": "knowledge (geography)",
+      "terrain": "knowledge (geography)",
+      "climate": "knowledge (geography)",
+      "region": "knowledge (geography)",
+      "territory": "knowledge (geography)",
+      "homeland": "knowledge (geography)",
+      "migration": "knowledge (geography)",
+      "demographics": "knowledge (geography)",
+      "population": "knowledge (geography)",
+      "species": "knowledge (geography)",
+      "belief": "knowledge (religion)",
+      "rites": "knowledge (religion)",
+      "taboos": "knowledge (religion)",
+      "divine role": "knowledge (religion)",
+      "cosmology": "knowledge (planes)",
+      "alignment": "knowledge (planes)",
+      "reality": "knowledge (planes)",
+      "metaphysics": "knowledge (planes)",
+      "magic": "knowledge (arcana)",
+      "fundamentals": "knowledge (arcana)",
+      "source": "knowledge (arcana)",
+      "costs": "knowledge (arcana)",
+      "limits": "knowledge (arcana)",
+      "physics": "knowledge (arcana)",
+      "classical mechanics": "knowledge (arcana)",
+      "electromagnetism": "knowledge (arcana)",
+      "quantum law": "knowledge (arcana)",
+      "architecture": "knowledge (engineering)",
+      "technology": "knowledge (engineering)",
+      "materials": "knowledge (engineering)",
+      "hierarchy": "knowledge (nobility)"
+    },
+    "by_kind": {
+      "world": "knowledge (arcana)",
+      "continent": "knowledge (geography)",
+      "nation": "knowledge (local)",
+      "city": "knowledge (local)",
+      "people": "knowledge (local)",
+      "character": "knowledge (local)",
+      "faction": "knowledge (local)",
+      "event": "knowledge (history)",
+      "_default": "knowledge (local)"
+    },
+    "by_type": {
+      "arcana": "knowledge (arcana)",
+      "engineering": "knowledge (engineering)",
+      "geography": "knowledge (geography)",
+      "history": "knowledge (history)",
+      "local": "knowledge (local)",
+      "nobility": "knowledge (nobility)",
+      "planes": "knowledge (planes)",
+      "religion": "knowledge (religion)"
+    },
+    "outcome": {
+      "tag": "knows.lore.$of"
+    },
+    "resolved_by": {
+      "file": "rules/skilluses.py",
+      "find": "def knowledge_answer(engine, intent, actor, partial)"
+    }
+  },
+  "skill.appraise.value": {
+    "name": "value an item",
+    "skill": "appraise",
+    "source": "CRB, Appraise (d20pfsrd.com/skills/appraise): 'A DC 20 Appraise check determines the value of a common item. If you succeed by 5 or more, you also determine if the item has magic properties, although this success does not grant knowledge of the magic item's abilities. If you fail the check by less than 5, you determine the price of that item to within 20% of its actual value. If you fail this check by 5 or more, the price is wildly inaccurate, subject to GM discretion.' 'Appraising an item takes 1 standard action.' 'Additional attempts to Appraise an item reveal the same result.'",
+    "dc": "20",
+    "action": "standard",
+    "outcome": {
+      "magic_by": 5,
+      "near_miss": [
+        0.8,
+        1.2
+      ],
+      "wild": [
+        0.4,
+        2.5
+      ]
+    },
+    "resolved_by": {
+      "file": "rules/skilluses.py",
+      "find": "def appraise(engine, intent, actor, mods, partial)"
+    }
+  },
+  "skill.spellcraft.identify-casting": {
+    "name": "identify a spell as it is cast",
+    "skill": "spellcraft",
+    "source": "CRB, Spellcraft (d20pfsrd.com/skills/spellcraft): 'Identify a spell as it is being cast: 15 + spell level.' 'Identifying a spell as it is being cast requires no action, but you must be able to clearly see the spell as it is being cast.' 'You cannot retry checks made to identify a spell.' Trained only.",
+    "dc": "15 + spell_level",
+    "dc_names": [
+      "spell_level"
+    ],
+    "action": "none",
+    "resolved_by": {
+      "file": "rules/skilluses.py",
+      "find": "def identify_casting(engine, out, caster, spell, level) -> dict | None:"
+    }
+  },
+  "skill.spellcraft.identify-item": {
+    "name": "identify a magic item",
+    "skill": "spellcraft",
+    "source": "CRB, Spellcraft: 'Identify the properties of a magic item using detect magic: 15 + item's caster level.' 'You can attempt to ascertain the properties of a magic item once per day per item.' The one identify there is, the circle bench's (rules/knowledge.py identify), reached in play through this door.",
+    "action": "time",
+    "resolved_by": {
+      "file": "rules/skilluses.py",
+      "find": "def identify_item(engine, intent, actor, mods, partial)"
+    }
+  },
+  "skill.perform.for-coin": {
+    "name": "perform for coin",
+    "skill": "perform",
+    "source": "CRB, Perform (d20pfsrd.com/skills/perform): DC 10 'Routine performance. Trying to earn money by playing in public is akin to begging. You can earn 1d10 cp/day.' 15 'Enjoyable performance. In a prosperous city, you can earn 1d10 sp/day.' 20 'Great performance ... 3d10 sp/day.' 25 'Memorable performance ... 1d6 gp/day.' 30 'Extraordinary performance ... 3d6 gp/day.' Retries are allowed but do not negate previous failures: +2 to the DC for each previous failure.",
+    "action": "time",
+    "hours": 4,
+    "table": {
+      "10": {
+        "dice": "1d10",
+        "cp_each": 1,
+        "said": "a routine performance"
+      },
+      "15": {
+        "dice": "1d10",
+        "cp_each": 10,
+        "said": "an enjoyable performance"
+      },
+      "20": {
+        "dice": "3d10",
+        "cp_each": 10,
+        "said": "a great performance"
+      },
+      "25": {
+        "dice": "1d6",
+        "cp_each": 100,
+        "said": "a memorable performance"
+      },
+      "30": {
+        "dice": "3d6",
+        "cp_each": 100,
+        "said": "an extraordinary performance"
+      }
+    },
+    "resolved_by": {
+      "file": "rules/skilluses.py",
+      "find": "def perform_for_coin(engine, intent, actor, mods, partial)"
+    }
   }
 }

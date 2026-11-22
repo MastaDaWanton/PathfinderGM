@@ -38,9 +38,12 @@
     "appraise": {
       "name": "Appraise",
       "book": "Judge what an object, gem or work of art is worth.",
-      "uses": [],
-      "not_yet": "Shops price everything from their own tables, so Appraise never changes what you pay or are paid. Valuing loot and spotting the best piece in a hoard are not rolled either.",
-      "not_yet_uses": ["skill.appraise.value", "skill.appraise.best-in-hoard"]
+      "uses": [
+        {"text": "Appraise a thing you carry, DC 20: made, its worth at the counter's price; made by 5, whether it is magic; missed by under 5, within a fifth of the truth; missed by more, a wild guess. Asked again, the same answer.",
+         "file": "rules/skilluses.py", "find": "def appraise(engine, intent, actor, mods, partial)", "use": "skill.appraise.value"}
+      ],
+      "not_yet": "Shops price everything from their own tables, so an appraisal does not change what you pay or are paid. Spotting the best piece in a hoard is not rolled.",
+      "not_yet_uses": ["skill.appraise.best-in-hoard"]
     },
     "bluff": {
       "name": "Bluff",
@@ -201,7 +204,9 @@
       "book": "Magic, spells, magic items, dragons and magical beasts.",
       "uses": [
         {"text": "Recall what a creature here is: DC 10 + its CR in the Knowledge its kind calls for. Make it and you remember one useful thing about it, and one more for every 5 you beat it by. There is no second try.",
-         "file": "rules/skilluses.py", "find": "def monster_lore(engine, intent, actor, mods, partial)", "use": "skill.knowledge.monster-lore"}
+         "file": "rules/skilluses.py", "find": "def monster_lore(engine, intent, actor, mods, partial)", "use": "skill.knowledge.monster-lore"},
+        {"text": "Recall what you know of a town, people, nation, person or event the world names: DC 10 what it is and what anybody knows, 15 its rumours, 20 what is kept quiet. Only what you recall is told; no second try; untrained, no higher than 10.",
+         "file": "rules/skilluses.py", "find": "def knowledge_answer(engine, intent, actor, partial)", "use": "skill.knowledge.answer"}
       ],
       "not_yet": "Recognising a spell or a magic effect is not rolled yet.",
       "not_yet_uses": ["skill.knowledge.identify-magic"]
@@ -221,24 +226,30 @@
         {"text": "Mending a construct: the better of this and your Craft. It takes ten minutes and restores 1d6 per Hit Die.",
          "file": "content/rules/repairs.json", "find": "\"skills\": [\"craft\", \"knowledge (engineering)\"],"},
         {"text": "Winning a construct's loyalty: the better of this and Disable Device. Fail by 5 and it turns on you.",
-         "file": "rules/engine.py", "find": "f\"{skill.title()} check (claim)\""}
+         "file": "rules/engine.py", "find": "f\"{skill.title()} check (claim)\""},
+        {"text": "Recall what you know of a town, people, nation, person or event the world names: DC 10 what it is and what anybody knows, 15 its rumours, 20 what is kept quiet. Only what you recall is told; no second try; untrained, no higher than 10.",
+         "file": "rules/skilluses.py", "find": "def knowledge_answer(engine, intent, actor, partial)", "use": "skill.knowledge.answer"}
       ],
-      "not_yet": "Judging buildings, bridges and siege works.",
+      "not_yet": "Judging a building, bridge or siege work in front of you is not rolled yet.",
       "not_yet_uses": ["skill.knowledge.engineering"]
     },
     "knowledge (geography)": {
       "name": "Knowledge (Geography)",
       "book": "Lands, terrain, climate and where peoples live.",
-      "uses": [],
+      "uses": [
+        {"text": "Recall what you know of a town, people, nation, person or event the world names: DC 10 what it is and what anybody knows, 15 its rumours, 20 what is kept quiet. Only what you recall is told; no second try; untrained, no higher than 10.",
+         "file": "rules/skilluses.py", "find": "def knowledge_answer(engine, intent, actor, partial)", "use": "skill.knowledge.answer"}
+      ],
       "not_yet": "Journeys have no getting-lost or finding-the-way roll yet.",
       "not_yet_uses": ["skill.knowledge.find-the-way"]
     },
     "knowledge (history)": {
       "name": "Knowledge (History)",
       "book": "Wars, past rulers, the founding of places and what happened long ago.",
-      "uses": [],
-      "not_yet": "Recalling history is not rolled on its own yet.",
-      "not_yet_uses": ["skill.knowledge.history"]
+      "uses": [
+        {"text": "Recall what you know of a town, people, nation, person or event the world names: DC 10 what it is and what anybody knows, 15 its rumours, 20 what is kept quiet. Only what you recall is told; no second try; untrained, no higher than 10.",
+         "file": "rules/skilluses.py", "find": "def knowledge_answer(engine, intent, actor, partial)", "use": "skill.knowledge.answer"}
+      ]
     },
     "knowledge (local)": {
       "name": "Knowledge (Local)",
@@ -247,10 +258,10 @@
         {"text": "When you ask the GM about a place, one secret roll per place (DC 15) decides whether its street rumours reach the answer. It is never rerolled.",
          "file": "play/views.py", "find": "said_mem[key] = bool(roll.total >= 15)"},
         {"text": "Recall what a creature here is: DC 10 + its CR in the Knowledge its kind calls for. Make it and you remember one useful thing about it, and one more for every 5 you beat it by. There is no second try.",
-         "file": "rules/skilluses.py", "find": "def monster_lore(engine, intent, actor, mods, partial)", "use": "skill.knowledge.monster-lore"}
-      ],
-      "not_yet": "Knowing a place's laws, rulers and customs is not rolled. Asking around town is Diplomacy.",
-      "not_yet_uses": ["skill.knowledge.local-customs"]
+         "file": "rules/skilluses.py", "find": "def monster_lore(engine, intent, actor, mods, partial)", "use": "skill.knowledge.monster-lore"},
+        {"text": "Recall what you know of a town, people, nation, person or event the world names: DC 10 what it is and what anybody knows, 15 its rumours, 20 what is kept quiet. Only what you recall is told; no second try; untrained, no higher than 10.",
+         "file": "rules/skilluses.py", "find": "def knowledge_answer(engine, intent, actor, partial)", "use": "skill.knowledge.answer"}
+      ]
     },
     "knowledge (nature)": {
       "name": "Knowledge (Nature)",
@@ -267,35 +278,40 @@
     "knowledge (nobility)": {
       "name": "Knowledge (Nobility)",
       "book": "Lineages, heraldry, royalty and the manners of courts.",
-      "uses": [],
-      "not_yet": "Heraldry, lineages and court manners are not rolled yet.",
-      "not_yet_uses": ["skill.knowledge.nobility"]
+      "uses": [
+        {"text": "Recall what you know of a town, people, nation, person or event the world names: DC 10 what it is and what anybody knows, 15 its rumours, 20 what is kept quiet. Only what you recall is told; no second try; untrained, no higher than 10.",
+         "file": "rules/skilluses.py", "find": "def knowledge_answer(engine, intent, actor, partial)", "use": "skill.knowledge.answer"}
+      ],
+      "not_yet": "Heraldry and lineages: the world's record holds none yet, so there are none to recall.",
+      "not_yet_uses": ["skill.knowledge.heraldry"]
     },
     "knowledge (planes)": {
       "name": "Knowledge (Planes)",
       "book": "The other planes and what comes from them: outsiders and elementals.",
       "uses": [
         {"text": "Recall what a creature here is: DC 10 + its CR in the Knowledge its kind calls for. Make it and you remember one useful thing about it, and one more for every 5 you beat it by. There is no second try.",
-         "file": "rules/skilluses.py", "find": "def monster_lore(engine, intent, actor, mods, partial)", "use": "skill.knowledge.monster-lore"}
-      ],
-      "not_yet": "Planar matters beyond knowing a creature are not rolled yet.",
-      "not_yet_uses": ["skill.knowledge.planar-lore"]
+         "file": "rules/skilluses.py", "find": "def monster_lore(engine, intent, actor, mods, partial)", "use": "skill.knowledge.monster-lore"},
+        {"text": "Recall what you know of a town, people, nation, person or event the world names: DC 10 what it is and what anybody knows, 15 its rumours, 20 what is kept quiet. Only what you recall is told; no second try; untrained, no higher than 10.",
+         "file": "rules/skilluses.py", "find": "def knowledge_answer(engine, intent, actor, partial)", "use": "skill.knowledge.answer"}
+      ]
     },
     "knowledge (religion)": {
       "name": "Knowledge (Religion)",
       "book": "Gods, rites, holy symbols, and the undead.",
       "uses": [
         {"text": "Recall what a creature here is: DC 10 + its CR in the Knowledge its kind calls for. Make it and you remember one useful thing about it, and one more for every 5 you beat it by. There is no second try.",
-         "file": "rules/skilluses.py", "find": "def monster_lore(engine, intent, actor, mods, partial)", "use": "skill.knowledge.monster-lore"}
+         "file": "rules/skilluses.py", "find": "def monster_lore(engine, intent, actor, mods, partial)", "use": "skill.knowledge.monster-lore"},
+        {"text": "Recall what you know of a town, people, nation, person or event the world names: DC 10 what it is and what anybody knows, 15 its rumours, 20 what is kept quiet. Only what you recall is told; no second try; untrained, no higher than 10.",
+         "file": "rules/skilluses.py", "find": "def knowledge_answer(engine, intent, actor, partial)", "use": "skill.knowledge.answer"}
       ],
-      "not_yet": "Recognising gods' symbols and rites is not rolled yet.",
+      "not_yet": "Recognising a holy symbol you see is not rolled yet.",
       "not_yet_uses": ["skill.knowledge.religious-symbols"]
     },
     "linguistics": {
       "name": "Linguistics",
       "book": "Learn a new language with each rank, read old or foreign writing, and make or spot forgeries.",
       "uses": [],
-      "not_yet": "Ranks do not teach languages yet, and there are no forgeries or old scripts to read.",
+      "not_yet": "Nobody in this game speaks or writes a tongue you cannot follow, so ranks teach no languages yet, and there are no forgeries or old scripts to read.",
       "not_yet_uses": ["skill.linguistics.languages", "skill.linguistics.forgery"]
     },
     "perception": {
@@ -317,9 +333,12 @@
     "perform": {
       "name": "Perform",
       "book": "Entertain an audience (song, dance, oratory, an instrument) and earn coin by it.",
-      "uses": [],
-      "not_yet": "Performing for coin, a bard's countersong, and Perform standing in for other skills.",
-      "not_yet_uses": ["skill.perform.for-coin", "skill.perform.countersong"]
+      "uses": [
+        {"text": "Perform for coin in a settlement, an evening's work, by the book's table: DC 10 a few coppers, 15 a few silver, 20 more, 25 a few gold, 30 more again. Each failure that day makes the next attempt 2 harder.",
+         "file": "rules/skilluses.py", "find": "def perform_for_coin(engine, intent, actor, mods, partial)", "use": "skill.perform.for-coin"}
+      ],
+      "not_yet": "A bard's countersong, Perform standing in for other skills, and a masterwork instrument's +2.",
+      "not_yet_uses": ["skill.perform.countersong"]
     },
     "profession": {
       "name": "Profession",
@@ -351,9 +370,16 @@
     "sense motive": {
       "name": "Sense Motive",
       "book": "Tell when someone is lying to you, get a hunch about a situation, or notice someone is under a spell.",
-      "uses": [],
-      "not_yet": "Your own Sense Motive is not rolled yet: catching a lie, a hunch, noticing a charm. The people you lie to do roll theirs.",
-      "not_yet_uses": ["skill.sense-motive.lie", "skill.sense-motive.hunch", "skill.sense-motive.enchantment"]
+      "uses": [
+        {"text": "Read somebody, once a day each: against the Bluff of anybody keeping a matter from you, you learn they are holding back (never what); DC 25 (15 if dominated) shows a spell has hold of them; else a hunch, DC 20.",
+         "file": "rules/skilluses.py", "find": "def sense_motive(engine, intent, actor, mods, partial)", "use": "skill.sense-motive.hunch"},
+        {"text": "Noticing a charm or domination on somebody: DC 25, or 15 if they are dominated.",
+         "file": "rules/skilluses.py", "find": "def _enchanted_by(target):", "use": "skill.sense-motive.enchantment"},
+        {"text": "Catching a lie: who keeps a matter back is the world's own record, set against their Bluff.",
+         "file": "rules/schemes.py", "find": "def keeps_secret(scene, ref: str) -> bool:", "use": "skill.sense-motive.lie"}
+      ],
+      "not_yet": "Discerning a secret message: nobody in this game passes one yet.",
+      "not_yet_uses": ["skill.sense-motive.secret-message"]
     },
     "sleight of hand": {
       "name": "Sleight of Hand",
@@ -372,10 +398,14 @@
       "book": "Identify a spell as it is cast or a magic item's powers, and make magic items.",
       "uses": [
         {"text": "Identifying a magic item: the better of your Enchanter check and your Spellcraft, against 15 + the item's caster level. Beat it by 10 and you also find a curse.",
-         "file": "play/enchant_views.py", "find": "return sum(m.value for m in stack(pc.skill_modifiers(\"spellcraft\")))"}
+         "file": "play/enchant_views.py", "find": "return sum(m.value for m in stack(pc.skill_modifiers(\"spellcraft\")))", "use": "skill.spellcraft.identify-item"},
+        {"text": "Studying a magic item in hand, in play: the same identify as the circle's, DC 15 + its caster level, once per item per day.",
+         "file": "rules/skilluses.py", "find": "def identify_item(engine, intent, actor, mods, partial)", "use": "skill.spellcraft.identify-item"},
+        {"text": "Seeing a spell cast by somebody not on your side: Spellcraft, DC 15 + the spell's level, no action. Unless somebody here knows it, the story names no spell.",
+         "file": "rules/skilluses.py", "find": "def identify_casting(engine, out, caster, spell, level) -> dict | None:", "use": "skill.spellcraft.identify-casting"}
       ],
-      "not_yet": "Identifying a spell as it is cast. Making magic items uses your Enchanter level, not Spellcraft.",
-      "not_yet_uses": ["skill.spellcraft.identify-casting"]
+      "not_yet": "Making magic items uses your Enchanter level, not Spellcraft.",
+      "not_yet_uses": ["skill.spellcraft.craft-magic-items"]
     },
     "stealth": {
       "name": "Stealth",
@@ -421,7 +451,7 @@
       "name": "Use Magic Device",
       "book": "Make a wand, scroll or magic item work for you when it was not made for your kind.",
       "uses": [],
-      "not_yet": "There are no wands or scrolls to activate yet, so nothing calls for it.",
+      "not_yet": "There are no wands or scrolls to find or buy yet (only potions, which anybody can drink), so nothing calls for it.",
       "not_yet_uses": ["skill.use-magic-device.activate"]
     }
   }

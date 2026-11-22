@@ -7519,11 +7519,32 @@ class Engine:
                 out.actor = str(intent.actor)
             if isinstance(out, Outcome) and not out.about:
                 out.about = _about_refs(intent, self.scene)
+            if intent.op == "cast" and isinstance(out, Outcome) and out.status == "resolved":
+                self._identify_casting(intent, out)
             return out
         finally:
             if m is not None:
                 m.guttered.clear()
                 m.guttered.update(before)
+
+    def _identify_casting(self, intent: Intent, out) -> None:
+        """A cast somebody here watched: their Spellcraft to know it, and a spell nobody
+        knew left unnamed in the tell (rules/skilluses.py `identify_casting`)."""
+        from . import skilluses
+
+        cast = next((e for e in out.effects or () if isinstance(e, dict)
+                     and e.get("kind") == "cast" and e.get("spell")), None)
+        caster = self.scene.actors.get(intent.actor or "")
+        if cast is None or caster is None:
+            return
+        try:
+            spell = spells_mod.get(str(cast["spell"]))
+        except KeyError:
+            return
+        record = skilluses.identify_casting(self, out, caster, spell,
+                                            cast.get("spell_level") or 0)
+        if record:
+            out.effects += [record]      # the outcome's record, as `done.effects +=` above
 
     def _articled(self, outcome):
         """A tell names every person by a label with its article (`names.with_articles`).
@@ -8494,6 +8515,10 @@ class Engine:
 
         if helped is None and skilluses.is_lore_subject(self, intent, actor):
             return skilluses.monster_lore(self, intent, actor, [], partial)
+        # A question about the world's own record (round 2, the skills-mind lane): the
+        # topic is the world's, the Knowledge is the record's own field for it.
+        if helped is None and actor.is_pc and skilluses.asks_the_world(intent):
+            return skilluses.knowledge_answer(self, intent, actor, partial)
         if ability:
             mods = actor.ability_check_modifiers(ability)
         else:
@@ -8505,6 +8530,15 @@ class Engine:
             if str(skill).lower() == named_skill and intent.params.get(flag) \
                     and helped is None:
                 return getattr(skilluses, resolve)(self, intent, actor, mods, partial)
+        # The player's own read of a person, appraisal, performance for coin or study of a
+        # magic item (round 2): the row's DC and consequence, never the plan's band. Not a
+        # check the engine itself set against somebody (`opposed_by`), and Perform only
+        # out of a fight (a bard's performance in one is the class ability's door).
+        door = (skilluses.door_for(intent, actor, skill)
+                if helped is None and not intent.params.get("opposed_by") else None)
+        if door is not None and not (door is skilluses.perform_for_coin
+                                     and self.scene.in_encounter):
+            return door(self, intent, actor, mods, partial)
         opposed = intent.params.get("opposed_by")
         # A creature's Perception with no DC and nobody named, while somebody here is
         # hidden from it: that is searching ("Intentionally searching for stimulus is a
