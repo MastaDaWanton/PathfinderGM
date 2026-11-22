@@ -3226,6 +3226,34 @@ def prepare_spells(request):
         return JsonResponse(_sheet_now(pc))
 
     level = casting.spell_level_for(pc, spell)
+    # `metamagic`: the feats a prepared caster fixes on this copy (rules/metamagic.py),
+    # held as its own prepared key in the slot of the raised level — "a wizard must
+    # prepare the spell with the feat applied" (CRB, Metamagic Feats).
+    from rules import metamagic
+
+    meta = metamagic.chosen(body)
+    if meta and action in ("prepare", "unprepare") and level is not None:
+        key = casting.metamagic_key(spell.id, meta)
+        if action == "prepare":
+            at = level + metamagic.levels(pc, meta)
+            why = (metamagic.refusal(pc, spell, meta, spontaneous=False)
+                   or ("a cantrip with metamagic is not supported yet."
+                       if casting.at_will(level) else "")
+                   or (f"that takes a level {at} slot, and {pc.name} reaches level "
+                       f"{casting.highest_spell_level(pc)}."
+                       if at > casting.highest_spell_level(pc) else "")
+                   or ("" if casting.knows(pc, spell) else
+                       f"{spell.name} is not in {pc.name}'s spellbook.")
+                   or casting.prepare_refusal(pc, at, count))
+            if why:
+                return JsonResponse({"error": why, "level": at, "spell": spell.id},
+                                    status=409)
+            casting.prepare(pc, key, count)
+        else:
+            casting.unprepare(pc, key, count)
+        casting.remember_loadout(pc)
+        c.save()
+        return JsonResponse(_sheet_now(pc))
     if action in ("prepare", "learn"):
         if level is None:
             return JsonResponse(

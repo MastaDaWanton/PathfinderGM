@@ -409,6 +409,18 @@ Both were hit by real spells and both are one line:
    spec instead. A `choice_at_cast` field, or a `resistance` whose target may be a list, would
    make it executable.
 
+   **Closed 2026-11-22 (lane C).** A spell spec names the choice with the enchanting
+   vocabulary's own `"choice_key": "energy"` and leaves `target` empty; the cast carries
+   `energy` (acid, cold, electricity, fire, sonic), refused before the slot is spent when
+   it is missing or not one of the five (`Engine._check_cast_choices`, code
+   `choose_energy`), and bound into a copy of the spell for that cast (`Engine._cast_copy`).
+   A ward's points may be a formula over `caster_level`, worked out for the caster in the
+   same copy. Protection from energy is the first user (`immunity` with `absorbs`, spent
+   by `Actor._spend_ward`); resist energy's document is lane B's to write (part-21.json).
+   Summon monster and summon nature's ally take `creature` the same way
+   (content/spells/summon-tables.json, rules/summons.py), and metamagic feats `metamagic`
+   (rules/metamagic.py).
+
 Neither is urgent. Both are recorded because the alternative was a silently wrong number.
 
 ### 5.4 `play/homebrew.py` — the spell bench blurb is now stale

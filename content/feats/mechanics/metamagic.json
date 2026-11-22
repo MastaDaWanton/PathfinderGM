@@ -1,0 +1,45 @@
+{
+ "_about": "Lane C, 2026-11-22: metamagic feats as transforms of a copy of the spell at the cast (rules/metamagic.py). `does` is the transform, `levels` the slot levels it adds (CRB).",
+ "extend-spell": {
+  "metamagic": {
+   "does": "extend",
+   "levels": 1
+  }
+ },
+ "empower-spell": {
+  "metamagic": {
+   "does": "empower",
+   "levels": 2
+  }
+ },
+ "maximize-spell": {
+  "metamagic": {
+   "does": "maximize",
+   "levels": 3
+  }
+ },
+ "enlarge-spell": {
+  "metamagic": {
+   "does": "enlarge",
+   "levels": 1
+  }
+ },
+ "silent-spell": {
+  "metamagic": {
+   "does": "silent",
+   "levels": 1
+  }
+ },
+ "still-spell": {
+  "metamagic": {
+   "does": "still",
+   "levels": 1
+  }
+ },
+ "quicken-spell": {
+  "metamagic": {
+   "does": "quicken",
+   "levels": 4
+  }
+ }
+}

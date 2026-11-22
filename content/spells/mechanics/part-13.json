@@ -2652,8 +2652,9 @@
    "effects": [
     {
      "type": "immunity",
-     "target": "one energy type chosen when you cast — acid, cold, electricity, fire or sonic",
-     "note": "temporary; it discharges once it has absorbed 12 points of that energy per caster level, to a maximum of 120 points at caster level 10th"
+     "choice_key": "energy",
+     "absorbs": "min(12 * caster_level, 120)",
+     "note": "temporary; the energy is chosen at the cast (cast param `energy`), and the ward discharges once it has absorbed 12 points of that energy per caster level, to a maximum of 120 points at caster level 10th"
     },
     {
      "type": "narrative",
@@ -2667,7 +2668,7 @@
     "dismissible": false
    },
    "converted_by": "read",
-   "notes": "The energy type is chosen at casting, so it cannot be named in a vocabulary field. Corpus duration is 'minutes/level (10) or until discharged'."
+   "notes": "The energy is the cast's choice (`choice_key: energy`, bound by Engine._cast_copy); the discharge is `absorbs`, spent by Actor._spend_ward. Corpus duration is 'minutes/level (10) or until discharged'."
   },
   "protection-from-energy-communal": {
    "effects": [

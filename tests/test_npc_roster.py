@@ -81,12 +81,14 @@ def test_a_plural_word_finds_its_singular():
 # --- templated creatures ----------------------------------------------------------------------
 
 def test_every_declared_templated_creature_is_built():
-    """58 summonable bases (CRB Table 10-1's starred entries) celestial and fiendish, and 24
-    common raised dead as zombie and skeleton: 164, every one built at load."""
-    assert len(DERIVED["derived"]) == 164
+    """59 summonable bases (CRB Table 10-1's starred entries) celestial and fiendish, and 24
+    common raised dead as zombie and skeleton: 166, every one built at load. The monitor
+    lizard joined 2026-11-22: it is starred at level 3 and the summon tables could not
+    call it up templated without it."""
+    assert len(DERIVED["derived"]) == 166
     store = bestiary.imported()
     built = [v for v in store.values() if v.get("biomes_from") == "template"]
-    assert len(built) == 164
+    assert len(built) == 166
 
 
 def test_a_summoned_celestial_dog_is_the_rules_dog():

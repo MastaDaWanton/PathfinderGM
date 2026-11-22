@@ -633,8 +633,13 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # `guess`: an area spell cast at a square the caster guesses at, for somebody hidden
     # from it it has not found — the engine's die picks the square (`Engine._guess_point`;
     # Concealment, CRB p.196), as an attack's `guess` does.
+    # The cast-time choices (lane C, 2026-11-22), each checked against the spell's own
+    # document before anything is spent (`Engine._check_cast`), never invented:
+    # `creature` is the summoned creature, from the spell's table (rules/summons.py);
+    # `energy` the chosen energy of resist energy and its kin (acid, cold, electricity,
+    # fire, sonic); `metamagic` the metamagic feats the caster applies (rules/metamagic.py).
     "cast": (("spell",), ("at", "level", "defensively", "square", "choose", "aim",
-                          "guess"),
+                          "guess", "creature", "energy", "metamagic"),
              "hidden"),
     # Crafted potions and tinctures doing something. `how` is drink, apply, throw or coat,
     # and the difference is real: a splash weapon is a ranged touch attack and a coated
@@ -914,7 +919,10 @@ TIME_UNITS = ("round", "minute", "hour", "day")
 PLAYER_FIXABLE = frozenset({
     "unprepared", "no_slots", "not_known", "not_on_list", "too_high", "ability_too_low",
     "not_your_turn", "no_aim", "out_of_range", "no_line_of_effect", "no_such_object",
-    "no_such_weapon", "out_of_reach", "absent_ground"})
+    "no_such_weapon", "out_of_reach", "absent_ground",
+    # The cast-time choices (lane C): which creature, which energy, which metamagic are the
+    # player's to make; a plan that invents one is a choice the player never made.
+    "choose_creature", "choose_energy", "metamagic"})
 
 
 class IntentError(ValueError):

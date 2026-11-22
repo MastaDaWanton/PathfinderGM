@@ -31,6 +31,7 @@ from . import consumables
 from . import crafting
 from . import dc as dc_mod
 from . import effectspec
+from . import metamagic
 from . import finish_uses
 from . import foraging
 from . import ingredients as ing_mod
@@ -67,7 +68,7 @@ from . import words as english
 from .tables import (
     CONDITIONS,
     ABILITY_FULL, AID_ANOTHER_BONUS, AID_ANOTHER_DC, MANEUVERS, SAVES, SIZE_ORDER,
-    ability_check_of, maneuver_text, normalise_damage_type,
+    ENERGY_DAMAGE, ability_check_of, maneuver_text, normalise_damage_type,
 )
 
 
@@ -6435,6 +6436,11 @@ class Engine:
             return []
         timing = str(getattr(spell, "casting_time", "") or "").lower()
         if "swift" in timing or "immediate" in timing or "free" in timing:
+            return []
+        # "Casting a quickened spell doesn't provoke an attack of opportunity" (CRB). A
+        # caster without the feat is refused at the cast, so no opening is owed either.
+        if ("quicken-spell" in metamagic.chosen(params)
+                and "quicken-spell" in metamagic.held(caster)):
             return []
         out: list[dict] = []
         for watcher, reaction in reactions.provoked_by_action(self.scene, caster_ref):
@@ -26270,6 +26276,11 @@ class Engine:
         # the dice popup, never in the intent's params, which a model can write.
         item = (partial.get("item_cast")
                 or (partial.get("cast_state") or {}).get("item_cast") or None)
+        # The cast-time choices (lane C): the chosen energy bound into the spell's own
+        # documents and the metamagic made on them — a copy for this cast, which every
+        # reader below takes as the spell (`_cast_copy`). An item's power applies no feat.
+        meta = () if item else metamagic.chosen(intent.params)
+        spell = self._cast_copy(intent, actor, spell, meta)
         level = int(item["level"]) if item else casting.spell_level_for(actor, spell)
         # Which slot pays (`casting.cast_source`): the ordinary one, a domain slot or a
         # specialist's school slot, and two for an opposition-school spell. Decided once,
@@ -26282,6 +26293,10 @@ class Engine:
             spent = self._standard_spent_refusal(intent, actor)
             if spent is not None:
                 return spent
+        if state is None and meta:
+            slow = self._metamagic_round_refusal(intent, actor, spell)
+            if slow is not None:
+                return slow
         if state is None and not item:
             # A cursed item's drawback (CRB, Cursed Items: "character cannot cast arcane
             # spells" / "divine spells" / "any spells"), held or worn: asked of the
@@ -26309,7 +26324,7 @@ class Engine:
         else:
             # A converted cure pays with the slot of the spell it is cast in place of
             # (`casting.conversion_source`), never with a slot of the cure's own level.
-            source = (state or {}).get("source") or casting.cast_source(actor, spell)                 or casting.conversion_source(actor, spell) or {
+            source = (state or {}).get("source") or casting.cast_source(actor, spell, meta)                 or casting.conversion_source(actor, spell) or {
                 "pool": "" if casting.at_will(level) else casting.slot_pool(level),
                 "key": "", "cost": 0 if casting.at_will(level) else 1, "level": level}
         level = int(source.get("level", level))
@@ -26487,6 +26502,29 @@ class Engine:
                 state["tells"].append(
                     f"The {fouled_by} does not foul the casting (arcane spell failure "
                     f"{asf}%, rolled {roll.total}).")
+            # Deafened (CRB, Conditions): "a 20% chance of spell failure when casting
+            # spells with verbal components" — the gate Silent Spell's copy, with its V
+            # struck out, passes (rules/metamagic.py). Lane C, 2026-11-22.
+            comps = [str(c).strip().upper() for c in spell.components or ()]
+            if not item and "V" in comps and actor.has_state("state.senses.deafened"):
+                roll = self.dice.roll("1d100", label="Deafened: verbal spell failure (20%)",
+                                      visibility="hidden")
+                state["rolls"].append(roll.as_dict())
+                if roll.total <= 20:
+                    return Outcome(
+                        intent_id=intent.id, op="cast", rolls=[roll],
+                        effects=[{"ref": actor.ref, "kind": "spell_failure",
+                                  "spell": spell.id, "name": spell.name, "chance": 20,
+                                  "rolled": roll.total, "deafened": True, "slot": pool,
+                                  "slots_left": casting.pool_left(actor, pool)}],
+                        tell=(f"{actor.name} cannot hear the words of {spell.name} and "
+                              f"misspeaks them: deafened, {roll.total} against 20%. The "
+                              f"spell is lost"
+                              + ("." if casting.at_will(level) else ", and its slot "
+                                 "with it.")),
+                        because=intent.because)
+                state["tells"].append(f"Deafened, {actor.name} still speaks the words "
+                                      f"true (20% failure, rolled {roll.total}).")
             # Concentration (CRB p.206): struck while casting, casting defensively, or
             # held in a grapple, each a check the spell is lost on — after the slot,
             # like the failure above. An item's power is not a casting (no slot, no
@@ -26517,6 +26555,11 @@ class Engine:
                                         spell.spell_resistance or "", flags=re.I).strip()
 
         bits = [f"caster level {cl}"]
+        if metamagic.said(spell):
+            bits.insert(0, metamagic.said(spell)
+                        + f", in a level {source.get('slot', level)} slot")
+        if getattr(spell, "chosen_energy", ""):
+            bits.append(f"against {spell.chosen_energy}")
         if save and save.lower() not in ("none", "no", "—", "-"):
             bits.append(f"{save}, DC {dc}")
         if sr and sr.lower() not in ("no", "none", "—", "-"):
@@ -26681,7 +26724,11 @@ class Engine:
                 None, partial, state, dice, state_key="cast_state",
             )
             state["rolls"].append(roll.as_dict())
-            state["rolled"] = max(0, roll.total)
+            # Empower and Maximize (rules/metamagic.py) act on the rolled total; a spell
+            # of missiles has each missile's share remade below instead.
+            state["rolled"] = max(0, roll.total if missiles else
+                                  metamagic.dice_total(spell, dice, roll.total))
+            state["raw_rolled"] = max(0, roll.total)
             state["stage"] = "targets"
             if missiles:
                 # Each missile its own share of the faces, and the missiles dealt out over
@@ -26698,6 +26745,8 @@ class Engine:
                 else:
                     state["missiles"] = _missiles_split(self.dice, one_missile,
                                                         roll.faces, missiles, live)
+                for m in state["missiles"]:
+                    m["amount"] = metamagic.dice_total(spell, one_missile, m["amount"])
 
         rolled = int(state.get("rolled", 0))
         per_target = state.get("missiles")
@@ -26857,6 +26906,9 @@ class Engine:
                                            if state.get("ray_order") else {})))
         elif dice and "rolled" in state:
             tells.append(f"{dice} — {state.get('rolled', 0)}.")
+        remade = metamagic.dice_said(spell, state, per_target)
+        if dice and remade:
+            tells.append(remade)
         tells.extend(state["tells"])
         crossed_said = self._hp_state_tell(crossed).strip()
         if crossed_said:
@@ -27350,6 +27402,8 @@ class Engine:
             "save": plan.get("save", ""), "save_effect": plan.get("save_effect", ""),
             "square": tuple(square) if square else None,
             "chosen": intent.params.get("choose"),
+            # Summon monster's creature, from its table (`_summon`, rules/summons.py).
+            "creature": intent.params.get("creature"),
             "vars": {
                 "caster_level": cl, "level": actor.level, "spell_level": level,
                 "hit_dice": actor.hit_dice, "casting_mod": dc - 10 - level,
@@ -28147,13 +28201,33 @@ class Engine:
         caster = self.scene.actors.get(ctx.get("caster", ""))
         if caster is not None and not caster.is_pc:
             side = "them" if side == "pc" else "pc"
+        count, said = int(spec.get("count") or 1), []
+        if spec.get("table"):
+            # Summon monster / summon nature's ally: the cast's own choice, from the
+            # spell's table (`summons.pick`), already refused at the door when it is
+            # missing or off the list (`_check_cast`), so a failure here is a resume of a
+            # cast whose table changed underneath it — said, never invented.
+            from . import summons
+
+            try:
+                picked = summons.pick(spec["table"], int(spec.get("level") or 1),
+                                      ctx.get("creature"))
+            except ValueError as exc:
+                return ([{"kind": "summon_refused", "creature": str(ctx.get("creature")),
+                          "why": str(exc)}], [f"Nothing arrives: {exc}"])
+            name = picked["creature"]
+            count, said = self._summon_count(picked["count"], caster)
         try:
             # A summon names a creature in a document someone wrote (a spell, an item, a
             # homebrew bundle); a retired id there would call up its stand-in — a CR 1
             # nupperibo summoned as a CR 14 peri (`bestiary.retired`).
             if retired(name):
                 raise UnknownTemplate(f"no creature {name!r}." + suggestion(name))
-            made = self._bring_in(name, count=int(spec.get("count") or 1), side=side)
+            # One at a time when the spell chose: 1d4+1 can be five, and five through
+            # `_bring_in`'s count is a troop — one actor with their pooled hit points —
+            # where the book's five dogs are five dogs, each its own turn and hit points.
+            made = ([m for _ in range(count) for m in self._bring_in(name, side=side)]
+                    if spec.get("table") else self._bring_in(name, count=count, side=side))
         except UnknownTemplate as exc:
             # Named rather than invented. A summon that quietly produces nothing is a
             # spell the player paid a slot for and cannot tell did not work.
@@ -28166,10 +28240,71 @@ class Engine:
                 what=f"the summoned {m['name']}", rounds_left=ctx.get("rounds"),
                 source=ctx.get("source", ""), owner=ctx.get("caster", ""),
                 creature=m["ref"]))
+        said += self._augment_summoned(caster, made, ctx)
+        # "It appears where you designate and acts immediately, on your turn" (CRB,
+        # Summon Monster I): on the caster's count, after the caster, not on a roll of
+        # its own. `_bring_in` enrolled it on its own d20; moved through the order's two
+        # doors, which keep the turn where it was.
+        at = next((n for r, n in self.scene.initiative if caster is not None
+                   and r == caster.ref), None)
+        if spec.get("table") and at is not None:
+            for m in made:
+                self.scene.leave_order(m["ref"])
+                self.scene.enrol(m["ref"], at)
         return ([{"kind": "summon", "actors": made, "side": side,
                   "rounds": ctx.get("rounds")}],
                 ["Answering the call: "
-                 + ", ".join(f"{m['name']} ({m['ref']})" for m in made) + "."])
+                 + ", ".join(f"{m['name']} ({m['ref']})" for m in made) + "."] + said)
+
+    def _summon_count(self, dice: str, caster) -> tuple[int, list[str]]:
+        """How many of one kind a summoning spell calls: 1, 1d3 or 1d4+1 (`summons.
+        options`), rolled with the engine's dice and said in the tell — plus one where the
+        caster's feat document says so (Superior Summoning: "each time you cast a
+        summoning spell that conjures more than one creature, add one to the total")."""
+        if dice == "1":
+            return 1, []
+        got = self.dice.roll(dice, label="how many answer the summons", visibility="player")
+        extra = sum(int(d.get("summon_extra") or 0) for d in self._feat_docs(caster))
+        line = f"{dice} answer: {got.total}" + (f", and {extra} more" if extra else "") + "."
+        return got.total + extra, [line]
+
+    def _feat_docs(self, actor) -> list[dict]:
+        """The feat mechanics documents an actor holds, once each."""
+        from . import feats as feats_mod
+
+        out, seen = [], set()
+        for raw in getattr(actor, "feats", None) or ():
+            doc = feats_mod.document(raw)
+            if doc and doc["id"] not in seen:
+                seen.add(doc["id"])
+                out.append(doc)
+        return out
+
+    def _augment_summoned(self, caster, made: list[dict], ctx: dict) -> list[str]:
+        """The caster's feats on what they called up: Augment Summoning's "+4 enhancement
+        bonus to Strength and Constitution for the duration of the spell that summoned it".
+
+        Read from the feat's own document (`summoned`, content/feats/mechanics/
+        summoning.json), applied as a buff on each arrival with the spell's clock and the
+        feat as its source, so it ends with the summons and nothing outlives it. A
+        Constitution bonus raises the hit point total (`Actor.hp_max` follows the score);
+        a creature that has just arrived is at its full total."""
+        specs = [(d, s) for d in self._feat_docs(caster) for s in d.get("summoned") or ()]
+        if not specs:
+            return []
+        for m in made:
+            actor = self.scene.actors.get(m["ref"])
+            if actor is None:
+                continue
+            for doc, spec in specs:
+                actor.add_buff(spec["type"], spec["target"], int(spec["amount"]),
+                               source=doc["name"], rounds=ctx.get("rounds"),
+                               bonus_type=str(spec.get("bonus_type") or ""),
+                               origin=f"feat:{doc['id']}")
+            actor.hp = actor.hp_max
+        names = " and ".join(sorted({d["name"] for d, _ in specs}))
+        terms = ", ".join(effectspec.render(s) for _, s in specs)
+        return [f"{names}: {terms} on each, for as long as the spell lasts."]
 
     def _spell_operation(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
         """Permanency, dispel magic, suppression — spells whose target is another spell.
@@ -28352,11 +28487,17 @@ class Engine:
         if who is None or not against:
             return [], []
         rounds = ctx.get("rounds")
+        # Protection from energy's discharge (`absorbs`, resolved to points for this
+        # caster by `_cast_copy`): immune until that much is spent (`Actor._spend_ward`).
+        absorbs = int(spec.get("absorbs") or 0)
         who.grant_defence("immunity", against, source=ctx.get("source", ""),
-                          rounds=rounds, origin=str(ctx.get("origin") or ""))
+                          rounds=rounds, origin=str(ctx.get("origin") or ""),
+                          absorbs=absorbs)
         return ([{"kind": "defence", "ref": who.ref, "defence": "immunity",
-                  "against": against, "rounds": rounds}],
-                [f"{who.name} is immune to {against}."])
+                  "against": against, "rounds": rounds,
+                  **({"absorbs": absorbs} if absorbs else {})}],
+                [f"{who.name} is immune to {against}"
+                 + (f" until it has absorbed {absorbs} points." if absorbs else ".")])
 
     def _untrippable(self, defender: Actor) -> str:
         """Why the trip cannot work on this creature (CRB, Trip), or ""."""
@@ -28401,6 +28542,13 @@ class Engine:
                 f"cast spells.", "legality", index, code="not_known",
                 for_a_person=f"{actor.name} does not cast spells.",
             )
+        # A prepared metamagic copy named as the spell ("fireball+empower-spell", the
+        # Spells tab's key, `casting.metamagic_key`): the spell and its feats, apart.
+        sid, held_meta = casting.split_metamagic_key(intent.params["spell"])
+        if held_meta:
+            intent.params["spell"] = sid
+            intent.params["metamagic"] = sorted(set(metamagic.chosen(intent.params))
+                                                | set(held_meta))
         try:
             spell = spells_mod.get(str(intent.params["spell"]))
         except KeyError:
@@ -28468,7 +28616,9 @@ class Engine:
         # A copy in a domain or specialist slot counts (`casting.cast_source`), and only
         # there: until 2026-10-05 the domain slot was a number on the Spells tab that
         # nothing could be prepared into or cast from.
-        source = casting.cast_source(actor, spell)
+        meta = metamagic.chosen(intent.params)
+        self._check_cast_choices(intent, index, actor, spell, level, meta)
+        source = casting.cast_source(actor, spell, meta)
         unprepared = source is None
         # ...with the one exception the book names: a cure spell may be cast in place of a
         # prepared spell of the same level or higher, which is what keeps a cleric useful
@@ -28512,6 +28662,114 @@ class Engine:
                              f"A night's rest brings them back.",
             )
         self._check_aim(intent, index, actor, spell)
+
+    # --- cast-time choices (lane C, 2026-11-22) ---------------------------------------
+    #
+    # One idea, three uses: something the caster decides as the spell is cast — which
+    # creature answers a summons, which energy a ward is against, which metamagic shapes
+    # it. Each is a `cast` param, checked here against the spell's own document before
+    # anything is spent, refused with the list it could have been, and never invented:
+    # the model may carry the player's choice, it may not make one the document does not
+    # offer (law 3's "no model authors a number", for a choice).
+
+    def _check_cast_choices(self, intent: Intent, index: int, actor: Actor, spell,
+                            level: int, meta: list[str]) -> None:
+        from . import summons
+
+        table = summons.table_spec(spell)
+        if table is not None:
+            try:
+                summons.pick(table["table"], int(table.get("level") or 1),
+                             intent.params.get("creature"))
+            except ValueError as exc:
+                raise IntentError(
+                    f"cast: {spell.name} calls a creature the caster chooses. {exc}",
+                    "legality", index, code="choose_creature",
+                    fix={"kind": "choose", "param": "creature", "spell": spell.id,
+                         "options": [o["creature"] for o in summons.options(
+                             table["table"], int(table.get("level") or 1))]},
+                    for_a_person=f"Which creature does {spell.name} call? {exc}") from None
+        if _chooses_energy(spell.effects):
+            energy = str(intent.params.get("energy") or "").strip().lower()
+            if energy not in ENERGY_DAMAGE:
+                said = f"{energy!r} is not one of them. " if energy else ""
+                raise IntentError(
+                    f"cast: {spell.name} is against one energy the caster chooses: "
+                    f"{', '.join(ENERGY_DAMAGE)} (cast param `energy`). {said}",
+                    "legality", index, code="choose_energy",
+                    fix={"kind": "choose", "param": "energy", "spell": spell.id,
+                         "options": list(ENERGY_DAMAGE)},
+                    for_a_person=f"{said}Which energy does {spell.name} guard against: "
+                                 f"{', '.join(ENERGY_DAMAGE)}?")
+        if not meta:
+            return
+        kind = casting.caster_data(actor).get("kind")
+        why = metamagic.refusal(actor, spell, meta, spontaneous=kind != "prepared")
+        if not why and casting.at_will(level):
+            # shortcut: a metamagic cantrip would need a 1st-level-or-higher slot, and
+            # every reader of `at_will` spends nothing for level 0 — refused until those
+            # readers learn the slot; RAW allows it (CRB Metamagic Feats).
+            why = "a cantrip cast with metamagic is not supported yet."
+        at = level + metamagic.levels(actor, meta)
+        if not why and at > casting.highest_spell_level(actor):
+            why = (f"it would take a level {at} slot, and {actor.name} casts up to level "
+                   f"{casting.highest_spell_level(actor)}.")
+        if not why and kind == "prepared" and casting.prepared_count(
+                actor, casting.metamagic_key(spell.id, meta)) <= 0:
+            why = (f"a prepared caster fixes metamagic when preparing, and {actor.name} has "
+                   f"no {spell.name} prepared with "
+                   f"{' and '.join(m.replace('-', ' ') for m in meta)} today.")
+        if why:
+            raise IntentError(f"cast: {why}", "legality", index, code="metamagic",
+                              for_a_person=why[0].upper() + why[1:])
+
+    def _cast_copy(self, intent: Intent, actor: Actor, spell, meta):
+        """The spell as THIS cast makes it: a copy with the chosen energy written into its
+        documents, any caster-level formula in a ward's points worked out for this
+        caster, and the metamagic transforms made (rules/metamagic.py). The book's spell
+        is untouched; a cast with no choice to make gets the spell itself back."""
+        energy = str(intent.params.get("energy") or "").strip().lower()
+        if not _chooses_energy(spell.effects) and not meta:
+            return spell
+        out = copy.deepcopy(spell)
+        cl = casting.caster_level(actor)
+
+        def bind(specs):
+            for d in specs or ():
+                if not isinstance(d, dict):
+                    continue
+                if str(d.get("choice_key") or "") == "energy" and energy in ENERGY_DAMAGE:
+                    d.pop("choice_key")
+                    d["target"] = energy
+                for key in ("amount", "absorbs"):
+                    if (d.get("type") in ("resistance", "immunity")
+                            and isinstance(d.get(key), str)):
+                        d[key] = effectspec.evaluate(d[key], {"caster_level": cl})
+                for inner in ("effects", "options", "on_failure", "on_success"):
+                    bind(d.get(inner))
+
+        bind(out.effects)
+        if energy in ENERGY_DAMAGE and _chooses_energy(spell.effects):
+            out.chosen_energy = energy
+        return metamagic.apply(out, actor, meta)
+
+    def _metamagic_round_refusal(self, intent: Intent, actor: Actor, spell):
+        """A spontaneous caster's metamagic "takes longer to cast": a standard-action
+        spell becomes a full-round action (CRB, Metamagic Feats, Spontaneous Casters and
+        Metamagic Feats). In a fight that is the whole turn — refused after a move or an
+        action, and the move spent with it (`_coup_round_spent`, the coup de grâce's
+        question). A quickened spell is the exception: the copy's casting time is swift.
+        A prepared caster fixed the feat in the morning and casts in the normal time."""
+        if (not self.scene.in_encounter or intent.params.get("reaction")
+                or casting.caster_data(actor).get("kind") == "prepared"
+                or "swift" in str(spell.casting_time or "").lower()):
+            return None
+        why = self._coup_round_spent(actor, f"a {metamagic.said(spell)} spell cast "
+                                            f"spontaneously", "Nothing is spent.")
+        if why:
+            return self._refuse(intent, why, code="round_spent")
+        self.scene.move_spent[actor.ref] = self.scene.round
+        return None
 
     def _check_aim(self, intent: Intent, index: int, actor: Actor, spell) -> None:
         """The aim, checked before anything is spent, each refusal coded (§2.6).
@@ -37172,6 +37430,9 @@ def _damage_note(d: dict) -> str:
     explanation is the failure this exists to prevent.
     """
     bits = []
+    if d.get("warded"):
+        # A discharging immunity (protection from energy, `Actor._spend_ward`).
+        bits.append(f"{d['warded']} absorbed by {d.get('warded_by') or 'a ward'}")
     if d.get("resisted"):
         # Energy resistance, the first way damage vanishes (`take_damage` takes it off
         # before DR), was the one this note never said: a salamander-oiled coat's fire
@@ -37289,6 +37550,16 @@ def _uses_per_day(row: dict) -> int | None:
         return max(1, int(row.get("uses_count") or 1))
     except (TypeError, ValueError):
         return 1
+
+
+def _chooses_energy(specs) -> bool:
+    """Whether a spell's documents carry a `choice_key: "energy"` the cast must fill."""
+    for d in specs or ():
+        if isinstance(d, dict) and (str(d.get("choice_key") or "") == "energy" or any(
+                _chooses_energy(d.get(k)) for k in ("effects", "options", "on_failure",
+                                                    "on_success"))):
+            return True
+    return False
 
 
 def _cast_opener(actor, spell, bits: list[str], item: dict | None) -> str:
