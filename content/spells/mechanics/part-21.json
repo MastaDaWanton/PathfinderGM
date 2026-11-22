@@ -693,11 +693,31 @@
           "type": "save_mod",
           "amount": 1,
           "bonus_type": "morale",
+          "target": "fort",
+          "when": {
+            "against": "fear"
+          }
+        },
+        {
+          "type": "save_mod",
+          "amount": 1,
+          "bonus_type": "morale",
+          "target": "ref",
+          "when": {
+            "against": "fear"
+          }
+        },
+        {
+          "type": "save_mod",
+          "amount": 1,
+          "bonus_type": "morale",
           "target": "will",
-          "note": "against fear effects"
+          "when": {
+            "against": "fear"
+          }
         }
       ],
-      "notes": "Kept as spells.CURATED wrote it, for lane A's executor. RAW it lands on the caster and every ally in a 50-foot burst (a recipient lane A routes), and it counters and dispels bane.",
+      "notes": "RAW +1 morale on attack rolls and on saving throws against fear effects (CRB). The fear terms carry `when: {\"against\": \"fear\"}` (2026-11-22, integration), so they hold only on a fear spell's save. It lands on the caster's side of the 50-foot burst (lane A). It counters and dispels bane.",
       "converted_by": "read"
     },
     "blight": {

@@ -68,9 +68,11 @@ def test_casting_the_same_buff_twice_refreshes_it_rather_than_stacking():
     pc = s.actors["pc"]
     base = attack(pc)
     cast(e, "bless", at="pc")
+    once = len([x for x in pc.effects if x.source == "Bless"])
     cast(e, "bless", at="pc")
     assert attack(pc) == base + 1
-    assert len([x for x in pc.effects if x.source == "Bless"]) == 1
+    # One effect per term (attack, and the three fear saves), refreshed — never doubled.
+    assert len([x for x in pc.effects if x.source == "Bless"]) == once == 4
 
 
 def test_prayer_blesses_the_casters_side_and_hinders_the_other():
@@ -138,16 +140,36 @@ def test_enlarge_person_on_a_foe_is_saved_against():
         assert thug.ability_score("str") == (strength if made else strength + 2)
 
 
-def test_a_buff_whose_note_qualifies_it_is_told_and_not_applied():
-    """Bless's "+1 Will against fear effects" is a curated spec (lane B's) with the clause
-    in a note no reader asks. Applied, it would be +1 to every Will save; told, it is
-    honest until the data carries a `when`."""
+def test_bless_holds_against_fear_on_every_save_and_nothing_else():
+    """Bless: "+1 morale bonus on attack rolls and on saving throws against fear effects"
+    (CRB). Lane A found the save clause curated as "+1 Will" with "against fear effects"
+    in a note no reader asks, so it was told and never applied, and only ever named Will.
+    Integration 2026-11-22: three save terms with `when: {"against": "fear"}` — every
+    save, and only against fear."""
     s, e = table(caster("cleric", 5, "bless"))
     pc = s.actors["pc"]
-    will = save(pc, "will")
+    before = {w: save(pc, w) for w in ("fort", "ref", "will")}
     out = cast(e, "bless", at="pc").outcomes[0]
-    assert save(pc, "will") == will
-    assert "told rather than applied" in out.tell
+    assert "told rather than applied" not in out.tell
+    for w in ("fort", "ref", "will"):
+        assert save(pc, w) == before[w], w
+        assert save(pc, w, {"against": ("spell", "fear")}) == before[w] + 1, w
+
+
+def test_haste_gives_one_more_swing_on_a_full_attack_only():
+    """Haste: "when making a full attack action, a hasted creature may make one extra
+    attack with one natural or manufactured weapon … at the creature's full base attack
+    bonus" (CRB). Audit 2026-11-22: written as a `permission` nothing executes, so a
+    hasted fighter swung as often as before. Lane D built `extra_attacks` with
+    `when: {"full_attack": true}`; integration put haste's data on it (untyped: "haste"
+    is not a bonus type, and recasting refreshes by the spell's name)."""
+    s, e = table(caster("wizard", 7, "haste"))
+    pc = s.actors["pc"]
+    full, single = pc.attack_sequence(full_attack=True), pc.attack_sequence()
+    cast(e, "haste", at="pc")
+    assert len(pc.attack_sequence(full_attack=True)) == len(full) + 1
+    assert pc.attack_sequence(full_attack=True).count(0) == full.count(0) + 1
+    assert pc.attack_sequence() == single
 
 
 def test_expeditious_retreat_moves_land_speed():

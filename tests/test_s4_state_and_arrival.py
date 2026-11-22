@@ -457,6 +457,21 @@ def test_the_owners_real_saves_round_trip_byte_identically(save, tmp_path, monke
         assert all(weapons_mod.has(w) for w in got["weapons"][len(old_list):]), ref
         for key in ("equipped", "weapons", "print_armed"):
             was[key] = got.get(key)
+    # The fourth (2026-11-22, the implementation lanes): a "[feat 'x' is carried as
+    # flavour; engine applies nothing]" note goes once its feat gains a document
+    # (`sheet.validate`). Bobby's PC said so of Silent Spell and Quicken Spell, which lane
+    # C's metamagic made real; nothing else in the notes may move.
+    from rules import feats as feats_mod
+    for ref, was in (orig["scene"].get("people") or {}).items():
+        notes = was.get("notes")
+        if not isinstance(notes, str) or "is carried as flavour" not in notes:
+            continue
+        for f in re.findall(r"\[feat '([^']+)' is carried as flavour; engine applies nothing\]", notes):
+            if feats_mod.document(f):
+                note = f"[feat '{f}' is carried as flavour; engine applies nothing]"
+                notes = notes.replace("\n" + note, "").replace(note, "")
+                migrated = True
+        was["notes"] = notes
     orig.pop("world_source", None)
     now.pop("world_source", None)
     assert now == orig

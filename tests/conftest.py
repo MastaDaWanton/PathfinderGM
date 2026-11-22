@@ -448,7 +448,9 @@ def pytest_sessionfinish(session, exitstatus):
     """
     from rules import pristine
 
-    changed = [name for name, build in pristine._BUILDERS.items()
+    # A snapshot: rebuilding one catalogue can import a module that registers another
+    # (2026-11-22: the summon tables), and a live dict view then raised mid-loop.
+    changed = [name for name, build in list(pristine._BUILDERS.items())
                if build() != pristine._MEMO.get(name)]
     if changed:
         reporter = session.config.pluginmanager.get_plugin("terminalreporter")

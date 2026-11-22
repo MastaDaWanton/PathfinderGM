@@ -352,7 +352,8 @@ def test_a_buff_is_applied_for_the_spells_own_rounds():
     gave +1 morale, under a pin that said the duration "is still prose" — it had been read
     into rounds since 2026-09-30. Now the +1 lands as a timed, typed ActiveEffect stamped
     `spell:bless` for 50 rounds (minutes/level), and the thug on the other side gets none.
-    Its "+1 Will against fear" carries a note no reader asks, so it is still told."""
+    Its saves against fear land too, one effect per save, each asked only against fear
+    (`test_spell_buffs`)."""
     c = cleric(level=5, book=("bless",), prepared={"bless": 1})
     s, e = table(c)
     before = sum(m.value for m in s.actors["pc"].attack_modifiers())
@@ -362,14 +363,14 @@ def test_a_buff_is_applied_for_the_spells_own_rounds():
     pc = s.actors["pc"]
     assert sum(m.value for m in pc.attack_modifiers()) == before + 1
     held = [x for x in pc.effects if x.kind == "buff" and x.source == "Bless"]
-    assert len(held) == 1 and held[0].rounds_left == 50
-    assert held[0].origin == "spell:bless"
-    assert held[0].modifiers[0]["bonus_type"] == "morale"
+    assert len(held) == 4 and all(x.rounds_left == 50 for x in held)
+    assert all(x.origin == "spell:bless" for x in held)
+    assert all(x.modifiers[0]["bonus_type"] == "morale" for x in held)
     assert not [x for x in s.actors["c1"].effects if x.source == "Bless"]
-    assert "+1 on attack rolls for 5 minute(s) (Bless)" in out.tell
-    assert "told rather than applied" in out.tell
+    assert "+1 on attack rolls" in out.tell and "for 5 minute(s) (Bless)" in out.tell
+    assert "told rather than applied" not in out.tell
     plan = spells_mod.casting_plan(spells_mod.get("bless"), 5)
-    assert plan["dice"] == "" and len(plan["riders"]) == 2
+    assert plan["dice"] == "" and len(plan["riders"]) == 4
     assert "still prose" not in plan["note"]
 
 
