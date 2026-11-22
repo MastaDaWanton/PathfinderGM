@@ -188,3 +188,26 @@ def test_a_fear_spells_save_carries_aids_bonus_and_an_ordinary_one_does_not():
     out = cast(e, "cause-fear", at="c1").outcomes[0]
     will = next(r for r in out.rolls if "Will save" in (r.label or ""))
     assert any(m.source == "Aid" and m.value == 1 for m in will.modifiers)
+
+
+def test_a_chosen_resistance_lands_through_the_rider_path():
+    """Resist energy (lane B's part-21) is a `choose_one` of five `resistance` options, the
+    pick the cast's `choose` param, the amount a caster-level formula. `_choose` hands the
+    picked option to `_run_one`, which reaches `_cast_buff`: resist fire 20 at caster level
+    7, for the spell's rounds — and nothing at all while nobody has chosen."""
+    from rules.engine import Engine
+
+    s, e = table(caster("cleric", 7, "bless"))
+    pc = s.actors["pc"]
+    spec = {"type": "choose_one", "options": [
+        {"type": "resistance", "target": t,
+         "amount": "min(30, max(10, 10 + 10 * ((caster_level - 3) / 4)))"}
+        for t in ("acid", "cold", "electricity", "fire", "sonic")]}
+    ctx = {"caster": "pc", "targets": ["pc"], "caster_level": 7, "rounds": 70,
+           "source": "Resist Energy", "origin": "spell:resist-energy",
+           "vars": {"caster_level": 7}, "chosen": None}
+    assert Engine._run_one(e, spec, dict(ctx))[0][0]["kind"] == "choice_pending"
+    effects, tells = Engine._run_one(e, spec, {**ctx, "chosen": 4})
+    held = [x for x in pc.effects if x.source == "Resist Energy"]
+    assert held and held[0].rounds_left == 70
+    assert any("resistance 20 to fire" in t for t in tells)

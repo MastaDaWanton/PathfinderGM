@@ -744,11 +744,6 @@
      }
     }
    ],
-   "scaling": {
-    "base_dice": "1d8",
-    "bonus_per_level": 1,
-    "bonus_cap": 10
-   },
    "duration": {
     "kind": "per_level",
     "amount": 1,
