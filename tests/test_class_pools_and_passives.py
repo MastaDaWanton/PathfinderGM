@@ -99,3 +99,35 @@ def test_selective_channeling_spares_the_foe_in_a_healing_burst():
     assert _heals(got[False], "c1") and _heals(got[False], "c2")
     assert not _heals(got[True], "c1") and _heals(got[True], "c2"), got[True].tell
     assert "holds the energy back from the thug 1" in got[True].tell
+
+
+def test_lay_on_hands_on_herself_is_a_swift_action_and_the_bar_says_so():
+    """Audit 2026-11-22: lay on hands' `self_action: "swift"` (CRB p.61, "a swift action"
+    on herself) was read by nothing — the bar said "standard" and the use recorded no
+    action. Now the record of a use on herself says swift, on another says standard."""
+    pc = _pc("paladin", 4)
+    s, e = _board(pc, ("thug", (6, 5)))
+    s.sides = {"pc": ["pc", "c1"], "them": []}
+    pc.hp -= 5
+    out, _ = _use(e, "Lay on Hands", to="pc")
+    used = next(x for x in out.effects if x.get("kind") == "use_ability")
+    assert used["action"] == "swift", out.tell
+    s.actors["c1"].hp -= 3
+    out, _ = _use(e, "Lay on Hands", to="c1")
+    assert next(x for x in out.effects if x.get("kind") == "use_ability")["action"] \
+        == "standard"
+    bar = next(u for u in ca.usable(pc) if u["name"] == "Lay on Hands")
+    assert bar["text"].startswith("standard (swift on yourself)"), bar["text"]
+
+
+def test_a_class_ability_field_nothing_reads_is_refused_with_the_fix():
+    """The validator had no key whitelist (class-features' `DOC_KEYS` did), which is how a
+    field read by nothing got in. A misspelt one is refused now, top level and inside
+    `self`."""
+    doc = dict(next(d for d in ca.documents()["paladin"]["abilities"]
+                    if d["key"] == "lay on hands"))
+    doc["self_actoin"] = "swift"
+    doc["self"] = {"modifers": []}
+    got = ca.validate_documents({"paladin": {"class": "paladin", "abilities": [doc]}})
+    assert any("self_actoin" in p and "nothing reads" in p for p in got), got
+    assert any(".self" in p and "modifers" in p for p in got), got

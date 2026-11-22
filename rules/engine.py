@@ -33011,7 +33011,9 @@ class Engine:
             crossed.extend(self._hp_state_effects(self.scene.actors[ref]))
         records.append({"ref": actor.ref, "kind": "use_ability", "ability": name,
                         "class": str(doc.get("class") or ""), "origin": origin,
-                        "reached": [a.ref for a in landed]})
+                        "reached": [a.ref for a in landed],
+                        "action": ca.action_of(doc, actor, on_self=(
+                            [a.ref for a in who] == [actor.ref]))})
         if (doc.get("harmful") or hurt) and foes:
             from . import attitude as attitude_mod
 
