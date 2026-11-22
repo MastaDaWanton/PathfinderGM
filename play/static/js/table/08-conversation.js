@@ -258,6 +258,8 @@ function openTalk({ focus = true } = {}) {
   drawConvo(STATE, true);
   convoMarkSeen();
   paintTalkTab();
+  // The tray's first-time card (js/tutorials.js, content/tutorials/table.json).
+  if (window.Tutorials) Tutorials.arrive("table.talk", { entered: true, still: talkIsOpen });
   if (focus) {
     const to = tray.querySelector('#convo-people [aria-pressed="true"]')
       || document.getElementById("talkclose");

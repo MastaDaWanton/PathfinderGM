@@ -62,6 +62,15 @@
   .tut-help::after { content: ""; position: absolute; top: -10px; right: -10px; bottom: -10px; left: -10px; }
 }
 
+/* The inline first-time line (js/tutorials.js `inline`): one sentence inside a popup
+   that is already on screen, in the welcome line's gold rule. */
+.tut-inline {
+  margin: 8px 0 0; padding: 5px 10px; border-left: 2px solid var(--accent, #cfa964);
+  background: rgba(16, 12, 9, .55); color: var(--ink, #e8ddc4);
+  font: 14px/1.45 var(--body, Georgia, serif); text-align: left; white-space: normal;
+}
+.tut-inline .tut-link { margin-left: 6px; }
+
 /* Settings, Tutorials. */
 .tut-row { display: flex; align-items: center; gap: 10px; padding: 5px 0;
   border-bottom: 1px solid rgba(125, 104, 69, .22); }

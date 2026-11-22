@@ -2822,11 +2822,14 @@
   .sheetmore > #sheetpanel { height: 100%; }
   .modepage > #sheetpanel.on { flex: 1 1 0; }
   /* The sheet's own line above its page: a refusal, or the prompt for a character nobody
-     has said the gender of. Empty, it takes no room. */
+     has said the gender of. Empty, it is only the tab's tips "?" at its right (js/
+     tutorials.js), with no ground of its own: the one head row every sheet-backed tab has. */
   .sheetnote { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center;
                margin: 0 0 12px; padding: 8px 14px; border-radius: 3px; font: 14px/1.45 var(--body);
                background: rgba(8, 6, 4, .62); box-shadow: 0 0 16px 8px rgba(8, 6, 4, .32); }
-  .sheetnote:not(:has(#genderask)):has(#sheeterr:empty) { display: none; }
+  .sheetnote:not(:has(#genderask)):has(#sheeterr:empty) { margin: -6px 0 4px; padding: 0 4px;
+    background: none; box-shadow: none; }
+  .sheetnote .tut-help { margin-left: auto; }
   #sheeterr { color: #e0897c; }
   #sheeterr:empty { display: none; }
   /* The body scrolls; the framed cards' clasps reach 10px past the ring, so it keeps a
@@ -3812,10 +3815,10 @@
       <div class="bookhead">
         <div class="where">
           <h1 class="place" id="place-name"></h1>
-          <p class="whereline" id="where-line"></p>
+          <p class="whereline" id="where-line" data-tut="clock-line"></p>
         </div>
         <button type="button" class="v2-btn glance" id="glance"></button>
-        <div class="here" id="here" hidden>
+        <div class="here" id="here" data-tut="here" hidden>
           <span class="herelabel" id="here-label">Here</span>
           <div class="herelist" id="here-list" role="group" aria-labelledby="here-label"></div>
         </div>
@@ -3949,7 +3952,7 @@
     <!-- The crafting hub, a popover over the story's foot anchored to the desk, so nothing
          in the desk moves when it opens. Foraging lived only on the bench page, where it
          was a button and a table: no narration, no time, no way back into the fiction. -->
-    <div id="craftpanel" class="pop" role="dialog" aria-label="Craft action" hidden>
+    <div id="craftpanel" class="pop" role="dialog" aria-label="Craft action" data-tut="craft-panel" hidden>
       <div class="cp-ground"><b id="cp-biome">…</b> <em id="cp-desc"></em>
         <!-- The debug teleport moved here from the bench, where a workbench was
              claiming to be somewhere else. You forage where you stand; this is the
@@ -3960,7 +3963,7 @@
                 >debug</button>
       </div>
       <div class="cp-busy" id="cp-busy" hidden></div>
-      <div class="cp-hours">
+      <div class="cp-hours" data-tut="craft-hours">
         <label for="cp-h">Hours</label>
         <input type="range" id="cp-h" min="1" max="48" value="1">
         <b id="cp-hn">1</b>
@@ -3968,14 +3971,17 @@
       <!-- Every way of obtaining material, from every craft: "craft action should be
            the hub for mining, skinning, etc". Each declares its own; what is possible
            here is the scene's answer. -->
-      <div id="cp-actions"></div>
+      <div id="cp-actions" data-tut="craft-actions"></div>
       <!-- The app's own door out of the hub to the full bench. -->
       <div class="poprow">
         <!-- The herbalism bench, over the table; the full bench is the other crafts'. -->
-        <button type="button" class="v2-btn is-quiet is-small" data-bench-open
+        <button type="button" class="v2-btn is-quiet is-small" data-bench-open data-tut="craft-bench"
                 aria-haspopup="dialog" aria-controls="bench">Work at the bench</button>
-        <a class="v2-btn is-quiet is-small" href="/craft/">Open the full bench</a>
-        <button type="button" class="v2-btn is-quiet is-small" id="craftclose">Close</button>
+        <a class="v2-btn is-quiet is-small" href="/craft/" data-tut="craft-fullbench">Open the full bench</a>
+        <button type="button" class="v2-btn is-quiet is-small" id="craftclose" data-tut="craft-close">Close</button>
+        <!-- The craft action's tips again (js/tutorials.js). -->
+        <button type="button" class="tut-help" data-tut="help-craft" data-tut-help="table.craft"
+                aria-label="Show the tips for the craft action">?</button>
       </div>
     </div>
   </section>
@@ -3990,13 +3996,13 @@
 
   <!-- Sheet: the full sheet in the centre column, between its two sides (17-tab-sheet.js
        carries the sheet panel in here while the tab is open). -->
-  <section class="sheetmore" id="sheetmore" aria-label="The rest of the sheet"></section>
+  <section class="sheetmore" id="sheetmore" aria-label="The rest of the sheet" data-tut="page-sheet"></section>
 
   <!-- One sheet, split round the story: who the character is on the left, their numbers
        on the right (14-sides.js). Below 1180px the two halves become one column; on a
        phone the sheet is its own tab. -->
   <div class="sheet" id="sheet">
-    <aside class="side side-who v2-tooled-leather v2-gilt-edge" id="side-who"
+    <aside class="side side-who v2-tooled-leather v2-gilt-edge" id="side-who" data-tut="side-who"
            aria-label="Your character">
       <!-- The design's portrait frame. The app stores no portrait, so the frame says so
            and the reason sits under it, clear of the device's steam, which billows up
@@ -4010,45 +4016,45 @@
       <p class="pcstate" id="pc-state" hidden></p>
 
       <h3 class="sidehead v2-groove">In hand and worn</h3>
-      <ul class="loadout" id="loadout"></ul>
+      <ul class="loadout" id="loadout" data-tut="loadout"></ul>
       <p class="purse" id="purse"></p>
-      <button type="button" class="v2-btn door" id="open-equipment">Equipment</button>
+      <button type="button" class="v2-btn door" id="open-equipment" data-tut="door-equipment">Equipment</button>
       <!-- Herbalism opens over the table (30-bench-shell.js), so closing it keeps your
            place; the old bench at /craft/ stays for the four other crafts until each is
            revamped (docs/herbalism-ui-plan.md §4.1). -->
-      <button type="button" class="v2-btn door" id="open-bench" data-bench-open
+      <button type="button" class="v2-btn door" id="open-bench" data-bench-open data-tut="door-herbalism"
               aria-haspopup="dialog" aria-controls="bench">Herbalism</button>
       <!-- Smithing opens the forge over the table the same way (40-forge-shell.js,
            docs/blacksmithing-ui-plan.md §5.1). -->
-      <button type="button" class="v2-btn door" id="open-forge" data-forge-open
+      <button type="button" class="v2-btn door" id="open-forge" data-forge-open data-tut="door-smithing"
               aria-haspopup="dialog" aria-controls="forge">Smithing</button>
       <!-- Enchanting opens the circle over the table the same way (45-enchant-shell.js,
            docs/enchanting-ui-plan.md §5.1). In progress (37-works.js) puts its door after
            the last craft door, so it follows this one. -->
-      <button type="button" class="v2-btn door" id="open-enchant" data-enchant-open
+      <button type="button" class="v2-btn door" id="open-enchant" data-enchant-open data-tut="door-enchanting"
               aria-haspopup="dialog" aria-controls="enchant">Enchanting</button>
       <!-- Alchemy opens the bench over the table the same way (50-alchemy-shell.js,
            docs/alchemy-ui-plan.md §5.1), after Enchanting and before In progress (50 moves
            37's In progress door after this one: 37 places it after the doors it knows). -->
-      <button type="button" class="v2-btn door" id="open-alchemy" data-alchemy-open
+      <button type="button" class="v2-btn door" id="open-alchemy" data-alchemy-open data-tut="door-alchemy"
               aria-haspopup="dialog" aria-controls="alchemy">Alchemy</button>
       <!-- Leatherwork opens the leather bench over the table the same way (55-leather-shell.js,
            docs/leatherworking-ui-plan.md §5.1), after Alchemy; 55 moves In progress's door
            after this one, so the craft doors stay together. -->
-      <button type="button" class="v2-btn door" id="open-leather" data-leather-open
+      <button type="button" class="v2-btn door" id="open-leather" data-leather-open data-tut="door-leather"
               aria-haspopup="dialog" aria-controls="leather">Leatherwork</button>
-      <a class="v2-btn door" href="/craft/">Crafting bench</a>
+      <a data-tut="door-craftpage" class="v2-btn door" href="/craft/">Crafting bench</a>
       <!-- Switching is switching campaigns: one per character (01-core.js openRoster). -->
-      <button type="button" class="v2-btn is-quiet door" id="openroster">Who is playing</button>
+      <button type="button" class="v2-btn is-quiet door" id="openroster" data-tut="door-roster">Who is playing</button>
     </aside>
 
-    <aside class="side side-numbers v2-tooled-leather v2-gilt-edge" id="panels"
+    <aside class="side side-numbers v2-tooled-leather v2-gilt-edge" id="panels" data-tut="side-numbers"
            aria-label="Your numbers and the scene">
       <h3 class="sidehead v2-groove first">Life</h3>
-      <div class="life" id="life"></div>
+      <div class="life" id="life" data-tut="life"></div>
 
       <h3 class="sidehead v2-groove">Abilities</h3>
-      <ul class="medals" id="medals"></ul>
+      <ul class="medals" id="medals" data-tut="abilities"></ul>
 
       <h3 class="sidehead v2-groove glanceonly">Defence</h3>
       <dl class="plaques glanceonly" id="defence"></dl>
@@ -4058,11 +4064,11 @@
       <dl class="plaques glanceonly" id="saves"></dl>
 
       <h3 class="sidehead v2-groove">Experience</h3>
-      <div class="xp" id="xp"></div>
+      <div class="xp" id="xp" data-tut="xp"></div>
 
       <!-- The scene and the rolls, as the two disclosures the old column carried (07):
            folded or open, remembered per viewer. -->
-      <section class="panel" id="panel-scene" data-panel="scene" aria-labelledby="panel-scene-title">
+      <section class="panel" id="panel-scene" data-panel="scene" data-tut="panel-scene" aria-labelledby="panel-scene-title">
         <div class="panelhead">
           <button type="button" class="paneltoggle" id="panel-scene-title" aria-expanded="true"
                   aria-controls="panel-scene-body">In the scene</button>
@@ -4073,10 +4079,10 @@
           <div id="board"></div>
           <!-- Filled only when the GM view house rule is on; the server decides, so the
                seams cannot leak into an ordinary session through a front-end mistake. -->
-          <div id="gmview"></div>
+          <div id="gmview" data-tut="gmview"></div>
         </div>
       </section>
-      <section class="panel" id="panel-rolls" data-panel="rolls" aria-labelledby="panel-rolls-title">
+      <section class="panel" id="panel-rolls" data-panel="rolls" data-tut="panel-rolls" aria-labelledby="panel-rolls-title">
         <div class="panelhead">
           <button type="button" class="paneltoggle" id="panel-rolls-title" aria-expanded="true"
                   aria-controls="panel-rolls-body">Rolls</button>
@@ -4094,13 +4100,16 @@
        scrolling back left players unable to reach them. It takes the numbers' column, so
        it covers nothing of the book or the pen; with the sheet hidden it takes a column
        of its own; on a phone, the whole stage. -->
-  <section id="talktray" class="talk" aria-labelledby="talktray-title" inert>
+  <section id="talktray" class="talk" aria-labelledby="talktray-title" data-tut="talk-tray" inert>
     <div class="traybar">
       <h2 id="talktray-title">Conversation</h2>
-      <button type="button" id="talkclose" class="v2-btn is-quiet is-small">Close</button>
+      <!-- The conversation's tips again (js/tutorials.js). -->
+      <button type="button" class="tut-help" data-tut="help-talk" data-tut-help="table.talk"
+              aria-label="Show the tips for the conversation">?</button>
+      <button type="button" id="talkclose" data-tut="talk-close" class="v2-btn is-quiet is-small">Close</button>
     </div>
     <div id="convo" hidden>
-      <div id="convo-people" role="group" aria-label="Whose words to show"></div>
+      <div id="convo-people" role="group" aria-label="Whose words to show" data-tut="convo-people"></div>
       <div id="convo-log" role="log" aria-live="off" aria-labelledby="talktray-title"
            tabindex="0"></div>
       <button type="button" id="convo-latest" class="v2-btn is-quiet is-small" hidden>Go to the latest line</button>
@@ -4109,7 +4118,7 @@
          stands towards you, and the one button that ends it. Engine-held state; the button
          posts straight to the engine with no model call, because an exit that has to be
          noticed by a narrator is an exit that sometimes is not. -->
-    <div id="talk" hidden></div>
+    <div id="talk" data-tut="talk-now" hidden></div>
     <p class="trayempty" id="convo-empty">Nobody has spoken with you yet. What people say to
       you, and what you say back, is kept here.</p>
   </section>
@@ -4117,11 +4126,12 @@
 
 <!-- The tabs that take the whole page. Each is one container; its script (16-21) fills it
      or carries the panel it needs into it. -->
-<section class="modepage" id="mode-trade" role="tabpanel" aria-labelledby="tab-trade" hidden>
+<section class="modepage" id="mode-trade" role="tabpanel" aria-labelledby="tab-trade" data-tut="page-trade" hidden>
   <!-- Nobody here keeps a counter: said, not hidden (20-tab-trade.js). -->
-  <div class="v2-framed v2-card-leather notice" id="trade-none" hidden>
+  <div class="v2-framed v2-card-leather notice" id="trade-none" data-tut="trade-none" hidden>
     <i class="v2-rim" aria-hidden="true"></i>
-    <h2>At the counter</h2>
+    <h2>At the counter <button type="button" class="tut-help" data-tut="help-trade-none" data-tut-help="tab.trade"
+      aria-label="Show the tips for trading">?</button></h2>
     <p id="trade-none-why"></p>
     <p>Buy and sell here when a shop or a stall is open to you. What you buy goes into
       your pack, and you put it on from Equipment.</p>
@@ -4140,12 +4150,15 @@
     </div>
     <p class="tr-intro">Buy and sell here. What you buy goes into your pack, and you put it
       on from Equipment.</p>
-    <button type="button" class="v2-btn is-quiet is-small" data-open-equipment>Open equipment</button>
+    <button type="button" class="v2-btn is-quiet is-small" data-open-equipment data-tut="trade-equipment">Open equipment</button>
     <!-- Profession against the keeper's Sense Motive, once a counter a day (rules/
          tradecraft.py; the owner's option B, 2026-10-07). The prices below are redrawn
          with what it won. -->
-    <button type="button" class="v2-btn is-quiet is-small" id="tradehaggle" disabled>Haggle</button>
-    <button type="button" class="v2-btn is-quiet is-small close" id="closetrade">Close</button>
+    <button type="button" class="v2-btn is-quiet is-small" id="tradehaggle" data-tut="trade-haggle" disabled>Haggle</button>
+    <button type="button" class="v2-btn is-quiet is-small close" id="closetrade" data-tut="trade-close">Close</button>
+    <!-- The counter's tips again (js/tutorials.js). -->
+    <button type="button" class="tut-help" data-tut="help-trade" data-tut-help="tab.trade"
+            aria-label="Show the tips for trading">?</button>
   </div>
   <p id="trademsg" role="status" aria-live="polite"></p>
   <nav class="tabs v2-tabs" id="tradelines" role="tablist" aria-label="Counters at this market"
@@ -4162,7 +4175,7 @@
       </div>
       <p class="tr-purse"><span>Your purse</span> <b id="tradepurse"></b></p>
     </section>
-    <section class="tradecol tradedeal" aria-labelledby="tr-deal-h">
+    <section class="tradecol tradedeal" aria-labelledby="tr-deal-h" data-tut="trade-deal">
       <h2 id="tr-deal-h">The deal</h2>
       <div class="tr-basket" id="tradewhat"></div>
       <div class="tr-total">
@@ -4171,7 +4184,7 @@
              <b class="sum" id="tradesum"></b></div>
       </div>
       <p class="short" id="tradeshort"></p>
-      <button type="button" class="tr-go v2-btn is-go" id="tradego" disabled>Trade</button>
+      <button type="button" class="tr-go v2-btn is-go" id="tradego" data-tut="trade-go" disabled>Trade</button>
     </section>
     <section class="tradecol tr-wares" aria-labelledby="tr-wares-h">
       <h2 id="tr-wares-h">Their wares <span id="tradetill"></span></h2>
@@ -4188,7 +4201,7 @@
   <!-- Bulk trade goods (rules/trade.py, 2026-11-14): what this town makes by the pound,
        where it sells dear, and the party's cargo wherever it is. Bought and sold one
        line at a time, since every unit moves the market's price. -->
-  <section class="tr-cargo" id="tradecargo" aria-labelledby="tr-cargo-h" hidden>
+  <section class="tr-cargo" id="tradecargo" aria-labelledby="tr-cargo-h" data-tut="trade-cargo" hidden>
     <h2 id="tr-cargo-h">Trade goods <span id="tradecargohaul"></span></h2>
     <div id="tradecargobody"></div>
   </section>
@@ -4196,7 +4209,7 @@
 </section>
 
 <section class="modepage" id="mode-equipment" role="tabpanel" aria-labelledby="tab-equipment"
-         hidden>
+         data-tut="page-equipment" hidden>
   <!-- The approved design's Equipment head (the mock README, point 1): what the page is
        for, what the rules cannot do here, the numbers wearing moves, and the door to the
        counter. The rest of the page is 05's `pageEquipment`, in the sheet panel carried
@@ -4210,22 +4223,25 @@
         slot comes off by emptying its line.</p>
     </div>
     <dl class="eqnums" id="eq-nums" aria-label="Your defences"></dl>
-    <button type="button" class="v2-btn is-quiet" id="eq-trade">Go to Trade</button>
+    <button type="button" class="v2-btn is-quiet" id="eq-trade" data-tut="eq-trade">Go to Trade</button>
   </header>
 <!-- The sheet panel: one element, carried into whichever of Sheet, Equipment, Spells and
      Journal is open (17-tab-sheet.js), its page drawn by 05-sheet.js. The line above the
      page holds the sheet's own refusals and the prompt for a character with no gender. -->
 <div id="sheetpanel" aria-hidden="true">
-  <div class="sheetnote" id="sheetnote"><span id="sheeterr" role="status" aria-live="polite"></span></div>
+  <div class="sheetnote" id="sheetnote"><span id="sheeterr" role="status" aria-live="polite"></span>
+    <!-- The open tab's tips again (js/tutorials.js); 17-tab-sheet.js points it at the tab. -->
+    <button type="button" class="tut-help" data-tut="help-tab" data-tut-help="tab.sheet"
+            aria-label="Show the tips for this tab">?</button></div>
   <div class="sheetbody" id="sheetbody"></div>
 </div>
 </section>
 
-<section class="modepage" id="mode-spells" role="tabpanel" aria-labelledby="tab-spells" hidden>
+<section class="modepage" id="mode-spells" role="tabpanel" aria-labelledby="tab-spells" data-tut="page-spells" hidden>
 </section>
 
 <section class="modepage" id="mode-journal" role="tabpanel" aria-labelledby="tab-journal"
-         hidden>
+         data-tut="page-journal" hidden>
 </section>
 
 <!-- Settings, over the table (the Settings button in the top bar; 12-shell.js). The frame's
@@ -4514,7 +4530,7 @@
 <div id="veil"><div class="popup" id="popup"></div></div>
 
 <div id="deathveil">
-  <div class="deathpanel">
+  <div class="deathpanel" data-tut="death">
     <h2 id="deathtitle">Dead</h2>
     <p id="deathtext"></p>
     <h3>Who plays next?</h3>

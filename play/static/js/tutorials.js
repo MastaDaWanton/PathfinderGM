@@ -418,6 +418,32 @@
     }
   });
 
+  // --- the inline first-time line (plan §3.1) ---------------------------------------------
+  // For a section that is itself a popup or a narrow strip (the dice mat, That's wrong, a
+  // death): one sentence inside it, never a card over it, since a card over a modal is a
+  // card over a card. `inline(id)` gives the line's HTML for the caller's own renderer, or
+  // "" when tips are off, the words have not arrived or it was seen. Seen is marked the
+  // first time it is drawn; the line then stays for the rest of this page load, because
+  // the renderers that hold it redraw on every state, until its Got it puts it away.
+  var lines = {};   // id -> the words drawn this load, "" once put away
+  function inline(id) {
+    if (!(id in lines)) {
+      var t = BY[id];
+      if (!D || !t || D.off || !t.due.length) return "";
+      lines[id] = t.due.map(function (k) { return t.steps[k].words || ""; }).join(" ");
+      t.seen = true; t.due = []; t.updated = false;
+      post({ seen: [id] });
+    }
+    return lines[id] ? '<div class="tut-inline" role="note" data-tut-inline="' + esc(id) + '"><span>' + esc(lines[id]) +
+      '</span> <button type="button" class="tut-link" data-tut-inline-done>Got it</button></div>' : "";
+  }
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest && e.target.closest("[data-tut-inline-done]");
+    if (!b) return;
+    var p = b.closest("[data-tut-inline]");
+    if (p) { lines[p.dataset.tutInline] = ""; p.remove(); }
+  });
+
   // --- Settings, Tutorials (the index) ----------------------------------------------------
   // Show me goes to the section when this page has it (the table registers `reach`), or
   // asks the table around the Settings frame to, or says the words in place.
@@ -484,6 +510,7 @@
     load: load,
     ready: function () { return !!D; },
     arrive: arrive,
+    inline: inline,
     show: show,
     reach: function (id, fn) { reach[id] = fn; },
     isOpen: function () { return open ? open.id : ""; },

@@ -51,6 +51,12 @@ def _herb_in_progress_hours() -> int:
     return max(1, round(minutes / 60))
 
 
+def _haggle_max() -> int:
+    # The haggle's cap, Ultimate Campaign's 75% floor (content/rules/trade-uses.json).
+    from . import tradecraft
+    return int(tradecraft.row("haggle")["max_percent"])
+
+
 FACTS = {
     "hex_hours_open": lambda: _hex_hours(0),
     "hex_hours_rough": lambda: _hex_hours(1),
@@ -60,6 +66,7 @@ FACTS = {
     "march_dc_step": lambda: _march_dc(2) - _march_dc(1),
     "march_damage": _march_damage,
     "herb_in_progress_hours": _herb_in_progress_hours,
+    "haggle_max_percent": _haggle_max,
 }
 
 _FIELD = re.compile(r"\{([a-z_]+)\}")

@@ -43,7 +43,11 @@ MAX_BUTTON_WORDS = 14
 # bench without a tutorial is a failing test, not a forgotten one: add its id here and a
 # tutorial (or a "none" reason) for it. PENDING is the later phases' list: each lane takes
 # its own ids out as it writes them, and phase 6 leaves it empty.
-SECTIONS = {"table", "map.places", "map.region", "bench.herbalism"}
+SECTIONS = {"table", "map.places", "map.region", "bench.herbalism",
+            # phase 3, feat/tutorials-table
+            "table.here", "table.craft", "table.left", "table.right", "table.panels", "table.gmview",
+            "table.wrong", "table.dice", "table.clock", "table.talk", "table.music", "table.death",
+            "tab.sheet", "tab.levelup", "tab.equipment", "tab.spells", "tab.trade", "tab.journal"}
 PENDING = {
     # phase 2, feat/tutorials-home
     "home.worlds", "home.campaign", "home.import", "home.homebrew", "home.characters",
@@ -51,10 +55,6 @@ PENDING = {
     "settings.report", "home.manual",
     "create.who", "create.class", "create.abilities", "create.skills", "create.feats",
     "create.outfit", "create.builders",
-    # phase 3, feat/tutorials-table
-    "table.here", "table.craft", "table.left", "table.right", "table.panels", "table.gmview",
-    "table.wrong", "table.dice", "table.clock", "table.talk", "table.music", "table.death",
-    "tab.sheet", "tab.levelup", "tab.equipment", "tab.spells", "tab.trade", "tab.journal",
     # phase 4, feat/tutorials-maps-fights
     "map.ground", "map.march", "map.world", "map.sea", "map.site",
     "fight.bar", "fight.order", "fight.nonlethal",
@@ -357,3 +357,83 @@ def test_both_pages_load_the_cards():
 def test_the_shipped_build_carries_the_words():
     spec = (ROOT / "pathfindergm.spec").read_text(encoding="utf-8")
     assert '"tutorials",' in spec
+
+
+# --- the inline first-time line (plan §3.1, phase 3) ----------------------------------------
+
+_INLINE_PROBE = r"""
+const posts = [], listeners = {};
+global.window = global;
+global.addEventListener = () => {};
+global.HTMLElement = function () {};
+global.CustomEvent = function (n) { this.type = n; };
+global.document = {
+  cookie: "", addEventListener(ev, fn) { (listeners[ev] = listeners[ev] || []).push(fn); },
+  dispatchEvent() {}, getElementById() { return null; }, querySelector() { return null; },
+};
+const data = { off: false, welcome_dismissed: true, games_seen: [], tutorials: [
+  { id: "table.dice", title: "Your rolls", group: "The table", root: "dice-mat", seen: false, updated: false,
+    due: [0], steps: [{ title: "Your roll", words: "This roll is yours.", buttons: [] }] },
+  { id: "table.death", title: "A death", group: "The table", root: "death", seen: false, updated: false,
+    due: [0], steps: [{ title: "A death", words: "Death stays.", buttons: [] }] }]};
+global.fetch = (url, o) => {
+  if (o && o.method === "POST") {
+    const b = JSON.parse(o.body); posts.push(b);
+    (b.seen || []).forEach(id => { const t = data.tutorials.find(x => x.id === id); if (t) { t.seen = true; t.due = []; } });
+    if (typeof b.off === "boolean") data.off = b.off;
+  }
+  return Promise.resolve({ ok: true, json: () => Promise.resolve(JSON.parse(JSON.stringify(data))) });
+};
+require(process.argv[2]);
+const out = { before: Tutorials.inline("table.dice") };
+setTimeout(() => {
+  out.first = Tutorials.inline("table.dice");
+  out.again = Tutorials.inline("table.dice");
+  out.posts_after_two = JSON.parse(JSON.stringify(posts));
+  setTimeout(() => {
+    out.after_seen = Tutorials.inline("table.dice");
+    Tutorials.inline("x.unknown");
+    data.off = true;
+    Tutorials.load();
+    setTimeout(() => {
+      out.off = Tutorials.inline("table.death");
+      console.log(JSON.stringify(out));
+    }, 20);
+  }, 20);
+}, 20);
+"""
+
+
+def test_the_inline_line_shows_once_and_marks_itself_seen(tmp_path):
+    """The dice mat, That's wrong and a death are already dialogs, so their tutorial is one
+    line inside them (plan §3.1), not a card over a card. Drawn once it is marked seen, and
+    it stays drawn this page load because its hosts redraw on every state (23-thats-wrong.js
+    rebuilds every beat's slot); a second load, or tips off, draws nothing."""
+    import shutil
+    import subprocess
+
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("node is not installed")
+    probe = tmp_path / "probe.js"
+    probe.write_text(_INLINE_PROBE, encoding="utf-8")
+    done = subprocess.run([node, str(probe), str(ROOT / "play" / "static" / "js" / "tutorials.js")],
+                          capture_output=True, text=True, timeout=60)
+    assert done.returncode == 0, done.stderr[:2000]
+    out = json.loads(done.stdout.strip().splitlines()[-1])
+    assert out["before"] == "", "drawn before the words arrived"
+    assert "This roll is yours." in out["first"] and "data-tut-inline-done" in out["first"]
+    assert out["again"] == out["first"], "a redraw in the same load lost the line"
+    assert out["posts_after_two"] == [{"seen": ["table.dice"]}], "seen must be posted once, on first draw"
+    assert out["after_seen"] == out["first"], "the line went before the player put it away"
+    assert out["off"] == "", "tips off still drew a line"
+
+
+def test_every_inline_host_draws_the_line_it_names():
+    """Each inline tutorial is called by the renderer of the popup it lives in; a renamed id
+    would draw nothing and no other test would notice."""
+    js = ROOT / "play" / "static" / "js" / "table"
+    calls = "".join((js / f).read_text(encoding="utf-8") for f in ("02-state.js", "23-thats-wrong.js"))
+    for tid in ("table.dice", "table.wrong", "table.death"):
+        assert f'Tutorials.inline("{tid}")' in calls, tid
+        assert tid in _ids()

@@ -195,7 +195,7 @@
     } else if (o.by === "player") {
       bits.push(`<span class="fixtag">Your version</span>`);
     }
-    if (o.flaggable) bits.push(btn("fixlink", "open", "That’s wrong"));
+    if (o.flaggable) bits.push(btn("fixlink", "open", "That’s wrong", ' data-tut="thats-wrong"'));
     if (o.keep) bits.push(btn("fixlink", "keep", "Keep this one"));
     if (o.put_back) bits.push(btn("fixlink", "put_back", "Put the first one back"));
     if (o.write && o.by && o.by !== "narrator") {
@@ -282,7 +282,15 @@
         if (picking) p.innerHTML = pickable(String(s.transcript[i].text || ""), FIX.picked);
       }
     });
+    // The first-time line (js/tutorials.js `inline`, docs/tutorials-plan.md §3.1): one
+    // sentence under the latest "That's wrong", not a card over the story.
+    const links = document.querySelectorAll('#story .beatfix [data-fix="open"]');
+    const last = links.length && links[links.length - 1].closest(".beatfix");
+    if (last && window.Tutorials) last.insertAdjacentHTML("beforeend", Tutorials.inline("table.wrong"));
   }
+  // The words arrive after the first draw: draw the line once they do, unless a slip is
+  // open (a redraw would take the note being typed out from under the player).
+  document.addEventListener("tutorials:change", () => { if (FIX.beat < 0) paint(STATE); });
 
   async function send(body) {
     FIX.busy = true; FIX.error = "";

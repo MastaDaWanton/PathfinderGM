@@ -69,6 +69,506 @@
           ]
         }
       ]
+    },
+    {
+      "id": "table.here",
+      "v": 1,
+      "title": "Who is here",
+      "manual": "playing",
+      "root": "here",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "here",
+          "title": "Who is here",
+          "words": "Everyone named here is in the scene with you, and so is anyone the story shows: you can speak to them, follow them or fight them by saying so. Press a name to see how they stand, unhurt or wounded, and anything on them."
+        }
+      ]
+    },
+    {
+      "id": "table.craft",
+      "v": 1,
+      "title": "The craft action",
+      "manual": "benches",
+      "root": "craft-panel",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "craft-actions",
+          "title": "Getting material",
+          "words": "Every way of getting material where you stand, from every craft: forage, prospect, skin, gather or buy. Each is told in the story, with a real check and real time. One that cannot be done here is greyed, and pointing at it says why."
+        },
+        {
+          "since": 1,
+          "anchor": "craft-hours",
+          "title": "Hours",
+          "words": "Set the hours before you press a way to gather. The ground underfoot, named at the top, decides what there is to find."
+        },
+        {
+          "since": 1,
+          "anchor": "pen",
+          "title": "Saying it instead",
+          "words": "You can also write a craft in the pen. Making a simple thing that way is a real roll and a real item, and the story then offers its bench for the full craft.",
+          "source": {"file": "play/views.py", "literal": "def _point_to_the_bench("}
+        },
+        {
+          "since": 1,
+          "anchor": "craft-panel",
+          "title": "Buttons here",
+          "buttons": [
+            {"tut": "craft-bench", "label": "Work at the bench", "words": "Opens the herbalism bench over the table."},
+            {"tut": "craft-fullbench", "label": "Open the full bench", "words": "Every craft's bench, on a page of its own."},
+            {"tut": "help-craft", "label": "?", "words": "Shows these tips again."},
+            {"tut": "craft-close", "label": "Close", "words": "Puts this away. Esc does the same."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "table.left",
+      "v": 1,
+      "title": "The left side",
+      "manual": "playing",
+      "root": "side-who",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "loadout",
+          "title": "In hand and worn",
+          "words": "What you hold and what you wear, then your purse. Coins go by the names the nation you are in gives them, so the same coin is called something else across a border.",
+          "source": {"file": "rules/goods.py", "literal": "def coins_here("}
+        },
+        {
+          "since": 1,
+          "anchor": "door-herbalism",
+          "title": "The benches",
+          "words": "Each craft's bench opens over the table, and closing it keeps your place. Long work waits under In progress, below them, and finishes in its own time while you play.",
+          "buttons": [
+            {"tut": "door-herbalism", "label": "Herbalism", "words": "The herb bench."},
+            {"tut": "door-smithing", "label": "Smithing", "words": "The forge."},
+            {"tut": "door-enchanting", "label": "Enchanting", "words": "The enchanting circle."},
+            {"tut": "door-alchemy", "label": "Alchemy", "words": "The alchemy bench."},
+            {"tut": "door-leather", "label": "Leatherwork", "words": "The leather bench, with its vat and kettle."}
+          ]
+        },
+        {
+          "since": 1,
+          "anchor": "door-roster",
+          "title": "The other doors",
+          "buttons": [
+            {"tut": "door-equipment", "label": "Equipment", "words": "Everything you carry, on its own tab."},
+            {"tut": "door-craftpage", "label": "Crafting bench", "words": "Every craft's bench on a page of its own, away from the table."},
+            {"tut": "door-roster", "label": "Who is playing", "words": "Switch to another character; each one keeps their own game."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "table.right",
+      "v": 1,
+      "title": "The right side",
+      "manual": "playing",
+      "root": "side-numbers",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "life",
+          "title": "Life and the body",
+          "words": "Your hit points, and any non-lethal damage against its own limit. Under them, thirst, hunger and rest count down their grace. Past it the body calls for rolls, and failing them costs you: eat, drink and sleep in good time.",
+          "source": {"file": "rules/survival.py", "literal": "After the grace runs out, thirst asks every hour and hunger every day."}
+        },
+        {
+          "since": 1,
+          "anchor": "abilities",
+          "title": "Your numbers",
+          "words": "Abilities, defence and saves, as the rules count them now; a hurt ability says what it lost. The Sheet tab shows what each is made of."
+        },
+        {
+          "since": 1,
+          "anchor": "xp",
+          "title": "Experience",
+          "words": "How far you are from the next level, with your world classes under it. Once you have enough, the next full night's sleep takes the level.",
+          "source": {"file": "rules/sheet.py", "literal": "Any eight hours' sleep settles it"}
+        },
+        {
+          "since": 1,
+          "anchor": "sheettoggle",
+          "title": "Hide sheet",
+          "words": "Hide sheet folds both sides away and gives the story the width. Press it again to bring them back.",
+          "controls": [{"tut": "sheettoggle", "label": "Hide sheet"}]
+        }
+      ]
+    },
+    {
+      "id": "table.panels",
+      "v": 1,
+      "title": "Rolls and the scene",
+      "manual": "playing",
+      "root": "panel-rolls",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "panel-rolls",
+          "title": "Rolls",
+          "words": "Your own rolls from the latest turns, newest first: the die and everything added to it. What others roll is never shown here.",
+          "source": {"file": "play/static/js/table/03-offers-and-map.js", "literal": "Only the player's own rolls ever appear here."}
+        },
+        {
+          "since": 1,
+          "anchor": "panel-scene",
+          "title": "In the scene",
+          "words": "Who is in the scene and how they stand, and in a fight the turn order. Press a panel's name to fold it; it stays folded or open as you left it."
+        },
+        {
+          "since": 1,
+          "title": "The record",
+          "words": "An answer to a line starting /gm can carry The record beneath it: the engine's own account, word for word, rather than the GM's telling of it."
+        }
+      ]
+    },
+    {
+      "id": "table.gmview",
+      "v": 1,
+      "title": "GM view",
+      "manual": "playing",
+      "root": "gmview",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "gmview",
+          "title": "Behind the screen",
+          "words": "The GM view, shown because its house rule is on: the schemes running in your world, what has fired and what is still to come. It shows the GM's secrets. Turn it off on the Rulesets bench.",
+          "source": {"file": "rules/houserules.py", "literal": "\"gm_view\": False,"}
+        }
+      ]
+    },
+    {
+      "id": "table.wrong",
+      "v": 1,
+      "title": "That’s wrong",
+      "manual": "playing",
+      "root": "beatfix",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "thats-wrong",
+          "title": "That’s wrong",
+          "words": "That’s wrong, under a beat, tells the game it got something wrong. Mark the wrong sentences and the latest beat is remade, or write it yourself; the engine’s own mistakes are logged too. Your turn is never taken back.",
+          "controls": [{"tut": "thats-wrong", "label": "That’s wrong"}]
+        }
+      ]
+    },
+    {
+      "id": "table.dice",
+      "v": 1,
+      "title": "Your rolls",
+      "manual": "playing",
+      "root": "dice-mat",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "dice-mat",
+          "title": "Your roll",
+          "words": "This roll is yours: press Roll to throw it, or my own roll to type in a die you threw yourself. The lines show what adds to it. What others roll, and anything you could not know, is rolled out of sight.",
+          "controls": [{"tut": "dice-roll", "label": "Roll"}, {"tut": "dice-own", "label": "my own roll"}],
+          "source": {"file": "play/static/js/table/03-offers-and-map.js", "literal": "Only the player's own rolls ever appear here."}
+        }
+      ]
+    },
+    {
+      "id": "table.clock",
+      "v": 1,
+      "title": "Time passing",
+      "manual": "playing",
+      "root": "clock-line",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "clock-line",
+          "title": "Time passing",
+          "words": "When a turn takes an hour or more, a clock turns over the story to show the time going by, then goes; press it or Esc to put it away sooner. The day and the hour stay here, under the place's name."
+        }
+      ]
+    },
+    {
+      "id": "table.talk",
+      "v": 1,
+      "title": "The conversation",
+      "manual": "playing",
+      "root": "talk-tray",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "convo-people",
+          "title": "Whose words",
+          "words": "Everything said with the people here, or one person's words at a time. Earlier conversations keeps what was said with people who have gone."
+        },
+        {
+          "since": 1,
+          "anchor": "talk-now",
+          "title": "While you talk",
+          "words": "A conversation holds until you end it, and ending it is free. You answer by writing in the pen, as always.",
+          "buttons": [
+            {"tut": "talk-ignore", "label": "Ignore", "words": "Stop answering one person who spoke to you."},
+            {"tut": "talk-leave", "label": "Take your leave", "words": "End the conversation, at no cost."},
+            {"tut": "help-talk", "label": "?", "words": "Shows these tips again."},
+            {"tut": "talk-close", "label": "Close", "words": "Puts the tray away; Talk opens it again."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "table.music",
+      "v": 1,
+      "title": "Music",
+      "manual": "playing",
+      "root": "music",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "music",
+          "title": "Music",
+          "words": "Music turns the soundtrack on or off. How loud it plays is in Settings, with the other sounds.",
+          "controls": [{"tut": "music", "label": "Music"}, {"tut": "settings", "label": "Settings"}]
+        }
+      ]
+    },
+    {
+      "id": "table.death",
+      "v": 1,
+      "title": "A death",
+      "manual": "playing",
+      "root": "death",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "death",
+          "title": "A death",
+          "words": "Death stays: the dead come back only if someone pays for a raising, and that offer comes first when there is one. Otherwise choose who plays next, or return to the main page; the game is kept as it stands.",
+          "source": {"file": "play/static/js/table/02-state.js", "literal": "Death is a debt, not a wall"}
+        }
+      ]
+    },
+    {
+      "id": "tab.sheet",
+      "v": 1,
+      "title": "The Sheet tab",
+      "manual": "character",
+      "root": "page-sheet",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "page-sheet",
+          "title": "Your sheet",
+          "words": "Every number on these cards is the engine's own, with what it is made of written under it. Combat comes first: your attacks, and each manoeuvre's bonus, rolled against the target's CMD."
+        },
+        {
+          "since": 1,
+          "anchor": "skill-terms",
+          "title": "Skills",
+          "words": "Your skill totals. What each is made of shows the parts of every total; greyed skills cannot be tried untrained.",
+          "controls": [{"tut": "skill-terms", "label": "What each is made of"}]
+        },
+        {
+          "since": 1,
+          "anchor": "work",
+          "title": "Earn a living",
+          "words": "Work a day or Work a week earns pay at your trade. The pay is said before the roll, and the days really pass.",
+          "controls": [{"tut": "work", "label": "Work a day"}]
+        },
+        {
+          "since": 1,
+          "anchor": "class-card",
+          "title": "Class",
+          "words": "Your class table, the paths you took and what the next level gives. Feats and traits, your deeds, and your background and notes follow below it."
+        },
+        {
+          "since": 1,
+          "anchor": "help-tab",
+          "title": "Again",
+          "buttons": [
+            {"tut": "help-tab", "label": "?", "words": "Shows the tips for the tab you are on."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tab.levelup",
+      "v": 1,
+      "title": "Taking a level",
+      "manual": "character",
+      "root": "class-card",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "levelup",
+          "title": "A level to take",
+          "words": "When you have the experience, the next full night's sleep takes the level, or press Take level here. Choose the favoured class bonus beside it first. The hit points are rolled on the mat.",
+          "controls": [{"tut": "levelup", "label": "Take level"}],
+          "source": {"file": "rules/sheet.py", "literal": "Any eight hours' sleep settles it"}
+        },
+        {
+          "since": 1,
+          "anchor": "lvpicks",
+          "title": "What it owes",
+          "words": "A new level can owe feats, skill ranks, ability points or class choices. They wait under To choose from your levels until picked, and each pick is checked against the rules as you make it."
+        }
+      ]
+    },
+    {
+      "id": "tab.equipment",
+      "v": 1,
+      "title": "The Equipment tab",
+      "manual": "playing",
+      "root": "page-equipment",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "eq-rail",
+          "title": "What you carry",
+          "words": "Everything you carry, A to Z, sorted onto shelves down the side. Each row has its own buttons, such as Wield, Wear, Take off or Use, and a row the rules cannot act on says why."
+        },
+        {
+          "since": 1,
+          "anchor": "eq-doll",
+          "title": "Worn and wielded",
+          "words": "Every slot your body has. Press one to list only what fits it. Armour takes minutes to put on or take off, so in a fight only a shield changes."
+        },
+        {
+          "since": 1,
+          "anchor": "page-equipment",
+          "title": "Food and drink",
+          "words": "Fill takes water where there is some; Eat and Drink answer hunger and thirst from what you carry. In a fight, a drink is your standard action and draws attacks of opportunity.",
+          "source": {"file": "rules/engine.py", "literal": "a drink in a fight: a standard action that provokes"}
+        },
+        {
+          "since": 1,
+          "anchor": "eq-trade",
+          "title": "Buttons here",
+          "buttons": [
+            {"tut": "eq-trade", "label": "Go to Trade", "words": "New things are bought at a counter, on the Trade tab."},
+            {"tut": "help-tab", "label": "?", "words": "Shows these tips again."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tab.spells",
+      "v": 1,
+      "title": "The Spells tab",
+      "manual": "playing",
+      "root": "page-spells",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "spell-slots",
+          "title": "Slots",
+          "words": "Your slots by spell level, lit while unspent; cantrips spend none. A prepared caster may prepare whenever they like, but a slot spent today stays spent until a long rest.",
+          "source": {"file": "play/static/js/table/05-sheet.js", "literal": "Prepare whenever you like. A slot"}
+        },
+        {
+          "since": 1,
+          "anchor": "spells-today",
+          "title": "Ready today",
+          "words": "The middle column holds what you have ready. Drag a spell into it, or press its Prepare or Learn button. Cast puts the spell on your next turn, beside the pen."
+        },
+        {
+          "since": 1,
+          "anchor": "spells-index",
+          "title": "What you can choose",
+          "words": "The last column lists what you can choose from, and spells a level owes your book wait across the top. A choice the rules refuse says why."
+        },
+        {
+          "since": 1,
+          "anchor": "spells-btn",
+          "title": "Casting from the story",
+          "words": "The Spells button beside Say does the same from the table. Write what you cast at, and press Say.",
+          "controls": [{"tut": "spells-btn", "label": "Spells"}]
+        }
+      ]
+    },
+    {
+      "id": "tab.trade",
+      "v": 1,
+      "title": "The Trade tab",
+      "manual": "playing",
+      "root": "page-trade",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "trade-none",
+          "title": "A counter",
+          "words": "Trade opens a counter only where someone keeps one; anywhere else this page says so. Where there is one, saying in the pen what you want to buy opens it by itself."
+        },
+        {
+          "since": 1,
+          "anchor": "trade-deal",
+          "title": "The deal",
+          "words": "Put things from what you carry, or from their wares, into the deal, then press Trade. Prices move with how the keeper feels about you.",
+          "controls": [{"tut": "trade-go", "label": "Trade"}],
+          "source": {"file": "rules/tradecraft.py", "literal": "make shop prices move with attitude too"}
+        },
+        {
+          "since": 1,
+          "anchor": "trade-haggle",
+          "title": "Haggle",
+          "words": "Haggle once a day at each counter: your Profession against the keeper's Sense Motive, for up to {haggle_max_percent} percent off what you buy, or onto what you sell.",
+          "controls": [{"tut": "trade-haggle", "label": "Haggle"}],
+          "source": {"file": "content/rules/trade-uses.json", "literal": "Once a counter a day"}
+        },
+        {
+          "since": 1,
+          "anchor": "trade-cargo",
+          "title": "Trade goods",
+          "words": "Under the counter, goods by the pound: what this town makes, and where it sells dear. Carry them along the world's trade routes and sell where they are wanted."
+        },
+        {
+          "since": 1,
+          "anchor": "trade-close",
+          "title": "Buttons here",
+          "buttons": [
+            {"tut": "trade-equipment", "label": "Open equipment", "words": "Equipment, to wear or wield what you bought."},
+            {"tut": "trade-close", "label": "Close", "words": "Back to the table. Esc does the same."},
+            {"tut": "help-trade", "label": "?", "words": "Shows these tips again."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "tab.journal",
+      "v": 1,
+      "title": "The Journal tab",
+      "manual": "playing",
+      "root": "page-journal",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "page-journal",
+          "title": "Matters in play",
+          "words": "Matters in play are the things you have taken on: what is still to do, and what has happened so far. What people said keeps every conversation, a person at a time."
+        },
+        {
+          "since": 1,
+          "title": "What they have told you",
+          "words": "What companions confide about their own lives, once they think well enough of you. Where you have been lists the places you have walked."
+        },
+        {
+          "since": 1,
+          "anchor": "jr-write",
+          "title": "Notes and maps",
+          "words": "With ink and paper you can write notes here, or draw a map of where you have been. Without them, the buttons stay greyed.",
+          "controls": [{"tut": "jr-write", "label": "Write it down"}]
+        },
+        {
+          "since": 1,
+          "anchor": "help-tab",
+          "title": "Further down",
+          "words": "History keeps what happened, day by day. Each craft you know adds its own book below it: the herbarium, the smith's ledger and the rest.",
+          "buttons": [
+            {"tut": "help-tab", "label": "?", "words": "Shows these tips again."}
+          ]
+        }
+      ]
     }
   ]
 }

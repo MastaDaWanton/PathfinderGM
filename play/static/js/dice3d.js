@@ -647,7 +647,7 @@
     mat = document.createElement("div");
     mat.id = "d3d-mat";
     mat.innerHTML =
-      '<div id="d3d-card">' +
+      '<div id="d3d-card" data-tut="dice-mat">' +
       '<h3 id="d3d-title">Roll</h3>' +
       '<div id="d3d-why"></div>' +
       '<div id="d3d-stage"><div class="floor" id="d3d-floor1"></div>' +
@@ -660,8 +660,8 @@
       '<div id="d3d-note"></div>' +
       '<div id="d3d-own"><input type="number" id="d3d-face"></div>' +
       '<div id="d3d-acts">' +
-      '<button id="d3d-go">Roll</button>' +
-      '<button class="ghost" id="d3d-debug" title="Enter the result of a die you rolled ' +
+      '<button id="d3d-go" data-tut="dice-roll">Roll</button>' +
+      '<button class="ghost" id="d3d-debug" data-tut="dice-own" title="Enter the result of a die you rolled ' +
       'yourself">my own roll</button>' +
       '</div></div>';
     document.body.appendChild(mat);

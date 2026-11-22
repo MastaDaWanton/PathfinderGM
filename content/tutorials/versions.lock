@@ -11,8 +11,80 @@
   "hash": "d6f840e2b097941b",
   "v": 1
  },
+ "tab.equipment": {
+  "hash": "074b673d80ad503f",
+  "v": 1
+ },
+ "tab.journal": {
+  "hash": "015082f92d3c026f",
+  "v": 1
+ },
+ "tab.levelup": {
+  "hash": "49f7e41c86fdf169",
+  "v": 1
+ },
+ "tab.sheet": {
+  "hash": "ea8def38711cbf83",
+  "v": 1
+ },
+ "tab.spells": {
+  "hash": "704dc462dd2fb714",
+  "v": 1
+ },
+ "tab.trade": {
+  "hash": "08d8a85bc7011ea8",
+  "v": 1
+ },
  "table": {
   "hash": "b86c9c29ccb0c5e4",
+  "v": 1
+ },
+ "table.clock": {
+  "hash": "5cf5519c207f42ac",
+  "v": 1
+ },
+ "table.craft": {
+  "hash": "a76fad932cff5ee1",
+  "v": 1
+ },
+ "table.death": {
+  "hash": "c893eaa8e471ea53",
+  "v": 1
+ },
+ "table.dice": {
+  "hash": "28ebf3f33cd4d52c",
+  "v": 1
+ },
+ "table.gmview": {
+  "hash": "c5f5f6f24546528b",
+  "v": 1
+ },
+ "table.here": {
+  "hash": "87f2daae0b3c4f6f",
+  "v": 1
+ },
+ "table.left": {
+  "hash": "85b442e8871d27fb",
+  "v": 1
+ },
+ "table.music": {
+  "hash": "e72ce54e25a394bd",
+  "v": 1
+ },
+ "table.panels": {
+  "hash": "8aa54d46dcc16d01",
+  "v": 1
+ },
+ "table.right": {
+  "hash": "61a4a0bd3dcdd5bd",
+  "v": 1
+ },
+ "table.talk": {
+  "hash": "df89e13ee7ee2adf",
+  "v": 1
+ },
+ "table.wrong": {
+  "hash": "f9b0321807b7c493",
   "v": 1
  }
 }
