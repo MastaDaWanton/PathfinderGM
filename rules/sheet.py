@@ -339,6 +339,19 @@ STRIKES_EITHER_WAY = "lethality.either.unarmed"
 # The tag Quick Draw's feat document grants: "You can draw a weapon as a free action
 # instead of as a move action" (Core Rulebook p.132). Asked by `Engine._draw_paid`.
 QUICK_DRAW = "action.draw.free"
+# Double Slice's tag (its feat document): "Add your Strength bonus to damage rolls made
+# with your off-hand weapon" (APG). Asked by `strength_share`, never by the feat's name.
+OFF_HAND_FULL_STRENGTH = "two_weapon.off_hand.full_strength"
+# The attack options a swing may declare (lane D, 2026-11-22), in the order the combat
+# bar offers them, each a boolean on the attack op (rules/intents.py) that a feat or
+# class-feature document's `choice` names and whose numbers that document carries. The
+# feat each is first offered by, for the refusal's name; `can_choose` reads the documents.
+ATTACK_CHOICES = ("power_attack", "deadly_aim", "piranha_strike", "combat_expertise",
+                  "vital_strike", "cleave", "rapid_shot", "flurry")
+ATTACK_CHOICE_FEATS = {"power_attack": "power-attack", "deadly_aim": "deadly-aim",
+                       "piranha_strike": "piranha-strike",
+                       "combat_expertise": "combat-expertise", "vital_strike": "vital-strike",
+                       "cleave": "cleave", "rapid_shot": "rapid-shot"}
 
 _IMPLIED_GENDER = {"she": "woman", "he": "man"}
 
@@ -3166,6 +3179,41 @@ class Actor:
     # --- attack and damage --------------------------------------------------------------
 
     def weapon(self, key: str | None = None) -> dict:
+        """The weapon's statistics (`_weapon_stats`), with the held feats' threat range.
+
+        Improved Critical: "When using the weapon you selected, your threat range is
+        doubled" (CRB p.127), and keen's "doesn't stack with any other effect that
+        expands the threat range of a weapon (such as the keen edge spell or the
+        Improved Critical feat)" — so a row the layer already doubled (keen,
+        `crit_range_printed`) is left as it is. A feat document's `crit_range`
+        (`{"multiply": 2, "scope": {"weapon": "$target"}}`), read live like every feat
+        term; a printed stat block already holds its own."""
+        row = self._weapon_stats(key)
+        if row.get("stat_block") or row.get("crit_range_printed") is not None:
+            return row
+        mult = self._feat_threat(row, key)
+        if mult > 1:
+            row = dict(row, crit_range_printed=int(row.get("crit_range", 20) or 20))
+            row["crit_range"] = doubled_threat(row["crit_range_printed"], mult)
+        return row
+
+    def _feat_threat(self, row: dict, key: str | None) -> int:
+        """The best threat-range multiple a held feat document lays on this weapon."""
+        if getattr(self, "_reading_feats", False):
+            return 1
+        from . import feats as feats_mod
+
+        base = str(row.get("crafted_base") or key or self.wielded_key()).strip().lower()
+        ctx = {"weapon": {"key": base}}
+        best = 1
+        for raw in self.feats:
+            doc = feats_mod.document(raw)
+            spec = (doc or {}).get("crit_range")
+            if isinstance(spec, dict) and _scope_holds(spec.get("scope"), doc, ctx):
+                best = max(best, int(spec.get("multiply", 2) or 2))
+        return best
+
+    def _weapon_stats(self, key: str | None = None) -> dict:
         """The weapon's statistics.
 
         Goes through `rules.weapons` rather than reading `tables.WEAPONS` directly: the
@@ -3232,8 +3280,9 @@ class Actor:
         "deals damage as if it were a weapon of two size categories larger (a Medium light
         shield thus deals 1d6 points of damage and a Medium heavy shield deals 1d8 points
         of damage). The shield acts as a +1 weapon when used to bash.") had nothing to
-        change. A bash is one attack in place of the weapon's; there is no off hand in the
-        app, so no two-weapon penalty is charged and no second swing is offered.
+        change. A bash is one attack in place of the weapon's; on a two-weapon full attack
+        the shield may be the off hand's weapon (`off_hand: "shield"`, lane D 2026-11-22),
+        and the two-weapon penalties are charged then (`two_weapon_penalty`).
         """
         from . import weapons as weapons_mod
 
@@ -3856,21 +3905,40 @@ class Actor:
         return None
 
     def can_power_attack(self) -> str | None:
-        """None if legal, otherwise why not.
+        """None if legal, otherwise why not (`can_choose`)."""
+        return self.can_choose("power_attack")
 
-        The feat by its document (`choice: "power_attack"`), the prerequisites from
-        feats.json — BAB +1 and Str 13 used to be hard-coded here, a third copy
-        beside the index and the table.
+    def can_choose(self, choice: str) -> str | None:
+        """None if this creature may declare this attack option, otherwise why not.
+
+        The feat by its document (`choice`), the prerequisites from feats.json — BAB +1
+        and Str 13 used to be hard-coded for Power Attack, a third copy beside the index
+        and the table. A choice no feat declares may be a class feature's: the monk's
+        flurry of blows is a choice on the class-feature document (`classfeatures.
+        choices_of`), held while the class table grants it.
         """
+        from . import classfeatures
         from . import feats as feats_mod
 
-        doc = self.choice_feat("power_attack")
+        doc = self.choice_feat(choice)
         if doc is None:
-            return f"{self.name} does not have {feats_mod.get('power-attack').name}"
+            if choice in classfeatures.choices_of(self):
+                return None
+            named = ATTACK_CHOICE_FEATS.get(choice, choice.replace("_", "-"))
+            try:
+                named = feats_mod.get(named).name
+            except KeyError:
+                named = choice.replace("_", " ")
+            return f"{self.name} does not have {named}"
         verdict = feats_mod.meets(self, doc["id"])
         if verdict["unmet"]:
             return f"{self.name} cannot use {doc['name']}: needs {', '.join(verdict['unmet'])}"
         return None
+
+    def attack_choices(self) -> list[str]:
+        """Every attack option this creature may declare now, in ATTACK_CHOICES order —
+        what the combat bar offers (play/views.py `_attack_slots`)."""
+        return [c for c in ATTACK_CHOICES if self.can_choose(c) is None]
 
     def lethality_swap(self, weapon_key: str | None = None,
                        lethality: str | None = None) -> str:
@@ -3908,9 +3976,13 @@ class Actor:
         self, weapon_key: str | None = None, iteration: int = 0,
         power_attack: bool = False, lethality: str | None = None, defender=None,
         thrown: bool = False, range_ft: float | None = None,
-        beside_weapons: bool = False,
+        beside_weapons: bool = False, choices=(), hand: str = "", off_light: bool = False,
     ) -> list[Modifier]:
-        """`range_ft` is the distance to the defender when the board can measure it
+        """`choices`: the attack options declared with the swing beyond Power Attack
+        (ATTACK_CHOICES) — each a key in the roll context its documents' `when` asks.
+        `hand`: "primary" or "off" on a two-weapon full attack (`two_weapon_penalty`).
+
+        `range_ft` is the distance to the defender when the board can measure it
         (`Engine._gap_ft`); a `when: {"range_ft": {"lte": 30}}` term asks it —
         Point-Blank Shot's "+1 ... on ranged weapons at ranges of up to 30 feet". None
         (no map, the sheet's own line) drops the term, as every unevaluable clause is.
@@ -3953,6 +4025,11 @@ class Actor:
             mods.extend(self._shifted(ab))
         else:
             mods.append(Modifier(self.bab, "BAB"))
+            # A flurry's "base attack bonus from his monk class levels is equal to his
+            # monk level" (CRB, Monk): the class document's `bab` term, in this roll's
+            # context so it rides only the declared flurry.
+            mods.extend(self._buff_mods("combat_mod", "bab", self._roll_context(
+                key, **_declared(power_attack, choices))))
             am = self.ability_mod(ab)
             if am:
                 mods.append(Modifier(am, label))
@@ -4003,6 +4080,8 @@ class Actor:
         swap = self.lethality_swap(key, lethality) if lethality else ""
         if swap:
             mods.append(Modifier(LETHALITY_SWAP_PENALTY, swap))
+        if hand:
+            mods.append(self.two_weapon_penalty(hand, off_light))
 
         mods.extend(self._condition_mods("attack"))
         if not ranged:
@@ -4021,16 +4100,53 @@ class Actor:
         # Weapon Focus and Power Attack arrive here now, scoped and conditional, from
         # their documents — never as literals appended above.
         mods.extend(self._buff_mods("combat_mod", "attack",
-                                    self._roll_context(key, power_attack=power_attack,
-                                                      defender=defender,
+                                    self._roll_context(key, defender=defender,
                                                       thrown=ranged and thrown,
                                                       share=share,
+                                                      **_declared(power_attack, choices),
+                                                      **_hand_ctx(hand),
                                                       **_ranged_at(range_ft))))
         if w.get("bash_plus"):
             # A bashing shield "acts as a +1 weapon when used to bash" (`shield_bash`).
             mods.append(Modifier(int(w["bash_plus"]), f"{w['name']}, bashing",
                                  "enhancement"))
         return stack(mods)
+
+    @staticmethod
+    def two_weapon_penalty(hand: str, off_light: bool) -> Modifier:
+        """The book's own two-weapon penalty on this hand's swing, before any feat.
+
+        CRB, Combat, Two-Weapon Fighting (Table 8-7): "you suffer a -6 penalty with your
+        regular attack or attacks with your primary hand and a -10 penalty to the attack
+        with your off hand ... If your off-hand weapon is light, the penalties are
+        reduced by 2 each" (an unarmed strike is light). The Two-Weapon Fighting feat's
+        "+2 primary, +6 off" is its document's, through the funnel (`when: {"two_weapon":
+        ...}`), so the feat's removal takes its relief with it."""
+        base = -6 if hand == "primary" else -10
+        if off_light:
+            base += 2
+        return Modifier(base, f"two-weapon fighting ({'primary' if hand == 'primary' else 'off'}"
+                              f" hand{', light off-hand weapon' if off_light else ''})")
+
+    def confirm_modifiers(self, weapon_key: str | None = None, defender=None,
+                          choices=()) -> list[Modifier]:
+        """What a roll to confirm a critical adds beyond the swing's own terms (the
+        engine rolls it with the attack's modifiers plus these): Critical Focus's "+4
+        circumstance bonus on attack rolls made to confirm critical hits" (CRB), the
+        `crit_confirm` target, read nowhere else."""
+        return self._buff_mods("combat_mod", "crit_confirm", self._roll_context(
+            weapon_key, defender=defender, **_declared(False, choices)))
+
+    def weapon_dice(self, weapon_key: str | None = None, choices=()) -> int:
+        """How many extra times this blow rolls its weapon's dice: Vital Strike's
+        "roll the weapon's damage dice for the attack twice" is one, Improved's three
+        times two, Greater's four times three (`weapon_dice` terms, untyped, each feat
+        +1 and each requiring the one before). The engine rolls them past the critical
+        multiplier: "these extra weapon damage dice are not multiplied on a critical
+        hit, but are added to the total" (CRB, Vital Strike)."""
+        return max(0, sum(m.value for m in stack(self._buff_mods(
+            "combat_mod", "weapon_dice", self._roll_context(
+                weapon_key, **_declared(False, choices))))))
 
     def splash_attack_modifiers(self, defender=None) -> list[Modifier]:
         """The ranged touch attack a thrown flask is (CRB, Throw Splash Weapon: "make a
@@ -4065,15 +4181,26 @@ class Actor:
         mods.extend(self._buff_mods("combat_mod", "attack", ctx))
         return stack(mods)
 
-    def attack_sequence(self, weapon_key: str | None = None, full_attack: bool = False) -> list[int]:
+    def attack_sequence(self, weapon_key: str | None = None, full_attack: bool = False,
+                        choices=()) -> list[int]:
         """How many attacks, at which iteration index. Iteratives are the exact kind of
-        bookkeeping this app exists to carry."""
+        bookkeeping this app exists to carry.
+
+        `choices`: the declared attack options (ATTACK_CHOICES), in the context the
+        `extra_attacks`, `off_hand_attacks` and `bab` terms are asked in — Rapid Shot's
+        "fire one additional time this round at your highest bonus", a flurry's ladder."""
+        # `full_attack` in the context: haste's and Rapid Shot's extra are a full attack's
+        # (`when: {"full_attack": true}`); Battle Blood's ki attack asks nothing and rides
+        # a standard action too.
+        ctx = self._roll_context(weapon_key, full_attack=bool(full_attack),
+                                 **_declared(False, choices))
         # A timed extra swing laid by an ability (`combat_mod` on `extra_attacks`, typed so
         # two of one kind give one): Battle Blood Ki Pool's "make 1 extra attack at highest
         # bonus" (content/classes/blood-bending.json), one more swing at iteration 0 on the
-        # attack it is spent on — standard or full — and gone with the effect.
+        # attack it is spent on — standard or full — and gone with the effect. Rapid Shot
+        # and a monk's ki attack are the same shape, asked in the declared context.
         bonus = [0] * max(0, sum(m.value for m in stack(
-            self._buff_mods("combat_mod", "extra_attacks"))))
+            self._buff_mods("combat_mod", "extra_attacks", ctx))))
         if not full_attack:
             return [0] + bonus
         printed = self.weapon(weapon_key).get("stat_block")
@@ -4100,10 +4227,25 @@ class Actor:
         w = self.weapon(weapon_key)
         if w.get("natural"):
             return [0] * max(1, int(w.get("count", 1) or 1)) + extra + bonus
-        return list(range(len(iterative_attacks(self.bab)))) + extra + bonus
+        # A flurry counts its iteratives off the monk level (`bab` terms), and adds its
+        # two-weapon ladder with the same weapon (`off_hand_attacks` asked WITHOUT a hand:
+        # a flurry's extra blows are "any combination of unarmed strikes or attacks with
+        # a special monk weapon", at full Strength — not an off hand's).
+        bab = self.bab + sum(m.value for m in stack(self._buff_mods("combat_mod", "bab", ctx)))
+        ladder = list(range(self.off_hand_count(ctx)))
+        return list(range(len(iterative_attacks(bab)))) + extra + bonus + ladder
+
+    def off_hand_count(self, ctx: dict) -> int:
+        """The off-hand ladder's length in this context: 0/-5/-10 for one, two, three
+        (`off_hand_attacks`, untyped, stacking — Improved and Greater Two-Weapon
+        Fighting each add one; a flurry's class document gives its own). A two-weapon
+        full attack starts at one by the rule itself (`attack_plan`)."""
+        return max(0, min(3, sum(m.value for m in stack(
+            self._buff_mods("combat_mod", "off_hand_attacks", ctx)))))
 
     def attack_plan(self, weapon_key: str | None = None,
-                    full_attack: bool = False) -> list[tuple[str, int]]:
+                    full_attack: bool = False, choices=(),
+                    off_hand: str = "") -> list[tuple[str, int]]:
         """Every swing of this attack, as (weapon key, iteration) in the order thrown.
 
         A character's full attack is one weapon at falling bonuses, which is what
@@ -4121,7 +4263,16 @@ class Actor:
         w = self.weapon(key)
         printed = w.get("stat_block")
         if not printed:
-            return [(key, i) for i in self.attack_sequence(key, full_attack)]
+            plan = [(key, i) for i in self.attack_sequence(key, full_attack, choices)]
+            if off_hand and full_attack:
+                # Two-weapon fighting: "you can get one extra attack per round with that
+                # weapon" (CRB, Combat), and Improved/Greater add the -5 and -10 swings —
+                # after the primary hand's, the order the book prints them in.
+                off = off_hand.strip().lower()
+                ctx = self._roll_context(off, two_weapon="off",
+                                         **_declared(False, choices))
+                plan += [(off, i) for i in range(1 + self.off_hand_count(ctx))]
+            return plan
         if not full_attack:
             return [(printed["key"], 0)]
         from . import statblock_attacks
@@ -4133,7 +4284,7 @@ class Actor:
     def damage_modifiers(
         self, weapon_key: str | None = None, power_attack: bool = False, defender=None,
         thrown: bool = False, range_ft: float | None = None,
-        beside_weapons: bool = False,
+        beside_weapons: bool = False, choices=(), hand: str = "",
     ) -> list[Modifier]:
         """`thrown`, `range_ft` and `beside_weapons` as `attack_modifiers` takes them: a
         thrown dagger is a ranged weapon for Point-Blank Shot's damage as it is for the
@@ -4162,7 +4313,7 @@ class Actor:
             # Weapon Finesse changes the attack, never the damage. This is a standard
             # place to get 1e wrong.
             am = self._strength_on_damage(w, key, thrown, self.ability_mod("str"),
-                                          self.strength_share(w, beside_weapons))
+                                          self.strength_share(w, beside_weapons, hand))
             if am:
                 mods.append(Modifier(am, "Str"))
         mods.extend(self._condition_mods("damage"))
@@ -4173,16 +4324,19 @@ class Actor:
         # documents, against the weapon in hand.
         mods.extend(self._buff_mods("combat_mod", "damage",
                                     self._roll_context(
-                                        key, power_attack=power_attack, defender=defender,
+                                        key, defender=defender,
                                         thrown=bool(thrown and w.get("range_ft")),
-                                        share=self.strength_share(w, beside_weapons),
+                                        share=self.strength_share(w, beside_weapons, hand),
+                                        **_declared(power_attack, choices),
+                                        **_hand_ctx(hand),
                                         **_ranged_at(range_ft))))
         if w.get("bash_plus"):
             mods.append(Modifier(int(w["bash_plus"]), f"{w['name']}, bashing",
                                  "enhancement"))
         return stack(mods)
 
-    def strength_share(self, w: dict, beside_weapons: bool = False) -> float:
+    def strength_share(self, w: dict, beside_weapons: bool = False,
+                       hand: str = "") -> float:
         """The multiple of the Strength BONUS this swing's damage takes: 1.5, 1 or 0.5.
 
         Core Rulebook, Combat, "Strength Bonus": "when you deal damage with a weapon that
@@ -4193,8 +4347,8 @@ class Actor:
         a sole natural attack "adds 1-1/2 times"; and creatures that also attack with
         manufactured weapons "treat all of their available natural attacks as secondary
         attacks" (d20pfsrd.com/bestiary/rules-for-monsters/universal-monster-rules/
-        #Natural_Attacks). The app has no off hand (`shield_bash`), so that case is not
-        reached. A printed attack carries its own (`statblock_attacks.strength_share`).
+        #Natural_Attacks). The off hand is a two-weapon full attack's (`hand="off"`, lane
+        D 2026-11-22). A printed attack carries its own (`statblock_attacks.strength_share`).
 
         One reader for both things the book hangs on these cases: the damage's Strength
         (`_strength_on_damage`) and Power Attack's rungs (the roll context's
@@ -4209,6 +4363,11 @@ class Actor:
         printed = w.get("stat_block")
         if printed and printed.get("strength_share") is not None:
             return float(printed["strength_share"])
+        # The off hand of a two-weapon full attack (lane D, 2026-11-22): "a weapon in
+        # your off hand, you add only 1/2 your Strength bonus" — unless Double Slice's
+        # tag says the off hand strikes whole.
+        if hand == "off":
+            return 1.0 if self.has_state(OFF_HAND_FULL_STRENGTH) else 0.5
         if w.get("natural"):
             if w.get("secondary") or beside_weapons:
                 return 0.5
@@ -4274,7 +4433,7 @@ class Actor:
     # --- defence -----------------------------------------------------------------------
 
     def ac_modifiers(self, against: str = "melee", flat_footed: bool = False,
-                     attacker=None) -> list[Modifier]:
+                     attacker=None, provoked_by: str = "") -> list[Modifier]:
         mods = [Modifier(10, "base")]
         loses_dex = flat_footed or self.loses_dex_to_ac
 
@@ -4330,6 +4489,12 @@ class Actor:
         if attacker is not None:
             mods.extend(self._scoped_effect_mods(
                 "combat_mod", "ac", {"attacker_actor": attacker, "attack": against}))
+        # An attack of opportunity this creature's own movement drew (`provoked_by`, set
+        # by the engine on the swing it splices): Mobility's "+4 dodge bonus to Armor
+        # Class against attacks of opportunity caused when you move out of or within a
+        # threatened area" (CRB p.131), its own target so no other AC term is asked twice.
+        if provoked_by == "movement":
+            mods.extend(self._buff_mods("combat_mod", "ac_moving"))
         if loses_dex:
             # Denied Dex is denied dodge too — 1e: "any situation that denies you your
             # Dexterity bonus also denies you dodge bonuses". A negative Dex stays: a
@@ -4465,8 +4630,10 @@ class Actor:
                  against: str = "melee") -> int:
         return sum(m.value for m in self.touch_ac_modifiers(flat_footed, attacker, against))
 
-    def ac(self, against: str = "melee", flat_footed: bool = False, attacker=None) -> int:
-        return sum(m.value for m in self.ac_modifiers(against, flat_footed, attacker))
+    def ac(self, against: str = "melee", flat_footed: bool = False, attacker=None,
+           provoked_by: str = "") -> int:
+        return sum(m.value for m in self.ac_modifiers(against, flat_footed, attacker,
+                                                      provoked_by))
 
     def _scoped_effect_mods(self, kind: str, target: str, ctx: dict) -> list[Modifier]:
         """Only the effect modifiers that carry a scope (`vs`, `when`) and hold for ctx.
@@ -4501,7 +4668,7 @@ class Actor:
     # grappling than it should be.
 
     def cmb_modifiers(self, maneuver: str | None = None,
-                      power_attack: bool = False) -> list[Modifier]:
+                      power_attack: bool = False, choices=()) -> list[Modifier]:
         # Tiny or smaller creatures use Dex in place of Str for CMB, and so does a feat
         # document's `cmb_ability` (Agile Maneuvers, which did nothing before 2026-11-15).
         uses_dex = self.size in ("fine", "diminutive", "tiny")
@@ -4534,7 +4701,8 @@ class Actor:
         # Improved/Greater <manoeuvre> family arrives here scoped to the manoeuvre.
         mods.extend(self._buff_mods("combat_mod", "cmb",
                                     self._roll_context(None, maneuver=maneuver,
-                                                       power_attack=power_attack)))
+                                                       **_declared(power_attack,
+                                                                   choices))))
         return stack([m for m in mods if m.value])
 
     def cmd_modifiers(self, flat_footed: bool = False,
@@ -8019,6 +8187,21 @@ def _said_rounds(rounds: int) -> str:
             n = rounds // per
             return f"{n} {unit}{'s' if n != 1 else ''}"
     return f"{rounds} round{'s' if rounds != 1 else ''}"
+
+
+def _declared(power_attack: bool = False, choices=()) -> dict:
+    """The declared attack options as roll-context keys: `{"power_attack": True, ...}`,
+    what a document's `when: {"choice": ...}` asks (`_when_holds`)."""
+    out = {c: True for c in (choices or ()) if c}
+    if power_attack:
+        out["power_attack"] = True
+    return out
+
+
+def _hand_ctx(hand: str) -> dict:
+    """`{"two_weapon": "primary" | "off"}` for a two-weapon full attack's swing, the key
+    Two-Weapon Fighting's document asks; nothing otherwise."""
+    return {"two_weapon": hand} if hand else {}
 
 
 def _ranged_at(range_ft) -> dict:

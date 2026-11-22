@@ -370,7 +370,8 @@ def evades(actor) -> str:
 # `index` (0 = first pick), `picks` and `rank`.
 
 DOC_KEYS = frozenset({"name", "source", "modifiers", "dr", "immunities", "weapon", "armour",
-                      "evasion", "choice", "pick_bonus", "tags", "not_yet", "note"})
+                      "evasion", "choice", "pick_bonus", "tags", "not_yet", "note",
+                      "attack_choice"})
 MOD_KEYS = frozenset({"type", "target", "amount", "formula", "bonus_type", "when", "note"})
 # The feat grammar's four, plus `speed` (`target: "land"` after armour, the enhancement
 # channel `speed_feet` already reads; `"land_base"` BEFORE armour, which is where the
@@ -378,7 +379,7 @@ MOD_KEYS = frozenset({"type", "target", "amount", "formula", "bonus_type", "when
 # any load carried or armor worn").
 MOD_TYPES = ("ability_mod", "skill_mod", "save_mod", "combat_mod", "speed")
 BEARER_KEYS = frozenset({"armour", "shield", "armoured", "load", "helpless", "pool",
-                         "terrain"})
+                         "terrain", "state"})
 WEAPON_KEYS = frozenset({"applies_to", "damage_column", "strikes_as", "strikes_as_by_rank",
                          "when"})
 ARMOUR_KEYS = frozenset({"max_dex", "check_penalty", "unhindered"})
@@ -450,6 +451,20 @@ def held(actor) -> list[tuple[str, dict]]:
         return []
     reached = _ladders(cid, level)
     return [(leaf, doc) for leaf, doc in docs.items() if leaf in reached]
+
+
+def choices_of(actor) -> list[str]:
+    """The attack options this character's class features let them declare now: a
+    document's `attack_choice` — `{"id": "flurry", "when": {"bearer": ...}}` — whose
+    `when` holds (the monk's flurry is lost in armour, with a shield or under a medium
+    load, CRB). The numbers are the same document's `modifiers`, asked with the choice
+    in the roll context, as a feat's `choice` is."""
+    out = []
+    for _leaf, doc in held(actor):
+        pick = doc.get("attack_choice")
+        if isinstance(pick, dict) and pick.get("id") and holds(pick.get("when"), actor, None):
+            out.append(str(pick["id"]))
+    return out
 
 
 def name_of(leaf: str, doc: dict) -> str:
@@ -678,6 +693,12 @@ def _bearer_holds(clause: dict, actor, pick: str = "") -> bool:
         elif key == "pool":
             pool = actor.pool(str(want)) if hasattr(actor, "pool") else None
             if pool is None or int(getattr(pool, "current", 0) or 0) < 1:
+                return False
+        elif key == "state":
+            # A stance held as an ActiveEffect (Combat Expertise's, Cleave's): the term
+            # is the document's, the effect only says it is on — law 1, a prefix
+            # question, so removing the effect takes the number with it (law 2).
+            if not actor.has_state(str(want or "")):
                 return False
         elif key == "terrain":
             word = pick if want == "$pick" else str(want or "")
@@ -1175,6 +1196,15 @@ def validate(class_id: str, docs: dict | None = None) -> list[str]:
             bad = sorted(set(doc["armour"]) - ARMOUR_KEYS)
             if bad:
                 problems.append(f"{at}.armour: unknown key(s) {', '.join(bad)}.")
+        pick = doc.get("attack_choice")
+        if pick is not None:
+            from .intents import OPS
+
+            if not isinstance(pick, dict) or str(pick.get("id")) not in OPS["attack"][1]:
+                problems.append(f"{at}.attack_choice: {{\"id\": \"flurry\"}}, a boolean the "
+                                f"attack op carries ({', '.join(OPS['attack'][1])}).")
+            else:
+                problems.extend(_check_when(pick.get("when"), f"{at}.attack_choice", doc))
         if doc.get("choice") and not str(doc.get("pick_bonus", "")).strip():
             problems.append(f"{at}: a `choice` needs a `pick_bonus` formula for picks that "
                             f"do not record their own bonus.")

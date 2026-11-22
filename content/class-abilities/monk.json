@@ -79,6 +79,22 @@
       "tell": "{name}'s feet blur."
     },
     {
+      "key": "ki extra attack",
+      "name": "Ki Extra Attack",
+      "aliases": ["ki: extra attack", "ki attack", "ki for an extra attack", "extra ki attack"],
+      "level": 4,
+      "source": "CRB p.58 Ki Pool: \"By spending 1 point from his ki pool, a monk can make one additional attack at his highest attack bonus when making a flurry of blows attack.\" No action is named; spent with the flurry. The extra swing is `extra_attacks` on the round, asked only in a declared flurry's context (`when.choice`), so it is never a standard action's second blow.",
+      "text": "One more blow at your best bonus in this round's flurry of blows, for 1 ki.",
+      "action": "free",
+      "cost": {"pool": "ki", "amount": 1},
+      "self": {
+        "rounds": 1,
+        "modifiers": [{"type": "combat_mod", "target": "extra_attacks", "bonus_type": "ki",
+                       "amount": 1, "when": {"choice": "flurry"}}]
+      },
+      "tell": "{name} gathers ki for one more blow in the flurry."
+    },
+    {
       "key": "wholeness of body",
       "name": "Wholeness of Body",
       "level": 7,
@@ -92,7 +108,6 @@
     }
   ],
   "_not_yet": [
-    "Ki's extra attack in a flurry of blows: flurry itself is not built (class audit, lane 3), so there is no flurry to add an attack to.",
     "Ki strike (magic, cold iron and silver, lawful, adamantine): absent from the class table, lane 3's."
   ]
 }

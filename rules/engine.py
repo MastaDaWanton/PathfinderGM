@@ -4425,6 +4425,10 @@ class Engine:
                 why = actor.can_power_attack()
                 if why:
                     raise IntentError(f"attack: {why}", "legality", index, code="cannot_power_attack")
+            why = self._attack_choice_refusal(actor, key, intent.params)
+            if why:
+                raise IntentError(f"attack: {why}", "legality", index,
+                                  code="cannot_choose")
             # "You can use a MELEE weapon that deals lethal damage to deal nonlethal
             # damage instead" (Core Rulebook p.191). An arrow cannot be pulled; a sling
             # of softstones already deals nonlethal and needs no param at all.
@@ -6083,6 +6087,13 @@ class Engine:
             # suspends for the thrower's d20 and is logged as the attack it is (alchemy
             # contracts §7). Engine-written, straight into the queue: never parsed, so
             # its `flask` and `mode` cannot be a model's.
+            # A cleave that hit and found the next foe (`_cleave_next`): its blow is
+            # next, engine-written, so it rolls and suspends like any swing of the PC's.
+            if intent.op == "attack" and outcome.status == "resolved":
+                carried = next((e for e in (outcome.effects or [])
+                                if e.get("kind") == "cleave" and e.get("attack")), None)
+                if carried is not None:
+                    queue.insert(0, dict(carried.pop("attack")))
             if intent.op == "use_item" and outcome.status == "resolved":
                 thrown = next((e for e in (outcome.effects or [])
                                if e.get("kind") == "thrown" and e.get("attack")), None)
@@ -6317,11 +6328,15 @@ class Engine:
             from . import skilluses
 
             skilluses.spend_tumble(mover)    # a tumble covers the one move it was rolled for
-        return self._swings_at(ref, fired)
+        return self._swings_at(ref, fired, why="movement")
 
-    def _swings_at(self, ref: str, fired) -> list[dict]:
+    def _swings_at(self, ref: str, fired, why: str = "") -> list[dict]:
         """The reaction intents owed to `ref` by these (watcher, reaction) pairs, each
-        off its watcher's allowance (`_spend_reaction`)."""
+        off its watcher's allowance (`_spend_reaction`).
+
+        `why` is "movement" for a swing the target's own moving drew: stamped on the
+        spliced swing as `provoked_by` (engine-written, never parsed), which the AC it is
+        rolled against asks — Mobility's +4 (`Actor.ac_modifiers`)."""
         out: list[dict] = []
         for watcher, reaction in fired:
             if not self._spend_reaction(watcher, reaction.budget):
@@ -6334,7 +6349,8 @@ class Engine:
                 # Never a full attack: an attack of opportunity is a single swing, and
                 # letting it inherit the attacker's iteratives would turn a fighter's
                 # threatened square into four free attacks a round.
-                "params": {"full_attack": False, "reaction": reaction.id},
+                "params": {"full_attack": False, "reaction": reaction.id,
+                           **({"provoked_by": why} if why else {})},
                 "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
             })
         return out
@@ -6352,7 +6368,7 @@ class Engine:
             return []
         ref = str(effect.get("ref") or "")
         return self._swings_at(ref, reactions.provoked_by_entering(
-            self.scene, ref, tuple(effect["from"]), tuple(effect["to"])))
+            self.scene, ref, tuple(effect["from"]), tuple(effect["to"])), why="movement")
 
     def _provoked_by_maneuver(self, raw: dict) -> list[dict]:
         """The attack of opportunity a combat manoeuvre owes its target, unless the
@@ -7341,8 +7357,10 @@ class Engine:
                         "op": reaction.op, "actor": watcher, "target": mover,
                         "because": f"{who.name} turned to leave the fight",
                         # A single swing, never the attacker's iteratives
-                        # (`_reactions_before`).
-                        "params": {"full_attack": False, "reaction": reaction.id},
+                        # (`_reactions_before`). Moving out of a threatened square:
+                        # Mobility's AC asks `provoked_by` (`_swings_at`).
+                        "params": {"full_attack": False, "reaction": reaction.id,
+                                   "provoked_by": "movement"},
                         "visibility": ("player" if self.scene.actors[watcher].is_pc
                                        else "hidden"),
                     })
@@ -9845,6 +9863,12 @@ class Engine:
                         f"{actor.name} is not holding it. Catching it back is drawing it.")
         full = bool(intent.params.get("full_attack"))
         power = bool(intent.params.get("power_attack"))
+        # The other declared attack options (lane D): each a key in the roll context its
+        # feat or class document asks, checked legal at validate (`_attack_choice_refusal`).
+        from .sheet import ATTACK_CHOICES
+
+        choices = tuple(c for c in ATTACK_CHOICES[1:] if intent.params.get(c))
+        off_key = "" if dancing else str(intent.params.get("off_hand") or "").strip().lower()
         # A real weapon thrown (a dagger, a javelin, a throwing blade — anything with a
         # range increment): one throw, since the weapon leaves the hand with it, and the
         # weapon goes where it was thrown unless it returns (`_thrown_lands`, lane C2).
@@ -9997,10 +10021,12 @@ class Engine:
         # The attacker rides along so a term scoped to THIS attacker counts: a smiting
         # paladin's deflection is against the creature she smote (`_effect_scope_holds`).
         target_ac = defender.ac(against=weapon["category"],
-                                flat_footed=flat_footed or bool(flounders), attacker=actor)
+                                flat_footed=flat_footed or bool(flounders), attacker=actor,
+                                provoked_by=str(intent.params.get("provoked_by") or ""))
         # What the feint took off, given back to every swing after the first (the loop).
         feint_gain = (defender.ac(against=weapon["category"],
-                                  flat_footed=unfeinted_ff or bool(flounders), attacker=actor)
+                                  flat_footed=unfeinted_ff or bool(flounders), attacker=actor,
+                                  provoked_by=str(intent.params.get("provoked_by") or ""))
                       - target_ac) if feinted else 0
         # The AC's parts past the sheet's own number, (what, how much), so the tell can
         # state the number the roll was judged on and say what made it (`_ac_said`).
@@ -10055,6 +10081,14 @@ class Engine:
         state = partial.get("attack_state") or {"i": 0, "stage": "attack", "rolls": [],
                                                 "effects": [], "tells": []}
         if held is None:
+            # A stance the declared option lays "until your next turn" (Combat
+            # Expertise, Cleave): one round on the one ticker, its numbers the feat
+            # document's, asked by tag.
+            # A cleave's later blows are the same attack action: its stance is laid once.
+            guard = ("two_weapon",) if (off_key and off_key != "unarmed"
+                                         and actor.has_state("two_weapon.defense")) else ()
+            state["tells"].extend(self._lay_attack_stances(
+                actor, () if intent.params.get("cleaving") else choices + guard))
             state["seen"] = seen
             # Down when the blow comes (`Actor.is_down`: dying, unconscious): insensible to
             # who struck. Not helpless — a bound man awake sees who hits him. Kept from
@@ -10077,7 +10111,12 @@ class Engine:
                 state["tells"].append(caught_said)
         # (weapon, iteration) per swing. One weapon for a character; for a monster, the
         # whole printed option — an owlbear's claw, claw, bite (`Actor.attack_plan`).
-        sequence = actor.attack_plan(weapon_key, full)
+        sequence = actor.attack_plan(weapon_key, full, choices, off_key)
+        # Which hand each swing is (`hands`, parallel to `sequence`): a two-weapon full
+        # attack's off-hand swings follow the primary hand's (`Actor.attack_plan`).
+        off_from = len(actor.attack_plan(weapon_key, True, choices)) if off_key else None
+        hands = ([("primary" if n < off_from else "off") for n in range(len(sequence))]
+                 if off_from is not None and full else [""] * len(sequence))
         # One swing at a stated iterative. The combat panel lets a Blood Bender replace
         # any attack in a full attack with an ability, so the remaining weapon swings
         # arrive one op each, still carrying their own -5/-10 — a mixed full attack
@@ -10085,8 +10124,13 @@ class Engine:
         # class it was built for.
         it = intent.params.get("iteration")
         if it is not None and not full and not coup:
-            whole = actor.attack_plan(weapon_key, True)
-            sequence = [whole[min(int(it), len(whole) - 1)]]
+            whole = actor.attack_plan(weapon_key, True, choices, off_key)
+            at = min(int(it), len(whole) - 1)
+            sequence = [whole[at]]
+            hands = [("primary" if at < off_from else "off") if off_from is not None else ""]
+        # "An unarmed strike is always considered a light weapon" (CRB, Unarmed Attacks).
+        off_light = bool(off_key) and (off_key == "unarmed" or bool(
+            (actor.shield_bash(off_key) or actor.weapon(off_key)).get("light")))
         if coup:
             sequence = sequence[:1]
             # No roll to hit and a critical by right. Set once, on first entry: the
@@ -10135,6 +10179,26 @@ class Engine:
             if swift_extra:
                 swift_at = len(sequence)
                 sequence = list(sequence) + [sequence[0]] * swift_extra
+
+        # Manyshot (CRB p.131): "When making a full-attack action with a bow, your first
+        # attack fires two arrows. If the attack hits, both arrows hit." The second arrow
+        # is one more entry behind the first, put there once the first hits
+        # (`manyshot_at`, kept in the state so a resume rebuilds the same sequence), and
+        # it is damage without a roll to hit: "apply precision-based damage (such as sneak
+        # attack) and critical hit damage only once", so it is never a critical and
+        # carries no sneak dice; its own arrow is spent by the loop as every shot's is.
+        from . import weapons as weapons_mod_ms
+
+        many = (not coup and not dancing and actor.has_state("attack.manyshot")
+                and "bows" in weapons_mod_ms.groups_of(weapon_key or "")
+                and (full or (it is not None and int(it) == 0)))
+        if state.get("manyshot_at") is not None:
+            at_ms = int(state["manyshot_at"])
+            sequence = list(sequence)
+            sequence.insert(at_ms, sequence[at_ms - 1])
+            hands.insert(at_ms, hands[at_ms - 1] if hands else "")
+            if swift_at is not None:
+                swift_at += 1
 
         # Said once, before the first die: a narrator told only "the attack misses" has
         # no way to know the player was trying to take the man alive.
@@ -10196,6 +10260,7 @@ class Engine:
                 ac_note = _ac_said("AC", sheet_ac + feint_gain, flat_footed, ac_parts)
                 feint_gain = 0
             swing_key, iteration = sequence[state["i"]]
+            hand = hands[state["i"]] if state["i"] < len(hands) else (hands[0] if hands else "")
             # Each swing its own weapon: the bite of a claw-claw-bite full attack rolls
             # the bite's printed bonus and dice, not the claw's. The named weapon keeps
             # the dict built for it above (an improvised weapon carries its object's name).
@@ -10259,7 +10324,9 @@ class Engine:
                                                   thrown=thrown_any,
                                                   range_ft=self._gap_ft(actor, defender),
                                                   beside_weapons=self._beside_weapons(
-                                                      actor, weapon))
+                                                      actor, weapon),
+                                                  choices=choices, hand=hand,
+                                                  off_light=off_light)
                 atk_mods = atk_mods + self._situational_attack_mods(
                     actor, defender, weapon, range_pen)
 
@@ -10272,6 +10339,11 @@ class Engine:
             # A swarm is the same rule by another subtype ("creatures with the swarm
             # subtype don't make standard melee attacks"), and its block says so by
             # printing no bonus: "swarm (2d6 plus distraction)".
+            if state["stage"] == "attack" and state.get("manyshot_at") == state["i"]:
+                state["tells"].append(f"The second arrow of the pair finds {defender.name} "
+                                      f"too (Manyshot).")
+                state["crit"] = False
+                state["stage"] = "damage"
             if state["stage"] == "attack" and (getattr(actor, "troop", None) is not None
                                               or printed.get("automatic")):
                 state["tells"].append(
@@ -10400,6 +10472,13 @@ class Engine:
                         continue
                 state["hit_total"] = atk.total
                 self._judge(atk, True)
+                if many and state["i"] == 0 and state.get("manyshot_at") is None:
+                    state["manyshot_at"] = 1
+                    sequence = list(sequence)
+                    sequence.insert(1, sequence[0])
+                    hands.insert(1, hands[0] if hands else "")
+                    if swift_at is not None:
+                        swift_at += 1
                 # A threat is not a crit until it is confirmed — exactly the sort of step
                 # a person forgets mid-fight and code does not.
                 threat = natural is not None and natural >= weapon["crit_range"]
@@ -10407,8 +10486,11 @@ class Engine:
                 state["crit"] = False
 
             if state["stage"] == "confirm":
+                # Critical Focus's +4 (`Actor.confirm_modifiers`), on this roll alone.
+                confirm_mods = atk_mods if dancing else (
+                    list(atk_mods) + actor.confirm_modifiers(weapon_key, defender, choices))
                 confirm = self._roll_or_suspend_stage(
-                    intent, actor, atk_mods, f"Confirm critical ({weapon['name']})",
+                    intent, actor, confirm_mods, f"Confirm critical ({weapon['name']})",
                     swing_ac, partial, state, "1d20",
                 )
                 state["rolls"].append(confirm.as_dict())
@@ -10448,7 +10530,16 @@ class Engine:
                         actor, defender, weapon, state,
                         flat_footed=flat_footed or defender.loses_dex_to_ac, pulled=pulled)
                 mult = weapon["crit_mult"] if state.get("crit") else 1
-                dice_notation = _multiply_dice(weapon["damage"], mult)
+                # Vital Strike: the weapon's dice again per feat, "not multiplied on a
+                # critical hit, but ... added to the total" — so past `mult`, never in it.
+                vital = actor.weapon_dice(weapon_key, choices) \
+                    if "vital_strike" in choices and not dancing else 0
+                if vital and not state.get("vital_said"):
+                    state["vital_said"] = True
+                    state["tells"].append(
+                        f"{actor.name} puts the whole attack into one blow: Vital Strike, "
+                        f"the {weapon['name']}'s dice rolled {vital + 1} times.")
+                dice_notation = _multiply_dice(weapon["damage"], mult + vital)
                 dmg_mods = (actor.weapon_own_mods("combat_mod", "damage", weapon_key,
                                                   defender=defender) if dancing
                             else actor.damage_modifiers(weapon_key, power_attack=power,
@@ -10457,7 +10548,8 @@ class Engine:
                                                         range_ft=self._gap_ft(actor,
                                                                               defender),
                                                         beside_weapons=self._beside_weapons(
-                                                            actor, weapon)))
+                                                            actor, weapon),
+                                                        choices=choices, hand=hand))
                 rider_col = "" if dancing else str(weapon.get("rider_column") or "")
                 if rider_col:
                     # Blood DMG + Fist DMG + STR, and BOTH dice are the player's.
@@ -10496,7 +10588,8 @@ class Engine:
                 # blinded. Only the first was asked until 2026-09-27, so once a fight's
                 # first round was over a rogue's blow at a sleeping guard found nothing,
                 # and the coup de grâce the book gives sneak attack explicitly got none.
-                sneak_dice, sneak_why = ("", "") if dancing else self._sneak_for(
+                sneak_dice, sneak_why = ("", "") if (
+                    dancing or state.get("manyshot_at") == state["i"]) else self._sneak_for(
                     actor, defender, weapon,
                     flat_footed=flat_footed or defender.loses_dex_to_ac,
                     pulled=pulled)
@@ -11037,6 +11130,12 @@ class Engine:
         # It still opens with the attacker's name, which `_blows_from` reads.
         lead = (f"{actor.name} takes an attack of opportunity on {defender.name}: "
                 if intent.params.get("reaction") == "attack_of_opportunity" else "")
+        if "cleave" in choices and not coup:
+            nxt, said = self._cleave_next(actor, defender, weapon_key, intent, any_hit)
+            if nxt is not None:
+                effects.append({"ref": actor.ref, "kind": "cleave", "attack": nxt})
+            if said:
+                state["tells"].append(said)
         return Outcome(
             intent_id=intent.id, op="attack", rolls=rolls, dc=dc,
             verdict="hit" if any_hit else "miss",
@@ -24741,6 +24840,210 @@ class Engine:
             state["tells"].append(f"{defender.name}'s {name} does not turn the shot "
                                   f"({roll.total} against DC {dc}).")
             return ""
+        return ""
+
+    def _attack_choice_refusal(self, actor: Actor, key: str, params: dict) -> str:
+        """Why this swing may not carry the attack options it declares, or "".
+
+        Lane D, 2026-11-22. Each option is a feat's (or the monk's flurry), held with its
+        prerequisites met (`Actor.can_choose`), and each has the shape of action the book
+        gives it — a full attack is `full_attack`, or one of the combat bar's per-swing
+        ops (`iteration`):
+        - Vital Strike and Cleave are the attack action ("When you use the attack
+          action", "As a standard action"), never a full attack, and not each other;
+        - Rapid Shot ("When making a full-attack action with a ranged weapon"), a flurry
+          ("as a full-attack action", CRB Monk) and a second weapon in the off hand
+          (CRB, Two-Weapon Fighting: "one extra attack per round") are full attacks;
+        - Combat Expertise is declared "when ... making an attack or a full-attack
+          action with a melee weapon"; Piranha Strike "when wielding a light weapon",
+          and "cannot be used in conjunction with the Power Attack feat";
+        - a flurry is "unarmed strikes or attacks with a special monk weapon".
+        """
+        from . import weapons as weapons_mod
+        from .sheet import ATTACK_CHOICES
+
+        declared = [c for c in ATTACK_CHOICES[1:] if params.get(c)]
+        off = str(params.get("off_hand") or "").strip().lower()
+        if not declared and not off:
+            return ""
+        for c in declared:
+            why = actor.can_choose(c)
+            if why:
+                return why
+        full = bool(params.get("full_attack")) or params.get("iteration") is not None
+        w = actor.weapon(key)
+        ranged = w.get("category") == "ranged" or bool(params.get("thrown"))
+        said = {c: c.replace("_", " ").title() for c in declared}
+        for c in ("vital_strike", "cleave"):
+            if c in declared and full:
+                return (f"{said[c]} is the attack action — one blow — and cannot ride a "
+                        f"full attack. Strike once with it, or make the full attack "
+                        f"without it.")
+        if "vital_strike" in declared and "cleave" in declared:
+            return ("Vital Strike and Cleave are each the whole attack action; choose one "
+                    "of them.")
+        for c in ("rapid_shot", "flurry"):
+            if c in declared and not full:
+                return f"{said[c]} is a full attack: make it with Full attack."
+        if off and not full:
+            return ("A second weapon in the off hand swings in a full attack: make it with "
+                    "Full attack.")
+        if "rapid_shot" in declared and not ranged:
+            return "Rapid Shot is fired with a ranged weapon, not a " + str(w["name"]) + "."
+        if "combat_expertise" in declared and ranged:
+            return "Combat Expertise is declared with a melee weapon."
+        if "piranha_strike" in declared:
+            if params.get("power_attack"):
+                from . import feats as feats_mod
+
+                return (f"Piranha Strike cannot be used together with "
+                        f"{feats_mod.get('power-attack').name}.")
+            if not w.get("light") or ranged:
+                return f"Piranha Strike is for a light melee weapon, not a {w['name']}."
+        if "flurry" in declared:
+            if "monk" not in weapons_mod.groups_of(key) and key != "unarmed":
+                return (f"A flurry of blows is made with unarmed strikes or monk weapons, "
+                        f"not a {w['name']}.")
+            if off or "rapid_shot" in declared:
+                return ("A flurry of blows already strikes as if with two weapons; it takes "
+                        "no off hand and no Rapid Shot.")
+        if off:
+            return self._off_hand_refusal(actor, key, off)
+        return ""
+
+    # The stances an attack option lays: (choice, condition key whose tag the feat
+    # document asks, the feat's name, the tell). Both are "until your next turn" (CRB):
+    # one round on the one ticker, as defending's choice is (`_defend_with`).
+    _ATTACK_STANCES: ClassVar[tuple] = (
+        ("combat_expertise", "combat expertise", "Combat Expertise",
+         "{name} fights guardedly (Combat Expertise): harder to hit, and a little less "
+         "sure with the blade, until their next turn."),
+        ("cleave", "cleaving", "Cleave",
+         "{name} swings wide to cleave, leaving their guard open until their next turn."),
+        # Two-Weapon Defense (CRB): "When wielding a double weapon or two weapons (not
+        # including natural weapons or unarmed strikes), you gain a +1 shield bonus to
+        # your AC." The off hand is declared with the full attack, so the wielding is
+        # known for that round; `two_weapon` is passed for it by `_op_attack`.
+        ("two_weapon", "two-weapon guard", "Two-Weapon Defense",
+         "{name} keeps the second blade up as a guard."),
+    )
+
+    def _lay_attack_stances(self, actor: Actor, choices) -> list[str]:
+        """Lay the one-round stance of each declared option that has one, and say so.
+
+        The effect carries only its tag (`states.COMBAT_EXPERTISE`, `states.CLEAVING`):
+        the numbers are the feat document's, read live while the tag holds
+        (`when.bearer.state`), so the document is the one place Combat Expertise's
+        "+1 dodge per four base attack" is written, and the effect's end takes it away."""
+        said: list[str] = []
+        for choice, key, name, tell in self._ATTACK_STANCES:
+            if choice not in choices:
+                continue
+            doc = actor.choice_feat(choice) or {"id": "two-weapon-defense"}
+            # Already held this round (the bar's full attack posts a swing an op): kept
+            # and refreshed, said once.
+            again = actor.has_state(states.tags_for(key)[0])
+            actor.apply_effect(ActiveEffect(
+                name=key, kind="buff", key=key, source=name,
+                origin=f"rule:feat-{doc.get('id') or choice}",
+                duration="rounds", rounds_left=1, tags=states.tags_for(key)))
+            if not again:
+                said.append(tell.format(name=actor.name))
+        return said
+
+    def _cleave_next(self, actor: Actor, defender: Actor, weapon_key: str,
+                     intent: Intent, hit: bool) -> tuple[dict | None, str]:
+        """(the next blow of a cleave, its tell) — or (None, why there is none).
+
+        CRB p.119, Cleave: "If you hit, you deal damage normally and can make an
+        additional attack (using your full base attack bonus) against a foe that is
+        adjacent to the first and also within reach. You can only make one additional
+        attack per round with this feat." Great Cleave (`attack.cleave.great`, its
+        document's tag): "If you hit, you can continue to make attacks against foes
+        adjacent to the previous foe, so long as they are within your reach. You cannot
+        attack an individual foe more than once during this attack action." A mighty
+        cleaving weapon gives plain Cleave one more.
+
+        Adjacent and in reach are the board's (`grid.distance_between`,
+        `position.out_of_reach`); off the map nobody can be shown to stand beside the
+        first, so no further blow is offered and the tell says why. A foe is anybody not
+        on the attacker's side, not a bystander and not already down
+        (`reactions._allied`, the side model the attacks of opportunity use). The blow
+        is engine-written into the queue (`run`), never parsed: `cleaving` lists the
+        foes already struck, so a plain Cleave stops after one more and Great Cleave
+        never comes back to a foe."""
+        from . import grid as grid_mod
+        from . import position as position_mod
+        from . import reactions as reactions_mod
+
+        struck = [str(r) for r in (intent.params.get("cleaving") or ())] + [defender.ref]
+        if not hit:
+            return None, ""
+        # Mighty cleaving (CRB, magic weapons): "allows a wielder with the Cleave feat to
+        # make one additional attack if the first attack hits" — one more than Cleave's
+        # one, asked of the weapon's own layer tag, never of its name.
+        mighty = any(states.matches(str(t), "property.mighty-cleaving") for t in
+                     ((actor.weapon(weapon_key).get("magic") or {}).get("tags") or ()))
+        if len(struck) > (2 if mighty else 1) and not actor.has_state("attack.cleave.great"):
+            return None, ""
+        if not self.scene.has_grid or defender.ref not in self.scene.positions:
+            return None, (f"With no map to say who stands beside {defender.name}, the "
+                          f"cleave carries no further.")
+        here = self.scene.positions[defender.ref]
+        pick = None
+        for ref, foe in self.scene.actors.items():
+            if ref in struck or ref == actor.ref or foe.is_down \
+                    or ref not in self.scene.positions \
+                    or foe.has_state(states.BYSTANDER) \
+                    or reactions_mod._allied(self.scene, actor.ref, ref):
+                continue
+            if grid_mod.distance_between(tuple(here), defender.size,
+                                         tuple(self.scene.positions[ref]),
+                                         foe.size) > grid_mod.SQUARE_FT:
+                continue
+            if position_mod.out_of_reach(self.scene, actor, foe, weapon_key) is not None:
+                continue
+            pick = foe
+            break
+        if pick is None:
+            return None, (f"No other foe stands beside {defender.name} within "
+                          f"{actor.name}'s reach, so the cleave ends there.")
+        params = {k: v for k, v in (intent.params or {}).items()
+                  if k in ("weapon", "power_attack", "lethality", "cleave")}
+        params.update({"weapon": weapon_key, "cleave": True, "cleaving": struck})
+        return ({"op": "attack", "actor": actor.ref, "target": pick.ref,
+                 "id": f"{intent.id or 'attack'}-cleave{len(struck)}",
+                 "visibility": intent.visibility or ("player" if actor.is_pc else "hidden"),
+                 "because": f"cleaving on from {defender.name}", "params": params},
+                f"The blow carries on into {pick.name}, beside {defender.name} (Cleave).")
+
+    @staticmethod
+    def _off_hand_refusal(actor: Actor, key: str, off: str) -> str:
+        """Why `off` cannot be the off hand's weapon beside `key`, or "".
+
+        CRB, Combat, Two-Weapon Fighting: the second weapon is wielded "in your off
+        hand", so neither may need both hands (a double weapon's other end is the book's
+        exception and is not built); the off-hand weapon is carried, or is the fist, or
+        the shield on the arm ("you can bash with it, using it as an off-hand weapon",
+        CRB, Shields). Ranged off hands (two hand crossbows) are refused here: the
+        reload and range of a second launcher are not built."""
+        main = actor.weapon(key)
+        if int(main.get("hands", 1) or 1) >= 2:
+            return (f"The {main['name']} takes both hands, so there is no off hand to swing "
+                    f"a second weapon with.")
+        if actor.shield_bash(off) is None:
+            carried = [w.lower() for w in actor.weapons]
+            if off not in ("unarmed",) and carried and off not in carried:
+                return f"{actor.name} is not carrying a {off} for the off hand."
+            if off != "unarmed" and str(actor.shield or "none").lower() not in ("none", "buckler"):
+                return (f"The off hand holds the {actor.shield}; bash with it as the off-hand "
+                        f"weapon, or take it off.")
+        other = actor.shield_bash(off) or actor.weapon(off)
+        if int(other.get("hands", 1) or 1) >= 2 or other.get("category") == "ranged":
+            return (f"The {other['name']} cannot be swung in the off hand: the off hand takes "
+                    f"a one-handed or light melee weapon, the fist or a shield.")
+        # shortcut: a pair of one weapon (two daggers) is one key on the weapons list, so
+        # a second copy is not counted; upgrade when the inventory carries quantities.
         return ""
 
     def _defend_with(self, actor: Actor, weapon: dict, value) -> tuple[str, str]:

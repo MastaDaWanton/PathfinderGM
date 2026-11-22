@@ -1119,7 +1119,7 @@ def _validate_grants(d: dict, path: dict, at: str, resolved_names: set,
 # (rules/metamagic.py), and the slot levels it costs.
 _FEAT_DOC_KEYS = frozenset({"modifiers", "tags", "budget", "choice", "attack_ability",
                             "cmb_ability", "not_yet", "requires", "requires_not",
-                            "stacks", "summoned", "summon_extra", "metamagic"})
+                            "stacks", "summoned", "summon_extra", "metamagic", "crit_range"})
 
 
 def _feat_funnel_targets() -> set[str]:
@@ -1300,6 +1300,14 @@ def validate_feat_document(feat_id: str, doc) -> list[str]:
             problems.append(
                 f"{at}.attack_ability: {{\"use\": \"dex\", \"if_better\": true}} — "
                 f"which score feeds the attack roll instead of Strength.")
+    crit = doc.get("crit_range")
+    if crit is not None:
+        # Improved Critical's doubling (`Actor.weapon`): a multiple of the threat range's
+        # size, bound to the parenthetical weapon — never a face number a typo could set.
+        if not isinstance(crit, dict) or set(crit) - {"multiply", "scope"}                 or not isinstance(crit.get("multiply", 2), int)                 or int(crit.get("multiply", 2)) < 2                 or crit.get("scope", {"weapon": "$target"}) != {"weapon": "$target"}:
+            problems.append(
+                f"{at}.crit_range: {{\"multiply\": 2, \"scope\": {{\"weapon\": \"$target\"}}}} "
+                f"— the threat range doubled on the weapon the feat names.")
     sub = doc.get("cmb_ability")
     if sub is not None:
         from .tables import ABILITIES

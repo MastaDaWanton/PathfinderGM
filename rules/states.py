@@ -489,6 +489,11 @@ TAGS: dict[str, tuple[str, ...]] = {
     "blood armament": ("buff.stance.blood-armament",),
     "blood rage":     ("buff.stance.blood-rage",),
     "coagulated plate": ("buff.stance.coagulated-plate",),
+    # Lane D, 2026-11-22: a feat's declared stance, "until your next turn" (CRB), held
+    # as a one-round effect so the feat document's terms can ask for it by tag.
+    "combat expertise": ("buff.stance.combat-expertise",),
+    "cleaving":         ("buff.stance.cleaving",),
+    "two-weapon guard": ("buff.stance.two-weapon-guard",),
     # The price of coming back: somebody paid the priests, and now the debt sits
     # on the character. Clockless — the world decides when it is called in.
     "life debt": ("state.obligation.life-debt",),
@@ -564,6 +569,10 @@ TALKING = "talk.with-you"
 # remembered where the walk had been for.
 MAKING_FOR = "intent.making-for"
 MAKING_FOR_SOURCE = "rule:walk-cut"
+# The feat stances (TAGS above), named once for the engine that lays them and the
+# documents that ask for them.
+COMBAT_EXPERTISE = "buff.stance.combat-expertise"
+CLEAVING = "buff.stance.cleaving"
 # The forage encounter's stance (TAGS["holding ground"]), named once for its readers.
 HOLDING_GROUND = "state.holding-ground"
 HOLDING_GROUND_KEY = "holding ground"

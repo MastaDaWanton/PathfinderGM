@@ -12,6 +12,21 @@
     "source": "CRB, Monk: \"A monk also deals more damage with his unarmed strikes than a normal person would, as shown on Table: Monk\" (1d6 at 1st, 1d8 at 4th, 1d10 at 8th, 2d6 at 12th, 2d8 at 16th, 2d10 at 20th; Small and Large on Table: Small or Large Monk Unarmed Damage). The die is the table's `fist` column; rules/weapons.py:size_die scales it.",
     "weapon": {"applies_to": "unarmed", "damage_column": "fist"}
   },
+  "flurry-of-blows": {
+    "name": "Flurry of blows",
+    "source": "CRB p.57, Monk: \"a monk can make a flurry of blows as a full-attack action. When doing so he may make one additional attack using any combination of unarmed strikes or attacks with a special monk weapon as if using the Two-Weapon Fighting feat ... For the purpose of these attacks, the monk's base attack bonus from his monk class levels is equal to his monk level ... At 8th level, the monk can make two additional attacks when he uses flurry of blows, as if using Improved Two-Weapon Fighting ... At 15th level, the monk can make three additional attacks using flurry of blows, as if using Greater Two-Weapon Fighting ... A monk applies his full Strength bonus to his damage rolls for all successful attacks made with flurry of blows.\" Two-Weapon Fighting with light weapons is -2 on every attack (CRB Table 8-7), the -2 below; the ladder is 0/-5/-10 (`off_hand_attacks`, asked with no hand, so at full Strength). Checked against the table's printed flurry column: -1/-1 at 1st, +6/+6/+1/+1 at 8th, +13/+13/+8/+8/+3/+3 at 15th. Lost in armour, with a shield or under a medium or heavy load (this file's `_about`).",
+    "attack_choice": {"id": "flurry",
+                      "when": {"bearer": {"armour": ["none"], "shield": false, "load": ["light"]}}},
+    "modifiers": [
+      {"type": "combat_mod", "target": "bab", "formula": "max(0, level - bab)",
+       "bonus_type": "untyped", "when": {"choice": "flurry"}},
+      {"type": "combat_mod", "target": "attack", "amount": -2, "bonus_type": "untyped",
+       "when": {"choice": "flurry"}},
+      {"type": "combat_mod", "target": "off_hand_attacks",
+       "formula": "1 + min(1, max(0, level - 7)) + min(1, max(0, level - 14))",
+       "bonus_type": "untyped", "when": {"choice": "flurry"}}
+    ]
+  },
   "ac-bonus": {
     "name": "AC bonus",
     "source": "CRB, Monk: \"When unarmored and unencumbered, the monk adds his Wisdom bonus (if any) to his AC and his CMD. In addition, a monk gains a +1 bonus to AC and CMD at 4th level. This bonus increases by 1 for every four monk levels thereafter, up to a maximum of +5 at 20th level. These bonuses to AC apply even against touch attacks or when the monk is flat-footed. He loses these bonuses when he is immobilized or helpless, when he wears any armor, when he carries a shield, or when he carries a medium or heavy load.\" The +1 ... +5 is the table's AC bonus rungs.",

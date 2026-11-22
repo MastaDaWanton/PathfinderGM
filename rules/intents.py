@@ -346,7 +346,14 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                     # bounded by the engine against the weapon's own enhancement
                     # (`Engine._defend_with`), and kept out of the list a model is shown
                     # (CODE_ONLY_PARAMS) — the player's choice, never the model's number.
-                    "defending"), "player"),
+                    "defending",
+                    # The attack options a feat document's `choice` names (lane D,
+                    # 2026-11-22): each a declared boolean like `power_attack`, legal
+                    # only for a holder of the feat (`Actor.can_choose`), the numbers
+                    # the document's. `off_hand` names the weapon a two-weapon full
+                    # attack swings in the other hand (`Engine._off_hand_refusal`).
+                    "deadly_aim", "combat_expertise", "piranha_strike", "vital_strike",
+                    "cleave", "rapid_shot", "flurry", "off_hand"), "player"),
     # `lethality` because a Blood Bender paying for an ability in non-lethal
     # damage and one taking a sword are not in the same trouble.
     # `when`: the "against X only" clause a jar's or a flask's document carries (alchemy
@@ -815,6 +822,13 @@ PARAM_ALIASES = {
     "fullattack": "full_attack",
     "powerattack": "power_attack",
     "power attack": "power_attack",
+    "deadly aim": "deadly_aim",
+    "combat expertise": "combat_expertise",
+    "piranha strike": "piranha_strike",
+    "vital strike": "vital_strike",
+    "rapid shot": "rapid_shot",
+    "flurry of blows": "flurry",
+    "off hand": "off_hand",
     "opposed": "opposed_by",
     "against": "opposed_by",
     "difficulty": "dc",
@@ -1049,7 +1063,9 @@ def is_null(value) -> bool:
 FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "failed",
                          "thrown", "quoted", "own", "roll", "defensively", "aid", "past",
                          "coup_de_grace", "search", "diversion", "follow", "deliberate",
-                         "immersed", "feint", "tumble", "care", "display"})
+                         "immersed", "feint", "tumble", "care", "display",
+                         "deadly_aim", "combat_expertise", "piranha_strike",
+                         "vital_strike", "cleave", "rapid_shot", "flurry"})
 from .skilluses import OWN_DOORS as _OWN_DOORS  # noqa: E402 — the uses with their own door
 
 

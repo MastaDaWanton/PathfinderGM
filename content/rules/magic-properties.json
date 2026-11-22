@@ -441,8 +441,8 @@
       "spells": [["divine-power"]],
       "requires": {"melee": true},
       "documents": [],
-      "reads_tag": "The Cleave feat's action, when it exists, asks has_state('property.mighty-cleaving') of the weapon and allows one more attack against a foe adjacent to the last and within reach.",
-      "not_yet": ["Cleave has no feat action yet (states-effects-tells ledger: feat actions have no find_ability branch), so mighty cleaving has nothing to extend."],
+      "reads_tag": "Read since lane D (2026-11-22): the Cleave feat's attack (Engine._cleave_next) asks the weapon's property.mighty-cleaving tag and allows one more attack against a foe adjacent to the last and within reach.",
+      "not_yet": ["Off the map nobody can be shown to stand beside the foe, so a cleave (this extra blow with it) carries on only on the board."],
       "aliases": {},
       "source": "https://legacy.aonprd.com/coreRulebook/magicItems/weapons.html#mighty-cleaving",
       "text": "With Cleave, one more attack when the first hits, against a foe adjacent to the last and within reach. Melee weapons only."

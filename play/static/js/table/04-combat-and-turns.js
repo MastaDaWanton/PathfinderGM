@@ -7,7 +7,49 @@
 // existed. Buttons for the mechanical; the say box for everything else.
 const COMBAT = { target: null, move: null, standard: null, swift: null, frees: [],
                  order: [],                  // the staged steps' keys, as Commit posts them
-                 aim: null, picked: null };  // aim: a flask waiting for its square
+                 aim: null, picked: null,    // aim: a flask waiting for its square
+                 opts: new Set(),            // the attack options toggled on (`attacks.options`)
+                 off: "" };                  // the off hand's weapon for a full attack
+
+// --- the attack options (lane D, 2026-11-22) -----------------------------------------------
+// Power Attack, Deadly Aim, Combat Expertise, Rapid Shot, a flurry: each a feat's (or the
+// monk's) declared option, offered only while the server says the character may declare
+// it (`attacks.options`, `Actor.can_choose`). A `swing` option rides every blow the bar
+// stages, a `full` one changes what Full attack is made of (`attacks.plans`), and a
+// `strike` one is its own button beside Strike. Toggled before the action is picked, so
+// the action carries it; the engine prices every number.
+function attackOptions() { return ((STATE && STATE.attacks) || {}).options || []; }
+
+function optionParams(full) {
+  const out = {};
+  for (const o of attackOptions()) {
+    if (!COMBAT.opts.has(o.id)) continue;
+    if (o.shape === "swing" || (full && o.shape === "full")) out[o.id] = true;
+  }
+  return out;
+}
+
+function optionNote(full) {
+  const on = attackOptions().filter(o => COMBAT.opts.has(o.id)
+    && (o.shape === "swing" || (full && o.shape === "full")));
+  return on.length ? ` (${on.map(o => o.name).join(", ")})` : "";
+}
+
+function renderOptions() {
+  const row = $("#cb-opts");
+  if (!row) return;
+  const opts = attackOptions();
+  for (const id of [...COMBAT.opts]) if (!opts.some(o => o.id === id)) COMBAT.opts.delete(id);
+  const toggles = opts.filter(o => o.shape !== "strike");
+  row.hidden = !toggles.length;
+  row.innerHTML = toggles.map(o => `<button type="button" class="v2-btn is-small"
+    data-cbopt="${esc(o.id)}" aria-pressed="${COMBAT.opts.has(o.id)}"
+    title="${esc(o.text)}">${esc(o.name)}</button>`).join("");
+  for (const [id, sel] of [["vital_strike", "#cb-vital"], ["cleave", "#cb-cleave"]]) {
+    const b = $(sel);
+    if (b) b.hidden = !opts.some(o => o.id === id);
+  }
+}
 
 function actionKind(text) {
   const m = /^\s*(?:as an?|an?)?\s*(swift|free|immediate|move|standard|full[- ]round)\b/i
@@ -86,6 +128,7 @@ function renderCombat(s) {
     }</small></span>`).join("")
     || `<span class="sub">Nobody left standing against you.</span>`;
 
+  renderOptions();
   renderPlan();
   // The fight's first cards (js/tutorials.js): the bar on the player's own turn, when it is
   // needed and the card covers nothing the turn needs; non-lethal the first time anyone
@@ -756,15 +799,42 @@ document.addEventListener("click", async e => {
         </button>`).join("") + `<span class="cb-note">Which weapon?</span>`);
       return;
     }
-    COMBAT.standard = { label: `Strike ${targetName()}`,
-      actions: [{ op: "attack", target: COMBAT.target, params: {} }] };
+    COMBAT.standard = { label: `Strike ${targetName()}${optionNote(false)}`,
+      actions: [{ op: "attack", target: COMBAT.target, params: optionParams(false) }] };
     combatMenu(""); renderPlan(); return;
   }
   const sw = t.closest("[data-strikeweapon]");
   if (sw) {
     const w = sw.dataset.strikeweapon;
-    COMBAT.standard = { label: `Strike ${targetName()} (${w})`,
-      actions: [{ op: "attack", target: COMBAT.target, params: { weapon: w } }] };
+    COMBAT.standard = { label: `Strike ${targetName()} (${w})${optionNote(false)}`,
+      actions: [{ op: "attack", target: COMBAT.target,
+                  params: { weapon: w, ...optionParams(false) } }] };
+    combatMenu(""); renderPlan(); return;
+  }
+  // An option toggled: it rides the action picked after it, and a staged one is left as
+  // it was staged (the plan's chip says what it carries).
+  const opt = t.closest("[data-cbopt]");
+  if (opt) {
+    const id = opt.dataset.cbopt;
+    if (COMBAT.opts.has(id)) COMBAT.opts.delete(id); else COMBAT.opts.add(id);
+    // Piranha Strike "cannot be used in conjunction with the Power Attack feat", and a
+    // flurry takes no Rapid Shot: one of each pair at a time.
+    const apart = { piranha_strike: "power_attack", power_attack: "piranha_strike",
+                    flurry: "rapid_shot", rapid_shot: "flurry" };
+    if (COMBAT.opts.has(id) && apart[id]) COMBAT.opts.delete(apart[id]);
+    renderOptions();
+    if ($("#cb-menu").querySelector("#cb-fullok")) $("#cb-fullatk").click();
+    return;
+  }
+  // Vital Strike and Cleave: the attack action, one blow (`Engine._attack_choice_refusal`).
+  const one = t.closest("#cb-vital, #cb-cleave");
+  if (one) {
+    if (!COMBAT.target) { $("#err").textContent = "Pick a target first."; return; }
+    const id = one.id === "cb-vital" ? "vital_strike" : "cleave";
+    COMBAT.standard = { label: `${one.id === "cb-vital" ? "Vital Strike" : "Cleave"} at ${
+      targetName()}${optionNote(false)}`,
+      actions: [{ op: "attack", target: COMBAT.target,
+                  params: { ...optionParams(false), [id]: true } }] };
     combatMenu(""); renderPlan(); return;
   }
 
@@ -817,9 +887,18 @@ document.addEventListener("click", async e => {
           actions: [{ op, params: { how } }] };
     combatMenu(""); renderPlan(); return;
   }
+  const offPick = t.closest("[data-offhand]");
+  if (offPick) { COMBAT.off = offPick.dataset.offhand; $("#cb-fullatk").click(); return; }
   if (t.closest("#cb-fullatk")) {
     if (!COMBAT.target) { $("#err").textContent = "Pick a target first."; return; }
-    const seq = (STATE.attacks || {}).sequence || [0];
+    // The swings of this full attack, from the server's plans (`attacks.plans`): with a
+    // `full` option on, that option's; with an off hand chosen, the two-weapon plan.
+    const at = STATE.attacks || {};
+    const fullOn = attackOptions().find(o => o.shape === "full" && COMBAT.opts.has(o.id));
+    if (fullOn || !(at.off_hands || []).includes(COMBAT.off)) COMBAT.off = "";
+    const planKey = COMBAT.off ? `off:${COMBAT.off}` : (fullOn ? fullOn.id : "");
+    const plan = (at.plans || {})[planKey] || null;
+    const seq = plan ? plan.map(p => p.bonus) : (at.sequence || [0]);
     // A toggle is a free action whatever its text says — the armament and Blood Rage
     // sat in this list as "attacks", and picking one wasted a swing on something the
     // chips row below gives away for nothing.
@@ -831,8 +910,14 @@ document.addEventListener("click", async e => {
       `<option value="w:${esc(w)}">${esc(w)} (${seq[i] >= 0 ? "+" : ""}${
       esc(seq[i])})</option>`).join("") : "") + ((STATE.attacks || {}).replaceable ? abil.map(a =>
       `<option value="${esc(a.name)}">${esc(a.name)}</option>`).join("") : "");
-    combatMenu(seq.map((p, i) =>
-      `<div class="cb-slot"><label>attack ${i + 1}</label>
+    // The off hand (CRB, Two-Weapon Fighting): what swings beside the weapon in hand.
+    const offs = fullOn ? [] : (at.off_hands || []);
+    const offRow = offs.length ? `<div class="cb-slot"><label>off hand</label>${
+      ["", ...offs].map(k => `<button type="button" data-offhand="${esc(k)}"
+        aria-pressed="${COMBAT.off === k}">${esc(k || "none")}</button>`).join("")}</div>` : "";
+    combatMenu(offRow + seq.map((p, i) =>
+      `<div class="cb-slot"><label>attack ${i + 1}${plan && plan[i].hand === "off"
+        ? ` (off hand, ${esc(plan[i].weapon)})` : ""}</label>
        <select data-slot="${i}">${options(i)}</select></div>`).join("") +
       `<button id="cb-fullok">Set full attack</button>
        <span class="cb-note">Blood Bond: any swing can be an ability instead —
@@ -841,15 +926,19 @@ document.addEventListener("click", async e => {
   }
   if (t.closest("#cb-fullok")) {
     const slots = [...$("#cb-menu").querySelectorAll("select")].map(s => s.value);
+    // Every weapon swing carries the toggled options and the off hand, so the engine
+    // lays the same plan the slots were drawn from and rolls each swing at its place in it.
+    const extra = { ...optionParams(true), ...(COMBAT.off ? { off_hand: COMBAT.off } : {}) };
     const actions = slots.map((v, i) => {
-      if (!v) return { op: "attack", target: COMBAT.target, params: { iteration: i } };
+      if (!v) return { op: "attack", target: COMBAT.target, params: { iteration: i, ...extra } };
       if (v.startsWith("w:")) return { op: "attack", target: COMBAT.target,
-        params: { iteration: i, weapon: v.slice(2) } };
+        params: { iteration: i, weapon: v.slice(2), ...extra } };
       return { op: "use_ability", params: { ability: v }, target: COMBAT.target };
     });
     const label = "Full attack: " + slots.map(v =>
       v ? (v.startsWith("w:") ? v.slice(2) : v) : "weapon").join(", ") +
-      ` on ${targetName()}`;
+      (COMBAT.off ? ` and ${COMBAT.off} in the off hand` : "") +
+      ` on ${targetName()}${optionNote(true)}`;
     COMBAT.standard = { label, actions };
     combatMenu(""); renderPlan(); return;
   }

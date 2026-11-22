@@ -595,7 +595,21 @@ VOCAB: dict[str, list[dict]] = {
         ("con_check", "Constitution checks"), ("int_check", "Intelligence checks"),
         ("wis_check", "Wisdom checks"), ("cha_check", "Charisma checks"),
         ("concentration", "Concentration checks"),
-        ("spell_dc", "Spell save DCs"))],
+        ("spell_dc", "Spell save DCs"),
+        # Lane D, 2026-11-22: the attack-shape feats. Each is read by one reader on the
+        # sheet and nowhere else — `bab` by `attack_modifiers` and `attack_sequence` (a
+        # flurry's monk-level base attack), `extra_attacks` by `attack_sequence` (one
+        # more swing at the highest bonus: Rapid Shot, ki), `off_hand_attacks` there too
+        # (the off-hand ladder: two-weapon fighting's 0/-5/-10, a flurry's), `weapon_dice`
+        # by the damage roll (Vital Strike's extra dice, never multiplied on a critical),
+        # `crit_confirm` by the confirmation roll (Critical Focus), `ac_moving` by the AC
+        # an attack of opportunity for moving is rolled against (Mobility).
+        ("bab", "Base attack bonus (this attack)"),
+        ("extra_attacks", "Extra attacks at the highest bonus"),
+        ("off_hand_attacks", "Off-hand attacks"),
+        ("weapon_dice", "Extra weapon damage dice"),
+        ("crit_confirm", "Rolls to confirm a critical"),
+        ("ac_moving", "AC against attacks of opportunity for moving"))],
     "sense": [{"id": k, "name": n} for k, n in (
         ("low_light", "Low-light vision"), ("darkvision", "Darkvision"),
         ("scent", "Scent"), ("tremorsense", "Tremorsense"),
@@ -2417,18 +2431,23 @@ WHEN_KEYS: dict[str, str] = {
     "resting": "a save made while resting (a bedroll's cold)",
     "range_ft": "the attack's range, compared: {\"lte\": 30}",
     "armour": "the armour's weight class, answered at the forge (forge_items)",
-    "bearer": "the bearer's armour, load, shield, terrain or pool (classfeatures.holds)",
+    "bearer": "the bearer's armour, load, shield, terrain, pool or a held state tag "
+              "(classfeatures.holds)",
     "weapon_group": "the held weapon's group, or the class pick (classfeatures.holds)",
     "daylight": "whether it is day where the roll is made (sheet.SITUATION_KEYS)",
     "underground": "whether the roll is made underground",
     "near": "a kind of creature within 10 ft: {\"type\": \"undead\"}",
     "wielder_casts": "whether the item is in a caster's hands",
     "day_phase": "the phase of the day (rules/sky.py)",
+    "full_attack": "whether the attack's count is a full attack's (Actor.attack_sequence): "
+                   "an extra swing a full attack alone is owed (haste, Rapid Shot)",
+    "two_weapon": "which hand of a two-weapon full attack swings: primary or off "
+                  "(Actor.attack_modifiers)",
 }
 _WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment", "choice"),
                        "attacker": ("type", "subtype")}
 _WHEN_COMPARE = ("lte", "gte", "lt", "gt", "eq")
-_WHEN_BOOLS = ("daylight", "underground", "wielder_casts", "resting")
+_WHEN_BOOLS = ("daylight", "underground", "wielder_casts", "resting", "full_attack")
 
 # What a roll may be made AGAINST — the `against` of a roll context, one word per danger,
 # each with the reader that passes it. A closed list, because the clause is answered by
