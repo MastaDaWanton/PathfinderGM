@@ -96,6 +96,7 @@
                                  : "A magic item from the shelf", { pick: "vessel" });
       }
     }
+    if (m === "animate") html += constructPick();
     if (m === "prepare") html += circleSlots();
     if (m === "attune" || m === "bind") html += seatRows(m);
     if (m === "bind") html += bindExtras();
@@ -210,6 +211,26 @@
                 : empty("Catalyst", "Optional: a catalyst eases the binding", { pick: "catalyst", optional: true });
     html += '<label class="ew-check"><input type="checkbox" id="enchant-hurry"' + (o.hurry ? " checked" : "") + '>' +
       '<span>Hurry it<small>Half the time, and harder</small></span></label>';
+    return html;
+  }
+
+  // Animate's one choice: which construction line (the state's `constructs`, each with its
+  // lock in the server's words). Its body, essences and DC come back in the check.
+  function constructPick() {
+    var o = E.order, rows = (E.state && E.state.constructs) || [];
+    var pick = rows.filter(function (r) { return r.id === o.construct; })[0];
+    var html = '<h3 class="ew-h">The construct</h3>' +
+      '<label class="ew-choice" for="ew-construct"><span>Animate</span>' +
+      '<select id="ew-construct" class="v2-well ew-select" data-construct>' +
+      '<option value="">Choose</option>' + rows.map(function (r) {
+        return '<option value="' + esc(r.id) + '"' + (r.id === o.construct ? " selected" : "") +
+          (r.locked ? " disabled" : "") + '>' + esc(r.name) +
+          (r.locked ? " (" + esc(r.lock_reason) + ")" : "") + '</option>';
+      }).join("") + '</select></label>';
+    if (pick) {
+      html += '<p class="ew-hint">Body: ' + esc(pick.body) + '. ' + esc(E.moteWords(pick.motes)) +
+        ' of essence. Spells: ' + esc(pick.spells.join(", ")) + '.</p>';
+    }
     return html;
   }
 
@@ -456,5 +477,6 @@
       return;
     }
     if (e.target.id === "enchant-hurry") E.setHurry(e.target.checked);
+    if (e.target.id === "ew-construct") E.setConstruct(e.target.value);
   });
 })();

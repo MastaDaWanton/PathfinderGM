@@ -154,4 +154,10 @@
       };
     }
   };
+  // Animate (constructs, rules/constructs.py) plays Bind's crest game: the same timed
+  // windows, the light cresting at the body in the circle instead of a vessel.
+  defs.animate = Object.assign({}, defs.bind, {
+    id: "animate", name: "Animate",
+    first: "Light runs round the candles. Press as it crests at the body.",
+  });
 })();

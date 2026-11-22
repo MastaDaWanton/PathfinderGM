@@ -1581,6 +1581,7 @@
      "type": "heal",
      "dice": "1d6",
      "lethality": "lethal",
+     "scales": "full",
      "note": "repairs an object or construct creature; 1d6 per caster level, maximum 5d6"
     },
     {

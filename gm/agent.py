@@ -1812,6 +1812,12 @@ class GMAgent:
                                                        not_ready=not_ready),
             other=others[0] if others else None, pc_ref=pc.ref if pc else "pc")
         messages = base
+        # A construct that cannot speak has no `say` to sample (rules/constructs.mute):
+        # it obeys or it does not, without a word.
+        from rules import constructs
+
+        ops = tuple(o for o in self.COMPANION_ANSWER_OPS
+                    if o != "say" or not constructs.mute(actor))
         attempts: list[Attempt] = []
         rejections: list[str] = []
         for n in range(max_attempts):
@@ -1820,7 +1826,7 @@ class GMAgent:
                                 temperature=0.7, num_predict=400,
                                 schema=prompts.turn_schema(
                                     fighting=False, refs=tuple(scene.actors),
-                                    ops=self.COMPANION_ANSWER_OPS))
+                                    ops=ops))
             attempts.append(Attempt("companion", reply.seconds, reply.model, reply.text))
             try:
                 data = reply.json()

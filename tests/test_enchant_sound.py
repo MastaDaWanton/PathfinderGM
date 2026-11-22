@@ -189,7 +189,7 @@ def test_the_plan_and_the_callers_name_the_events_this_file_checks():
               "ambience.sanctum"):
         assert n in names, n
     assert {f"enchant.method.{m}" for m in METHODS} <= names
-    assert len(METHODS) == 6, METHODS
+    assert len(METHODS) == 7, METHODS          # Animate (constructs) is the seventh
     assert {"works.ready", "works.collect"} <= _called()
 
 

@@ -86,7 +86,8 @@
   };
   function blank(method) {
     return { method: method || null, vessel: "", circle: [], focus: "", seats: {}, choices: {},
-             catalyst: "", hurry: false, phials: {}, essence: "", item: "", recipe: "" };
+             catalyst: "", hurry: false, phials: {}, essence: "", item: "", recipe: "",
+             construct: "" };
   }
   E.order = blank(null);
   var subs = {};
@@ -517,6 +518,9 @@
   // question about a step the player is not taking.
   E.body = function (extra) {
     var o = E.order, m = o.method, body = { method: m };
+    // Animate (rules/constructs.py): the construct named; the server picks its body and
+    // essences off the shelf and says which in the check's info.
+    if (m === "animate") body.construct = o.construct;
     if (m === "prepare") {
       body.vessel = o.vessel; body.circle = o.circle.slice();
       if (o.focus) body.focus = o.focus;
@@ -661,6 +665,12 @@
     if (E.busy || E.live) return;
     var c = E.order.choices[seat] = E.order.choices[seat] || {};
     if (value === "" || value == null) delete c[k]; else c[k] = value;
+    E.emit("order");
+    E.runCheck();
+  };
+  E.setConstruct = function (id) {
+    if (E.busy || E.live) return;
+    E.order.construct = String(id || "");
     E.emit("order");
     E.runCheck();
   };

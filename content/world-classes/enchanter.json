@@ -37,7 +37,8 @@
     "bind",
     "read",
     "identify",
-    "unbind"
+    "unbind",
+    "animate"
    ],
    "max_tier": "uncommon",
    "ceiling": 2,
@@ -78,6 +79,7 @@
   "refine": "Condenses two or more phials of one essence family into one fuller phial, so a seat holds more motes. Each draw is paler than the last: a careless refine loses motes.",
   "unbind": "Unpicks a magic item's layer, last sigil first. The smith's item stays; a quarter of the layer's motes come back as residue, and you learn what kind of magic it carried.",
   "cleanse": "Lifts a curse you know of, sigil by sigil, and keeps the rest of the layer. DC 10 + the item's caster level, the book's remove curse.",
+  "animate": "Makes a construct, the book's construction line in the circle: a body (a homunculus's clay and mandrake, a suit of armour for an animated object, a golem's bought body), essences worth half its price, and the Enchanter check against the line's DC. The work waits In progress for the book's days; collected, the construct rises yours, and obeys you as a construct does: literally, without a word.",
   "read": "Tastes a pinch of an essence (a tenth of a phial) to learn one thing about it.",
   "identify": "Studies an item for what it was made to do. Beat the DC by 10 to see a curse as well. Once per item per day."
  },
@@ -113,6 +115,11 @@
    "needs": "Enchanter 3, a sanctum, and an item whose curse you know.",
    "for": "Keeping a flawed binding's magic without its curse."
   },
+  "animate": {
+   "does": "The construction line's DC, +5 per spell you neither know nor carry (a carried potion or scroll is used up), +5 if your Enchanter level is below the caster level it asks. Spends the body and essences worth half of the price less the body, 1 mote to 100 gp; then 8 hours per 1,000 gp of price In progress. The game's quality adds 1 hit point per Hit Die a step above Sound, and takes 1 off at Crude. A miss keeps everything.",
+   "needs": "Enchanter level equal to the construct's CR, rounded up: a homunculus at 1, an animated object at 3, a flesh golem at 7. Its body and the essences.",
+   "for": "A construct that follows you and obeys. It cannot heal: mend it with Craft or Knowledge (engineering), or make whole."
+  },
   "read": {
    "does": "10 minutes and a tenth of a phial: one trait of the essence. A volatile essence bites the one who reads it.",
    "needs": "An essence in your pack.",
@@ -133,6 +140,7 @@
    "refine",
    "unbind",
    "cleanse",
+   "animate",
    "read",
    "identify"
   ],
@@ -207,6 +215,18 @@
      "seconds": 6,
      "difficulty": 0.45,
      "band": "unpick"
+    }
+   },
+   "animate": {
+    "name": "Animate",
+    "where": "quiet",
+    "minutes": 60,
+    "takes": "a construct's body and essences",
+    "makes": "a construct, into In progress",
+    "tuning": {
+     "seconds": 7,
+     "difficulty": 0.45,
+     "band": "crest"
     }
    },
    "read": {

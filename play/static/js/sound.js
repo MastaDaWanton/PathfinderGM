@@ -1109,7 +1109,7 @@
   });
 
   // Choosing a method: the tool taken up (UI plan §11, `enchant.method.<name>` over
-  // rules/enchanter.py's six methods).
+  // rules/enchanter.py's seven methods, Animate the constructs').
   var ENCHANT_METHOD = {
     prepare: function (c) {      // the chalk box opened, a stick taken out
       knock(c, { f: k(c, [300, 280, 320]), peak: 0.09, lp: 1600, d: 0.035 });
@@ -1137,6 +1137,10 @@
     cleanse: function (c) {      // salt sprinkled, and the drop that carries it
       grains(c, { n: 8, span: 0.2, f: 4800, q: 1, type: "highpass", peak: 0.01, d: 0.005 });
       return drop(c, { at: 0.18, f: k(c, [650, 700, 610]), peak: 0.018 });
+    },
+    animate: function (c) {      // a heavy body shifting on the floor, and the bowl under it
+      knock(c, { f: k(c, [140, 130, 150]), peak: 0.07, lp: 700, d: 0.06 });
+      return bowl(c, { at: 0.12, f: 196 * phaseMul(c), peak: 0.02, d: 0.7 });
     },
   };
   Object.keys(ENCHANT_METHOD).forEach(function (m) {
