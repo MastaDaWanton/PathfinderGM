@@ -22,6 +22,7 @@ from gm.agent import GMAgent, TurnPlan
 from gm.client import ModelUnavailable, available
 from rules import awareness, biomes, grid
 from rules import places as places_mod
+from rules import surprise as surprise_mod
 from rules.intents import CARGO_COUNT_MAX, IntentError
 
 from . import campaign as campaign_mod
@@ -1282,6 +1283,8 @@ def _state(c) -> dict:
             # mapped, and the caves and dungeons found with their known rooms. Appended
             # last: the key order is a contract (2026-11-18).
             "known_places": _known_places_state(c),
+            # The surprise round (rules/surprise.py): the bar says the one-action rule.
+            "surprise_round": surprise_mod.running(c.scene),
         },
         # The abilities this character can use right now, for the row of buttons under
         # the transcript. Sent with the state because reaching a tier changes it.

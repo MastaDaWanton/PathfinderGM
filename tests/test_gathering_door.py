@@ -153,7 +153,8 @@ def test_gathering_pays_mastery_and_failure_teaches_twice():
     success pays"); a missed hour is a mishap, paid `MISHAP_LIMIT` times per ground."""
     s, e = _table(3, "hills", "blacksmith", 1)
     before = s.pc().track("blacksmith").mp
-    out = _run(e, "prospect", 3, 20).outcomes[-1]
+    # The gathering's own outcome, not the surprise round a creature met may open after it.
+    out = [o for o in _run(e, "prospect", 3, 20).outcomes if o.op != "surprise"][-1]
     assert s.pc().track("blacksmith").mp > before, out.tell
     assert "mastery" in out.tell
 

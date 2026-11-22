@@ -144,6 +144,13 @@
     "action": "standard",
     "resolved_by": {"file": "rules/engine.py", "find": "def _escape_from(self, intent: Intent, actor, holder, partial: dict,"}
   },
+  "skill.perception.ambush": {
+    "name": "spot an ambush",
+    "skill": "perception",
+    "source": "CRB, Combat, Surprise: \"Determining awareness may call for Perception checks\"; opposed by the ambushers' Stealth, -1 per 10 ft (CRB p.102).",
+    "action": "none",
+    "resolved_by": {"file": "rules/surprise.py", "find": "def decide(engine, sides: dict, ambushers=())"}
+  },
   "skill.perception.traps": {
     "name": "find traps and hidden ways",
     "skill": "perception",

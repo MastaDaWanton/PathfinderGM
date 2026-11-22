@@ -2399,6 +2399,13 @@ class Scene:
                                               "conditions": sorted({str(e.key)
                                                                     for e in held}),
                                               "from": "grapple", "why": "the fight ended"}]})
+        # A fight won inside its surprise round leaves the round's two states with a round
+        # still on their clock, and out of a fight nothing ticks rounds: the surprised
+        # would stand unable to act in the street (rules/surprise.py).
+        for who in list(self.people.values()):
+            who.remove_effects(match=lambda e: any(
+                states.matches(str(t), states.SURPRISED)
+                or states.matches(str(t), states.ONE_ACTION_TURN) for t in e.tags or ()))
         self.initiative = []
         self.turn = -1
         self.round = 0
@@ -4531,6 +4538,7 @@ class Engine:
         self._battle_joined = False
         self._journeyed = ""
         self._provoked = set()
+        self._surprise_said = None
         # A ship kept before holds were laden (saves from before playtest 2026-11-16 #92)
         # is laden through the one door the first time a turn finds her.
         from . import ships as ships_mod
@@ -5904,6 +5912,16 @@ class Engine:
             # square its walk ends on before anything asks where it is going — the
             # attacks of opportunity below need the square (`_toward_before`).
             self._toward_before(raw)
+            # The surprise round's one action (`_one_action_refusal`): asked before the
+            # reactions, the draw and the closing step, so a refused act provokes nothing,
+            # and asked again each time this blow comes back round behind a step or a draw
+            # spliced in front of it — the step was the action, and the blow is refused.
+            if not partial:
+                limited = self._one_action_refusal(raw)
+                if limited is not None:
+                    queue.pop(0)
+                    outcomes.append(limited)
+                    continue
             # Reactions are owed by the rules, not proposed by anyone, and they happen
             # *before* the action that provoked them completes: an attack of opportunity
             # lands as the creature leaves the square, so if it drops them they never
@@ -6009,6 +6027,8 @@ class Engine:
             # And a coup de grâce in a fight is the whole round (`_coup_paid`).
             if intent.op == "attack":
                 self._coup_paid(intent, outcome, queue)
+            # The surprise round's one action, spent where a later request can see it.
+            self._one_action_paid(intent, outcome)
             # The deeds this act holds, read off its own records against the snapshot,
             # and carried on its outcome for the history line. Every outcome is read, not
             # only the player's: a death the player's blow caused can land in anybody's
@@ -6038,6 +6058,9 @@ class Engine:
                         outcome, effects=list(outcome.effects) + list(told.effects),
                         tell=f"{outcome.tell} {told.tell}".strip())
             outcomes.append(outcome)
+            caught = self._surprise_said_now()
+            if caught is not None:
+                outcomes.append(caught)
             # A disabled creature's standard action costs it a hit point after the act
             # (`_disabled_strain`), and a grapple whose holder fell, died or was moved
             # away ends (`_grapples_settle`) - both here, the one place every op passes.
@@ -6607,6 +6630,64 @@ class Engine:
                 "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
             })
         return out
+
+    # --- the surprise round's one action (rules/surprise.py) -------------------------
+    #
+    # CRB, Combat, "The Surprise Round": the aware "each take a standard or move action
+    # during the surprise round. You can also take free actions". So no full attack, no
+    # full-round action, and not both a move and a standard. Read off the records the turn
+    # already keeps — `Scene.move_spent`, `Scene.standard_spent` and the batch's own
+    # resolved acts (`_acted_in_batch`) — never a counter of its own.
+    _ONE_ACTION_OPS = ("attack", "cast", "move", "use_item", "use_ability")
+
+    def _one_action_spent(self, actor) -> bool:
+        rnd = self.scene.round
+        if self.scene.move_spent.get(actor.ref) == rnd                 or self.scene.standard_spent.get(actor.ref) == rnd:
+            return True
+        # A blow the battle gate only deferred did nothing yet: it is the action to come.
+        return any(not any(e.get("kind") == "battle_joined" for e in o.effects or ())
+                   for o in self._acted_in_batch(actor, self._ONE_ACTION_OPS))
+
+    def _one_action_refusal(self, raw: dict) -> "Outcome | None":
+        """This act refused for the surprise round's limit, or None. A creature's full
+        attack is made one blow instead (`_one_blow_left`'s edit): its turn is the model's
+        choice and a refusal would waste the round it ambushed for; the player's is refused
+        with the reason, so the bar's "Full attack" and their words meet the same rule."""
+        op = raw.get("op")
+        if op not in self._ONE_ACTION_OPS or not self.scene.in_encounter:
+            return None
+        params = raw.get("params") or {}
+        if params.get("reaction"):
+            return None
+        actor = self.scene.actors.get(str(raw.get("actor") or ""))
+        if actor is None or not actor.has_state(states.ONE_ACTION_TURN):
+            return None
+        why = ""
+        if self._one_action_spent(actor):
+            why = "and it is spent. Nothing more is done this round."
+        elif op == "attack" and params.get("coup_de_grace"):
+            why = "and a coup de grâce takes the whole round."
+        elif op == "attack" and params.get("full_attack"):
+            if not actor.is_pc:
+                raw["params"] = dict(params, full_attack=False)
+                return None
+            why = "and a full attack takes the whole round. Strike once instead."
+        if not why:
+            return None
+        return self._refuse(
+            _intent_from_dict(raw),
+            f"Surprise round: {actor.name} has one standard or move action, {why}",
+            code="surprise_round")
+
+    def _one_action_paid(self, intent: Intent, outcome: "Outcome") -> None:
+        """A standard act resolved in the surprise round is recorded as the turn's standard
+        action (`Scene.standard_spent`), so the bar's next request in the same turn is
+        refused too; a move records itself (`move_spent`)."""
+        if intent.op not in self._ONE_ACTION_OPS or intent.op == "move"                 or outcome.status != "resolved" or intent.params.get("reaction")                 or any(e.get("kind") == "battle_joined" for e in outcome.effects or ()):
+            return
+        actor = self.scene.actors.get(intent.actor or "")
+        if actor is not None and self.scene.in_encounter                 and actor.has_state(states.ONE_ACTION_TURN):
+            self.scene.standard_spent[actor.ref] = self.scene.round
 
     def _standard_spent_refusal(self, intent: Intent, actor) -> "Outcome | None":
         """A blow or a spell after a drink this round, refused: the drink was the turn's
@@ -12416,7 +12497,8 @@ class Engine:
         "pass": _outcome_pass,
     }
 
-    def _ensure_encounter(self, initiator: str, target: str | None = None) -> bool:
+    def _ensure_encounter(self, initiator: str, target: str | None = None,
+                          ambush: bool = False) -> bool:
         """Start a fight the moment someone swings, if one is not already running.
         Returns whether it opened one — the attack op defers its swing when it did.
 
@@ -12429,6 +12511,10 @@ class Engine:
         The initiator keeps the turn they just took: they are the one who started it, and
         re-rolling them to the back of the order would take away the action they have
         already declared.
+
+        `ambush`: the other side lay in wait — every arrival on the road, in the wild, the
+        hex, the water, a lair or a camp — and rolls Stealth against the party's Perception
+        for the surprise round (rules/surprise.py), which every fight asks here at its start.
         """
         if self.scene.in_encounter:
             return False
@@ -12498,7 +12584,52 @@ class Engine:
         if target:
             self.rally(target)
         self._law_joins()
+        self._open_surprise(them if ambush else ())
         return True
+
+    def _open_surprise(self, ambushers=()) -> dict | None:
+        """The surprise round, decided once as the fight forms (rules/surprise.py), for
+        `_ensure_encounter`; `_op_begin_encounter` asks `surprise.begin` itself.
+
+        The turn: the initiator keeps it when they are aware, the shipped rule. An ambush
+        door names the player as the initiator only because somebody had to be; there,
+        and whenever the holder was caught unaware, the turn goes to the first aware
+        combatant in the order, with nobody's turn yet taken — `turn_is_next`, so the
+        creature loop's first `advance_turn` lands ON them, not past them. Said behind
+        the op that opened it (`_surprise_said_now`)."""
+        from . import surprise
+
+        record = surprise.begin(self, self.scene.sides, ambushers)
+        if record is None:
+            return None
+        self._surprise_said = record
+        holder = self.scene.turn_holder()
+        if ambushers or holder in record["unaware"]:
+            first = next((i for i, (r, _) in enumerate(self.scene.initiative)
+                          if r in record["aware"]), None)
+            if first is not None:
+                self.scene.acted.discard(holder)
+                self.scene.turn = first
+                self.scene.turn_is_next = True
+        return record
+
+    def _surprise_said_now(self) -> "Outcome | None":
+        """The surprise round's tell, as its own outcome, put by `_drive` right behind the
+        op whose fight it was (law 3: the two conditions it laid are applications, and every
+        one is told). In the batch, not at its end: a blow suspended for the player's die
+        resumes on a new Engine, and a record kept on this one was never said (measured
+        live 2026-11-22, the first cut)."""
+        from . import surprise
+
+        record = getattr(self, "_surprise_said", None)
+        self._surprise_said = None
+        if not record:
+            return None
+        return self._articled(Outcome(
+            intent_id="", op="surprise", rolls=list(record["rolls"]),
+            effects=[{"kind": "surprise", "aware": list(record["aware"]),
+                      "unaware": list(record["unaware"]), "origin": surprise.ORIGIN}],
+            tell=surprise.tell(self.scene, record), because="the fight's first moment"))
 
     # Templates whose people fight for each other. A guard comes to a guard's aid; a
     # merchant does not draw for a merchant.
@@ -12522,8 +12653,17 @@ class Engine:
                              visibility="hidden")
         # `enrol`, not an append and a sort: a newcomer who rolls above the turn-holder
         # sorts in ahead of them, and `turn` is an index (see `Scene.enrol`).
+        from . import surprise
+
+        # Joining a fight in its surprise round is joining it aware — they came to it — and
+        # the round's one action is all anybody aware has (rules/surprise.py). Asked before
+        # the enrol: the newcomer holds none of its states, so `running` reads the others.
+        late = surprise.running(self.scene)
         self.scene.enrol(ref, init.total)
         self.scene.sides.setdefault(side, []).append(ref)
+        if late:
+            a.add_condition(surprise.ROUND_KEY, rounds=1, source=surprise.ORIGIN,
+                            origin=surprise.ORIGIN)
         if ref not in self.scene.positions and self.scene.grid is not None:
             self.scene.place_by_zone([ref])
         return True
@@ -16267,7 +16407,7 @@ class Engine:
         made = self._meet_on_the_way(met, zone="far") if met is not None else []
         toll_line = self._ask_toll(met, made)
         if met is not None and met.aggressive and pc is not None and made:
-            self._ensure_encounter(pc.ref, target=made[0]["ref"])
+            self._ensure_encounter(pc.ref, target=made[0]["ref"], ambush=True)
 
         if stopped_short:
             # The march is over for this turn, and the road remembers how much of it is
@@ -17339,7 +17479,7 @@ class Engine:
         if waiting and pc is not None:
             here_now = [r for r in waiting if r in self.scene.actors]
             if here_now and not self.scene.in_encounter:
-                self._ensure_encounter(here_now[0], target=pc.ref)
+                self._ensure_encounter(here_now[0], target=pc.ref, ambush=True)
             for r in here_now:
                 self.join_fight(r, "them")
             names = [self.scene.actors[r].name for r in here_now]
@@ -17402,7 +17542,7 @@ class Engine:
                                          attitude_mod.HOSTILE, None,
                                          "the watch has your name")
             elif met.aggressive and pc is not None and made:
-                self._ensure_encounter(pc.ref, target=made[0]["ref"])
+                self._ensure_encounter(pc.ref, target=made[0]["ref"], ambush=True)
 
         note = str(intent.params.get("note") or "").strip()
         bits = []
@@ -18829,7 +18969,7 @@ class Engine:
         if enc.aggressive and enc.kind == "creature":
             effects[-1]["stance"] = clause.strip()
             if pc is not None and actor.ref == pc.ref:
-                self._ensure_encounter(pc.ref, target=ref)
+                self._ensure_encounter(pc.ref, target=ref, ambush=True)
                 self._enrol_the_rest(refs)
             return clause
         # Everything else that turns up stays where it is: the guardian on its find, and
@@ -20364,7 +20504,7 @@ class Engine:
             return (f"{_sentence(what)} {'surface' if many else 'surfaces'} alongside, "
                     f"{'look' if many else 'looks'} her over, and "
                     f"{'go' if many else 'goes'} down again.", [fx])
-        self._ensure_encounter(pc.ref, target=made[0]["ref"])
+        self._ensure_encounter(pc.ref, target=made[0]["ref"], ambush=True)
         for m in made[1:]:
             self.join_fight(m["ref"])
         # Her people defend their deck (playtest 2026-11-15 #92: the captain and the hand
@@ -21771,7 +21911,7 @@ class Engine:
                 self.scene.move(r, doc["id"])
             made = self._meet_on_the_way(met, zone="far")
             if met.aggressive and made:
-                self._ensure_encounter(pc.ref, target=made[0]["ref"])
+                self._ensure_encounter(pc.ref, target=made[0]["ref"], ambush=True)
             tell = " ".join([said + f", and on {doc['name']} the way stops being yours.",
                              *notes, ontheway.describe(met, who=[
                                  self.scene.actors[m["ref"]].name for m in made
@@ -22759,7 +22899,7 @@ class Engine:
             return (f"{_sentence(what)} {'surface' if many else 'surfaces'} nearby, "
                     f"{'look' if many else 'looks'} the party over, and "
                     f"{'go' if many else 'goes'} down again.", [fx])
-        self._ensure_encounter(pc.ref, target=made[0]["ref"])
+        self._ensure_encounter(pc.ref, target=made[0]["ref"], ambush=True)
         for m in made[1:]:
             self.join_fight(m["ref"])
         return (f"{_sentence(what)} {'come' if many else 'comes'} up out of the water at "
@@ -22991,7 +23131,7 @@ class Engine:
                 + ((", and they have seen you." if many else ", and it has seen you.")
                    if aggressive else ", further in."))
         if aggressive and pc is not None and (by is None or by.ref == pc.ref):
-            self._ensure_encounter(pc.ref, target=ref)
+            self._ensure_encounter(pc.ref, target=ref, ambush=True)
             self._enrol_the_rest(refs)
         return ([{"kind": "gathering", "encounter": "creature", "creature": name or row["name"],
                   "aggressive": aggressive, "ref": ref, "refs": refs}], tell)
@@ -30569,6 +30709,16 @@ class Engine:
         if self._companions_join():
             self.scene.turn = -1
             self.scene.advance_turn()
+        # The surprise round (rules/surprise.py), once everybody is in: the unaware cannot
+        # act, so pointed again from the top the order lands on the first who can.
+        from . import surprise
+
+        caught = surprise.begin(self, self.scene.sides)
+        if caught is not None:
+            self.scene.acted = set()
+            self.scene.turn = -1
+            self.scene.advance_turn()
+            rolls = rolls + list(caught["rolls"])
         # An attack riding this same batch is deferred: the fight this op opened is
         # announced, and the first swing belongs to whoever wins the first turn.
         self._battle_joined = True
@@ -30582,10 +30732,15 @@ class Engine:
             law_note = (" The watch comes in against you: "
                         + ", ".join(self.scene.actors[r].name for r in law_in
                                     if r in self.scene.actors) + ".")
+        surprise_fx = ([{"kind": "surprise", "aware": list(caught["aware"]),
+                         "unaware": list(caught["unaware"]), "origin": surprise.ORIGIN}]
+                       if caught is not None else [])
+        surprise_note = (" " + surprise.tell(self.scene, caught)) if caught is not None else ""
         return Outcome(
             intent_id=intent.id, op="begin_encounter", rolls=rolls,
-            effects=[{"kind": "initiative", "order": order, "law": list(law_in or [])}],
-            tell=f"Initiative: {names}.{law_note}", because=intent.because,
+            effects=[{"kind": "initiative", "order": order, "law": list(law_in or [])}]
+            + surprise_fx,
+            tell=f"Initiative: {names}.{law_note}{surprise_note}", because=intent.because,
         )
 
     def _flat_footed(self, defender) -> bool:
@@ -35728,7 +35883,7 @@ class Engine:
             met = camp["night"]
             made = self._meet_on_the_way(met, zone="near") if met.aggressive else []
             if made:
-                self._ensure_encounter(actor.ref, target=made[0]["ref"])
+                self._ensure_encounter(actor.ref, target=made[0]["ref"], ambush=True)
                 camp_fx.append({"kind": "night-check", "met": met.kind, "at_dawn": True,
                                 "met_refs": [m["ref"] for m in made],
                                 "origin": "rule:night-check"})
@@ -36028,7 +36183,7 @@ class Engine:
         fx, rolls, said = self._camp_morning(actor, camp, slept, stiff=False)
         made = self._meet_on_the_way(met, zone="near")
         if made:
-            self._ensure_encounter(actor.ref, target=made[0]["ref"])
+            self._ensure_encounter(actor.ref, target=made[0]["ref"], ambush=True)
         bits = [self._night_said(met, made, hours=slept)] + said
         if camp.get("scaled_by"):
             bits.append(f"The {camp['scaled_by']} was no hiding place tonight.")
@@ -36092,7 +36247,7 @@ class Engine:
             met = camp["night"]
             made = self._meet_on_the_way(met, zone="near") if met.aggressive else []
             if made:
-                self._ensure_encounter(actor.ref, target=made[0]["ref"])
+                self._ensure_encounter(actor.ref, target=made[0]["ref"], ambush=True)
                 fx.append({"kind": "night-check", "met": met.kind, "at_dawn": True,
                            "met_refs": [m["ref"] for m in made],
                            "origin": "rule:night-check"})

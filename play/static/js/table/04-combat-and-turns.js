@@ -96,7 +96,9 @@ function renderCombat(s) {
   if (!on) { COMBAT.target = COMBAT.move = COMBAT.standard = COMBAT.swift = null;
              COMBAT.frees = []; COMBAT.order = []; COMBAT.aim = COMBAT.picked = null; return; }
 
-  $("#cb-round").textContent = `Round ${s.scene.round || 1}`;
+  // The surprise round (rules/surprise.py): its one rule said where the round is.
+  $("#cb-round").textContent = s.scene.surprise_round
+    ? "Surprise round: one standard or move action" : `Round ${s.scene.round || 1}`;
   const up = s.scene.turn_ref === (s.pc && s.pc.ref || "pc");
   $("#cb-turn").textContent = up ? "your turn" :
     `waiting on ${(s.scene.initiative.find(i => i.up) || {}).name || "…"}`;
@@ -577,6 +579,16 @@ function throwMenu(flask) {
       splash on the four squares around it (AC 5, no direct hit).</span>`);
 }
 
+// The surprise round allows one standard or move action (CRB, "The Surprise Round"): a
+// full attack or a coup de grâce is refused here with the reason, as the engine refuses
+// it (`Engine._one_action_refusal`).
+function wholeRoundInSurprise(what) {
+  if (!(STATE && STATE.scene && STATE.scene.surprise_round)) return false;
+  combatMenu(`<span class="cb-note">Surprise round: one standard or move action. ${
+    esc(what)} takes the whole round. Strike once instead.</span>`);
+  return true;
+}
+
 function combatMenu(html) {
   const m = $("#cb-menu");
   m.hidden = !html;
@@ -839,6 +851,7 @@ document.addEventListener("click", async e => {
   }
 
   if (t.closest("#cb-coup")) {
+    if (wholeRoundInSurprise("A coup de grâce")) return;
     if (!COMBAT.target) { $("#err").textContent = "Pick a target first."; return; }
     // Filed in the standard slot, as a full attack is: the panel budgets no full round
     // for either, and the engine enforces no action economy for any op.
@@ -890,6 +903,7 @@ document.addEventListener("click", async e => {
   const offPick = t.closest("[data-offhand]");
   if (offPick) { COMBAT.off = offPick.dataset.offhand; $("#cb-fullatk").click(); return; }
   if (t.closest("#cb-fullatk")) {
+    if (wholeRoundInSurprise("A full attack")) return;
     if (!COMBAT.target) { $("#err").textContent = "Pick a target first."; return; }
     // The swings of this full attack, from the server's plans (`attacks.plans`): with a
     // `full` option on, that option's; with an off hand chosen, the two-weapon plan.
