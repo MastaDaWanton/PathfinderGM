@@ -472,6 +472,22 @@ def test_the_owners_real_saves_round_trip_byte_identically(save, tmp_path, monke
                 notes = notes.replace("\n" + note, "").replace(note, "")
                 migrated = True
         was["notes"] = notes
+    # The fifth (2026-11-22, the spell-items lane; owner ruling: the item creation feats
+    # leave the game): a retired feat leaves the sheet with its flavour note, and a player
+    # character is owed the pick back (`feats_refunded`). Nothing else may move.
+    for ref, was in (orig["scene"].get("people") or {}).items():
+        shed = [f for f in was.get("feats") or () if feats_mod.is_retired(f)]
+        if not shed:
+            continue
+        migrated = True
+        got = now["scene"]["people"][ref]
+        was["feats"] = [f for f in was["feats"] if f not in shed]
+        for f in shed:
+            note = f"[feat '{f}' is carried as flavour; engine applies nothing]"
+            was["notes"] = str(was.get("notes") or "").replace("\n" + note, "").replace(note, "")
+        if was.get("kind") == "pc":
+            assert got.get("feats_refunded") == int(was.get("feats_refunded") or 0) + len(shed)
+            was["feats_refunded"] = got["feats_refunded"]
     orig.pop("world_source", None)
     now.pop("world_source", None)
     assert now == orig

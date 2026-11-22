@@ -9476,9 +9476,13 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
     # loses the line, with no note (the circle and the alchemy bench make what it made).
     from . import feats as feats_mod
 
-    shed = sum(1 for f in data.get("feats") or () if feats_mod.is_retired(f))
+    shed = [f for f in data.get("feats") or () if feats_mod.is_retired(f)]
     if shed and a.is_pc:
-        a.feats_refunded += shed
+        a.feats_refunded += len(shed)
+    for f in shed:
+        # And the "carried as flavour" line `validate` wrote for it (no note survives).
+        note = f"[feat '{f}' is carried as flavour; engine applies nothing]"
+        a.notes = str(a.notes or "").replace("\n" + note, "").replace(note, "")
     a.spell_swaps = sorted({int(n) for n in data.get("spell_swaps") or []
                             if str(n).lstrip("-").isdigit()})
     if "level_spells_taken" in data:
