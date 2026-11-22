@@ -28618,6 +28618,9 @@ class Engine:
         # nothing could be prepared into or cast from.
         meta = metamagic.chosen(intent.params)
         self._check_cast_choices(intent, index, actor, spell, level, meta)
+        # The aim below is checked against the spell as this cast makes it: an enlarged
+        # spell's doubled range (`_cast_copy`).
+        spell = self._cast_copy(intent, actor, spell, meta)
         source = casting.cast_source(actor, spell, meta)
         unprepared = source is None
         # ...with the one exception the book names: a cure spell may be cast in place of a
@@ -28683,24 +28686,34 @@ class Engine:
                              intent.params.get("creature"))
             except ValueError as exc:
                 raise IntentError(
-                    f"cast: {spell.name} calls a creature the caster chooses. {exc}",
+                    f"cast: {spell.name} calls a creature the caster chooses (cast param "
+                    f"`creature`). {exc}",
                     "legality", index, code="choose_creature",
                     fix={"kind": "choose", "param": "creature", "spell": spell.id,
                          "options": [o["creature"] for o in summons.options(
                              table["table"], int(table.get("level") or 1))]},
                     for_a_person=f"Which creature does {spell.name} call? {exc}") from None
-        if _chooses_energy(spell.effects):
+        # Two shapes say "one energy, chosen at the cast": a `choice_key: "energy"` spec
+        # (protection from energy) and a `choose_one` of one option per energy (lane B's
+        # resist energy, part-21.json). The `energy` param answers both; for the second
+        # it names the option `choose` would have counted to (`_choose`).
+        options = (list(ENERGY_DAMAGE) if _chooses_energy(spell.effects)
+                   else _energy_options(spell.effects))
+        if options and not (intent.params.get("choose") not in (None, "")
+                            and not _chooses_energy(spell.effects)):
             energy = str(intent.params.get("energy") or "").strip().lower()
-            if energy not in ENERGY_DAMAGE:
+            if energy not in options:
                 said = f"{energy!r} is not one of them. " if energy else ""
                 raise IntentError(
                     f"cast: {spell.name} is against one energy the caster chooses: "
-                    f"{', '.join(ENERGY_DAMAGE)} (cast param `energy`). {said}",
+                    f"{', '.join(options)} (cast param `energy`). {said}",
                     "legality", index, code="choose_energy",
                     fix={"kind": "choose", "param": "energy", "spell": spell.id,
-                         "options": list(ENERGY_DAMAGE)},
+                         "options": options},
                     for_a_person=f"{said}Which energy does {spell.name} guard against: "
-                                 f"{', '.join(ENERGY_DAMAGE)}?")
+                                 f"{', '.join(options)}?")
+            if not _chooses_energy(spell.effects):
+                intent.params["choose"] = options.index(energy) + 1
         if not meta:
             return
         kind = casting.caster_data(actor).get("kind")
@@ -28729,7 +28742,7 @@ class Engine:
         caster, and the metamagic transforms made (rules/metamagic.py). The book's spell
         is untouched; a cast with no choice to make gets the spell itself back."""
         energy = str(intent.params.get("energy") or "").strip().lower()
-        if not _chooses_energy(spell.effects) and not meta:
+        if not (_chooses_energy(spell.effects) or _energy_options(spell.effects) or meta):
             return spell
         out = copy.deepcopy(spell)
         cl = casting.caster_level(actor)
@@ -37560,6 +37573,25 @@ def _chooses_energy(specs) -> bool:
                                                     "on_success"))):
             return True
     return False
+
+
+def _energy_options(specs) -> list[str]:
+    """The energies of a `choose_one` whose every option is a resistance or immunity to
+    one energy (resist energy as lane B wrote it), in option order; [] for anything
+    else, which keeps its own `choose`."""
+    for d in specs or ():
+        if not isinstance(d, dict):
+            continue
+        if d.get("type") == "choose_one":
+            opts = [o for o in d.get("options") or () if isinstance(o, dict)]
+            got = [str(o.get("target") or "").lower() for o in opts]
+            if opts and all(o.get("type") in ("resistance", "immunity") for o in opts) \
+                    and all(g in ENERGY_DAMAGE for g in got):
+                return got
+        found = _energy_options(d.get("effects"))
+        if found:
+            return found
+    return []
 
 
 def _cast_opener(actor, spell, bits: list[str], item: dict | None) -> str:

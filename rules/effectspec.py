@@ -2771,11 +2771,14 @@ def render(spec: dict, *, against: bool = False) -> str:
         # "Resist fire 0" is not a rating, it is a missing one. The source often says
         # "resistance to fire damage" without a number, and a zero on the card reads as
         # a value somebody chose.
-        body = f"Resist {target}" + (f" {amount}" if amount else "")
+        body = f"Resist {target or 'the chosen energy'}" + (f" {amount}" if amount else "")
     elif t == "damage_reduction":
         body = f"DR {amount}/{spec.get('bypass') or '—'}"
     elif t == "immunity":
-        body = f"Immune to {target}"
+        # Unbound, a choice at the cast reads as one (`choice_key`); `absorbs` is the
+        # protection-from-energy discharge.
+        body = f"Immune to {target or 'the chosen energy'}" + (
+            f" until it has absorbed {spec['absorbs']}" if spec.get("absorbs") else "")
     elif t == "sense":
         rng = f" {spec['range']} ft" if spec.get("range") else ""
         body = f"{_label(etype, target)}{rng}"

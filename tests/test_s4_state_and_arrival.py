@@ -225,7 +225,10 @@ def test_player_fixable_is_exactly_the_registers_set():
         "unprepared", "no_slots", "not_known", "not_on_list", "too_high",
         "ability_too_low", "not_your_turn", "no_aim", "out_of_range",
         "no_line_of_effect", "no_such_object", "no_such_weapon", "out_of_reach",
-        "absent_ground"})
+        "absent_ground",
+        # Lane C, 2026-11-22: which creature a summons calls, which energy a ward is
+        # against and which metamagic shapes a cast are the player's choices.
+        "choose_creature", "choose_energy", "metamagic"})
     assert "no_such_target" not in PLAYER_FIXABLE and "wrong_aim" not in PLAYER_FIXABLE
 
 

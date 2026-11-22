@@ -7564,7 +7564,8 @@ def _spell_sheet(actor: Actor) -> dict | None:
                 "duration": spell.duration, "save": spell.saving_throw,
                 "components": spell.components,
                 "prepared": casting.prepared_count(actor, spell_id),
-                **({"metamagic": meta} if meta else {})}
+                **({"metamagic": meta} if meta else {}),
+                **({"choice": choice} if (choice := _cast_choice(spell)) else {})}
 
     known = sorted(
         (entry(sid) for sid in _reachable_spells(actor, data)),
@@ -7661,6 +7662,31 @@ def _choosable(actor: Actor) -> list[dict]:
                        for sp in shown],
         })
     return out
+
+
+def _cast_choice(spell) -> dict | None:
+    """The choice a cast of this spell must carry, for the page's picker: which creature
+    answers a summons, which energy a ward is against (`Engine._check_cast_choices` asks
+    the same two questions at the door). `{"param", "options": [{"id", "name"}]}`."""
+    from . import bestiary, summons
+    from .tables import ENERGY_DAMAGE
+
+    table = summons.table_spec(spell)
+    if table is not None:
+        opts = summons.options(table["table"], int(table.get("level") or 1))
+        return {"param": "creature", "options": [
+            {"id": o["creature"],
+             "name": str((bestiary.lookup(o["creature"]) or {}).get("name")
+                         or o["creature"]) + ("" if o["count"] == "1" else f" ×{o['count']}")}
+            for o in opts]}
+    from .engine import _chooses_energy, _energy_options
+
+    energies = (list(ENERGY_DAMAGE) if _chooses_energy(spell.effects)
+                else _energy_options(spell.effects))
+    if energies:
+        return {"param": "energy",
+                "options": [{"id": e, "name": e.capitalize()} for e in energies]}
+    return None
 
 
 def _reachable_spells(actor: Actor, data: dict) -> list[str]:

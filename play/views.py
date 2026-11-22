@@ -519,6 +519,10 @@ def cast_act(request):
         if not isinstance(aim, str) or not _AIM.match(aim):
             return JsonResponse({"error": _aim_help(aim)}, status=400)
         params["aim"] = aim
+    # The cast-time choices (lane C): words and feat ids the engine checks at the door.
+    for key in ("creature", "energy", "metamagic"):
+        if body.get(key) not in (None, "", []):
+            params[key] = body[key]
     label = str(body.get("label") or f"I cast {spell}").strip()
     engine = c.engine()
     agent = GMAgent(c.world, engine)
@@ -3208,6 +3212,8 @@ def prepare_spells(request):
         return JsonResponse({"error": f"slot must be one of "
                                       f"{', '.join(casting.SPECIAL_SLOTS)}"}, status=400)
 
+    # A metamagic copy's own key ("fireball+empower-spell") names the spell and its feats.
+    spell_id, keyed_meta = casting.split_metamagic_key(spell_id)
     try:
         spell = spells_mod.get(spell_id)
     except KeyError:
@@ -3231,7 +3237,7 @@ def prepare_spells(request):
     # prepare the spell with the feat applied" (CRB, Metamagic Feats).
     from rules import metamagic
 
-    meta = metamagic.chosen(body)
+    meta = sorted(set(metamagic.chosen(body)) | set(keyed_meta))
     if meta and action in ("prepare", "unprepare") and level is not None:
         key = casting.metamagic_key(spell.id, meta)
         if action == "prepare":
@@ -4196,7 +4202,7 @@ def _dry_cast(c, attached: tuple, text: str):
     chip = dict(chip)
     if not chip.get("aim"):
         try:
-            spell = spells_mod.get(chip["id"])
+            spell = spells_mod.get(str(chip["id"]).split("+")[0])
         except KeyError:
             spell = None
         found = areas.aim_from_words(c.scene, pc.ref, text, spell) if pc else None
@@ -4205,6 +4211,7 @@ def _dry_cast(c, attached: tuple, text: str):
     params = {"spell": chip["id"]}
     if chip.get("aim"):
         params["aim"] = chip["aim"]
+    params.update({k: chip[k] for k in ("creature", "energy") if chip.get(k)})
     engine = c.engine()
     undo = c.scene.snapshot()
     refusal = None
@@ -4253,8 +4260,11 @@ def _read_attachments(c, body: dict, text: str, carry_on: bool) -> tuple[tuple, 
     if not isinstance(item, dict) or item.get("kind") != "spell":
         return (), "Only a spell or a place can be attached to a turn."
     spell_id = str(item.get("id") or "").strip()
+    # A copy prepared with metamagic is attached by its key ("fireball+empower-spell",
+    # `casting.metamagic_key`); the spell is the part before the feats.
+    base, meta = casting.split_metamagic_key(spell_id)
     try:
-        spell = spells_mod.get(spell_id)
+        spell = spells_mod.get(base)
     except KeyError:
         return (), f"There is no spell called {spell_id or 'that'}."
     pc = c.scene.pc()
@@ -4262,12 +4272,23 @@ def _read_attachments(c, body: dict, text: str, carry_on: bool) -> tuple[tuple, 
         return (), "There is nobody here to cast it."
     if not (casting.knows(pc, spell) or spell.id in (getattr(pc, "prepared", None) or {})):
         return (), f"{pc.name} does not know {spell.name}."
-    out = {"kind": "spell", "id": spell.id, "name": spell.name}
+    from rules import metamagic
+
+    out = {"kind": "spell", "id": casting.metamagic_key(spell.id, meta) if meta else spell.id,
+           "name": metamagic.named(spell.name, meta)}
     if "aim" in item:
         aim = item.get("aim")
         if not isinstance(aim, str) or not _AIM.match(aim):
             return (), _aim_help(aim)
         out["aim"] = aim
+    # The cast-time choices the chip carries (the refusal's picker, lane C): words, each
+    # checked by the engine against the spell's own document before anything is spent.
+    for key in ("creature", "energy"):
+        got = item.get(key)
+        if got not in (None, ""):
+            if not isinstance(got, str) or len(got) > 60:
+                return (), f"{key} is the name of one {key}."
+            out[key] = got
     return (out,), ""
 
 

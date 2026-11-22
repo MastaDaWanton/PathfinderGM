@@ -378,3 +378,45 @@ def test_the_feat_files_carry_only_their_own_lanes_ids():
                 if not k.startswith("_")}
         assert not mine & core, (name, mine & core)
     assert metamagic.DOES
+
+
+def test_enlarge_doubles_a_medium_range_on_the_copy_only():
+    """Enlarge Spell: "medium-range spells have a range of 200 ft. + 20 ft./level". Magic
+    missile at caster level 7: 170 ft plain, 340 ft enlarged; the book's spell is
+    unchanged."""
+    from rules import spells as spells_mod
+
+    pc = caster(cls="sorcerer", level=7, book=SORC, feats=("Enlarge Spell",))
+    plain = spells_mod.get("magic-missile")
+    big = metamagic.apply(plain, pc, ["enlarge-spell"])
+    assert spells_mod.range_feet(plain, 7) == 170
+    assert spells_mod.range_feet(big, 7) == 340
+    assert spells_mod.range_feet(spells_mod.get("magic-missile"), 7) == 170
+
+
+def test_resist_energy_as_lane_b_wrote_it_is_answered_by_the_energy_param(monkeypatch):
+    """Lane B wrote resist energy (part-21.json) as a `choose_one` of five `resistance`
+    options. The `energy` param answers it as it answers a `choice_key` spec: refused
+    before the slot without one, and naming the option `choose` would have counted to.
+    Rated 10 below caster level 7 and 20 from it (CRB), worked out for the caster."""
+    import dataclasses
+
+    from rules import spells as spells_mod
+
+    amount = "min(30, max(10, 10 * ((caster_level + 1) / 4)))"
+    real = spells_mod.get("resist-energy")
+    b = dataclasses.replace(real, effects=[{"type": "choose_one", "options": [
+        {"type": "resistance", "target": e, "amount": amount}
+        for e in ("acid", "cold", "electricity", "fire", "sonic")]}])
+    monkeypatch.setitem(spells_mod.all_spells(), "resist-energy", b)
+    pc = caster(cls="sorcerer", level=7, book=("resist-energy",))
+    s, e = table(pc, fight=False)
+    with pytest.raises(IntentError) as err:
+        e.validate([{"op": "cast", "actor": "pc",
+                     "params": {"spell": "resist-energy", "aim": "self"}}])
+    assert err.value.code == "choose_energy" and err.value.fix["options"][3] == "fire"
+    [intent] = e.validate([{"op": "cast", "actor": "pc", "params": {
+        "spell": "resist-energy", "aim": "self", "energy": "fire"}}])
+    assert intent.params["choose"] == 4
+    copy = e._cast_copy(intent, pc, b, [])
+    assert copy.effects[0]["options"][3]["amount"] == 20

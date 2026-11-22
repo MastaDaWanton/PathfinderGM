@@ -418,13 +418,45 @@ function castStep(spell, onSelf, defensively) {
   const self = onSelf || castIsPersonal(spell);
   if (self) params.aim = "self";
   if (defensively) params.defensively = true;
+  // The cast-time choices (lane C): the creature or energy picked on this menu, and a
+  // spontaneous caster's metamagic. The engine checks both against the spell.
+  const choice = castChoiceOf(spell.id);
+  if (choice && spell.pick) params[choice.param] = spell.pick;
+  if (spell.meta) params.metamagic = [spell.meta];
   const act = { op: "cast", params };
   if (!self && COMBAT.target) act.target = COMBAT.target;
   const at = self ? "on yourself" : COMBAT.target ? `at ${targetName()}` : "";
   return { label: `Cast ${spell.name}${at ? " " + at : ""}${defensively ? ", defensively" : ""}`,
            actions: [act],
            cast: { id: spell.id, name: spell.name, range: spell.range || "",
-                   self: !!onSelf, defensively: !!defensively } };
+                   self: !!onSelf, defensively: !!defensively,
+                   pick: spell.pick || "", meta: spell.meta || "" } };
+}
+
+function castChoiceOf(id) {
+  const known = (((SPELLS.sheet || {}).spells || {}).known || []).find(k => k.id === id);
+  return (known && known.choice) || null;
+}
+
+// A spontaneous caster's metamagic is chosen as the spell is cast; a prepared caster's
+// was fixed when it was prepared (its copy is its own row in the picker).
+function castMetaFeats() {
+  const sp = (SPELLS.sheet || {}).spells || {};
+  return sp.kind === "prepared" ? [] : (sp.metamagic || []);
+}
+
+function castPicks(spell) {
+  const choice = castChoiceOf(spell.id);
+  const pick = choice ? `<label class="cb-pick">${choice.param === "creature" ? "Calls"
+    : "Against"} <select data-castpick="${esc(choice.param)}"><option value="">choose…</option>${
+    choice.options.map(o => `<option value="${esc(o.id)}"${o.id === spell.pick ? " selected"
+      : ""}>${esc(o.name)}</option>`).join("")}</select></label>` : "";
+  const feats = castMetaFeats();
+  const meta = feats.length ? `<label class="cb-pick">Metamagic <select data-castmeta><option
+    value="">none</option>${feats.map(f => `<option value="${esc(f.id)}"${f.id === spell.meta
+      ? " selected" : ""}>${esc(f.name)} (+${esc(f.levels)})</option>`).join("")}</select></label>`
+    : "";
+  return pick + meta;
 }
 
 function castMenu(spell) {
@@ -436,12 +468,23 @@ function castMenu(spell) {
     : `<button type="button" data-castaim="self">On yourself instead</button>`;
   const guard = `<button type="button" data-castdef="${def ? "off" : "on"}" aria-pressed="${
     def ? "true" : "false"}">${def ? "Cast normally instead" : "Cast defensively"}</button>`;
-  combatMenu(`${turn}${guard}<span class="cb-note">${esc(spell.name)} is in this turn, with ${
+  combatMenu(`${turn}${guard}${castPicks(spell)}<span class="cb-note">${esc(spell.name)} is in this turn, with ${
     COMBAT.move ? "your move" : "any move you click on the map"}. Commit turn casts it.${
     def ? " Defensively: no attack of opportunity, but a concentration check (DC 15 + twice"
       + " the spell's level) or the spell is lost."
       : " Cast within a foe's reach, it provokes an attack of opportunity."}</span>`);
 }
+
+// The creature, energy or metamagic picked on the cast menu restages the cast with it.
+document.addEventListener("change", e => {
+  const sel = e.target.closest && e.target.closest("[data-castpick], [data-castmeta]");
+  const cast = COMBAT.standard && COMBAT.standard.cast;
+  if (!sel || !cast) return;
+  const next = Object.assign({}, cast, sel.hasAttribute("data-castmeta")
+    ? { meta: sel.value } : { pick: sel.value });
+  COMBAT.standard = castStep(next, cast.self, cast.defensively);
+  renderPlan();
+});
 
 // Called by 10-spells.js when a spell is chosen in a fight. Returns false when there is
 // no fight (or no panel), and the spell goes to the Say box as it always did.
@@ -615,6 +658,7 @@ document.addEventListener("click", async e => {
     return;
   }
   const castAim = t.closest("[data-castaim]");
+  if (t.closest("[data-castpick], [data-castmeta]")) return;
   if (castAim && COMBAT.standard && COMBAT.standard.cast) {
     COMBAT.standard = castStep(COMBAT.standard.cast, castAim.dataset.castaim === "self",
                                COMBAT.standard.cast.defensively);

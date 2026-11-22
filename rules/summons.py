@@ -100,7 +100,7 @@ def pick(table: str, level: int, said) -> dict:
     shown = ", ".join(sorted({o["creature"] for o in opts if o["from_level"] == level}))
     raise ValueError(
         (f"{said!r} is not on the list this spell calls from. " if want else
-         "Name the creature to call (cast param `creature`). ")
+         "Name the creature to call. ")
         + f"Level {level}: {shown}"
         + (f"; or 1d3 of one kind from level {level - 1}"
            + (", or 1d4+1 from any lower level" if level > 2 else "") if level > 1 else "")
