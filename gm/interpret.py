@@ -638,7 +638,7 @@ break_in  kick in, force or pick the lock of a door
 stealth   sneak, hide, slip past. `pace` is careful, or hurried when the words hurry
           (dash, rush, quickly, at a run-walk); `diversion` is bluff when the same words
           first distract the onlookers by a trick, a shout or a lie, else none
-athletics climb, swim, jump
+athletics climb, swim, jump, fly, mount
 exert     lift, push, pull, heave, drag, hold up or shift something heavy by main
           strength, alone or with somebody; the target is whoever you help with it.
           Never a person pushed or shoved: that is attack
@@ -814,11 +814,15 @@ _DEMOS = [
          {"span": "head for the cooper", "target": "the cooper", "act": "seek"},
          {"span": "to ask about barrels", "commit": "intended", "says": "about barrels",
           "act": "talk"}]}),
-    ("I climb the bell tower to look over the rooftops.",
+    # "the rooftops" became "the roofs" 2026-11-22 (round 2, body skills): nine characters
+    # that pay for "fly, mount" on the athletics gloss, with 8 of headroom in the budget
+    # (tests/test_playtest_2026_11_17_reader_budget.py). A Ride or Fly deed then owes the
+    # check whose `use` the declared op offers (rules/bodyskills.py USES).
+    ("I climb the bell tower to look over the roofs.",
      {"question": False, "claims": [], "actions": [
          {"span": "climb the bell tower", "place": "the bell tower", "act": "athletics"},
-         {"span": "to look over the rooftops", "commit": "intended",
-          "object": "the rooftops", "act": "look"}]}),
+         {"span": "to look over the roofs", "commit": "intended",
+          "object": "the roofs", "act": "look"}]}),
     # Feats of strength (`exert`, 2026-10-16), written unlike the probe lines (no cart, no
     # "help him"): one heave alone, one beside somebody, who is the target. Here, beside the
     # other deed of the body, and not last: appended at the end of the list they were the
@@ -2942,6 +2946,13 @@ def ops_for(frame: dict | None, scene=None, places=()) -> list[str]:
             add("advance_time")
         elif act == "insult":
             add("provoke")
+        elif act == "athletics":
+            # A climb, a jump, a swim, a flight or a mount owes its check (rules/
+            # bodyskills.py), whose skill, use and feet the declared op asks for. Measured
+            # live 2026-11-22: "I take a running start and jump across the ten-foot gap"
+            # read `athletics` with no check owed (the jump words matched no detector),
+            # and the plan's own check rolled at "average" with the gap never read.
+            add("check")
         elif act == "talk" and a.get("says"):
             add("say")
         elif act == "seek" and a.get("target") and scene is not None:

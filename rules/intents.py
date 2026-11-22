@@ -318,7 +318,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                            # the subject a Knowledge question is about: names the engine
                            # grounds (`tradecraft.carries`, the world's own index), never
                            # a fact it takes on trust (rules/skilluses.py).
-                           "item", "about"),
+                           "item", "about",
+                           # Round 2 (rules/bodyskills.py): the body and movement use,
+                           # the fiction's feet for it, and the wind a flier meets.
+                           "use", "distance_ft", "height_ft", "wind"),
               "player"),
     "save": (("save", "dc"), ("on_success", "on_failure", "breaks"), "player"),
     # `player`, because the PC rolls their own to-hit and their own damage. Defaulting
@@ -1495,8 +1498,38 @@ def _check_params(intent: Intent, index: int) -> None:
         if own and (p.get("dc") or p.get("opposed_by")):
             raise IntentError(f"check: {own[1]} is rolled at its own DC, by the engine. Drop "
                               f"the dc and opposed_by and keep {own[1]}.", "schema", index)
+        # A body or movement use (rules/bodyskills.py USES): a closed word per skill, and
+        # the fiction's one scalar for it in whole feet, bounded as the hazard's slot is.
+        from .bodyskills import USES as _BODY_USES, WINDS as _WINDS
+
+        body_use = str(p.get("use") or "").strip().lower()
+        allowed = _BODY_USES.get(str(p.get("skill") or "").strip().lower(), ())
+        if body_use and body_use not in allowed:
+            # "none" is the sampler's word for a plain check (gm/prompts.py `_declared_op`
+            # asks the use of every declared check whose skill the words did not name),
+            # and a use of another skill is the same plain check: dropped, never a turn
+            # sent back to be written again for a word that changes nothing else.
+            p.pop("use", None)
+            body_use = ""
+        elif body_use:
+            p["use"] = body_use
+        for key, top in (("distance_ft", 100), ("height_ft", 500)):
+            if p.get(key) in (None, ""):
+                continue
+            try:
+                feet = int(p[key])
+            except (TypeError, ValueError):
+                raise IntentError(f"check: {key} is a whole number of feet.", "schema",
+                                  index) from None
+            if not 0 <= feet <= top:
+                raise IntentError(f"check: {key} is from 0 to {top} feet.", "schema", index)
+            p[key] = feet
+        if p.get("wind") and str(p["wind"]) not in _WINDS:
+            raise IntentError(f"check: wind is one of {', '.join(_WINDS)}.", "schema", index)
         if not p.get("dc") and not p.get("opposed_by") and not social and not search \
-                and not diversion and not own:
+                and not diversion and not own and not body_use                 and str(p.get("skill") or "").strip().lower() != "climb":
+            # (A climb may name no DC: one under way goes on at its wall's, and a fresh one
+            # is the book's 15, "adequate handholds and footholds" — rules/bodyskills.py.)
             raise IntentError(
                 "check: a check needs something to beat. Add either "
                 '"dc": {"band": "tough"} (one of ' + ", ".join(DC_BANDS) + "), or "

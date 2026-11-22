@@ -30,10 +30,18 @@
         {"text": "Still usable while raging, when most Dexterity skills are not.",
          "file": "content/class-abilities/barbarian.json", "find": "\"except\": [\"acrobatics\", \"fly\", \"intimidate\", \"ride\"]"},
         {"text": "Tumble past a foe's reach in a fight: one Acrobatics roll against each foe's CMD, +2 for each foe after the first and +10 at more than half speed. Every foe you beat gets no swing as you go by.",
-         "file": "rules/skilluses.py", "find": "def tumble(engine, intent, actor, mods, partial)", "use": "skill.acrobatics.tumble"}
+         "file": "rules/skilluses.py", "find": "def tumble(engine, intent, actor, mods, partial)", "use": "skill.acrobatics.tumble"},
+        {"text": "Jump a gap: the DC is its width in feet, doubled without a run-up. +4 per 10 ft of speed over 30, -4 under. Miss by 4 or less and a DC 20 Reflex save grabs the far edge; by 5 or more you fall.",
+         "file": "rules/bodyskills.py", "find": "def jump(engine, intent, actor, mods, partial, *, high: bool = False):", "use": "skill.acrobatics.jump"},
+        {"text": "Jump up: the DC is four times the height. Miss by 5 or more and you land prone.",
+         "file": "rules/bodyskills.py", "find": "def high_jump(engine, intent, actor, mods, partial):", "use": "skill.acrobatics.high-jump"},
+        {"text": "Jump down on purpose: DC 15 and the drop counts 10 feet shorter. The first die of a deliberate jump is non-lethal, and any damage leaves you prone.",
+         "file": "rules/bodyskills.py", "find": "def soften_fall(engine, intent, actor, mods, partial):", "use": "skill.acrobatics.soften-fall"},
+        {"text": "Cross a ledge, a beam or ice: the DC is the surface's (wider is easier). Made, you cross at half speed, and in a fight lose your Dexterity to AC while on it; missed, you fall or go prone.",
+         "file": "rules/bodyskills.py", "find": "def balance(engine, intent, actor, mods, partial):", "use": "skill.acrobatics.balance"}
       ],
-      "not_yet": "Softening a fall, jump distances, and tumbling through an enemy's own square.",
-      "not_yet_uses": ["skill.acrobatics.soften-fall", "skill.acrobatics.jump", "skill.acrobatics.through-a-space"]
+      "not_yet": "Tumbling through an enemy's own square, and the check a balancing body makes when it is hit.",
+      "not_yet_uses": ["skill.acrobatics.through-a-space", "skill.acrobatics.struck-while-balancing"]
     },
     "appraise": {
       "name": "Appraise",
@@ -70,10 +78,14 @@
         {"text": "Say you climb, clamber or scale something and the engine rolls Climb.",
          "file": "gm/judgement.py", "find": "(\"climb\", r\"climb|"},
         {"text": "At the bottom of a pit, climbing out is a Climb check at the pit's own difficulty.",
-         "file": "rules/dungeons.py", "find": "def climb_out(engine, intent, actor, partial: dict):", "use": "skill.climb.out-of-a-pit"}
+         "file": "rules/dungeons.py", "find": "def climb_out(engine, intent, actor, partial: dict):", "use": "skill.climb.out-of-a-pit"},
+        {"text": "Climbing moves you a quarter of your speed a check, at the wall's DC. Miss by 4 or less and you hold where you are; by 5 or more you fall from the height reached. On a wall you lose your Dexterity to AC.",
+         "file": "rules/bodyskills.py", "find": "def climb(engine, intent, actor, mods, partial):", "use": "skill.climb.move"},
+        {"text": "Falling off a wall, one Climb check at the wall's DC + 20 catches you.",
+         "file": "rules/bodyskills.py", "find": "catch_dc = value + int(row(\"skill.climb.catch\")[\"adds\"])", "use": "skill.climb.catch"}
       ],
-      "not_yet": "Anywhere but out of a pit, climbing is not yet a way of moving: going up on the battle map needs a climb or fly speed, not this skill, and a failed climb does not drop you.",
-      "not_yet_uses": ["skill.climb.move", "skill.climb.fall"]
+      "not_yet": "Climbing faster at -5, the check a climber makes when hit, and catching somebody else as they fall.",
+      "not_yet_uses": ["skill.climb.accelerated", "skill.climb.struck", "skill.climb.catch-another"]
     },
     "craft": {
       "name": "Craft",
@@ -148,17 +160,36 @@
         {"text": "Say you slip your bonds or wriggle free, and the engine rolls Escape Artist.",
          "file": "gm/judgement.py", "find": "(\"escape artist\", r\"slip"},
         {"text": "Breaking a grapple: the better of your Escape Artist and your combat manoeuvre against the holder's CMD.",
-         "file": "rules/engine.py", "find": "def _escape_from(self, intent: Intent, actor, holder, partial: dict,", "use": "skill.escape-artist.grapple"}
+         "file": "rules/engine.py", "find": "def _escape_from(self, intent: Intent, actor, holder, partial: dict,", "use": "skill.escape-artist.grapple"},
+        {"text": "Slip ropes (20 + the binder's combat manoeuvre bonus, a minute), a net (DC 20, a full-round action) or manacles (DC 30, a minute). Made, you are free.",
+         "file": "rules/bodyskills.py", "find": "def bonds(engine, intent, actor, mods, partial):", "use": "skill.escape-artist.bonds"},
+        {"text": "Squeeze through a tight space: DC 30 and at least a minute; you may try again.",
+         "file": "rules/bodyskills.py", "find": "def squeeze(engine, intent, actor, mods, partial):", "use": "skill.escape-artist.squeeze"}
       ],
-      "not_yet": "Slipping ropes or manacles, and squeezing through a tight space.",
-      "not_yet_uses": ["skill.escape-artist.bonds", "skill.escape-artist.squeeze"]
+      "not_yet": "Masterwork manacles (DC 35) and the snare spell (DC 23) are not told apart, and nobody ties anybody up in a grapple yet.",
+      "not_yet_uses": ["skill.escape-artist.masterwork-manacles", "skill.escape-artist.snare"]
     },
     "fly": {
       "name": "Fly",
       "book": "Manoeuvre in the air when you have a way to fly: hover, turn sharply, keep control in wind.",
-      "uses": [],
-      "not_yet": "Flying is a speed, not a roll: there are no checks to hover, turn or fight the wind yet.",
-      "not_yet_uses": ["skill.fly.manoeuvre"]
+      "uses": [
+        {"text": "Flying slower than half speed: DC 10.",
+         "file": "rules/bodyskills.py", "find": "def fly(engine, intent, actor, mods, partial):", "use": "skill.fly.slow"},
+        {"text": "Hovering in place: DC 15.",
+         "file": "rules/bodyskills.py", "find": "def fly(engine, intent, actor, mods, partial):", "use": "skill.fly.hover"},
+        {"text": "A sharp turn (more than 45 degrees in 5 feet): DC 15.",
+         "file": "rules/bodyskills.py", "find": "def fly(engine, intent, actor, mods, partial):", "use": "skill.fly.turn"},
+        {"text": "Turning right round in 10 feet: DC 20.",
+         "file": "rules/bodyskills.py", "find": "def fly(engine, intent, actor, mods, partial):", "use": "skill.fly.turn-about"},
+        {"text": "Climbing steeply (more than 45 degrees): DC 20. On wings, missing any of these by 5 or more drops you from your height.",
+         "file": "rules/bodyskills.py", "find": "def fly(engine, intent, actor, mods, partial):", "use": "skill.fly.fly-up"},
+        {"text": "High winds: -2 to -16 on every Fly check, and small enough fliers are held (DC 20 to move at all) or blown back 2d6 x 10 feet with 2d6 non-lethal (DC 25).",
+         "file": "rules/bodyskills.py", "find": "def fly(engine, intent, actor, mods, partial):", "use": "skill.fly.wind"},
+        {"text": "Falling with a way to fly, a DC 10 Fly check takes no damage (not when the fall is from a failed Fly check).",
+         "file": "rules/bodyskills.py", "find": "def fall(engine, actor, feet: int, *, deliberate: bool = False, may_fly: bool = True,", "use": "skill.fly.soft-landing"}
+      ],
+      "not_yet": "The DC 10 check a winged flier makes when hit, and the DC 25 after a collision.",
+      "not_yet_uses": ["skill.fly.struck", "skill.fly.collision"]
     },
     "handle animal": {
       "name": "Handle Animal",
@@ -176,10 +207,14 @@
         {"text": "Stop a bleeding wound, yours or somebody else's: DC 15 and the bleeding stops. A healing spell or power stops it too.",
          "file": "rules/firstaid.py", "find": "def stanch(patient, by: str)", "use": "skill.heal.stop-bleeding"},
         {"text": "Long-term care: DC 15 on somebody else. Make it and they heal twice as fast through their next full night's rest.",
-         "file": "rules/skilluses.py", "find": "def long_term_care(engine, intent, actor, mods, partial)", "use": "skill.heal.long-term-care"}
+         "file": "rules/skilluses.py", "find": "def long_term_care(engine, intent, actor, mods, partial)", "use": "skill.heal.long-term-care"},
+        {"text": "Treat poison: beat the poison's DC and the patient gets +4 on their next save against it. A standard action; you may treat yourself.",
+         "file": "rules/bodyskills.py", "find": "def treat_poison(engine, intent, actor, mods, partial):", "use": "skill.heal.treat-poison"},
+        {"text": "Treat disease: as poison, against the disease's DC, and ten minutes' work.",
+         "file": "rules/bodyskills.py", "find": "def treat_disease(engine, intent, actor, mods, partial):", "use": "skill.heal.treat-disease"}
       ],
-      "not_yet": "Treating poison, disease and deadly wounds. Only your own character heals by resting yet, so long-term care given to a companion does not show.",
-      "not_yet_uses": ["skill.heal.treat-poison", "skill.heal.treat-disease", "skill.heal.treat-deadly-wounds"]
+      "not_yet": "Treating deadly wounds.",
+      "not_yet_uses": ["skill.heal.treat-deadly-wounds"]
     },
     "intimidate": {
       "name": "Intimidate",
@@ -363,9 +398,24 @@
     "ride": {
       "name": "Ride",
       "book": "Stay in the saddle, guide a mount with your knees, and fight from horseback.",
-      "uses": [],
-      "not_yet": "Riding is a travel pace (twice as fast as walking), not a roll. Staying in the saddle and fighting mounted are not in play yet.",
-      "not_yet_uses": ["skill.ride.saddle", "skill.ride.mounted-combat"]
+      "uses": [
+        {"text": "Get on your mount: a move action in a fight, or a free action with a DC 20 Ride check. Mounted, you move on its legs and sit in its square.",
+         "file": "rules/bodyskills.py", "find": "def mount(engine, intent, actor, mods, partial):", "use": "skill.ride.mount"},
+        {"text": "Get down: as mounting.",
+         "file": "rules/bodyskills.py", "find": "def dismount(engine, intent, actor, mods, partial):", "use": "skill.ride.dismount"},
+        {"text": "Spur the mount: DC 15, a move action. +10 feet of speed this round, and the spurs cut it for 1d3. A tired mount cannot be spurred.",
+         "file": "rules/bodyskills.py", "find": "def spur(engine, intent, actor, mods, partial):", "use": "skill.ride.spur"},
+        {"text": "Drop down along your mount's flank: DC 15. +4 AC until your next turn, and no attacking or casting while there.",
+         "file": "rules/bodyskills.py", "find": "def cover(engine, intent, actor, mods, partial):", "use": "skill.ride.cover"},
+        {"text": "Leap on the mount: DC 15 to stay on, then the jump is your mount's Acrobatics or your Ride, whichever is lower.",
+         "file": "rules/bodyskills.py", "find": "def leap(engine, intent, actor, mods, partial):", "use": "skill.ride.leap"},
+        {"text": "Thrown from the saddle: DC 15 to land unhurt, else 1d6 and prone.",
+         "file": "rules/bodyskills.py", "find": "def _thrown(engine, rider, steed, why: str):", "use": "skill.ride.soft-fall"},
+        {"text": "With the Mounted Combat feat, once a round a Ride check that beats the attack roll turns a hit on your mount.",
+         "file": "rules/bodyskills.py", "find": "def mounted_combat(engine, attacker, defender, atk, state) -> str:", "use": "skill.ride.mounted-combat"}
+      ],
+      "not_yet": "Guiding with your knees, staying in the saddle when hit, fighting with or controlling a mount in battle, a mount falling under you, and the mounted charge (there is no charge yet).",
+      "not_yet_uses": ["skill.ride.guide", "skill.ride.stay-in-saddle", "skill.ride.fight", "skill.ride.control", "skill.ride.mount-falls"]
     },
     "sense motive": {
       "name": "Sense Motive",

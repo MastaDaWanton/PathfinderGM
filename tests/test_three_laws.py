@@ -241,6 +241,9 @@ _LITERAL_KEY_SITES = {
     "play/views.py": (3, "resurrection naming `dead` (the only caller entitled to "
                          "remove it), the life-debt it charges for, and the stance "
                          "toggle whose key comes from a class document"),
+    # 2026-11-22 (round 2, body skills): a fall, a failed jump, a lost footing and a
+    # throw from the saddle all write the one condition the book names, through `_prone`.
+    "rules/bodyskills.py": (1, "prone, the book's word for every way a body falls"),
 }
 
 

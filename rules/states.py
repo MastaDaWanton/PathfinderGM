@@ -919,6 +919,9 @@ BLOCKS: dict[str, frozenset[str]] = {
     CURSE_BARS_ANY: frozenset(("cast", "cast.arcane", "cast.divine")),
     CURSE_BARS_ARCANE: frozenset(("cast.arcane",)),
     CURSE_BARS_DIVINE: frozenset(("cast.divine",)),
+    # Hanging along a mount's flank (CRB, Ride: "You can't attack or cast spells while
+    # using your mount as cover"; rules/bodyskills.py `cover`).
+    "state.position.mount-cover": frozenset(("attack", "cast")),
 }
 
 

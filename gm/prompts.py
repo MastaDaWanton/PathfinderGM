@@ -3847,6 +3847,40 @@ def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...],
                 "properties": {"value": {"type": "string", "enum": sorted(CIRCUMSTANCE)},
                                "why": {"type": "string", "minLength": 8}},
                 "required": ["value", "why"]}
+        # The body and movement use (rules/bodyskills.py): the declared skill's own closed
+        # words when the words named one, every skill's otherwise — the model chooses,
+        # the engine validates (`intents.parse`). Its feet are whole numbers.
+        from rules.bodyskills import USES, WINDS
+
+        if "use" in props and skill and skill not in USES:
+            for name in ("use", "distance_ft", "height_ft", "wind"):
+                props.pop(name, None)     # a skill with no such uses offers none
+        elif "use" in props:
+            words = USES.get(skill) if skill else None
+            props["use"] = {"type": "string", "enum": list(words or dict.fromkeys(
+                ["none", *(u for us in USES.values() for u in us)]))}
+            # Required where the words named the skill: measured live 2026-11-22 on
+            # gemma-4-12B, "I take a running start and jump across the ten-foot gap" came
+            # back a plain Acrobatics check at "average" with no use at all, so the
+            # jump's own DC never ran. A required property the sampler must fill (6 of 6,
+            # memory `ollama-schema-enforcement`); the feet with it where every use of
+            # the skill reads them (0 is "none": no drop below).
+            # Not Heal's or Escape Artist's: first aid, long-term care and the grapple are
+            # theirs too, and the engine reads the poison or the bonds off the body.
+            # The words naming no skill (an athletics deed: "jump across the gap" has no
+            # detector, so `skill` is ""), the use is still asked, with "none" for a plain
+            # check: the same measurement, the check read by the reading alone.
+            if not skill:
+                need.extend(("use", "distance_ft", "height_ft"))
+            elif words and skill not in ("heal", "escape artist"):
+                need.append("use")
+                need.extend({"acrobatics": ("distance_ft", "height_ft"),
+                             "climb": ("height_ft",)}.get(skill, ()))
+        for feet in ("distance_ft", "height_ft"):
+            if feet in props:
+                props[feet] = {"type": "integer", "minimum": 0}
+        if "wind" in props:
+            props["wind"] = {"type": "string", "enum": list(WINDS)}
     if op == "cast" and "aim" in props:
         from rules import areas
 
