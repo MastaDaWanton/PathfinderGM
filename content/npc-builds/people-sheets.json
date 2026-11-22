@@ -5224,7 +5224,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "masterwork shortsword"
@@ -5705,7 +5705,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 shortsword"
@@ -9049,7 +9049,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 club"
@@ -11404,7 +11404,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]\n[feat 'Vital Strike' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 longsword"
@@ -12266,7 +12266,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]\n[feat 'Vital Strike' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+2 longsword"
@@ -13135,7 +13135,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]\n[feat 'Vital Strike' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+4 longsword"
@@ -14167,7 +14167,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 longsword"
@@ -23641,7 +23641,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]\n[feat 'Vital Strike' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 longsword"
@@ -24507,7 +24507,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]\n[feat 'Vital Strike' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+2 longsword"
@@ -25540,7 +25540,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 longsword"
@@ -28148,7 +28148,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "masterwork trident"
@@ -28615,7 +28615,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 trident"
@@ -29668,7 +29668,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 longspear"
@@ -33710,7 +33710,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Rapid Shot' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "masterwork longbow"
@@ -34165,7 +34165,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Rapid Shot' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 longbow"
@@ -36478,7 +36478,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]\n[feat 'Vital Strike' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 club"
@@ -37486,7 +37486,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 club"
@@ -39520,7 +39520,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Combat Expertise' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+2 longsword"
@@ -41423,7 +41423,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 light flail"
@@ -42148,7 +42148,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "masterwork light flail"
@@ -42674,7 +42674,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 longsword"
@@ -43426,7 +43426,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]\n[feat 'Vital Strike' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+2 longsword"
@@ -44269,7 +44269,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "masterwork longsword"
@@ -46197,7 +46197,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Combat Expertise' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 rapier"
@@ -47011,7 +47011,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Combat Expertise' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+2 rapier"
@@ -48745,7 +48745,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]\n[feat 'Vital Strike' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 longsword"
@@ -49557,7 +49557,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]\n[feat 'Vital Strike' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+2 longsword"
@@ -50427,7 +50427,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]\n[feat 'Vital Strike' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+3 longsword"
@@ -51312,7 +51312,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 longsword"
@@ -52665,7 +52665,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 shortsword"
@@ -56843,7 +56843,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]\n[feat 'Vital Strike' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 cutlass"
@@ -57863,7 +57863,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 cutlass"
@@ -58405,7 +58405,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 battleaxe"
@@ -59122,7 +59122,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "masterwork battleaxe"
@@ -65227,7 +65227,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]\n[feat 'Vital Strike' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 battleaxe"
@@ -66255,7 +66255,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 battleaxe"
@@ -66854,7 +66854,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Combat Expertise' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 rapier"
@@ -68551,7 +68551,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 lance"
@@ -69302,7 +69302,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]\n[feat 'Vital Strike' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+2 lance"
@@ -70174,7 +70174,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]\n[feat 'Vital Strike' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+3 lance"
@@ -70826,7 +70826,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "masterwork lance"
@@ -71671,7 +71671,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "masterwork club"
@@ -72261,7 +72261,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "masterwork shortsword"
@@ -72682,7 +72682,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 shortsword"
@@ -86911,7 +86911,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]\n[feat 'Vital Strike' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 longsword"
@@ -87775,7 +87775,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]\n[feat 'Vital Strike' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+2 longsword"
@@ -88804,7 +88804,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 longsword"
@@ -96712,7 +96712,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "masterwork club"
@@ -97175,7 +97175,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 club"
@@ -99952,7 +99952,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]\n[feat 'Vital Strike' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 longsword"
@@ -100774,7 +100774,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]\n[feat 'Vital Strike' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+2 longsword"
@@ -101654,7 +101654,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]\n[feat 'Great Cleave' is carried as flavour; engine applies nothing]\n[feat 'Vital Strike' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+3 longsword"
@@ -102559,7 +102559,7 @@
     "flat_damage": null,
     "flat_initiative": null,
     "flat_cmd": null,
-    "notes": "\n[feat 'Cleave' is carried as flavour; engine applies nothing]",
+    "notes": "",
     "slots": {
      "hands": [
       "+1 longsword"
