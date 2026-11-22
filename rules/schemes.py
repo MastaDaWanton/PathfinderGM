@@ -268,6 +268,19 @@ def validate(doc: dict) -> list[str]:
                 if card.get("secret"):
                     problems.append(f"{at}.hook: a secret card is never pulled; the hook "
                                     f"belongs on the card the player can see.")
+        # Who keeps the secret (Sense Motive, rules/skilluses.py `sense_motive`): the person
+        # slots whose words about the matter are a lie or a half-truth while the card is
+        # live. Authored, never inferred: the clerk of the sealed letter is in the secret
+        # and does not know it, and a reading of the facts could not tell him from a liar.
+        kept = card.get("kept_by")
+        if kept is not None:
+            if not card.get("secret"):
+                problems.append(f"{at}.kept_by: only a secret card is kept by anybody.")
+            for who in kept if isinstance(kept, list) else [kept]:
+                spec = slots.get(str(who).lstrip("$"))
+                if not (isinstance(spec, dict) and (spec.get("role") or spec.get("from"))):
+                    problems.append(f"{at}.kept_by: {who!r} is not a person slot of this "
+                                    f"scheme; name a slot with a role, e.g. [\"giver\"].")
     keys = {c.get("key") for c in doc.get("cards") or [] if isinstance(c, dict)}
     for c in doc.get("opens") or []:
         found = _criterion_kind(c)
@@ -1603,6 +1616,32 @@ def card_owner(scene, card_id: str) -> tuple[dict, dict, str] | None:
             if cid == card_id and inst.get("scheme") in docs:
                 return inst, docs[inst["scheme"]], key
     return None
+
+
+def keeps_secret(scene, ref: str) -> bool:
+    """Whether this person is keeping a live scheme's secret card from the player — a
+    slot the card's `kept_by` names, the card still open. What a Sense Motive set against
+    their Bluff asks (rules/skilluses.py); derived from the schemes, never stored, so a
+    card resolved is a secret no longer kept."""
+    if not ref:
+        return False
+    docs = all_schemes()
+    for inst in scene.schemes or ():
+        doc = docs.get(inst.get("scheme"))
+        if doc is None or inst.get("outcome"):
+            continue
+        slots = inst.get("slots") or {}
+        for card in doc.get("cards") or ():
+            cid = (inst.get("cards") or {}).get(card.get("key"))
+            if not cid or not card.get("kept_by"):
+                continue
+            live = cards_mod.find(scene, cid)
+            if live is None or not live.live:
+                continue
+            if any((slots.get(str(w).lstrip("$")) or {}).get("ref") == ref
+                   for w in card["kept_by"]):
+                return True
+    return False
 
 
 def ticking_steps(doc: dict, key: str, n: int) -> list[dict]:

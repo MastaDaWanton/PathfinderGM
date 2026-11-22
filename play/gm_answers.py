@@ -710,18 +710,15 @@ def _match(names: dict, term: str, named: bool = False):
     return names[whole[0]] if len(whole) == 1 else None
 
 
-# Pathfinder 1e's own mapping of creature type to the Knowledge skill that identifies
-# one, which is the actual answer to "do I recognise this".
-_KNOWLEDGE = {
-    "aberration": "Knowledge (dungeoneering)", "animal": "Knowledge (nature)",
-    "construct": "Knowledge (arcana)", "dragon": "Knowledge (arcana)",
-    "fey": "Knowledge (nature)", "humanoid": "Knowledge (local)",
-    "magical beast": "Knowledge (arcana)",
-    "monstrous humanoid": "Knowledge (dungeoneering)",
-    "ooze": "Knowledge (dungeoneering)", "outsider": "Knowledge (planes)",
-    "plant": "Knowledge (nature)", "undead": "Knowledge (religion)",
-    "vermin": "Knowledge (dungeoneering)",
-}
+def _knowledge(kind: str) -> str:
+    """The Knowledge that identifies a creature of this type, from the one table
+    (content/rules/skill-uses.json, the CRB's). This file kept its own copy until
+    2026-11-22, with vermin and monstrous humanoids under dungeoneering; the CRB files
+    both under nature."""
+    from rules import skilluses
+
+    skill = skilluses.row(skilluses.LORE)["by_type"].get(str(kind or "").lower(), "")
+    return ("Knowledge" + skill[len("knowledge"):]) if skill else ""
 
 
 def _find_creature(c, engine, term, named=False):
@@ -741,7 +738,7 @@ def _find_creature(c, engine, term, named=False):
     if not b:
         return []
     kind = str(b.get("creature_type") or "creature")
-    skill = _KNOWLEDGE.get(kind.lower(), "the Knowledge skill for its kind")
+    skill = _knowledge(kind) or "the Knowledge skill for its kind"
     head = " ".join(str(x) for x in (b.get("name"), "—", b.get("size", ""), kind) if x)
     return [f"CREATURE: {head}, CR {b.get('cr', '?')}.",
             f"  identifying one is a {skill} check, DC 10 + its CR",
@@ -868,7 +865,7 @@ def about_what_is_here(c, engine, question: str):
 
             row = bestiary.lookup(template) or {}
             kind = str(row.get("creature_type") or "")
-        skill = _KNOWLEDGE.get(kind.lower(), "") if kind else ""
+        skill = _knowledge(kind)
         line = "  " + seen
         if skill:
             line += " — a " + kind + "; identifying it is a " + skill + " check"

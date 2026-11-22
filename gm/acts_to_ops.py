@@ -2857,6 +2857,17 @@ def _recall(row: Row, a: dict, scene, pc) -> None:
             nearest(scene, here) if here and getattr(scene, "in_encounter", False) else "")
     who = (getattr(scene, "actors", {}) or {}).get(ref) if ref else None
     if who is None or who is pc:
+        # Not a creature here: a question about the world (round 2, skills-mind), asked
+        # when the world's own index finds the words (`skilluses.knowledge_answer`, whose
+        # Knowledge is the record's own field for what was found).
+        here = str(getattr(scene, "location_id", "") or "")
+        if words and skilluses.topic_in(None, words, here) is not None:
+            row.intents.append({"op": "check", "actor": pc.ref,
+                                "params": {"skill": "knowledge (local)", "about": words,
+                                           "dc": {"band": "average"}},
+                                "because": f"the player tries to recall {words}"})
+            row.note = f"what the world's record holds on {words}"
+            return
         row.note = "a recall of nobody here: nothing to roll"
         return
     row.intents.append({"op": "check", "actor": pc.ref, "target": who.ref,
@@ -3934,7 +3945,45 @@ def apply(raw, rows: list[Row], frame: dict | None, scene, *, notes: list | None
         out.append(b)
     out = fold_price_talk(out, notes)
     out = fold_the_fine(out, scene, notes)
+    aim_the_reads(out, acting, scene, pc, notes)
     return out or [{"op": "narrate_only", "because": "nothing the reading stands behind"}]
+
+
+# The player's own checks whose door reads a subject the plan kept leaving off (round 2,
+# rules/skilluses.py): who is read, and what is appraised or studied.
+_READS_A_PERSON = frozenset({"sense motive"})
+_READS_A_THING = frozenset({"appraise", "spellcraft"})
+
+
+def aim_the_reads(out: list, acting: list, scene, pc, notes: list | None = None) -> None:
+    """A plan's Sense Motive with no target, or Appraise/Spellcraft with no `item`, given
+    the subject the reading names: the person its words find (`person`), else the one
+    the player is dealing with (`addressed`); the thing its `object` names that the player
+    carries. Measured live 2026-11-22 (gemma-4-12B): "I watch Tanna Vell's face closely.
+    Is she lying to me?" was planned `check sense motive` with target null, so the read
+    had nobody to read. Code finds the person; the plan only named the skill."""
+    from rules import tradecraft
+
+    for b in out:
+        if not isinstance(b, dict) or b.get("op") != "check" \
+                or b.get("actor") not in (None, "", "pc", pc.ref):
+            continue
+        p = b.get("params") or {}
+        skill = str(p.get("skill") or "").strip().lower()
+        if skill in _READS_A_PERSON and not b.get("target"):
+            words = [" ".join(str(a.get("target") or "").split()) for a in acting]
+            ref = next((r for r in (person(scene, w) for w in words if w) if r), "") \
+                or addressed(scene)
+            if ref and ref != pc.ref:
+                b["target"] = ref
+                if notes is not None:
+                    notes.append(f"the plan's {skill} read aimed at {ref}")
+        if skill in _READS_A_THING and not p.get("item"):
+            for a in acting:
+                said = " ".join(str(a.get("object") or a.get("target") or "").split())
+                if said and tradecraft.carries(pc, said):
+                    b.setdefault("params", {})["item"] = said
+                    break
 
 
 def _pays_for_the_room(r: dict, acts: set, scene, pc) -> bool:

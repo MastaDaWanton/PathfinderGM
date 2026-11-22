@@ -63,6 +63,7 @@
         {
           "key": "why",
           "secret": true,
+          "kept_by": ["asker"],
           "title": "What $hidden is hiding from",
           "facts": [
             "$hidden is at $lodging and has not left it, because $asker is not owed anything and both of them know it.",

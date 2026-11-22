@@ -831,6 +831,8 @@ the time, the cost and the pay: looking over a thing's make is {"op": "judge", "
 "sailor", "depth": "basic"}} ("complex" for a hard one); haggling with the keeper here is
 {"op": "haggle", "target": "<the keeper's ref>"}; working for pay is {"op": "work",
 "params": {"days": 1, "trade": "<their trade>"}} (7 for a week). Never state the pay.
+Valuing a thing carried is {"op": "check", "params": {"skill": "appraise", "item": "<the
+thing>"}}; the engine says what it is worth.
 Taking armour or a shield off, or putting away what is in hand: {"op": "take_off",
 "actor": "pc", "params": {"item": "armour"}} ("shield", or the thing's name). The engine
 says how long it takes, and a suit does not come off in the middle of a fight.

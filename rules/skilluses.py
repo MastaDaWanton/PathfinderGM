@@ -625,3 +625,574 @@ def dazzling_display(engine, intent, actor, mods, partial):
                     basis="Dazzling Display: each foe's 10 + Hit Dice + Wis",
                     verdict="success" if effects else "failure",
                     margin=roll.total - hardest, effects=effects, tell=" ".join(bits))
+
+
+# =============================================================================================
+# Round 2 (skills-mind lane, 2026-11-22): the mind, social and knowledge skills
+# =============================================================================================
+#
+# The rows are content/rules/skill-uses.json's; the rules text each quotes is the CRB's
+# (d20pfsrd.com/skills/<skill>, read 2026-11-22). docs/research/2026-11-22-skills-mind.md
+# has the prior art and what was left honestly not built: Linguistics (no language is ever
+# a barrier in this game and no foreign or forged writing exists), Use Magic Device (no
+# wand or scroll exists), Handle Animal (a companion obeys in character, the owner's
+# ruling of 2026-10-01).
+
+HUNCH = "skill.sense-motive.hunch"
+ENCHANTMENT = "skill.sense-motive.enchantment"
+LIE = "skill.sense-motive.lie"
+ANSWER = "skill.knowledge.answer"
+APPRAISE = "skill.appraise.value"
+CASTING = "skill.spellcraft.identify-casting"
+ITEM = "skill.spellcraft.identify-item"
+PERFORM = "skill.perform.for-coin"
+
+# What the reads leave on the reader (law 1: asked with has_state, never matched).
+SENSED = "knows.sensed"                  # .<ref>: a read made today; "Retry? No"
+KNOWS_LYING = "knows.lying"              # .<ref>: caught keeping something back
+KNOWS_ENCHANTED = "knows.enchanted"      # .<ref>: seen to be under a spell's sway
+KNOWS_LORE = "knows.lore"                # .<topic>.<field>: recalled
+LORE_TRIED_TOPIC = "lore.tried.topic"    # .<topic>.<field>: tried and nothing came back
+ROUNDS_A_DAY = 14400
+
+
+def _slug(text: str) -> str:
+    import re
+
+    return re.sub(r"[^a-z0-9]+", "-", str(text or "").lower()).strip("-") or "thing"
+
+
+def door_for(intent, actor, skill: str):
+    """The round-2 door a player's own check of this skill takes, or None for the plain
+    check. Each door reads its subject off the intent (its target, `item`, `about`) and
+    refuses with the fix named when there is none to read."""
+    if not getattr(actor, "is_pc", False):
+        return None
+    skill = str(skill or "").strip().lower()
+    if skill == "sense motive":
+        return sense_motive
+    if skill == "appraise":
+        return appraise
+    if skill == "perform":
+        return perform_for_coin
+    if skill == "spellcraft" and intent.params.get("item"):
+        return identify_item
+    return None
+
+
+def asks_the_world(intent) -> bool:
+    """A Knowledge check about something the world's record names (`about`), not about a
+    creature standing here: answered by `knowledge_answer`."""
+    return str(intent.params.get("skill") or "").lower().startswith("knowledge") \
+        and bool(str(intent.params.get("about") or "").strip())
+
+
+# --- Sense Motive -----------------------------------------------------------------------------
+
+_DOMINATING = frozenset({"dominate-person", "dominate-monster", "dominate-animal"})
+
+
+def _enchanted_by(target):
+    """(the spell, dominated) of an enchantment on this body, or (None, False). Read off
+    the effect's own provenance stamp (`ActiveEffect.origin` = `spell:<id>`, written only
+    by a door) and the spell's school, never the condition's words: charm person lands as
+    an `attitude.*` step that a Diplomacy roll could have made too."""
+    from . import spells as spells_mod
+
+    best = None
+    for e in getattr(target, "effects", ()) or ():
+        origin = str(getattr(e, "origin", "") or "")
+        if not origin.startswith("spell:"):
+            continue
+        sid = origin.split(":", 1)[1]
+        try:
+            spell = spells_mod.get(sid)
+        except KeyError:
+            continue
+        if str(spell.school or "").lower() != "enchantment":
+            continue
+        if sid in _DOMINATING:
+            return spell, True
+        best = best or spell
+    return best, False
+
+
+def sense_motive(engine, intent, actor, mods, partial):
+    """The player's own Sense Motive (CRB, Sense Motive), one read of one person:
+
+      * set against that person's Bluff when the engine knows they are keeping something
+        from the player (`schemes.keeps_secret`: a live secret card's `kept_by`, authored
+        in the scheme document, never a model's word that somebody lied);
+      * against DC 25 (15 if dominated) when a spell of enchantment holds them, read off
+        the effect's own `spell:` stamp;
+      * else a hunch, DC 20: whether they are what they seem.
+
+    One roll answers all three. "Retry? No" (one read of a person a day,
+    `knows.sensed.<ref>`). Made, the knowing is a tag on the reader (`knows.lying.<ref>`,
+    `knows.enchanted.<ref>`), and the tell says what was read and nothing more: never
+    what the secret is, which stays the GM's card. Failed, or out-bluffed, the book gives
+    no read at all, and the tell is the same either way: a lie that held reads exactly as
+    nothing to find."""
+    from .activeeffect import ActiveEffect
+    from . import schemes as schemes_mod
+
+    target = _target(engine, intent)
+    if target is None or target.is_pc:
+        return engine._refuse(intent, f"{actor.name} names nobody to read: a Sense Motive is "
+                                      f"made on one person here. Nothing is rolled.")
+    if actor.has_state(f"{SENSED}.{target.ref}"):
+        return engine._refuse(intent, f"{actor.name} has already read {target.name} today; "
+                                      f"looking again tells nothing new. Nothing is rolled.",
+                              code="no_retry")
+    spell, dominated = _enchanted_by(target)
+    hiding = schemes_mod.keeps_secret(engine.scene, target.ref)
+    hunch = dc(HUNCH, target)
+    roll = engine._roll_or_suspend(intent, actor, list(mods),
+                                   label=f"Sense Motive check (reading {target.name})",
+                                   dc=hunch, partial=partial, dc_shown=False)
+    actor.apply_effect(ActiveEffect(
+        name=f"read {target.name}", kind="knowledge", key=f"sensed-{target.ref}",
+        source="rule:sense-motive", origin="rule:sense-motive", duration="rounds",
+        rounds_left=ROUNDS_A_DAY, tags=(f"{SENSED}.{target.ref}",)))
+    rolls, effects, said = [roll], [], []
+    verdict, margin, dc_value, basis = "failure", None, hunch, "a hunch: DC 20"
+    if hiding:
+        try:
+            bluff = target.skill_modifiers("bluff", opposed=True)
+        except Exception:  # noqa: BLE001 — a body with no Bluff on its sheet bluffs at +0
+            bluff = []
+        # Rolled after the player's own die, so a resumed check never rolls it twice.
+        theirs = engine.dice.d20(list(bluff), label=f"{target.name}'s Bluff (keeping it "
+                                                    f"back)", visibility="hidden")
+        rolls.append(theirs)
+        margin = roll.total - theirs.total
+        dc_value, basis = theirs.total, f"against {target.name}'s Bluff"
+        if margin >= 0:
+            verdict = "success"
+            actor.apply_effect(ActiveEffect(
+                name=f"knows {target.name} is keeping something back", kind="knowledge",
+                key=f"lying-{target.ref}", source="rule:sense-motive",
+                origin="rule:sense-motive", tags=(f"{KNOWS_LYING}.{target.ref}",)))
+            effects.append({"ref": actor.ref, "kind": "knowledge", "of": target.ref,
+                            "tag": f"{KNOWS_LYING}.{target.ref}",
+                            "origin": "rule:sense-motive"})
+            said.append(f"{target.name} is not telling {actor.name} the whole truth: "
+                        f"something about the matter is being kept back")
+    if spell is not None:
+        need = dc(ENCHANTMENT, target, dominated=int(dominated))
+        if roll.total >= need:
+            verdict = "success"
+            actor.apply_effect(ActiveEffect(
+                name=f"knows {target.name} is under a spell", kind="knowledge",
+                key=f"enchanted-{target.ref}", source="rule:sense-motive",
+                origin="rule:sense-motive", tags=(f"{KNOWS_ENCHANTED}.{target.ref}",)))
+            effects.append({"ref": actor.ref, "kind": "knowledge", "of": target.ref,
+                            "tag": f"{KNOWS_ENCHANTED}.{target.ref}",
+                            "origin": "rule:sense-motive"})
+            said.append(f"{target.name} is not acting of their own will: "
+                        + ("something has hold of them, and they do as they are bid"
+                           if dominated else "a spell has turned how they feel"))
+        if margin is None:
+            margin, dc_value = roll.total - need, need
+            basis = ("sense enchantment: DC 15, dominated" if dominated
+                     else "sense enchantment: DC 25")
+    if not hiding and spell is None:
+        margin = roll.total - hunch
+        if margin >= 0:
+            verdict = "success"
+            said.append(f"nothing in {target.name}'s manner is off: as far as {actor.name} "
+                        f"can read them, they are what they seem")
+    tell = (f"{actor.name} reads {target.name}: " + "; ".join(said) + "." if said else
+            f"{actor.name} watches {target.name} closely and reads nothing either way.")
+    return _outcome(intent, rolls=rolls, dc_value=dc_value, basis=basis, verdict=verdict,
+                    margin=margin, effects=effects, tell=tell)
+
+
+# --- Knowledge: answering a question from the world's own record -----------------------------
+
+def topic_in(world, about: str, here: str = ""):
+    """The world's best match for the words, or None. Found by the world's own index
+    (play/gm_search.py, BM25 over the export), so every name in an answer is the world's:
+    a question the record has no words for finds nothing, and nothing is rolled. "Here"
+    and "this town" are the settlement the party stands in (`here`, the scene's
+    location), as the /gm door reads them. `world` None is the loaded campaign's."""
+    from play import gm_search
+    from . import residency
+
+    world = residency._world(world)
+    about = " ".join(str(about or "").split())
+    if world is None or not about:
+        return None
+    entity = world.get(here) if here and gm_search.asks_about_here(about) else None
+    if entity is not None:
+        name, kind, facts, text = entity.name, entity.kind, dict(entity.facts or {}), ""
+        tid = entity.id
+    else:
+        hits = gm_search.search(world, about, limit=1)
+        if not hits:
+            return None
+        h = hits[0]
+        entity = world.get(h.entity_id) if h.entity_id else None
+        name, kind, facts, text = h.name, getattr(entity, "kind", "") or h.kind, \
+            dict(h.facts or {}), str(h.text or "")
+        tid = h.entity_id or _slug(f"{h.kind}-{h.name}")
+    return {"id": tid, "name": name, "kind": str(kind or "").lower(), "facts": facts,
+            "text": text, "summary": str(getattr(entity, "summary", "") or "")}
+
+
+def _topic(engine, about: str):
+    return topic_in(getattr(engine, "world", None), about,
+                    str(getattr(engine.scene, "location_id", "") or ""))
+
+
+def _field_of(key: str, kind: str) -> str:
+    r = row(ANSWER)
+    k = " ".join(str(key or "").split()).lower()
+    return r["fields"].get(k) or r["by_kind"].get(kind) or r["by_kind"]["_default"]
+
+
+def _first(text: str, cap: int = 240) -> str:
+    """The first sentence of a fact, at most `cap` characters: a recalled answer, not
+    the record read out."""
+    import re
+
+    t = " ".join(str(text or "").split())
+    m = re.match(r"(.+?[.!?])(\s|$)", t)
+    t = m.group(1) if m else t
+    return t if len(t) <= cap else t[:cap].rsplit(" ", 1)[0] + "…"
+
+
+def answer_field(topic: dict, asked: str, about: str = "") -> tuple[str, list[tuple[str, str]]]:
+    """(the Knowledge that answers it, its facts): the field of a fact the question names
+    by the record's own key ("the history of Branford" names its History), else the
+    plan's field when the subject holds facts in it, else the subject's own field (its
+    kind's), else its fullest field. A fact the record repeats under two keys (World Bible
+    weaves a town's Urban Life into its Social Classes) is told once."""
+    import re
+
+    r = row(ANSWER)
+    by_field: dict[str, list[tuple[str, str]]] = {}
+    seen: set[str] = set()
+    named = ""
+    words = " " + " ".join(re.findall(r"[a-z]+", str(about or "").lower())) + " "
+    for k, v in topic["facts"].items():
+        key = " ".join(str(k).split()).lower()
+        said = " ".join(str(v).split()).lower()
+        if key in r["never"] or said in seen:
+            continue
+        seen.add(said)
+        field = _field_of(k, topic["kind"])
+        by_field.setdefault(field, []).append((k, str(v)))
+        if not named and f" {key} " in words:
+            named = field
+    if named:
+        return named, by_field[named]
+    own = _field_of("", topic["kind"])
+    asked = str(asked or "").strip().lower()
+    if asked in by_field:
+        return asked, by_field[asked]
+    if own in by_field or not by_field:
+        return own, by_field.get(own, [])
+    best = max(by_field, key=lambda f: len(by_field[f]))
+    return best, by_field[best]
+
+
+def knowledge_answer(engine, intent, actor, partial):
+    """Knowledge to answer a question (CRB, Knowledge): "a DC of 10 (for really easy
+    questions), 15 (for basic questions), or 20 to 30 (for really tough questions)"; no
+    retry; untrained, no DC above 10. The subject is the world's (`_topic`); which
+    Knowledge answers is the record's own fact keys (the row's `fields`, `answer_field`).
+    The tiers are the /gm door's (play/gm_search.py `tier_of`) at Knowledge (local)'s own
+    DCs, which that door already uses: what it is and what anybody there knows ("rulers
+    and laws"), DC 10; its rumours ("common rumour"), DC 15; what is kept ("hidden
+    organisations"), DC 20. A
+    person's own `Secret` is never recalled (the row's `never`): it is theirs, not lore.
+    Only what was recalled reaches the tell, and the knowing is a tag on the recaller."""
+    from .activeeffect import ActiveEffect
+    from .sheet import IllegalSheet
+    from . import words
+    from play import gm_search
+
+    r = row(ANSWER)
+    topic = _topic(engine, str(intent.params.get("about") or ""))
+    if topic is None:
+        return engine._refuse(intent, f"Nothing {actor.name} could have heard of goes by "
+                                      f"that name in this world; there is nothing to "
+                                      f"recall. Nothing is rolled.", code="unknown_topic")
+    skill, facts = answer_field(topic, str(intent.params.get("skill") or ""),
+                                str(intent.params.get("about") or ""))
+    key = f"{_slug(topic['id'])}.{_slug(skill)}"
+    if actor.has_state(f"{KNOWS_LORE}.{key}") or actor.has_state(f"{LORE_TRIED_TOPIC}.{key}"):
+        return engine._refuse(intent, f"{actor.name} has already searched their memory for "
+                                      f"what {skill.title()} holds on {topic['name']}; "
+                                      f"thinking on it again teaches nothing new. Nothing is "
+                                      f"rolled.", code="no_retry")
+    tiers = {k: int(v) for k, v in r["tiers"].items()}
+    try:
+        mods, cap = actor.skill_modifiers(skill), None
+    except IllegalSheet:
+        mods, cap = actor.ability_check_modifiers("int"), tiers["really_easy"]
+    roll = engine._roll_or_suspend(intent, actor, list(mods), label=f"{skill.title()} check",
+                                   dc=tiers["really_easy"], partial=partial)
+    total = roll.total if cap is None else min(roll.total, cap)
+    recalled: list[str] = []
+    if total >= tiers["really_easy"]:
+        # World Bible's summary is a role word ("Village", "Person") or a sentence.
+        what = " ".join(str(topic["summary"] or topic["kind"]).split())
+        recalled.append(f"{topic['name']}: {_first(what)}".rstrip(".") if " " in what
+                        else f"{topic['name']} is {words.a(what.lower())}")
+    reach = {gm_search.PUBLIC: "basic", gm_search.RUMOUR: "tough",
+             gm_search.HIDDEN: "really_tough"}
+    # The deepest first: a fact a check reached at 20 is what the roll was for, and the
+    # answer holds `most_facts` at most.
+    deep = {gm_search.HIDDEN: 0, gm_search.RUMOUR: 1, gm_search.PUBLIC: 2}
+    for k, v in sorted(facts, key=lambda kv: deep[gm_search.tier_of(kv[0])]):
+        if total >= tiers[reach[gm_search.tier_of(k)]]:
+            recalled.append(f"{k.lower()}: {_first(v)}".rstrip("."))
+    if not topic["facts"] and topic["text"] and total >= tiers["basic"]:
+        recalled.append(_first(topic["text"]).rstrip("."))
+    recalled = recalled[:1 + int(r["most_facts"])]
+    margin = roll.total - tiers["really_easy"]
+    basis = (f"answer a question in {skill.title()}: 10 what it is and what anybody "
+             f"knows, 15 rumour, 20 what is kept" + (" (untrained: no higher than 10)"
+                                                     if cap else ""))
+    fx = {"ref": actor.ref, "kind": "lore", "of": topic["id"], "field": skill,
+          "facts": len(recalled), "origin": "rule:knowledge-answer"}
+    if not recalled:
+        actor.apply_effect(ActiveEffect(
+            name=f"tried to recall {topic['name']}", kind="knowledge", key=f"lore-tried-{key}",
+            source="rule:knowledge-answer", origin="rule:knowledge-answer",
+            tags=(f"{LORE_TRIED_TOPIC}.{key}",)))
+        return _outcome(intent, rolls=[roll], dc_value=tiers["really_easy"], basis=basis,
+                        verdict="failure", margin=margin, effects=[fx],
+                        tell=f"{actor.name} searches their memory for {topic['name']} and "
+                             f"nothing of it comes back.")
+    actor.apply_effect(ActiveEffect(
+        name=f"recalls {topic['name']}", kind="knowledge", key=f"lore-{key}",
+        source="rule:knowledge-answer", origin="rule:knowledge-answer",
+        tags=(f"{KNOWS_LORE}.{key}",), payload={"facts": recalled, "about": topic["id"]}))
+    return _outcome(intent, rolls=[roll], dc_value=tiers["really_easy"], basis=basis,
+                    verdict="success", margin=margin, effects=[fx],
+                    tell=f"{actor.name} recalls what {skill.title()} holds on "
+                         f"{topic['name']}: " + "; ".join(recalled) + ".")
+
+
+# --- Appraise ---------------------------------------------------------------------------------
+
+def _worth_gp(actor, name: str) -> float:
+    """The thing's open-counter worth, by the one pricing door: its own record (forged,
+    bought, enchanted) or a stock jar, else the Core tables by name."""
+    from . import pricing
+    from . import tradecraft
+
+    rec = tradecraft._record(actor, name)
+    if rec:
+        return float(pricing.worth(rec))
+    for st in (getattr(actor, "stock", None) or {}).values():
+        if str(getattr(st, "name", "") or "").strip().lower() == name.strip().lower():
+            return float(pricing.worth(st))
+    return float(pricing.goods_worth(name))
+
+
+def appraise(engine, intent, actor, mods, partial):
+    """Appraise a thing carried (CRB, Appraise): "A DC 20 Appraise check determines the
+    value of a common item. If you succeed by 5 or more, you also determine if the item
+    has magic properties ... If you fail the check by less than 5, you determine the price
+    of that item to within 20% of its actual value. If you fail this check by 5 or more,
+    the price is wildly inaccurate." A standard action; "additional attempts to Appraise
+    an item reveal the same result" (the first answer is kept in `Scene.dealings`, the
+    judge's own store). The value is the pricing door's (`pricing.worth`), the number every
+    counter pays by; a miss is that number moved by a hidden roll inside the row's band."""
+    from . import goods
+    from . import tradecraft
+
+    owner = engine.scene.actors.get(intent.target or "") or actor
+    said = str(intent.params.get("item") or "").strip()
+    name = tradecraft.carries(owner, said) if said else ""
+    if not name:
+        return engine._refuse(intent, (f"{owner.name} is not carrying {said}" if said else
+                                       f"{actor.name} names nothing to appraise")
+                              + ": an Appraise is made on a thing in hand. Nothing is rolled.")
+    key = tradecraft.dealing_key("appraise", actor.ref, name.lower())
+    seen = engine.scene.dealings.get(key)
+    if seen:
+        return _outcome(intent, tell=str(seen.get("tell") or ""))
+    spent = _no_action_left(engine, actor, "standard", "an appraisal")
+    if spent:
+        return engine._refuse(intent, spent + " Nothing is rolled.", code="action_spent")
+    out = row(APPRAISE)["outcome"]
+    value_dc = dc(APPRAISE, actor)
+    roll = engine._roll_or_suspend(intent, actor, list(mods), label="Appraise check",
+                                   dc=value_dc, partial=partial)
+    _spend_action(engine, actor, "standard")
+    margin = roll.total - value_dc
+    true_gp = _worth_gp(owner, name)
+    seen_gp = true_gp
+    if margin < 0:
+        lo, hi = out["near_miss"] if margin > -5 else out["wild"]
+        pct = engine.dice.roll("1d100", label="Appraise's error", visibility="hidden").total
+        seen_gp = true_gp * (float(lo) + (float(hi) - float(lo)) * (pct - 1) / 99.0)
+    seen_cp = int(round(seen_gp * 100))
+    worth = goods.purse_line(goods.coins_for(seen_cp), engine._coins_here())
+    if margin >= 0:
+        tell = f"{actor.name} appraises {name} (Appraise {roll.total}): it is worth {worth}."
+        if margin >= int(out["magic_by"]):
+            tell += (" And there is magic in it." if tradecraft.is_magic(owner, name)
+                     else " There is no magic in it.")
+    else:
+        tell = (f"{actor.name} appraises {name} (Appraise {roll.total}) and puts it at "
+                f"{worth}.")
+    engine.scene.dealings[key] = {"tell": tell, "said_cp": seen_cp}
+    return _outcome(intent, rolls=[roll], dc_value=value_dc, basis="a common item: DC 20",
+                    verdict="success" if margin >= 0 else "failure", margin=margin,
+                    effects=[{"ref": actor.ref, "kind": "appraised", "item": name,
+                              "said_cp": seen_cp, "origin": "rule:appraise"}], tell=tell)
+
+
+# --- Spellcraft -------------------------------------------------------------------------------
+
+def identify_item(engine, intent, actor, mods, partial):
+    """Spellcraft to identify a magic item's properties, in play: the one identify there
+    is (`knowledge.identify`, the circle bench's own door: DC 15 + the item's caster
+    level, the curse at 10 over, once per item per day) handed this roll. The bench and
+    the table are one rule and one record (`magic.known` on the item), not two."""
+    from . import knowledge as knowledge_mod
+    from . import tradecraft
+
+    said = str(intent.params.get("item") or "").strip()
+    name = tradecraft.carries(actor, said) if said else ""
+    rec = tradecraft._record(actor, name) if name else None
+    if not rec:
+        return engine._refuse(intent, f"{actor.name} has no magic item called "
+                                      f"{said or 'that'} in hand to study. Nothing is "
+                                      f"rolled.")
+    try:
+        need = knowledge_mod.identify_dc(rec)
+    except Exception:  # noqa: BLE001 — a record with no layer has no caster level to read
+        need = 15
+    roll = engine._roll_or_suspend(intent, actor, list(mods),
+                                   label=f"Spellcraft check (identify {name})", dc=need,
+                                   partial=partial)
+    day = engine.scene.clock_minutes // (24 * 60)
+    got = knowledge_mod.identify(actor, rec, roll.total, day=day)
+    result = got.get("result")
+    if result == "none":
+        tell = f"{actor.name} studies {name}: there is no magic in it to know."
+    elif result == "fail":
+        tell = (f"{actor.name} studies {name} and cannot make out what its magic does; "
+                f"another day may tell more.")
+    else:
+        tell = f"{actor.name} studies {name} and learns what its magic does."
+        if result == "curse":
+            tell += (f" And more: {got.get('curse')}." if got.get("cursed")
+                     else " There is no curse on it.")
+    return _outcome(intent, rolls=[roll], dc_value=int(got.get("dc") or need),
+                    basis="identify a magic item: 15 + its caster level",
+                    verdict="failure" if result == "fail" else "success",
+                    margin=got.get("margin"),
+                    effects=[{"ref": actor.ref, "kind": "identified", "item": name,
+                              "result": result, "learned": list(got.get("learned") or ()),
+                              "origin": "rule:spellcraft-identify"}], tell=tell)
+
+
+def _same_side(scene, a, b) -> bool:
+    if a.has_state("bond.travels-with-you"):
+        return True
+    return any(a.ref in refs and b.ref in refs for refs in (scene.sides or {}).values())
+
+
+def identify_casting(engine, out, caster, spell, level) -> dict | None:
+    """Spellcraft to identify a spell as it is being cast (CRB: DC 15 + spell level, no
+    action, no retry, "you must clearly see the spell as it is being cast"): each player
+    character trained in Spellcraft who sees a cast made by somebody not on their side
+    rolls it. A cast nobody here identified names no spell: the cast's own tell says "a
+    spell" where it said the spell's name, so the narrator cannot say what the character
+    does not know. Amends the tell and rolls of `out` in place and returns the record of
+    the attempt for its effects, or None when nobody here watched."""
+    from . import awareness
+
+    scene = engine.scene
+    if caster is None or caster.is_pc or not spell or not getattr(spell, "name", ""):
+        return None
+    watchers = [a for a in scene.actors.values()
+                if a.is_pc and a is not caster and not a.is_down
+                and awareness.sees(scene, a, caster)]
+    if not watchers or _same_side(scene, caster, watchers[0]):
+        return None
+    need = dc(CASTING, caster, spell_level=int(level or 0))
+    knew = []
+    for pc in watchers:
+        if not int((pc.ranks or {}).get("spellcraft", 0) or 0):
+            continue                     # trained only
+        roll = engine.dice.d20(list(pc.skill_modifiers("spellcraft")),
+                               label=f"{pc.name}'s Spellcraft (identify the casting)",
+                               visibility="hidden")
+        out.rolls.append(roll)
+        if roll.total >= need:
+            knew.append(pc.name)
+    if knew:
+        out.tell = (f"{out.tell} {' and '.join(knew)} knows the casting at once: "
+                    f"{spell.name}.").strip()
+    else:
+        out.tell = out.tell.replace(spell.name, "a spell", 1).replace(spell.name, "the spell")
+    return {"kind": "identified", "spell": spell.id, "by": list(knew), "dc": need,
+            "origin": "rule:spellcraft-identify"}
+
+
+# --- Perform ----------------------------------------------------------------------------------
+
+def perform_for_coin(engine, intent, actor, mods, partial):
+    """Perform to earn money (CRB, Perform): the book's table, DC 10 a routine performance
+    (1d10 cp), 15 enjoyable (1d10 sp), 20 great (3d10 sp), 25 memorable (1d6 gp), 30
+    extraordinary (3d6 gp), for an evening's work in a settlement. "Retries are allowed,
+    but they don't negate previous failures": each failure today puts +2 on every row
+    of the next attempt (`Scene.dealings`). The coin goes to the purse, the evening to
+    the clock and the body (`Engine._work_hours`, a day's work's own door)."""
+    from . import goods
+    from . import places as places_mod
+    from . import tradecraft
+
+    r = row(PERFORM)
+    scene = engine.scene
+    if scene.initiative:
+        return engine._refuse(intent, "Not in the middle of a fight.")
+    loc = engine.world.get(scene.location_id) if (engine.world and scene.location_id) else None
+    if loc is None or places_mod.setting_of(scene.at) != "in":
+        return engine._refuse(intent, "There is nobody out here to pay for a performance: "
+                                      "performing for coin is done in a settlement. Nothing "
+                                      "is rolled.")
+    day = scene.clock_minutes // (24 * 60)
+    key = tradecraft.dealing_key("perform", actor.ref, day)
+    failed = int((scene.dealings.get(key) or {}).get("failed", 0))
+    table = sorted(((int(d), pay) for d, pay in r["table"].items()), reverse=True)
+    lowest = table[-1][0] + 2 * failed
+    roll = engine._roll_or_suspend(intent, actor, list(mods), label="Perform check (for coin)",
+                                   dc=lowest, partial=partial)
+    worked, body = engine._work_hours(actor, int(r["hours"]))
+    got = next((pay for d, pay in table if roll.total >= d + 2 * failed), None)
+    coins = engine._coins_here()
+    town = getattr(loc, "name", "") or "the town"
+    paid = 0
+    if got is None:
+        scene.dealings[key] = {"failed": failed + 1}
+        tell = (f"{actor.name} performs in {town} through the evening (Perform "
+                f"{roll.total}) and nobody stops to pay.")
+    else:
+        paid = engine.dice.roll(got["dice"], label="Perform's takings",
+                                visibility="hidden").total * int(got["cp_each"])
+        actor.purse = goods.credit(actor.purse, paid)
+        tell = (f"{actor.name} performs in {town} through the evening, {got['said']} "
+                f"(Perform {roll.total}), and takes "
+                f"{goods.purse_line(goods.coins_for(paid), coins)}. {actor.name} now has "
+                f"{goods.purse_line(actor.purse, coins)} in hand.")
+    if body:
+        tell += f" The evening costs them: {body}."
+    return _outcome(intent, rolls=[roll], dc_value=lowest,
+                    basis="earn a living: DC 10, 15, 20, 25, 30 by the book's table"
+                          + (f", +{2 * failed} for today's failures" if failed else ""),
+                    verdict="success" if got else "failure", margin=roll.total - lowest,
+                    effects=[{"ref": actor.ref, "kind": "time", "minutes": worked * 60,
+                              "origin": "rule:perform"},
+                             {"ref": actor.ref, "kind": "earned", "paid_cp": paid,
+                              "origin": "rule:perform"}],
+                    tell=tell)

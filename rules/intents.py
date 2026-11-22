@@ -313,7 +313,12 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                            "sought", "seeking",
                            # Lane E (2026-11-22): a skill use with its own row and door
                            # (rules/skilluses.py OWN_DOORS); `square` is where a tumble goes.
-                           "feint", "tumble", "care", "display", "square"),
+                           "feint", "tumble", "care", "display", "square",
+                           # Round 2 (skills-mind): the thing appraised or studied, and
+                           # the subject a Knowledge question is about: names the engine
+                           # grounds (`tradecraft.carries`, the world's own index), never
+                           # a fact it takes on trust (rules/skilluses.py).
+                           "item", "about"),
               "player"),
     "save": (("save", "dc"), ("on_success", "on_failure", "breaks"), "player"),
     # `player`, because the PC rolls their own to-hit and their own damage. Defaulting

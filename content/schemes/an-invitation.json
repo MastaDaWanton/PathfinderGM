@@ -62,6 +62,7 @@
         {
           "key": "house",
           "secret": true,
+          "kept_by": ["elder", "heir"],
           "title": "What $elder is really asking",
           "facts": [
             "$elder means to pass the house to $heir and knows the rest of the household will not have it said by anyone who lives in it.",

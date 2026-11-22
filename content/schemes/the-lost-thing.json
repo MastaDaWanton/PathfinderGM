@@ -71,6 +71,7 @@
         {
           "key": "truth",
           "secret": true,
+          "kept_by": ["giver"],
           "title": "Who really has the $lost",
           "facts": [
             "$rival, $giver's own kin, took the $lost and is out at $wild with it.",

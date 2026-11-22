@@ -582,7 +582,7 @@ journey   take the road or a ship to another town; book or take passage, board a
 leave     walk or climb out of where you are — a building, ground gone down into (a
           cellar, a crypt, a cave), or the settlement itself — with nowhere
           else named
-look      look, watch, listen, read, examine; `recall`: recalling a creature's lore
+look      look, watch, listen, read, examine; `recall`: recalling what you know
 search    look for a THING or a PLACE (a way in, somewhere to sleep). `where` is
           here for going over where you are or a part of it (a room, its walls or
           floor, a ship's hold, the ground here) for anything hidden or lost, else
@@ -1503,7 +1503,8 @@ def per_act_schema() -> dict:
                  # Whether the move tumbles past somebody's reach (lane E), a closed
                  # boolean after the place's words, as `within_place`.
                  **({"tumble": {"type": "boolean"}} if act == "go" else {}),
-                 # Whether a look is recalling what a creature is (lane E, monster lore).
+                 # Whether a look is recalling what one knows: a creature here (lane E, monster
+                 # lore) or a thing the world names (round 2, `skilluses.knowledge_answer`).
                  **({"recall": {"type": "boolean"}} if act == "look" else {}),
                  # Which fixture of the room the walk is to (`fixture_kinds`), a closed
                  # enum after `within_place`: the map places one the room lacks

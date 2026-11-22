@@ -76,6 +76,7 @@
         {
           "key": "prognosis",
           "secret": true,
+          "kept_by": ["healer"],
           "title": "What $healer is not saying to $sick",
           "facts": [
             "$healer has seen this before and knows how fast it goes: the $herb is worth having within days, not weeks.",
