@@ -309,10 +309,10 @@
         {"text": "It is what other people roll against your Stealth. Their number is never shown.",
          "file": "gm/judgement.py", "find": "return {\"ref\": max(pool, key=lambda r: _perception(actors[r])), \"skill\": \"perception\"}"},
         {"text": "Search a dungeon room and the roll is set against the hidden ways and armed traps there and one room on.",
-         "file": "rules/dungeons.py", "find": "def searched(engine, pc, total: int)", "use": "skill.perception.traps"}
-      ],
-      "not_yet": "Spotting an ambush before a fight: there is no surprise round yet.",
-      "not_yet_uses": ["skill.perception.ambush"]
+         "file": "rules/dungeons.py", "find": "def searched(engine, pc, total: int)", "use": "skill.perception.traps"},
+        {"text": "When something lies in wait on the road, in the wild, the water or a lair, your Perception is rolled in secret against its Stealth. Beaten, you are surprised: it acts first and you lose the opening round.",
+         "file": "rules/surprise.py", "find": "def decide(engine, sides: dict, ambushers=())", "use": "skill.perception.ambush"}
+      ]
     },
     "perform": {
       "name": "Perform",
@@ -388,7 +388,9 @@
         {"text": "Strike from hiding at range and you roll Stealth at -20 to keep them from knowing who did it.",
          "file": "rules/attitude.py", "find": "[Modifier(-20, \"sniping, to stay hidden\")]"},
         {"text": "Win the roll and you stay hidden from those you beat, until they find you, you attack, or you leave.",
-         "file": "rules/engine.py", "find": "def _stealth_lands(self, actor, roll, opposed, won: bool,", "use": "skill.stealth.hidden"}
+         "file": "rules/engine.py", "find": "def _stealth_lands(self, actor, roll, opposed, won: bool,", "use": "skill.stealth.hidden"},
+        {"text": "Open a fight from hiding on someone who never found you and you get the surprise round: one action before they can act.",
+         "file": "rules/surprise.py", "find": "a combatant is aware when it sees, or has a hunch of, at least one opponent"}
       ]
     },
     "survival": {

@@ -55,7 +55,9 @@ def _journey(engine, to: str = "Zhilvarnia", **params):
     res = engine.run(engine.validate(
         [{"op": "journey", "actor": "pc", "because": "passage",
           "params": {"to": to, **params}}], origin="author:test"))
-    return res.outcomes[-1]
+    # The journey's own outcome: a meeting that opens a fight with a surprise round is
+    # told behind it in its own outcome (rules/surprise.py).
+    return [o for o in res.outcomes if o.op != "surprise"][-1]
 
 
 def test_the_two_continents_are_a_passage_apart_both_ways():

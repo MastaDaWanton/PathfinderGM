@@ -185,6 +185,9 @@ WANTED = "state.wanted"
 SUSPECTED = "state.suspected"
 GUARD = "role.guard"
 BYSTANDER = "role.bystander"
+# The surprise round's two states (TAGS "surprised" / "surprise round", rules/surprise.py).
+SURPRISED = "state.unable.surprised"
+ONE_ACTION_TURN = "turn.one-action"
 # Sells what they carry, once each (tbaMUD's keeper selling off `keeper->carrying`): a
 # carter with a cart of goods, no counter and no shelf of its own. The trade panel opens
 # across them and lists their `goods`; `Engine._buy_carried` moves the real line. Granted by
@@ -457,6 +460,16 @@ TAGS: dict[str, tuple[str, ...]] = {
     # `tables.CONDITIONS`; no `recovery.rest` — a night's sleep leaves you in the pit.
     "in a pit":    ("state.position.pit",),
     "flat-footed": ("state.position.flat-footed", "recovery.rest", "state.exposed"),
+    # The surprise round (CRB, Combat, "Surprise"; rules/surprise.py). An unaware combatant
+    # "doesn't get to act in the surprise round": `state.unable`, so `can_act` says no and
+    # the order walks past them; flat-footed they already are, for not having acted
+    # (`Engine._flat_footed`), so no `state.exposed` here — uncanny dodge still keeps Dex.
+    # The aware take "a standard action or a move action ... You can also take free
+    # actions" — a turn of one action, `ONE_ACTION_TURN`, read by
+    # `Engine._one_action_refusal`. Both last the one round, on the one ticker, and
+    # `Scene.end_encounter` lifts them when the fight ends inside it.
+    "surprised":   (SURPRISED,),
+    "surprise round": (ONE_ACTION_TURN,),
     "bleed":       ("state.wound.bleeding",),
     # A poison or a disease running in the body (Core Rulebook, Afflictions, pp. 555-557):
     # saved against on its frequency until it is cured or runs out. Not a condition of
