@@ -2344,6 +2344,21 @@ def _power_acts(s, d: dict, slot: str, on: bool, held_weapon: bool) -> list[dict
     return out
 
 
+def _copy_acts(pc, s, d: dict) -> list[dict]:
+    """A wizard's "Copy into spellbook" on a scroll's row (`api/spells/copy`), offered only
+    while the copy would be allowed (`spellitems.copy_plan`)."""
+    from rules import spellitems
+
+    if spellitems.kind_of(s) != "scroll":
+        return []
+    c = _live_of(pc)
+    clock = int(c.scene.clock_minutes or 0) if c is not None else None
+    if spellitems.copy_plan(pc, s, clock=clock)["refused"]:
+        return []
+    return [{"label": "Copy into spellbook", "api": "/api/spells/copy",
+             "body": {"item": d["id"]}}]
+
+
 def _forged_weapon_line(rec: dict) -> list[str]:
     """A forged weapon's facts for its Equipment row: the base weapon's dice, type and crit,
     then each of the forge's own numbers by the piece it comes from ("+4 damage, forged iron
@@ -2703,6 +2718,7 @@ def _carried(pc) -> list[dict]:
             else:
                 acts += by_name(d["name"], slot)
         acts += _power_acts(s, d, slot, bool(on), held_weapon)
+        acts += _copy_acts(pc, s, d)
         # A finished wondrous item is used by its power, never drunk: on the magic shelf it
         # passed `usable`, and live (2026-10-30) a looted cloak of resistance and a bought
         # pot of war paint each offered "Drink".
@@ -3569,6 +3585,63 @@ def learnable_spells(request):
                     "save": sp.saving_throw, "line": sp.line}
                    for lvl, sp in casting.learnable(pc)],
     })
+
+
+@require_POST
+def copy_spell(request):
+    """A wizard copies a scroll into the spellbook (`spellitems.copy_plan` /
+    `resolve_copy`): POST `{"item": <stock id>}`. An hour of study and the writing pass on
+    the clock, the Spellcraft check is rolled on the table's die (visible to the player),
+    and the writing's cost is paid only for a spell written. Out of a fight only."""
+    from rules import spellitems
+    from rules.dice import Modifier
+
+    c = campaign_mod.current()
+    pc = c.scene.pc()
+    if pc is None:
+        return JsonResponse({"error": "nobody is being played"}, status=409)
+    if c.scene.in_encounter:
+        return JsonResponse({"error": "Not in the middle of a fight: copying a spell takes "
+                                      "hours of quiet."}, status=409)
+    if c.scene.awaiting:
+        return JsonResponse({"error": "There is a roll waiting on you."}, status=409)
+    refusal = _cannot_act(pc, "copy a spell")
+    if refusal:
+        return refusal
+    key = str(read_body(request).get("item") or "")
+    st = (pc.stock or {}).get(key)
+    if st is None:
+        return JsonResponse({"error": "That scroll is not in your pack."}, status=409)
+    now = int(c.scene.clock_minutes or 0)
+    plan = spellitems.copy_plan(pc, st, clock=now)
+    if plan["refused"]:
+        return JsonResponse({"error": " ".join(plan["refused"])}, status=409)
+    from rules import goods
+
+    if goods.in_copper(pc.purse) < int(round(plan["cost_gp"] * 100)):
+        return JsonResponse({"error": f"Writing it costs {plan['cost_gp']:g} gp in inks, and "
+                                      f"you cannot pay it."}, status=409)
+    from rules import spells as spells_mod
+
+    name = spells_mod.get(plan["spell"]).name
+    mods = list(pc.skill_modifiers("spellcraft")) + [
+        Modifier(t["value"], t["label"]) for t in plan["bonus_terms"]]
+    roll = c.engine().dice.d20(mods, label=f"Spellcraft: copy {name} (DC {plan['dc']})",
+                               visibility="player")
+    got = spellitems.resolve_copy(pc, key, roll.total, clock=now)
+    c.scene.advance(int(plan["minutes"]))
+    if got["success"]:
+        tell = (f"{pc.name} studies the {st.name} and writes {name} into the spellbook. The "
+                f"scroll's writing fades from the vellum as the last line dries.")
+    else:
+        tell = (f"{pc.name} studies the {st.name}, but {name} will not come clear. The "
+                f"scroll is untouched; another try must wait a week.")
+    c.transcript.append({"who": "gm", "kind": "consequence", "text": tell})
+    if c.character_id:
+        roster.record(c.character_id, pc)
+    c.save()
+    return JsonResponse({"ok": True, "tell": tell, "copied": got["success"],
+                         "roll": roll.as_dict(), "sheet": _sheet_payload(pc)})
 
 
 @require_POST

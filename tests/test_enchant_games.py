@@ -33,8 +33,10 @@ CONTRACTS = ROOT / "docs" / "enchanting-contracts.md"
 HERB_GAMES = ROOT / "play" / "static" / "js" / "bench-games"
 FORGE_GAMES = ROOT / "play" / "static" / "js" / "forge-games"
 
-METHODS = ["prepare", "attune", "bind", "refine", "unbind", "cleanse"]
-ORDER_GAMES = ["prepare", "unbind", "cleanse"]
+# Scribe and Wand (spell-items lane, 2026-11-22) play Prepare's order game with their own
+# pieces, so every rule below holds of them as of Prepare.
+METHODS = ["prepare", "attune", "bind", "refine", "unbind", "cleanse", "scroll", "wand"]
+ORDER_GAMES = ["prepare", "unbind", "cleanse", "scroll", "wand"]
 HERB_METHODS = ["grind", "mix", "brew", "dry", "reduce", "extract", "infuse", "steep", "neutralize"]
 FORGE_METHODS = ["smelt", "alloy", "forge", "quench", "temper", "fold", "hone", "assemble", "finish",
                  "strengthen"]
@@ -101,7 +103,9 @@ def test_steady_mode_declares_no_hold(method):
     js = _read(_game(method))
     assert _list(js, "HOLDS_STEADY") == [] and _list(js, "HOLDS") == []
     assert _list(js, "KEYS"), f"{method}.js listens for no key: not playable by keyboard"
-    assert re.search(r"ctx\.steady\b", _code(js)), f"{method}.js ignores Steady mode"
+    # Scribe and Wand hand the whole game to Prepare's, which reads it.
+    assert re.search(r"ctx\.steady\b", _code(js)) or "defs.prepare.create.call(this, ctx)" in js, \
+        f"{method}.js ignores Steady mode"
 
 
 @pytest.mark.parametrize("method", METHODS)
@@ -121,6 +125,8 @@ def test_every_game_draws_shapes_and_its_own_aim(method):
     a saw edge, not only red), and no game depends on the cursor art (the candle cursor's hotspot
     drifted in 0.2.2): each draws its zones through the kit's shapes and its own reticle."""
     code = _code(_read(_game(method)))
+    if "defs.prepare.create.call(this, ctx)" in code:
+        code = _code(_read(_game("prepare")))      # Scribe and Wand draw with Prepare's game
     assert re.search(r"k\.(dialBand|barBand|ring|notch|pip)\(", code)
     assert "k.reticle(" in code and "ctx.pointer" in code, f"{method}.js draws no aim of its own"
 
@@ -255,7 +261,7 @@ vm.createContext(sandbox);
 for (const f of files) vm.runInContext(fs.readFileSync(f, "utf8"), sandbox);
 const W = sandbox.window, BG = W.BenchGames;
 const DT = 1 / 60;
-const ENCHANT = ["prepare", "attune", "bind", "refine", "unbind", "cleanse"];
+const ENCHANT = ["prepare", "attune", "bind", "refine", "unbind", "cleanse", "scroll", "wand"];
 const stub = new Proxy({}, {
   get(t, k) {
     if (k === "measureText") return (s) => ({ width: String(s).length * 6.5 });
@@ -284,6 +290,8 @@ const DEFAULTS = {
   refine: {},
   unbind: { seq: ["sigil", "sigil", "enhancement"] },
   cleanse: { seq: ["sigil", "sigil", "sigil"] },
+  scroll: { seq: ["quarter", "ink", "sigil", "enhancement", "bell"] },
+  wand: { seq: ["quarter", "sigil", "enhancement", "sigil", "bell"] },
 };
 
 function sim(method, o) {
@@ -359,6 +367,10 @@ const MOUSE = {
     const m = st.marks.find((x) => x.turn === st.step && !x.gone); io.click(m.x, m.y);
   },
 };
+// Scribe and Wand are Prepare's order game with other pieces: the same bots play them.
+KEYS.scroll = KEYS.wand = KEYS.prepare;
+ARROWS.scroll = ARROWS.wand = ARROWS.prepare;
+MOUSE.scroll = MOUSE.wand = MOUSE.prepare;
 // The reduced-motion player: hears only the counted beat ("3", "2", "1", "Now") and presses
 // one beat after "1", by the rhythm the first three set. It never reads where anything is.
 function rhythm() {

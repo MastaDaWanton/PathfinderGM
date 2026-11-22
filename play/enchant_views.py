@@ -235,7 +235,20 @@ def _state_body(c, pc) -> dict:
         # The enchanting manuals carried, for the footer's Manuals button (POST
         # api/enchant/manual reads one).
         "manuals": manual_reader.carried(pc, knowledge.ENCHANTER),
+        # The spells Scribe and Wand may write at this level, known ones first (the
+        # working's spell picker; `rules/spellitems.options`).
+        "spell_items": _spell_item_options(pc, int(progress.level)),
     }
+
+
+def _spell_item_options(pc, level: int) -> dict:
+    from rules import spellitems
+
+    out = {}
+    for kind in ("scroll", "wand"):               # each method is named for what it makes
+        if en.method_level(kind) <= level:
+            out[kind] = spellitems.options(pc, en.spell_item_cap(level, kind), kind)
+    return out
 
 
 def _ready(request):

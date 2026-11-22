@@ -395,7 +395,9 @@ retired from the shelf (`kind: vessel` kept loadable, never offered). Working tr
 
 ## 6. Bench rules and API (lane E serves, wave 2 UI consumes)
 
-Methods (revamp plan §10): `prepare, attune, bind, refine, unbind, cleanse, read, identify`.
+Methods (revamp plan §10): `prepare, attune, bind, refine, unbind, cleanse, read, identify, scroll, wand`.
+(Scribe, method `scroll`, and Wand: the spell-items lane, 2026-11-22, `rules/spellitems.py`; each is one step with
+an order game, its work In progress for the book's time.)
 Levels, perks (`potency`, `quality`, `yield`, `capacity`), ceilings, the check (three terms, no
 naturals), the DC through `magic_layer.plan`, the failure table (plan §10.1), quality capped by
 Prepare and Attune + 1, places through `places.for_scene` (a sanctum tag; a hired circle's rent

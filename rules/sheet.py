@@ -1369,9 +1369,10 @@ class Actor:
             m = holder.get("magic")
             if not (isinstance(m, dict) and m.get("uses")):
                 continue
+            # A wand's charges are a count too, never a day's (`spellitems`, CRB Wands).
             once = {str(p.get("key")) for p in (magic_layer.layer(holder).get("powers")
                                                  or ())
-                    if str(p.get("uses") or "").strip().lower() == "once"}
+                    if str(p.get("uses") or "").strip().lower() in ("once", "charges")}
             m["uses"] = {k: v for k, v in m["uses"].items() if k in once}
         # The forge's limited finishes by the same rule (`finish_uses.new_day`): a wyroot
         # haft's daily spark back, a spent blanch still spent.

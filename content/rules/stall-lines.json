@@ -69,7 +69,7 @@
       "blacksmith": ["fuel", "flux", "quenchant", "treatment"],
       "alchemist": ["solvent", "salt", "catalyst", "vessel", "treatment"],
       "leatherworker": ["tannin", "oil", "wax", "thread", "treatment"],
-      "enchanter": ["ink", "chalk", "salt", "catalyst", "treatment"]
+      "enchanter": ["ink", "chalk", "salt", "catalyst", "treatment", "vellum", "blank"]
     },
     "made_from": {
       "blacksmith": ["ore", "metal", "alloy", "fitting"],

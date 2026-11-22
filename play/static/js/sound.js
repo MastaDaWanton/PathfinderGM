@@ -1137,6 +1137,13 @@
     cleanse: function (c) {      // salt sprinkled, and the drop that carries it
       grains(c, { n: 8, span: 0.2, f: 4800, q: 1, type: "highpass", peak: 0.01, d: 0.005 });
       return drop(c, { at: 0.18, f: k(c, [650, 700, 610]), peak: 0.018 });
+    },    scroll: function (c) {       // the pen dipped, and a nib's first scratch
+      drop(c, { f: k(c, [720, 760, 690]), peak: 0.016 });
+      return noise(c, { at: 0.12, type: "highpass", f: 2800, q: 1.2, peak: 0.02, d: 0.06 });
+    },
+    wand: function (c) {         // a slim baton tapped on the bench, then turned in the hand
+      knock(c, { f: k(c, [520, 560, 490]), peak: 0.06, lp: 2200, d: 0.025 });
+      return noise(c, { at: 0.07, f: 1600, q: 2.5, peak: 0.02, d: 0.05 });
     },
   };
   Object.keys(ENCHANT_METHOD).forEach(function (m) {

@@ -947,13 +947,21 @@ def magic_item_goods() -> list[Good]:
 
     The owner's ruling of 2026-10-30: sell the new items in magic shops. Before it no
     counter sold any catalogue wondrous item, Core or ours (docs/own-items.md)."""
-    from . import materials
+    from . import materials, spellitems
 
-    return [Good(id=PREFIXES["magic"] + rid, name=str(row["name"]),
-                 price_gp=float(row.get("price_gp") or 0),
-                 tier=str(row.get("tier") or "common"), staple=False, kind="magic", key=rid)
-            for rid, row in sorted(materials.recipes().items())
-            if float(row.get("price_gp") or 0) > 0]
+    out = [Good(id=PREFIXES["magic"] + rid, name=str(row["name"]),
+                price_gp=float(row.get("price_gp") or 0),
+                tier=str(row.get("tier") or "common"), staple=False, kind="magic", key=rid)
+           for rid, row in sorted(materials.recipes().items())
+           if float(row.get("price_gp") or 0) > 0]
+    # And the classic scrolls and wands (`spellitems.SOLD`), at the book's price: the
+    # circle's Scribe and Wand make them, and a counter that sells magic sells these.
+    for key, st in spellitems.sold():
+        entry = spellitems.entry_of(st) or {}
+        out.append(Good(id=PREFIXES["magic"] + key, name=st.name,
+                        price_gp=float(entry.get("price_gp") or 0), tier=st.tier,
+                        staple=False, kind="magic", key=key))
+    return out
 
 
 def catalogue_ids() -> set[str]:

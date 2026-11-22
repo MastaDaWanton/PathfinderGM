@@ -1084,7 +1084,8 @@ def learn_problems(actor, spell_ids) -> list[str]:
         return ["Choose at least one spell."]
     if not owed["owed"]:
         return [f"{name} has no spells owed for the levels gained. Spells beyond those "
-                f"are copied into the book from a scroll or another book."]
+                f"are copied into the book from a scroll: Copy into spellbook, on the "
+                f"scroll's Equipment row."]
     problems: list[str] = []
     if len(set(ids)) != len(ids):
         problems.append("The same spell was chosen twice; choose a different one.")

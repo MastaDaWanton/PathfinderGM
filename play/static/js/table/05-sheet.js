@@ -2471,7 +2471,7 @@ async function eqAct(btn) {
   let said = "", bad = false;
   try {
     const d = await post(act.api, act.body);
-    if (act.api === "/api/use") {
+    if (act.api === "/api/use" || act.api === "/api/spells/copy") {
       said = d.tell || "";
       if (d.sheet) SHEET = d.sheet;
       render(await getState());
@@ -2485,7 +2485,7 @@ async function eqAct(btn) {
       said = d.wear_tell || d.trade_tell || "";
       render(d);
     }
-    if (act.api !== "/api/use" && act.api !== "/api/slots") SHEET = await readJSON(await fetch("/api/sheet"));
+    if (act.api !== "/api/use" && act.api !== "/api/slots" && act.api !== "/api/spells/copy") SHEET = await readJSON(await fetch("/api/sheet"));
   } catch (err) {
     said = err.message || String(err);
     bad = true;

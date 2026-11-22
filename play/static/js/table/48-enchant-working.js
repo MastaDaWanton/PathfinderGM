@@ -45,7 +45,7 @@
   var CHOICE = { creature_type: "Against", damage_type: "Energy", skill: "Skill" };
   // Which shelf group an empty slot takes from (the server's `group` on each row).
   var PICK = { seat: "Essences", essence: "Essences", vessel: "Vessels", item: "Vessels",
-               circle: "Circle", focus: "Gems", catalyst: "Catalysts" };
+               circle: "Circle", focus: "Gems", catalyst: "Catalysts", blank: "Blanks" };
   function cap(t) { t = String(t || ""); return t.charAt(0).toUpperCase() + t.slice(1); }
   function words(t) { return cap(String(t || "").replace(/-/g, " ")); }
 
@@ -100,6 +100,7 @@
     if (m === "attune" || m === "bind") html += seatRows(m);
     if (m === "bind") html += bindExtras();
     if (m === "refine") html += dropper();
+    if (m === "scroll" || m === "wand") html += spellItemSlots(m);
     if (m === "read") {
       var es = E.item(o.essence);
       html += (es ? filled("Essence", es, "essence") :
@@ -213,9 +214,36 @@
     return html;
   }
 
-  function dropper() {
-    var o = E.order, keys = Object.keys(o.phials), html = '<h3 class="ew-h">The dropper</h3>';
-    if (!keys.length) return html + empty("Phials", "Two or more phials of one essence family, from the shelf", { pick: "essence" });
+  // Scribe and Wand (rules/enchanter.py `_build_spell_item`): the spell, typed or picked
+  // from the server's list (`state.spell_items`, known spells first), the vellum or the
+  // blank, a scroll's ink, and the phials for whatever motes the spell's price asks.
+  function spellItemSlots(m) {
+    var o = E.order, opts = ((E.state || {}).spell_items || {})[m] || [];
+    var cur = opts.filter(function (r) { return r.id === o.spell; })[0];
+    var html = '<h3 class="ew-h">' + (m === "scroll" ? "The scroll" : "The wand") + '</h3>' +
+      '<label class="ew-slot is-full ew-spell"><span class="ew-label">Spell</span>' +
+      '<input type="text" id="enchant-spell" list="enchant-spells" autocomplete="off" spellcheck="false"' +
+      ' placeholder="Type or pick a spell" value="' + esc(cur ? cur.name : "") + '"></label>' +
+      '<datalist id="enchant-spells">' + opts.map(function (r) {
+        return '<option value="' + esc(r.name) + '">' + esc((r.level ? "level " + r.level : "cantrip") +
+          (r.known ? ", known" : "")) + '</option>';
+      }).join("") + '</datalist>';
+    var label = m === "scroll" ? "Vellum" : "Blank", b = E.item(o.blank);
+    html += b ? filled(label, b, "blank")
+              : empty(label, m === "scroll" ? "A sheet of scroll vellum from the shelf" : "A wand blank from the shelf",
+                      { pick: "blank" });
+    if (m === "scroll") {
+      var ink = E.item(o.ink);
+      html += ink ? filled("Ink", ink, "ink") : empty("Ink", "An ink from the shelf to write with", { pick: "circle" });
+    }
+    return html + dropper(true);
+  }
+
+  function dropper(forMotes) {
+    var o = E.order, keys = Object.keys(o.phials), html = '<h3 class="ew-h">' + (forMotes ? "Essence for the motes" : "The dropper") + '</h3>';
+    if (!keys.length) return html + (forMotes
+      ? empty("Phials", "Only if the spell's price asks motes: essence from the shelf", { pick: "essence", optional: true })
+      : empty("Phials", "Two or more phials of one essence family, from the shelf", { pick: "essence" }));
     return html + '<ul class="ew-parts">' + keys.map(function (k) {
       var it = E.item(k);
       if (!it) return "";
@@ -456,5 +484,11 @@
       return;
     }
     if (e.target.id === "enchant-hurry") E.setHurry(e.target.checked);
+    if (e.target.id === "enchant-spell") {
+      var name = String(e.target.value || "").trim().toLowerCase();
+      var opts = ((E.state || {}).spell_items || {})[E.order.method] || [];
+      var hit = opts.filter(function (r) { return r.name.toLowerCase() === name; })[0];
+      E.setSpell(hit ? hit.id : name.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""));
+    }
   });
 })();

@@ -246,9 +246,13 @@ def finished(recipe_id: str, *, how: str = "bought"):
     one power. `how` is "bought" — a counter's item is known for what it is and known to be
     clean — or "found": nothing about it is known (lane F's convention, `known = {}`), and
     it is identified the way any found item is. Raises KeyError for no recipe."""
-    from . import magic_layer, materials
+    from . import magic_layer, materials, spellitems
     from .crafting import Stock
 
+    # A scroll or a wand off a magic counter (`spellitems.SOLD`, "scroll:<spell>").
+    spell_item = spellitems.from_good_key(recipe_id, how=how)
+    if spell_item is not None:
+        return spell_item
     row = materials.recipe(recipe_id)
     if row is None:
         raise KeyError(f"no wondrous item {recipe_id!r}")

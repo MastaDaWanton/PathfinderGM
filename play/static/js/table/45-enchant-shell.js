@@ -52,18 +52,18 @@
   // The methods themselves, their order, names and locks are the server's (`state.methods`).
   // What is here is copy: the Roll button's words, the flat stand-in's name for the step, and
   // the empty working's sentence. Keys 1-8 pick the eight methods in order (UI plan §6.1).
-  var KEYS = ["1", "2", "3", "4", "5", "6", "7", "8"];
+  var KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
   var ROLL = { prepare: "Roll Prepare", attune: "Roll Attune", bind: "Roll Bind",
                refine: "Roll Refine", unbind: "Roll Unbind", cleanse: "Roll Cleanse",
-               read: "Read", identify: "Identify" };
+               read: "Read", identify: "Identify", scroll: "Roll Scribe", wand: "Roll Wand" };
   var TOOL = { prepare: "the circle", attune: "the seats", bind: "the binding",
                refine: "the dropper", unbind: "the sigils", cleanse: "the curse",
-               read: "a pinch", identify: "the study" };
+               read: "a pinch", identify: "the study", scroll: "the pen", wand: "the blank" };
   // Two letters per method on the roundel: Read and Refine share an R, and at 1280 wide the
   // strip is icons only (bench.css). The engraved art waits on the owner's icon approval
   // (UI plan Q-UI1); a lettered roundel is the bench's own fallback, not a broken mask.
   var ABBR = { prepare: "Pr", attune: "At", bind: "Bi", refine: "Rf", unbind: "Ub",
-               cleanse: "Cl", read: "Rd", identify: "Id" };
+               cleanse: "Cl", read: "Rd", identify: "Id", scroll: "Sc", wand: "Wa" };
   // The ritual's path (UI plan §6.1: "Prepare, then Attune, then Bind", the herb bench's
   // next-step button). Which step a vessel is ready for follows from its state, which is
   // the server's word on the shelf row.
@@ -86,7 +86,8 @@
   };
   function blank(method) {
     return { method: method || null, vessel: "", circle: [], focus: "", seats: {}, choices: {},
-             catalyst: "", hurry: false, phials: {}, essence: "", item: "", recipe: "" };
+             catalyst: "", hurry: false, phials: {}, essence: "", item: "", recipe: "",
+             spell: "", blank: "", ink: "" };
   }
   E.order = blank(null);
   var subs = {};
@@ -195,6 +196,8 @@
     o.circle.forEach(function (k) { if (k === key) n += 1; });
     if (o.focus === key) n += 1;
     if (o.catalyst === key) n += 1;
+    if (o.blank === key) n += 1;
+    if (o.ink === key) n += 1;
     return n;
   };
 
@@ -531,6 +534,11 @@
       body.phials = Object.assign({}, o.phials);
     } else if (m === "unbind" || m === "cleanse") {
       body.vessel = o.vessel;
+    } else if (m === "scroll" || m === "wand") {
+      // A scroll or a wand: the spell chosen in the working, the vellum or blank, the ink
+      // (a scroll's) and the phials for the motes (rules/enchanter.py `_build_spell_item`).
+      body.spell = o.spell; body.blank = o.blank; body.phials = Object.assign({}, o.phials);
+      if (m === "scroll") body.ink = o.ink;
     }
     if (extra) Object.keys(extra).forEach(function (k) { body[k] = extra[k]; });
     return body;
@@ -577,7 +585,7 @@
     }
     if (it.group === "Essences") {
       var left = (it.count || 0) - E.inOrder(key);
-      if (m === "refine") {
+      if (m === "refine" || m === "scroll" || m === "wand") {
         if (left <= 0) { E.say("All your " + it.name + " is in the dropper already."); return false; }
         o.phials[key] = (o.phials[key] || 0) + 1;
         E.say(it.name + " in the dropper, " + o.phials[key] + " in all.");
@@ -602,7 +610,14 @@
         E.sound("enchant.seat");
         return changed(it);
       }
-      return refuse(it, "essences go in at Attune or Refine");
+      return refuse(it, "essences go in at Attune, Refine, Scribe or Wand");
+    }
+    if (m === "scroll" || m === "wand") {
+      var want = m === "scroll" ? "vellum" : "blank";
+      if (it.kind === want) { o.blank = key; E.say(it.name + " laid in the circle."); return changed(it); }
+      if (m === "scroll" && it.kind === "ink") { o.ink = key; E.say(it.name + " set beside the vellum."); return changed(it); }
+      return refuse(it, m === "scroll" ? "a scroll takes a sheet of vellum, an ink and essences"
+                                       : "a wand takes a wand blank and essences");
     }
     if (m === "prepare") {
       if (it.kind === "focus") { o.focus = key; E.say(it.name + " set as the focus."); return changed(it); }
@@ -650,6 +665,8 @@
     else if (what === "focus") o.focus = "";
     else if (what === "catalyst") o.catalyst = "";
     else if (what === "essence") o.essence = "";
+    else if (what === "blank") o.blank = "";
+    else if (what === "ink") o.ink = "";
     else if (what === "item") o.item = "";
     else if (what === "phial") {
       o.phials[key] = (o.phials[key] || 0) - 1;
@@ -661,6 +678,14 @@
     if (E.busy || E.live) return;
     var c = E.order.choices[seat] = E.order.choices[seat] || {};
     if (value === "" || value == null) delete c[k]; else c[k] = value;
+    E.emit("order");
+    E.runCheck();
+  };
+  // The spell a scroll or a wand will hold: an id from the state's `spell_items` list.
+  E.setSpell = function (id) {
+    if (E.busy || E.live) return;
+    E.order.spell = String(id || "");
+    E.result = null;
     E.emit("order");
     E.runCheck();
   };

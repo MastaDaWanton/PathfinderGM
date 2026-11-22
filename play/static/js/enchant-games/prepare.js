@@ -25,7 +25,9 @@
     catalyst: "Catalyst", bell: "Bell" };
   var POOL = ["chalk", "salt", "ink", "treatment", "focus", "catalyst", "bell"];
   var GLANCE = 0.47, LIMIT = 3, COST = 0.34;
-  function nameOf(kind) { return NAMES[kind] || (kind.charAt(0).toUpperCase() + kind.slice(1)); }
+  function nameOf(kind, names) {
+    return (names || NAMES)[kind] || (kind.charAt(0).toUpperCase() + kind.slice(1));
+  }
 
   defs.prepare = {
     id: "prepare",
@@ -41,8 +43,13 @@
     // the chalk's stroke. The miss is the circle's one muffled bowl (`enchant.miss`).
     SOUNDS: { hit: "enchant.chalk", chalk: "enchant.chalk", salt: "enchant.salt",
               ink: "enchant.ink", bell: "enchant.bell", miss: "enchant.miss" },
+    // Scribe and Wand play this same game with their own pieces (scribe.js, wand.js: the
+    // spell-items lane, 2026-11-22, the study's "calligraphy: the strokes in order"): a def
+    // that names its own NAMES and POOL is read through `this`, as the frame calls
+    // `def.create(ctx)`.
     create: function (ctx) {
       var k = ctx.kit, C = ctx.C, steady = ctx.steady;
+      var names = (this && this.NAMES) || NAMES, pool = (this && this.POOL) || POOL;
       var seq = (ctx.seq || []).map(function (s) { return String(s || "").toLowerCase(); })
         .filter(function (s) { return s; }).slice(0, 8);
       if (!seq.length) seq = ["chalk", "ink", "bell"];
@@ -52,7 +59,7 @@
       // number key means the same piece for the whole game.
       var kinds = [];
       seq.forEach(function (s) { if (kinds.indexOf(s) < 0) kinds.push(s); });
-      var decoys = POOL.filter(function (p) { return kinds.indexOf(p) < 0; });
+      var decoys = pool.filter(function (p) { return kinds.indexOf(p) < 0; });
       var want = Math.min(6 - Math.min(6, kinds.length), ctx.difficulty > 0.5 ? 2 : 1);
       for (var d = 0; d < want && decoys.length; d++) kinds.push(decoys.splice(Math.floor(ctx.rng() * decoys.length), 1)[0]);
       kinds = kinds.slice(0, 6);
@@ -120,7 +127,7 @@
         hint: function () {
           if (step >= n) return null;
           if (t < glanceEnd) return "Watch the order";
-          return "Piece " + (step + 1) + " of " + n + (shown[step] && !steady ? ": " + nameOf(seq[step]) : "");
+          return "Piece " + (step + 1) + " of " + n + (shown[step] && !steady ? ": " + nameOf(seq[step], names) : "");
         },
         progress: function () { return step / n; },
         state: function () {
@@ -171,7 +178,7 @@
             g.restore();
             k.glyph(g, kinds[q], cx, ty - th * 0.12, Math.min(9, th * 0.22), C.ink, 1.4);
             k.text(g, String(q + 1), cx - tw / 2 + 5, ty - th / 2 + 8, C, { size: 12, colour: C.dim });
-            if (th >= 38) k.text(g, nameOf(kinds[q]), cx, ty + th / 2 - 8, C, { size: 12, align: "center", colour: C.dim });
+            if (th >= 38) k.text(g, nameOf(kinds[q], names), cx, ty + th / 2 - 8, C, { size: 12, align: "center", colour: C.dim });
           }
           var p = ctx.pointer;
           if (p.inside && p.y >= 0 && p.y <= H) k.reticle(g, p.x, p.y, C, p.down);

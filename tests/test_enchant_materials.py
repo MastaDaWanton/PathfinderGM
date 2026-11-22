@@ -358,11 +358,12 @@ def test_scaled_recipes_are_lane_as_documents(recipes):
 
 
 def test_vessels_are_retired_from_the_shelf():
-    """Plan §7.3: a vessel is a real item record now, picked from the rack; the seven
-    vessel rows stay loadable for old saves and say they are retired."""
+    """Plan §7.3: a vessel is a real item record now, picked from the rack; the vessel rows
+    stay loadable for old saves and say they are retired. Seven until 2026-11-22, when the
+    wand blank came back as the Wand method's own `blank` (the spell-items lane)."""
     vessels = [d for d in materials.all().values() if d["kind"] == "vessel"
                and d["catalogue"] == materials.ENCHANT_CATALOGUE]
-    assert len(vessels) == 7
+    assert len(vessels) == 6
     assert all(d["retired"] for d in vessels)
 
 

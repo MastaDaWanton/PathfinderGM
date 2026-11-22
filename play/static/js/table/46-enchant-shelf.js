@@ -49,7 +49,8 @@
 
   // The groups, as the server sends them (`state.shelf`), in the enchanter's order.
   var ORDER = [["intermediates", "Prepared and attuned"], ["vessels", "Vessels"], ["essences", "Essences"],
-               ["circle", "Circle"], ["gems", "Gems"], ["catalysts", "Catalysts"]];
+               ["circle", "Circle"], ["blanks", "Vellum and blanks"], ["gems", "Gems"],
+               ["catalysts", "Catalysts"]];
 
   function amount(it) {
     var have = it.amount != null ? it.amount : it.count;

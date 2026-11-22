@@ -6612,8 +6612,21 @@ class Engine:
         Only a drink that will go down: no dose carried, or no action left, is refused by
         the op with nothing provoked."""
         params = raw.get("params") or {}
-        if params.get("power") or params.get("reaction"):
+        if params.get("reaction"):
             return []
+        if params.get("power"):
+            # Reading a scroll provokes "exactly as casting a spell does" (CRB, Magic
+            # Items, Spell Completion); a wand's trigger and every other power does not.
+            actor = self.scene.actors.get(str(raw.get("actor") or ""))
+            if actor is None:
+                return []
+            _rec, _lay, row, why = self._power_of(actor, str(params.get("item") or ""),
+                                                  str(params["power"]))
+            spec = (row or {}).get("spec") or {}
+            if why or spec.get("activation") != "completion":
+                return []
+            return self._provoked_by_casting({"op": "cast", "actor": actor.ref,
+                                              "params": {"spell": spec.get("spell")}})
         how = str(params.get("how") or "drink").strip().lower()
         actor = self.scene.actors.get(str(raw.get("actor") or ""))
         if actor is None or how not in self._DRINKS:
@@ -25734,6 +25747,145 @@ class Engine:
         state["rolls"].extend(r.as_dict() for r in res.rolls or [])
         return out
 
+    def _spell_item_gate(self, intent: Intent, actor: Actor, rec: dict, spec: dict, name: str,
+                         origin: str, rolls: list, tells: list) -> Outcome | None:
+        """Who may set off a scroll or a wand (CRB, Magic Items; Use Magic Device), asked
+        before a use is counted. None means the cast goes ahead; an Outcome is the reader's
+        failure, with the scroll kept and the wand's charge unspent.
+
+        Spell completion (a scroll, `activation.completion`): the spell on the reader's
+        class list, of the reader's tradition ("arcane spellcasters ... can only use
+        scrolls containing arcane spells"), and the score for its level; a reader whose
+        caster level is below the scroll's makes a caster level check, DC scroll CL + 1, a
+        natural 1 always failing; on a failure a DC 5 Wisdom check avoids a mishap, and
+        the mishap is the book's first, "a surge of uncontrolled magical energy deals 1d6
+        points of damage per spell level to the scroll user" (the GM's pick among seven;
+        the engine takes the one with a number, an owner call).
+        Spell trigger (a wand, `activation.trigger`): the spell on the class list.
+        Anyone else: Use Magic Device, trained only, DC 20 + the scroll's caster level or
+        DC 20 for a wand; a scroll's spell also needs the score, emulated by a second check
+        ("your effective ability score equals your Use Magic Device check result minus
+        15"); "if you ever roll a natural 1 while attempting to activate an item and you
+        fail, then you can't try to activate that item again for 24 hours"; a failed check
+        spends nothing ("Failing the roll does not expend a charge"). The scroll's own
+        caster level check is not asked of a Use Magic Device reader: the DC 20 + CL is it
+        (an owner call: the book does not say). legacy.aonprd.com/coreRulebook/
+        magicItems/scrolls.html, wands.html, skills/useMagicDevice.html, read 2026-11-22.
+        """
+        from . import armour, casting
+
+        try:
+            spell = spells_mod.get(str(spec.get("spell") or ""))
+        except KeyError:
+            return None                     # the cast door refuses it in its own words
+        kind = str(spec.get("item_kind") or "")
+        level = int(spec.get("level") or 0)
+        item_cl = int(spec.get("caster_level") or 1)
+        rid = str(rec.get("id") or rec.get("name"))
+        now = int(self.scene.clock_minutes or 0)
+        mag = rec.get("magic") if isinstance(rec.get("magic"), dict) else {}
+        visible = "player" if actor.is_pc else "hidden"
+
+        def stop(kind_: str, words: str, more: tuple = (), **extra) -> Outcome:
+            return Outcome(intent_id=intent.id, op="use_item",
+                           rolls=[_roll_from_dict(r) for r in rolls],
+                           effects=[{"ref": actor.ref, "kind": kind_, "item": rid,
+                                     "spell": spell.id, "origin": origin, **extra},
+                                    *more],
+                           tell=" ".join(tells + [words]).strip(), because=intent.because)
+
+        until = (mag.get("blundered") or {}).get(actor.ref)
+        if until is not None and now < int(until):
+            return self._refuse(intent, f"The {name} will not answer {actor.name} again "
+                                        f"until a day has passed since the fumble.",
+                                code="item_power")
+        if not (mag.get("known") or {}).get("intent"):
+            return self._refuse(intent, f"The {name} is not deciphered yet: what it holds "
+                                        f"is unknown. Identify it at the circle first.",
+                                code="item_power")
+        own = casting.is_caster(actor) and casting.on_class_list(actor, spell)
+        if own and kind == "scroll":
+            mine = "arcane" if armour.is_arcane(actor) else "divine"
+            own = mine == str(spec.get("tradition") or mine)
+        if own:
+            if kind != "scroll":
+                return None
+            ability = casting.casting_ability(actor)
+            need = 10 + int(casting.spell_level_for(actor, spell) or level)
+            if level > 0 and actor.ability_score(ability) < need:
+                return self._refuse(intent, f"{actor.name} needs {ability.title()} {need} to "
+                                            f"cast {spell.name} from the {name}.",
+                                    code="item_power")
+            mine_cl = casting.caster_level(actor)
+            if mine_cl >= item_cl:
+                return None
+            roll = self.dice.d20([Modifier(mine_cl, "caster level")],
+                                 label=f"Caster level check ({name}, DC {item_cl + 1})",
+                                 visibility=visible)
+            rolls.append(roll.as_dict())
+            if roll.faces[0] != 1 and roll.total >= item_cl + 1:
+                tells.append(f"{actor.name} strains to hold writing above their own craft, "
+                             f"and the words come out whole.")
+                return None
+            wis = self.dice.d20([Modifier(actor.ability_mod("wis"), "Wisdom")],
+                                label="Wisdom (DC 5) to keep the scroll's magic in hand",
+                                visibility=visible)
+            rolls.append(wis.as_dict())
+            if wis.total >= 5:
+                return stop("spell_item_failed",
+                            f"The words of the {name} slide out of {actor.name}'s grasp "
+                            f"half-said, and the magic will not come. The writing stays.")
+            hurt = self._run_within(self.validate(
+                [{"op": "damage", "actor": actor.ref, "visibility": "hidden",
+                  "because": f"the {name} misfires",
+                  "params": {"to": actor.ref, "amount": f"{max(1, level)}d6",
+                             "type": "untyped"}}],
+                origin=origin, origin_name=name))
+            for o in hurt:
+                rolls.extend(r.as_dict() for r in o.rolls or [])
+            return stop("spell_item_mishap",
+                        f"The {name} misfires: uncontrolled magic lashes back through "
+                        f"{actor.name}. The writing stays.",
+                        more=tuple(x for o in hurt for x in o.effects or ()))
+        # Use Magic Device: trained only (CRB Table 4-2), and its first resolved use.
+        if not actor.ranks.get("use magic device") and actor.printed_skill(
+                "use magic device") is None:
+            how = "read" if kind == "scroll" else "work"
+            return self._refuse(intent, f"{spell.name} is not a spell {actor.name} casts, "
+                                        f"and only someone trained in Use Magic Device can "
+                                        f"{how} a {kind} of it anyway.", code="item_power")
+        dc = 20 + item_cl if kind == "scroll" else 20
+        roll = self.dice.d20(actor.skill_modifiers("use magic device"),
+                             label=f"Use Magic Device ({name}, DC {dc})", visibility=visible)
+        rolls.append(roll.as_dict())
+        if roll.total < dc:
+            extra = {}
+            words = (f"{actor.name} works at the {name}, but the magic does not "
+                     f"recognise them.")
+            if roll.faces[0] == 1:
+                # The book's 24 hours, kept on the item's layer, its one record.
+                for holder in actor.item_records(rid):
+                    holder["magic"].setdefault("blundered", {})[actor.ref] = now + 1440
+                extra["barred_until"] = now + 1440
+                words += " It will not answer them again for a day."
+            return stop("spell_item_failed", words, check="use magic device", **extra)
+        if kind == "scroll" and level > 0:
+            ability = "int" if str(spec.get("tradition") or "") == "arcane" else "wis"
+            if actor.ability_score(ability) < 10 + level:
+                second = self.dice.d20(actor.skill_modifiers("use magic device"),
+                                       label=f"Use Magic Device, emulating "
+                                             f"{ability.title()} {10 + level}",
+                                       visibility=visible)
+                rolls.append(second.as_dict())
+                if second.total - 15 < 10 + level:
+                    return stop("spell_item_failed",
+                                f"{actor.name} coaxes the {name} awake but cannot carry "
+                                f"its words through to the end.",
+                                check="use magic device")
+        tells.append(f"{actor.name} talks the {name} into answering a hand it was not "
+                     f"made for.")
+        return None
+
     def _use_power(self, intent: Intent, partial: dict) -> Outcome:
         """Use one power of a worn or wielded magic item: count the use, then run it.
 
@@ -25775,6 +25927,16 @@ class Engine:
         origin = f"item:{rec_id}"
         spec = dict(row.get("spec") or {})
         what = _property_word(spec)
+        # A scroll or a wand (`rules/spellitems.py`): who may set it off is the book's
+        # spell completion or spell trigger rule, asked before a use is counted, so a
+        # reader who cannot work it keeps the scroll and the wand its charge.
+        gate_rolls: list = []
+        gate_tells: list[str] = []
+        if not resuming and spec.get("activation"):
+            stopped = self._spell_item_gate(intent, actor, rec, spec, name, origin,
+                                            gate_rolls, gate_tells)
+            if stopped is not None:
+                return stopped
         count = _uses_per_day(row)
         left = None
         spent = ""
@@ -25800,6 +25962,17 @@ class Engine:
                 spent = (f" The {name}'s {what} is spent for good." if _used_once(row)
                          else f" The {name} has {left} use{'s' if left != 1 else ''} of "
                               f"its {what} left today.")
+                if str(row.get("uses") or "") == "charges":
+                    # A wand's charges (CRB Wands: 50, each one use of the spell). A stack
+                    # of wands shares one layer, so the count is the wand in hand's: at
+                    # none it is a stick, taken off the stack, and the next starts fresh.
+                    spent = f" The {name} has {left} charge{'s' if left != 1 else ''} left."
+                    if left <= 0 and sid:
+                        actor.take_stock(sid, 1)
+                        for holder in actor.item_records(rec_id):
+                            holder["magic"].setdefault("uses", {})[str(row["key"])] = 0
+                        used_up = True
+                        spent = f" The {name}'s last charge is spent; it is only a stick now."
         record = {"ref": actor.ref, "kind": "item_power", "item": rec_id,
                   "power": str(row.get("key")), "origin": origin,
                   **({"left": left} if left is not None else {}),
@@ -25812,7 +25985,9 @@ class Engine:
             except KeyError:
                 return self._refuse(intent, f"The {name}'s power names a spell the Spells "
                                             f"bench does not have ({spec['spell']}).")
-            level = min((int(v) for v in (spell.lists or {}).values()), default=0)
+            # A scroll or a wand says the level it was written at (its tradition's list).
+            level = (int(spec["level"]) if spec.get("level") is not None
+                     else min((int(v) for v in (spell.lists or {}).values()), default=0))
             if not (spec.get("caster_level") or (lay or {}).get("caster_level")):
                 # No caster level written: the lowest that can cast the spell (CRB, Magic
                 # Item Creation), as a potion's is (`consumables`). It was 1, so a 3rd-level
@@ -25832,9 +26007,11 @@ class Engine:
             import dataclasses
 
             out = self._op_cast(cast, partial)
+            said = (out.tell + spent).strip() if spent else out.tell
             return dataclasses.replace(
                 out, op="use_item", effects=[record] + list(out.effects or []),
-                tell=(out.tell + spent).strip() if spent else out.tell)
+                rolls=[_roll_from_dict(r) for r in gate_rolls] + list(out.rolls or []),
+                tell=" ".join(gate_tells + [said]).strip())
 
         effects: list[dict] = [record]
         tells: list[str] = []

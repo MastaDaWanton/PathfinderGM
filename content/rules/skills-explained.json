@@ -502,9 +502,12 @@
     "use magic device": {
       "name": "Use Magic Device",
       "book": "Make a wand, scroll or magic item work for you when it was not made for your kind.",
-      "uses": [],
-      "not_yet": "There are no wands or scrolls to find or buy yet (only potions, which anybody can drink), so nothing calls for it.",
-      "not_yet_uses": ["skill.use-magic-device.activate"]
+      "uses": [
+        {"text": "Read a scroll or set off a wand your class does not cast: DC 20 + the scroll's caster level, or DC 20 for a wand. A second check emulates a scroll's ability score. A failure spends nothing; a natural 1 that fails locks you out for a day.",
+         "file": "rules/engine.py", "find": "def _spell_item_gate(", "use": "skill.use-magic-device.activate"}
+      ],
+      "not_yet": "Activating an item blind, emulating a race or an alignment, and deciphering a written spell are not built: the circle's Identify reads a found scroll instead.",
+      "not_yet_uses": ["skill.use-magic-device.blind", "skill.use-magic-device.emulate-race", "skill.use-magic-device.decipher"]
     }
   }
 }

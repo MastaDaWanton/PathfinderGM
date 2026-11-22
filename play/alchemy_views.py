@@ -1148,7 +1148,11 @@ def alchemy_learn(request):
         hidden = not _potion_known(pc, st)
         potion_name = st.name
     elif source == "scroll":
-        if st is None or not getattr(st, "holds_spell", None) or "drink" in (st.how or []):
+        from rules import spellitems
+
+        # A wand holds a spell and no writing (`spellitems.kind_of`, the item's tag).
+        if st is None or not getattr(st, "holds_spell", None) or "drink" in (st.how or []) \
+                or spellitems.kind_of(st) == "wand":
             return _err("Hold a scroll to copy from.", 409)
         fid = (formulae.for_spell(st.holds_spell) or {}).get("id", "")
     elif source == "spellbook":
@@ -1541,8 +1545,11 @@ def alchemy_formulary(request):
     _t, progress = _progress(pc)
     known = [r for r in (_formula_row(pc, f, progress.level) for f in formulae.known(pc)) if r]
     writings = []
+    from rules import spellitems
+
     for sid, st in sorted((pc.stock or {}).items()):
-        if not getattr(st, "holds_spell", None) or int(st.count or 0) <= 0:
+        if not getattr(st, "holds_spell", None) or int(st.count or 0) <= 0 \
+                or spellitems.kind_of(st) == "wand":
             continue
         route = "potion" if "drink" in (st.how or []) or getattr(st, "craft", "") == TRACK_ID \
             else "scroll"

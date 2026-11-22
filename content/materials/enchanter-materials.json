@@ -5283,18 +5283,29 @@
    "why_retired": "Retired 2026-10-05 (enchanting plan §7.3): a vessel is a real item record now, picked from the rack; this entry stays loadable for old saves and is never offered."
   },
   {
-   "id": "wand-vessel",
-   "name": "Wand Blank (vessel)",
-   "kind": "vessel",
-   "tier": "rare",
-   "requires": "a masterwork wand blank of coldwood or bone",
+   "id": "scroll-vellum",
+   "name": "Scroll Vellum",
+   "kind": "vellum",
+   "tier": "common",
    "obtain": "bought",
-   "price_gp": 200,
-   "text": "A masterwork wand blank. Wand work leans on the spell side of the craft, which this bench does not model yet; the vessel is listed so the material exists when it does.",
+   "price_gp": 1,
+   "text": "A sheet of scraped, chalked calfskin, smooth enough to take a fine line. The circle's Scribe method writes one spell on it, and it becomes a scroll.",
    "effects": [],
    "drawbacks": [],
-   "retired": true,
-   "why_retired": "Retired 2026-10-05 (enchanting plan §7.3): a vessel is a real item record now, picked from the rack; this entry stays loadable for old saves and is never offered."
+   "_note": "Spell-items lane 2026-11-22. The CRB's parchment is 2 sp a sheet; 1 gp is the materials price floor for a common thing (tests/test_enchant_materials.py), so vellum is dearer than parchment. The study asked for vellum from the leatherworker; the tannery's Cut has no vellum pattern yet, so it is bought (an owner call)."
+  },
+  {
+   "id": "wand-vessel",
+   "name": "Wand Blank",
+   "kind": "blank",
+   "tier": "common",
+   "requires": "a thin baton of coldwood or bone, six to twelve inches",
+   "obtain": "bought",
+   "price_gp": 5,
+   "text": "A thin baton of coldwood or bone, six to twelve inches and lighter than an ounce. The circle's Wand method binds one spell into it, with fifty charges.",
+   "effects": [],
+   "drawbacks": [],
+   "_note": "Un-retired 2026-11-22 (spell-items lane) as the wand's vessel: the study's simplest source, a bought blank (docs/item-creation-feats-study.md Q7, an owner call). The book prices no blank; 5 gp is ours, and it counts toward the wand's half-price cost. Old saves holding the retired 200 gp row read it as this."
   },
   {
    "id": "amulet-vessel",

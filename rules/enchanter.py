@@ -421,9 +421,9 @@ def _family_phase(family: str) -> str:
 
 
 # The kinds of circle material (plan §7.3), as the old shelf names them.
-CIRCLE_KINDS = ("chalk", "salt", "ink", "treatment", "catalyst", "focus")
+CIRCLE_KINDS = ("chalk", "salt", "ink", "treatment", "catalyst", "focus", "vellum", "blank")
 _GROUPS = {"chalk": "Circle", "salt": "Circle", "ink": "Circle", "treatment": "Circle",
-           "catalyst": "Catalysts", "focus": "Gems"}
+           "catalyst": "Catalysts", "focus": "Gems", "vellum": "Blanks", "blank": "Blanks"}
 
 
 @dataclass
@@ -726,6 +726,7 @@ def shelf(actor, now: int = 0) -> dict:
         "circle": [c for c in circle if c["group"] == "Circle"],
         "gems": [c for c in circle if c["group"] == "Gems"],
         "catalysts": [c for c in circle if c["group"] == "Catalysts"],
+        "blanks": [c for c in circle if c["group"] == "Blanks"],
         "cant_use": bad,
     }
 
@@ -876,6 +877,13 @@ class StepPlan:
     days: int = 0
     name_after: str = ""
     lifts: list[str] = field(default_factory=list)
+    # Scribe and Wand (`rules/spellitems.py`): the spell, the tradition and level it is
+    # written at, its minimum caster level, and the coin the half price asks past the motes.
+    spell: str = ""
+    tradition: str = ""
+    spell_level: int = 0
+    item_cl: int = 0
+    coin_cp: int = 0
 
     @property
     def can_roll(self) -> bool:
@@ -1024,11 +1032,14 @@ def _recipe_needs_met(rec_doc: dict, seated: list[Phial]) -> list[str]:
 
 
 def _spells_held(actor) -> dict[str, str]:
-    """{spell id: stock key} for every carried potion or scroll holding a spell."""
+    """{spell id: stock key} for every carried potion or scroll holding a spell. A wand is
+    not spent whole for one spell's worth (`spellitems.kind_of`)."""
+    from . import spellitems
+
     out = {}
     for sid, st in (getattr(actor, "stock", {}) or {}).items():
         sp = str(getattr(st, "holds_spell", "") or "")
-        if sp and int(getattr(st, "count", 0) or 0) > 0:
+        if sp and int(getattr(st, "count", 0) or 0) > 0 and spellitems.kind_of(st) != "wand":
             out.setdefault(sp, sid)
     return out
 
@@ -1599,8 +1610,207 @@ def _build_cleanse(plan: StepPlan, actor, body, where, now) -> None:
     plan.name_after = v.name
 
 
+def spell_item_cap(level: int, kind: str) -> int:
+    """The highest spell level an Enchanter of this level writes into a scroll or a wand:
+    max(1, floor(level / 2)), alchemy's curve for potions (study §3.2), and a wand never
+    above the book's 4th."""
+    from . import spellitems
+
+    cap = max(1, int(level) // 2)
+    return min(cap, spellitems.wand_max_level()) if kind == "wand" else cap
+
+
+def _ordinal_level(n: int) -> str:
+    if n <= 0:
+        return "0-level"
+    return {1: "1st", 2: "2nd", 3: "3rd"}.get(int(n), f"{int(n)}th") + "-level"
+
+
+def _phials_from(plan: StepPlan, actor, body, now) -> list[tuple[Phial, int]]:
+    """The phials the body names, {key: count}, checked against the shelf (Refine's rule)."""
+    raw = body.get("phials") or {}
+    if isinstance(raw, list):
+        counts: dict[str, int] = {}
+        for k in raw:
+            counts[str(k)] = counts.get(str(k), 0) + 1
+        raw = counts
+    if not isinstance(raw, dict):
+        plan.problems.append("`phials` must be {key: count}.")
+        return []
+    shelf_ph = {p.key: p for p in phials(actor, reserved(actor, now))}
+    picked = []
+    for k, n in raw.items():
+        ph = shelf_ph.get(str(k))
+        try:
+            n = int(n)
+        except (TypeError, ValueError):
+            n = 0
+        if ph is None or n <= 0:
+            plan.problems.append("A phial set out for this is no longer on your shelf.")
+            continue
+        if n > ph.count:
+            plan.problems.append(f"You carry {ph.count} {ph.name} and asked for {n}.")
+            n = ph.count
+        if ph.rank > level_band(plan.level):
+            plan.problems.append(_band_refusal(ph.name, ph.tier, plan.level))
+        picked.append((ph, n))
+    return picked
+
+
+def _build_spell_item(plan: StepPlan, actor, body, where, now, kind: str) -> None:
+    """Scribe (a scroll) and Wand (a wand of 50 charges): one spell, written or bound at the
+    circle by Enchanter level, never by a feat (owner ruling 2026-11-22; study options A).
+
+    The book's creation check, DC 5 + the item's caster level (CRB, Magic Item Creation),
+    with the circle's own two +5s (owner round 1, round 4 point 4: never a refusal): a spell
+    neither known nor carried in a scroll or potion (a carried one stands in, and is spent:
+    "through another magic item"), and an Enchanter level below the caster level. The cost
+    is half the book price (25 or 750 gp x spell level x caster level): the vellum, the ink
+    and the blank count toward it, every whole 100 gp of the rest is motes (1 mote = 100 gp,
+    owner round 4 point 9), the remainder coin for the ink's pigments (study Q15, an owner
+    call). Any spell the cast door casts may be written, at the same fidelity as its cast
+    (study Q4: a scroll is a cast, not a bottled effect)."""
+    from . import formulae, spellitems, spells as spells_mod
+
+    items = circle_items(actor)
+    want = "vellum" if kind == "scroll" else "blank"
+    bk = str(body.get("blank") or "")
+    blank = next((c for c in items if c.key == bk and c.kind == want), None) if bk else None
+    if blank is None:
+        plan.problems.append("Lay a sheet of vellum in the circle." if kind == "scroll"
+                             else "Lay a wand blank in the circle.")
+    ink = None
+    if kind == "scroll":
+        ik = str(body.get("ink") or "")
+        ink = next((c for c in items if c.key == ik and c.kind == "ink"), None) if ik else None
+        if ink is None:
+            plan.problems.append("Set an ink beside the vellum to write with.")
+        elif ink.rank > level_band(plan.level):
+            plan.problems.append(_band_refusal(ink.name, ink.tier, plan.level))
+    picked = _phials_from(plan, actor, body, now)
+    plan.refine = picked
+    sid = str(body.get("spell") or "").strip().lower()
+    if not sid:
+        plan.problems.append("Choose the spell to write." if kind == "scroll"
+                             else "Choose the spell to bind.")
+        return
+    try:
+        sp = spells_mod.get(sid)
+    except KeyError:
+        plan.problems.append(f"There is no spell called {sid!r}.")
+        return
+    trad = spellitems.tradition_of(sp, actor)
+    lvl = spellitems.spell_level(sp, trad)
+    cap = spell_item_cap(plan.level, kind)
+    if kind == "wand" and lvl > spellitems.wand_max_level():
+        plan.problems.append(f"{sp.name} is a {_ordinal_level(lvl)} spell; a wand holds "
+                             f"one of 4th level or lower.")
+    elif lvl > cap:
+        plan.problems.append(f"{sp.name} is a {_ordinal_level(lvl)} spell; Enchanter "
+                             f"{plan.level} writes spells up to {_ordinal_level(cap)}.")
+    cl = spellitems.min_caster_level(sp, lvl)
+    price = spellitems.price_gp(kind, lvl, cl)
+    plan.spell, plan.tradition, plan.spell_level, plan.item_cl = sp.id, trad, lvl, cl
+    plan.name_after = spellitems.name_for(kind, sp, cl)
+    # The DC, term by term (the one place it is built for this step).
+    terms = [{"why": f"5 + caster level {cl}", "dc": 5 + cl}]
+    if sp.id not in _spells_known(actor, [sp.id]):
+        held = _spells_held(actor).get(sp.id)
+        if held:
+            plan.potions = [held]
+            plan.info.append(f"The {actor.stock[held].name} you carry stands in for the "
+                             f"spell, and is spent in the writing.")
+        else:
+            terms.append({"why": f"{sp.name}: you neither know it nor carry it", "dc": 5})
+    if plan.level < cl:
+        terms.append({"why": f"Enchanter {plan.level}, below caster level {cl}", "dc": 5})
+    plan.dc_terms = terms
+    plan.dc = sum(t["dc"] for t in terms)
+    plan.rank = max([1] + [p.rank for p, _ in picked] + ([ink.rank] if ink else []))
+    # Half the book price, less what the vellum, ink or blank already paid for.
+    gear_gp = sum(float(materials()[c.id].price_gp or 0) for c in (blank, ink) if c)
+    owed_gp = max(0.0, price / 2.0 - gear_gp)
+    motes = int(owed_gp // 100)
+    plan.coin_cp = int(round((owed_gp - motes * 100) * 100))
+    have = sum(p.motes * n for p, n in picked)
+    if have < motes:
+        plan.problems.append(f"It asks {motes} mote{'s' if motes != 1 else ''} of essence; "
+                             f"the phials set out hold {have}.")
+    from . import goods
+
+    if plan.coin_cp and goods.in_copper(getattr(actor, "purse", None) or {}) < plan.coin_cp:
+        plan.problems.append(f"The pigments cost {plan.coin_cp / 100:g} gp, and you cannot "
+                             f"pay it.")
+    plan.consumes = [(c.key, 1, c.name) for c in (blank, ink) if c] + \
+        [(p.key, n, p.name) for p, n in picked]
+    # The book's time, In progress after the step (the 2026-11-18 ruling): a scroll of 250
+    # gp or less takes 2 hours; otherwise, and for every wand, 8 working hours per 1,000 gp
+    # (begun thousands, `formulae.brew_minutes`' reading), a working day on the calendar.
+    plan.work_minutes = formulae.brew_minutes(price) if kind == "scroll" else \
+        1440 * max(1, math.ceil(price / 1000.0))
+    plan.days = plan.work_minutes // 1440
+    plan.lead = {"id": sp.id, "name": sp.name, "rank": plan.rank}
+    plan.info.append(f"{sp.name}, {_ordinal_level(lvl)} {trad}, caster level {cl}: "
+                     f"{price:g} gp at market. It costs {price / 2:g} gp to make: "
+                     + _say_list([w for w in (
+                         f"the {blank.name.lower()}" if blank else "",
+                         f"the {ink.name.lower()}" if ink else "",
+                         f"{motes} mote{'s' if motes != 1 else ''}" if motes else "",
+                         f"{plan.coin_cp / 100:g} gp in coin" if plan.coin_cp else "")])
+                     + ".")
+    hours = plan.work_minutes / 60
+    plan.info.append(f"Then {hours:g} hours In progress." if hours < 24 else
+                     f"Then {plan.days} day{'s' if plan.days != 1 else ''} In progress.")
+    plan.info.append("A finer hand raises the caster level, up to your Enchanter level.")
+
+
+def _build_scribe(plan: StepPlan, actor, body, where, now) -> None:
+    _build_spell_item(plan, actor, body, where, now, "scroll")
+
+
+def _build_wand(plan: StepPlan, actor, body, where, now) -> None:
+    _build_spell_item(plan, actor, body, where, now, "wand")
+
+
+def spell_item_cl(plan: StepPlan, tier: int) -> int:
+    """The finished item's caster level: the minimum, one higher for each quality step above
+    Sound (alchemy's rule for a potion, owner Q6.4), never above the Enchanter level that is
+    the maker's caster level (or the minimum, when that is higher)."""
+    from . import formulae
+
+    raised = int(plan.item_cl) + max(0, int(tier) - formulae.SOUND)
+    return min(raised, max(int(plan.item_cl), int(plan.level)))
+
+
+def _land_spell_item(actor, plan: StepPlan, tier: int, now: int) -> tuple[dict, str, dict]:
+    from . import goods, inprogress, spellitems
+
+    kind = plan.method                  # the method is the item's kind: scroll or wand
+    spend(actor, plan.consumes)
+    for sk in plan.potions:
+        actor.take_stock(sk, 1)
+    if plan.coin_cp:
+        actor.purse, _ok = goods.spend(actor.purse, plan.coin_cp)
+    cl = spell_item_cl(plan, tier)
+    st = spellitems.make(kind, plan.spell, cl, maker=actor, quality=int(tier), how="made",
+                         tradition=plan.tradition)
+    key = inprogress.fresh_key(actor, st.id)
+    actor.stock[key] = st
+    doing = "scribing" if kind == "scroll" else "binding"
+    work = inprogress.begin(actor, f"stock:{key}", craft=TRACK_ID,
+                            minutes=max(1, int(plan.work_minutes)), now=int(now),
+                            label=f"{doing.title()} {_a(st.name)}", doing=doing, result={})
+    wait = (f"{plan.work_minutes // 60} hours" if plan.work_minutes < 1440 else
+            f"{plan.days} day{'s' if plan.days != 1 else ''}")
+    said = (f"The {'writing' if kind == 'scroll' else 'binding'} takes, "
+            f"{wc.quality_name(tier)}: the {st.name} waits In progress, ready in {wait}.")
+    return work, said, {"key": f"stock:{key}", "name": st.name, "state": "in_progress",
+                        "work": work}
+
+
 _BUILD = {"prepare": _build_prepare, "attune": _build_attune, "bind": _build_bind,
-          "refine": _build_refine, "unbind": _build_unbind, "cleanse": _build_cleanse}
+          "refine": _build_refine, "unbind": _build_unbind, "cleanse": _build_cleanse,
+          "scroll": _build_scribe, "wand": _build_wand}
 
 
 def fits_for(plan: StepPlan, actor, now: int) -> dict:
@@ -1630,6 +1840,19 @@ def fits_for(plan: StepPlan, actor, now: int) -> dict:
             else:
                 why = ""
             out[c.key] = {"ok": not why, "as": c.kind, "why": why}
+    if m in ("scroll", "wand"):
+        # A scroll takes vellum and an ink, a wand a blank; both take phials for the motes.
+        takes = ("vellum", "ink") if m == "scroll" else ("blank",)
+        for c in circle_items(actor):
+            why = "" if c.kind in takes else (
+                "A scroll is written on vellum with an ink." if m == "scroll"
+                else "A wand is bound into a wand blank.")
+            if not why and c.rank > level_band(level):
+                why = _band_refusal(c.name, c.tier, level)
+            out[c.key] = {"ok": not why, "as": c.kind, "why": why}
+        for p in phials(actor, reserved(actor, now)):
+            why = _band_refusal(p.name, p.tier, level) if p.rank > level_band(level) else ""
+            out[p.key] = {"ok": not why, "as": "phial", "why": why}
     if m in ("attune", "refine"):
         v = plan.vessel
         prep = ((v.record.get("magic") or {}).get("circle") or {}).get("prepared") \
@@ -1783,6 +2006,12 @@ def tuning_for(plan: StepPlan, now: int) -> dict:
                                                      + m["powers"])))
     if plan.method == "cleanse":
         out["seq"] = ["sigil", "sigil", "sigil"]
+    if plan.method in ("scroll", "wand"):
+        # The calligraphy (study §3.2: "the strokes in order, no freehand"): rule the sheet
+        # (or notch the blank), a stroke and a rune for each spell level, then the seal.
+        strokes = [("sigil", "enhancement")[i % 2] for i in range(2 * max(1, plan.spell_level))]
+        head = ["quarter", "ink"] if plan.method == "scroll" else ["quarter"]
+        out["seq"] = head + strokes[:6] + ["bell"]
     return out
 
 
@@ -1838,6 +2067,10 @@ def lines_for(plan: StepPlan) -> dict:
     if m == "cleanse":
         return {"miss_small": "Miss: the curse holds. The time is lost.",
                 "miss_big": "Miss by 5 or more: the same."}
+    if m in ("scroll", "wand"):
+        what = "vellum and the ink" if m == "scroll" else "blank"
+        return {"miss_small": "Miss by 1 to 4: the time is lost, nothing spent.",
+                "miss_big": f"Miss by 5 or more: the {what} spoil; the essences are kept."}
     return {"miss_small": "", "miss_big": ""}
 
 
@@ -1879,6 +2112,14 @@ def miss(actor, progress, plan: StepPlan, margin: int, *, now: int) -> dict:
     elif plan.method == "bind":
         said = (f"Missed by {out_by}. The binding does not take: the essences are kept and "
                 f"the vessel stays attuned.")
+    elif plan.method in ("scroll", "wand") and out_by >= 5:
+        # The book: "A failed check ruins the materials used". The circle's own ruling
+        # (round 4) keeps everything on a miss by 1 to 4, as Bind does; by 5 or more the
+        # vellum or blank and the ink are spoiled, and the essences are kept (owner call).
+        lost = spend(actor, [c for c in plan.consumes if c[0].startswith("inv:")])
+        said = (f"Missed by {out_by}. The {'writing' if plan.method == 'scribe' else 'binding'} "
+                f"spoils: {_say_list([x['name'] for x in lost]) or 'nothing'} ruined; the "
+                f"essences are kept.")
     else:
         said = f"Missed by {out_by}. The time is lost; nothing is spent."
     track = wc.get(TRACK_ID)
@@ -1983,6 +2224,10 @@ def finish(actor, progress, plan: StepPlan, tier: int, *, engine=None, now: int 
             pay_first(f"bound:{e['id']}", f"first {prop.get('name', e['id'])} bound")
         products.append({"key": v.key, "name": plan.name_after, "state": "in_progress",
                          "work": work})
+    elif plan.method in ("scroll", "wand"):
+        work, said, made = _land_spell_item(actor, plan, tier, now)
+        products.append(made)
+        pay_first(f"{plan.method}:{plan.spell}", f"first {made['name'].split(' (')[0]}")
     elif plan.method == "refine":
         spend(actor, plan.consumes)
         key, name, motes = _land_refined(actor, plan, tier)
@@ -3062,6 +3307,8 @@ KIND_GLYPH: dict[str, str] = {
     "vessel": "🔮",
     "catalyst": "📿",
     "treatment": "🧿",
+    "vellum": "📃",
+    "blank": "🥢",
 }
 
 

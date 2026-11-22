@@ -282,7 +282,7 @@ def total_bonus(magic: dict) -> int:
 def _wondrous_powers_gp(magic: dict) -> list[int]:
     out = [_entry_gp(e) for e in magic["properties"] + magic["flat"]]
     for p in magic["powers"]:
-        r = recipe(str(p.get("recipe") or "")) or {}
+        r = recipe(str(p.get("recipe") or "")) or p      # a spell power prices itself
         out.append(int(r.get("price_gp") or 0))
     return out
 
@@ -319,7 +319,7 @@ def caster_level(magic: dict, gear: str) -> int:
         if prop and prop.get("cl") is not None:
             cls.append(int(prop["cl"]))
     for p in magic["powers"]:
-        r = recipe(str(p.get("recipe") or "")) or {}
+        r = recipe(str(p.get("recipe") or "")) or p      # a spell power's own CL
         if r.get("caster_level") is not None:
             cls.append(int(r["caster_level"]))
     return max(cls or [0])
@@ -916,6 +916,21 @@ def layer(record, *, believed: bool = False) -> dict:
                 _bucket(out, dict(scaled, origin=origin,
                                   source=f"essence:{entry.get('essence')}"), uses, prop["id"])
     for p in m["powers"]:
+        if p.get("spell") and p.get("item_kind"):
+            # A scroll's or a wand's one spell (`rules/spellitems.py`): the spell itself is
+            # the power, at the item's caster level and DC, through the same cast door.
+            from . import spellitems
+
+            sid = str(p["spell"])
+            _bucket(out, {"type": "item_power", "spell": sid,
+                          "caster_level": int(p.get("caster_level") or 1),
+                          "level": int(p.get("level") or 0), "dc": p.get("dc"),
+                          "uses": p.get("uses"), "uses_count": p.get("uses_count"),
+                          "activation": p.get("activation"), "item_kind": p["item_kind"],
+                          "tradition": p.get("tradition"), "origin": origin,
+                          "source": f"spell:{sid}"}, uses, sid)
+            out["tags"].extend(t for t in spellitems.tags_of(p) if t not in out["tags"])
+            continue
         rid = str(p.get("recipe") or "")
         r = recipe(rid)
         if r is None:

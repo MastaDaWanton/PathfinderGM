@@ -70,6 +70,7 @@ urlpatterns = [
     path("api/spells/prepare", views.prepare_spells, name="prepare_spells"),
     path("api/spells/learnable", views.learnable_spells, name="learnable_spells"),
     path("api/spells/learn", views.learn_spells, name="learn_spells"),
+    path("api/spells/copy", views.copy_spell, name="copy_spell"),
     path("api/spells/swap", views.swap_spell, name="swap_spell"),
     path("api/level-up", views.level_up, name="level_up"),
     path("api/level/feats", views.level_feat_menu, name="level_feat_menu"),

@@ -37,11 +37,12 @@
     "bind",
     "read",
     "identify",
-    "unbind"
+    "unbind",
+    "scroll"
    ],
    "max_tier": "uncommon",
    "ceiling": 2,
-   "note": "The whole ritual in miniature: lay a circle round the item, seat the essences where they fit, bind them at the crest. One new property in a working. Common and uncommon essence; Fine work at best."
+   "note": "The whole ritual in miniature: lay a circle round the item, seat the essences where they fit, bind them at the crest. One new property in a working. Common and uncommon essence; Fine work at best. Scribe writes a spell onto vellum: a scroll."
   },
   {
    "level": 2,
@@ -51,11 +52,12 @@
     "phials"
    ],
    "methods": [
-    "refine"
+    "refine",
+    "wand"
    ],
    "max_tier": "exotic",
    "ceiling": 3,
-   "note": "Refine (condense essences of one family into one fuller phial), more than one new property in one working, and rare and exotic essence. Superior work."
+   "note": "Refine (condense essences of one family into one fuller phial), more than one new property in one working, and rare and exotic essence. Superior work. Wand binds a spell into a wand blank, with 50 charges."
   },
   {
    "level": 3,
@@ -79,7 +81,9 @@
   "unbind": "Unpicks a magic item's layer, last sigil first. The smith's item stays; a quarter of the layer's motes come back as residue, and you learn what kind of magic it carried.",
   "cleanse": "Lifts a curse you know of, sigil by sigil, and keeps the rest of the layer. DC 10 + the item's caster level, the book's remove curse.",
   "read": "Tastes a pinch of an essence (a tenth of a phial) to learn one thing about it.",
-  "identify": "Studies an item for what it was made to do. Beat the DC by 10 to see a curse as well. Once per item per day."
+  "identify": "Studies an item for what it was made to do. Beat the DC by 10 to see a curse as well. Once per item per day.",
+  "scroll": "Writes one spell onto a sheet of vellum as a scroll, stroke by stroke in its order. Any spell the circle can cast, up to half your Enchanter level in spell level (at least 1st). The scroll is read once, by anyone whose class casts the spell, or by Use Magic Device.",
+  "wand": "Binds one spell of 4th level or lower into a wand blank, with 50 charges. Spell level up to half your Enchanter level (at least 1st). Anyone whose class casts the spell can use it, or anyone with Use Magic Device."
  },
  "_method_help_note": "One entry per method, and the set must match method_descriptions exactly (tests/test_enchanter.py). `does` is the mechanical effect in numbers, `needs` what must be in the circle, `for` what a player reaches for it to do.",
  "method_help": {
@@ -122,6 +126,16 @@
    "does": "DC 15 + the item's caster level, the better of your Enchanter check and your Spellcraft. Beat it to learn what the item was made to do; beat it by 10 to see a curse too.",
    "needs": "A magic item.",
    "for": "Knowing what you carry, and whether it is cursed."
+  },
+  "scroll": {
+   "does": "DC 5 + the scroll's caster level, +5 if you neither know the spell nor carry it in a scroll or potion (a carried one is spent), +5 if your Enchanter level is below that caster level. Costs half the book price (25 gp x spell level x caster level): the vellum and ink count toward it, a whole 100 gp of the rest is paid in motes, the remainder in coin. Then the writing waits In progress: 2 hours at 250 gp or less, else 8 hours per 1,000 gp.",
+   "needs": "A sheet of vellum and an ink from your pack, the spell chosen, and phials enough for the motes it asks.",
+   "for": "Spells to carry: a reading for when the slots are gone, a spell for a friend who casts, and a scroll a wizard can copy into the book."
+  },
+  "wand": {
+   "does": "DC 5 + the wand's caster level, +5 for a spell you neither know nor carry, +5 if your Enchanter level is below that caster level. Costs half the book price (750 gp x spell level x caster level): the blank counts toward it, whole 100s in motes, the rest in coin. Then 1 day per 1,000 gp In progress.",
+   "needs": "Enchanter 2, a wand blank from your pack, the spell chosen, and phials enough for the motes it asks.",
+   "for": "Fifty castings of one spell: the wand of cure light wounds, the wand of magic missile."
   }
  },
  "_bench_note": "The circle's rule rows (docs/enchanting-revamp-plan.md §6, §10, §14), read by rules/enchanter.py. Every number the plan marks proposed lives here so it tunes without a code change. `where`: `quiet` is anywhere out of a fight; `sanctum` needs one (a founded place of kind sanctum you hold, rules/places.py tags). `minutes` is the ritual's own time; a binding's countdown is the book's working days (8 hours of work to a calendar day, plan §6.8). Tuning is for the minigames: `seconds`, the base `difficulty`, and the band the strip draws; `phase_widen` (1.5, owner round 4 point 9) widens Bind's windows inside the essence family's phase of the day, `eager_widen` the eager trait's 10%.",
@@ -134,7 +148,9 @@
    "unbind",
    "cleanse",
    "read",
-   "identify"
+   "identify",
+   "scroll",
+   "wand"
   ],
   "methods": {
    "prepare": {
@@ -222,6 +238,30 @@
     "minutes": 1,
     "takes": "a magic item",
     "makes": "knowledge"
+   },
+   "scroll": {
+    "name": "Scribe",
+    "where": "quiet",
+    "minutes": 30,
+    "takes": "a sheet of vellum, an ink, and essences for a dearer spell",
+    "makes": "a scroll, into In progress",
+    "tuning": {
+     "seconds": 7,
+     "difficulty": 0.4,
+     "band": "order"
+    }
+   },
+   "wand": {
+    "name": "Wand",
+    "where": "quiet",
+    "minutes": 60,
+    "takes": "a wand blank and essences",
+    "makes": "a wand of 50 charges, into In progress",
+    "tuning": {
+     "seconds": 7,
+     "difficulty": 0.45,
+     "band": "order"
+    }
    }
   },
   "_seats_note": "The seats a vessel offers Attune, by what the book prices it as (rules/magic_layer.vessel_kind), each named for the piece it sits on (UI plan §6.5: a blade's point, edge and guard). `piece` is the record's piece the seat answers for an affinity; a seat with none answers only the vessel's polarity. The number of seats is how many phials one working can take.",
