@@ -7678,8 +7678,8 @@ def _document_effect_text(doc: dict) -> str:
         # The funnel targets a class document reads (`classbuilder._feat_funnel_targets`).
         if target.startswith("pool."):
             what = f"{target[5:]} a day"
-        elif target.startswith("channel.") and target.endswith(".dc"):
-            what = "channel energy save DC"
+        elif target.endswith(".dc"):
+            what = f"{target.split('.')[0]} save DC"
         if spec.get("type") == "save_mod":
             what += " saves"
         typed = str(spec.get("bonus_type") or "")
