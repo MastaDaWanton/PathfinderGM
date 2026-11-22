@@ -419,6 +419,7 @@ def test_a_release_needs_both_lists_empty():
     src = HIT_TEST.read_text(encoding="utf-8")
     assert ('const MUST_SHOW = ["#cb-commit", "#cb-end", "#input", '
             '"#sayform button[type=submit]"];') in src
-    assert "return {checked: seen.length, covered, unreachable};" in src
+    # `card` joined the answer in 0.5.0: the tutorials' card-open mode (docs/packaging.md).
+    assert "return {checked: seen.length, covered, unreachable, card};" in src
     step = " ".join(PACKAGING.read_text(encoding="utf-8").split())
     assert "`covered` and `unreachable` must both be empty" in step

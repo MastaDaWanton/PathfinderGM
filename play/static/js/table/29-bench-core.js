@@ -721,7 +721,7 @@
           '<span class="bf-line" aria-hidden="true"><i style="transform:scaleX(' + frac.toFixed(3) + ')"></i></span>' +
           '<span class="bf-mp">' + (need ? esc(have) + " / " + esc(need) : esc(t.mp) + " mastery") + '</span>';
       }
-      var picks = f.picks ? '<button type="button" class="bf-btn bf-perks" data-bench-perks>' +
+      var picks = f.picks ? '<button type="button" class="bf-btn bf-perks" data-bench-perks data-tut="bench-perks">' +
         (f.picks === 1 ? "1 perk to pick" : esc(f.picks) + " perks to pick") + '</button>' : "";
       var steady = C.steady();
       foot.innerHTML =
@@ -737,7 +737,7 @@
         // shows (enchanting UI plan §6.10). Absent when 37 is not on the page.
         (window.Works && typeof Works.footButton === "function" ? Works.footButton() : "") +
         '<button type="button" class="bf-btn bf-steady" role="switch" aria-checked="' + steady +
-        '" data-bench-steady>Steady mode<span class="bf-switch" aria-hidden="true"></span></button>';
+        '" data-tut="bench-steady" data-bench-steady>Steady mode<span class="bf-switch" aria-hidden="true"></span></button>';
     };
     var footEl = o.foot && $id(o.foot);
     if (footEl) {

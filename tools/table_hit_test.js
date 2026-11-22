@@ -20,7 +20,19 @@
 // script passed. Below the foot of a box that can show it (End turn 3 to 63px under the
 // choices at 1000x609, 1024x700 and 1280x720) is one scroll away, and is not listed: the
 // book keeps 45% of the stage and the desk's choices scroll past that by design.
+//
+// CARD OPEN (the tutorials, docs/tutorials-plan.md §3.7). With a first-time card open
+// (js/tutorials.js), or `window.HIT_TEST_TUTORIAL = "<id>"` set first to open one, the same
+// check runs with the card's rules: a control under the card's own box may be covered, but
+// never one in MUST_SHOW or the focused element (WCAG 2.4.11); the card may take at most a
+// quarter of the window; and `card.missing` lists the steps' anchors the page did not draw.
+// `card.problems` empty, with `covered` and `unreachable` empty, is the pass.
 (() => {
+  const T = globalThis.Tutorials;
+  if (globalThis.HIT_TEST_TUTORIAL && T && T.isOpen() !== globalThis.HIT_TEST_TUTORIAL) {
+    T.show(globalThis.HIT_TEST_TUTORIAL);   // shown on a timer of 0: run the test again after it
+  }
+  const cardEl = T && T.isOpen() ? T.card() : null;
   // What a fight cannot be played without, and the pen. Up and down only: on a phone the
   // turn's buttons are one row that scrolls sideways by design (the mock README's phone).
   const MUST_SHOW = ["#cb-commit", "#cb-end", "#input", "#sayform button[type=submit]"];
@@ -53,13 +65,26 @@
   const name = (el) => el.id ? "#" + el.id
     : el.tagName.toLowerCase() + (el.className && typeof el.className === "string"
       ? "." + el.className.trim().split(/\s+/).join(".") : "");
-  const covered = [];
+  const covered = [], problems = [];
+  const must = new Set(MUST_SHOW.flatMap((s) => [...document.querySelectorAll(s)]));
   for (const el of seen) {
     const {x, y} = shown(el);
     const top = document.elementFromPoint(x, y);
     if (top && top !== el && !el.contains(top) && !top.contains(el)) {
-      covered.push({control: name(el), label: (el.innerText || el.value || el.getAttribute("aria-label") || "").trim().slice(0, 40), under: name(top)});
+      const entry = {control: name(el), label: (el.innerText || el.value || el.getAttribute("aria-label") || "").trim().slice(0, 40), under: name(top)};
+      if (cardEl && cardEl.contains(top)) {
+        // Under the card: allowed, unless it is a control a turn cannot do without.
+        if (must.has(el) || el === document.activeElement) problems.push({...entry, why: "the card covers it"});
+      } else covered.push(entry);
     }
+  }
+  let card = null;
+  if (cardEl) {
+    const rep = T.report();
+    if (rep.area > 0.25) problems.push({why: `the card takes ${Math.round(rep.area * 100)}% of the window`});
+    const r = cardEl.getBoundingClientRect();
+    if (r.width >= innerWidth - 1 && r.height >= innerHeight - 1) problems.push({why: "the card is full-screen"});
+    card = {id: rep.id, step: rep.step, area: Math.round(rep.area * 1000) / 1000, missing: rep.missing, problems};
   }
   // The tallest the window onto a control can be: the window cut to every ancestor that
   // clips up and down, wherever the control itself is scrolled to.
@@ -80,5 +105,5 @@
     const box = room(el), of = el.getBoundingClientRect().height;
     if (box < of) unreachable.push({control: name(el), box: Math.round(box), of: Math.round(of)});
   }
-  return {checked: seen.length, covered, unreachable};
+  return {checked: seen.length, covered, unreachable, card};
 })();

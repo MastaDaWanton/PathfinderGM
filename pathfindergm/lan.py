@@ -291,6 +291,8 @@ GUEST_WRITES = frozenset({
     "/api/characters", "/api/character/gender", "/api/character/new",
     "/api/character/switch", "/api/resurrect", "/api/resume", "/api/start",
     "/api/character/create", "/api/character/choices",
+    # A tip dismissed on the phone is the player's dismissal (play/tutorials.py).
+    "/api/tutorials",
 })
 _GUEST_WRITE_PATTERNS = (re.compile(r"^/api/outfit/[^/]+/buy$"),)
 

@@ -193,6 +193,8 @@
   B.say = core.say;
   function focusFirst() { core.focusFirst(); }
 
+  if (window.Tutorials) Tutorials.reach("bench.herbalism", function () { if (!B.open) B.openBench($id("open-bench")); });
+
   // /play/#bench, the old bench's "Open the herbalism bench" (craft.html), opens it on load.
   function fromHash() { if (location.hash === "#bench" && !B.open) B.openBench($id("open-bench")); }
   window.addEventListener("hashchange", fromHash);
@@ -221,6 +223,8 @@
       var at = document.activeElement;
       if (!at || at === document.body || at.id === "bench-close") focusFirst();
       maybeAmbience();
+      // The first-time card, now its methods and satchel are drawn to point at.
+      if (window.Tutorials) Tutorials.arrive("bench.herbalism", { entered: true, still: function () { return B.open; } });
     }).catch(function (err) {
       B.loading = false;
       B.error = err.message || String(err);
@@ -877,9 +881,11 @@
       picks: t && t.picks_banked,
       // Manuals when a herbal manual is carried (the server's `state.manuals`).
       buttons: ((s && s.manuals && s.manuals.length)
-        ? '<button type="button" class="bf-btn" data-bench-manuals aria-haspopup="dialog">Manuals</button>' : "") +
-        '<button type="button" class="bf-btn" data-bench-recipes aria-haspopup="dialog">Recipes</button>' +
-        '<button type="button" class="bf-btn" data-bench-herbarium>Herbarium</button>',
+        ? '<button type="button" class="bf-btn" data-bench-manuals data-tut="bench-manuals" aria-haspopup="dialog">Manuals</button>' : "") +
+        '<button type="button" class="bf-btn" data-bench-recipes data-tut="bench-recipes" aria-haspopup="dialog">Recipes</button>' +
+        '<button type="button" class="bf-btn" data-bench-herbarium data-tut="bench-herbarium">Herbarium</button>' +
+        // The bench's tips again (js/tutorials.js), beside Steady mode as the plan places it.
+        '<button type="button" class="tut-help" data-tut="help-bench" data-tut-help="bench.herbalism" aria-label="Show the tips for this bench">?</button>',
     };
   }
   function renderFoot() { core.renderFoot(); }

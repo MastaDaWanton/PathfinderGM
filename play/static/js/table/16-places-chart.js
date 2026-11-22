@@ -286,7 +286,7 @@ const PlacesChart = (function () {
         ? `<ol class="route">${legs.map(x => `<li>${e(upper(x.name))}<span>${
             e(MINUTE_WORDS(x.time_words))}</span></li>`).join("")}</ol>
           <p>About ${Number(n.walk.minutes) || 0} ${Number(n.walk.minutes) === 1 ? "minute" : "minutes"} on foot, by the way above.</p>
-          <button type="button" class="v2-btn is-go walkthere" data-walkto="${e(n.id)}"${
+          <button type="button" class="v2-btn is-go walkthere" data-tut="walk-there" data-walkto="${e(n.id)}"${
             on ? ` aria-describedby="walksaid"` : ""}>Walk there</button>`
         : `<p class="shutwhy">${e(n.why || "No way there by the ways you know.")}</p>`}</div>` + out;
     }

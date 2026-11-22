@@ -1,0 +1,99 @@
+{
+  "_note": "Tutorials for the Map tab's Places and Region views. The same rules as table.json's note; the numbers come from rules/tutorialfacts.py so the cards say what rules/hexes.py and rules/survival.py do.",
+  "order": 5,
+  "group": "Maps and travel",
+  "tutorials": [
+    {
+      "id": "map.places",
+      "v": 1,
+      "title": "Places",
+      "manual": "playing",
+      "root": "places-board",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "places-btn",
+          "title": "Places",
+          "words": "Places shows the town as you know it, laid out on a tabletop. Press Places again to go back to the ground you are standing on.",
+          "controls": [{"tut": "places-btn", "label": "Places"}]
+        },
+        {
+          "since": 1,
+          "anchor": "places-board",
+          "title": "The fog",
+          "words": "Where you have stood is painted, places you have only seen are grey, and the rest is cloud. It fills in as you find things and never shows what you have not. The layout is a sketch: distance on it is not distance walked.",
+          "source": {"file": "play/places_found.py", "literal": "`visited` (stood in) is kept apart from seen"}
+        },
+        {
+          "since": 1,
+          "anchor": "places-slip",
+          "title": "Going somewhere",
+          "words": "Press a place for its card: how you know it and the way there. Walk there attaches the whole walk to your turn, and Say sets off. Something on the way, a meeting or the watch at a gate, can stop you.",
+          "controls": [{"tut": "walk-there", "label": "Walk there"}],
+          "source": {"file": "play/static/js/table/16-tab-map.js", "literal": "the engine walks every hop of it in one turn"}
+        },
+        {
+          "since": 1,
+          "anchor": "map-crumbs",
+          "title": "The maps above",
+          "words": "The names along the top are the maps above this one: the region, the continent, the world. Press one, or zoom out past a map, to open the one above it.",
+          "buttons": [
+            {"tut": "help-map", "label": "?", "words": "Shows the tips for the map you are looking at."}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "map.region",
+      "v": 1,
+      "title": "Region travel",
+      "manual": "playing",
+      "root": "places-board",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "places-board",
+          "title": "One hex a move",
+          "words": "Each hex is {hex_miles} miles across. Press any hex you have seen and you walk there, a hex at a time. For most walkers open plain takes {hex_hours_open} hours a hex and rougher ground {hex_hours_rough}; slower walkers take longer.",
+          "source": {"file": "rules/hexes.py", "literal": "HOURS_PLAIN, HOURS_ROUGH = "}
+        },
+        {
+          "since": 1,
+          "anchor": "travel-panel",
+          "title": "Each stop",
+          "words": "Where you stop you look round, and every hex the look covers clears on the map. A meeting, a fight, something new in sight or the end of the day stops you on the way, and the story says which.",
+          "source": {"file": "rules/engine.py", "literal": "stops short where a meeting, a fight, a new sighting or the end of"}
+        },
+        {
+          "since": 1,
+          "anchor": "travel-panel",
+          "title": "Past a day's travel",
+          "words": "After {march_free_hours} hours on the way since you last rested, the day's travel is done. Going on is a forced march: a Constitution check each hour, DC {march_dc_first} and {march_dc_step} more every hour, with {march_damage} non-lethal and fatigue on a failure.",
+          "controls": [{"tut": "hex-march", "label": "Push on (forced march)"},
+                       {"tut": "hex-stop", "label": "Stop for the day"}],
+          "source": {"file": "rules/survival.py", "literal": "def forced_march_dc("}
+        },
+        {
+          "since": 1,
+          "anchor": "travel-panel",
+          "title": "Water",
+          "words": "By a coast the buttons say how you cross: sail in your own ship, row a hired boat, or swim. A swim says what it will cost you before you press it.",
+          "controls": [{"tut": "hex-go", "label": "sail"}, {"tut": "hex-go", "label": "row"},
+                       {"tut": "hex-swim", "label": "Swim"}],
+          "source": {"file": "rules/hexes.py", "literal": "WAYS = (\"ship\", \"boat\", \"swim\")"}
+        },
+        {
+          "since": 1,
+          "anchor": "travel-panel",
+          "title": "Buttons under Travel",
+          "words": "Each button names a way you can step, with the ground and the hours it takes.",
+          "buttons": [
+            {"tut": "hex-siteto", "label": "Walk to", "words": "A site you spotted further off, walked a hex at a time."},
+            {"tut": "hex-enter", "label": "Go into", "words": "Enter the tower, ruin, mine or cave in the hex you stand on."},
+            {"tut": "help-map", "label": "?", "words": "Shows these tips again."}
+          ]
+        }
+      ]
+    }
+  ]
+}

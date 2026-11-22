@@ -1,0 +1,74 @@
+{
+  "_note": "Tutorials for the play table (docs/tutorials-plan.md §3.6). Each step: at most 45 words, no digit outside a {placeholder} (rules/tutorialfacts.py), an anchor that is a data-tut attribute some template or script draws, and every control named by `controls` or `buttons` carrying that label near its data-tut. Change a step's words, anchor or controls and you must raise the tutorial's `v` and set that step's `since` to it, then refresh versions.lock (tools/tutorials_lock.py). tests/test_tutorials.py holds every rule.",
+  "order": 3,
+  "group": "The table",
+  "tutorials": [
+    {
+      "id": "table",
+      "v": 1,
+      "title": "The table",
+      "manual": "playing",
+      "root": "pen",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "pen",
+          "title": "What do you do?",
+          "words": "Write what your character does, the way you would tell a GM, and press Say. The rules engine rolls and decides; the GM tells it. A turn takes a while on your own machine. A line starting /gm asks the engine out of character.",
+          "controls": [{"tut": "say", "label": "Say"}],
+          "source": {"file": "play/views.py", "literal": "_GM = re.compile("}
+        },
+        {
+          "since": 1,
+          "anchor": "continue",
+          "title": "Continue",
+          "words": "Continue means you keep doing what you were doing, and the world moves a beat. Use it when you have nothing new to say and want the scene to go on.",
+          "controls": [{"tut": "continue", "label": "Continue"}],
+          "source": {"file": "gm/prompts.py", "literal": "I take no action. Carry the scene on from where it stopped"}
+        },
+        {
+          "since": 1,
+          "anchor": "exits",
+          "title": "The ways on",
+          "words": "These are the ways on from here. Press one to attach it to your turn, then Say to go; the time on it is real time passing. The suggestions below are offers, never orders: you can always write something else.",
+          "source": {"file": "play/static/js/table/11-exits.js", "literal": "A click ATTACHES the place, as a spell is attached, and Say sends it"}
+        },
+        {
+          "since": 1,
+          "anchor": "pen-actions",
+          "title": "Beside the pen",
+          "buttons": [
+            {"tut": "craft-action", "label": "Craft action", "words": "Forage, prospect, skin, gather or buy material, told as part of the story."},
+            {"tut": "spells-btn", "label": "Spells", "words": "Casters only: choose a spell to cast with this turn."},
+            {"tut": "help-table", "label": "?", "words": "Shows these tips again."}
+          ]
+        },
+        {
+          "since": 1,
+          "anchor": "tabs",
+          "title": "The tabs",
+          "buttons": [
+            {"tut": "tab-map", "label": "Map", "words": "Where everyone stands, and the places you have found."},
+            {"tut": "tab-sheet", "label": "Sheet", "words": "Your character: combat, skills, feats and the next level."},
+            {"tut": "tab-equipment", "label": "Equipment", "words": "Everything you carry, worn and held."},
+            {"tut": "tab-spells", "label": "Spells", "words": "Casters only: what you know and have prepared."},
+            {"tut": "tab-trade", "label": "Trade", "words": "Buying and selling, when you stand at a counter."},
+            {"tut": "tab-journal", "label": "Journal", "words": "Quests, what people said, where you have been, and your notes."}
+          ]
+        },
+        {
+          "since": 1,
+          "anchor": "topend",
+          "title": "The corner",
+          "buttons": [
+            {"tut": "talk", "label": "Talk", "words": "What has been said to you, person by person."},
+            {"tut": "music", "label": "Music", "words": "The soundtrack on or off; its level is in Settings."},
+            {"tut": "settings", "label": "Settings", "words": "Models, sound, tips and reporting a problem, without leaving the game."},
+            {"tut": "sheettoggle", "label": "Hide sheet", "words": "Folds the side panels away and gives the story the width."},
+            {"tut": "leave", "label": "Worlds & characters", "words": "Back to the shelf of worlds and characters."}
+          ]
+        }
+      ]
+    }
+  ]
+}

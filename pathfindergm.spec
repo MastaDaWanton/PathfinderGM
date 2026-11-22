@@ -57,6 +57,7 @@ CONTENT_DIRS = [
     "bloodlines",  # what a sorcerer's bloodline powers do (rules/grantedpowers.py)
     "schools",     # a wizard's school powers and arcane bond (rules/grantedpowers.py)
     "dungeons",    # a dungeon's builders and ruin tags, its story (rules/dungeons.py)
+    "tutorials",   # the first-time cards' words (play/tutorials.py)
 ]
 
 datas = [(f"content/{name}", f"content/{name}") for name in CONTENT_DIRS]

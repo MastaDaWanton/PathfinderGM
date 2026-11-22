@@ -3709,6 +3709,10 @@
      picker, shared with the forge. Ahead of the table's scripts, which hand it the sheet. -->
 <link rel="stylesheet" href="{% asset 'css/skillhelp.css' %}">
 <script src="{% asset 'js/skillhelp.js' %}"></script>
+<!-- The first-time cards (play/tutorials.py, docs/tutorials-plan.md), ahead of the table's
+     own scripts, which tell it when the player reaches a section. -->
+<link rel="stylesheet" href="{% asset 'css/tutorials.css' %}">
+<script src="{% asset 'js/tutorials.js' %}"></script>
 </head>
 <body class="page-backdrop-room mode-table">
 <script nonce="{{ request.csp_nonce }}">
@@ -3738,46 +3742,46 @@
        a quiet line above the world's name, as far as the bar allows from the tabs, the
        pen and a fight's controls, so a hand reaching for any of them does not pass it. -->
   <nav class="worldnav" aria-label="Where you are">
-    <a class="leave" href="/">Worlds &amp; characters</a>
+    <a class="leave" href="/" data-tut="leave">Worlds &amp; characters</a>
     <p class="world" id="world-name">{{ world_name }}</p>
   </nav>
   <!-- The tabs, each a word (12-shell.js). Spells is shown for a caster only, and Trade
        is the one door to the counter: the footer's duplicate Trade button is gone. -->
-  <div class="modes v2-tabs" role="tablist" aria-label="The table">
+  <div class="modes v2-tabs" role="tablist" aria-label="The table" data-tut="tabs">
     <button type="button" role="tab" id="tab-table" data-mode="table" aria-selected="true"
             aria-controls="stage">Table</button>
-    <button type="button" role="tab" id="tab-map" data-mode="map" aria-selected="false"
+    <button type="button" role="tab" id="tab-map" data-mode="map" data-tut="tab-map" aria-selected="false"
             aria-controls="stage" tabindex="-1">Map</button>
-    <button type="button" role="tab" id="tab-sheet" data-mode="sheet" aria-selected="false"
+    <button type="button" role="tab" id="tab-sheet" data-mode="sheet" data-tut="tab-sheet" aria-selected="false"
             aria-controls="stage" tabindex="-1">Sheet</button>
-    <button type="button" role="tab" id="tab-equipment" data-mode="equipment"
+    <button type="button" role="tab" id="tab-equipment" data-mode="equipment" data-tut="tab-equipment"
             aria-selected="false" aria-controls="mode-equipment" tabindex="-1">Equipment</button>
-    <button type="button" role="tab" id="tab-spells" data-mode="spells" aria-selected="false"
+    <button type="button" role="tab" id="tab-spells" data-mode="spells" data-tut="tab-spells" aria-selected="false"
             aria-controls="mode-spells" tabindex="-1" hidden>Spells</button>
-    <button type="button" role="tab" id="tab-trade" data-mode="trade" aria-selected="false"
+    <button type="button" role="tab" id="tab-trade" data-mode="trade" data-tut="tab-trade" aria-selected="false"
             aria-controls="mode-trade" tabindex="-1">Trade</button>
-    <button type="button" role="tab" id="tab-journal" data-mode="journal" aria-selected="false"
+    <button type="button" role="tab" id="tab-journal" data-mode="journal" data-tut="tab-journal" aria-selected="false"
             aria-controls="mode-journal" tabindex="-1">Journal</button>
   </div>
   <!-- The device's place on a phone (13-device.js moves it here below 761px). -->
   <div class="dv-slot" id="dv-slot" aria-hidden="true"></div>
-  <div class="topend">
+  <div class="topend" data-tut="topend">
     <!-- The conversation is a tray, not a tab: it opens beside the story and never over
          it (08-conversation.js). The count says how many new lines; it never opens the
          tray by itself. -->
-    <button type="button" id="talktab" class="v2-btn talkbtn" aria-controls="talktray"
+    <button type="button" id="talktab" data-tut="talk" class="v2-btn talkbtn" aria-controls="talktray"
             aria-expanded="false" title="The conversation">Talk<span class="edgecount v2-count"
             hidden></span></button>
     <!-- The background music on or off (music.js), without touching its level, which is
          the Settings page's Music slider. -->
-    <button type="button" id="musictoggle" class="v2-btn is-quiet" aria-pressed="true"
+    <button type="button" id="musictoggle" data-tut="music" class="v2-btn is-quiet" aria-pressed="true"
             title="Background music">Music</button>
     <!-- Settings without leaving the table (the owner, 2026-10-05: "i have to go to the
          main page then to settings"). It opens the shelf's own Settings page in a panel
          over the game (12-shell.js), so there is one Settings page, not two that drift. -->
-    <button type="button" id="settingsbtn" class="v2-btn is-quiet" aria-haspopup="dialog"
+    <button type="button" id="settingsbtn" data-tut="settings" class="v2-btn is-quiet" aria-haspopup="dialog"
             aria-controls="settingslayer" title="Settings">Settings</button>
-    <button type="button" id="sheettoggle" class="v2-btn is-quiet" aria-expanded="true"
+    <button type="button" id="sheettoggle" data-tut="sheettoggle" class="v2-btn is-quiet" aria-expanded="true"
             aria-controls="sheet">Hide sheet</button>
   </div>
 </header>
@@ -3833,15 +3837,18 @@
       <h2 id="board-name">The ground</h2>
       <div class="boardctl" role="group" aria-label="How to look at it">
         <div class="v2-recess" role="group" aria-label="The town">
-          <button type="button" class="v2-btn" id="placesbtn" aria-pressed="false"
+          <button type="button" class="v2-btn" id="placesbtn" data-tut="places-btn" aria-pressed="false"
                   aria-controls="placeswrap"
                   title="The places you have found, and the ways between them">Places</button>
         </div>
         <div class="groundctl" id="groundctl"></div>
+        <!-- The Map's tips again (js/tutorials.js); 16-tab-map.js points it at the map shown. -->
+        <button type="button" class="tut-help" data-tut="help-map" data-tut-help="map.places"
+                aria-label="Show the tips for this map">?</button>
       </div>
     </div>
     <div id="mapwrap"></div>
-    <div id="placeswrap" class="placeswrap" aria-live="off" hidden></div>
+    <div id="placeswrap" class="placeswrap" data-tut="places-board" aria-live="off" hidden></div>
     <p class="panelempty boardempty">No ground is mapped yet. The map is drawn from wherever
       the party is standing, as soon as they are standing somewhere.</p>
   </section>
@@ -3895,7 +3902,7 @@
       <div id="passage-offer" role="group" aria-label="Berths offered"></div>
       <!-- The ways on from here (I6, 11-exits.js): `scene.exits` from the engine's own
            place graph, grouped, with the rules' reason on any way that is shut. -->
-      <nav id="exits" aria-label="From here" hidden></nav>
+      <nav id="exits" data-tut="exits" aria-label="From here" hidden></nav>
       <div id="suggestions" role="group" aria-label="Suggested actions"></div>
       <div id="abilities"></div>
     </div>
@@ -3909,27 +3916,30 @@
         <label for="input" class="vh">What do you do?</label>
         <!-- The out-of-character door is discoverable or it does not exist. `title` so
              the hint is there on hover without taking a line of the page. -->
-        <input type="text" id="input" class="v2-well" placeholder="What do you do?" autofocus
+        <input type="text" id="input" data-tut="pen" class="v2-well" placeholder="What do you do?" autofocus
                title="Type what your character does. Put speech in &quot;quotes&quot;.
 /gm asks the engine a question out of character: /gm who is here, /gm what am I carrying, /gm quests.
 /cheat makes something true: /cheat I have 100 gold.">
-        <button type="submit" id="send" class="v2-btn is-go">Say</button>
+        <button type="submit" id="send" data-tut="say" class="v2-btn is-go">Say</button>
       </div>
-      <div class="actions" role="group" aria-label="Other actions">
+      <div class="actions" role="group" aria-label="Other actions" data-tut="pen-actions">
         <!-- For the turn that stops mid-scene: your character keeps to what they were
              doing and the world takes its beat (the owner's ruling on Continue). -->
-        <button type="button" id="carryon" class="v2-btn is-quiet"
+        <button type="button" id="carryon" data-tut="continue" class="v2-btn is-quiet"
                 title="You keep to what you were doing and the scene moves on">Continue</button>
-        <button type="button" id="craftaction" class="v2-btn is-quiet" aria-expanded="false"
+        <button type="button" id="craftaction" data-tut="craft-action" class="v2-btn is-quiet" aria-expanded="false"
                 aria-controls="craftpanel"
                 title="Forage, prospect, skin, gather, buy: every way of getting material"
                 >Craft action</button>
         <!-- Shown by 10-spells.js when the character casts spells at all. Opened by script
              rather than `popovertarget`, because the combat bar's Cast… opens the same
              picker and one opener has to know where the other left it. -->
-        <button type="button" id="spellbtn" class="v2-btn is-quiet" aria-controls="spellpop"
+        <button type="button" id="spellbtn" data-tut="spells-btn" class="v2-btn is-quiet" aria-controls="spellpop"
                 aria-haspopup="dialog" aria-expanded="false"
                 title="Choose a spell to cast this turn" hidden>Spells</button>
+        <!-- The table's tips again (js/tutorials.js). -->
+        <button type="button" class="tut-help" data-tut="help-table" data-tut-help="table"
+                aria-label="Show the tips for the table">?</button>
       </div>
     </form>
     <!-- The spell picker (Lane F). Popover, so Esc and a click outside close it. -->
@@ -4245,14 +4255,14 @@
   <header class="bench-strip v2-card-leather">
     <div class="bench-cap bench-strip-in">
       <h2 class="bench-title" id="bench-title">Herbalism</h2>
-      <div class="bench-methods" id="bench-methods" role="radiogroup"
+      <div class="bench-methods" id="bench-methods" data-tut="bench-methods" role="radiogroup"
            aria-label="Method"></div>
-      <button type="button" class="v2-btn is-quiet bench-close" id="bench-close">Close</button>
+      <button type="button" class="v2-btn is-quiet bench-close" id="bench-close" data-tut="bench-close">Close</button>
     </div>
   </header>
 
   <div class="bench-frame">
-    <section class="bench-panel bench-satchel v2-framed v2-tooled-leather" id="bench-satchel"
+    <section class="bench-panel bench-satchel v2-framed v2-tooled-leather" id="bench-satchel" data-tut="bench-satchel"
              aria-label="Your satchel">
       <i class="v2-rim" aria-hidden="true"></i>
       <div class="bench-satchel-in" id="bench-satchel-in"></div>
@@ -4263,7 +4273,7 @@
       <ul class="bench-chips" id="bench-chips" aria-label="On the tool"></ul>
       <p class="bench-info" id="bench-info"></p>
       <div class="bench-rollrow">
-        <button type="button" class="v2-btn is-go bench-roll" id="bench-roll" disabled
+        <button type="button" class="v2-btn is-go bench-roll" id="bench-roll" data-tut="bench-roll" disabled
                 aria-describedby="bench-why">Roll Craft</button>
         <span class="bench-why" id="bench-why"></span>
       </div>
@@ -4278,7 +4288,7 @@
     </section>
   </div>
 
-  <footer class="bench-foot v2-card-leather" id="bench-foot">
+  <footer class="bench-foot v2-card-leather" id="bench-foot" data-tut="bench-foot">
     <div class="bench-cap bench-foot-in" id="bench-foot-in"></div>
   </footer>
   <!-- The bench's own popovers: the herbarium card, the confirms, the perk picker and

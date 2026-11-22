@@ -1,0 +1,18 @@
+{
+ "bench.herbalism": {
+  "hash": "77d242d37fe349f6",
+  "v": 1
+ },
+ "map.places": {
+  "hash": "0fd7ed84a46e129f",
+  "v": 1
+ },
+ "map.region": {
+  "hash": "d6f840e2b097941b",
+  "v": 1
+ },
+ "table": {
+  "hash": "b86c9c29ccb0c5e4",
+  "v": 1
+ }
+}

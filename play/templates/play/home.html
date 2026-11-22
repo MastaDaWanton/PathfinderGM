@@ -12,6 +12,8 @@
 <link rel="stylesheet" href="{% asset 'css/theme-v2.css' %}">
 <!-- The skill card (what a skill does in this game), shared with the table. -->
 <link rel="stylesheet" href="{% asset 'css/skillhelp.css' %}">
+<!-- The first-time cards and Settings, Tutorials (js/tutorials.js). -->
+<link rel="stylesheet" href="{% asset 'css/tutorials.css' %}">
 <style>
   @font-face {
     font-family: "Cinzel"; font-style: normal; font-weight: 400; font-display: swap;
@@ -956,6 +958,9 @@
   <a href="/manual" class="manuallink">Manual</a>
 </header>
 
+<!-- The first launch's one line (owner decision D1): tips come as you go. Kept out of
+     #pane, which is drawn again on every change. -->
+<div class="wrap" id="tutwelcome"></div>
 <main><div class="wrap" id="pane"></div></main>
 
 <!-- The player's preferences and the app's sound (Settings, "Sound and motion"). Ahead of
@@ -965,6 +970,7 @@
 <script src="{% asset 'js/music.js' %}"></script>
 <script nonce="{{ request.csp_nonce }}">window.Music && Music.start("ambient");</script>
 <script src="{% asset 'js/skillhelp.js' %}"></script>
+<script src="{% asset 'js/tutorials.js' %}"></script>
 <script nonce="{{ request.csp_nonce }}">
 const STATE = {{ state_json|safe }};
 // Who was just forged, if the forge sent us back here. Opens on the roster rather than
@@ -2096,10 +2102,24 @@ function setGroup(id, title, body) {
     <h2 class="sect" id="${id}">${title}</h2>${body}</section>`;
 }
 
+// Settings, Tutorials: every card, seen or not, with Show me; Show all tips again and
+// Turn tips off (js/tutorials.js draws the list and answers its buttons).
+function tutorialsPanel() {
+  return setGroup("set-tutorials", "Tutorials",
+    `<div id="tut-index">${window.Tutorials ? Tutorials.index() : ""}</div>`);
+}
+// Only the parts that show it are drawn again: the whole pane would drop a half-typed key.
+document.addEventListener("tutorials:change", () => {
+  const box = document.getElementById("tut-index");
+  if (box && window.Tutorials) box.innerHTML = Tutorials.index();
+  const line = document.getElementById("tutwelcome");
+  if (line && window.Tutorials) line.innerHTML = EMBEDDED ? "" : Tutorials.welcome();
+});
+
 function paneSettings() {
   if (!SETTINGS) {
     return `<div class="setcol"><p class="note">Reading the model settings…</p>`
-      + soundPanel() + reportSlot() + `</div>`;
+      + soundPanel() + tutorialsPanel() + reportSlot() + `</div>`;
   }
   const byId = Object.fromEntries(SETTINGS.providers.map(p => [p.id, p]));
   return `<div class="setcol">
@@ -2162,6 +2182,7 @@ function paneSettings() {
     ${narrationPanel()}
     ${gmPanel()}
     ${soundPanel()}
+    ${tutorialsPanel()}
     ${reportSlot()}
     </div>`;
 }

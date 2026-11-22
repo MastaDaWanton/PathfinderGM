@@ -392,10 +392,14 @@ def test_closing_puts_everything_back_and_returns_focus(run):
     assert run["home"] == "a-home"
 
 
+# The tutorials (0.5.0) added a `data-tut` anchor to each footer control and the herb
+# bench's "?" beside Steady mode (js/tutorials.js): attributes and one button, nothing that
+# moves the footer's look. The strings follow, so the byte-for-byte pin still holds.
 _STEADY = ('<button type="button" class="bf-btn bf-steady" role="switch" aria-checked="false" '
-           'data-bench-steady>Steady mode<span class="bf-switch" aria-hidden="true"></span></button>')
-_HERB_BUTTONS = ('<button type="button" class="bf-btn" data-bench-recipes aria-haspopup="dialog">Recipes</button>'
-                 '<button type="button" class="bf-btn" data-bench-herbarium>Herbarium</button>')
+           'data-tut="bench-steady" data-bench-steady>Steady mode<span class="bf-switch" aria-hidden="true"></span></button>')
+_HERB_BUTTONS = ('<button type="button" class="bf-btn" data-bench-recipes data-tut="bench-recipes" aria-haspopup="dialog">Recipes</button>'
+                 '<button type="button" class="bf-btn" data-bench-herbarium data-tut="bench-herbarium">Herbarium</button>'
+                 '<button type="button" class="tut-help" data-tut="help-bench" data-tut-help="bench.herbalism" aria-label="Show the tips for this bench">?</button>')
 
 
 def test_the_herb_footer_is_byte_for_byte_what_it_was(run):
@@ -410,7 +414,7 @@ def test_the_herb_footer_is_byte_for_byte_what_it_was(run):
               '<span class="bf-level">Herbalist 3</span>'
               '<span class="bf-line" aria-hidden="true"><i style="transform:scaleX(0.250)"></i></span>'
               '<span class="bf-mp">10 / 40</span></span>'
-              '<button type="button" class="bf-btn bf-perks" data-bench-perks>2 perks to pick</button>'
+              '<button type="button" class="bf-btn bf-perks" data-bench-perks data-tut="bench-perks">2 perks to pick</button>'
               '<span class="bf-gap"></span>' + _HERB_BUTTONS + _STEADY)
     assert run["herbFoot"] == expect
     top = ('<span class="bf-clock" id="bench-clock">Day 3, 4pm</span>'
@@ -418,7 +422,7 @@ def test_the_herb_footer_is_byte_for_byte_what_it_was(run):
            '<span class="bf-level">Herbalist 5</span>'
            '<span class="bf-line" aria-hidden="true"><i style="transform:scaleX(1.000)"></i></span>'
            '<span class="bf-mp">120 mastery</span></span>'
-           '<button type="button" class="bf-btn bf-perks" data-bench-perks>1 perk to pick</button>'
+           '<button type="button" class="bf-btn bf-perks" data-bench-perks data-tut="bench-perks">1 perk to pick</button>'
            '<span class="bf-gap"></span>' + _HERB_BUTTONS + _STEADY)
     assert run["herbFootTop"] == top
 

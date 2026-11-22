@@ -174,13 +174,20 @@
   }
 
   // The first-time card stays until the player has scored 0.6 or better in that game. The
-  // storage can be absent or throw (a private window, blocked site data), and then the card
-  // simply shows again: never an error.
+  // mark is the tutorials store's (js/tutorials.js, the data folder's tutorials.json), so a
+  // phone on the LAN or a launch on another port knows it too; the old per-browser keys are
+  // moved into it once (Tutorials.migrateGames). Tips turned off count as seen. Before the
+  // store has answered, or on a page without it, this browser's storage still serves, and
+  // storage that is absent or throws just means the card shows again: never an error.
   function seenGet(method) {
+    var T = window.Tutorials, got = T && typeof T.gameSeen === "function" ? T.gameSeen(method) : null;
+    if (got !== null) return got;
     try { return window.localStorage.getItem("pgm.games.seen." + method) === "1"; }
     catch (e) { return false; }
   }
   function seenSet(method) {
+    var T = window.Tutorials;
+    if (T && typeof T.ready === "function" && T.ready()) { T.markGame(method); return; }
     try { window.localStorage.setItem("pgm.games.seen." + method, "1"); }
     catch (e) { /* the card will show again next time; that is all */ }
   }
@@ -1991,9 +1998,11 @@
         catch (e) { r.stage = null; }
       }
       // The first-time card: two seconds, then the game starts by itself; Space or a click
-      // starts it sooner. Shown until the player scores 0.6 or better in this game.
+      // starts it sooner. Shown until the player scores 0.6 or better in this game. The ?
+      // on the strip pauses a game and brings this card back (owner decision D7, 2026-11-21:
+      // keep the start, say how to pause).
       if (!seenGet(def.id)) {
-        showCard(r, def.first, "Space or click to begin");
+        showCard(r, def.first, "Space or click to begin. The ? pauses the game.");
         r.cardTimer = setTimeout(function () { if (run === r && r.phase === "card") start(r); }, 2000);
       } else {
         start(r);

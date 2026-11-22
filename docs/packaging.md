@@ -408,6 +408,11 @@ build rather than trusting it.
    pointer. `unreachable` (2026-10-30) names a turn's buttons or the pen squeezed into a
    box too short to show them whole: at 794x608 in a fight, End turn sat in a 17px strip
    of the desk's choices, and the story's paragraph lay over the part that showed.
+   Run it twice more (0.5.0, the tutorials): once with tips off, exactly as above, and
+   once per table card with one open (`window.HIT_TEST_TUTORIAL = "table"`, run, run
+   again; then `"map.places"` and `"map.region"` on the Map), at every release size.
+   `card.problems` must be empty too: no card over End turn, Commit, the pen or Say,
+   none over the focused control, none over a quarter of the window.
    **Close that browser tab when done.** The page sends heartbeats, and the packaged
    backend binds the same port (8917) every time, so a tab left open keeps the next
    backend alive. On 2026-10-16 a tab left from 0.2.18's hit test made 0.2.19's

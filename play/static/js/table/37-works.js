@@ -172,7 +172,7 @@
 
   // The footer button every bench's footer carries (29's `renderFoot` asks for it).
   W.footButton = function () {
-    return '<button type="button" class="bf-btn wk-foot" data-works-open aria-haspopup="dialog"' +
+    return '<button type="button" class="bf-btn wk-foot" data-works-open data-tut="works" aria-haspopup="dialog"' +
       ' aria-controls="works">In progress<span class="wk-count">' + countHtml(summary) + '</span></button>';
   };
 

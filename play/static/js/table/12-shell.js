@@ -217,6 +217,8 @@ shellPaint(SHELL_MODE, false);
     layer.hidden = true;
     frame.src = "about:blank";
     btn.focus();
+    // Settings, Tutorials may have turned tips off or shown them all again.
+    if (window.Tutorials) Tutorials.load();
   }
   btn.addEventListener("click", () => open());
   close.addEventListener("click", shut);
@@ -229,6 +231,28 @@ shellPaint(SHELL_MODE, false);
   });
   window.addEventListener("message", e => {
     if (e.origin === location.origin && e.data && e.data.pgm === "close-settings") shut();
+    // Settings, Tutorials' Show me, from inside the frame: the card shows on the table.
+    if (e.origin === location.origin && e.data && e.data.pgm === "tutorial-show"
+        && typeof e.data.id === "string" && window.Tutorials) {
+      shut();
+      Tutorials.show(e.data.id);
+    }
   });
   layer.addEventListener("click", e => { if (e.target === layer) shut(); });
 })();
+
+// The table's first-time card (js/tutorials.js, content/tutorials/table.json): once the
+// story has its opening on the page, so the card is about a table with something on it.
+// The card itself waits while the pen holds words (tutorials.js `blocked`).
+onRender(function tableTips() {
+  if (!window.Tutorials || Shell.mode() !== "table") return;
+  const story = document.getElementById("story");
+  if (story && story.children.length) {
+    Tutorials.arrive("table", { still: () => Shell.mode() === "table" });
+  }
+});
+if (window.Tutorials) {
+  Tutorials.reach("table", () => Shell.show("table"));
+  // The minigames' old per-browser marks move into the store, once (tutorials.js).
+  Tutorials.migrateGames();
+}

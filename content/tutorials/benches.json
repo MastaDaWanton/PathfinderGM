@@ -1,0 +1,59 @@
+{
+  "_note": "Tutorials for the craft benches. The same rules as table.json's note. The minigames' own first cards (33-bench-games.js) are not here: they keep their own words and their own rule (shown until you score well), and only their seen marks live in the tutorials store.",
+  "order": 7,
+  "group": "Benches",
+  "tutorials": [
+    {
+      "id": "bench.herbalism",
+      "v": 1,
+      "title": "The herbalism bench",
+      "manual": "herbalism",
+      "root": "bench-methods",
+      "steps": [
+        {
+          "since": 1,
+          "anchor": "bench-methods",
+          "title": "Methods",
+          "words": "The methods of the craft run along the top, and the number keys pick them too. A locked method opens at a higher herbalism level, and says which.",
+          "source": {"file": "rules/crafting.py", "literal": "\"lock_reason\": f\"Herbalist {need}\" if locked else \"\""}
+        },
+        {
+          "since": 1,
+          "anchor": "bench-satchel",
+          "title": "Your satchel",
+          "words": "On the left is what you carry that this method can work. Drag an ingredient onto the tool, click it, or press Enter on it. Anything that cannot go on the tool says why."
+        },
+        {
+          "since": 1,
+          "anchor": "bench-roll",
+          "title": "Roll Craft",
+          "words": "Roll Craft throws your Craft check. On a success a short game plays, and how well you play sets the quality, up to the best your herbalism level allows. The column on the right shows that ladder.",
+          "controls": [{"tut": "bench-roll", "label": "Roll Craft"}],
+          "source": {"file": "rules/worldclass.py", "literal": "def ceiling_index("}
+        },
+        {
+          "since": 1,
+          "anchor": "bench-foot",
+          "title": "Long work",
+          "words": "A step of {herb_in_progress_hours} hour or longer goes In progress. You carry it with you, and it finishes in its own time while you play.",
+          "controls": [{"tut": "works", "label": "In progress"}],
+          "source": {"file": "rules/crafting.py", "literal": "int(rows.get(\"in_progress_after\", 60))"}
+        },
+        {
+          "since": 1,
+          "anchor": "bench-foot",
+          "title": "Buttons along the foot",
+          "buttons": [
+            {"tut": "bench-recipes", "label": "Recipes", "words": "Steps you saved, to run again."},
+            {"tut": "bench-herbarium", "label": "Herbarium", "words": "What you know of each herb, in the Journal."},
+            {"tut": "bench-manuals", "label": "Manuals", "words": "Read a herbal manual you carry; reading takes hours."},
+            {"tut": "bench-perks", "label": "perks to pick", "words": "Past the top level, each level gives perks to choose."},
+            {"tut": "bench-steady", "label": "Steady mode", "words": "Slower games, and every hold becomes a press."},
+            {"tut": "help-bench", "label": "?", "words": "Shows these tips again."},
+            {"tut": "bench-close", "label": "Close", "words": "Back to the table. Esc does the same."}
+          ]
+        }
+      ]
+    }
+  ]
+}
