@@ -1,0 +1,189 @@
+{
+  "_about": [
+    "The skill uses this game resolves: the engine computes the DC or the opposed roll AND",
+    "applies the consequence (docs/implementation-audit-2026-11-22.md, lane E). Keyed",
+    "skill.<skill>.<use>, the id a feat or a ledger line names. Read by rules/skilluses.py.",
+    "",
+    "skill: the engine's skill id (rules/tables.py SKILLS); a Knowledge use names the",
+    "  family and the row's `by_type` says which Knowledge.",
+    "resolved_by: the file that makes it true and a literal piece of it; tests/test_skill_uses.py",
+    "  reads every one back, as tests/test_skill_help.py reads the hover's `uses`.",
+    "dc: a formula over the subject's sheet (rules/resources.py, `variables`) plus the names in",
+    "  `dc_names`, which only the reader knows. Absent where the DC is another table's",
+    "  (attitude, the trap's own number) or an opposed roll.",
+    "action: the action it costs in a fight: free, none (part of another action), move,",
+    "  standard, full-round, or time (hours out of a fight).",
+    "faster_with: the standing tag that makes it a cheaper action, and which (a feat document",
+    "  in content/feats/mechanics/skills.json grants it).",
+    "outcome: what success lays, in the tag framework. `$by` and `$of` are refs the reader fills.",
+    "",
+    "content/rules/skills-explained.json's `not_yet_uses` names, per skill, the uses its",
+    "`not_yet` line says are missing; a use named there that is also a row here is a stale",
+    "line, and the suite fails on it (tests/test_skill_uses.py)."
+  ],
+  "skill.bluff.feint": {
+    "name": "feint",
+    "skill": "bluff",
+    "source": "CRB, Bluff (Feint) and Combat (Feint): 'The DC of this check is equal to 10 + your opponent's base attack bonus + your opponent's Wisdom modifier. If your opponent is trained in Sense Motive, the DC is instead equal to 10 + your opponent's Sense Motive bonus, if higher.' 'When feinting against a non-humanoid you take a -4 penalty. Against a creature of animal Intelligence (1 or 2), you take a -8 penalty. Against a creature lacking an Intelligence score, it's impossible.' 'the next melee attack you make against the target does not allow him to use his Dexterity bonus to AC (if any). This attack must be made on or before your next turn.' Feinting is a standard action.",
+    "dc": "max(10 + bab + wis_mod, 10 + sense_motive)",
+    "dc_names": ["sense_motive"],
+    "penalties": {"non_humanoid": -4, "animal_intelligence": -8},
+    "action": "standard",
+    "faster_with": {"tag": "skill.bluff.feint.move-action", "action": "move"},
+    "outcome": {"tag": "state.feinted.$by", "rounds": 2,
+                "greater_tag": "skill.bluff.feint.greater", "greater_grants": "state.exposed.feinted",
+                "greater_rounds": 1},
+    "resolved_by": {"file": "rules/skilluses.py", "find": "def feint(engine, intent, actor, mods, partial)"}
+  },
+  "skill.acrobatics.tumble": {
+    "name": "tumble past a foe's reach",
+    "skill": "acrobatics",
+    "source": "CRB, Acrobatics: moving through a threatened area, DC = the opponent's CMD, 'This penalty increases by +2 for each additional opponent avoided in one round'; 'When moving in this way, you move at half speed. You can move at full speed by increasing the DC of the check by 10.' 'You cannot use Acrobatics to move past foes if your speed is reduced due to carrying a medium or heavy load or wearing medium or heavy armor.' Action: none, part of the move.",
+    "dc": "cmd + 2 * avoided + 10 * full_speed",
+    "dc_names": ["cmd", "avoided", "full_speed"],
+    "action": "none",
+    "outcome": {"tag": "movement.unprovoking.$of", "rounds": 1},
+    "resolved_by": {"file": "rules/skilluses.py", "find": "def tumble(engine, intent, actor, mods, partial)"}
+  },
+  "skill.knowledge.monster-lore": {
+    "name": "identify a creature",
+    "skill": "knowledge",
+    "source": "CRB, Knowledge: 'In general, the DC of such a check equals 10 + the monster's CR. For common monsters, such as goblins, the DC of this check equals 5 + the monster's CR... A successful check allows you to remember a bit of useful information about that monster. For every 5 points by which your check result exceeds the DC, you recall another piece of useful information.' 'You cannot make an untrained Knowledge check with a DC higher than 10.' Retry: no. The creature-type table is the same page's.",
+    "dc": "10 + cr",
+    "dc_names": ["cr"],
+    "action": "free",
+    "by_type": {
+      "construct": "knowledge (arcana)", "dragon": "knowledge (arcana)",
+      "magical beast": "knowledge (arcana)",
+      "aberration": "knowledge (dungeoneering)", "ooze": "knowledge (dungeoneering)",
+      "humanoid": "knowledge (local)",
+      "animal": "knowledge (nature)", "fey": "knowledge (nature)",
+      "monstrous humanoid": "knowledge (nature)", "plant": "knowledge (nature)",
+      "vermin": "knowledge (nature)",
+      "outsider": "knowledge (planes)",
+      "undead": "knowledge (religion)"
+    },
+    "outcome": {"tag": "knows.creature.$of", "facts": "1 + margin // 5"},
+    "resolved_by": {"file": "rules/skilluses.py", "find": "def monster_lore(engine, intent, actor, mods, partial)"}
+  },
+  "skill.heal.first-aid": {
+    "name": "first aid",
+    "skill": "heal",
+    "source": "CRB, Heal: 'You usually use first aid to save a dying character... you can make him stable.' DC 15, a standard action. Bleed (CRB Appendix 2 / Bestiary UMR): 'Bleeding can be stopped by a DC 15 Heal check or through the application of any spell that cures hit point damage.'",
+    "dc": "15",
+    "action": "standard",
+    "resolved_by": {"file": "rules/firstaid.py", "find": "patient.stabilise(\"first aid\")"}
+  },
+  "skill.heal.stop-bleeding": {
+    "name": "stop bleeding",
+    "skill": "heal",
+    "source": "Bleed (CRB Appendix 2; Bestiary Universal Monster Rules): 'Bleeding can be stopped by a DC 15 Heal check or through the application of any spell that cures hit point damage.' The bleed tell's own promise (Engine._rider_bleed).",
+    "dc": "15",
+    "action": "standard",
+    "resolved_by": {"file": "rules/firstaid.py", "find": "def stanch(patient, by: str)"}
+  },
+  "skill.heal.long-term-care": {
+    "name": "long-term care",
+    "skill": "heal",
+    "source": "CRB, Heal: 'Providing long-term care means treating a wounded person for a day or more. If your Heal check is successful, the patient recovers hit points or ability score points lost to ability damage at twice the normal rate: 2 hit points per level for a full 8 hours of rest in a day.' 'You can tend as many as six patients at a time.' 'You cannot give long-term care to yourself.' DC 15, 8 hours.",
+    "dc": "15",
+    "action": "time",
+    "outcome": {"tag": "care.long-term", "most_patients": 6},
+    "resolved_by": {"file": "rules/skilluses.py", "find": "def long_term_care(engine, intent, actor, mods, partial)"}
+  },
+  "skill.intimidate.demoralize": {
+    "name": "demoralize",
+    "skill": "intimidate",
+    "source": "CRB p.99 (Intimidate, Demoralize): DC 10 + the target's Hit Dice + its Wisdom modifier; shaken for 1 round, +1 round for every 5 by which the check beats the DC. A standard action.",
+    "dc": "10 + hit_dice + wis_mod",
+    "action": "standard",
+    "resolved_by": {"file": "rules/engine.py", "find": "def _demoralize(self, actor, target, margin: int, demand: str):"}
+  },
+  "skill.intimidate.dazzling-display": {
+    "name": "Dazzling Display",
+    "skill": "intimidate",
+    "source": "CRB, Dazzling Display (d20pfsrd.com): 'While wielding the weapon in which you have Weapon Focus, you can perform a bewildering show of prowess as a full-round action. Make an Intimidate check to demoralize all foes within 30 feet who can see your display.'",
+    "dc": "10 + hit_dice + wis_mod",
+    "action": "full-round",
+    "needs_tag": "skill.intimidate.dazzling-display",
+    "range_ft": 30,
+    "resolved_by": {"file": "rules/skilluses.py", "find": "def dazzling_display(engine, intent, actor, mods, partial)"}
+  },
+  "skill.intimidate.influence": {
+    "name": "influence attitude",
+    "skill": "intimidate",
+    "source": "CRB p.99 (Intimidate): friendly for 1d6 x 10 minutes, then unfriendly.",
+    "action": "time",
+    "resolved_by": {"file": "rules/engine.py", "find": "def _cowed(self, actor, target, demand: str, because: str, remember, regard_effects):"}
+  },
+  "skill.diplomacy.request": {
+    "name": "make a request",
+    "skill": "diplomacy",
+    "source": "CRB p.93 (Diplomacy, Make Request).",
+    "action": "time",
+    "resolved_by": {"file": "rules/engine.py", "find": "def _make_request(self, intent: Intent, actor, target, mods, partial: dict) -> Outcome:"}
+  },
+  "skill.disable-device.trap": {
+    "name": "disarm a trap",
+    "skill": "disable device",
+    "source": "CRB p.94 (Disable Device): a found trap's own DC.",
+    "action": "time",
+    "resolved_by": {"file": "rules/dungeons.py", "find": "def disarm_lands(engine, actor, trap: dict, margin: int)"}
+  },
+  "skill.disguise.pass": {
+    "name": "pass in disguise",
+    "skill": "disguise",
+    "source": "CRB p.95 (Disguise): the result is the disguise, opposed by each viewer's Perception.",
+    "action": "time",
+    "resolved_by": {"file": "rules/disguise.py", "find": "def passes(viewer, actor) -> bool:"}
+  },
+  "skill.escape-artist.grapple": {
+    "name": "escape a grapple",
+    "skill": "escape artist",
+    "source": "CRB p.200 (Grapple): Escape Artist against the grappler's CMD.",
+    "action": "standard",
+    "resolved_by": {"file": "rules/engine.py", "find": "def _escape_from(self, intent: Intent, actor, holder, partial: dict,"}
+  },
+  "skill.perception.traps": {
+    "name": "find traps and hidden ways",
+    "skill": "perception",
+    "source": "CRB p.102 (Perception): searching, against what hides here.",
+    "action": "move",
+    "resolved_by": {"file": "rules/dungeons.py", "find": "def searched(engine, pc, total: int)"}
+  },
+  "skill.sleight-of-hand.take": {
+    "name": "lift a thing unseen",
+    "skill": "sleight of hand",
+    "source": "CRB p.104 (Sleight of Hand).",
+    "action": "standard",
+    "resolved_by": {"file": "rules/engine.py", "find": "_TAKEN_UNDER = frozenset({\"sleight of hand\", \"stealth\"})"}
+  },
+  "skill.stealth.hidden": {
+    "name": "stay hidden",
+    "skill": "stealth",
+    "source": "CRB p.106 (Stealth): creatures that fail to beat your Stealth are not aware of you.",
+    "action": "move",
+    "resolved_by": {"file": "rules/engine.py", "find": "def _stealth_lands(self, actor, roll, opposed, won: bool,"}
+  },
+  "skill.survival.live-off-land": {
+    "name": "get along in the wild",
+    "skill": "survival",
+    "source": "CRB p.107 (Survival): DC 10, one more person fed per 2 points over.",
+    "action": "time",
+    "resolved_by": {"file": "rules/engine.py", "find": "def _op_live_off_land(self, intent: Intent, partial: dict) -> Outcome:"}
+  },
+  "skill.swim.water": {
+    "name": "swim",
+    "skill": "swim",
+    "source": "CRB, Swim: calm 10, rough 15, stormy 20; no progress, or under.",
+    "action": "move",
+    "resolved_by": {"file": "rules/engine.py", "find": "def swim(self) -> list[str]:"}
+  },
+  "skill.climb.out-of-a-pit": {
+    "name": "climb out of a pit",
+    "skill": "climb",
+    "source": "CRB, Climb: the pit's own DC.",
+    "action": "move",
+    "resolved_by": {"file": "rules/dungeons.py", "find": "def climb_out(engine, intent, actor, partial: dict):"}
+  }
+}

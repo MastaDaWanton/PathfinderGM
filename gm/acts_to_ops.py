@@ -1189,8 +1189,14 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 _exert(row, frame, i, scene, pc)
             if act == "request" and pc is not None:
                 _request(row, a, scene, pc)
-            if act == "threaten" and pc is not None:
+            if act in ("threaten", "use", "other") and pc is not None                     and _dazzling_display(row, a, pc):
+                pass
+            elif act == "threaten" and pc is not None:
                 _threaten(row, a, scene, pc, frame, i, rows)
+            if act == "look" and a.get("recall") and pc is not None and not any(
+                    (t.get("params") or {}).get("skill", "").startswith("knowledge")
+                    for r in rows for t in r.intents):
+                _recall(row, a, scene, pc)       # one recall a turn: one memory searched
             if act == "craft" and pc is not None:
                 _craft(row, a, pc)
             if act == "loot" and pc is not None:
@@ -1258,6 +1264,7 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 row.note = "the same work agreed once already this turn"
             seen.add(who)
     _take_is_the_harvest(rows)
+    _tumbles(rows, frame, scene, pc)
     # One search a turn: "I take my time and go over every brick …, taking twenty on the
     # search" was read as two searches (playtest 2026-11-16, beat 256). The first stands,
     # taking whatever the words took on either.
@@ -2772,10 +2779,10 @@ def first_aid(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list[s
             # there is exactly one — the engine's state, as `firstaid.patient_of` reads it.
             # The question below still decides whether the deed is first aid at all.
             dying_here = [x for x in people.values()
-                          if x is not pc and firstaid.dying(x)]
+                          if x is not pc and firstaid.needs_aid(x)]
             ref = dying_here[0].ref if len(dying_here) == 1 else ""
         patient = people.get(ref) if ref else None
-        if (patient is None or patient is pc or not firstaid.dying(patient)
+        if (patient is None or patient is pc or not firstaid.needs_aid(patient)
                 or patient.ref in tended):
             # One first aid per patient a turn: "I kneel by the porter and try to
             # stabilise him" is two actions of the reading and one Heal check.
@@ -2796,6 +2803,83 @@ def first_aid(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list[s
         row.note = f"first aid to {patient.name}"
         notes.append(row.note)
     return notes
+
+
+# --- skill uses with their own row (lane E, rules/skilluses.py) -----------------------------
+
+def _tumbles(rows: list[Row], frame, scene, pc) -> None:
+    """A move the reading says tumbles past somebody's reach (`interpret` `go.tumble`), in
+    a fight: the Acrobatics check goes in front of each move the row built, aimed at the
+    same square, so the engine rolls it against every foe the move would provoke
+    (`skilluses.tumble`). A tumble with no square built is said, not invented."""
+    if pc is None or not getattr(scene, "in_encounter", False):
+        return
+    actions = (frame or {}).get("actions") or []
+    carried = False
+    for row in rows:
+        a = actions[row.index] if row.index < len(actions) else {}
+        if row.act != "go" or not (a.get("tumble") or carried):
+            carried = False
+            continue
+        moves = [b for b in row.intents if b.get("op") == "move"
+                 and (b.get("params") or {}).get("square")]
+        if not moves:
+            # Read live 2026-11-22 (gemma-4-12B): "I roll under the ogre's swing and come
+            # up at E6" came back as two walks, the tumble at "under the ogre's swing" and
+            # the square on the next. The tumble rides on to the next walk of the line.
+            carried = True
+            row.note = row.note or "a tumble with no square named: carried to the next walk"
+            continue
+        carried = False
+        for b in moves:
+            row.intents.insert(row.intents.index(b), {
+                "op": "check", "actor": pc.ref,
+                "params": {"skill": "acrobatics", "tumble": True,
+                           "square": list(b["params"]["square"])[:2]},
+                "because": "the player tumbles past their foes' reach"})
+        row.note = "a tumble, then the move"
+
+
+def _recall(row: Row, a: dict, scene, pc) -> None:
+    """Recalling what a creature here is (`interpret` `look.recall`): the Knowledge check
+    its type calls for, at DC 10 + its CR (`skilluses.monster_lore`). Who is meant is the
+    engine's finder on the words, else the one the player is dealing with."""
+    from rules import skilluses
+
+    words = " ".join(str(a.get("target") or a.get("object") or "").split())
+    ref = person(scene, words) if words else addressed(scene)
+    if not ref and not words:
+        # Read live 2026-11-22: "I try to recall what I know about the troll" came back
+        # `look, recall` with no target 3 times of 3. The engine's answer: the one
+        # stranger standing here, else in a fight the nearest of them.
+        here = [x.ref for x in _standing_here(scene) if not _ours(x)]
+        ref = here[0] if len(here) == 1 else (
+            nearest(scene, here) if here and getattr(scene, "in_encounter", False) else "")
+    who = (getattr(scene, "actors", {}) or {}).get(ref) if ref else None
+    if who is None or who is pc:
+        row.note = "a recall of nobody here: nothing to roll"
+        return
+    row.intents.append({"op": "check", "actor": pc.ref, "target": who.ref,
+                        "params": {"skill": skilluses.lore_skill(who),
+                                   "dc": {"band": "average"}},
+                        "because": f"the player tries to recall what {who.name} is"})
+    row.note = f"monster lore on {who.name}"
+
+
+def _dazzling_display(row: Row, a: dict, pc) -> bool:
+    """A power named as Dazzling Display, a feat the player holds (`feats.resolve` on the
+    reader's `power` slot: the feat list's own names, never a word list): the Intimidate
+    at every foe who sees it (`skilluses.dazzling_display`). False when it is not."""
+    from rules import feats as feats_mod
+
+    feat, _target = feats_mod.resolve(str(a.get("power") or ""))
+    if feat is None or feat.id != "dazzling-display":
+        return False
+    row.intents.append({"op": "check", "actor": pc.ref,
+                        "params": {"skill": "intimidate", "display": True},
+                        "because": "the player makes a dazzling display"})
+    row.note = "Dazzling Display"
+    return True
 
 
 # --- who a declared blow lands on -------------------------------------------------------------
@@ -3031,6 +3115,15 @@ def victims(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list[str
                                 "params": params})
             row.note = f"{victim.name} is down: " + (
                 "a coup de grâce" if coup else "a blow at helpless AC")
+            notes.append(row.note)
+            continue
+        if a.get("blow") == "feint":
+            # A feint is no blow (lane E, rules/skilluses.py `feint`): the Bluff at the
+            # foe's own DC, which leaves them without their Dexterity against the next.
+            row.intents.append({"op": "check", "actor": pc.ref, "target": victim.ref,
+                                "params": {"skill": "bluff", "feint": True},
+                                "because": f"the player feints at {victim.name}"})
+            row.note = f"a feint at {victim.name} ({victim.ref}): {how}"
             notes.append(row.note)
             continue
         man = MANOEUVRE_OF_BLOW.get(str(a.get("blow") or ""))

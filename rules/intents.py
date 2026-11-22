@@ -310,7 +310,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # `object`, `acts_to_ops._request`), said in the request's tell (`Engine._make_request`).
     "check": (("skill",), ("dc", "opposed_by", "circumstance", "aid", "request", "search",
                            "pace", "diversion", "past", "demand", "take", "wants",
-                           "sought", "seeking"),
+                           "sought", "seeking",
+                           # Lane E (2026-11-22): a skill use with its own row and door
+                           # (rules/skilluses.py OWN_DOORS); `square` is where a tumble goes.
+                           "feint", "tumble", "care", "display", "square"),
               "player"),
     "save": (("save", "dc"), ("on_success", "on_failure", "breaks"), "player"),
     # `player`, because the PC rolls their own to-hit and their own damage. Defaulting
@@ -1038,7 +1041,8 @@ def is_null(value) -> bool:
 FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "failed",
                          "thrown", "quoted", "own", "roll", "defensively", "aid", "past",
                          "coup_de_grace", "search", "diversion", "follow", "deliberate",
-                         "immersed"})
+                         "immersed", "feint", "tumble", "care", "display"})
+from .skilluses import OWN_DOORS as _OWN_DOORS  # noqa: E402 — the uses with their own door
 
 
 def _flag(value) -> bool:
@@ -1444,8 +1448,17 @@ def _check_params(intent: Intent, index: int) -> None:
             raise IntentError("check: a diversion is rolled against every watcher's "
                               "sense motive, by the engine. Drop the dc and opposed_by "
                               "and keep diversion.", "schema", index)
+        # A use with its own row is rolled at the row's DC (rules/skilluses.py OWN_DOORS):
+        # it needs nothing to beat from the plan, and a plan's number beside it is refused.
+        own = next(((sk, flag) for (sk, flag) in _OWN_DOORS if p.get(flag)), None)
+        if own and own[0] != p.get("skill"):
+            raise IntentError(f"check: {own[1]} is a use of {own[0]}. Make that the skill, "
+                              f"or drop {own[1]}.", "schema", index)
+        if own and (p.get("dc") or p.get("opposed_by")):
+            raise IntentError(f"check: {own[1]} is rolled at its own DC, by the engine. Drop "
+                              f"the dc and opposed_by and keep {own[1]}.", "schema", index)
         if not p.get("dc") and not p.get("opposed_by") and not social and not search \
-                and not diversion:
+                and not diversion and not own:
             raise IntentError(
                 "check: a check needs something to beat. Add either "
                 '"dc": {"band": "tough"} (one of ' + ", ".join(DC_BANDS) + "), or "

@@ -1,0 +1,17 @@
+{
+  "_about": [
+    "Lane E (2026-11-22): the feats that change a skill use with its own row in",
+    "content/rules/skill-uses.json. Each grants a standing tag the use's door asks",
+    "(rules/skilluses.py): the tag names the use id, as Owlcat's use categories let a bonus",
+    "aim at one use. Loaded beside core.json by rules/feats.py; nothing here is in core.json."
+  ],
+  "improved-feint": {
+    "tags": ["skill.bluff.feint.move-action"]
+  },
+  "greater-feint": {
+    "tags": ["skill.bluff.feint.greater"]
+  },
+  "dazzling-display": {
+    "tags": ["skill.intimidate.dazzling-display"]
+  }
+}

@@ -251,9 +251,9 @@ def caught_flat_footed(defender) -> bool:
     that conflating it with `is_down` or `can_act` has cost a bug each.
 
     The feint exception in the same paragraph — "can still lose her Dexterity bonus to AC
-    if an opponent successfully uses the feint action against her" — is not implemented
-    because there is no feint action in the app to succeed at. Said rather than silently
-    dropped.
+    if an opponent successfully uses the feint action against her" — holds because the
+    feint never asks this function: `Engine._op_attack` adds the feint's denial after the
+    flat-footed answer (rules/skilluses.py `feinted`, lane E 2026-11-22).
     """
     if defender is None or not defender.has_state(UNCANNY_DODGE):
         return True
