@@ -75,7 +75,8 @@ ARCHETYPES = {
               "feats": ["Toughness", "Combat Casting", "Skill Focus ($skill)", "Iron Will",
                         "Self-Sufficient", "Great Fortitude", "Improved Initiative",
                         "Lightning Reflexes", "Alertness", "Endurance", "Diehard",
-                        "Brew Potion", "Scribe Scroll", "Magical Aptitude"]},
+                        # Brew Potion and Scribe Scroll were here: retired 2026-11-22.
+                        "Magical Aptitude"]},
     "aristocrat": {"class": "aristocrat", "preset": "skill", "armour": "light",
                    "feats": ["Skill Focus ($skill)", "Persuasive", "Iron Will",
                              "Weapon Focus ($weapon)", "Alertness", "Dodge", "Toughness",

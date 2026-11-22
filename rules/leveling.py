@@ -758,8 +758,10 @@ BOOK_ABILITY_EVERY = 4
 #            prerequisites normally required for these feats to select them"
 BONUS_FEAT_RULES: dict[str, dict] = {
     "fighter": {"types": ["combat"], "say": "a combat feat"},
-    "wizard": {"types": ["metamagic", "item creation"], "ids": ["spell-mastery"],
-               "say": "a metamagic or item creation feat, or Spell Mastery"},
+    # The book's "an item creation feat" is gone with the feats (owner 2026-11-22,
+    # `feats.RETIRED`): the circle makes scrolls and wands, so the wizard picks among the rest.
+    "wizard": {"types": ["metamagic"], "ids": ["spell-mastery"],
+               "say": "a metamagic feat or Spell Mastery"},
     "monk": {"ids_by_level": {
         1: ["catch-off-guard", "combat-reflexes", "deflect-arrows", "dodge",
             "improved-grapple", "scorpion-style", "throw-anything"],
@@ -950,6 +952,9 @@ def owed(actor, rules: dict | None = None) -> dict:
             points.append({"for_level": n, "source": "house",
                            "points": got["house_points"]})
 
+    # A retired item creation feat's pick, given back (`Actor.feats_refunded`), first.
+    feats = [{"for_level": 1, "source": "refund"}] * int(
+        getattr(actor, "feats_refunded", 0) or 0) + feats
     feats = feats[int(getattr(actor, "level_feats_taken", 0) or 0):]
     bonus = bonus[int(getattr(actor, "bonus_feats_taken", 0) or 0):]
     spent = int(getattr(actor, "ability_points_taken", 0) or 0)

@@ -143,8 +143,8 @@ def test_a_sun_and_protection_cleric_holds_powers_where_she_held_none():
 
 def test_domains_change_speed_class_skills_and_feats():
     """Travel's +10 ft goes on the base speed, before armour (CRB); Knowledge makes every
-    Knowledge skill a class skill (+3 with a rank); Darkness hands over Blind-Fight and Rune
-    Scribe Scroll at the forge."""
+    Knowledge skill a class skill (+3 with a rank); Darkness hands over Blind-Fight at the
+    forge. Rune's Scribe Scroll is gone with the item creation feats (owner 2026-11-22)."""
     travel = forge("cleric", ability="wis", domains=["Travel", "Knowledge"],
                    skills=["knowledge (history)"])
     assert travel.speed_feet == 40
@@ -152,9 +152,8 @@ def test_domains_change_speed_class_skills_and_feats():
     hist = {m.source: m.value for m in travel.skill_modifiers("knowledge (history)")}
     assert hist.get("class skill") == 3
     dark = forge("cleric", ability="wis", domains=["Darkness", "Rune"])
-    assert {"blind-fight", "scribe scroll"} <= {f.lower().replace(" ", "-")
-                                                if f.lower() == "blind-fight" else f.lower()
-                                                for f in dark.feats}
+    held = {f.lower() for f in dark.feats}
+    assert "blind-fight" in held and "scribe scroll" not in held
 
 
 def test_a_domain_attack_is_used_through_the_one_executor():

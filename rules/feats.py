@@ -39,6 +39,34 @@ NOT_YET = {"proficiency", "first_level_only", "mythic_tier"}
 SIZE_ORDER = ("fine", "diminutive", "tiny", "small", "medium", "large", "huge",
               "gargantuan", "colossal")
 
+# The item creation feats, out of the game (owner ruling 2026-11-22: "Remove item creation
+# feats they are unnecessary, instead build the magic items like wands and scrolls and
+# constructs into the enchanting world class"). The world classes are the makers: the
+# alchemy bench brews, the enchanting circle binds, scribes and makes wands, each gated by
+# its own levels (docs/item-creation-feats-study.md). Left out of `all_feats`, so nothing
+# can pick, grant or qualify by one; a sheet that holds one sheds it on load
+# (`sheet.from_dict`): a player character gets a free feat pick back, a printed creature
+# just loses the line. Master Craftsman stays: its +2 on a Craft or Profession is its own.
+# Demon Grafter and Inscribe Magical Tattoo are tagged item creation too and stay: neither
+# is a book feat the circle replaces (study §3.8).
+RETIRED: frozenset[str] = frozenset({
+    "brew-potion", "scribe-scroll", "craft-wand", "craft-staff", "craft-rod",
+    "craft-wondrous-item", "craft-magic-arms-and-armor", "forge-ring", "craft-construct"})
+
+
+def is_retired(raw) -> bool:
+    """Whether a sheet's feat string names a retired feat (by id or name, target kept off)."""
+    import re
+
+    from .tables import FEAT_TARGET_RE
+
+    if not isinstance(raw, str):
+        raw = (raw or {}).get("id", "") if isinstance(raw, dict) else ""
+    text = str(raw or "").strip()
+    m = re.match(FEAT_TARGET_RE, text, re.IGNORECASE)
+    key = (m.group("feat") if m else text).strip().lower()
+    return key in RETIRED or key.replace(" ", "-") in RETIRED
+
 
 @dataclass
 class Feat:
@@ -139,6 +167,8 @@ def _build_feats() -> dict[str, Feat]:
     # down with no file named (review 2026-11-11, finding 4).
     out: dict[str, Feat] = {}
     for k, v in raw.items():
+        if k in RETIRED:
+            continue
         try:
             out[k] = from_dict(v)
         except Exception as exc:  # noqa: BLE001 — whatever a hand-written file can hold

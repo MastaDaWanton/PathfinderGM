@@ -1,0 +1,19 @@
+{
+  "_about": [
+    "Round 3, spell-items lane (2026-11-22): the item creation feats left the game (owner",
+    "ruling 2026-11-22, rules/feats.py RETIRED). Master Craftsman stays for its +2; the clause",
+    "that made its ranks count as caster level for Craft Magic Arms and Armor and Craft",
+    "Wondrous Item has no feat left to qualify for, so core.json's not_yet about it is dropped",
+    "here (the later file wins)."
+  ],
+  "master-craftsman": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "$target",
+        "amount": 2,
+        "bonus_type": "untyped"
+      }
+    ]
+  }
+}

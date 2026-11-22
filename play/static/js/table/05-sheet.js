@@ -466,6 +466,8 @@ let LVPTS = { spread: {}, busy: false };
 const HOUSE_RHYTHM = { every: "every level", odd: "odd levels", even: "even levels" };
 
 function owedFor(pick) {
+  // A retired item creation feat's pick, given back (rules/leveling.py `owed`).
+  if (pick.source === "refund") return "a retired item creation feat, given back";
   return `level ${pick.for_level}${pick.source === "house" ? " (house rule)" : ""}`;
 }
 

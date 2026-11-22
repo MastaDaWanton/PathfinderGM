@@ -65,7 +65,7 @@
     }
   ],
   "levels": [
-    {"level": 1, "grants": ["arcane bond", "arcane school", "cantrips", "scribe scroll"]},
+    {"level": 1, "grants": ["arcane bond", "arcane school", "cantrips", "bonus feat"]},
     {"level": 2, "grants": []},
     {"level": 3, "grants": []},
     {"level": 4, "grants": []},

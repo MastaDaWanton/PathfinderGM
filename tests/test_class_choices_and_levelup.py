@@ -253,7 +253,9 @@ def test_a_monks_bonus_feat_waives_its_prerequisites_at_the_forge_too():
 def test_the_feats_a_class_grants_are_on_the_sheet():
     monk = forge("monk")
     assert {"improved unarmed strike", "stunning fist"} <= set(monk.feats)
-    assert "scribe scroll" in forge("wizard").feats
+    # Scribe Scroll left the game with the item creation feats (owner 2026-11-22): the
+    # wizard's 1st-level row is a bonus feat now, and the forge writes none for it.
+    assert "scribe scroll" not in forge("wizard").feats
     assert "eschew materials" in forge("sorcerer").feats
     ranger = forge("ranger")
     assert "endurance" not in ranger.feats

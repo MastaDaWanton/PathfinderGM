@@ -66,8 +66,9 @@ def test_the_rogue_finally_has_a_sneak_attack():
 
 def test_the_wizards_school_and_bond_are_at_first_level():
     at = {r["level"]: r.get("grants", []) for r in _rows("wizard")}
-    assert {"arcane bond", "arcane school", "cantrips", "scribe scroll"} <= set(at[1])
-    assert [lvl for lvl, g in at.items() if "bonus feat" in g] == [5, 10, 15, 20]
+    # Scribe Scroll's row is a bonus feat since the item creation feats left (2026-11-22).
+    assert {"arcane bond", "arcane school", "cantrips", "bonus feat"} <= set(at[1])
+    assert [lvl for lvl, g in at.items() if "bonus feat" in g] == [1, 5, 10, 15, 20]
 
 
 def test_the_proficiencies_are_the_ones_the_book_gives():

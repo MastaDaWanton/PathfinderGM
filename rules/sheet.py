@@ -595,6 +595,10 @@ class Actor:
     level_feats_taken: int = 0
     bonus_feats_taken: int = 0
     ability_points_taken: int = 0
+    # Feat picks given back when a retired feat left the sheet (`feats.RETIRED`, the item
+    # creation feats, owner 2026-11-22): `leveling.owed` offers each as one more general
+    # feat, taken through `level_feats_taken` like any other. Written only when nonzero.
+    feats_refunded: int = 0
     # What this character has learned about herbs (docs/herbalism-revamp-plan.md §8): an
     # ingredient id to {"keys": [property keys], "how": {key: "tasted, day 14"}}. Owned by
     # `rules/herbknowledge.py`, which is the only thing that reads or writes it, so the
@@ -8743,7 +8747,8 @@ def to_dict(actor: Actor) -> dict:
         d["spell_swaps"] = sorted(int(n) for n in actor.spell_swaps)
     # The level-up picks taken, on the same rule: only when some were, so a save from
     # before they existed reads back byte for byte.
-    for key in ("level_feats_taken", "bonus_feats_taken", "ability_points_taken"):
+    for key in ("level_feats_taken", "bonus_feats_taken", "ability_points_taken",
+                "feats_refunded"):
         if int(getattr(actor, key, 0) or 0):
             d[key] = int(getattr(actor, key))
     # The herbalism revamp's two stores, on the same rule: only when there is something
@@ -9181,7 +9186,8 @@ def _current_feats(feats: list) -> list[str]:
         return []
     from . import feats as feats_mod
 
-    return [feats_mod.current_name(f) if isinstance(f, str) else f for f in feats]
+    return [feats_mod.current_name(f) if isinstance(f, str) else f for f in feats
+            if not feats_mod.is_retired(f)]
 
 
 def material_renames() -> dict[str, str]:
@@ -9462,8 +9468,17 @@ def from_dict(data: dict, ref: str | None = None) -> Actor:
     a.manuals_read = [str(m) for m in (data.get("manuals_read") or [])]
     # Absent is zero here, unlike the spells: nothing granted a feat or an ability point
     # after creation before these counters existed, so an older save has taken none.
-    for key in ("level_feats_taken", "bonus_feats_taken", "ability_points_taken"):
+    for key in ("level_feats_taken", "bonus_feats_taken", "ability_points_taken",
+                "feats_refunded"):
         setattr(a, key, max(0, int(data.get(key) or 0)))
+    # A retired item creation feat leaves the sheet (`feats.RETIRED`): a player character
+    # is given the pick back to spend on the Class card, a printed creature or an NPC just
+    # loses the line, with no note (the circle and the alchemy bench make what it made).
+    from . import feats as feats_mod
+
+    shed = sum(1 for f in data.get("feats") or () if feats_mod.is_retired(f))
+    if shed and a.is_pc:
+        a.feats_refunded += shed
     a.spell_swaps = sorted({int(n) for n in data.get("spell_swaps") or []
                             if str(n).lstrip("-").isdigit()})
     if "level_spells_taken" in data:

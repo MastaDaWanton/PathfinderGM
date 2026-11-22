@@ -1018,16 +1018,6 @@
   "Rune": {
    "powers": [
     {
-     "key": "rune bonus feat",
-     "name": "Scribe Scroll",
-     "level": 1,
-     "kind": "Ex",
-     "line": "Scribe Scroll as a bonus feat.",
-     "feats": [
-      "scribe-scroll"
-     ]
-    },
-    {
      "key": "blast rune",
      "name": "Blast Rune",
      "level": 1,
