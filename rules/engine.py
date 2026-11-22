@@ -10020,11 +10020,17 @@ class Engine:
         # rot grub. Swift Strikes: Corvin T. strikes again ..." on 3 of 3 blows that turn).
         # Said up front it also promised a blow at a grub the first swing then dropped.
         swift_at, swift_extra = None, 0
-        if (not coup and not dancing and leveling_mod.has_passive(actor, "swift strikes")
+        # A reached passive's `repeat_swings` (Battle Blood's Swift Strikes), read by field
+        # rather than by the passive's name (audit 2026-11-22, law 1).
+        repeat = next((g for g in leveling_mod.passive_grants(actor)
+                       if isinstance(g.get("repeat_swings"), dict)), None)
+        if (not coup and not dancing and repeat
                 and f"{actor.ref}>{defender.ref}" in self.scene.attacked):
-            swift_extra = 2 if full else 1
-            swift_at = len(sequence)
-            sequence = list(sequence) + [sequence[0]] * swift_extra
+            swift_extra = int(repeat["repeat_swings"].get("full" if full else "standard", 0)
+                              or 0)
+            if swift_extra:
+                swift_at = len(sequence)
+                sequence = list(sequence) + [sequence[0]] * swift_extra
 
         # Said once, before the first die: a narrator told only "the attack misses" has
         # no way to know the player was trying to take the man alive.
@@ -10062,7 +10068,7 @@ class Engine:
             if swift_at is not None and state["i"] == swift_at                     and not state.get("swift_said"):
                 state["swift_said"] = True
                 state["tells"].append(
-                    f"Swift Strikes gives {actor.name} "
+                    f"{repeat['name']} gives {actor.name} "
                     f"{'two more swings' if swift_extra == 2 else 'one more swing'} at "
                     f"{defender.name}.")
             # One round a shot, iteratives included, spent as it is loosed — once per

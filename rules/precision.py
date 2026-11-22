@@ -49,7 +49,6 @@ from __future__ import annotations
 import logging
 import re
 
-from . import classes as classes_mod
 
 # How far a ranged sneak attack reaches. The rogue's own text, and it is a hard edge
 # rather than a penalty: past it the dice simply do not apply.
@@ -61,28 +60,28 @@ IMMUNE_TRAITS = frozenset({"ooze traits", "elemental traits"})
 # Held apart on purpose: believed immune, not confirmed on the source pages. See header.
 IMMUNE_SUBTYPES_UNSOURCED = frozenset({"incorporeal", "swarm"})
 
-# "sneak attack 3d6" on a class table row.
-_SNEAK = re.compile(r"sneak attack\s+(\d+d\d+)", re.I)
-
-
 def dice_for(actor) -> str:
     """The sneak attack dice this character's class table grants by their level, or "".
 
     Read off the table rather than computed from the level, because the table is the
     document and a class that grants it on a different ladder — an archetype, a homebrew
     class on the bench — is then right for free. Group 13 wrote the rogue's ladder down;
-    this reads it.
+    this reads it — by the `class.sneak-attack` ladder and its rung's dice
+    (`classfeatures.rungs`, `rung_dice`), the one grammar the other class features use.
+    Until 2026-11-22 it was its own regex over the grant's English (`sneak attack NdN`),
+    outside the three-law ratchet (audit §3.5).
     """
+    from . import classfeatures
+
     cid = str(getattr(actor, "char_class", "") or "")
     if not cid:
         return ""
-    best = ""
-    for level in range(1, int(getattr(actor, "level", 1) or 1) + 1):
-        for grant in classes_mod.table_at(cid, level).get("grants") or []:
-            m = _SNEAK.search(str(grant))
-            if m:
-                best = m.group(1)
-    return best
+    level = int(getattr(actor, "level", 1) or 1)
+    for grant in reversed(classfeatures.rungs(cid, level, classfeatures.SNEAK_ATTACK)):
+        dice = classfeatures.rung_dice(grant)
+        if dice:
+            return dice
+    return ""
 
 
 def _doc_of(defender) -> dict:

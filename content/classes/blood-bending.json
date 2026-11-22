@@ -1254,6 +1254,10 @@
         "Blood Rage": "blood rage"
       },
       "grants": {
+        "Swift Strikes": {
+          "repeat_swings": {"standard": 1, "full": 2},
+          "_note": "'every subsequent attack action against that same target strikes twice: +1 extra attack on a standard action, +2 on a full-round action, at the same bonus.' Read by the attack op off `leveling.passive_grants` (audit 2026-11-22: the engine matched the passive's name)."
+        },
         "Blood Burst": {
           "action": "standard",
           "area": {

@@ -299,7 +299,7 @@ def passive_grants(actor) -> list[dict]:
         for name in det.get("passive") or ():
             doc = (det.get("grants") or {}).get(name)
             if isinstance(doc, dict) and has_passive(actor, str(name)):
-                out.append(doc)
+                out.append({**doc, "name": doc.get("name") or str(name)})
     return out
 
 
