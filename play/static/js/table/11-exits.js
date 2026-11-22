@@ -251,9 +251,10 @@ function renderPassageOffer(s) {
   const rows = offer.rows || [];
   if (!rows.length || s.awaiting || s.ended) { box.innerHTML = ""; return; }
   const pressed = attachedExitId();
-  box.innerHTML = rows.map(e => `<button type="button" class="passbtn v2-btn"
+  box.innerHTML = rows.map(e => `<button type="button" class="passbtn v2-btn" data-tut="sea-way"
       data-passage="${esc(e.id)}" aria-pressed="${pressed === e.id}">Book passage to ${
       esc(e.name)} · ${esc(e.time_words)}</button>`).join("");
+  if (window.Tutorials) Tutorials.arrive("map.sea");   // the sea's first card (16-tab-map.js)
 }
 
 document.addEventListener("click", e => {

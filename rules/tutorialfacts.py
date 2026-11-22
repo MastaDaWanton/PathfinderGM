@@ -51,6 +51,12 @@ def _herb_in_progress_hours() -> int:
     return max(1, round(minutes / 60))
 
 
+def _knockout_dice() -> str:
+    # A non-lethal coup de grâce's failed save: out this many hours, never dead.
+    from . import coup_de_grace
+    return coup_de_grace.KNOCKOUT_DICE
+
+
 FACTS = {
     "hex_hours_open": lambda: _hex_hours(0),
     "hex_hours_rough": lambda: _hex_hours(1),
@@ -60,6 +66,7 @@ FACTS = {
     "march_dc_step": lambda: _march_dc(2) - _march_dc(1),
     "march_damage": _march_damage,
     "herb_in_progress_hours": _herb_in_progress_hours,
+    "knockout_dice": _knockout_dice,
 }
 
 _FIELD = re.compile(r"\{([a-z_]+)\}")

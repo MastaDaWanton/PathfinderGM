@@ -402,6 +402,26 @@
     setTimeout(function () { present(id, all, false, from || document.activeElement); }, reach[id] ? 120 : 0);
   }
 
+  // --- the inline first-time line (plan §3.1) ---------------------------------------------
+  // For what is already a prompt (the forced-march line): one sentence inside it, where a
+  // card would be a card over a card. The caller writes the returned HTML into its own
+  // markup. Due and tips on, it is marked seen the first time it is drawn and kept for the
+  // rest of this page, so a redraw of the prompt does not snatch it away mid-read. The "?"
+  // and Show me still show it as a card. Written by phase 4 in the shape §3.1 gives; phase 3
+  // builds the same helper for the dice popup, and the merge keeps one.
+  var inlined = {};             // id -> the line, once drawn on this page
+  function inline(id) {
+    var t = D && BY[id];
+    if (!t) return "";
+    if (!(id in inlined)) {
+      if (D.off || !t.due.length) return "";
+      inlined[id] = t.due.map(function (k) { return t.steps[k].words || ""; }).join(" ");
+      t.seen = true; t.due = []; t.updated = false;
+      post({ seen: [id] });
+    }
+    return '<span class="tut-inline">' + esc(inlined[id]) + "</span>";
+  }
+
   document.addEventListener("click", function (e) {
     var b = e.target.closest && e.target.closest("[data-tut-help]");
     if (b) { e.preventDefault(); show(b.dataset.tutHelp, b); return; }
@@ -485,6 +505,7 @@
     ready: function () { return !!D; },
     arrive: arrive,
     show: show,
+    inline: inline,
     reach: function (id, fn) { reach[id] = fn; },
     isOpen: function () { return open ? open.id : ""; },
     close: function () { if (open) finish(open.auto ? "later" : "close"); },

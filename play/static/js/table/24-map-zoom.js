@@ -208,11 +208,11 @@ var MapZoom = (function () {
     Z.view.setAttribute("aria-label",
       `The board. The wheel or plus and minus zoom, 0 fits it, the middle button or arrows pan.${
         is3d() ? " The right button dragged sideways, or Q and E, turn it." : ""}`);
-    Z.view.insertAdjacentHTML("beforeend", `<div class="mapzoom" role="group" aria-label="Zoom">
-      <button type="button" class="v2-btn" data-mapzoom="in" aria-label="Zoom in" title="Zoom in (wheel, +)">+</button>
-      <button type="button" class="v2-btn" data-mapzoom="out" aria-label="Zoom out" title="Zoom out (wheel, minus)">&minus;</button>
-      <button type="button" class="v2-btn" data-mapzoom="fit" aria-label="Fit the whole board" title="Fit the whole board (0)">Fit</button>
-      <button type="button" class="v2-btn" data-mapzoom="me" aria-label="Centre on you" title="Centre on you"${Z.pc ? "" : " disabled"}>You</button>
+    Z.view.insertAdjacentHTML("beforeend", `<div class="mapzoom" role="group" aria-label="Zoom" data-tut="map-zoom">
+      <button type="button" class="v2-btn" data-mapzoom="in" data-tut="zoom-in" aria-label="Zoom in" title="Zoom in (wheel, +)">+</button>
+      <button type="button" class="v2-btn" data-mapzoom="out" data-tut="zoom-out" aria-label="Zoom out" title="Zoom out (wheel, minus)">&minus;</button>
+      <button type="button" class="v2-btn" data-mapzoom="fit" data-tut="zoom-fit" aria-label="Fit the whole board" title="Fit the whole board (0)">Fit</button>
+      <button type="button" class="v2-btn" data-mapzoom="me" data-tut="zoom-me" aria-label="Centre on you" title="Centre on you"${Z.pc ? "" : " disabled"}>You</button>
     </div>`);
     apply();
   }

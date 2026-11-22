@@ -650,8 +650,8 @@ function renderMap(s) {
   const places = typeof mapShowingPlaces === "function" && mapShowingPlaces();
   const pressed = on => `class="v2-btn" aria-pressed="${on && !places ? "true" : "false"}"`;
   const view = `<div class="v2-recess" role="group" aria-label="View">
-      <button type="button" data-mapview="flat" ${pressed(!MAP_3D)}>Flat</button>
-      <button type="button" data-mapview="3d" ${pressed(MAP_3D)}>3D</button></div>${MAP_3D
+      <button type="button" data-mapview="flat" data-tut="map-flat" ${pressed(!MAP_3D)}>Flat</button>
+      <button type="button" data-mapview="3d" data-tut="map-3d" ${pressed(MAP_3D)}>3D</button></div>${MAP_3D
       ? `<div class="v2-recess" role="group" aria-label="Turn the board">
           <button type="button" class="v2-btn" data-mapturn="-1"
                   aria-label="Turn the board left"><span class="long">Turn </span>left</button>
@@ -673,7 +673,7 @@ function renderMap(s) {
   // The key opens OVER the board, never under it (variant D): a key that pushed the foot
   // taller shrank the board while somebody was looking at it. It stays as it was left.
   const sw = (cls, label) => `<span class="mapk"><i class="sw ${cls}" aria-hidden="true"></i>${label}</span>`;
-  const key = `<details class="mapkey"${typeof MAPREAD !== "undefined" && MAPREAD.keyOpen ? " open" : ""}><summary>Key</summary>
+  const key = `<details class="mapkey"${typeof MAPREAD !== "undefined" && MAPREAD.keyOpen ? " open" : ""}><summary data-tut="map-key">Key</summary>
       <div class="mapkeyrow">${sw("k-pc", "You")}${sw("k-ally", "Ally")}${sw("k-foe", "Foe")}${
       sw("k-by", "Bystander")}${s.scene.in_encounter ? sw("k-turn", "Whose turn") : ""}${
       T.provokes ? sw("k-safe", "Move, safe") + sw("k-risky", "Move, provokes") : ""}${
@@ -690,7 +690,7 @@ function renderMap(s) {
   $("#groundctl").innerHTML = view + picker;
   // The readout (25-map-readout.js) is a box of fixed height under the board, so nothing
   // tapped or pointed at changes the board's size.
-  $("#mapwrap").innerHTML = `<div class="boardview">${svg}</div>
+  $("#mapwrap").innerHTML = `<div class="boardview" data-tut="ground-board">${svg}</div>
     <div class="boardfoot"><div id="mapread" class="mapread" aria-live="polite"></div>
       <div class="maprow">${key}${g.about ? `<span class="mapabout" title="${esc(g.about)}">${
         esc(g.about)}</span>` : ""}</div></div>`;

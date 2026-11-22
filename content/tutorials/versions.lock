@@ -39,6 +39,18 @@
   "hash": "25e09b636330fb72",
   "v": 1
  },
+ "fight.bar": {
+  "hash": "6e4420f6f4c9b3f2",
+  "v": 1
+ },
+ "fight.nonlethal": {
+  "hash": "b3f30676091a2aa2",
+  "v": 1
+ },
+ "fight.order": {
+  "hash": "4db0f4e87f3969d0",
+  "v": 1
+ },
  "home.campaign": {
   "hash": "24afa6eebcf0ae8a",
   "v": 1
@@ -63,12 +75,32 @@
   "hash": "384ab14b3ce49952",
   "v": 1
  },
+ "map.ground": {
+  "hash": "6451364c1c910745",
+  "v": 1
+ },
+ "map.march": {
+  "hash": "f9c3b1d7e59f2b08",
+  "v": 1
+ },
  "map.places": {
   "hash": "0fd7ed84a46e129f",
   "v": 1
  },
  "map.region": {
   "hash": "d6f840e2b097941b",
+  "v": 1
+ },
+ "map.sea": {
+  "hash": "1abda5056a818992",
+  "v": 1
+ },
+ "map.site": {
+  "hash": "21c7b8abcf251776",
+  "v": 1
+ },
+ "map.world": {
+  "hash": "afc2adb951bd1ffe",
   "v": 1
  },
  "settings.jobs": {
