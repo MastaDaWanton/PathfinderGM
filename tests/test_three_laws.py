@@ -441,7 +441,20 @@ _REACHES = {
     ("combat_mod", "weapon_dice"): lambda a: a.weapon_dice(),
     ("combat_mod", "crit_confirm"): lambda a: sum(m.value for m in a.confirm_modifiers()),
     ("combat_mod", "ac_moving"): lambda a: a.ac(provoked_by="movement"),
+    # Feat loop b1, 2026-11-22: the caster level a spell is cast at (Spell
+    # Specialization), read by `casting.spell_caster_level` with the spell's context.
+    ("combat_mod", "spell_cl"): lambda a: _spell_cl(a),
+    # And a caster level CHECK (the scroll above one's level, spell resistance).
+    ("combat_mod", "caster_level"):
+        lambda a: sum(m.value for m in a.caster_level_check_modifiers()),
 }
+
+
+def _spell_cl(a) -> int:
+    from rules import casting, spells
+
+    a.char_class, a.level = "wizard", 5          # the probe casts, as a wizard 5
+    return casting.spell_caster_level(a, spells.get("magic-missile"))
 
 
 def _spell_dc(a) -> int:
@@ -456,8 +469,6 @@ _UNREACHED = {
     # touch_ac left this list in stage 2: it reads the typed channels now and drops
     # the three a touch attack ignores, rather than subtracting armour-table numbers
     # from a finished total.
-    "caster_level": "stage 9 — no reader consults it; casting has no check to spend "
-                    "it on yet",
 }
 
 

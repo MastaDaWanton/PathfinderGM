@@ -768,9 +768,52 @@ def save_dc(actor, spell_level: int, spell=None) -> int:
     if spell is not None and hasattr(actor, "_buff_mods"):
         from .dice import stack
 
-        ctx = {"school": str(getattr(spell, "school", "") or "").strip().lower()}
-        dc += sum(m.value for m in stack(actor._buff_mods("combat_mod", "spell_dc", ctx)))
+        dc += sum(m.value for m in stack(actor._buff_mods("combat_mod", "spell_dc",
+                                                          spell_context(spell))))
     return dc
+
+
+def spell_context(spell, **extra) -> dict:
+    """The roll context of anything a spell's numbers are asked through — its save DC, the
+    caster level it is cast at, the check against spell resistance, a concentration check:
+    the spell's school, subschool, id, energy and descriptors, for a feat's `scope`.
+
+    Feat loop b1, 2026-11-22. Only `school` was passed (Spell Focus), so Elemental Focus
+    ("spells that deal damage of the energy type you select"), Spell Specialization (one
+    spell) and Peacemaker (a list of calming spells) had no word to bind to. The energy is
+    what the spell's damage IS as this cast makes it (an Elemental Spell's copy, a chosen
+    energy), from its own documents; `spell_obj` is the spell itself, for the readers that
+    ask more than a word (Allied Spellcaster's "the same spell prepared")."""
+    if spell is None:
+        return dict(extra)
+    from . import spells as spells_mod
+
+    words = lambda v: str(v or "").strip().lower()
+    energy = {words(getattr(spell, "chosen_energy", "")),
+              words(spells_mod.casting_plan(spell, 1).get("damage_type"))
+              if getattr(spell, "effects", None) else ""}
+    energy.discard("")
+    energy.discard("untyped")
+    return {"school": words(getattr(spell, "school", "")),
+            "subschool": words(getattr(spell, "subschool", "")),
+            "spell": words(getattr(spell, "id", "")),
+            "energy": tuple(sorted(energy)),
+            "descriptor": tuple(words(d) for d in getattr(spell, "descriptors", None) or ()),
+            "spell_obj": spell, **extra}
+
+
+def spell_caster_level(actor, spell=None, **extra) -> int:
+    """The caster level this spell is CAST at: `caster_level` and what the funnel adds to
+    it for this spell (`combat_mod` target `spell_cl`, in `spell_context`) — Spell
+    Specialization's +2 for its one spell, Bloatmage Initiate's +1 for its school. With no
+    spell, the bare caster level (a scoped term binds nowhere without a context)."""
+    cl = caster_level(actor)
+    if not cl or spell is None or not hasattr(actor, "_buff_mods"):
+        return cl
+    from .dice import stack
+
+    return max(1, cl + sum(m.value for m in stack(
+        actor._buff_mods("combat_mod", "spell_cl", spell_context(spell, **extra)))))
 
 
 def level_on_list(spell, list_name: str) -> int | None:
@@ -1183,11 +1226,30 @@ CONVERTS_TO = {
 def converts_spontaneously(actor, spell) -> bool:
     """Whether this caster may cast this spell without having prepared it."""
     data = caster_data(actor)
+    if spell is not None and preferred(actor, spell):
+        return True
     starts = CONVERTS_TO.get(str(data.get("list") or "").lower())
     if not starts or spell is None:
         return False
     name = str(getattr(spell, "name", "")).strip().lower()
     return any(name.startswith(s) for s in starts)
+
+
+def preferred(actor, spell) -> bool:
+    """Preferred Spell (APG): "Choose one spell which you have the ability to cast. You can
+    cast that spell spontaneously by sacrificing a prepared spell or spell slot of equal or
+    higher level" — the sheet's parenthetical is the spell, and a book caster must have it
+    in the book (feat loop b1)."""
+    from . import feats as feats_mod
+
+    sid = str(getattr(spell, "id", "") or "")
+    for raw in getattr(actor, "feats", None) or ():
+        doc = feats_mod.document(raw)
+        if doc and doc.get("id") == "preferred-spell" and "-".join(
+                str(doc.get("target") or "").lower().split()) == sid:
+            book = caster_data(actor).get("prepare_from") == "spellbook"
+            return not book or sid in (getattr(actor, "spellbook", None) or [])
+    return False
 
 
 def sacrifice_for(actor, spell_level: int) -> str:
@@ -1215,7 +1277,7 @@ def sacrifice_for(actor, spell_level: int) -> str:
     return best
 
 
-def conversion_source(actor, spell) -> dict | None:
+def conversion_source(actor, spell, meta=()) -> dict | None:
     """Where a spontaneously converted cure comes from, in `cast_source`'s shape plus the
     prepared spell given up (`sacrifice`), or None when it cannot be converted.
 
@@ -1227,7 +1289,14 @@ def conversion_source(actor, spell) -> dict | None:
     lvl = spell_level_for(actor, spell) if spell is not None else None
     if lvl is None or at_will(lvl) or not converts_spontaneously(actor, spell):
         return None
-    given = sacrifice_for(actor, lvl)
+    # A Preferred Spell with metamagic: "This increases the minimum level of the prepared
+    # spell or spell slot you must sacrifice".
+    lift = 0
+    if meta and preferred(actor, spell):
+        from . import metamagic
+
+        lift = metamagic.levels(actor, meta)
+    given = sacrifice_for(actor, lvl + lift)
     if not given:
         return None
     from . import spells as spells_mod
@@ -1237,7 +1306,8 @@ def conversion_source(actor, spell) -> dict | None:
     except KeyError:
         paid = None
     return {"pool": slot_pool(paid if paid is not None else lvl), "key": "", "cost": 1,
-            "level": lvl, "sacrifice": given}
+            "level": lvl, "sacrifice": given,
+            **({"slot": paid if paid is not None else lvl + lift} if lift else {})}
 
 
 def prepared_count(actor, spell_id: str) -> int:

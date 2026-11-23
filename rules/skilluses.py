@@ -483,7 +483,8 @@ def monster_lore(engine, intent, actor, mods, partial):
     value = dc(LORE, target, cr=_cr_of(target))
     try:
         # The creature recalled is what the check is about: Demonologist's "+2 bonus on
-        # all Knowledge checks related to ... demons" asks `when.target` of it.
+        # all Knowledge checks related to ... demons" and Demon Hunter's "+2 on Knowledge
+        # (planes) checks to know the powers and abilities of demons" ask `when.target` of it.
         mods = actor.skill_modifiers(skill, ctx={"target_actor": target})
     except IllegalSheet:
         if value > 10:

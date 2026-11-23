@@ -398,6 +398,24 @@ CONDITIONS: dict[str, dict] = {
     },
 }
 
+# States the engine lays that the book does NOT name as conditions (Appendix 2 is
+# CONDITIONS' authority, `tests/test_reference.py`): a metamagic feat's penalty or gate,
+# read through `Condition.data` exactly as a condition row is.
+SPELL_STATES: dict[str, dict] = {
+    # Feat loop b1, 2026-11-22: what two metamagic feats lay (rules/metamagic.py).
+    # Concussive Spell (UM): "a -2 penalty on attack rolls, saving throws, skill checks, and
+    # ability checks" — shaken's numbers, and no fear in it. Disruptive Spell (APG): a
+    # concentration check for every spell cast, its DC on the condition's payload
+    # (`Engine._concentrate`).
+    "concussed": {
+        "name": "Concussed",
+        "attack": -2, "saves": -2, "skills": -2, "ability_checks": -2,
+        "note": "-2 on attack rolls, saves, skill and ability checks (Concussive Spell)",
+    },
+    "disrupted": {"name": "Disrupted",
+                  "note": "must make a concentration check to cast (Disruptive Spell)"},
+}
+
 # --- Difficulty bands ------------------------------------------------------------
 
 # The PF1e difficulty table's own vocabulary. The GM agent picks one of these words; code

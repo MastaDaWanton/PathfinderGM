@@ -32,7 +32,7 @@ if TYPE_CHECKING:   # annotation names only: each of these imports the sheet bac
 from .dice import Modifier, stack
 from .tables import (
     ABILITIES, ABILITY_FULL, ABILITY_NAMES, ARMOUR, ARMOUR_SPEED,
-    CONDITIONS, FEAT_TARGET_RE, LETHALITY_SWAP_PENALTY,
+    CONDITIONS, SPELL_STATES, FEAT_TARGET_RE, LETHALITY_SWAP_PENALTY,
     MANEUVERS, NON_PROFICIENT_PENALTY, SAVE_ABILITY, SAVES, SHIELDS, SIZES, SKILLS,
     SLOT_ORDER_LEFT, SLOT_ORDER_RIGHT, SLOT_RULES_LIMIT, SLOTS,
     WEAPONS, ENERGY_DAMAGE, ENERGY_VS_OBJECTS_HALVED, ability_modifier, bab_for,
@@ -65,11 +65,12 @@ class Condition:
 
     @property
     def name(self) -> str:
-        return CONDITIONS.get(self.key, {}).get("name", self.key.title())
+        return (CONDITIONS.get(self.key) or SPELL_STATES.get(self.key, {})).get(
+            "name", self.key.title())
 
     @property
     def data(self) -> dict:
-        return CONDITIONS.get(self.key, {})
+        return CONDITIONS.get(self.key) or SPELL_STATES.get(self.key, {})
 
 
 @dataclass
@@ -3211,6 +3212,17 @@ class Actor:
         if am:
             mods.append(Modifier(am, (ability or "int").title()))
         mods.extend(self._buff_mods("combat_mod", "concentration", ctx))
+        return stack(mods)
+
+    def caster_level_check_modifiers(self, ctx: dict | None = None) -> list[Modifier]:
+        """d20 + caster level, and what moves a caster level CHECK — the vocabulary's
+        `combat_mod` target `caster_level`, read by nothing until the feat loop (b1,
+        2026-11-22): the scroll above the reader's level (Cypher Magic's +2) and the check
+        against spell resistance (`Engine._resists`, which adds the spell's own level)."""
+        from . import casting
+
+        mods = [Modifier(casting.caster_level(self), "caster level")]
+        mods.extend(self._buff_mods("combat_mod", "caster_level", ctx))
         return stack(mods)
 
     # --- initiative -------------------------------------------------------------------
@@ -7924,9 +7936,14 @@ def _spell_sheet(actor: Actor) -> dict | None:
         "note": data.get("note", ""),
         # The metamagic feats this caster holds (rules/metamagic.py), for the tab's
         # "prepare with" / "cast with" choices; the engine checks each at the door.
-        "metamagic": [{"id": fid, "name": doc["name"],
-                       "levels": int(doc["metamagic"]["levels"])}
-                      for fid, doc in sorted(metamagic.held(actor).items())],
+        # A stepped feat (Heighten, Reach: rules/metamagic.py) is one choice per step,
+        # "heighten-spell-2" named "Heighten Spell (+2)".
+        "metamagic": [{"id": fid if n == 1 else f"{fid}-{n}",
+                       "name": doc["name"] + (f" (+{n})" if doc["metamagic"].get("steps")
+                                              else ""),
+                       "levels": int(doc["metamagic"]["levels"]) * n}
+                      for fid, doc in sorted(metamagic.held(actor).items())
+                      for n in range(1, int(doc["metamagic"].get("steps") or 1) + 1)],
         # `held`, `open` and `blocked` are the room rule's own answers (casting.open_slots,
         # casting.prepare_refusal), so the Spells tab draws spent / ready / open sockets
         # and disables Prepare with the endpoint's sentence rather than re-deriving the
@@ -8380,8 +8397,8 @@ def _scope_holds(scope, doc: dict, ctx: dict | None) -> bool:
         return True
     if not isinstance(scope, dict) or not ctx:
         return False
-    for key, want in scope.items():
-        want = str(want)
+    for key, raw in scope.items():
+        want = str(raw)
         if want == "$target":
             want = str(doc.get("target") or "")
             if not want:
@@ -8389,10 +8406,21 @@ def _scope_holds(scope, doc: dict, ctx: dict | None) -> bool:
         if key == "weapon":
             have = str((ctx.get("weapon") or {}).get("key", ""))
         else:
-            have = str(ctx.get(key, "") or "")
-        if have.strip().lower() != want.strip().lower():
+            have = ctx.get(key, "") or ""
+        # A spell's roll context answers several words at once (fireball is fire; a
+        # split elemental spell is two energies) and a term may name several (Peacemaker's
+        # list of calming spells): any one in common binds. Spell ids and the sheet's
+        # "Spell Specialization (magic missile)" are the same word (feat loop b1).
+        haves = {_scope_word(h) for h in (have if isinstance(have, (list, tuple, set,
+                                                                   frozenset)) else [have])}
+        wants = {_scope_word(w) for w in (raw if isinstance(raw, (list, tuple)) else [want])}
+        if not haves & wants:
             return False
     return True
+
+
+def _scope_word(word) -> str:
+    return "-".join(str(word or "").strip().lower().split())
 
 
 def _kind_leaf(word) -> str:
@@ -8705,6 +8733,14 @@ def _when_holds(when, ctx: dict | None) -> bool:
                 wanted = value if isinstance(value, (list, tuple)) else [value]
                 if not any(f"{field_name}.{_kind_leaf(v)}" in tags for v in wanted):
                     return False
+        elif key == "ally_adjacent":
+            # A teamwork feat's ally (feat loop b1): one of the allies the engine found
+            # within 5 feet (`Engine._adjacent_allies`) who holds the feat — with a shield
+            # of the weight asked, or the spell being cast ready to cast themselves.
+            if not isinstance(want, dict) or not any(
+                    _ally_answers(ally, want, ctx) for ally in ctx.get("adjacent_allies")
+                    or ()):
+                return False
         elif key in SITUATION_KEYS:
             # Lane F's dependent curses (curses.SITUATION_FACTS), answered off the moment
             # the roll is made in (`Situation`): by day or night, underground or above,
@@ -8743,6 +8779,38 @@ def _when_holds(when, ctx: dict | None) -> bool:
             # a spell and against fear (`Engine._cast_save`) — so a tuple answers by
             # membership.
             if (want not in have) if isinstance(have, tuple) else (have != want):
+                return False
+    return True
+
+
+def _ally_answers(ally, want: dict, ctx: dict) -> bool:
+    """Whether this adjacent ally answers a teamwork clause: holds the feat, carries the
+    shield weight asked (a buckler counts as light: Shielded Caster's "a buckler or a light
+    shield"), and — for `same_spell` — has the spell of the roll prepared or, a
+    spontaneous caster, known with a slot of its level left (Allied Spellcaster)."""
+    from . import casting, feats as feats_mod
+
+    if not any((feats_mod.document(f) or {}).get("id") == want.get("feat")
+               for f in getattr(ally, "feats", None) or ()):
+        return False
+    if want.get("shield"):
+        # By the shield's own bonus: +1 is a buckler or a light shield, +2 and more a
+        # heavy or tower shield (CRB Table 6-6), so a crafted record answers as its base.
+        ac = int((ally.shield_stats() or {}).get("ac", 0) or 0)
+        weight = "heavy" if ac >= 2 else "light" if ac == 1 else ""
+        if weight != want["shield"]:
+            return False
+    if want.get("same_spell"):
+        spell = ctx.get("spell_obj")
+        if spell is None or not casting.is_caster(ally):
+            return False
+        if casting.caster_data(ally).get("kind") == "prepared":
+            if casting.prepared_count(ally, spell.id) <= 0:
+                return False
+        else:
+            lvl = casting.spell_level_for(ally, spell)
+            if spell.id not in (getattr(ally, "spellbook", None) or []) or lvl is None                     or (not casting.at_will(lvl)
+                        and casting.pool_left(ally, casting.slot_pool(lvl)) <= 0):
                 return False
     return True
 

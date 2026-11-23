@@ -1,5 +1,8 @@
 {
- "_about": "Lane C, 2026-11-22: metamagic feats as transforms of a copy of the spell at the cast (rules/metamagic.py). `does` is the transform, `levels` the slot levels it adds (CRB).",
+ "_about": [
+  "Lane C, 2026-11-22: metamagic feats as transforms of a copy of the spell at the cast (rules/metamagic.py). `does` is the transform, `levels` the slot levels it adds (CRB).",
+  "Feat loop b1, 2026-11-22: the rest of the book's metamagic on the same transform. `steps` (Heighten, Reach): the most the cast may name, \"heighten-spell-2\", each costing `levels`. `rider`: what the spell lays on a creature it damages (rules/metamagic.py RIDER_KEYS)."
+ ],
  "extend-spell": {
   "metamagic": {
    "does": "extend",
@@ -41,5 +44,197 @@
    "does": "quicken",
    "levels": 4
   }
+ },
+ "heighten-spell": {
+  "metamagic": {
+   "does": "heighten",
+   "levels": 1,
+   "steps": 8
+  }
+ },
+ "widen-spell": {
+  "metamagic": {
+   "does": "widen",
+   "levels": 3
+  }
+ },
+ "reach-spell": {
+  "metamagic": {
+   "does": "reach",
+   "levels": 1,
+   "steps": 3
+  }
+ },
+ "merciful-spell": {
+  "metamagic": {
+   "does": "merciful",
+   "levels": 0
+  }
+ },
+ "intensified-spell": {
+  "metamagic": {
+   "does": "intensify",
+   "levels": 1
+  }
+ },
+ "elemental-spell": {
+  "metamagic": {
+   "does": "elemental",
+   "levels": 1
+  },
+  "not_yet": [
+   "splitting the damage half to the chosen energy and half to its own type (only the whole replacement is built)",
+   "a caster holding Elemental Spell for two energies cannot name which at the cast: the sheet's last one is used"
+  ]
+ },
+ "piercing-spell": {
+  "metamagic": {
+   "does": "pierce",
+   "levels": 1
+  }
+ },
+ "persistent-spell": {
+  "metamagic": {
+   "does": "persist",
+   "levels": 2
+  }
+ },
+ "focused-spell": {
+  "metamagic": {
+   "does": "focus",
+   "levels": 1
+  }
+ },
+ "selective-spell": {
+  "metamagic": {
+   "does": "select",
+   "levels": 1
+  }
+ },
+ "disruptive-spell": {
+  "metamagic": {
+   "does": "disrupt",
+   "levels": 1
+  },
+  "not_yet": [
+   "the check for spell-like abilities (only cast spells ask it)"
+  ]
+ },
+ "ectoplasmic-spell": {
+  "metamagic": {
+   "does": "ectoplasm",
+   "levels": 1
+  },
+  "not_yet": [
+   "ethereal creatures (the engine has no ethereal state)",
+   "the 50% chance a corporeal non-damaging spell has against the incorporeal, which the engine does not roll for any spell, so the ectoplasmic exemption has nothing to waive there"
+  ]
+ },
+ "dazing-spell": {
+  "metamagic": {
+   "does": "rider",
+   "levels": 3,
+   "rider": {
+    "condition": "dazed",
+    "save": "will"
+   }
+  }
+ },
+ "sickening-spell": {
+  "metamagic": {
+   "does": "rider",
+   "levels": 2,
+   "rider": {
+    "condition": "sickened",
+    "save": "fort"
+   }
+  }
+ },
+ "thundering-spell": {
+  "metamagic": {
+   "does": "rider",
+   "levels": 2,
+   "rider": {
+    "condition": "deafened",
+    "save": "fort"
+   }
+  }
+ },
+ "rime-spell": {
+  "metamagic": {
+   "does": "rider",
+   "levels": 1,
+   "rider": {
+    "condition": "entangled",
+    "needs": [
+     "cold"
+    ],
+    "damage_types": [
+     "cold"
+    ]
+   }
+  }
+ },
+ "flaring-spell": {
+  "metamagic": {
+   "does": "rider",
+   "levels": 1,
+   "rider": {
+    "condition": "dazzled",
+    "needs": [
+     "fire",
+     "light",
+     "electricity"
+    ],
+    "damage_types": [
+     "fire",
+     "electricity"
+    ]
+   }
+  }
+ },
+ "concussive-spell": {
+  "metamagic": {
+   "does": "rider",
+   "levels": 2,
+   "rider": {
+    "condition": "concussed",
+    "needs": [
+     "sonic"
+    ]
+   }
+  }
+ },
+ "burning-spell": {
+  "metamagic": {
+   "does": "rider",
+   "levels": 2,
+   "rider": {
+    "burn": 2,
+    "needs": [
+     "acid",
+     "fire"
+    ],
+    "damage_types": [
+     "acid",
+     "fire"
+    ]
+   }
+  }
+ },
+ "toppling-spell": {
+  "metamagic": {
+   "does": "rider",
+   "levels": 1,
+   "rider": {
+    "trip": true,
+    "needs": [
+     "force"
+    ]
+   }
+  },
+  "not_yet": [
+   "the trip when the force spell MOVES the target without damaging it (no spell's push is a manoeuvre here yet)"
+  ]
  }
 }
