@@ -281,6 +281,22 @@ def feint(engine, intent, actor, mods, partial):
             f"check{dc_mod.by(margin)}: {target.name}'s guard is drawn, and {actor.name}'s "
             f"next melee attack on them, this turn or the next, finds them without their "
             f"Dexterity to their defence.")
+    partners = _feint_partners(engine, actor)
+    for ally in partners:
+        # Feint Partner (UC): "Whenever an ally who also has this feat successfully feints
+        # an opponent, that opponent also loses his Dexterity bonus to AC against the next
+        # attack you make against him before the end of the feinting ally's next turn" —
+        # the same per-feinter tag, in the partner's name, for the same rounds.
+        target.apply_effect(ActiveEffect(
+            name=f"feinted for {ally.name}", kind="situation", key=f"feinted-by-{ally.ref}",
+            source=FEINT_SOURCE, origin="rule:feat-feint-partner", duration="rounds",
+            rounds_left=int(out["rounds"]), tags=(f"{FEINTED}.{ally.ref}",),
+            payload={"by": ally.ref, "partner_of": actor.ref}))
+        effects.append({"ref": target.ref, "kind": "condition", "condition": "feinted",
+                        "by": ally.ref, "origin": "rule:feat-feint-partner"})
+    if partners:
+        said += (f" Feint Partner: {_and(p.name for p in partners)}'s next blow at "
+                 f"{target.name} finds the same opening.")
     if actor.has_state(out["greater_tag"]):
         target.apply_effect(ActiveEffect(
             name=f"off guard from {actor.name}'s feint", kind="situation",
@@ -295,12 +311,39 @@ def feint(engine, intent, actor, mods, partial):
                     margin=margin, effects=effects, tell=said)
 
 
+# Feint Partner's tag (content/feats/mechanics/batch1-maneuvers.json), a teamwork feat:
+# the feinter and the ally must both hold it.
+FEINT_PARTNER = "teamwork.feint-partner"
+
+
+def _feint_partners(engine, actor) -> list:
+    """The feinter's allies in this fight who share Feint Partner with them."""
+    from .position import _same_side
+
+    scene = engine.scene
+    if not actor.has_state(FEINT_PARTNER) or not (getattr(scene, "sides", None) or {}):
+        return []
+    return [o for ref, o in scene.actors.items()
+            if ref != actor.ref and not o.is_down and o.has_state(FEINT_PARTNER)
+            and _same_side(scene, actor.ref, ref)]
+
+
+def _and(names) -> str:
+    names = list(names)
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+
+
 def feinted(defender, attacker, weapon: dict | None) -> bool:
-    """Whether this blow is the feinter's next melee attack on a creature it feinted."""
-    if defender is None or attacker is None or not weapon \
-            or weapon.get("category") == "ranged" or weapon.get("thrown"):
+    """Whether this blow is the feinter's next melee attack on a creature it feinted — or,
+    for a Feint Partner's opening, the partner's next attack of any kind ("the next
+    attack you make against him", UC)."""
+    if defender is None or attacker is None or not weapon:
         return False
-    return defender.has_state(f"{FEINTED}.{attacker.ref}")
+    tag = f"{FEINTED}.{attacker.ref}"
+    if weapon.get("category") == "ranged" or weapon.get("thrown"):
+        return any(tag in (e.tags or ()) and (e.payload or {}).get("partner_of")
+                   for e in defender.effects)
+    return defender.has_state(tag)
 
 
 def spend_feint(defender, attacker, landed: bool = False) -> None:

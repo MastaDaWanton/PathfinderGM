@@ -221,5 +221,8 @@
   },
   "tantrum": {
     "tags": ["skill.bluff.feint.raging"]
+  },
+  "feint-partner": {
+    "tags": ["teamwork.feint-partner"]
   }
 }

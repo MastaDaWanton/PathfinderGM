@@ -486,3 +486,29 @@ def test_a_tantrum_feint_outlasts_a_miss_and_ends_on_the_hit():
                                        "visibility": "hidden", "params": {}}]))
     assert next(o for o in res.outcomes if o.op == "attack").verdict == "hit"
     assert not thug.has_state("state.feinted.pc")
+
+
+def test_feint_partner_opens_the_foe_to_the_partner_too():
+    """UC: "Whenever an ally who also has this feat successfully feints an opponent, that
+    opponent also loses his Dexterity bonus to AC against the next attack you make" — the
+    feinter and the ally must both hold it; a ranged shot from the partner reads it too."""
+    from rules import skilluses
+
+    def feint(kesst_has: bool):
+        scene, engine, pc, thug = _fight(*(["Feint Partner"] if kesst_has else []),
+                                         ally_feats=["Feint Partner"], ally_at=(5, 10))
+        engine.dice = _Faces({"Bluff": 20})
+        pc.feats.append("Improved Feint")
+        scene.acted.update(scene.actors)
+        res = engine.run(engine.validate([{"op": "check", "actor": "pc", "target": "c1",
+                                           "visibility": "hidden",
+                                           "params": {"skill": "bluff", "feint": True}}]))
+        assert next(o for o in res.outcomes if o.op == "check").verdict == "success"
+        return scene, thug
+
+    scene, thug = feint(True)
+    assert thug.has_state("state.feinted.ally")
+    assert skilluses.feinted(thug, scene.get("ally"), {"category": "ranged"})
+    assert not skilluses.feinted(thug, scene.get("pc"), {"category": "ranged"})
+    scene, thug = feint(False)
+    assert not thug.has_state("state.feinted.ally")
