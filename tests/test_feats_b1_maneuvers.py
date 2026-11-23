@@ -367,3 +367,48 @@ def test_dragonheart_on_a_save_against_a_dragons_rider():
     assert any(m["value"] == 1 and "Dragonheart" in str(m.get("source"))
                for m in stung["modifiers"])
     assert not any("Dragonheart" in str(m.get("source")) for m in sapped["modifiers"])
+
+
+# --- a manoeuvre in a swing of the full attack: trip anywhere, Quick X in the first ------
+
+def _slot(feats=(), **params):
+    scene = Scene(location_id="5bbd0c40345f")
+    pc = load_pc("fixtures/pc-borin.json")
+    pc.level = 6                                    # BAB +6: two swings, +6/+1
+    pc.feats = list(pc.feats) + list(feats)
+    scene.add(pc)
+    scene.add(instantiate("thug", scene=scene, name=THUG))
+    engine = Engine(scene, _AimedCMB(10))
+    engine._ensure_encounter("pc")
+    scene.positions["pc"], scene.positions["c1"] = (6, 10), (7, 10)
+    scene.resync_zones()
+    return pc, _maneuver(engine, **params)
+
+
+def test_a_bull_rush_cannot_take_a_swing_without_quick_bull_rush():
+    """UC, Quick Bull Rush: "Normal: A bull rush combat maneuver is a standard action."
+    Before this a swing slot could carry no manoeuvre at all; now the engine says which."""
+    _, out = _slot(key="bull rush", iteration=0)
+    assert out.status == "refused" and "standard action" in out.tell
+    _, out = _slot(["Quick Bull Rush"], key="bull rush", iteration=0)
+    assert out.status != "refused", out.tell
+    _, out = _slot(["Quick Bull Rush"], key="bull rush", iteration=1)
+    assert out.status == "refused" and "first" in out.tell
+
+
+def test_a_trip_stands_in_a_later_swing_at_that_swings_bonus():
+    """CRB: a trip is made "in place of a melee attack" — the second swing's -5 rides it."""
+    pc, out = _slot(key="trip", iteration=1)
+    assert out.status != "refused", out.tell
+    assert _named(_cmb_roll(out), "a later swing") == -5
+
+
+def test_the_combat_bar_offers_each_swing_only_what_the_engine_takes():
+    from play.views import _slot_maneuvers
+
+    pc = load_pc("fixtures/pc-borin.json")
+    pc.level = 6
+    pc.feats = list(pc.feats) + ["Quick Steal"]
+    first, second = _slot_maneuvers(pc)
+    assert set(first) == {"disarm", "sunder", "trip", "steal"}
+    assert set(second) == {"disarm", "sunder", "trip"}

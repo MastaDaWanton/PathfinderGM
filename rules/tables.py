@@ -821,6 +821,10 @@ SHIELDS: dict[str, dict] = {
 #                or sickened" — and nothing in state carried any of it but a dazzle.
 #                The narrator is fed tells and nothing else (the third law), so each of
 #                those was prose asserting a fact the next beat could not find.
+# `in_place_of_attack` — made "in place of a melee attack" (CRB: disarm, sunder, trip), so
+#                one may stand in any swing of a full attack at that swing's bonus; the
+#                others are a standard action, and only a Quick <manoeuvre> feat lets one
+#                take the first swing (UC, Quick Bull Rush ...). Feat loop b1.
 # `sheet`      — plain values for the character sheet, which reads a template with no
 #                fight behind it ("the target drops one item it holds").
 # `short` / `blocked` — the moving manoeuvres' sentences when the ground stops them
@@ -874,6 +878,7 @@ MANEUVERS: dict[str, dict] = {
         "both_hands_at": 10,
         "unarmed_penalty": -4,
         "outcome": "drop",
+        "in_place_of_attack": True,
         "sheet": {"item": "one item it holds (both hands, by 10 or more)"},
     },
     "grapple": {
@@ -904,6 +909,7 @@ MANEUVERS: dict[str, dict] = {
         "name": "sunder",
         "provokes": True,
         "lead": "{actor} [land] a sunder on {target's} gear",
+        "in_place_of_attack": True,
         "effect": "{actor} [damage] an item {target} [are] holding or wearing",
         "damages_item": True,
     },
@@ -917,6 +923,7 @@ MANEUVERS: dict[str, dict] = {
         "backfire": "{actor} [are] knocked prone instead",
         "backfire_condition": "prone",
         "extra_legs_penalty": True,
+        "in_place_of_attack": True,
     },
     # Reposition, APG: the target moves 5 feet (+5 per 5 over) and "must remain within
     # your reach" but for the last 5 feet. The attacker stays put. Where to is the

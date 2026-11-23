@@ -68,7 +68,8 @@ from . import words as english
 from .tables import (
     CONDITIONS,
     ABILITY_FULL, AID_ANOTHER_BONUS, AID_ANOTHER_DC, MANEUVERS, SAVES, SIZE_ORDER,
-    ENERGY_DAMAGE, ability_check_of, maneuver_text, normalise_damage_type,
+    ENERGY_DAMAGE, ability_check_of, iterative_attacks, maneuver_text,
+    normalise_damage_type,
 )
 
 
@@ -10153,6 +10154,10 @@ class Engine:
             # riding it — a trip is not a way to finish somebody.
             full = False
         elif intent.params.get("manoeuvre"):
+            if partial.get("attack_state") is None:
+                why = self._maneuver_slot_refusal(intent, actor)
+                if why:
+                    return self._refuse(intent, why, code="maneuver_slot")
             done = self._resolve_maneuver(intent, actor, defender, weapon_key, partial)
             # A manoeuvre is an attack roll (CMB against CMD) at a creature: it ends a
             # hiding as a blow does. Only one that was rolled — a refusal did nothing.
@@ -11877,6 +11882,37 @@ class Engine:
             params["square"] = square + list(start[2:3])
         raw["params"] = params
 
+    # The tag a Quick <manoeuvre> feat grants (UC): its standard-action manoeuvre may take
+    # the first swing of a full attack. `maneuver.in-place-of-attack.bull-rush` ...
+    IN_PLACE_OF_ATTACK = "maneuver.in-place-of-attack"
+
+    @classmethod
+    def _maneuver_slot_refusal(cls, intent: Intent, actor: Actor) -> str:
+        """Why this manoeuvre cannot stand in the full-attack swing it names (`iteration`),
+        or "". CRB: disarm, sunder and trip are made "in place of a melee attack", so in
+        any swing; every other manoeuvre "is a standard action" (APG, UC: "Normal: A bull
+        rush combat maneuver is a standard action"), and Quick Bull Rush, Dirty Trick,
+        Drag, Reposition and Steal let theirs replace "one of your melee attacks ... the
+        melee attack with the highest base attack bonus" — the first swing. Feat loop b1:
+        before it a swing slot could carry no manoeuvre at all."""
+        it = intent.params.get("iteration")
+        if it is None:
+            return ""
+        key = str(intent.params.get("manoeuvre") or "")
+        m = MANEUVERS.get(key) or {}
+        if m.get("in_place_of_attack"):
+            return ""
+        name = m.get("name", key)
+        tag = f"{cls.IN_PLACE_OF_ATTACK}.{'-'.join(key.split())}"
+        if not actor.has_state(tag):
+            return (f"A {name} is a standard action and cannot take a swing of a full "
+                    f"attack; make it on its own. (Trip, disarm and sunder can stand in "
+                    f"any swing.)")
+        if int(it or 0) != 0:
+            return (f"Quick {name.title()} takes the swing with the highest bonus, the "
+                    f"first of the full attack, not a later one.")
+        return ""
+
     def _resolve_maneuver(self, intent: Intent, actor: Actor, defender: Actor,
                           weapon_key: str, partial: dict) -> Outcome:
         """A combat manoeuvre: the same attack roll, with CMB instead of the attack
@@ -11899,6 +11935,14 @@ class Engine:
         self._ensure_encounter(intent.actor, intent.target)
 
         mods = list(actor.cmb_modifiers(key, defender=defender))
+        # A manoeuvre standing in a later swing of a full attack is made at that swing's
+        # bonus (CRB: "in place of a melee attack"): the iterative's -5, -10, -15.
+        it = intent.params.get("iteration")
+        if it is not None and int(it or 0) > 0:
+            seq = iterative_attacks(actor.bab)
+            step = seq[min(int(it), len(seq) - 1)] - seq[0]
+            if step:
+                mods.append(Modifier(step, "a later swing of the full attack"))
         # Struck by the target while trying it: "apply that amount as a penalty to the
         # attack roll to perform the maneuver" (CRB, aonprd.com/Rules.aspx?ID=188). The
         # wounds before the provoked swing were written by `_provoked_by_maneuver`.

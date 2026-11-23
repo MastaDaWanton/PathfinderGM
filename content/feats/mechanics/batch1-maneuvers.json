@@ -203,5 +203,20 @@
     "not_yet": [
       "elves, half-elves and humans tracking you take no -4 on their Survival checks yet: a feat document moves its bearer's rolls, and the tracker's roll does not ask who is tracked"
     ]
+  },
+  "quick-bull-rush": {
+    "tags": ["maneuver.in-place-of-attack.bull-rush"]
+  },
+  "quick-dirty-trick": {
+    "tags": ["maneuver.in-place-of-attack.dirty-trick"]
+  },
+  "quick-drag": {
+    "tags": ["maneuver.in-place-of-attack.drag"]
+  },
+  "quick-reposition": {
+    "tags": ["maneuver.in-place-of-attack.reposition"]
+  },
+  "quick-steal": {
+    "tags": ["maneuver.in-place-of-attack.steal"]
   }
 }
