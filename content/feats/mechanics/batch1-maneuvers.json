@@ -220,7 +220,7 @@
     "tags": ["maneuver.in-place-of-attack.steal"]
   },
   "tantrum": {
-    "tags": ["skill.bluff.feint.raging"]
+    "tags": ["skill.unforbidden.bluff.feint"]
   },
   "feint-partner": {
     "tags": ["teamwork.feint-partner"]

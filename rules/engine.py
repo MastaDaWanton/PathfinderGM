@@ -38440,8 +38440,9 @@ def _sized_weapon(w: dict, size: str) -> dict:
 def _forbidden_skill(actor, skill: str, use: str = "") -> str:
     """The sentence refusing a skill an effect forbids (`payload.forbids`), or "".
 
-    `use`: the skill's use (`Engine._skill_use_ctx`). Tantrum's feint while raging is
-    let through rage's ban (`skilluses.FEINT_WHILE_RAGING`), and nothing else is."""
+    `use`: the skill's use (`Engine._skill_use_ctx`). A held tag
+    `skill.unforbidden.<skill>.<use>` lets that one use through every ban
+    (`skilluses.UNFORBIDDEN`): Tantrum's feint through the barbarian's, and nothing else."""
     from . import skilluses
     from .tables import ABILITY_FULL, SKILLS
 
@@ -38453,9 +38454,7 @@ def _forbidden_skill(actor, skill: str, use: str = "") -> str:
         rule = (p.get("forbids") or {}).get("skills") or {}
         if not rule:
             continue
-        if (use == "feint" and str(skill).strip().lower() == "bluff"
-                and skilluses.RAGING in (e.tags or ())
-                and actor.has_state(skilluses.FEINT_WHILE_RAGING)):
+        if use and actor.has_state(skilluses.unforbidden_tag(skill, use)):
             continue
         spared = [str(s) for s in rule.get("except") or ()]
         if row[0] in (rule.get("abilities") or ()) and skill.strip().lower() not in spared:

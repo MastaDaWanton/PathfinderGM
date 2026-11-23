@@ -273,8 +273,8 @@ def feint(engine, intent, actor, mods, partial):
         # feinter's next turn and a little past it; a per-turn clock would end it exactly.
         rounds_left=int(out["rounds"]), tags=(f"{FEINTED}.{actor.ref}",),
         payload={"by": actor.ref,
-                 **({"until_hit": True} if actor.has_state(RAGING)
-                    and actor.has_state(FEINT_WHILE_RAGING) else {})}))
+                 **({"until_hit": True} if actor.has_state(RAGE_STANCE)
+                    and actor.has_state(unforbidden_tag("bluff", "feint")) else {})}))
     effects = [{"ref": target.ref, "kind": "condition", "condition": "feinted",
                 "by": actor.ref, "origin": "rule:feint"}]
     said = (f"{actor.name} feints at {target.name}{cost} and makes the bluff "
@@ -356,10 +356,16 @@ def spend_feint(defender, attacker, landed: bool = False) -> None:
         landed or not (e.payload or {}).get("until_hit")))
 
 
-# Tantrum's tag (content/feats/mechanics/batch1-maneuvers.json): "You may use the Bluff
-# skill to feint while raging", which rage's ban on Charisma skills otherwise refuses.
-FEINT_WHILE_RAGING = "skill.bluff.feint.raging"
-RAGING = "buff.stance.rage"
+# A skill use let through an effect's ban on its skill (`Engine._forbidden_skill`):
+# `skill.unforbidden.<skill>.<use>`. Tantrum's (content/feats/mechanics/batch1-
+# maneuvers.json): "You may use the Bluff skill to feint while raging", which rage's ban on
+# Charisma skills otherwise refuses; and its raging feint lasts until a blow lands.
+UNFORBIDDEN = "skill.unforbidden"
+RAGE_STANCE = "buff.stance.rage"
+
+
+def unforbidden_tag(skill: str, use: str) -> str:
+    return f"{UNFORBIDDEN}.{'-'.join(str(skill).strip().lower().split())}.{use}"
 
 
 # --- tumble -----------------------------------------------------------------------------------
