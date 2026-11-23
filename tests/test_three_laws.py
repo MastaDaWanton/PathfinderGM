@@ -441,7 +441,17 @@ _REACHES = {
     ("combat_mod", "weapon_dice"): lambda a: a.weapon_dice(),
     ("combat_mod", "crit_confirm"): lambda a: sum(m.value for m in a.confirm_modifiers()),
     ("combat_mod", "ac_moving"): lambda a: a.ac(provoked_by="movement"),
+    # Feat loop b1, 2026-11-22: the caster level a spell is cast at (Spell
+    # Specialization), read by `casting.spell_caster_level` with the spell's context.
+    ("combat_mod", "spell_cl"): lambda a: _spell_cl(a),
 }
+
+
+def _spell_cl(a) -> int:
+    from rules import casting, spells
+
+    a.char_class, a.level = "wizard", 5          # the probe casts, as a wizard 5
+    return casting.spell_caster_level(a, spells.get("magic-missile"))
 
 
 def _spell_dc(a) -> int:

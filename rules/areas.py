@@ -241,6 +241,10 @@ def shape_of(spell, caster_level: int) -> dict:
             out = {"shape": m.group(2).lower(), "length_ft": int(m.group(1))}
     if out and parsed.get("origin") == "you":
         out["on_you"] = True
+    if out and getattr(spell, "area_scale", 1) != 1:
+        # Widen Spell's copy (rules/metamagic.py): "any numeric measurements of the
+        # spell's area increase by 100%".
+        out["length_ft"] = int(out["length_ft"] * spell.area_scale)
     return out
 
 

@@ -1246,10 +1246,14 @@ def validate_feat_document(feat_id: str, doc) -> list[str]:
             # Trip written so would never add its +2 — `_scope_holds` compares words.
             from .tables import MANEUVERS
 
+            # The spell's own words (feat loop b1, 2026-11-22): `casting.spell_context`
+            # hands every spell roll its school, subschool, id, energy and descriptors.
+            binds = ("weapon", "maneuver", "school", "subschool", "spell", "energy",
+                     "descriptor")
             for key, want in scope.items():
-                if key not in ("weapon", "maneuver", "school"):
+                if key not in binds:
                     problems.append(f"{mat}.scope: {key!r} binds nothing. One of: "
-                                    f"maneuver, school, weapon.")
+                                    f"{', '.join(sorted(binds))}.")
                 elif key == "maneuver" and str(want) not in MANEUVERS:
                     problems.append(f"{mat}.scope.maneuver: {want!r} is not a combat "
                                     f"maneuver. One of: {', '.join(sorted(MANEUVERS))}.")

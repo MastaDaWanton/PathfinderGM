@@ -614,7 +614,13 @@ VOCAB: dict[str, list[dict]] = {
         ("off_hand_attacks", "Off-hand attacks"),
         ("weapon_dice", "Extra weapon damage dice"),
         ("crit_confirm", "Rolls to confirm a critical"),
-        ("ac_moving", "AC against attacks of opportunity for moving"))],
+        ("ac_moving", "AC against attacks of opportunity for moving"),
+        # Feat loop b1, 2026-11-22: the caster level a spell is CAST at, read by
+        # `casting.spell_caster_level` with the spell's roll context (school, spell,
+        # energy, descriptor, subschool) — Spell Specialization's "treat your caster level
+        # as being two higher for all level-variable effects of the spell", Bloatmage
+        # Initiate's "+1 caster level". Not `caster_level`, which is a CHECK's bonus.
+        ("spell_cl", "Caster level of a spell cast"))],
     "sense": [{"id": k, "name": n} for k, n in (
         ("low_light", "Low-light vision"), ("darkvision", "Darkvision"),
         ("scent", "Scent"), ("tremorsense", "Tremorsense"),
@@ -2448,6 +2454,13 @@ WHEN_KEYS: dict[str, str] = {
                    "an extra swing a full attack alone is owed (haste, Rapid Shot)",
     "two_weapon": "which hand of a two-weapon full attack swings: primary or off "
                   "(Actor.attack_modifiers)",
+    # Feat loop b1, 2026-11-22: the teamwork feats' "whenever you are adjacent to an ally
+    # who also has this feat" (Shielded Caster, Allied Spellcaster). The engine hands the
+    # roll the allies standing within 5 feet (`Engine._adjacent_allies`); a roll with no
+    # board passes none and the clause holds for nobody.
+    "ally_adjacent": "an ally within 5 ft who holds the feat named: {\"feat\": "
+                     "\"shielded-caster\"}, optionally \"shield\" (light, heavy) and "
+                     "\"same_spell\" (sheet._when_holds)",
 }
 _WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment", "choice"),
                        "attacker": ("type", "subtype")}
@@ -2487,6 +2500,13 @@ AGAINST: dict[str, str] = {
     "language-dependent": "a language-dependent effect",
     "bardic_performance": "a bard's performance (a class ability's `against`)",
     "tracks": "a Survival check to follow or identify tracks (Engine track op)",
+    # Feat loop b1, 2026-11-22: what a spell's save is against beyond its own data — the
+    # caster's tradition (Divine Defiance's "saving throws against divine spells") and
+    # negative energy (Necromantic Affinity). Added by `Engine._cast_save`; never a bare
+    # energy word, because "cold" is already the cold WEATHER's save (Endurance).
+    "divine_spell": "a spell cast by a divine caster (Engine._cast_save)",
+    "arcane_spell": "a spell cast by an arcane caster (Engine._cast_save)",
+    "negative_energy": "a spell of negative energy, an inflict (Engine._cast_save)",
 }
 
 
@@ -2512,6 +2532,8 @@ CASTING_SITUATIONS: dict[str, str] = {
     "defensively": "casting defensively: DC 15 + double the spell's level",
     "grappled": "casting while grappled: DC 10 + the grappler's CMB + the spell's level",
     "damaged": "struck while casting: DC 10 + the damage taken + the spell's level",
+    "disrupted": "under a disruptive spell: DC its save DC + the spell's level "
+                 "(Disruptive Spell)",
 }
 
 
@@ -2556,6 +2578,14 @@ def when_problems(when, where: str = "when") -> list[str]:
                                f"creature type. One of: {', '.join(CREATURE_TYPES)}.")
             if "alignment" in want and want["alignment"] not in ALIGNMENTS:
                 out.append(f"{where}.{key}.alignment is one of {', '.join(ALIGNMENTS)}.")
+        elif key == "ally_adjacent":
+            if not isinstance(want, dict) or not str(want.get("feat") or "").strip():
+                out.append(f"{where}.ally_adjacent names the feat the ally holds: "
+                           f"{{\"feat\": \"shielded-caster\"}}.")
+            elif sorted(set(want) - {"feat", "shield", "same_spell"}):
+                out.append(f"{where}.ally_adjacent has only feat, shield and same_spell.")
+            elif "shield" in want and want["shield"] not in ("light", "heavy"):
+                out.append(f"{where}.ally_adjacent.shield is light or heavy.")
         elif key in ("weapon", "armour", "bearer", "near"):
             if not isinstance(want, dict) or not want:
                 out.append(f"{where}.{key} is an object of the fields it asks.")

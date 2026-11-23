@@ -482,7 +482,9 @@ def monster_lore(engine, intent, actor, mods, partial):
                               code="no_retry")
     value = dc(LORE, target, cr=_cr_of(target))
     try:
-        mods = actor.skill_modifiers(skill)
+        # The creature recalled is the roll's target: Demon Hunter's "+2 on Knowledge
+        # (planes) checks to know the powers and abilities of demons" (feat loop b1).
+        mods = actor.skill_modifiers(skill, ctx={"target_actor": target})
     except IllegalSheet:
         if value > 10:
             return engine._refuse(intent, f"{actor.name} has no training in {skill.title()}, "

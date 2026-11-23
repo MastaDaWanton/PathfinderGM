@@ -421,6 +421,11 @@ TAGS: dict[str, tuple[str, ...]] = {
     "blinded":     ("state.senses.blinded", "state.exposed"),
     "deafened":    ("state.senses.deafened",),
     "dazzled":     ("state.senses.dazzled", "recovery.rest"),
+    # Feat loop b1 (rules/metamagic.py): Concussive Spell's -2s and Disruptive Spell's
+    # concentration gate; Burning Spell's clinging fire is its periodic damage only.
+    "concussed":   ("state.impaired.concussed",),
+    "disrupted":   ("state.casting.disrupted",),
+    "burning-spell": ("state.wound.burning-spell",),
     "invisible":   ("state.hidden.invisible",),
     # A won Stealth check, held (rules/awareness.py, 2026-10-30): "Creatures that fail to
     # beat your Stealth check are not aware of you and treat you as if you had total
