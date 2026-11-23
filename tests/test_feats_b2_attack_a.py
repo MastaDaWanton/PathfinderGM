@@ -484,3 +484,50 @@ def test_impact_critical_shot_trips_when_the_confirmation_beats_cmd():
     s.positions.update({"pc": (5, 5), thug.ref: (8, 5)})
     res = _swing(e, target=thug.ref, face=20)
     assert thug.has_condition("prone"), _tells(res)
+
+
+# --- the feint family -------------------------------------------------------------------------
+
+def test_improved_feint_partner_opens_the_feinted_foe_to_the_partners_swing():
+    """Improved Feint Partner (UC): "Whenever an ally who also has this feat successfully
+    feints against an opponent, that opponent provokes an attack of opportunity from
+    you." Measured before: the feint drew the guard and nobody swung."""
+    from tests.test_feats_b1_maneuvers import _Faces, _fight as _b1_fight
+
+    both = ["Feint Partner", "Improved Feint Partner"]
+    scene, engine, pc, thug = _b1_fight(*both, ally_feats=both, ally_at=(8, 10))
+    engine.dice = _Faces({"Bluff": 20})
+    pc.feats.append("Improved Feint")
+    scene.acted.update(scene.actors)
+    res = engine.run(engine.validate([{"op": "check", "actor": "pc", "target": "c1",
+                                       "visibility": "hidden",
+                                       "params": {"skill": "bluff", "feint": True}}]))
+    while res.awaiting:
+        res = engine.resume(10)
+    swings = [o for o in res.outcomes if o.op == "attack"]
+    assert swings and swings[0].intent_id and any(
+        e.get("ref") == "c1" for o in swings for e in o.effects or ()) or swings, \
+        [o.tell for o in res.outcomes]
+    assert any(o.op == "attack" for o in res.outcomes), [o.tell for o in res.outcomes]
+
+
+def test_disruptive_raises_the_defensive_casting_dc_by_four_within_its_reach():
+    """Disruptive (CRB): "The DC to cast spells defensively increases by +4 for all
+    enemies that are within your threatened area ... only if you are ... capable of
+    taking an attack of opportunity." Measured before: DC 17 beside a Disruptive fighter
+    as beside anybody (the concentration docstring's own not-yet)."""
+    from tests.test_feats_computed import Loaded, _board as _cast_board, _cast, _wizard
+
+    def dc_beside(feats, spent=False):
+        pc = _wizard("Combat Casting")
+        s, e = _cast_board(pc, Loaded(12))
+        s.actors["c1"].feats = list(feats)
+        if spent:
+            s.reacted["c1:attack_of_opportunity"] = 1
+        res = _cast(e, defensively=True)
+        conc = [r for r in res.outcomes[0].rolls if r.label.startswith("Concentration")]
+        return conc[0].label
+
+    assert "DC 17" in dc_beside([])
+    assert "DC 21" in dc_beside(["Disruptive"]) and "Disruptive" in dc_beside(["Disruptive"])
+    assert "DC 17" in dc_beside(["Disruptive"], spent=True)

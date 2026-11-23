@@ -6109,6 +6109,10 @@ class Engine:
             # blow that brought it in.
             if intent.op == "move" and outcome.status == "resolved":
                 queue[0:0] = self._reactions_on_arrival(outcome)
+            # A feint that drew a guard opens the foe to a partner's swing (Improved Feint
+            # Partner, `_reactions_after_feint`): next in the queue, as the arrival's is.
+            if intent.op == "check" and outcome.status == "resolved":
+                queue[0:0] = self._reactions_after_feint(outcome)
             # The plan's placeholders (new1…) become the refs just made, in everything
             # still queued — rewritten in the queue itself, so a turn that suspends for
             # the player's roll later on carries real refs into the save.
@@ -6391,6 +6395,40 @@ class Engine:
                            **({"provoked_by": why} if why else {})},
                 "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
             })
+        return out
+
+    # Improved Feint Partner's tag (its feat document, feat loop b2).
+    FEINT_PARTNER_OPENS = "teamwork.feint-partner.improved"
+
+    def _reactions_after_feint(self, outcome: "Outcome") -> list[dict]:
+        """Improved Feint Partner (UC): "Whenever an ally who also has this feat
+        successfully feints against an opponent, that opponent provokes an attack of
+        opportunity from you." Read off the feint's own record (`rule:feint`), owed to
+        each ally holding the feat who threatens the foe, off their allowance
+        (`_swings_at`). No board, no threatened square, no swing — the reactions rule."""
+        if not self.scene.in_encounter or not self.scene.has_grid:
+            return []
+        from .position import _same_side
+
+        out: list[dict] = []
+        for e in outcome.effects or ():
+            if e.get("kind") != "condition" or e.get("condition") != "feinted" \
+                    or e.get("origin") != "rule:feint":
+                continue
+            feinter = self.scene.actors.get(str(e.get("by") or ""))
+            foe_ref = str(e.get("ref") or "")
+            spot = self.scene.positions.get(foe_ref)
+            if feinter is None or spot is None \
+                    or not feinter.has_state(self.FEINT_PARTNER_OPENS):
+                continue
+            fired = [(ref, reactions.attack_of_opportunity(ally))
+                     for ref, ally in self.scene.actors.items()
+                     if ref not in (feinter.ref, foe_ref) and not ally.is_down
+                     and ally.has_state(self.FEINT_PARTNER_OPENS)
+                     and _same_side(self.scene, feinter.ref, ref)
+                     and reactions.reactions_for(ally)
+                     and reactions.threatens(self.scene, ref, tuple(spot[:2]))]
+            out += self._swings_at(foe_ref, fired, why="feint")
         return out
 
     def _reactions_on_arrival(self, outcome: "Outcome") -> list[dict]:
@@ -7316,9 +7354,9 @@ class Engine:
         itself and a natural 20 not a success (`dice.d20_succeeds` is for saves).
 
         Not yet: the checks for vigorous or violent motion, weather, entangled, and
-        continuous damage (Table 8-5 rows the engine has no situation for), and the
-        Disruptive FEAT (+4 to the defensive DC from a foe who holds it). Disruptive SPELL's
-        check is built (the `disrupted` situation below, feat loop b1).
+        continuous damage (Table 8-5 rows the engine has no situation for). The Disruptive
+        FEAT's +4 is built (feat loop b2, `_disrupted_by`), as is Disruptive SPELL's check
+        (the `disrupted` situation below, feat loop b1).
         """
         situations: list[tuple[str, int, str]] = []
         before = intent.params.get("struck_from")
@@ -7346,7 +7384,15 @@ class Engine:
                 situations.append(("damaged", 10 + taken + level,
                                    f"struck for {taken} while casting"))
         if bool(intent.params.get("defensively")):
-            situations.append(("defensively", 15 + 2 * level, "casting defensively"))
+            # Disruptive (CRB): "The DC to cast spells defensively increases by +4 for all
+            # enemies that are within your threatened area ... only if you are aware of
+            # the enemy's location and are capable of taking an attack of opportunity"
+            # (feat loop b2) — `_disrupted_by`.
+            near = self._disrupted_by(actor)
+            situations.append(("defensively", 15 + 2 * level + (4 if near else 0),
+                               "casting defensively"
+                               + (f" within {near.name}'s reach (Disruptive)" if near
+                                  else "")))
         if actor.has_state("state.held.grappled") or actor.has_state("state.held.pinned"):
             holder = self._grappler_of(actor)
             if holder is not None:
@@ -7584,6 +7630,30 @@ class Engine:
             if states.attitude_of(a) == "hostile":
                 out.append(r)
         return out
+
+    # Disruptive's tag (its feat document, feat loop b2).
+    DISRUPTS_DEFENSIVE_CASTING = "reactions.disrupts.casting-defensively"
+
+    def _disrupted_by(self, caster) -> "Actor | None":
+        """The first foe holding Disruptive who threatens this caster's square, knows where
+        the caster is (`awareness.locates`) and still has an attack of opportunity this
+        round — the feat's three conditions; None with no board."""
+        from . import awareness
+
+        spot = self.scene.positions.get(caster.ref)
+        if not self.scene.has_grid or spot is None:
+            return None
+        for ref, foe in self.scene.actors.items():
+            if foe is caster or foe.is_down or not self._against(foe, caster) \
+                    or not foe.has_state(self.DISRUPTS_DEFENSIVE_CASTING) \
+                    or not reactions.reactions_for(foe) \
+                    or not reactions.threatens(self.scene, ref, tuple(spot[:2])) \
+                    or not awareness.locates(self.scene, foe, caster):
+                continue
+            used = self.scene.reacted.get(f"{ref}:attack_of_opportunity", 0)
+            if used < reactions.budget_for(foe):
+                return foe
+        return None
 
     def _spend_reaction(self, ref: str, budget: str) -> bool:
         """Take one from this creature's allowance, or refuse.

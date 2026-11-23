@@ -471,5 +471,15 @@
     "not_yet": [
       "the bull rush in place of the trip ('push your opponent back as if from the bull rush combat maneuver ... you cannot move with the target'): the engine always takes the trip"
     ]
+  },
+  "improved-feint-partner": {
+    "tags": [
+      "teamwork.feint-partner.improved"
+    ]
+  },
+  "disruptive": {
+    "tags": [
+      "reactions.disrupts.casting-defensively"
+    ]
   }
 }
