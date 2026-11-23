@@ -339,6 +339,13 @@ def copy_plan(actor, stock, *, clock: int | None = None) -> dict:
     if data.get("prepare_from") != "spellbook":
         out["refused"].append(f"{actor.name} keeps no spellbook to copy into.")
         return out
+    # Spellcraft is trained only (CRB Table 4-2): found live 2026-11-22, an untrained
+    # wizard's copy raised "cannot attempt spellcraft untrained" as a server error.
+    if not (getattr(actor, "ranks", None) or {}).get("spellcraft") \
+            and actor.printed_skill("spellcraft") is None:
+        out["refused"].append(f"Copying a spell is a Spellcraft check, and Spellcraft is "
+                              f"trained only: {actor.name} has no ranks in it.")
+        return out
     if entry is None or entry.get("item_kind") != "scroll":
         out["refused"].append("Only a scroll's writing can be copied into a spellbook.")
         return out

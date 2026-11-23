@@ -7262,7 +7262,9 @@ def use_item(request):
            # Before 2026-10-30 only the GM's words reached it, so a bought paint had no
            # button anywhere.
            {"op": "use_item", "actor": "pc", "because": f"{pc.name} uses it",
-            "params": {"item": item, "power": power}} if power else
+            # A scroll's or a wand's spell aimed at somebody (`to`, a ref), when sent.
+            "params": {"item": item, "power": power,
+                       **({"to": target} if body.get("to") else {})}} if power else
            {"op": "use_item", "actor": "pc", "because": f"{pc.name} reaches for it",
             "params": {"item": item, "how": how, "to": target,
                        # Where it goes (the Use menu): only `apply` takes one.

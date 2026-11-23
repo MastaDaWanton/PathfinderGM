@@ -160,7 +160,7 @@
   };
 
   // --- lookups ------------------------------------------------------------------------------
-  var GROUPS = ["vessels", "intermediates", "essences", "circle", "gems", "catalysts", "cant_use"];
+  var GROUPS = ["vessels", "intermediates", "essences", "circle", "gems", "catalysts", "blanks", "cant_use"];
   E.item = function (key) {
     var s = E.state && E.state.shelf;
     if (!s || !key) return null;

@@ -776,6 +776,15 @@ def item_card(record: dict) -> dict:
     if card.get("identified"):
         card["house"] = mine.get("house", [])
         card["uses"] = mine.get("powers", [])
+        # A scroll's or a wand's one spell (`spellitems`): the recipe readers said "None"
+        # for a power with no recipe (seen live 2026-11-22 on the Equipment row).
+        from . import magic_layer, spellitems
+
+        entry = spellitems.entry_of(record)
+        if entry:
+            used = (magic_layer.magic_of(record).get("uses") or {}).get(str(entry["spell"]))
+            card["lines"] = [spellitems.card_line(entry, int(used or 0))]
+            card["uses"] = []
     else:
         card.setdefault("summary", mine.get("summary"))
     # An item converted from an old save that never named a choice (bane's foe) asks it
@@ -1033,13 +1042,16 @@ def _recipe_needs_met(rec_doc: dict, seated: list[Phial]) -> list[str]:
 
 def _spells_held(actor) -> dict[str, str]:
     """{spell id: stock key} for every carried potion or scroll holding a spell. A wand is
-    not spent whole for one spell's worth (`spellitems.kind_of`)."""
-    from . import spellitems
+    not spent whole for one spell's worth (`spellitems.kind_of`), and work In progress is
+    nobody's to spend: found live 2026-11-22, a second Scribe of mage armour ate the first
+    scroll while it was still being written."""
+    from . import inprogress, spellitems
 
     out = {}
     for sid, st in (getattr(actor, "stock", {}) or {}).items():
         sp = str(getattr(st, "holds_spell", "") or "")
-        if sp and int(getattr(st, "count", 0) or 0) > 0 and spellitems.kind_of(st) != "wand":
+        if sp and int(getattr(st, "count", 0) or 0) > 0 and spellitems.kind_of(st) != "wand" \
+                and inprogress.work_of(st) is None:
             out.setdefault(sp, sid)
     return out
 
@@ -2421,17 +2433,34 @@ def _collect_binding(item, actor) -> dict:
 
 
 def _cancel_binding(item, actor) -> dict:
+    from . import spellitems
+
+    if spellitems.kind_of(item):
+        # A scroll or a wand half made is no scroll or wand: found live 2026-11-22, a
+        # stopped scribing "came back as it was", which for a scroll is a finished scroll.
+        key = next((k for k, st in (getattr(actor, "stock", {}) or {}).items()
+                    if st is item), "")
+        if key:
+            del actor.stock[key]
+        return {"said": f"The work is stopped, and the unfinished {item.name} with it: "
+                        f"the vellum, ink, blank and essences are spent."}
     return {"said": f"The binding is stopped. The {item.name} comes back as it was; the "
                     f"essences are spent."}
+
+
+def _stop_words(item) -> str:
+    from . import spellitems
+
+    if spellitems.kind_of(item):
+        return "The unfinished work is lost, and what went into it is spent."
+    return "The vessel comes back unenchanted. The essences are spent."
 
 
 def _register() -> None:
     from . import inprogress
 
     inprogress.register(TRACK_ID, collect=_collect_binding, cancel=_cancel_binding,
-                        icon="enchant",
-                        stop_words="The vessel comes back unenchanted. The essences are "
-                                   "spent.")
+                        icon="enchant", stop_words=_stop_words)
 
 
 # =============================================================================================

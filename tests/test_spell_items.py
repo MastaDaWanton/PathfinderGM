@@ -284,3 +284,38 @@ def test_a_wand_is_not_a_scroll_to_the_alchemist_or_a_spent_prerequisite():
     pc.add_stock(spellitems.make("scroll", "shield", how="bought"), 1)
     held = en._spells_held(pc)
     assert "shield" in held and "mage-armor" not in held
+
+
+# --- found in live play, 2026-11-22 (Sammy's save, a copy) --------------------------------
+
+def test_a_scroll_still_being_written_is_no_stand_in_and_stopping_it_loses_it():
+    """Live: a second Scribe of mage armour read the first scroll, still In progress, as
+    the carried spell, dropped its DC from 11 to 6 and spent it. And a stopped scribing
+    "came back as it was", which for a scroll is a finished scroll."""
+    from rules import inprogress
+
+    pc, prog = _circle_wizard()
+    body = {"spell": "mage-armor", "blank": "inv:scroll-vellum", "ink": "inv:silver-ink"}
+    first = en.plan_step(pc, prog, "scroll", body)
+    got = en.finish(pc, prog, first, 1, now=0)
+    key = got["products"][0]["key"].split(":", 1)[1]
+    second = en.plan_step(pc, prog, "scroll", body)
+    assert second.potions == [] and second.dc == first.dc
+    stopped = inprogress.cancel(pc, key, now=10)
+    assert stopped["ok"] and key not in pc.stock
+
+
+def test_an_untrained_wizard_is_refused_the_copy_in_words():
+    """Live: the copy door raised "cannot attempt spellcraft untrained" as a 500."""
+    pc = _wizard(skills=["perception"])
+    pc.add_stock(spellitems.make("scroll", "magic-missile", how="bought"), 1)
+    st = next(v for v in pc.stock.values() if spellitems.kind_of(v))
+    assert any("trained only" in r for r in spellitems.copy_plan(pc, st, clock=0)["refused"])
+
+
+def test_a_wands_card_says_its_spell_and_charges():
+    """Live: the Equipment row of a made wand read "None"."""
+    st = spellitems.make("wand", "magic-missile", how="bought")
+    st.magic["uses"] = {"magic-missile": 3}
+    card = en.item_card({"magic": st.magic, "id": "w", "name": st.name})
+    assert card["lines"] == ["Magic Missile, caster level 1; 47 charges left"]
