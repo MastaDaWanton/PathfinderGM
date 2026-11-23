@@ -481,5 +481,19 @@
     "tags": [
       "reactions.disrupts.casting-defensively"
     ]
+  },
+  "whip-mastery": {
+    "tags": [
+      "lethality.either.whip",
+      "weapon.whip.through-armour"
+    ]
+  },
+  "slaying-sprint": {
+    "tags": [
+      "coup_de_grace.unprovoking"
+    ],
+    "not_yet": [
+      "'move up to half your speed instead of taking a 5-foot step when taking a full-round action to perform a coup de grace': the coup still spends the move (Scene.move_spent), so no move follows it"
+    ]
   }
 }

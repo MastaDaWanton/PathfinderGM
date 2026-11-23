@@ -531,3 +531,38 @@ def test_disruptive_raises_the_defensive_casting_dc_by_four_within_its_reach():
     assert "DC 17" in dc_beside([])
     assert "DC 21" in dc_beside(["Disruptive"]) and "Disruptive" in dc_beside(["Disruptive"])
     assert "DC 17" in dc_beside(["Disruptive"], spent=True)
+
+
+def test_a_whip_cannot_hurt_the_armoured_until_whip_mastery():
+    """CRB: "A whip deals no damage to any creature with an armor bonus of +1 or higher
+    or a natural armor bonus of +3 or higher." Whip Mastery: "you can deal damage with a
+    whip despite" both, and "can deal lethal damage with a whip" without the -4."""
+    pc = _wren(["Weapon Focus (whip)"], weapons=["whip"], equipped="whip")
+    thug = from_dict({"name": "the guard", "kind": "npc", "class": "fighter", "level": 1,
+                      "abilities": {"str": 12, "dex": 10, "con": 12, "int": 10, "wis": 10,
+                                    "cha": 10}, "hp": 500, "armour": "chain shirt",
+                      "weapons": ["longsword"], "equipped": "longsword"}, ref="c1")
+    s, e = _board(pc, thug)
+    thug.hp_max = thug.hp = 500
+    e._ensure_encounter("pc")
+    s.positions.update({"pc": (5, 5), thug.ref: (6, 5)})
+    res = _swing(e, target=thug.ref, face=19)
+    assert thug.hp == 500 and "does no harm" in _tells(res), _tells(res)
+    assert pc.lethality_swap("whip", "lethal")
+    pc.feats.append("Whip Mastery")
+    res = _swing(e, target=thug.ref, face=19, lethality="lethal")
+    assert thug.hp < 500, _tells(res)
+    assert pc.lethality_swap("whip", "lethal") == ""
+
+
+def test_slaying_sprint_delivers_a_coup_de_grace_without_provoking():
+    """Slaying Sprint (UC): "Performing a coup de grace does not provoke attacks of
+    opportunity", with a light or one-handed weapon. The bandit at the shoulder swung
+    first before (tests/test_narration_followups.py's coup); with the feat he does not."""
+    from tests.test_narration_followups import _coup, _fight as _coup_fight, _run
+
+    s, down, standing = _coup_fight()
+    s.actors["pc"].feats = list(s.actors["pc"].feats) + ["Slaying Sprint"]
+    res = _run(s, [_coup(down)])
+    attacks = [o for o in res.outcomes if o.op == "attack"]
+    assert [o.actor for o in attacks] == ["pc"], [o.tell for o in attacks]

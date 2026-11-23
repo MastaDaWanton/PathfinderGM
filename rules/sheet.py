@@ -350,6 +350,7 @@ def _trait_word(text) -> str:
 # lethal or nonlethal damage, at your choice." A permission is a tag (law 1), so the
 # attack roll asks `has_state` and never looks for the feat by name.
 STRIKES_EITHER_WAY = "lethality.either.unarmed"
+LETHALITY_EITHER = "lethality.either"
 # The tag Quick Draw's feat document grants: "You can draw a weapon as a free action
 # instead of as a move action" (Core Rulebook p.132). Asked by `Engine._draw_paid`.
 QUICK_DRAW = "action.draw.free"
@@ -4045,6 +4046,12 @@ class Actor:
                       and not w.get("natural") and not w.get("granted_by"))
         if plain_fist and (self.has_state(STRIKES_EITHER_WAY)
                            or self.has_state(classfeatures_mod.UNARMED_STRIKE)):
+            return ""
+        # The same waiver for a named weapon (feat loop b2): Whip Mastery's "You can deal
+        # lethal damage with a whip, although you can still deal nonlethal damage when you
+        # want" is `lethality.either.whip`, its document's tag.
+        base = str(w.get("crafted_base") or weapons_mod.key_for(str(weapon_key or "")) or "")
+        if base and self.has_state(f"{LETHALITY_EITHER}.{base}"):
             return ""
         if wanted == "nonlethal":
             return f"pulling the blow with a {w['name']} (non-lethal)"

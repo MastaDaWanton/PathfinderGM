@@ -6769,6 +6769,8 @@ class Engine:
                                        "action. A move is still theirs to take."),
                             code="standard_spent")
 
+    COUP_UNPROVOKING = "coup_de_grace.unprovoking"      # Slaying Sprint's tag
+
     def _coup_provokes(self, intent: Intent, actor, defender, weapon_key: str) -> None:
         """The attacks of opportunity a coup de grâce in a fight draws, raised as
         `_ReactionsOwed` at the blow's point of commitment, the way `_leaving_the_fight`
@@ -6792,6 +6794,12 @@ class Engine:
             return
         if self.scene.has_grid and position_mod.out_of_reach(
                 self.scene, actor, defender, weapon_key) is not None:
+            return
+        # Slaying Sprint (UC): "Performing a coup de grace does not provoke attacks of
+        # opportunity. You can use this feat only when wielding a light or one-handed
+        # weapon" — its document's tag (feat loop b2).
+        if actor.has_state(self.COUP_UNPROVOKING) and weapon.get("category") == "melee" and (
+                weapon.get("light") or int(weapon.get("hands", 1) or 1) <= 1):
             return
         owed: list[dict] = []
         for watcher, reaction in reactions.provoked_by_action(self.scene, actor.ref):
@@ -25546,6 +25554,8 @@ class Engine:
                               f"({roll.total} against {pct}%).")
         return False
 
+    WHIP_THROUGH_ARMOUR = "weapon.whip.through-armour"      # Whip Mastery's tag
+
     def _harmless_blow(self, actor: Actor, defender: Actor, weapon: dict,
                        struck_as: tuple, incorporeal: bool) -> str:
         """Why this blow does nothing at all, or "".
@@ -25566,6 +25576,22 @@ class Engine:
                 if kind != "object" and _is_of_kind(defender, "type", kind):
                     return (f"The {name} passes through {defender.name} without harm: "
                             f"brilliant energy cannot hurt the {kind}.")
+        # The whip (CRB, Weapon Descriptions): "A whip deals no damage to any creature
+        # with an armor bonus of +1 or higher or a natural armor bonus of +3 or higher."
+        # Whip Mastery's "you can deal damage with a whip despite a creature's armor
+        # bonus or natural armor bonus" is its document's tag (feat loop b2). Measured
+        # before: a whip lashed a knight in full plate as it lashed a beggar.
+        from . import weapons as weapons_mod
+
+        base = str(weapon.get("crafted_base") or weapons_mod.key_for(
+            str(weapon.get("key") or weapon.get("name") or "")) or "")
+        if base == "whip" and not actor.has_state(self.WHIP_THROUGH_ARMOUR):
+            worn = defender.ac_modifiers(attacker=actor)
+            armour = sum(m.value for m in worn if (m.type or "") == "armour")
+            hide = sum(m.value for m in worn if (m.type or "") == "natural armour")
+            if armour >= 1 or hide >= 3:
+                return (f"The whip cracks against {defender.name}'s "
+                        f"{'armour' if armour >= 1 else 'hide'} and does no harm.")
         if not incorporeal or {"magic", "ghost_touch"} & set(struck_as):
             return ""
         natural = bool(weapon.get("natural") or weapon.get("stat_block"))
