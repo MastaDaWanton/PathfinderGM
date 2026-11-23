@@ -245,8 +245,9 @@ def build_animate(plan, actor, body, where, now) -> None:
     plan.rank = max((p.rank for p, _ in picked), default=1)
     lead = en._lead([p for p, _ in picked])
     if lead is not None:
+        # No `phase`: the hour widens Bind's windows only (`enchanter.tuning_for`), and a
+        # phase here drew "Bind's windows are wider then" beside Animate (seen live).
         plan.lead = {"id": template, "name": name, "rank": lead.rank}
-        plan.phase = lead.phase
     # The DC.
     terms = [{"why": f"{name}'s construction line, {r.get('skill')}", "dc": int(r["dc"])}]
     groups = [[str(s) for s in g] for g in r.get("spells") or ()]

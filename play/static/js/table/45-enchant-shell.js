@@ -52,18 +52,18 @@
   // The methods themselves, their order, names and locks are the server's (`state.methods`).
   // What is here is copy: the Roll button's words, the flat stand-in's name for the step, and
   // the empty working's sentence. Keys 1-8 pick the eight methods in order (UI plan §6.1).
-  var KEYS = ["1", "2", "3", "4", "5", "6", "7", "8"];
+  var KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
   var ROLL = { prepare: "Roll Prepare", attune: "Roll Attune", bind: "Roll Bind",
                refine: "Roll Refine", unbind: "Roll Unbind", cleanse: "Roll Cleanse",
-               read: "Read", identify: "Identify" };
+               animate: "Roll Animate", read: "Read", identify: "Identify" };
   var TOOL = { prepare: "the circle", attune: "the seats", bind: "the binding",
                refine: "the dropper", unbind: "the sigils", cleanse: "the curse",
-               read: "a pinch", identify: "the study" };
+               animate: "the body", read: "a pinch", identify: "the study" };
   // Two letters per method on the roundel: Read and Refine share an R, and at 1280 wide the
   // strip is icons only (bench.css). The engraved art waits on the owner's icon approval
   // (UI plan Q-UI1); a lettered roundel is the bench's own fallback, not a broken mask.
   var ABBR = { prepare: "Pr", attune: "At", bind: "Bi", refine: "Rf", unbind: "Ub",
-               cleanse: "Cl", read: "Rd", identify: "Id" };
+               cleanse: "Cl", animate: "An", read: "Rd", identify: "Id" };
   // The ritual's path (UI plan §6.1: "Prepare, then Attune, then Bind", the herb bench's
   // next-step button). Which step a vessel is ready for follows from its state, which is
   // the server's word on the shelf row.
