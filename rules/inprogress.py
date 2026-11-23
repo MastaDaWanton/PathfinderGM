@@ -115,6 +115,9 @@ def _registry() -> dict[str, _Craft]:
     # And the forge (ruling 2026-11-18: its steps of an hour or more wait here too).
     if "blacksmith" not in _CRAFTS:
         from . import blacksmith  # noqa: F401  — registers `blacksmith`
+    # And Handle Animal's lessons (round 3): a trick taught, a purpose trained, a rearing.
+    if "handler" not in _CRAFTS:
+        from . import animals  # noqa: F401  — registers `handler`
     return _CRAFTS
 
 

@@ -112,6 +112,13 @@ def orders_for(scene, ref: str, transcript=(), limit: int = MAX_ORDERS) -> list[
     actor = (getattr(scene, "actors", {}) or {}).get(ref)
     if actor is None:
         return []
+    # An animal hears no sentence (rules/animals.py, the owner's ruling of 2026-11-22):
+    # what reaches it is the command Handle Animal gave, which `turn_facts` states.
+    from rules import animals
+
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    if not animals.understands(actor, pc):
+        return []
     from gm.prompts import CARRY_ON
 
     out: list[str] = []
@@ -160,8 +167,15 @@ def addressed(scene, text: str) -> list[str]:
     out = []
     raw = str(text or "")
     quoted = " ".join(speech.lines(raw))
+    from rules import animals
+
+    pc = scene.pc() if hasattr(scene, "pc") else None
     for ref, actor in (getattr(scene, "actors", {}) or {}).items():
         if not is_companion(actor) or actor.is_down:
+            continue
+        # Spoken to, an animal does not answer words: its handling is the deed
+        # (`acts_to_ops._to_an_animal`), not a companion's reply.
+        if not animals.understands(actor, pc):
             continue
         words = sorted(_name_words(actor.name), key=len, reverse=True)
         head = (re.findall(r"[a-z']+", str(actor.name).lower()) or [""])[-1]
@@ -242,6 +256,12 @@ def who_they_are(scene, actor) -> str:
     # tone, not sentences (rules/animal_companion.py:character_words).
     if animal_companion.is_animal_companion(actor):
         return animal_companion.character_words(scene, actor)
+    # Any other beast with no language (a bought horse, a trained dog): its tricks and its
+    # command, never a person's attitude and trade (rules/animals.py).
+    from rules import animals
+
+    if animals.wordless(actor):
+        return animals.character_line(scene, actor)
     name = actor.name
     bits = []
     # One of a caravan the player was hired to guard (rules/jobs.py): hired hands, not
@@ -291,7 +311,14 @@ def turn_facts(scene, actor, orders: list[str]) -> str:
     if foes:
         lines.append("The fight is against: "
                      + ", ".join(f"{r} ({n})" for r, n in foes) + ".")
-    if orders:
+    from rules import animals
+
+    if animals.wordless(actor) and not orders:
+        cmd = animals.command_words(scene, actor)
+        lines.append(f"{name} understands no words. " + (
+            f"It was commanded by Handle Animal: {cmd}. It does that this turn."
+            if cmd else f"Nobody has commanded it; it does what a {name} would."))
+    elif orders:
         lines.append(f"What the player has said to {name}, newest first:")
         lines += [f"  - {o}" for o in orders]
         lines.append(f"{name} decides what to do with that as themselves: do it, do it "
@@ -446,6 +473,30 @@ def attack_on_a_bystander(scene, ref: str, raw, orders=()) -> str:
                 + (", ".join(f"{fr} ({fn})" for fr, fn in foes) or "nobody standing")
                 + ". If they will not strike a foe, that is a narrate_only or a move.")
     return ""
+
+
+def handled_unheeded(scene, ref: str, raw) -> str:
+    """The refusal for an animal's turn that ignores the attack it was handled to make, or
+    "". CRB, Handle Animal: "If your check succeeds, the animal performs the task or trick
+    on its next action" — the made check decides, never the turn's own prose."""
+    from rules import animals
+
+    actor = (getattr(scene, "actors", {}) or {}).get(ref)
+    got = animals.command(actor) if actor is not None else None
+    if not got or got[0] != "attack" or not got[1]:
+        return ""
+    foe = scene.actors.get(got[1])
+    if foe is None or not scene.conscious(foe.ref):
+        return ""
+    mine = [r for r in raw or () if isinstance(r, dict) and r.get("actor") == ref]
+    if any(r.get("op") == "attack" and (r.get("target") == foe.ref
+                                        or foe.ref in (r.get("targets") or ()))
+           for r in mine):
+        return ""
+    return (f"{actor.name} was handled to attack {foe.name} ({foe.ref}): its turn is "
+            f"that attack. Write {{\"op\": \"attack\", \"actor\": \"{ref}\", "
+            f"\"target\": \"{foe.ref}\"}}, closing first with a move if it is out of "
+            f"reach.")
 
 
 def turning_on_the_party(scene, ref: str, raw) -> str:

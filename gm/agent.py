@@ -605,6 +605,9 @@ class GMAgent:
             # overruled op is kept on the record.
             check_skill = (judgement.declared_check_skill(player_input, self.engine.scene)
                            if "check" in detectors else "")
+            # Words to an animal: the check is Handle Animal (or wild empathy), held so by
+            # the act table off the animal's tags (`acts_to_ops._to_an_animal`).
+            check_skill = next((r.skill for r in self.rows if r.skill), check_skill)
             declared, overruled = interpret.supported(detectors, self.reading,
                                                       check_skill=check_skill)
             self.reading["overruled"] = overruled
@@ -1715,6 +1718,8 @@ class GMAgent:
                                                _owned_by(data.get("intents"), ref,
                                                          self.engine.scene))
                 turned = (companions.turning_on_the_party(self.engine.scene, ref, raw)
+                          or (companions.handled_unheeded(self.engine.scene, ref, raw)
+                              if friend else "")
                           or (companions.attack_against_its_reason(ref, raw)
                               if friend else "")
                           or (companions.attack_on_a_bystander(

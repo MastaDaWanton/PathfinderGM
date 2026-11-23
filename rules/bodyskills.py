@@ -40,6 +40,10 @@ USES: dict[str, tuple[str, ...]] = {
     "fly": ("slow", "hover", "turn", "turn-about", "fly-up", "wind"),
     "ride": ("mount", "dismount", "spur", "cover", "leap"),
     "heal": ("treat-poison", "treat-disease"),
+    # Handle Animal (rules/animals.py, round 3): its uses are declared the same way, and
+    # resolved before the skill's training is asked (an untrained handler may still make
+    # the book's Charisma check on a domestic animal), by `animals.social_door`.
+    "handle animal": ("handle", "push", "teach", "train", "rear"),
 }
 WINDS = ("light", "moderate", "strong", "severe", "windstorm", "hurricane", "tornado")
 
@@ -987,6 +991,76 @@ def mounted_combat(engine, attacker, defender, atk, state) -> str:
     return ""
 
 
+def control_in_battle(engine, intent, rider):
+    """CRB, Ride: "Control Mount in Battle: As a move action, you can attempt to control a
+    light horse, pony, heavy horse, or other mount not trained for combat riding while in
+    battle. If you fail the Ride check, you can do nothing else in that round. You do not
+    need to roll for horses or ponies trained for combat." DC 20.
+
+    Asked by the attack and the cast of a mounted rider in a fight, once a round: the
+    round's answer is an `item_spent` effect the round ticker expires, as Mounted
+    Combat's is. None when the rider may act (trained mount, made this round, or not
+    mounted); else the refusal, its roll on it. A made control is said beside the blow.
+    Combat training is the animal's own (`animals.combat_trained`: the purpose, or every
+    one of its tricks) — before round 3 nothing recorded it and a bought warhorse lost the
+    "(combat-trained)" off its name and nothing else."""
+    from .activeeffect import ActiveEffect
+    from . import animals
+    from .engine import Outcome
+
+    scene = engine.scene
+    steed = mount_of(scene, rider) if scene.in_encounter else None
+    if steed is None or animals.combat_trained(steed):
+        return None
+    held = next((e for e in rider.effects if e.kind == "item_spent"
+                 and e.key == "mount-control"), None)
+    if held is not None:
+        if (held.payload or {}).get("made"):
+            return None
+        return engine._refuse(intent, f"{rider.name} has lost control of {steed.name} this "
+                                      f"round and can do nothing else.", code="action_spent")
+    r = row("skill.ride.control")
+    spent = _no_action_left(engine, rider, "move", "controlling the mount")
+    if spent:
+        return engine._refuse(intent, f"{steed.name} is not trained for combat: "
+                                      f"{rider.name} must spend a move action to control it "
+                                      f"before attacking or casting. {spent}",
+                              code="action_spent")
+    roll = _roll(engine, rider, _skill_mods(rider, "ride"),
+                 "Ride check (control the mount in battle)")
+    made = roll.total >= int(r["dc"])
+    rider.apply_effect(ActiveEffect(
+        name="the mount in hand this round" if made else "the mount out of hand this round",
+        kind="item_spent", key="mount-control", source="rule:skill.ride.control",
+        origin="rule:skill.ride.control", duration="rounds", rounds_left=1,
+        payload={"made": made}))
+    _spend_action(engine, rider, "move" if made else "full-round")
+    said = (f"{steed.name} is not trained for combat: {rider.name} "
+            + (f"keeps it in hand (Ride {roll.total} against DC {r['dc']}), a move action."
+               if made else
+               f"cannot control it (Ride {roll.total} against DC {r['dc']}) and can do "
+               f"nothing else this round."))
+    fx = [{"ref": rider.ref, "kind": "mount_control", "mount": steed.ref, "made": made,
+           "origin": "rule:skill.ride.control"}]
+    if made:
+        engine._side_outcomes.append(Outcome(
+            intent_id=intent.id, op="check", rolls=[roll], effects=fx, tell=said,
+            dc={"value": int(r["dc"]), "basis": "control a mount in battle"},
+            verdict="success", margin=roll.total - int(r["dc"])))
+        return None
+    return Outcome(intent_id=intent.id, op=intent.op, status="prevented", rolls=[roll],
+                   effects=fx, tell=said, verdict="failure",
+                   margin=roll.total - int(r["dc"]), because=intent.because)
+
+
+def _handled(engine, intent, actor, mods, partial):
+    """Handle Animal's uses, should a caller reach them through `DOORS` (the check door
+    `animals.social_door` takes them first)."""
+    from . import animals
+
+    return animals.check(engine, intent, actor, partial)
+
+
 # --- Heal: treat poison and disease -----------------------------------------------------------
 
 def _patient(engine, intent, actor):
@@ -1083,4 +1157,5 @@ DOORS = {
     "skill.ride.leap": leap,
     "skill.heal.treat-poison": treat_poison,
     "skill.heal.treat-disease": treat_disease,
+    **{use_id("handle animal", u): _handled for u in USES["handle animal"]},
 }

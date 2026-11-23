@@ -262,7 +262,9 @@ def _apply(companion, master, animal_key: str, edl: int, tricks=None,
         kind="bond", key=BOND_KEY, source=f"companion:{getattr(master, 'ref', '')}",
         origin=origin or pay.get("origin") or "class:nature bond",
         duration="until-dismissed",
-        tags=(BOND_TAG, "type.animal", *b["tags"]),
+        # Its bonus tricks as the trick tags every handler asks (rules/animals.py): "they
+        # don't count against the normal trick limit", and they are known as surely.
+        tags=(BOND_TAG, "type.animal", *b["tags"], *(f"trick.{t}" for t in tricks)),
         modifiers=mods,
         payload={"animal": b["animal"], "master": getattr(master, "ref", ""),
                  "master_name": getattr(master, "name", ""), "edl": int(edl),
@@ -398,12 +400,13 @@ def sync(scene) -> list[str]:
 def character_words(scene, actor) -> str:
     """Who an animal companion is, in words, for its own turn (`gm/companions.py`).
 
-    The ruling's "as their character dictates", for an animal: Int 1 or 2, so it hears its
-    druid's tone and the tricks it knows, not sentences — an order that is one of its
-    tricks it carries out readily; anything else it may only follow as far as an animal
-    could make sense of it. Its bond makes it loyal, never servile (it will not walk into
-    fire for a word). No numbers.
+    The ruling's "as their character dictates", for an animal, and the owner's of
+    2026-11-22: an animal companion cannot understand words without magic, so what it acts
+    on is the command Handle Animal gave it (free for its druid, through the link) and its
+    own nature. Its bond makes it loyal, never servile. No numbers.
     """
+    from . import animals
+
     bond = bond_of(actor)
     pay = (bond.payload or {}) if bond else {}
     master = str(pay.get("master_name") or "the player")
@@ -411,12 +414,14 @@ def character_words(scene, actor) -> str:
     animal = (short_name(str(pay.get("animal") or "")) or "animal").lower()
     knows = (f"it knows these tricks by word and gesture: {', '.join(tricks)}"
              if tricks else "it has learned no tricks yet")
+    cmd = animals.command_words(scene, actor) if scene is not None else ""
     return (f"{actor.name} is {master}'s animal companion — a {animal} bound to them by "
-            f"nature's bond, loyal to them before anyone. It is an animal: it understands "
-            f"{master}'s voice and tone, not sentences; {knows}. An order that is one of "
-            f"its tricks it does readily, as a {animal} would; anything else it follows "
-            f"only as far as an animal can make sense of it, and it will not throw itself "
-            f"into certain death on a word.")
+            f"nature's bond, loyal to them before anyone. It is an animal: it does not "
+            f"understand words; {knows}. "
+            + (f"It was commanded by Handle Animal: {cmd}, and does that, as a {animal} "
+               f"would. " if cmd else
+               f"Nobody has commanded it, so it does what a loyal {animal} would. ")
+            + "It will not throw itself into certain death.")
 
 
 def sheet_lines(scene, master) -> list[dict]:

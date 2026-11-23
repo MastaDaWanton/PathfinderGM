@@ -3876,6 +3876,20 @@ def _declared_op(op: str, refs: tuple[str, ...], places: tuple[str, ...],
                 need.append("use")
                 need.extend({"acrobatics": ("distance_ft", "height_ft"),
                              "climb": ("height_ft",)}.get(skill, ()))
+        # Handle Animal's closed words (rules/animals.py): the trick, the purpose, and
+        # who an attack is pointed at — chosen from enums, never written. Asked only of a
+        # Handle Animal check (the act table declares it for words said to an animal,
+        # `acts_to_ops._to_an_animal`); every other check is offered none of them.
+        if skill == "handle animal":
+            from rules import animals
+
+            props["trick"] = {"type": "string", "enum": ["none", *animals.tricks()]}
+            props["purpose"] = {"type": "string", "enum": ["none", *animals.purposes()]}
+            props["at"] = {"type": "string", "enum": ["none", *refs]}
+            need.append("trick")
+        else:
+            for name in ("trick", "purpose", "at"):
+                props.pop(name, None)
         for feet in ("distance_ft", "height_ft"):
             if feet in props:
                 props[feet] = {"type": "integer", "minimum": 0}
