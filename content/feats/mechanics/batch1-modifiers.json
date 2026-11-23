@@ -1,0 +1,207 @@
+{
+  "_about": [
+    "Feat loop, batch 1, lane b1-modifiers (2026-11-22): plain and situational modifiers and",
+    "skill-use feats, in the grammar core.json uses (rules/classbuilder.py",
+    "validate_feat_document). Benefit text from content/feats/feats.json, checked against",
+    "aonprd.com FeatDisplay. New readers this lane built, each used by more than one feat:",
+    "comma-separated picks on `$target` (Scholar, Prodigy, Cosmopolitan); the formula names",
+    "`ranks_<skill>` and `allies` (Actor._feat_formula_extra: Stone Read, Shake It Off, Swarm",
+    "Scatter); feat terms on the AC line with a roll context, `attack` and `flanked`",
+    "(Actor._ac_context: Low Profile, Back to Back); `against` sleep, electricity, emotion,",
+    "area and demoralize (effectspec.AGAINST). A `not_yet` names a clause the engine does not",
+    "run; a feat carrying one is PARTIAL, never done."
+  ],
+  "nature-soul": {
+    "modifiers": [
+      {"type": "skill_mod", "target": "knowledge (nature)",
+       "formula": "2 + 2 * min(1, ranks // 10)", "bonus_type": "untyped"},
+      {"type": "skill_mod", "target": "survival",
+       "formula": "2 + 2 * min(1, ranks // 10)", "bonus_type": "untyped"}
+    ]
+  },
+  "sea-legs": {
+    "modifiers": [
+      {"type": "skill_mod", "target": "acrobatics", "amount": 2, "bonus_type": "untyped"},
+      {"type": "skill_mod", "target": "climb", "amount": 2, "bonus_type": "untyped"},
+      {"type": "skill_mod", "target": "swim", "amount": 2, "bonus_type": "untyped"}
+    ]
+  },
+  "scholar": {
+    "modifiers": [
+      {"type": "skill_mod", "target": "$target",
+       "formula": "2 + 2 * min(1, ranks // 10)", "bonus_type": "untyped",
+       "note": "two Knowledge skills, named on the sheet: Scholar (knowledge (history), knowledge (local))"}
+    ]
+  },
+  "prodigy": {
+    "modifiers": [
+      {"type": "skill_mod", "target": "$target",
+       "formula": "2 + 2 * min(1, ranks // 10)", "bonus_type": "untyped",
+       "note": "two of Craft, Perform and Profession, named on the sheet: Prodigy (craft, perform)"}
+    ]
+  },
+  "cosmopolitan": {
+    "tags": ["skill.class.$target"],
+    "not_yet": [
+      "two additional languages: the sheet keeps no languages, so there is nothing to add them to"
+    ]
+  },
+  "cautious-fighter": {
+    "modifiers": [
+      {"type": "combat_mod", "target": "ac", "amount": 2, "bonus_type": "dodge",
+       "when": {"bearer": {"state": "buff.stance.fighting-defensively"}},
+       "note": "your dodge bonus when fighting defensively increases by 2"},
+      {"type": "combat_mod", "target": "ac", "amount": 2, "bonus_type": "dodge",
+       "when": {"bearer": {"state": "buff.stance.total-defense"}},
+       "note": "and when using total defense"}
+    ]
+  },
+  "low-profile": {
+    "tags": ["cover.soft.none"],
+    "modifiers": [
+      {"type": "combat_mod", "target": "ac", "amount": 1, "bonus_type": "dodge",
+       "when": {"attack": "ranged"}}
+    ]
+  },
+  "improved-blind-fight": {
+    "tags": ["miss_chance.ignore.partial.melee"]
+  },
+  "improved-shield-bash": {
+    "tags": ["shield.bash.keeps-guard"]
+  },
+  "stone-read": {
+    "modifiers": [
+      {"type": "skill_mod", "target": "perception",
+       "formula": "2 + 2 * min(1, ranks_knowledge_dungeoneering // 10)",
+       "bonus_type": "untyped", "when": {"bearer": {"terrain": "underground"}}},
+      {"type": "skill_mod", "target": "perception",
+       "formula": "2 + 2 * min(1, ranks_knowledge_dungeoneering // 10)",
+       "bonus_type": "untyped", "when": {"bearer": {"terrain": "mountain"}}}
+    ]
+  },
+  "uncanny-alertness": {
+    "modifiers": [
+      {"type": "skill_mod", "target": "perception", "amount": 1, "bonus_type": "untyped"},
+      {"type": "skill_mod", "target": "sense motive", "amount": 1, "bonus_type": "untyped"},
+      {"type": "save_mod", "target": "fort", "amount": 2, "bonus_type": "untyped",
+       "when": {"against": "sleep"}},
+      {"type": "save_mod", "target": "ref", "amount": 2, "bonus_type": "untyped",
+       "when": {"against": "sleep"}},
+      {"type": "save_mod", "target": "will", "amount": 2, "bonus_type": "untyped",
+       "when": {"against": "sleep"}},
+      {"type": "save_mod", "target": "fort", "amount": 2, "bonus_type": "untyped",
+       "when": {"against": "charm"}},
+      {"type": "save_mod", "target": "ref", "amount": 2, "bonus_type": "untyped",
+       "when": {"against": "charm"}},
+      {"type": "save_mod", "target": "will", "amount": 2, "bonus_type": "untyped",
+       "when": {"against": "charm"}}
+    ]
+  },
+  "improvisation": {
+    "tags": ["skill.untrained.all"],
+    "modifiers": [
+      {"type": "skill_mod", "target": "all", "formula": "2 * (1 - min(1, ranks))",
+       "bonus_type": "untyped", "note": "on skills you have no ranks in"}
+    ]
+  },
+  "shake-it-off": {
+    "modifiers": [
+      {"type": "save_mod", "target": "fort", "formula": "min(4, allies)", "bonus_type": "untyped"},
+      {"type": "save_mod", "target": "ref", "formula": "min(4, allies)", "bonus_type": "untyped"},
+      {"type": "save_mod", "target": "will", "formula": "min(4, allies)", "bonus_type": "untyped"}
+    ]
+  },
+  "swarm-scatter": {
+    "tags": ["defense.swarm.rats.scattered"],
+    "modifiers": [
+      {"type": "combat_mod", "target": "ac", "formula": "allies", "bonus_type": "circumstance"}
+    ]
+  },
+  "back-to-back": {
+    "modifiers": [
+      {"type": "combat_mod", "target": "ac", "formula": "2 * min(1, allies)",
+       "bonus_type": "circumstance", "when": {"flanked": true},
+       "note": "flanked, and adjacent to an ally with this feat"}
+    ]
+  },
+  "bleeding-critical": {
+    "tags": ["critical.bleeding"]
+  },
+  "crippling-critical": {
+    "tags": ["critical.crippling"],
+    "not_yet": [
+      "a creature with several movement types has the one chosen halved: the engine halves land speed only",
+      "a flying creature's DC 10 Fly check to stay airborne and its manoeuvrability reduced a step"
+    ]
+  },
+  "taunt": {
+    "tags": ["skill.bluff.demoralize"]
+  },
+  "desert-dweller": {
+    "tags": ["climate.heat.very-hot.unhindered"],
+    "modifiers": [
+      {"type": "combat_mod", "target": "con_check", "amount": 4, "bonus_type": "untyped",
+       "when": {"against": "starvation"}},
+      {"type": "combat_mod", "target": "con_check", "amount": 4, "bonus_type": "untyped",
+       "when": {"against": "thirst"}}
+    ],
+    "not_yet": [
+      "extreme heat treated as severe and severe as very hot: the engine's heat is one row (very hot, above 90 F), with no severe or extreme tier to step down"
+    ]
+  },
+  "storm-lashed": {
+    "modifiers": [
+      {"type": "save_mod", "target": "fort", "amount": 2, "bonus_type": "untyped",
+       "when": {"against": "electricity"}},
+      {"type": "save_mod", "target": "ref", "amount": 2, "bonus_type": "untyped",
+       "when": {"against": "electricity"}},
+      {"type": "save_mod", "target": "will", "amount": 2, "bonus_type": "untyped",
+       "when": {"against": "electricity"}}
+    ],
+    "not_yet": [
+      "rain's visibility and Perception penalties, and the high winds' Perception penalty and size for wind: the engine charges no weather penalty to either, so there is nothing to reduce",
+      "electrical effects that are not spells (a breath weapon): only a spell's save says what it is against"
+    ]
+  },
+  "harrowed": {
+    "modifiers": [
+      {"type": "save_mod", "target": "will", "amount": 1, "bonus_type": "untyped",
+       "when": {"against": "enchantment"}}
+    ],
+    "not_yet": [
+      "the daily harrow draw and its +2 on a d20 roll of the card's suit: no harrow deck and no after-the-roll bonus exist"
+    ]
+  },
+  "fearless-curiosity": {
+    "modifiers": [
+      {"type": "save_mod", "target": "fort", "amount": 1, "bonus_type": "untyped",
+       "when": {"against": "emotion"}},
+      {"type": "save_mod", "target": "ref", "amount": 1, "bonus_type": "untyped",
+       "when": {"against": "emotion"}},
+      {"type": "save_mod", "target": "will", "amount": 1, "bonus_type": "untyped",
+       "when": {"against": "emotion"}}
+    ],
+    "not_yet": [
+      "a new save at the start of each turn under a fear effect to step it down (panicked to frightened to shaken to none): no reader re-saves a fear at turn start"
+    ]
+  },
+  "boar-ferocity": {
+    "modifiers": [
+      {"type": "skill_mod", "target": "intimidate", "amount": 2, "bonus_type": "untyped",
+       "when": {"against": "demoralize"}}
+    ],
+    "not_yet": [
+      "piercing damage added to your unarmed strikes: an unarmed strike's damage type is fixed",
+      "demoralize as a free action on tearing flesh: Boar Style has no document"
+    ]
+  },
+  "snake-style": {
+    "modifiers": [
+      {"type": "skill_mod", "target": "sense motive", "amount": 2, "bonus_type": "untyped"}
+    ],
+    "not_yet": [
+      "piercing damage with your unarmed strikes: an unarmed strike's damage type is fixed",
+      "the style itself, and its immediate-action Sense Motive as AC: no style stance is entered here"
+    ]
+  }
+}

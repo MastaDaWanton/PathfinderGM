@@ -2448,11 +2448,16 @@ WHEN_KEYS: dict[str, str] = {
                    "an extra swing a full attack alone is owed (haste, Rapid Shot)",
     "two_weapon": "which hand of a two-weapon full attack swings: primary or off "
                   "(Actor.attack_modifiers)",
+    # Feat loop b1 (2026-11-22): Back to Back's "+2 circumstance bonus to AC against
+    # attacks from opponents flanking you" — asked of the AC line (`Actor._ac_context`).
+    "flanked": "whether the one attacking this creature flanks it on the board "
+               "(Actor._ac_context, position.flanking_with)",
 }
 _WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment", "choice"),
                        "attacker": ("type", "subtype")}
 _WHEN_COMPARE = ("lte", "gte", "lt", "gt", "eq")
-_WHEN_BOOLS = ("daylight", "underground", "wielder_casts", "resting", "full_attack")
+_WHEN_BOOLS = ("daylight", "underground", "wielder_casts", "resting", "full_attack",
+               "flanked")
 
 # What a roll may be made AGAINST — the `against` of a roll context, one word per danger,
 # each with the reader that passes it. A closed list, because the clause is answered by
@@ -2487,6 +2492,16 @@ AGAINST: dict[str, str] = {
     "language-dependent": "a language-dependent effect",
     "bardic_performance": "a bard's performance (a class ability's `against`)",
     "tracks": "a Survival check to follow or identify tracks (Engine track op)",
+    # Feat loop b1 (2026-11-22), each passed by `spell_against` off the spell's own data:
+    # Storm-Lashed's "+2 on all saving throws against electrical effects", Fearless
+    # Curiosity's "+1 on saving throws against effects with the emotion descriptor",
+    # Uncanny Alertness's "+2 on saving throws against sleep and charm effects", Covering
+    # Shield's "Reflex saves against area of effect attacks".
+    "electricity": "an electricity effect (the descriptor)",
+    "emotion": "an effect with the emotion descriptor",
+    "sleep": "a sleep effect: a spell that lands magical slumber (attitude._sleep_spec)",
+    "area": "an area of effect: a spell with an area (Spell.area_value)",
+    "demoralize": "an Intimidate check to demoralize (Engine._demoralize_mods)",
 }
 
 
@@ -2504,7 +2519,28 @@ def spell_against(spell) -> tuple[str, ...]:
             part = part.strip()
             if part and part not in words:
                 words.append(part)
+    # What the spell IS beyond its words (feat loop b1): an area spell is an area of
+    # effect, and a spell that lands magical slumber is a sleep effect — read off its
+    # effect documents the way the witness gate knows one (`attitude._sleep_spec`).
+    if getattr(spell, "area_value", None):
+        words.append("area")
+    if _lands_sleep(getattr(spell, "effects", None) or ()):
+        words.append("sleep")
     return tuple(words)
+
+
+def _lands_sleep(specs) -> bool:
+    from .attitude import _sleep_spec
+
+    for spec in specs:
+        if not isinstance(spec, dict):
+            continue
+        if str(spec.get("type") or "") == "apply_condition" and _sleep_spec(spec):
+            return True
+        if _lands_sleep(list(spec.get("on_failure") or ()) + list(spec.get("on_success")
+                                                                  or ())):
+            return True
+    return False
 
 # The situations a concentration check is made in (`Engine._concentrate`), as the
 # Core Rulebook's Table 8-5 names them and as far as the engine makes them.

@@ -267,6 +267,19 @@ ATTACKER_TRAIT = "attacker:"
 # The skill_mod target that reaches every skill (`Actor.skill_modifiers`).
 ALL_SKILLS = "all"
 
+
+def feat_rank_name(skill: str) -> str:
+    """`ranks_knowledge_dungeoneering`: a feat formula's name for a skill's ranks."""
+    return "ranks_" + "_".join(re.findall(r"[a-z]+", str(skill).lower()))
+
+
+# The names a feat document's formula may ask beyond the sheet's (`Actor._feat_formula_
+# extra`): the ranks in the skill the term lands on, in any named skill, and the adjacent
+# allies holding the same feat. The validator probes formulas with these.
+FEAT_FORMULA_NAMES = ("ranks", "allies", *(feat_rank_name(s) for s in SKILLS))
+# A feat's class-skill grant, `skill.class.$target` bound to each pick (`class_skills`).
+FEAT_CLASS_SKILL = "skill.class."
+
 # A blow's trait saying how much damage reduction it passes by rule: `ignores_dr` all of
 # it (a smite), `ignores_dr:5` five points of it (Artificer's Touch at 5th). Read by
 # `Actor.damage_reduction` through `dr_ignored`; never a bypass word.
@@ -2438,12 +2451,18 @@ class Actor:
         alone, so a bloodline's class skill was printed in the catalogue and never got
         its +3 (`rules/grantedpowers.py:class_skills`)."""
         own = tuple(self.class_data.get("class_skills", ()) or ())
+        # A feat's `skill.class.<skill>` tags (Cosmopolitan's "choose two ... skills. Those
+        # skills always count as class skills for you"), bound to its picks by
+        # `standing_tags`. Asked only when some feat document carries one.
+        feat_skills = [t[len(FEAT_CLASS_SKILL):] for t in self.standing_tags()
+                       if t.startswith(FEAT_CLASS_SKILL)] if self._feats_grant_class_skills() \
+            else []
         if not (self.domains or self.class_choices):
-            return own
+            return own + tuple(dict.fromkeys(s for s in feat_skills if s not in own))
         from . import classes as classes_mod
         from . import grantedpowers
 
-        more = list(grantedpowers.class_skills(self))
+        more = list(grantedpowers.class_skills(self)) + feat_skills
         # Any class-option pick's `class_skill`, not only a bloodline's: the expert "can
         # choose any 10 skills to be class skills" (CRB p. 450), ten picks of a catalogue.
         for ch in classes_mod.choices_for(self.char_class or "", self.level):
@@ -2452,6 +2471,13 @@ class Actor:
                 if skill and skill not in more:
                     more.append(skill)
         return own + tuple(s for s in more if s not in own)
+
+    def _feats_grant_class_skills(self) -> bool:
+        from . import feats as feats_mod
+
+        return any(str(t).startswith(FEAT_CLASS_SKILL)
+                   for raw in self.feats
+                   for t in ((feats_mod.document(raw) or {}).get("tags") or ()))
 
     def ability_score(self, ab: str) -> int:
         """The score as it stands, after everything that has happened to it.
@@ -3099,7 +3125,9 @@ class Actor:
         # Word, Diviner's Fortune, Aura of Despair. Foundry PF1's change target `skills`
         # ("All Skills") is the same idea. Before it, each of those documents could name
         # one skill only and the bonus said on the sheet never reached a roll.
-        mods.extend(self._buff_mods("skill_mod", ALL_SKILLS, ctx))
+        # The skill rolled rides along, so an "all skills" term can ask its ranks
+        # (Improvisation's "+2 on all skill checks for skills you have no ranks in").
+        mods.extend(self._buff_mods("skill_mod", ALL_SKILLS, {**(ctx or {}), "skill": skill}))
         return stack(mods)
 
     # --- saves ----------------------------------------------------------------------
@@ -4518,6 +4546,12 @@ class Actor:
         if attacker is not None:
             mods.extend(self._scoped_effect_mods(
                 "combat_mod", "ac", {"attacker_actor": attacker, "attack": against}))
+        # And a feat's (feat loop b1): Low Profile's "+1 dodge bonus to AC against ranged
+        # attacks", Back to Back's "+2 ... against attacks from opponents flanking you".
+        # The kind of attack is always known here; whether this attacker flanks is asked
+        # of the board the blow is made on (`position.flanking_with`), no board no flank.
+        mods.extend(self._feat_mods("combat_mod", "ac",
+                                    self._ac_context(against, attacker), scoped=True))
         # An attack of opportunity this creature's own movement drew (`provoked_by`, set
         # by the engine on the swing it splices): Mobility's "+4 dodge bonus to Armor
         # Class against attacks of opportunity caused when you move out of or within a
@@ -4544,6 +4578,22 @@ class Actor:
             if against == "melee":
                 mods.append(Modifier(-4, "helpless, against melee"))
         return stack(mods)
+
+    def _ac_context(self, against: str, attacker=None) -> dict:
+        """The roll context an AC is asked in: the attack's kind, who makes it, and
+        whether they flank this creature on the board of the moment."""
+        ctx: dict = {"attack": against, "flanked": False}
+        if attacker is not None:
+            ctx["attacker_actor"] = attacker
+            scene = getattr(current_moment(), "scene", None)
+            if scene is not None and against == "melee":
+                from . import position
+
+                try:
+                    ctx["flanked"] = bool(position.flanking_with(scene, attacker, self))
+                except Exception:  # noqa: BLE001 - an unplaced body flanks nobody
+                    ctx["flanked"] = False
+        return ctx
 
     def _melded_gear(self) -> set[str]:
         """Which of "armour" and "shield" give no AC right now, and why it is the rule.
@@ -5815,10 +5865,17 @@ class Actor:
                 if "$target" in tag:
                     if not doc.get("target"):
                         continue                   # bound to nothing yet
-                    target = str(doc["target"]).strip().lower()
-                    if tag.startswith("proficient.weapon."):
-                        target = weapons_mod.key_for(target) or target
-                    tag = tag.replace("$target", target)
+                    # One tag per pick: Cosmopolitan's two class skills, comma-separated
+                    # as Scholar's two Knowledges are (`_feat_mods`).
+                    for target in str(doc["target"]).strip().lower().split(","):
+                        target = target.strip()
+                        if tag.startswith("proficient.weapon."):
+                            target = weapons_mod.key_for(target) or target
+                        elif tag.startswith(FEAT_CLASS_SKILL):
+                            target = base_skill(target)
+                        if target:
+                            out.append(tag.replace("$target", target))
+                    continue
                 out.append(tag)
         # The race's own tags — `race.<id>`, its senses, its immunities — from its
         # document (rules/races.py), so "is this an elf" and "can they see in the dark"
@@ -6365,8 +6422,14 @@ class Actor:
             return built(_stripped(rec))
         return built(rec)
 
-    def _feat_mods(self, kind: str, target: str, ctx: dict | None = None) -> list["Modifier"]:
+    def _feat_mods(self, kind: str, target: str, ctx: dict | None = None,
+                   scoped: bool = False) -> list["Modifier"]:
         """Modifiers from the feats this character holds, read off their documents.
+
+        `scoped` (feat loop b1, 2026-11-22): only the terms whose `when` asks the roll
+        context (any key but `bearer`), for a builder whose ordinary read has none — the
+        AC line, as `_scoped_effect_mods` is for effects. The ordinary read drops exactly
+        those terms (no context, no answer), so the two reads never count a term twice.
 
         The sixth channel, retired: before stage 8 every feat term was a bare
         `Modifier` appended inside a builder from a hand-written Python table — untyped
@@ -6422,14 +6485,21 @@ class Actor:
                         continue
                     if flat and not spec.get("when"):
                         continue
+                    if scoped and not set(spec.get("when") or {}) - {"bearer"}:
+                        continue
                     # `$target` as the TARGET: Skill Focus (perception) is a skill_mod on
                     # whichever skill the sheet's parenthetical names, folded onto the one
                     # id ranks sit on ("craft (alchemy)" is Craft, `tables.base_skill`).
+                    # A feat that picks two (Scholar, Prodigy: "pick any two Knowledge
+                    # skills") names both, comma-separated: Scholar (knowledge (history),
+                    # knowledge (local)) — one document, each pick a skill it lands on.
                     aimed = str(spec.get("target", "")).lower()
                     if aimed == "$target":
-                        aimed = str(doc.get("target") or "").strip().lower()
-                        if kind == "skill_mod" and aimed:
-                            aimed = base_skill(aimed)
+                        picks = [p.strip() for p in str(doc.get("target") or "").lower()
+                                 .split(",") if p.strip()]
+                        if kind == "skill_mod":
+                            picks = [base_skill(p) for p in picks]
+                        aimed = want if want in picks else ""
                     if not aimed or aimed != want:
                         continue
                     # `bearer` (light armour, a shield, a light load) is answered off the
@@ -6443,7 +6513,12 @@ class Actor:
                         # on — Alertness's "if you have 10 or more ranks in one of these
                         # skills, the bonus increases to +4 for that skill".
                         extra = {"ranks": int(self.ranks.get(want, 0) or 0)} \
-                            if kind == "skill_mod" else None
+                            if kind == "skill_mod" else {}
+                        # "On all skill checks" with no ranks (Improvisation): the ranks
+                        # of the skill being rolled, which `skill_modifiers` names in ctx.
+                        if want == ALL_SKILLS and ctx and ctx.get("skill"):
+                            extra["ranks"] = int(self.ranks.get(ctx["skill"], 0) or 0)
+                        extra.update(self._feat_formula_extra(spec["formula"], doc["id"]))
                         try:
                             amount = resources.evaluate(spec["formula"], self, extra)
                         except resources.FormulaError:
@@ -6455,6 +6530,56 @@ class Actor:
                                             _bonus_type(spec.get("bonus_type"))))
         finally:
             self._reading_feats = False
+        return out
+
+    def _feat_formula_extra(self, formula: str, fid: str) -> dict:
+        """The names only a feat's reader can answer (`FEAT_FORMULA_NAMES`), supplied
+        when the formula asks them.
+
+        - `ranks_<skill>`: the ranks in a named skill — Stone Read's "+4 if you have 10 or
+          more ranks in Knowledge (dungeoneering)" scales a Perception term on another
+          skill's ranks, which `ranks` (the skill the term lands on) cannot say.
+        - `allies`: allies adjacent to this creature who also hold this feat — Shake It
+          Off's "+1 per such ally (maximum +4)", Swarm Scatter's "+1 for each ally who has
+          this feat and is adjacent". Asked of the scene the roll is made in (the moment);
+          outside one there is nobody beside you and the count is 0. Adjacent is 5 feet on
+          the board; with no map, everyone here is taken to be beside you — the
+          convention `Situation.near` uses for "within 10 feet".
+        """
+        out: dict = {}
+        text = str(formula)
+        if "ranks_" in text:
+            for skill in SKILLS:
+                name = feat_rank_name(skill)
+                if name in text:
+                    out[name] = int(self.ranks.get(skill, 0) or 0)
+        if "allies" in text:
+            out["allies"] = len(self.adjacent_allies_with(fid))
+        return out
+
+    def adjacent_allies_with(self, fid: str) -> list:
+        """The allies beside this creature (same side, up, within 5 ft) who hold feat
+        `fid` — the teamwork-shaped feats' one question (see `_feat_formula_extra`)."""
+        from . import feats as feats_mod
+        from . import position
+
+        m = current_moment()
+        scene = getattr(m, "scene", None)
+        here = getattr(scene, "actors", None) or {}
+        if self.ref not in here:
+            return []
+        out = []
+        for ref, other in here.items():
+            if ref == self.ref or other.is_down or other.is_dead \
+                    or fid not in feats_mod._held(other) \
+                    or not position._same_side(scene, self.ref, ref):
+                continue
+            try:
+                feet = scene.distance_between(self.ref, ref)
+            except Exception:  # noqa: BLE001 - an unplaced body is unmeasured, not a crash
+                feet = None
+            if feet is None or int(feet) <= 5:
+                out.append(other)
         return out
 
     def _class_mods(self, kind: str, target: str, ctx: dict | None = None) -> list["Modifier"]:

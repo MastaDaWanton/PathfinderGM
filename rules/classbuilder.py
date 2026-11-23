@@ -1224,7 +1224,12 @@ def validate_feat_document(feat_id: str, doc) -> list[str]:
         if probe.get("formula"):
             # A skill term's formula may ask `ranks` (the skill's own ranks, supplied by
             # the reader), which the generic check does not know; checked here with it.
-            names = ("ranks",) if kind == "skill_mod" else ()
+            from .sheet import FEAT_FORMULA_NAMES
+
+            # `ranks` (and the named skills' ranks, the adjacent allies holding the feat)
+            # are supplied by the reader (`Actor._feat_formula_extra`).
+            names = tuple(n for n in FEAT_FORMULA_NAMES
+                          if kind == "skill_mod" or n != "ranks")
             trouble = resources.check(probe.pop("formula"), names)
             probe.setdefault("amount", 0)
             if trouble:
