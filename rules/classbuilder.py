@@ -1120,7 +1120,46 @@ def _validate_grants(d: dict, path: dict, at: str, resolved_names: set,
 _FEAT_DOC_KEYS = frozenset({"modifiers", "tags", "budget", "choice", "attack_ability",
                             "cmb_ability", "not_yet", "requires", "requires_not",
                             "stacks", "summoned", "summon_extra", "metamagic", "crit_range",
-                            "on_hit"})
+                            "on_hit",
+                            # Feat loop b2-styles: rerolls and after-the-die bonuses.
+                            "luck"})
+
+# The keys a feat's `luck` entry may carry (rules/luck.py, which reads them).
+_LUCK_KEYS = frozenset({"reroll", "bonus", "ally_save", "on_reroll", "surge", "rolls",
+                        "per_day", "bonus_type"})
+
+
+def _luck_problems(at: str, entries) -> list[str]:
+    """Everything wrong with a feat's `luck` list (rules/luck.py), with the fix named."""
+    from . import luck as luck_mod
+
+    if not isinstance(entries, list):
+        return [f"{at}.luck: a list of entries, each one of {', '.join(luck_mod.KINDS)}."]
+    out = []
+    for i, e in enumerate(entries):
+        where = f"{at}.luck[{i}]"
+        if not isinstance(e, dict):
+            out.append(f"{where}: an object.")
+            continue
+        bad = sorted(set(e) - _LUCK_KEYS)
+        if bad:
+            out.append(f"{where}: unknown key(s) {', '.join(bad)}; an entry carries "
+                       f"{', '.join(sorted(_LUCK_KEYS))}.")
+        kinds = [k for k in luck_mod.KINDS if k in e]
+        if len(kinds) != 1:
+            out.append(f"{where}: exactly one of {', '.join(luck_mod.KINDS)}.")
+        if "reroll" in e and e["reroll"] not in ("natural_1", "any"):
+            out.append(f"{where}.reroll: \"natural_1\" or \"any\".")
+        if "bonus" in e and (not isinstance(e["bonus"], dict) or not e["bonus"]
+                             or set(e["bonus"]) - {"before", "after"}):
+            out.append(f"{where}.bonus: {{\"before\": 8, \"after\": 4}}.")
+        rolls = e.get("rolls", [])
+        if not isinstance(rolls, list) or not all(isinstance(r, str) and r for r in rolls):
+            out.append(f"{where}.rolls: a list of roll kinds — attack, save, save.fort, "
+                       f"skill, skill.disable device, ability, d20.")
+        if not isinstance(e.get("per_day", 0), int) or int(e.get("per_day", 0)) < 0:
+            out.append(f"{where}.per_day: a count of uses a day, or left out for no limit.")
+    return out
 
 # What a feat's `on_hit` may lay on the creature a melee blow just struck (feat loop b1,
 # 2026-11-22): the attack riders' own executors (`Engine._RIDERS`), each key it reads.
@@ -1366,6 +1405,8 @@ def validate_feat_document(feat_id: str, doc) -> list[str]:
                 f"— the threat range doubled on the weapon the feat names.")
     if doc.get("on_hit") is not None:
         problems.extend(_on_hit_problems(at, doc["on_hit"], doc))
+    if doc.get("luck") is not None:
+        problems.extend(_luck_problems(at, doc["luck"]))
     sub = doc.get("cmb_ability")
     if sub is not None:
         from .tables import ABILITIES

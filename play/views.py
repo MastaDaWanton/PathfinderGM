@@ -4464,7 +4464,9 @@ def roll(request):
     engine = c.engine()
     undo = c.scene.snapshot()
     try:
-        resolution = engine.resume(face)
+        # The luck the player chose on the popup (rules/luck.py): a feat id the engine
+        # checks against its own offers, or "keep". Anything else is ignored there.
+        resolution = engine.resume(face, luck=str(body.get("luck") or "")[:64])
     except (IntentError, ValueError, KeyError) as exc:
         # A raise part-way through resolution used to be a 500 with the scene already
         # half-mutated and never saved: the damage had landed, the pending roll was

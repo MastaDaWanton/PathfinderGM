@@ -1,0 +1,55 @@
+{
+  "_about": [
+    "Feat loop, batch 2, styles lane (2026-11-22): the style feats and their follow-ups, and the",
+    "reroll and once-a-day luck feats. Each benefit is the book's (the benefit text in feats.json,",
+    "from aonprd.com / d20pfsrd.com). A style is a stance (rules/styles.py): its follow-ups ask",
+    "`bearer.state` for `style.<id>`, and a base style's clauses not prefaced by 'while using this",
+    "style' hold always. Luck is a document's `luck` list, read by rules/luck.py at the engine's",
+    "d20 doors. What still does not run is the document's `not_yet`."
+  ],
+  "dauntless-destiny": {
+    "modifiers": [
+      {"type": "save_mod", "target": "fort", "amount": 1, "bonus_type": "untyped",
+       "when": {"against": "emotion"}},
+      {"type": "save_mod", "target": "ref", "amount": 1, "bonus_type": "untyped",
+       "when": {"against": "emotion"}},
+      {"type": "save_mod", "target": "will", "amount": 1, "bonus_type": "untyped",
+       "when": {"against": "emotion"}}
+    ],
+    "luck": [
+      {"reroll": "natural_1", "rolls": ["save", "attack"], "per_day": 1}
+    ],
+    "not_yet": [
+      "the free-action Intimidate to demoralize after a reroll that succeeds: no door demoralizes as a free action off a roll",
+      "the reroll is still offered on a save against a trap: a save's roll does not say what forced it"
+    ]
+  },
+  "inexplicable-luck": {
+    "luck": [
+      {"bonus": {"before": 8, "after": 4}, "rolls": ["d20"], "per_day": 1}
+    ],
+    "not_yet": [
+      "initiative, concentration and the saves a spell or a hazard rolls for you: only the attack roll, a save the turn calls for, and a skill or ability check carry luck"
+    ]
+  },
+  "close-call": {
+    "luck": [
+      {"reroll": "any", "rolls": ["skill.disable device", "skill.sleight of hand"], "per_day": 1}
+    ]
+  },
+  "strong-comeback": {
+    "luck": [
+      {"on_reroll": 2, "bonus_type": "circumstance", "rolls": ["ability", "skill", "save"]}
+    ]
+  },
+  "surge-of-success": {
+    "luck": [
+      {"surge": 2, "bonus_type": "circumstance"}
+    ]
+  },
+  "lucky-halfling": {
+    "luck": [
+      {"ally_save": 30, "per_day": 1}
+    ]
+  }
+}

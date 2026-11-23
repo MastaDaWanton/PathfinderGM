@@ -52,6 +52,7 @@ from . import weapons as weapons_mod
 from .activeeffect import ActiveEffect
 from .guards import Guard, Packet
 from .dice import Dice, Modifier, Roll, d20_succeeds, natural_said
+from . import luck as luck_mod
 from .grid import Grid
 from . import hazards
 from . import deeds
@@ -5879,12 +5880,15 @@ class Engine:
                                because=""))
         return out
 
-    def resume(self, face: int) -> Resolution:
-        """Continue a suspended list with the face the player rolled."""
+    def resume(self, face: int, luck: str = "") -> Resolution:
+        """Continue a suspended list with the face the player rolled. `luck`: the luck
+        feat the player chose on the popup for this die, or "keep" (`_luck_face`)."""
         if not self.scene.awaiting:
             raise RuntimeError("nothing is awaiting a player roll")
         partial = dict(self.scene.pending_partial)
         partial["player_face"] = int(face)
+        if luck:
+            partial["player_luck"] = str(luck)
         remaining = list(self.scene.pending_intents)
         done = list(self.scene.pending_outcomes)
         self.scene.awaiting = None
@@ -6106,6 +6110,8 @@ class Engine:
             outcomes.extend(self._works_settles())
             # And what the same hours ended, behind the op whose hours they were.
             outcomes.extend(self._ended_settles())
+            # The luck the op's rolls used (rules/luck.py), told behind it.
+            outcomes.extend(self._luck_settles())
             # A single-roll check, save or manoeuvre decided on the player's own d20:
             # its outcome's verdict IS that roll's answer. Anything that judged the roll
             # at its own stage already has (`_judge` keeps the first).
@@ -8310,7 +8316,8 @@ class Engine:
             dc = self.LOCK_DC + (0 if tools else self.NO_TOOLS)
             label = (f"Disable Device — picking the lock of {house.name}"
                      + ("" if tools else " (no thieves' tools)"))
-        roll = self._roll_or_suspend(intent, pc, mods, label, dc, partial)
+        roll = self._roll_or_suspend(intent, pc, mods, label, dc, partial,
+                                     kind="skill.disable device")
         opened = roll.total >= dc
         self.scene.advance(0, rounds=1)
 
@@ -8930,6 +8937,7 @@ class Engine:
             # play argument at all, because it is not a difficulty they could know, it
             # is the outcome of somebody else's hidden die.
             dc_shown=not opposed,
+            kind=(f"ability.{ability}" if ability else f"skill.{str(skill).lower()}"),
         )
 
         margin = roll.total - resolved_dc.final
@@ -9665,6 +9673,7 @@ class Engine:
         roll = self._roll_or_suspend(
             intent, actor, mods, label=f"{SAVES[save]} save",
             dc=resolved_dc.final, partial=partial, extra_partial={"save_gutter": gut},
+            kind=f"save.{save}",
         )
 
         # The face decides before the total (CRB p.180; `dice.d20_succeeds`). Until
@@ -10647,7 +10656,7 @@ class Engine:
             if state["stage"] == "attack":
                 atk = self._roll_or_suspend_stage(
                     intent, actor, atk_mods, f"Attack with {weapon['name']}",
-                    swing_ac, partial, state, "1d20",
+                    swing_ac, partial, state, "1d20", kind="attack",
                 )
                 state["rolls"].append(atk.as_dict())
                 natural = atk.natural
@@ -10810,6 +10819,8 @@ class Engine:
                 state["rolls"].append(confirm.as_dict())
                 state["crit"] = confirm.total >= swing_ac
                 self._judge(confirm, state["crit"])
+                if state["crit"]:
+                    self._surge(actor, "a confirmed critical hit")
                 state["stage"] = "damage"
 
             if state["stage"] == "damage" and printed.get("ability"):
@@ -38318,9 +38329,12 @@ class Engine:
     def _roll_or_suspend_stage(
         self, intent: Intent, actor: Actor, mods: list[Modifier], label: str,
         dc: int | None, partial: dict, state: dict, notation: str,
-        state_key: str = "attack_state",
+        state_key: str = "attack_state", kind: str = "",
     ) -> Roll:
         """One stage of a multi-stage intent: roll it, or hand it to the player and stop.
+
+        `kind` names a d20 roll for the luck feats (`rules/luck.py`): "attack" for the
+        swing's to-hit. Left out, a roll no luck reaches (damage, the confirmation).
 
         Unlike `_roll_or_suspend` this carries the accumulated `state` into the
         suspension, so an attack that has already rolled to-hit does not roll it again
@@ -38335,8 +38349,15 @@ class Engine:
         cast rolls the caster's damage and then each target's saving throw, and the popup
         must only ever open for a roll the player is entitled to make.
         """
+        lucky = bool(kind) and notation.strip() == "1d20"
+        if lucky:
+            mods = list(mods) + luck_mod.surge_terms(actor, kind)
         if intent.visibility == "player" and actor.is_pc:
             if "player_face" in partial:
+                if lucky:
+                    return self._took(self._luck_face(
+                        intent, actor, mods, label, dc, partial, kind, {state_key: state},
+                        True))
                 face = partial.pop("player_face")
                 return self._took(self.dice.given_total(face, notation, mods, label=label))
             count, faces, _ = self.dice.parse(notation)
@@ -38352,10 +38373,12 @@ class Engine:
                     "dc": dc,
                     "because": self._roll_why(intent, actor),
                     "intent_id": intent.id,
+                    **({"luck": luck_mod.before_offers(actor, kind)} if lucky else {}),
                 },
                 {state_key: state},
             )
-        return self.dice.roll(notation, mods, label=label, visibility=intent.visibility)
+        rolled = self.dice.roll(notation, mods, label=label, visibility=intent.visibility)
+        return self._luck_npc(actor, mods, label, dc, kind, rolled) if lucky else rolled
 
     def _roll_why(self, intent: Intent, actor: Actor) -> str:
         """The dice popup's subtitle for a roll the player makes: the plan's `because`,
@@ -38387,15 +38410,24 @@ class Engine:
     def _roll_or_suspend(
         self, intent: Intent, actor: Actor, mods: list[Modifier], label: str,
         dc: int, partial: dict, extra_partial: dict | None = None,
-        dc_shown: bool = True,
+        dc_shown: bool = True, kind: str = "",
     ) -> Roll:
         """Roll it, or hand it to the player and stop.
 
         The player rolls their own; everything else the engine rolls and hands to the GM
         as a fact. That is the architecture decision, enforced in one place.
+
+        `kind` names the roll for the luck feats (`rules/luck.py`): "save.fort",
+        "skill.disable device", "ability.str". Left out, no luck reaches it.
         """
+        if kind:
+            mods = list(mods) + luck_mod.surge_terms(actor, kind)
         if intent.visibility == "player" and actor.is_pc:
             if "player_face" in partial:
+                if kind:
+                    return self._took(self._luck_face(
+                        intent, actor, mods, label, dc, partial, kind,
+                        dict(extra_partial or {}), dc_shown))
                 return self._took(self.dice.given(partial["player_face"], mods, label=label))
             prompt = {
                 "label": label,
@@ -38414,8 +38446,179 @@ class Engine:
                 "because": self._roll_why(intent, actor),
                 "intent_id": intent.id,
             }
+            if kind:
+                prompt["luck"] = luck_mod.before_offers(actor, kind)
             raise _NeedsPlayerRoll(prompt, dict(extra_partial or {}))
-        return self.dice.d20(mods, label=label, visibility=intent.visibility)
+        rolled = self.dice.d20(mods, label=label, visibility=intent.visibility)
+        return self._luck_npc(actor, mods, label, dc, kind, rolled) if kind else rolled
+
+    # --- luck on a d20 (feat loop b2-styles, rules/luck.py) ----------------------------
+
+    @staticmethod
+    def _short(roll: Roll, dc, kind: str) -> bool | None:
+        """Whether the roll misses what it needed; None when that is not known (an
+        opposed check rolls against nothing yet). Attacks and saves read the face
+        (`d20_succeeds`); a check reads the total."""
+        if dc is None or int(dc or 0) <= 0:
+            return None
+        if kind.startswith(("attack", "save")):
+            return not d20_succeeds(roll, int(dc))
+        return roll.total < int(dc)
+
+    def _luck_note(self, who: Actor, doc: dict, said: str) -> None:
+        self.__dict__.setdefault("_luck_said", []).append(
+            {"ref": who.ref, "tell": said, "origin": f"rule:feat-{doc['id']}"})
+
+    def _luck_settles(self) -> list:
+        """The luck this op's rolls used, told behind it (law 3): a reroll, a bonus after
+        the die, a friend's save lent. One outcome per op, its effects naming each feat."""
+        said = self.__dict__.pop("_luck_said", None) or []
+        if not said:
+            return []
+        fx = [{"ref": r["ref"], "kind": "luck", "origin": r["origin"]} for r in said]
+        return [Outcome(intent_id="", op="luck", effects=fx,
+                        tell=" ".join(r["tell"] for r in said), because="")]
+
+    def _luck_face(self, intent: Intent, actor: Actor, mods: list[Modifier], label: str,
+                   dc, partial: dict, kind: str, keep: dict, dc_shown: bool) -> Roll:
+        """The player's own d20 with the luck they chose on the popup.
+
+        First pass: the face, with a "before the roll" bonus they pressed (Inexplicable
+        Luck's +8, spent here). If their feats offer anything once the die is down — the
+        natural 1 Dauntless Destiny rerolls, a miss Close Call or Inexplicable Luck's +4
+        could mend — the roll suspends once more with those offers (`luck`) and the face
+        kept (`luck_first`); the player rerolls (a new face), takes the bonus, or keeps
+        the die. Second pass: what they chose, checked against the same offers and spent.
+        Only one reroll a roll, whoever offers it (Dauntless Destiny)."""
+        face = int(partial.pop("player_face"))
+        choice = str(partial.pop("player_luck", "") or "").strip().lower()
+        first = partial.pop("luck_first", None)
+        before = str(partial.pop("luck_before", "") or "")
+        if first is None and choice:
+            doc, entry = luck_mod.find(actor, choice, "bonus")
+            if doc and (entry["bonus"] or {}).get("before") and luck_mod.covers(entry, kind) \
+                    and luck_mod.spend(actor, doc, entry):
+                before = choice
+                self._luck_note(actor, doc, f"{actor.name} calls on {doc['name']} before "
+                                            f"the roll (+{int(entry['bonus']['before'])}).")
+        extra: list[Modifier] = []
+        if before:
+            doc, entry = luck_mod.find(actor, before, "bonus")
+            if doc:
+                extra.append(Modifier(int(entry["bonus"]["before"]),
+                                      f"{doc['name']} (before the roll)"))
+        start = int(first) if first is not None else face
+        roll = self.dice.given(start, list(mods) + extra, label=label)
+        offers = luck_mod.after_offers(actor, kind, roll, self._short(roll, dc, kind),
+                                       skip=before)
+        if first is None:
+            if offers:
+                prompt = {
+                    "label": f"{label} — your luck", "die": "1d20", "actor": actor.name,
+                    "min": 1, "max": 20,
+                    "modifier": sum(m.value for m in roll.modifiers),
+                    "breakdown": [m.as_dict() for m in roll.modifiers],
+                    "dc": dc, "dc_shown": bool(dc_shown),
+                    "because": self._roll_why(intent, actor), "intent_id": intent.id,
+                    "luck": offers, "luck_face": int(face), "luck_total": roll.total,
+                }
+                raise _NeedsPlayerRoll(prompt, {**keep, "luck_first": int(face),
+                                                "luck_before": before})
+            return self._luck_after_roll(actor, kind, roll, dc)
+        took = next((o for o in offers if o["id"] == choice), None)
+        if took is not None:
+            doc, entry = luck_mod.find(actor, took["id"],
+                                       "reroll" if took["kind"] == "reroll" else "bonus")
+            if doc and luck_mod.spend(actor, doc, entry):
+                if took["kind"] == "reroll":
+                    back = (luck_mod.comeback(actor, kind)
+                            if kind.split(".")[0] in ("save", "skill", "ability") else [])
+                    roll = self.dice.given(face, list(mods) + extra + back,
+                                           label=f"{label}, rerolled ({doc['name']})")
+                    self._luck_note(actor, doc, f"{actor.name} rolls again ({doc['name']}): "
+                                                f"{int(first)}, then {face}.")
+                else:
+                    roll = self.dice.given(int(first), list(mods) + extra + [Modifier(
+                        int(took["amount"]), f"{doc['name']} (after the roll)")],
+                        label=label)
+                    self._luck_note(actor, doc, f"{actor.name} calls on {doc['name']} after "
+                                                f"the roll (+{int(took['amount'])}).")
+        return self._luck_after_roll(actor, kind, roll, dc)
+
+    def _luck_npc(self, actor: Actor, mods: list[Modifier], label: str, dc, kind: str,
+                  roll: Roll) -> Roll:
+        """Anybody else's d20 with their luck taken by the book's trigger: Dauntless
+        Destiny on a natural 1; Close Call when the check falls short; Inexplicable Luck's
+        +4 when four more would make it (the GM knows the DC). The "before the roll" +8
+        is never pre-committed by the engine (owner call, b2-styles)."""
+        short = self._short(roll, dc, kind)
+        for o in luck_mod.after_offers(actor, kind, roll, short):
+            if o["kind"] == "reroll" and roll.natural != 1 and short is not True:
+                continue
+            if o["kind"] == "bonus" and not (short and dc is not None
+                                             and roll.total + int(o["amount"]) >= int(dc)):
+                continue
+            doc, entry = luck_mod.find(actor, o["id"],
+                                       "reroll" if o["kind"] == "reroll" else "bonus")
+            if not doc or not luck_mod.spend(actor, doc, entry):
+                continue
+            if o["kind"] == "reroll":
+                back = (luck_mod.comeback(actor, kind)
+                        if kind.split(".")[0] in ("save", "skill", "ability") else [])
+                was = roll.raw
+                roll = self.dice.d20(list(mods) + back, label=f"{label}, rerolled "
+                                     f"({doc['name']})", visibility=roll.visibility)
+                self._luck_note(actor, doc, f"{actor.name} rolls again ({doc['name']}): "
+                                            f"{was}, then {roll.raw}.")
+            else:
+                roll = Roll(die=roll.die, faces=list(roll.faces),
+                            modifiers=list(roll.modifiers) + [Modifier(
+                                int(o["amount"]), f"{doc['name']} (after the roll)")],
+                            label=roll.label, visibility=roll.visibility)
+                self._luck_note(actor, doc, f"{actor.name} calls on {doc['name']} "
+                                            f"(+{int(o['amount'])}).")
+            break
+        return self._luck_after_roll(actor, kind, roll, dc)
+
+    def _luck_after_roll(self, actor: Actor, kind: str, roll: Roll, dc) -> Roll:
+        """What follows a d20 once it stands: a held Surge of Success spent on it, a new
+        one earned by a natural 20 on a save, and — a save failed — an ally's Lucky
+        Halfling roll of the same save, taken in its place when it succeeds."""
+        if luck_mod.surge_terms(actor, kind):
+            gone = actor.remove_effects(match=lambda e: luck_mod.SURGE in (e.tags or ()))
+            for e in gone[:1]:
+                self._luck_note(actor, {"id": e.key}, f"{actor.name} spends {e.source} on "
+                                                       f"this roll.")
+        if kind.startswith("save") and roll.natural == 20:
+            self._surge(actor, "a natural 20 on the save")
+        if kind.startswith("save.") and dc is not None and int(dc or 0) > 0 \
+                and not d20_succeeds(roll, int(dc)):
+            save = kind.split(".", 1)[1]
+            for other, doc, entry in luck_mod.ally_savers(actor, self.scene, self._gap_ft):
+                if not luck_mod.spend(other, doc, entry):
+                    continue
+                theirs = self.dice.d20(other.save_modifiers(save),
+                                       label=f"{other.name}'s {SAVES.get(save, save)} save "
+                                             f"for {actor.name} ({doc['name']})",
+                                       visibility="player")
+                made = d20_succeeds(theirs, int(dc))
+                self._luck_note(other, doc, (
+                    f"{other.name} rolls the save for {actor.name} ({doc['name']}): "
+                    f"{theirs.total}, " + (f"and {actor.name} takes it." if made
+                                           else "no better.")))
+                if made:
+                    return theirs
+                break
+        return roll
+
+    def _surge(self, actor: Actor, why: str) -> None:
+        """Surge of Success, earned (a confirmed critical, a natural 20 on a save)."""
+        eff = luck_mod.surge_effect(actor)
+        if eff is None:
+            return
+        actor.apply_effect(eff)
+        self._luck_note(actor, {"id": eff.key}, f"{actor.name} rides {why}: "
+                                                 f"+2 on the next roll ({eff.source}).")
 
     def _apply_damage(self, target: Actor, amount: int, dtype: str,
                       traits: tuple[str, ...] = (),

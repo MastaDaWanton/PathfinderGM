@@ -1157,7 +1157,8 @@ async function sendRoll(face, shown) {
   busy(true);
   let state = null;
   const logBefore = (STATE && STATE.log) || [];
-  try { state = await post("/api/roll", { face: landed }); }
+  const luck = shown.luck && shown.luck.picked;
+  try { state = await post("/api/roll", luck ? { face: landed, luck } : { face: landed }); }
   catch (e) { $("#err").className = ""; $("#err").textContent = e.message; }
   finally { busy(false); }
   // The turn this die finished is over, so the "Not yet done: …" its first reply put up

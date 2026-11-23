@@ -792,6 +792,19 @@ function showPopup(p) {
     terms: terms,
     note: lo === hi ? "" : `${die} (${lo}–${hi})`,
   };
+  // The luck feats this roll may call on (rules/luck.py), every word the server's. Before
+  // the throw a bonus toggles; once the die is down (`luck_face`) the player rerolls,
+  // takes the bonus, or keeps the face. The pick rides the post (`sendRoll`).
+  if (p.luck && p.luck.length) {
+    const choices = p.luck.map(o => ({ id: o.id, text: o.text,
+                                       kind: o.when === "before" ? "before" : o.kind }));
+    if (p.luck_face != null) {
+      choices.push({ id: "keep", kind: "keep", text: `Keep the ${p.luck_face}` });
+      shown.note = `You rolled ${p.luck_face} (${sign(p.luck_total - p.luck_face)}, ` +
+        `${p.luck_total} in all).`;
+    }
+    shown.luck = { choices, face: p.luck_face != null ? p.luck_face : null, picked: null };
+  }
   // `hold` keeps the mat open when the table is doing the rolling, so the die goes
   // straight from the wind-up into its throw. It used to close here and reopen on the
   // far side of the request, which is the blink the player saw as the animation
