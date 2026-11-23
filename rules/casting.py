@@ -1226,11 +1226,30 @@ CONVERTS_TO = {
 def converts_spontaneously(actor, spell) -> bool:
     """Whether this caster may cast this spell without having prepared it."""
     data = caster_data(actor)
+    if spell is not None and preferred(actor, spell):
+        return True
     starts = CONVERTS_TO.get(str(data.get("list") or "").lower())
     if not starts or spell is None:
         return False
     name = str(getattr(spell, "name", "")).strip().lower()
     return any(name.startswith(s) for s in starts)
+
+
+def preferred(actor, spell) -> bool:
+    """Preferred Spell (APG): "Choose one spell which you have the ability to cast. You can
+    cast that spell spontaneously by sacrificing a prepared spell or spell slot of equal or
+    higher level" — the sheet's parenthetical is the spell, and a book caster must have it
+    in the book (feat loop b1)."""
+    from . import feats as feats_mod
+
+    sid = str(getattr(spell, "id", "") or "")
+    for raw in getattr(actor, "feats", None) or ():
+        doc = feats_mod.document(raw)
+        if doc and doc.get("id") == "preferred-spell" and "-".join(
+                str(doc.get("target") or "").lower().split()) == sid:
+            book = caster_data(actor).get("prepare_from") == "spellbook"
+            return not book or sid in (getattr(actor, "spellbook", None) or [])
+    return False
 
 
 def sacrifice_for(actor, spell_level: int) -> str:
@@ -1258,7 +1277,7 @@ def sacrifice_for(actor, spell_level: int) -> str:
     return best
 
 
-def conversion_source(actor, spell) -> dict | None:
+def conversion_source(actor, spell, meta=()) -> dict | None:
     """Where a spontaneously converted cure comes from, in `cast_source`'s shape plus the
     prepared spell given up (`sacrifice`), or None when it cannot be converted.
 
@@ -1270,7 +1289,14 @@ def conversion_source(actor, spell) -> dict | None:
     lvl = spell_level_for(actor, spell) if spell is not None else None
     if lvl is None or at_will(lvl) or not converts_spontaneously(actor, spell):
         return None
-    given = sacrifice_for(actor, lvl)
+    # A Preferred Spell with metamagic: "This increases the minimum level of the prepared
+    # spell or spell slot you must sacrifice".
+    lift = 0
+    if meta and preferred(actor, spell):
+        from . import metamagic
+
+        lift = metamagic.levels(actor, meta)
+    given = sacrifice_for(actor, lvl + lift)
     if not given:
         return None
     from . import spells as spells_mod
@@ -1280,7 +1306,8 @@ def conversion_source(actor, spell) -> dict | None:
     except KeyError:
         paid = None
     return {"pool": slot_pool(paid if paid is not None else lvl), "key": "", "cost": 1,
-            "level": lvl, "sacrifice": given}
+            "level": lvl, "sacrifice": given,
+            **({"slot": paid if paid is not None else lvl + lift} if lift else {})}
 
 
 def prepared_count(actor, spell_id: str) -> int:

@@ -3185,6 +3185,17 @@ class Actor:
         mods.extend(self._buff_mods("combat_mod", "concentration", ctx))
         return stack(mods)
 
+    def caster_level_check_modifiers(self, ctx: dict | None = None) -> list[Modifier]:
+        """d20 + caster level, and what moves a caster level CHECK — the vocabulary's
+        `combat_mod` target `caster_level`, read by nothing until the feat loop (b1,
+        2026-11-22): the scroll above the reader's level (Cypher Magic's +2) and the check
+        against spell resistance (`Engine._resists`, which adds the spell's own level)."""
+        from . import casting
+
+        mods = [Modifier(casting.caster_level(self), "caster level")]
+        mods.extend(self._buff_mods("combat_mod", "caster_level", ctx))
+        return stack(mods)
+
     # --- initiative -------------------------------------------------------------------
 
     def initiative_modifiers(self) -> list[Modifier]:

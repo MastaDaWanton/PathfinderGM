@@ -2507,6 +2507,8 @@ AGAINST: dict[str, str] = {
     "divine_spell": "a spell cast by a divine caster (Engine._cast_save)",
     "arcane_spell": "a spell cast by an arcane caster (Engine._cast_save)",
     "negative_energy": "a spell of negative energy, an inflict (Engine._cast_save)",
+    "scroll": "casting from a scroll: its caster level (Engine._use_power) and the check to "
+              "read one above the reader's level (Engine._spell_item_gate)",
 }
 
 

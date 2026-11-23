@@ -496,3 +496,44 @@ def test_a_scope_matches_one_word_of_several():
     assert _scope_holds({"spell": "$target"}, {"target": "magic missile"},
                         {"spell": "magic-missile"})
     assert _when_holds({"ally_adjacent": {"feat": "x"}}, {"adjacent_allies": []}) is False
+
+
+def test_preferred_spell_casts_by_giving_up_a_prepared_spell_and_takes_metamagic():
+    """APG Preferred Spell: "You can cast that spell spontaneously by sacrificing a
+    prepared spell or spell slot of equal or higher level ... You can apply any metamagic
+    feats you possess to this spell when you cast it. This increases the minimum level of
+    the prepared spell ... you must sacrifice". A wizard 9 with fireball unprepared gives
+    up lightning bolt; empowered, the 5th-level cone of cold."""
+    pc = caster(cls="wizard", level=9,
+                book=("fireball", "lightning-bolt", "cone-of-cold", "magic-missile"),
+                feats=("Preferred Spell (fireball)", "Empower Spell"))
+    pc.prepared = {"lightning-bolt": 1, "cone-of-cold": 1, "magic-missile": 1}
+    s, e = table(pc)
+    out = cast(e, spell="fireball", at="c1")
+    assert "gives up Lightning Bolt" in out.tell
+    out = cast(e, spell="fireball", at="c1", metamagic="empower")
+    assert "gives up Cone of Cold" in out.tell and "empowered, in a level 5 slot" in out.tell
+    assert pc.prepared == {"magic-missile": 1}
+    plain = caster(cls="wizard", level=9, book=("fireball", "lightning-bolt"), feats=())
+    plain.prepared = {"lightning-bolt": 1}
+    s2, e2 = table(plain)
+    with pytest.raises(IntentError):
+        e2.validate([{"op": "cast", "actor": "pc", "params": {"spell": "fireball",
+                                                               "at": "c1"}}])
+
+
+def test_cypher_magic_reads_scrolls_a_level_higher_and_checks_at_plus_two():
+    pc = caster(feats=("Cypher Magic",))
+    plain = caster(feats=())
+    assert sum(m.value for m in pc.caster_level_check_modifiers({"against": "scroll"})) \
+        == sum(m.value for m in plain.caster_level_check_modifiers({"against": "scroll"})) + 2
+    assert sum(m.value for m in stack(pc._buff_mods("combat_mod", "spell_cl",
+                                                    {"against": "scroll"}))) == 1
+
+
+def test_a_giants_rock_is_not_deflected():
+    pc = caster(feats=("Deflect Arrows",))
+    s, e = table(pc)
+    pc.equipped, pc.shield = "unarmed", "none"
+    assert e._deflect_by_feat(pc, {"key": "rock", "category": "ranged"}, "ranged") == ""
+    assert "Deflect Arrows" in e._deflect_by_feat(pc, {"key": "longbow"}, "ranged")

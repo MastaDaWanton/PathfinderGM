@@ -360,17 +360,11 @@
   "deflect-arrows": {
     "tags": [
       "deflect.ranged.hand"
-    ],
-    "not_yet": [
-      "unusually massive ranged weapons (boulders, ballista bolts) are not told apart from other ranged weapons"
     ]
   },
   "missile-shield": {
     "tags": [
       "deflect.ranged.shield"
-    ],
-    "not_yet": [
-      "unusually massive ranged weapons are not told apart from other ranged weapons"
     ]
   },
   "ray-shield": {
@@ -379,6 +373,29 @@
     ],
     "not_yet": [
       "the shield suffering the full effects of the spell it turned"
+    ]
+  },
+  "preferred-spell": {},
+  "cypher-magic": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "spell_cl",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "scroll"
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "caster_level",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "scroll"
+        }
+      }
     ]
   }
 }

@@ -25123,6 +25123,12 @@ class Engine:
         The caller has already asked that the defender is aware and not flat-footed."""
         if kind == "ranged" and (weapon.get("natural") or weapon.get("stat_block_natural")):
             return ""
+        # "Unusually massive ranged weapons (such as boulders or ballista bolts)": a
+        # giant's printed rock and the siege engines, by the weapon's own word.
+        said = str(weapon.get("key") or weapon.get("name") or "").strip().lower()
+        if kind == "ranged" and said.split(" ")[0] in ("rock", "rocks", "boulder",
+                                                       "ballista", "catapult", "trebuchet"):
+            return ""
         for tag, feat, needs in self._DEFLECT_TAGS[kind]:
             if not defender.has_state(tag):
                 continue
@@ -25910,7 +25916,10 @@ class Engine:
             mine_cl = casting.caster_level(actor)
             if mine_cl >= item_cl:
                 return None
-            roll = self.dice.d20([Modifier(mine_cl, "caster level")],
+            # A caster level CHECK, through the funnel (`Actor.caster_level_check_
+            # modifiers`): Cypher Magic's "+2 bonus on caster level checks made to
+            # activate a scroll with a higher caster level than your own" (feat loop b1).
+            roll = self.dice.d20(actor.caster_level_check_modifiers({"against": "scroll"}),
                                  label=f"Caster level check ({name}, DC {item_cl + 1})",
                                  visibility=visible)
             rolls.append(roll.as_dict())
@@ -26084,6 +26093,13 @@ class Engine:
                 # Item Creation), as a potion's is (`consumables`). It was 1, so a 3rd-level
                 # fireball power rolled 1d6.
                 cl = max(1, 2 * level - 1)
+            if str(spec.get("item_kind") or "") == "scroll":
+                # Cypher Magic (ISWG): "You cast spells from scrolls at +1 caster level
+                # higher than the scroll's caster level" — `spell_cl` against a scroll.
+                from .dice import stack as _stack
+
+                cl += sum(m.value for m in _stack(actor._buff_mods(
+                    "combat_mod", "spell_cl", {"against": "scroll"})))
             if not resuming:
                 partial["item_cast"] = {"cl": cl, "level": level,
                                         "dc": 10 + level + level // 2,
@@ -27381,7 +27397,7 @@ class Engine:
         else:
             # A converted cure pays with the slot of the spell it is cast in place of
             # (`casting.conversion_source`), never with a slot of the cure's own level.
-            source = (state or {}).get("source") or casting.cast_source(actor, spell, meta)                 or casting.conversion_source(actor, spell) or {
+            source = (state or {}).get("source") or casting.cast_source(actor, spell, meta)                 or casting.conversion_source(actor, spell, meta) or {
                 "pool": "" if casting.at_will(level) else casting.slot_pool(level),
                 "key": "", "cost": 0 if casting.at_will(level) else 1, "level": level}
         level = int(source.get("level", level))
@@ -28196,7 +28212,10 @@ class Engine:
         # And the spell's own words (feat loop b1): Diviner's Delving's "+2 ... with
         # divinations", Demon Hunter's "against creatures with the demon subtype",
         # Allied Spellcaster's ally beside the caster.
+        sr_ctx = casting.spell_context(spell, against="spell_resistance",
+                                       target_actor=target)
         mods = _stack([Modifier(int(cl), "caster level")]
+                      + actor._buff_mods("combat_mod", "caster_level", sr_ctx)
                       + actor._buff_mods("combat_mod", "spell_resistance",
                                          casting.spell_context(
                                              spell, against="spell_resistance",
@@ -30018,7 +30037,7 @@ class Engine:
                              f"first.",
             )
         if source is None and may_convert:
-            source = casting.conversion_source(actor, spell)
+            source = casting.conversion_source(actor, spell, meta)
         paying = (source or {}).get("pool") or casting.slot_pool(level)
         cost = max(1, int((source or {}).get("cost", 1) or 1))
         if not casting.at_will(level) and casting.pool_left(actor, paying) < cost:
@@ -30093,7 +30112,11 @@ class Engine:
             why = (f"it would take a level {at} slot, and {actor.name} casts up to level "
                    f"{casting.highest_spell_level(actor)}.")
         if not why and kind == "prepared" and casting.prepared_count(
-                actor, casting.metamagic_key(spell.id, meta)) <= 0:
+                actor, casting.metamagic_key(spell.id, meta)) <= 0 \
+                and not (casting.preferred(actor, spell)
+                         and casting.conversion_source(actor, spell, meta) is not None):
+            # A Preferred Spell takes its metamagic at the cast, from a higher slot given
+            # up (`casting.conversion_source`); any other prepared copy was fixed at dawn.
             why = (f"a prepared caster fixes metamagic when preparing, and {actor.name} has "
                    f"no {spell.name} prepared with "
                    f"{' and '.join(m.replace('-', ' ') for m in meta)} today.")

@@ -444,6 +444,9 @@ _REACHES = {
     # Feat loop b1, 2026-11-22: the caster level a spell is cast at (Spell
     # Specialization), read by `casting.spell_caster_level` with the spell's context.
     ("combat_mod", "spell_cl"): lambda a: _spell_cl(a),
+    # And a caster level CHECK (the scroll above one's level, spell resistance).
+    ("combat_mod", "caster_level"):
+        lambda a: sum(m.value for m in a.caster_level_check_modifiers()),
 }
 
 
@@ -466,8 +469,6 @@ _UNREACHED = {
     # touch_ac left this list in stage 2: it reads the typed channels now and drops
     # the three a touch attack ignores, rather than subtracting armour-table numbers
     # from a finished total.
-    "caster_level": "stage 9 — no reader consults it; casting has no check to spend "
-                    "it on yet",
 }
 
 
