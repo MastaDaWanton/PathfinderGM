@@ -30,66 +30,374 @@
   },
   "reach-defense": {
     "modifiers": [
-      {"type": "combat_mod", "target": "ac", "amount": 2, "bonus_type": "dodge",
-       "when": {"opportunity": true, "adjacent": false},
-       "note": "against attacks of opportunity from opponents not adjacent to you"}
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 2,
+        "bonus_type": "dodge",
+        "when": {
+          "opportunity": true,
+          "adjacent": false
+        },
+        "note": "against attacks of opportunity from opponents not adjacent to you"
+      }
     ]
   },
   "death-frombelow": {
     "modifiers": [
-      {"type": "combat_mod", "target": "attack", "amount": 2, "bonus_type": "circumstance",
-       "when": {"opportunity": true, "target": {"aloft": true}},
-       "note": "an attack of opportunity against a flying opponent"}
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 2,
+        "bonus_type": "circumstance",
+        "when": {
+          "opportunity": true,
+          "target": {
+            "aloft": true
+          }
+        },
+        "note": "an attack of opportunity against a flying opponent"
+      }
     ],
     "not_yet": [
       "'when you have set a weapon against a charge': no readied action sets a weapon against a charge yet (the charge lane's machinery)"
     ]
   },
   "snap-shot": {
-    "tags": ["threat.ranged.5"]
+    "tags": [
+      "threat.ranged.5"
+    ]
   },
   "greater-snap-shot": {
     "modifiers": [
-      {"type": "combat_mod", "target": "damage",
-       "formula": "2 + 2 * min(1, bab // 16) + 2 * min(1, bab // 20)", "bonus_type": "untyped",
-       "when": {"opportunity": true, "weapon": {"ranged": true}},
-       "note": "an attack of opportunity with a ranged weapon that hits"},
-      {"type": "combat_mod", "target": "crit_confirm",
-       "formula": "2 + 2 * min(1, bab // 16) + 2 * min(1, bab // 20)", "bonus_type": "untyped",
-       "when": {"opportunity": true, "weapon": {"ranged": true}}}
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "formula": "2 + 2 * min(1, bab // 16) + 2 * min(1, bab // 20)",
+        "bonus_type": "untyped",
+        "when": {
+          "opportunity": true,
+          "weapon": {
+            "ranged": true
+          }
+        },
+        "note": "an attack of opportunity with a ranged weapon that hits"
+      },
+      {
+        "type": "combat_mod",
+        "target": "crit_confirm",
+        "formula": "2 + 2 * min(1, bab // 16) + 2 * min(1, bab // 20)",
+        "bonus_type": "untyped",
+        "when": {
+          "opportunity": true,
+          "weapon": {
+            "ranged": true
+          }
+        }
+      }
     ]
   },
   "furious-focus": {
     "modifiers": [
-      {"type": "combat_mod", "target": "attack", "formula": "1 + bab // 4",
-       "bonus_type": "untyped",
-       "when": {"choice": "power_attack", "first_attack": true,
-                "weapon": {"category": "melee", "strength_share": 1.5}},
-       "note": "Power Attack's penalty lifted from the first attack each turn, two-handed"}
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "formula": "1 + bab // 4",
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "power_attack",
+          "first_attack": true,
+          "weapon": {
+            "category": "melee",
+            "strength_share": 1.5
+          }
+        },
+        "note": "Power Attack's penalty lifted from the first attack each turn, two-handed"
+      }
     ]
   },
   "elven-battle-training": {
     "modifiers": [
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "disarm"}, "when": {"bearer": {"wielding": "longbow"}}},
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "sunder"}, "when": {"bearer": {"wielding": "longbow"}}},
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "disarm"}, "when": {"bearer": {"wielding": "composite-longbow"}}},
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "sunder"}, "when": {"bearer": {"wielding": "composite-longbow"}}},
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "disarm"}, "when": {"bearer": {"wielding": "shortbow"}}},
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "sunder"}, "when": {"bearer": {"wielding": "shortbow"}}},
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "disarm"}, "when": {"bearer": {"wielding": "composite-shortbow"}}},
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "sunder"}, "when": {"bearer": {"wielding": "composite-shortbow"}}},
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "disarm"}, "when": {"bearer": {"wielding": "longsword"}}},
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "sunder"}, "when": {"bearer": {"wielding": "longsword"}}},
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "disarm"}, "when": {"bearer": {"wielding": "rapier"}}},
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "sunder"}, "when": {"bearer": {"wielding": "rapier"}}},
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "disarm"}, "when": {"bearer": {"wielding": "elven-curve-blade"}}},
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "sunder"}, "when": {"bearer": {"wielding": "elven-curve-blade"}}},
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "disarm"}, "when": {"bearer": {"wielding": "elven-branched-spear"}}},
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "sunder"}, "when": {"bearer": {"wielding": "elven-branched-spear"}}},
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "disarm"}, "when": {"bearer": {"wielding": "elven-leafblade"}}},
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "sunder"}, "when": {"bearer": {"wielding": "elven-leafblade"}}},
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "disarm"}, "when": {"bearer": {"wielding": "elven-thornblade"}}},
-      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped", "scope": {"maneuver": "sunder"}, "when": {"bearer": {"wielding": "elven-thornblade"}}}
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "longbow"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "longbow"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "composite-longbow"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "composite-longbow"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "shortbow"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "shortbow"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "composite-shortbow"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "composite-shortbow"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "longsword"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "longsword"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "rapier"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "rapier"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "elven-curve-blade"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "elven-curve-blade"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "elven-branched-spear"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "elven-branched-spear"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "elven-leafblade"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "elven-leafblade"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "elven-thornblade"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "elven-thornblade"
+          }
+        }
+      }
     ],
     "tags": [
       "reactions.aoo.extra.wielding.longsword",
@@ -101,21 +409,67 @@
     ]
   },
   "improved-improvisation": {
-    "tags": ["proficiency.nonproficient.halved"],
+    "tags": [
+      "proficiency.nonproficient.halved"
+    ],
     "modifiers": [
-      {"type": "skill_mod", "target": "all", "formula": "2 * (1 - min(1, ranks))",
-       "bonus_type": "untyped",
-       "note": "Improvisation's +2 on skills you have no ranks in raised to +4"}
+      {
+        "type": "skill_mod",
+        "target": "all",
+        "formula": "2 * (1 - min(1, ranks))",
+        "bonus_type": "untyped",
+        "note": "Improvisation's +2 on skills you have no ranks in raised to +4"
+      }
     ]
   },
   "medusa-s-wrath": {
     "modifiers": [
-      {"type": "combat_mod", "target": "extra_attacks", "amount": 2, "bonus_type": "untyped",
-       "when": {"full_attack": true, "weapon": {"key": "unarmed"},
-                "target": {"state": ["state.unable.dazed", "state.position.flat-footed",
-                                     "state.unable.paralyzed", "state.impaired.staggered",
-                                     "state.unable.stunned", "state.down.unconscious"]}},
-       "note": "two more unarmed strikes at your highest bonus, against a dazed, flat-footed, paralyzed, staggered, stunned or unconscious foe"}
+      {
+        "type": "combat_mod",
+        "target": "extra_attacks",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "full_attack": true,
+          "weapon": {
+            "key": "unarmed"
+          },
+          "target": {
+            "state": [
+              "state.unable.dazed",
+              "state.position.flat-footed",
+              "state.unable.paralyzed",
+              "state.impaired.staggered",
+              "state.unable.stunned",
+              "state.down.unconscious"
+            ]
+          }
+        },
+        "note": "two more unarmed strikes at your highest bonus, against a dazed, flat-footed, paralyzed, staggered, stunned or unconscious foe"
+      }
+    ]
+  },
+  "cornugon-smash": {
+    "tags": [
+      "demoralize.on-hit.power-attack"
+    ]
+  },
+  "dreadful-carnage": {
+    "tags": [
+      "demoralize.on-drop"
+    ]
+  },
+  "two-weapon-rend": {
+    "tags": [
+      "two_weapon.rend"
+    ]
+  },
+  "impact-critical-shot": {
+    "tags": [
+      "critical.ranged.impact"
+    ],
+    "not_yet": [
+      "the bull rush in place of the trip ('push your opponent back as if from the bull rush combat maneuver ... you cannot move with the target'): the engine always takes the trip"
     ]
   }
 }

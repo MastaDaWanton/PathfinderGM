@@ -424,3 +424,63 @@ def test_medusas_wrath_strikes_twice_more_at_a_reeling_foe():
     assert len(reeling) == len(plain) + 2
     assert [i for _k, i in reeling].count(0) == [i for _k, i in plain].count(0) + 2
     assert len(monk.attack_plan("unarmed", False, defender=thug)) == 1
+
+
+# --- what a landed blow sets off --------------------------------------------------------------
+
+def test_cornugon_smash_demoralizes_the_foe_a_power_attack_damaged():
+    """Cornugon Smash (Cheliax): "When you damage an opponent with a Power Attack, you may
+    make an immediate Intimidate check as a free action to attempt to demoralize"."""
+    pc = _wren(["Power Attack", "Cornugon Smash"], ranks={"intimidate": 8})
+    pc.abilities["cha"] = 40
+    s, e, thug = _board(pc, foes=["thug"])
+    thug.hp_max = thug.hp = 500
+    e._ensure_encounter("pc")
+    s.positions.update({"pc": (5, 5), thug.ref: (6, 5)})
+    res = _swing(e, target=thug.ref, face=19)
+    assert not thug.has_state("state.fear"), "no Power Attack, no smash"
+    res = _swing(e, target=thug.ref, face=19, power_attack=True)
+    assert "Cornugon Smash: Intimidate" in _tells(res) and thug.has_state("state.fear"), \
+        _tells(res)
+
+
+def test_dreadful_carnage_demoralizes_the_foes_who_saw_one_fall():
+    pc = _wren(["Power Attack", "Furious Focus", "Dreadful Carnage"],
+               ranks={"intimidate": 8}, level=12)
+    pc.abilities["cha"] = 40
+    s, e, one, two = _board(pc, foes=["thug", "thug"])
+    e._ensure_encounter("pc")
+    s.sides = {"pc": ["pc"], "them": [one.ref, two.ref]}
+    s.positions.update({"pc": (5, 5), one.ref: (6, 5), two.ref: (5, 8)})
+    one.hp = 1
+    res = _swing(e, target=one.ref, face=19)
+    assert one.hp <= 0
+    assert "Dreadful Carnage" in _tells(res) and two.has_state("state.fear"), _tells(res)
+
+
+def test_two_weapon_rend_adds_its_damage_once_when_both_hands_hit():
+    pc = _wren(["Two-Weapon Fighting", "Two-Weapon Rend"], weapons=["shortsword", "dagger"],
+               equipped="shortsword")
+    pc.abilities["str"] = 18                           # +4: 1d10 + 6
+    s, e, thug = _board(pc, foes=["thug"])
+    thug.hp_max = thug.hp = 500
+    e._ensure_encounter("pc")
+    s.positions.update({"pc": (5, 5), thug.ref: (6, 5)})
+    res = _swing(e, target=thug.ref, face=19, full_attack=True, off_hand="dagger")
+    said = _tells(res)
+    assert said.count("Two-Weapon Rend") == 1, said
+    rend = next(f for o in res.outcomes for f in o.effects
+                if f.get("origin") == "rule:feat-two-weapon-rend")
+    assert 7 <= rend["amount"] <= 16
+
+
+def test_impact_critical_shot_trips_when_the_confirmation_beats_cmd():
+    pc = _wren(["Point-Blank Shot", "Impact Critical Shot"], equipped="longbow")
+    pc.abilities["dex"] = 30
+    pc.goods["arrows"] = 20
+    s, e, thug = _board(pc, foes=["thug"])
+    thug.hp_max = thug.hp = 500
+    e._ensure_encounter("pc")
+    s.positions.update({"pc": (5, 5), thug.ref: (8, 5)})
+    res = _swing(e, target=thug.ref, face=20)
+    assert thug.has_condition("prone"), _tells(res)

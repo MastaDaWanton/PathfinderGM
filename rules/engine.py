@@ -10806,6 +10806,7 @@ class Engine:
                 )
                 state["rolls"].append(confirm.as_dict())
                 state["crit"] = confirm.total >= swing_ac
+                state["confirm_total"] = confirm.total     # Impact Critical Shot's CMD test
                 self._judge(confirm, state["crit"])
                 state["stage"] = "damage"
 
@@ -11217,6 +11218,14 @@ class Engine:
                 # bleed, Dazing and Stunning Assault's save-or-condition.
                 for extra in ([] if dancing else self._feat_riders(
                         intent, actor, defender, weapon_key, weapon, state)):
+                    state["effects"].append(extra["effect"])
+                    if extra.get("tell"):
+                        state["tells"].append(extra["tell"])
+                # What a held feat does once a blow has landed (feat loop b2): Cornugon
+                # Smash's demoralize, Dreadful Carnage's at a fall, Two-Weapon Rend, Impact
+                # Critical Shot (`_feat_after_hit`).
+                for extra in ([] if dancing else self._feat_after_hit(
+                        actor, defender, weapon, power, hand, state)):
                     state["effects"].append(extra["effect"])
                     if extra.get("tell"):
                         state["tells"].append(extra["tell"])
@@ -24054,6 +24063,119 @@ class Engine:
                         continue
                 out.extend(self._RIDERS[str(rule["kind"])](self, intent, actor, defender,
                                                            run, origin, state))
+        return out
+
+    # Feat loop b2 (2026-11-22): what a held feat does after a blow lands, each its
+    # document's tag, asked with `has_state` — never the feat's name.
+    DEMORALIZE_ON_POWER_HIT = "demoralize.on-hit.power-attack"     # Cornugon Smash
+    DEMORALIZE_ON_DROP = "demoralize.on-drop"                      # Dreadful Carnage
+    TWO_WEAPON_REND = "two_weapon.rend"                            # Two-Weapon Rend
+    IMPACT_CRITICAL = "critical.ranged.impact"                     # Impact Critical Shot
+
+    def _feat_after_hit(self, actor: Actor, defender: Actor, weapon: dict, power: bool,
+                        hand: str, state: dict) -> list[dict]:
+        """A held feat's free action once a blow has landed (feat loop b2, 2026-11-22).
+
+        - Cornugon Smash (Cheliax): "When you damage an opponent with a Power Attack, you
+          may make an immediate Intimidate check as a free action to attempt to
+          demoralize your opponent."
+        - Dreadful Carnage (APG): "Whenever you reduce an enemy to 0 or fewer hit points,
+          you can make an Intimidate check to demoralize all enemies within 30 feet as a
+          free action. Enemies that cannot see both you and the enemy you reduced ... are
+          unaffected."
+        - Two-Weapon Rend (CRB): "If you hit an opponent with both your primary hand and
+          your off-hand weapon, you deal an additional 1d10 points of damage plus 1-1/2
+          times your Strength modifier. You can only deal this additional damage once
+          each round."
+        - Impact Critical Shot (UC): on a ranged critical, "if your confirmation roll
+          exceeds your opponent's CMD, you can ... knock that target prone as if from a
+          trip combat maneuver" (the bull rush is the other choice; see the document).
+
+        "You can" and "may": the engine always takes them, since each only hurts the foe
+        (owner call). Every demoralize goes through the one door (`_demoralize`)."""
+        out: list[dict] = []
+        dealt = int(state.get("dealt") or 0)
+        melee = weapon.get("category") == "melee"
+        if power and melee and dealt > 0 and actor.has_state(self.DEMORALIZE_ON_POWER_HIT) \
+                and defender.hp > 0 and not defender.is_dead:
+            out.extend(self._free_demoralize(actor, [defender], "Cornugon Smash"))
+        if dealt > 0 and defender.hp <= 0 and actor.has_state(self.DEMORALIZE_ON_DROP) \
+                and not state.get("carnage_said"):
+            state["carnage_said"] = True
+            from . import awareness
+
+            side = next((k for k, refs in (self.scene.sides or {}).items()
+                         if actor.ref in refs), None)
+            foes = [a for k, refs in (self.scene.sides or {}).items() if k != side
+                    for a in (self.scene.actors.get(r) for r in refs)
+                    if a is not None and a is not defender and not a.is_down
+                    and awareness.sees(self.scene, a, actor)
+                    and awareness.sees(self.scene, a, defender)
+                    and not a.has_state("state.senses.blinded")
+                    and ((g := self._gap_ft(actor, a)) is None or g <= 30)]
+            if foes:
+                out.extend(self._free_demoralize(actor, foes, "Dreadful Carnage"))
+        if hand and dealt > 0 and actor.has_state(self.TWO_WEAPON_REND):
+            hit = state.setdefault("rend_hands", {}).setdefault(defender.ref, [])
+            if hand not in hit:
+                hit.append(hand)
+            if {"primary", "off"} <= set(hit) and not state.get("rended") \
+                    and defender.hp > -defender.hp_max:
+                state["rended"] = True
+                bonus = int(1.5 * max(0, actor.ability_mod("str")))
+                roll = self.dice.roll("1d10", [Modifier(bonus, "1-1/2 Str")] if bonus else [],
+                                      label="Two-Weapon Rend (1d10 + 1-1/2 Str)",
+                                      visibility="player")
+                state["rolls"].append(roll.as_dict())
+                more = self._apply_damage(defender, max(1, roll.total), weapon["type"])
+                more["origin"] = "rule:feat-two-weapon-rend"
+                out.append({"effect": more,
+                            "tell": f"{actor.name}'s two blades rend {defender.name} for "
+                                    f"{more['amount']} more (Two-Weapon Rend)."})
+        if state.get("crit") and weapon.get("category") == "ranged" \
+                and actor.has_state(self.IMPACT_CRITICAL) and defender.hp > 0:
+            total = int(state.get("confirm_total") or 0)
+            cmd = defender.cmd()
+            if total > cmd and not defender.has_state("state.position.prone"):
+                defender.add_condition("prone", None, source=f"{actor.name}'s impact shot",
+                                       origin="rule:feat-impact-critical-shot")
+                out.append({"effect": {"ref": defender.ref, "kind": "condition",
+                                       "condition": "prone",
+                                       "origin": "rule:feat-impact-critical-shot"},
+                            "tell": f"The shot's impact ({total} against CMD {cmd}) knocks "
+                                    f"{defender.name} off their feet: prone."})
+            elif total <= cmd:
+                out.append({"effect": {"ref": defender.ref, "kind": "rider_resisted",
+                                       "rider": "impact", "origin":
+                                       "rule:feat-impact-critical-shot"},
+                            "tell": f"{defender.name} takes the shot's impact standing "
+                                    f"({total} against CMD {cmd})."})
+        state.pop("confirm_total", None)
+        return out
+
+    def _free_demoralize(self, actor: Actor, foes: list, why: str) -> list[dict]:
+        """One Intimidate roll, read against each foe with its own size terms and DC (CRB
+        p.99: 10 + Hit Dice + Wis), through the one Demoralize door — a free action, so it
+        spends nothing. The roll shows in the dice log (`visibility` player)."""
+        from . import attitude as attitude_mod
+
+        face = self.dice.roll("1d20", label=f"Intimidate ({why}: demoralize)",
+                              visibility="player")
+        out: list[dict] = [{"effect": {"ref": actor.ref, "kind": "check",
+                                       "skill": "intimidate", "face": face.total,
+                                       "origin": f"rule:feat-{why.lower().replace(' ', '-')}"},
+                            "tell": ""}]
+        for foe in foes:
+            mods = self._demoralize_mods(actor, foe, [])
+            total = face.total + sum(m.value for m in mods)
+            dc = attitude_mod.intimidate_dc(foe)
+            said, fx = self._demoralize(actor, foe, total - dc, "")
+            for e in fx:
+                out.append({"effect": e, "tell": ""})
+            out.append({"effect": {"ref": foe.ref, "kind": "demoralize", "total": total,
+                                   "dc": dc, "from": why},
+                        "tell": f"{why}: Intimidate {total} against {foe.name}'s DC {dc}. "
+                                f"{said}"})
         return out
 
     # The tags a rogue talent's catalogue entry carries (content/class-options/
