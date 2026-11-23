@@ -194,9 +194,26 @@
     "handle animal": {
       "name": "Handle Animal",
       "book": "Make an animal do as you ask, teach it tricks, and train it for a purpose.",
-      "uses": [],
-      "not_yet": "An animal companion does its tricks without a roll, and teaching new tricks, rearing or pushing an animal are not in play yet.",
-      "not_yet_uses": ["skill.handle-animal.push", "skill.handle-animal.teach"]
+      "uses": [
+        {"text": "Animals do not understand words. Speaking to one reaches nothing unless magic lets you speak with animals: this skill is how you get one to act.",
+         "file": "rules/animals.py", "find": "def not_understood(listener) -> str:", "use": "skill.handle-animal.handle"},
+        {"text": "Handle: DC 10 to have an animal do a trick it knows, a move action (+2 if it is hurt, +5 for a creature that is not an animal). Your own animal companion: a free action and +4.",
+         "file": "rules/animals.py", "find": "def handle(engine, intent, actor, partial):", "use": "skill.handle-animal.handle"},
+        {"text": "Push: DC 25 to have it do something it does not know, a full-round action (a move action for your own companion).",
+         "file": "rules/animals.py", "find": "def handle(engine, intent, actor, partial):", "use": "skill.handle-animal.push"},
+        {"text": "Teach a trick: a week of lessons, three hours a day, at the trick's DC (15 or 20). An animal of Intelligence 1 learns three tricks at most, of 2, six. It waits In progress.",
+         "file": "rules/animals.py", "find": "def teach(engine, intent, actor, partial):", "use": "skill.handle-animal.teach"},
+        {"text": "Train for a purpose: riding, combat riding, fighting, guarding, heavy labor, hunting or performance, two to six weeks. A mount trained for combat riding needs no Ride check to control it in a fight.",
+         "file": "rules/animals.py", "find": "def train(engine, intent, actor, partial):", "use": "skill.handle-animal.train"},
+        {"text": "Rear a wild animal: DC 15 + its Hit Dice and a year, and never tried twice. In this game the animal must be at least indifferent and travel with you, as the world has no young to raise.",
+         "file": "rules/animals.py", "find": "def rear(engine, intent, actor, partial):", "use": "skill.handle-animal.rear"},
+        {"text": "Wild empathy (druid, ranger): d20 + your level + Charisma to improve an animal's attitude as Diplomacy does a person's, within 30 feet, in a minute. A magical beast of an animal's wits is at -4. Diplomacy cannot reach an animal.",
+         "file": "rules/animals.py", "find": "def wild_empathy(engine, intent, actor, target, partial):", "use": "skill.handle-animal.wild-empathy"},
+        {"text": "Untrained, a Charisma check can handle or push a domestic animal or your own companion, but cannot teach, train or rear.",
+         "file": "rules/animals.py", "find": "def _mods(actor, animal, *, untrained_ok: bool):", "use": "skill.handle-animal.handle"}
+      ],
+      "not_yet": "Teaching an animal to obey only you, or to attack any creature at all (two tricks); only the Core Rulebook's twelve tricks are taught.",
+      "not_yet_uses": ["skill.handle-animal.exclusive", "skill.handle-animal.attack-any"]
     },
     "heal": {
       "name": "Heal",
@@ -412,10 +429,12 @@
         {"text": "Thrown from the saddle: DC 15 to land unhurt, else 1d6 and prone.",
          "file": "rules/bodyskills.py", "find": "def _thrown(engine, rider, steed, why: str):", "use": "skill.ride.soft-fall"},
         {"text": "With the Mounted Combat feat, once a round a Ride check that beats the attack roll turns a hit on your mount.",
-         "file": "rules/bodyskills.py", "find": "def mounted_combat(engine, attacker, defender, atk, state) -> str:", "use": "skill.ride.mounted-combat"}
+         "file": "rules/bodyskills.py", "find": "def mounted_combat(engine, attacker, defender, atk, state) -> str:", "use": "skill.ride.mounted-combat"},
+        {"text": "A mount not trained for combat riding has to be controlled in a fight: DC 20, a move action, before you attack or cast that round. Miss it and you can do nothing else that round. A combat-trained mount needs no roll.",
+         "file": "rules/bodyskills.py", "find": "def control_in_battle(engine, intent, rider):", "use": "skill.ride.control"}
       ],
-      "not_yet": "Guiding with your knees, staying in the saddle when hit, fighting with or controlling a mount in battle, a mount falling under you, and the mounted charge (there is no charge yet).",
-      "not_yet_uses": ["skill.ride.guide", "skill.ride.stay-in-saddle", "skill.ride.fight", "skill.ride.control", "skill.ride.mount-falls"]
+      "not_yet": "Guiding with your knees, staying in the saddle when hit, directing a combat-trained mount's own attack, a mount falling under you, and the mounted charge (there is no charge yet).",
+      "not_yet_uses": ["skill.ride.guide", "skill.ride.stay-in-saddle", "skill.ride.fight", "skill.ride.mount-falls"]
     },
     "sense motive": {
       "name": "Sense Motive",

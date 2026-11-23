@@ -321,7 +321,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                            "item", "about",
                            # Round 2 (rules/bodyskills.py): the body and movement use,
                            # the fiction's feet for it, and the wind a flier meets.
-                           "use", "distance_ft", "height_ft", "wind"),
+                           "use", "distance_ft", "height_ft", "wind",
+                           # Round 3 (rules/animals.py): the trick an animal is handled,
+                           # pushed or taught, the purpose it is trained for, and who an
+                           # attack trick is pointed at.
+                           "trick", "purpose", "at"),
               "player"),
     "save": (("save", "dc"), ("on_success", "on_failure", "breaks"), "player"),
     # `player`, because the PC rolls their own to-hit and their own damage. Defaulting
@@ -1526,8 +1530,38 @@ def _check_params(intent: Intent, index: int) -> None:
             p[key] = feet
         if p.get("wind") and str(p["wind"]) not in _WINDS:
             raise IntentError(f"check: wind is one of {', '.join(_WINDS)}.", "schema", index)
+        # Handle Animal's closed words (rules/animals.py): a trick of the book's twelve, a
+        # purpose of its seven, and `at` a ref. Only on a Handle Animal check.
+        if p.get("trick") or p.get("purpose") or p.get("at"):
+            from . import animals as _animals
+
+            if p.get("skill") != "handle animal":
+                for key in ("trick", "purpose", "at"):
+                    p.pop(key, None)
+            else:
+                trick = "-".join(str(p.get("trick") or "").lower().split())
+                if trick in ("", "none"):
+                    p.pop("trick", None)
+                elif trick not in _animals.tricks():
+                    raise IntentError(f"check: trick is one of "
+                                      f"{', '.join(_animals.tricks())}.", "schema", index)
+                else:
+                    p["trick"] = trick
+                purpose = " ".join(str(p.get("purpose") or "").lower().replace("-", " ")
+                                   .split())
+                if purpose in ("", "none"):
+                    p.pop("purpose", None)
+                elif purpose not in _animals.purposes():
+                    raise IntentError(f"check: purpose is one of "
+                                      f"{', '.join(_animals.purposes())}.", "schema", index)
+                else:
+                    p["purpose"] = purpose
+                if p.get("at") in ("", "none", None):
+                    p.pop("at", None)
+                else:
+                    p["at"] = normalise_ref(p["at"])
         if not p.get("dc") and not p.get("opposed_by") and not social and not search \
-                and not diversion and not own and not body_use                 and str(p.get("skill") or "").strip().lower() != "climb":
+                and not diversion and not own and not body_use                 and str(p.get("skill") or "").strip().lower() not in ("climb", "handle animal"):
             # (A climb may name no DC: one under way goes on at its wall's, and a fresh one
             # is the book's 15, "adequate handholds and footholds" — rules/bodyskills.py.)
             raise IntentError(

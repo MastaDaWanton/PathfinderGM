@@ -8537,7 +8537,14 @@ class Engine:
             for e in speaker.effects:
                 if (e.payload or {}).get("checked"):
                     e.payload = dict(e.payload, checked=[])
+        from . import animals
+
         if heard is not None and speaker is not None and speaker.is_pc \
+                and not heard.is_pc and not animals.understands(heard, speaker):
+            # A beast with no language (rules/animals.py): the words reach nothing, and no
+            # conversation opens. Its tricks are given by Handle Animal.
+            bits.append(animals.not_understood(heard))
+        elif heard is not None and speaker is not None and speaker.is_pc \
                 and not heard.is_pc:
             opened = self.join_talk(heard, how="you spoke to them")
             if opened:
@@ -8594,6 +8601,16 @@ class Engine:
             # 10" and left nothing on the character, while the same words a turn later
             # rolled nothing at all.
             return self._op_disguise(intent, partial)
+        # Animals (rules/animals.py, the owner's ruling of 2026-11-22): a Handle Animal
+        # check is its use's door, and Diplomacy at a creature that cannot understand it is
+        # wild empathy or a refusal — before the skill's own training refuses an untrained
+        # handler the book's Charisma check on a domestic animal.
+        if helped is None and actor.is_pc:
+            from . import animals
+
+            handled = animals.social_door(self, intent, actor, skill, partial)
+            if handled is not None:
+                return handled
         # The skill uses with their own row (rules/skilluses.py, content/rules/
         # skill-uses.json, lane E 2026-11-22): the DC, the action and the consequence are
         # the row's, never the plan's. Monster lore first: the creature's type picks the
@@ -9756,6 +9773,15 @@ class Engine:
                 effects=[{"ref": actor.ref, "kind": "attack_stopped", "why": why}],
                 tell=f"{actor.name} is {why} and never swings.",
                 because=intent.because)
+        # A rider on a mount not trained for combat controls it first (CRB, Ride: DC 20,
+        # a move action, once a round; failing, they "can do nothing else in that round").
+        if partial.get("attack_state") is None and not intent.params.get("reaction") \
+                and not dancing:
+            from . import bodyskills
+
+            held = bodyskills.control_in_battle(self, intent, actor)
+            if held is not None:
+                return held
         # A drink this round was the standard action (owner ruling 2026-11-13). A thrown
         # flask's attack was asked at the throw (`_op_use_item`), its dose already spent.
         if partial.get("attack_state") is None and not dancing \
@@ -21292,6 +21318,11 @@ class Engine:
         """Bring somebody into the conversation; the tell, or "" if they were in it."""
         if who is None or who.is_pc or who.has_state(states.TALKING):
             return ""
+        # Nobody converses with a beast that understands no words (rules/animals.py).
+        from . import animals
+
+        if not animals.understands(who, self.scene.pc()):
+            return ""
         # Nobody hostile is in a conversation (`_settle_talk` closes one the moment it
         # finds them so). Opening one here only for the end of the batch to close it was
         # a contradiction on the page: measured live 2026-10-09 (the fight script), "I
@@ -21412,6 +21443,11 @@ class Engine:
             return Outcome(intent_id=intent.id, op="greet", effects=[],
                            tell=f"You are already in conversation with {who.name}.",
                            because=intent.because)
+        from . import animals
+
+        if not animals.understands(who, pc):
+            return self._refuse(intent, f"{pc.name} speaks to {who.name}. "
+                                        + animals.not_understood(who))
         from . import attitude as _attitude
 
         if _attitude.of(who) == _attitude.HOSTILE:
@@ -27050,6 +27086,14 @@ class Engine:
 
         actor = self.scene.actors[intent.actor]
         spell = spells_mod.get(str(intent.params["spell"]))
+        # Casting from the saddle of a mount not trained for combat: controlled first (CRB,
+        # Ride: "If you succeed, you can attack or cast spells normally").
+        if not partial.get("cast_state"):
+            from . import bodyskills
+
+            held = bodyskills.control_in_battle(self, intent, actor)
+            if held is not None:
+                return held
         # A magic item's power cast through this door (`_use_power`, enchanting contracts
         # §4): the item's caster level and the book's item DC, no slot, no prepared copy,
         # no arcane spell failure (the armour fouls a caster's gestures, not a command
@@ -28266,6 +28310,12 @@ class Engine:
         kind = str(spec.get("type", ""))
         if kind in self._BUFFS and trigger in ITEM_TRIGGERS:
             return False                       # a worn ring's fast healing is the item's
+        if kind == "permission" and trigger == "on_cast":
+            # A permission naming its tag (speak with animals, round 3) is granted through
+            # the buff door, timed by the spell; one naming none stays told.
+            from .effectspec import permission_tag
+
+            return bool(permission_tag(str(spec.get("tag") or "")))
         return (kind in self._EXECUTES
                 or (trigger != "on_cast" and trigger not in ITEM_TRIGGERS)
                 or _ac_grant(spec) is not None)
@@ -28665,7 +28715,8 @@ class Engine:
         if _ac_grant(spec) is not None:
             return self._grant_ac(spec, ctx)
         # A buff that waits on a trigger is a ward's (`_stand_by`), not a cast's.
-        if kind in self._BUFFS and str(spec.get("trigger") or "on_cast") == "on_cast":
+        if (kind in self._BUFFS or kind == "permission") \
+                and str(spec.get("trigger") or "on_cast") == "on_cast":
             return self._cast_buff(spec, ctx)
         return self._stand_by(spec, ctx)
 

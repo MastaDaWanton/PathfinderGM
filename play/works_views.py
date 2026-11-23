@@ -59,6 +59,11 @@ def works_collect(request):
     key = str(read_body(request).get("key") or "")
     if not key:
         return _err("Say which work to collect (`key`).")
+    # Lessons lay their trick on the animal, who is in the scene, not the pack
+    # (rules/animals.py `lend_scene`).
+    from rules import animals
+
+    animals.lend_scene(c.scene)
     got = inprogress.collect(pc, key, now=_now(c), here=getattr(pc, "at", None) or None)
     if not got.get("ok"):
         return _err(str(got.get("why") or "It cannot be collected."), 409)
