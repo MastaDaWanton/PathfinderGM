@@ -6777,7 +6777,13 @@ class Actor:
         # Below zero you are not resting, you are bleeding. Healing starts from 0 so a
         # night's sleep cannot carry someone from -6 to a comfortable 4.
         floor = max(self.hp, 0)
-        self.hp = min(self.hp_max, floor + per_level * max(1, self.level))
+        from .states import CONSTRUCT
+
+        # A construct "cannot heal damage on its own" (Bestiary, Construct type): it is
+        # mended (rules/repair.py) or made whole, never slept back. Measured 2026-11-22:
+        # a homunculus at 3 of 11 rose to 4 after a night, and a broken one at -5 to 1.
+        if not self.has_state(CONSTRUCT):
+            self.hp = min(self.hp_max, floor + per_level * max(1, self.level))
 
         # You stand up in the morning. Waking still prone, shaken and entangled from a
         # fight the night before is the sort of stale state that quietly poisons every

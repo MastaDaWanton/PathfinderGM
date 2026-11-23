@@ -67,6 +67,15 @@ def works_collect(request):
     got = inprogress.collect(pc, key, now=_now(c), here=getattr(pc, "at", None) or None)
     if not got.get("ok"):
         return _err(str(got.get("why") or "It cannot be collected."), 409)
+    # A construct the circle animated rises into the scene here: Collect has no scene
+    # (rules/constructs.py `collect`), the view does.
+    spec = (got.get("product") or {}).get("construct")
+    if spec:
+        from rules import constructs
+
+        made, tell = constructs.arrive(c.engine(), pc, spec)
+        got = dict(got, said=f"{got['said']} {tell}",
+                   product=dict(got["product"], key=made.ref, name=made.name))
     # One line in the table's log, as a bench step writes one.
     c.transcript.append({"who": "gm", "kind": "consequence", "text": got["said"]})
     c.save()

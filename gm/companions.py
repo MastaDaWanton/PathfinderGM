@@ -271,7 +271,17 @@ def who_they_are(scene, actor) -> str:
     hired = jobs_mod.role_line(scene, actor.ref)
     if hired:
         bits.append(hired)
-    if owned(actor):
+    from rules import constructs
+
+    if owned(actor) and constructs.mute(actor):
+        # The book's construct (Bestiary, Golem): "do nothing without orders", "follow
+        # instructions explicitly", incapable of strategy; and no voice at all.
+        bits.append(f"{name} belongs to the player and is devoted to them. {name} is a "
+                    f"construct with no mind of its own"
+                    + ("" if constructs.mindless(actor) else " beyond its link to its maker")
+                    + f": it understands simple commands from the player and carries them "
+                    f"out exactly as said, never more; it cannot speak or answer")
+    elif owned(actor):
         bits.append(f"{name} belongs to the player, who claimed them, and is devoted to "
                     f"them: told plainly, {name} does it, as literally as it was said")
     elif not hired:
@@ -304,6 +314,8 @@ def foes_of(scene, ref: str) -> list[tuple[str, str]]:
 
 def turn_facts(scene, actor, orders: list[str]) -> str:
     """The block a companion's own turn is told, between its state and the question."""
+    from rules import constructs
+
     name = actor.name
     lines = [f"{name} TRAVELS WITH the player and came into this fight on the player's "
              f"side. Who {name} is (fact): {who_they_are(scene, actor)}"]
@@ -323,6 +335,12 @@ def turn_facts(scene, actor, orders: list[str]) -> str:
         lines += [f"  - {o}" for o in orders]
         lines.append(f"{name} decides what to do with that as themselves: do it, do it "
                      f"their own way, or refuse. The engine decides what lands.")
+    elif owned(actor) and constructs.mute(actor):
+        # The golem's own rule: uncommanded it keeps its last instruction, and "if
+        # attacked, it returns the attack" — never a plan of its own.
+        lines.append(f"The player has given {name} no order this fight. {name} keeps to "
+                     f"the last thing it was told, and strikes back only at whoever has "
+                     f"attacked it; otherwise it stays by the player.")
     else:
         lines.append(f"The player has told {name} nothing this fight; {name} does what "
                      f"they would do.")
@@ -967,8 +985,14 @@ def interjection_due(scene, transcript, outcomes, *, answered=(), talking=(),
         return None
     if answered:
         return None
+    # A construct that cannot speak never speaks up. Measured live 2026-11-22: a made
+    # homunculus ("Common (cannot speak)") interjected "The absence of form is an optimal
+    # execution of the craft." — the interjection call is told who speaks and writes a line.
+    from rules import constructs
+
     party = [r for r, a in (getattr(scene, "actors", {}) or {}).items()
-             if is_companion(a) and not a.is_down and scene.conscious(r)]
+             if is_companion(a) and not a.is_down and scene.conscious(r)
+             and not constructs.mute(a)]
     if not party:
         return None
     arrived = arrived_at(scene, moved)

@@ -1,0 +1,155 @@
+{
+  "_about": [
+    "Construction lines for the constructs the enchanting circle's Animate method makes (rules/constructs.py).",
+    "Owner ruling 2026-11-22: 'build the magic items like wands and scrolls and constructs into the enchanting world class' - no Craft Construct feat; Enchanter levels gate them.",
+    "Each row is keyed by the bestiary template the finished construct is made from (rules/bestiary.lookup), so the actor that joins is the printed stat block.",
+    "`cl`, `price_gp`, `body_gp`, `spells` and `dc` are the printed Construction line (Bestiary 1-6 golem pages, the homunculus page; Ultimate Magic for animated objects, which print no line in the Bestiary). Sources: docs/research/2026-11-22-constructs.md.",
+    "`spells` is a list of requirement groups: any one spell of a group meets it (the bone golem's 'animate dead or animate objects').",
+    "`dc` is the printed DC; the printed DCs do not always equal 5 + CL (wood, glass, mithral), so they are data, never derived. Repairs read it too (rules/repair.py crafting_dc).",
+    "`body` is what the circle takes as the body: `ingredients` from the satchel, `forged` an item the forge or the leatherworker made, or `coin_gp` for a body no bench in the app builds yet (golems), which is bought.",
+    "What the code derives, never stored here: the essences (motes) are half of (price - body), 1 mote = 100 gp, the enchanting rule; the working time is the circle's 8 hours per 1,000 gp of price; the Enchanter level that may animate it is the stat block's CR rounded up (owner call, docs/research/2026-11-22-constructs.md)."
+  ],
+  "homunculus": {
+    "cl": 7, "price_gp": 2050, "body_gp": 50,
+    "spells": [["arcane-eye"], ["mirror-image"], ["mending"]],
+    "skill": "Craft (leather) or Craft (sculptures)", "dc": 12,
+    "body": {"ingredients": {"mandrake": 1},
+             "words": "clay, ash, mandrake root, spring water and a pint of the maker's own blood"},
+    "source": "https://legacy.aonprd.com/bestiary/homunculus.html"
+  },
+  "animated-object": {
+    "cl": 11, "price_gp": 4500, "body_gp": 0,
+    "spells": [["animate-objects"], ["permanency"]],
+    "skill": "Spellcraft or an appropriate Craft", "dc": 16,
+    "dc_note": "Ultimate Magic prints no DC for animated objects; 5 + CL 11, its general rule.",
+    "body": {"forged": "armour",
+             "words": "a suit of armour the forge or the leatherworker made: the object itself is the body"},
+    "source": "https://legacy.aonprd.com/ultimatemagic/magic/buildingAndModifyingConstructs.html"
+  },
+  "carrion-golem": {
+    "cl": 7, "price_gp": 10500, "body_gp": 500,
+    "spells": [["animate-dead"], ["contagion"], ["false-life"], ["gentle-repose"], ["geas-lesser"]],
+    "skill": "Craft (leather) or Heal", "dc": 13,
+    "body": {"coin_gp": 500, "words": "the parts of several corpses and 500 gp of preservatives"},
+    "source": "https://legacy.aonprd.com/bestiary2/golem.html"
+  },
+  "golem-wood": {
+    "cl": 7, "price_gp": 19300, "body_gp": 300,
+    "spells": [["alarm"], ["animate-objects"], ["cat-s-grace"], ["geas-quest"], ["limited-wish"]],
+    "skill": "Craft (carpentry)", "dc": 17,
+    "body": {"coin_gp": 300, "words": "fine seasoned wood and 300 gp of oils and resins"},
+    "source": "https://legacy.aonprd.com/bestiary/golem.html"
+  },
+  "golem-flesh": {
+    "cl": 8, "price_gp": 20500, "body_gp": 500,
+    "spells": [["animate-dead"], ["bull-s-strength"], ["geas-quest"], ["limited-wish"]],
+    "skill": "Craft (leather) or Heal", "dc": 13,
+    "body": {"coin_gp": 500, "words": "parts of six corpses and 500 gp of unguents"},
+    "source": "https://legacy.aonprd.com/bestiary/golem.html"
+  },
+  "golem-bone": {
+    "cl": 9, "price_gp": 41000, "body_gp": 1000,
+    "spells": [["geas-quest"], ["limited-wish"], ["telekinesis"], ["animate-dead", "animate-objects"]],
+    "skill": "Craft (sculpture) or Heal", "dc": 15,
+    "body": {"coin_gp": 1000, "words": "a dozen skeletons and 1,000 gp of fittings"},
+    "source": "https://legacy.aonprd.com/bestiary3/golem.html"
+  },
+  "glass-golem": {
+    "cl": 10, "price_gp": 33000, "body_gp": 1000,
+    "spells": [["animate-objects"], ["flame-strike"], ["geas-quest"], ["spell-turning"]],
+    "skill": "Craft (sculptures)", "dc": 17,
+    "body": {"coin_gp": 1000, "words": "2,500 lb of glass and 1,000 gp of leading"},
+    "source": "https://legacy.aonprd.com/bestiary2/golem.html"
+  },
+  "golem-clay": {
+    "cl": 11, "price_gp": 41500, "body_gp": 1500,
+    "spells": [["animate-objects"], ["bless"], ["commune"], ["prayer"], ["resurrection"]],
+    "skill": "Craft (sculptures) or Craft (pottery)", "dc": 16,
+    "body": {"coin_gp": 1500, "words": "1,000 lb of clay and 1,500 gp of oils"},
+    "source": "https://legacy.aonprd.com/bestiary/golem.html"
+  },
+  "golem-ice": {
+    "cl": 12, "price_gp": 18500, "body_gp": 500,
+    "spells": [["chill-touch"], ["cone-of-cold"], ["geas-quest"], ["ice-storm"], ["resist-energy"]],
+    "skill": "Craft (sculptures)", "dc": 17,
+    "body": {"coin_gp": 500, "words": "1,000 lb of ice and 500 gp of rare salts"},
+    "source": "https://legacy.aonprd.com/bestiary/golem.html"
+  },
+  "lead-golem": {
+    "cl": 13, "price_gp": 57500, "body_gp": 7500,
+    "spells": [["cloudkill"], ["geas-quest"], ["limited-wish"], ["sequester"]],
+    "skill": "Craft (armor) or Craft (weapons)", "dc": 18,
+    "body": {"coin_gp": 7500, "words": "10,000 lb of lead and 7,500 gp of fittings"},
+    "source": "https://aonprd.com/MonsterDisplay.aspx?ItemName=Lead%20Golem"
+  },
+  "golem-stone": {
+    "cl": 14, "price_gp": 105000, "body_gp": 5000,
+    "spells": [["antimagic-field"], ["geas-quest"], ["limited-wish"], ["symbol-of-stunning"]],
+    "skill": "Craft (sculptures) or Craft (stonemasonry)", "dc": 19,
+    "body": {"coin_gp": 5000, "words": "3,000 lb of stone and 5,000 gp of pigments and tools"},
+    "source": "https://legacy.aonprd.com/bestiary/golem.html"
+  },
+  "clockwork-golem": {
+    "cl": 15, "price_gp": 120000, "body_gp": 10000,
+    "spells": [["animate-objects"], ["blade-barrier"], ["geas-quest"], ["grease"], ["telekinesis"]],
+    "skill": "Craft (clocks) or Craft (locks)", "dc": 20,
+    "body": {"coin_gp": 10000, "words": "1,500 lb of gears and 10,000 gp of springs and plate"},
+    "source": "https://legacy.aonprd.com/bestiary2/golem.html"
+  },
+  "golem-fossil": {
+    "cl": 15, "price_gp": 125000, "body_gp": 5000,
+    "spells": [["flesh-to-stone"], ["geas-quest"], ["limited-wish"], ["stone-shape"]],
+    "skill": "Craft (sculpture) or Heal", "dc": 20,
+    "body": {"coin_gp": 5000, "words": "fossil skeletons and 5,000 gp of fittings"},
+    "source": "https://legacy.aonprd.com/bestiary3/golem.html"
+  },
+  "golem-crystal": {
+    "cl": 15, "price_gp": 127000, "body_gp": 7000,
+    "spells": [["geas-quest"], ["limited-wish"], ["possession"], ["thoughtsense"]],
+    "skill": "Craft (glass) or Craft (jewelry)", "dc": 22,
+    "body": {"coin_gp": 7000, "words": "2,750 lb of crystal and 7,000 gp of settings"},
+    "source": "https://aonprd.com/MonsterDisplay.aspx?ItemName=Crystal%20Golem"
+  },
+  "golem-obsidian": {
+    "cl": 15, "price_gp": 130000, "body_gp": 8500,
+    "spells": [["geas-quest"], ["limited-wish"], ["volcanic-storm"]],
+    "skill": "Craft (glass) or Craft (sculpture)", "dc": 24,
+    "body": {"coin_gp": 8500, "words": "2,500 lb of obsidian and 8,500 gp of fittings"},
+    "source": "https://aonprd.com/MonsterDisplay.aspx?ItemName=Obsidian%20Golem"
+  },
+  "golem-iron": {
+    "cl": 16, "price_gp": 150000, "body_gp": 10000,
+    "spells": [["cloudkill"], ["geas-quest"], ["limited-wish"], ["polymorph-any-object"]],
+    "skill": "Craft (armor) or Craft (weapons)", "dc": 21,
+    "body": {"coin_gp": 10000, "words": "5,000 lb of iron and 10,000 gp of rare tinctures"},
+    "source": "https://legacy.aonprd.com/bestiary/golem.html"
+  },
+  "golem-brass": {
+    "cl": 17, "price_gp": 180000, "body_gp": 20000,
+    "spells": [["geas-quest"], ["incendiary-cloud"], ["limited-wish"], ["see-invisibility"]],
+    "skill": "Craft (armor) or Craft (blacksmithing)", "dc": 22,
+    "body": {"coin_gp": 20000, "words": "18,000 lb of brass and 20,000 gp of fittings"},
+    "source": "https://legacy.aonprd.com/bestiary3/golem.html"
+  },
+  "golem-cannon": {
+    "cl": 17, "price_gp": 200000, "body_gp": 10000,
+    "spells": [["geas-quest"], ["limited-wish"], ["plane-shift", "secret-chest"]],
+    "skill": "Craft (siege engine) and Knowledge (engineering)", "dc": 25,
+    "body": {"coin_gp": 10000, "words": "2,000 lb of mixed metals and 10,000 gp of powder and fittings"},
+    "source": "https://legacy.aonprd.com/bestiary3/golem.html"
+  },
+  "mithral-golem": {
+    "cl": 18, "price_gp": 250000, "body_gp": 50000,
+    "spells": [["animate-objects"], ["geas-quest"], ["haste"], ["polymorph-any-object"], ["wish"]],
+    "skill": "Craft (sculpture)", "dc": 25,
+    "body": {"coin_gp": 50000, "words": "3,000 lb of mithral and 50,000 gp of fittings"},
+    "source": "https://legacy.aonprd.com/bestiary2/golem.html"
+  },
+  "golem-gold": {
+    "cl": 18, "price_gp": 220000, "body_gp": 25000,
+    "spells": [["geas-quest"], ["limited-wish"], ["polymorph-any-object"], ["prismatic-spray"]],
+    "skill": "Craft (armor)", "dc": 25,
+    "body": {"coin_gp": 25000, "words": "1,800 lb of specially prepared lead, turned to gold at the animating, and 25,000 gp of fittings"},
+    "source": "https://aonprd.com/MonsterDisplay.aspx?ItemName=Gold%20Golem"
+  }
+}
