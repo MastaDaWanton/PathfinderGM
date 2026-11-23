@@ -7810,9 +7810,14 @@ def _spell_sheet(actor: Actor) -> dict | None:
         "note": data.get("note", ""),
         # The metamagic feats this caster holds (rules/metamagic.py), for the tab's
         # "prepare with" / "cast with" choices; the engine checks each at the door.
-        "metamagic": [{"id": fid, "name": doc["name"],
-                       "levels": int(doc["metamagic"]["levels"])}
-                      for fid, doc in sorted(metamagic.held(actor).items())],
+        # A stepped feat (Heighten, Reach: rules/metamagic.py) is one choice per step,
+        # "heighten-spell-2" named "Heighten Spell (+2)".
+        "metamagic": [{"id": fid if n == 1 else f"{fid}-{n}",
+                       "name": doc["name"] + (f" (+{n})" if doc["metamagic"].get("steps")
+                                              else ""),
+                       "levels": int(doc["metamagic"]["levels"]) * n}
+                      for fid, doc in sorted(metamagic.held(actor).items())
+                      for n in range(1, int(doc["metamagic"].get("steps") or 1) + 1)],
         # `held`, `open` and `blocked` are the room rule's own answers (casting.open_slots,
         # casting.prepare_refusal), so the Spells tab draws spent / ready / open sockets
         # and disables Prepare with the endpoint's sentence rather than re-deriving the

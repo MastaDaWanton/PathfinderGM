@@ -119,8 +119,15 @@ def test_reach_turns_a_melee_touch_into_a_ranged_touch_at_close_range():
     far = metamagic.apply(spells.get("shocking-grasp"), pc, ["reach-spell-2"])
     assert far.range_value["kind"] == "medium"
     assert metamagic.levels(pc, ["reach-spell-2"]) == 2
-    assert "long range" in metamagic.refusal(pc, spells.get("shocking-grasp"),
-                                             ["reach-spell-4"], spontaneous=True)
+    assert "long range" in metamagic.refusal(pc, spells.get("magic-missile"),
+                                             ["reach-spell-2"], spontaneous=True)
+    assert "at most 3" in metamagic.refusal(pc, spells.get("shocking-grasp"),
+                                            ["reach-spell-4"], spontaneous=True)
+    from rules.sheet import _spell_sheet
+
+    offered = {m["id"]: m["name"] for m in _spell_sheet(pc)["metamagic"]}
+    assert offered["reach-spell-3"] == "Reach Spell (+3)" and "reach-spell-4" not in offered
+    assert "heighten-spell-8" in offered and offered["dazing-spell"] == "Dazing Spell"
 
 
 def test_merciful_spell_deals_its_damage_as_nonlethal():

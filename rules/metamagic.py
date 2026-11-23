@@ -103,9 +103,10 @@ def document_problems(at: str, doc) -> list[str]:
     out = []
     if sorted(set(doc) - {"does", "levels", "steps", "rider"}):
         out.append(f"{at}.metamagic: only does, levels, steps and rider.")
-    if "steps" in doc and not isinstance(doc["steps"], bool):
-        out.append(f"{at}.metamagic.steps: true when the cast names how many levels "
-                   f"(Heighten Spell), each costing `levels`.")
+    if "steps" in doc and (isinstance(doc["steps"], bool) or not isinstance(
+            doc["steps"], int) or not 1 < doc["steps"] <= 9):
+        out.append(f"{at}.metamagic.steps: the most steps the cast may name (Heighten "
+                   f"Spell: 8, to 9th level from 1st), each costing `levels`.")
     if (doc["does"] == "rider") != ("rider" in doc):
         out.append(f"{at}.metamagic.rider: what the spell lays on a creature it damages, "
                    f"for does \"rider\" and no other.")
@@ -198,6 +199,8 @@ def refusal(actor, spell, ids, *, spontaneous: bool) -> str:
         does = doc["metamagic"]["does"]
         if base_id(fid) != fid and not doc["metamagic"].get("steps"):
             return f"{doc['name']} is applied once, without a number."
+        if steps(fid) > int(doc["metamagic"].get("steps") or 1):
+            return f"{doc['name']} is applied at most {doc['metamagic']['steps']} times."
         # A rider asks the spell as an Elemental Spell named with it makes it: a cold
         # fireball is a cold spell to Rime Spell.
         shaped = spell if does != "rider" else apply(spell, actor, [
