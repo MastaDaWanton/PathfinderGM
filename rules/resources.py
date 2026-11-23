@@ -76,6 +76,16 @@ class _Lazy(Mapping):
         return len(self._names)
 
 
+def _class_ids() -> list[str]:
+    """Every class id as a formula word ("blood bending" → blood_bending)."""
+    try:
+        from . import classes as classes_mod
+
+        return ["_".join(str(c).lower().split()) for c in classes_mod.all_classes()]
+    except Exception:  # noqa: BLE001 - no content loaded: a formula names no class
+        return []
+
+
 def variables(actor) -> Mapping:
     """Everything a formula may refer to, read off the sheet.
 
@@ -104,6 +114,14 @@ def variables(actor) -> Mapping:
     names["control_blood"] = lambda: max(_tracks().values())
     names["control_blood_a"] = lambda: _tracks()["a"]
     names["control_blood_b"] = lambda: _tracks()["b"]
+    # `level_<class>`: the levels this creature has in that class — the whole level for
+    # its one class, 0 for every other (feat loop b2, 2026-11-22). Punishing Kick's
+    # Special: "A monk may attempt a punishing kick attack a number of times per day
+    # equal to his monk level"; the characters here have one class, so that is `level`.
+    for cid in _class_ids():
+        names[f"level_{cid}"] = (lambda c=cid: actor.level if " ".join(str(
+            getattr(actor, "char_class", "") or "").lower().replace("_", " ").split())
+            .replace(" ", "_") == c else 0)
     for ab in ABILITIES:
         names[ab] = (lambda a=ab: actor.ability_score(a))
         names[f"{ab}_mod"] = (lambda a=ab: actor.ability_mod(a))
