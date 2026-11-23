@@ -228,8 +228,11 @@ SAVE_ABILITY = {"fort": "con", "ref": "dex", "will": "wis"}
 
 # Only feats the engine actually applies. A feat on the sheet that is not here is carried
 # as flavour and contributes nothing — better than silently pretending it worked.
-# Feats written with a parenthesised target, e.g. "weapon focus (rapier)".
-FEAT_TARGET_RE = r"^(?P<feat>[^(]+?)\s*\((?P<target>[^)]+)\)$"
+# Feats written with a parenthesised target, e.g. "weapon focus (rapier)". The target may
+# hold parentheses of its own (feat loop b1, 2026-11-22): "skill focus (knowledge
+# (arcana))" and "scholar (knowledge (history), knowledge (local))" matched nothing with
+# `[^)]+`, so Skill Focus could never land on a Knowledge.
+FEAT_TARGET_RE = r"^(?P<feat>[^(]+?)\s*\((?P<target>.+)\)$"
 
 
 # --- Conditions ------------------------------------------------------------------

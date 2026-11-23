@@ -482,7 +482,9 @@ def monster_lore(engine, intent, actor, mods, partial):
                               code="no_retry")
     value = dc(LORE, target, cr=_cr_of(target))
     try:
-        mods = actor.skill_modifiers(skill)
+        # The creature recalled is what the check is about: Demonologist's "+2 bonus on
+        # all Knowledge checks related to ... demons" asks `when.target` of it.
+        mods = actor.skill_modifiers(skill, ctx={"target_actor": target})
     except IllegalSheet:
         if value > 10:
             return engine._refuse(intent, f"{actor.name} has no training in {skill.title()}, "
@@ -578,6 +580,50 @@ def _focus_in_hand(actor) -> bool:
     return False
 
 
+# Motivating Display's tag (its feat document, feat loop b1).
+MOTIVATES = "skill.intimidate.motivating-display"
+
+
+def _motivate(engine, actor, total: int, side, range_ft: int):
+    """Motivating Display (Blood of the Moon): "your Intimidate check while using Dazzling
+    Display also applies to allies within 30 feet who can see you. The DC for this effect
+    is the same as it would be to demoralize your allies. Each ally so affected gains a +1
+    morale bonus on attack rolls and skill checks for the duration that it would normally
+    be shaken" — Demoralize's 1 round + 1 per 5 over (`Engine._demoralize`), one effect per
+    ally on the one ticker, morale-typed so it takes the best with other morale."""
+    from . import attitude as attitude_mod
+    from . import awareness
+    from .activeeffect import ActiveEffect
+
+    scene = engine.scene
+    said, effects = [], []
+    for ref in (scene.sides or {}).get(side, ()) if side else ():
+        ally = scene.actors.get(ref)
+        if ally is None or ally is actor or ally.is_down \
+                or not awareness.sees(scene, ally, actor):
+            continue
+        gap = engine._gap_ft(actor, ally)
+        if gap is not None and gap > range_ft:
+            continue
+        margin = total - attitude_mod.intimidate_dc(ally)
+        if margin < 0:
+            continue
+        rounds = 1 + margin // 5
+        ally.apply_effect(ActiveEffect(
+            name="motivated", kind="buff", key="motivating-display",
+            source=f"{actor.name}'s Motivating Display",
+            origin="rule:feat-motivating-display", duration="rounds", rounds_left=rounds,
+            modifiers=[{"kind": "combat_mod", "target": "attack", "amount": 1,
+                        "bonus_type": "morale"},
+                       {"kind": "skill_mod", "target": "all", "amount": 1,
+                        "bonus_type": "morale"}]))
+        effects.append({"ref": ally.ref, "kind": "buff", "buff": "motivated",
+                        "rounds": rounds, "origin": "rule:feat-motivating-display"})
+        said.append(f"{ally.name} takes heart from it: +1 morale on attacks and skill "
+                    f"checks for {rounds} round{'s' if rounds != 1 else ''}.")
+    return said, effects
+
+
 def dazzling_display(engine, intent, actor, mods, partial):
     """Dazzling Display (CRB): a full-round action wielding the Weapon Focus weapon; one
     Intimidate check demoralizes every foe within 30 feet who can see it, each against
@@ -620,6 +666,10 @@ def dazzling_display(engine, intent, actor, mods, partial):
     for f in foes:
         said, fx = engine._demoralize(actor, f, roll.total - attitude_mod.intimidate_dc(f), "")
         bits.append(said)
+        effects.extend(fx)
+    if actor.has_state(MOTIVATES):
+        said, fx = _motivate(engine, actor, roll.total, side, int(r["range_ft"]))
+        bits.extend(said)
         effects.extend(fx)
     return _outcome(intent, rolls=[roll], dc_value=hardest,
                     basis="Dazzling Display: each foe's 10 + Hit Dice + Wis",

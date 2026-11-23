@@ -254,8 +254,13 @@ def cover_of(scene, actor, defender) -> str:
 
     span = distance_between(here, actor.size, there, defender.size)
     crossed = grid_line(tuple(here[:2]), tuple(there[:2]), span)
+    from .states import GIVES_NO_SOFT_COVER
+
     for ref, other in scene.actors.items():
-        if ref in (actor.ref, defender.ref) or other.is_down:
+        # Low Profile (APG): "you do not provide soft cover to creatures when ranged
+        # attacks pass through your square" — its document's tag.
+        if ref in (actor.ref, defender.ref) or other.is_down \
+                or other.has_state(GIVES_NO_SOFT_COVER):
             continue
         spot = scene.positions.get(ref)
         if spot is None or _level(spot) != _level(there):

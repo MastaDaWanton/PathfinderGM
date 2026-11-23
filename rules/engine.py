@@ -8827,6 +8827,10 @@ class Engine:
         swayed = None if heard is not None else self._sway_subject(intent, skill)
         if swayed is not None and (refusal := self._sway_refusal(intent, actor, swayed, skill)):
             return refusal
+        # Intimidate in a fight at one on a side is Demoralize (`_sway`): its own roll.
+        if swayed is not None and skill == "intimidate" and self.scene.in_encounter and any(
+                swayed.ref in refs for refs in (self.scene.sides or {}).values()):
+            mods = self._demoralize_mods(actor, swayed, mods)
         # First aid (Lane C, `rules/firstaid.py`): a Heal check aimed at somebody dying
         # is the rulebook's DC 15 to make them stable, whatever DC the plan wrote.
         from . import firstaid
@@ -8984,6 +8988,44 @@ class Engine:
             verdict=verdict, margin=margin, effects=effects, tell=tell,
             because=intent.because,
         )
+
+    @staticmethod
+    def _demoralize_mods(actor, target, mods) -> list:
+        """The roll a Demoralize is made with (CRB p.99, Intimidate).
+
+        - Asked `against: demoralize`, so a feat's "+2 on Intimidate checks to demoralize"
+          (Boar Ferocity) lands on this roll and on no other Intimidate.
+        - Size, the book's own: "You gain a +4 bonus on this check for every size category
+          you are larger than your target and a -4 penalty for every size category you are
+          smaller." Measured 2026-11-22 (feat loop b1): no Demoralize charged it, so a
+          halfling scared an ogre as easily as a goblin.
+        - Taunt (APG): "You can demoralize opponents using Bluff rather than Intimidate
+          ... and take no skill check penalty for being smaller than your target" — the
+          feat document's tag; the better of the two skills is taken, which is the only
+          choice a player makes, and only a penalty for size is waived."""
+        from .sheet import IllegalSheet
+        from .tables import SIZE_ORDER
+
+        ctx = {"against": "demoralize"}
+        try:
+            mods = actor.skill_modifiers("intimidate", ctx=ctx)
+        except IllegalSheet:
+            pass
+        taunt = actor.has_state(states.DEMORALIZES_WITH_BLUFF)
+        if taunt:
+            try:
+                bluff = actor.skill_modifiers("bluff", ctx=ctx)
+            except IllegalSheet:
+                bluff = None
+            if bluff is not None and sum(m.value for m in bluff) > sum(m.value for m in mods):
+                mods = [Modifier(m.value, f"{m.source} (Bluff, Taunt)", m.type) for m in bluff]
+        sizes = list(SIZE_ORDER)
+        mine, theirs = (str(getattr(a, "size", "") or "medium").lower() for a in (actor, target))
+        if mine in sizes and theirs in sizes:
+            steps = sizes.index(mine) - sizes.index(theirs)
+            if steps > 0 or (steps < 0 and not taunt):
+                mods = [*mods, Modifier(4 * steps, f"{mine} against {theirs}")]
+        return mods
 
     def _skill_mods_or_refusal(self, intent: Intent, actor, skill: str,
                                opposed: bool = False):
@@ -10166,7 +10208,9 @@ class Engine:
         if def_gutter and current_moment() is not None:
             current_moment().guttered.update(def_gutter)
 
-        flat_footed = self._flat_footed(defender) or self._unseen_attacker(defender, actor)
+        flat_footed = self._flat_footed(defender) or (
+            self._unseen_attacker(defender, actor)
+            and not self._pinpointed_shooter(defender, actor, weapon))
         # A feint this attacker landed (rules/skilluses.py): "the next melee attack you make
         # against the target does not allow him to use his Dexterity bonus to AC" (CRB,
         # Combat, Feint) — this blow's first swing only, uncanny dodge or not. Asked once
@@ -10257,6 +10301,7 @@ class Engine:
                                          and actor.has_state("two_weapon.defense")) else ()
             state["tells"].extend(self._lay_attack_stances(
                 actor, () if intent.params.get("cleaving") else choices + guard))
+            state["tells"].extend(self._lower_shield_for_bash(actor, weapon, off_key))
             state["seen"] = seen
             # Down when the blow comes (`Actor.is_down`: dying, unconscious): insensible to
             # who struck. Not helpless — a bound man awake sees who hits him. Kept from
@@ -10512,6 +10557,13 @@ class Engine:
                                       f"too (Manyshot).")
                 state["crit"] = False
                 state["stage"] = "damage"
+            if state["stage"] == "attack" and printed.get("automatic") \
+                    and self._scatters_rats(defender, actor):
+                state["tells"].append(
+                    f"{defender.name} and the ally at their side stamp and sweep; the rats "
+                    f"scatter from them and find no purchase (Swarm Scatter).")
+                state["i"] += 1
+                continue
             if state["stage"] == "attack" and (getattr(actor, "troop", None) is not None
                                               or printed.get("automatic")):
                 state["tells"].append(
@@ -10588,6 +10640,17 @@ class Engine:
                         state["tells"].append(
                             f"The {weapon['name'].lower()} veers to {defender.name}: "
                             f"{why} gives no miss chance against it.")
+                    chance = 0
+                # Improved Blind-Fight (APG): "Your melee attacks ignore the miss chance for
+                # less than total concealment" — anything under total's 50% — the feat
+                # document's tag, asked of the vocabulary as Blind-Fight's reroll is.
+                if chance and chance < 50 and weapon.get("category") != "ranged" \
+                        and actor.has_state(states.IGNORES_PARTIAL_CONCEALMENT):
+                    if not state.get("blind_fight_said"):
+                        state["blind_fight_said"] = True
+                        state["tells"].append(
+                            f"{actor.name} strikes true through the {why}: in melee it "
+                            f"gives no miss chance against them.")
                     chance = 0
                 if chance:
                     miss = self.dice.roll("1d100", label=f"miss chance ({why})",
@@ -11062,6 +11125,11 @@ class Engine:
                     state["effects"].append(extra["effect"])
                     if extra["tell"]:
                         state["tells"].append(extra["tell"])
+                # A critical feat's own rider (Bleeding Critical, Crippling Critical).
+                if state.get("crit"):
+                    for extra in self._critical_feat(actor, defender, weapon):
+                        state["effects"].append(extra["effect"])
+                        state["tells"].append(extra["tell"])
                 # A blanch is spent by the hit it just struck as (`_spend_on_hit`).
                 for extra in self._spend_on_hit(actor, weapon):
                     state["effects"].append(extra["effect"])
@@ -11340,6 +11408,13 @@ class Engine:
 
         out = compulsion.penalty_against(actor, defender.ref) + position_mod.attack_mods(
             self.scene, actor, defender, weapon)
+        # The invisible condition's +2 on attack (tables.CONDITIONS) taken back from a
+        # shot at a defender who has pinpointed the shooter (`_pinpointed_shooter`).
+        from . import awareness
+
+        if actor.has_state(awareness.INVISIBLE) \
+                and self._pinpointed_shooter(defender, actor, weapon):
+            out = out + [Modifier(-2, f"pinpointed by {defender.name} (Improved Blind-Fight)")]
         # In the open water beside a ship: the water table's attack penalty, which the
         # sheet charges only for a wet PLACE (`Actor._water_penalty`) and cannot see here.
         if self.scene.afloat(actor.ref) and not actor.water_row():
@@ -23460,7 +23535,8 @@ class Engine:
         through `validate`/`run`, the door `_natural_riders` uses, so the nausea is an
         `ActiveEffect` with its source, and its tell is the save's own.
         """
-        if not printed.get("automatic") or defender.hp <= 0 or defender.is_dead:
+        if not printed.get("automatic") or defender.hp <= 0 or defender.is_dead \
+                or self._scatters_rats(defender, actor):
             return []
         doc = actor._creature_doc() or {}
         said = " ".join(str(doc.get(f) or "") for f in ("special_attacks", "melee"))
@@ -23847,6 +23923,85 @@ class Engine:
                             "origin": origin},
                  "tell": f"{defender.name} reels from the blow and can make no attacks "
                          f"of opportunity for a round."}]
+
+    # A critical feat's tag (its document's), in the order the book's riders are written.
+    CRITICAL_FEATS: ClassVar[tuple] = ("critical.bleeding", "critical.crippling")
+
+    def _critical_feat(self, actor: Actor, defender: Actor, weapon: dict) -> list[dict]:
+        """A critical feat's rider on a confirmed critical hit (feat loop b1, 2026-11-22).
+
+        - Bleeding Critical (CRB p.119): "Whenever you score a critical hit with a
+          slashing or piercing weapon, your opponent takes 2d6 points of bleed damage ...
+          The effects of this feat stacks." A second one adds 2d6 to the bleed this feat
+          already left, one effect, re-laid bigger — the general bleed rule ("take the
+          worse") gives way to the feat's own "stack".
+        - Crippling Critical (APG): "its speed is halved for 1 minute. A successful
+          Fortitude save reduces this duration to 1d4 rounds. The DC of this save is equal
+          to 10 + your base attack bonus" — the `crippled` condition (`state.slowed`).
+
+        "You can only apply the effects of one critical feat to a given critical hit
+        unless you possess Critical Mastery": the first critical feat on the sheet, or
+        all of them under Critical Mastery's `critical.mastery` tag. Each the document's
+        tag, asked of the vocabulary; the defender's immunities are asked as the bleed
+        rider asks them."""
+        from . import feats as feats_mod
+
+        held = [t for t in self.CRITICAL_FEATS if actor.has_state(t)]
+        if not held or defender.hp <= 0 or defender.is_dead:
+            return []
+        if not actor.has_state("critical.mastery"):
+            order = [t for raw in actor.feats
+                     for t in ((feats_mod.document(raw) or {}).get("tags") or ())
+                     if t in held]
+            held = order[:1] or held[:1]
+        out: list[dict] = []
+        if "critical.bleeding" in held and any(
+                w in str(weapon.get("type") or "").lower() for w in ("slashing", "piercing")):
+            origin = "rule:feat-bleeding-critical"
+            if states.immune_to(defender, "bleed", "bleed") or defender.has_state("immune.bleed"):
+                out.append({"effect": {"ref": defender.ref, "kind": "rider_refused",
+                                       "rider": "bleed", "origin": origin},
+                            "tell": f"{defender.name} does not bleed; the wound stays shut."})
+            else:
+                had = [e for e in defender.effects if e.origin == origin]
+                dice = 2 * (1 + sum(int((e.payload or {}).get("crits", 1)) for e in had))
+                defender.remove_effects(match=lambda e: e.origin == origin)
+                defender.apply_effect(ActiveEffect(
+                    name="Bleed", kind="condition", key="bleed",
+                    source=f"{actor.name}'s Bleeding Critical", origin=origin,
+                    tags=states.tags_for("bleed"),
+                    payload={"stopped_by": "a DC 15 Heal check or any magical healing",
+                             "crits": dice // 2},
+                    periodic=[{"per": "round", "damage": f"{dice}d6",
+                               "damage_type": "untyped"}]))
+                out.append({"effect": {"ref": defender.ref, "kind": "condition",
+                                       "condition": "bleed", "per_round": f"{dice}d6",
+                                       "origin": origin},
+                            "tell": f"{actor.name}'s critical opens {defender.name} up: "
+                                    f"{dice}d6 bleed a round until a DC 15 Heal check or "
+                                    f"magical healing stops it."})
+        if "critical.crippling" in held:
+            origin = "rule:feat-crippling-critical"
+            dc = 10 + int(actor.bab)
+            roll = self.dice.d20(defender.save_modifiers("fort"),
+                                 label=f"Fortitude save (Crippling Critical, DC {dc})",
+                                 visibility="hidden")
+            saved = d20_succeeds(roll, dc)
+            rounds = self.dice.roll("1d4", label="Crippling Critical (rounds)",
+                                    visibility="hidden").total if saved else 10
+            defender.remove_effects(match=lambda e: e.origin == origin)
+            defender.apply_effect(ActiveEffect(
+                name="crippled", kind="condition", key="crippled",
+                source=f"{actor.name}'s Crippling Critical", origin=origin,
+                duration="rounds", rounds_left=rounds, tags=states.tags_for("crippled")))
+            out.append({"effect": {"ref": defender.ref, "kind": "condition",
+                                   "condition": "crippled", "rounds": rounds,
+                                   "save": roll.total, "dc": dc, "origin": origin},
+                        "tell": f"{actor.name}'s critical cripples {defender.name}: half "
+                                f"speed for {rounds} round{'s' if rounds != 1 else ''}"
+                                + (f" (Fortitude {roll.total} against {dc} shortens it)."
+                                   if saved else f" (Fortitude {roll.total} against {dc})." )})
+        return out
 
     def _rider_bleed(self, intent: Intent, actor: Actor, defender: Actor, rule: dict,
                      origin: str, state: dict) -> list[dict]:
@@ -25226,6 +25381,32 @@ class Engine:
                  "note": why},
                 {"kind": "combat_mod", "target": "ac", "amount": defensive_dodge(actor),
                  "bonus_type": "dodge", "note": why}]
+
+    @staticmethod
+    def _lower_shield_for_bash(actor: Actor, weapon: dict, off_key) -> list[str]:
+        """A shield bash's price (CRB, Combat, Shield Bash Attacks): "a character that
+        performs a shield bash loses the shield's shield bonus to AC until his next turn"
+        — a one-round effect carrying the shield's own bonus as a penalty, on the one
+        ticker, so its end gives the bonus back. Improved Shield Bash ("you may still
+        apply the shield's shield bonus to your AC") is its document's tag, asked here.
+        Feat loop b1, 2026-11-22: before it, the bash cost nothing and the feat had
+        nothing to waive."""
+        bashed = bool(weapon.get("shield_bash")) or (
+            bool(off_key) and actor.shield_bash(off_key) is not None)
+        if not bashed or actor.has_state(states.SHIELD_BASH_KEEPS_GUARD):
+            return []
+        n = int(actor.shield_stats().get("ac") or 0)
+        if n <= 0:
+            return []
+        again = actor.has_state(states.SHIELD_LOWERED)
+        actor.apply_effect(ActiveEffect(
+            name="shield lowered", kind="buff", key="shield lowered",
+            source="Shield bash", origin="rule:shield-bash", duration="rounds",
+            rounds_left=1, tags=states.tags_for("shield lowered"),
+            modifiers=[{"kind": "combat_mod", "target": "ac", "amount": -n,
+                        "bonus_type": "", "note": "the shield swung, not held"}]))
+        return [] if again else [f"{actor.name} swings the shield to strike and leaves "
+                                 f"its guard open (-{n} armour class) until their next turn."]
 
     @staticmethod
     def total_defense_effect(actor: Actor) -> ActiveEffect:
@@ -31115,6 +31296,35 @@ class Engine:
             or not self._has_acted(defender.ref)
         )
 
+    @staticmethod
+    def _scatters_rats(defender, swarm) -> bool:
+        """Swarm Scatter (Blood of the Moon): "As long as you have this bonus, you are
+        immune to the swarm attack and distraction ability of rat swarms" — the bonus
+        being an adjacent ally with the feat (`Actor.adjacent_allies_with`). A rat swarm
+        is known by its bestiary template's id (rat-swarm, hivemind-rat-swarm), never by
+        a name in prose."""
+        return bool(defender.has_state(states.SCATTERS_RATS)
+                    and str(getattr(swarm, "from_template", "") or "").endswith("rat-swarm")
+                    and defender.adjacent_allies_with("swarm-scatter"))
+
+    def _pinpointed_shooter(self, defender, attacker, weapon: dict | None) -> bool:
+        """Improved Blind-Fight (APG): "If you successfully pinpoint an invisible or hidden
+        attacker within 30 feet, that attacker gets no advantages related to hitting you
+        with ranged attacks. That is, you don't lose your Dexterity bonus to Armor Class,
+        and the attacker doesn't get the usual +2 bonus for being invisible." The feat
+        document's tag, the defender's pinpoint (`awareness.locates`), a ranged blow, and
+        30 feet on the board (no board, no distance: taken as within it)."""
+        from . import awareness
+
+        if attacker is None or defender is None or not weapon \
+                or weapon.get("category") != "ranged" \
+                or not defender.has_state(states.IGNORES_PARTIAL_CONCEALMENT) \
+                or not attacker.has_state(awareness.HIDDEN) \
+                or not awareness.locates(self.scene, defender, attacker):
+            return False
+        feet = self._gap_ft(attacker, defender)
+        return feet is None or int(feet) <= 30
+
     def _unseen_attacker(self, defender, attacker) -> bool:
         """Whether `defender` is struck by somebody it cannot see, and so keeps no Dex.
 
@@ -36709,6 +36919,12 @@ class Engine:
                 and target.has_state(permission_tag("endure_elements")):
             return rolls, effects, (f"{target.name} feels none of the "
                                     f"{row.get('against') or rule}: endure elements.")
+        # Desert Dweller (ISWG): "You are not impacted at all by very hot conditions" —
+        # the one heat this row models (above 90° F); its document's tag.
+        if str(row.get("against") or rule) == "heat" \
+                and target.has_state(states.HEAT_UNHINDERED):
+            return rolls, effects, (f"{target.name} is at home in the heat and feels "
+                                    f"none of it.")
         failed = taken = 0
         made = 0
         for i in range(max(0, int(hours))):

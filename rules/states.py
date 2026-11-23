@@ -513,6 +513,11 @@ TAGS: dict[str, tuple[str, ...]] = {
     # while using total defense" is the `reactions.none` tag `reactions_for` asks.
     "fighting defensively": ("buff.stance.fighting-defensively",),
     "total defense":        ("buff.stance.total-defense", "reactions.none"),
+    # Feat loop b1, 2026-11-22: a shield bash's open guard until the next turn (CRB,
+    # Combat), and Crippling Critical's "its speed is halved" (APG) — `state.slowed` is
+    # the one half-speed question `Actor.speed_feet` asks.
+    "shield lowered": ("buff.stance.shield-lowered",),
+    "crippled":       ("state.slowed.crippled",),
     # The price of coming back: somebody paid the priests, and now the debt sits
     # on the character. Clockless — the world decides when it is called in.
     "life debt": ("state.obligation.life-debt",),
@@ -594,6 +599,21 @@ COMBAT_EXPERTISE = "buff.stance.combat-expertise"
 CLEAVING = "buff.stance.cleaving"
 FIGHTING_DEFENSIVELY = "buff.stance.fighting-defensively"
 TOTAL_DEFENSE = "buff.stance.total-defense"
+# Feat loop b1 (2026-11-22), each a feat document's permission tag, asked by its reader:
+# Improved Blind-Fight's melee through partial concealment (`Engine` attack loop), Improved
+# Shield Bash's kept guard (`Engine._lower_shield_for_bash`), Low Profile's "you do not
+# provide soft cover to creatures when ranged attacks pass through your square"
+# (`position.cover_of`).
+IGNORES_PARTIAL_CONCEALMENT = "miss_chance.ignore.partial.melee"
+SHIELD_BASH_KEEPS_GUARD = "shield.bash.keeps-guard"
+SHIELD_LOWERED = "buff.stance.shield-lowered"
+GIVES_NO_SOFT_COVER = "cover.soft.none"
+# Taunt's "demoralize opponents using Bluff rather than Intimidate" (`Engine._demoralize_mods`).
+DEMORALIZES_WITH_BLUFF = "skill.bluff.demoralize"
+# Swarm Scatter's immunity to rat swarms (`Engine._scatters_rats`), Desert Dweller's "not
+# impacted at all by very hot conditions" (`Engine._exposure`).
+SCATTERS_RATS = "defense.swarm.rats.scattered"
+HEAT_UNHINDERED = "climate.heat.very-hot.unhindered"
 # The forage encounter's stance (TAGS["holding ground"]), named once for its readers.
 HOLDING_GROUND = "state.holding-ground"
 HOLDING_GROUND_KEY = "holding ground"
