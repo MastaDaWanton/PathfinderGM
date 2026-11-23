@@ -7029,11 +7029,11 @@ class Engine:
         hold = next((e for e in defender.effects if self._is_grapple(e)
                      and str((e.payload or {}).get("by") or "") == actor.ref), None)
         p = dict(hold.payload or {}) if hold is not None else {}
-        mods = list(actor.cmb_modifiers("grapple"))
+        mods = list(actor.cmb_modifiers("grapple", defender=defender))
         mods.append(Modifier(5, "maintaining the hold", "circumstance"))
         if int(p.get("hold_bonus") or 0):
             mods.append(Modifier(int(p["hold_bonus"]), str(p.get("hold_rider") or "grab")))
-        cmd = sum(m.value for m in defender.cmd_modifiers(maneuver="grapple"))
+        cmd = sum(m.value for m in defender.cmd_modifiers(maneuver="grapple", attacker=actor))
         state = partial.get("attack_state") or {}
         rolls: list[Roll] = []
         if defender.is_helpless or defender.is_down:
@@ -7094,9 +7094,11 @@ class Engine:
         check against the holder's CMD, a standard action that provokes nothing; success
         ends it for both. `how` is "cmb", "escape artist" or "" — the better of the two,
         as a player at the table would choose."""
-        cmd = sum(m.value for m in holder.cmd_modifiers(maneuver="grapple"))
-        cmb = list(actor.cmb_modifiers("escape"))
-        art = list(actor.skill_modifiers("escape artist"))
+        cmd = sum(m.value for m in holder.cmd_modifiers(maneuver="grapple", attacker=actor))
+        cmb = list(actor.cmb_modifiers("escape", defender=holder))
+        # An Escape Artist check to break free is one "made to escape a grapple or to
+        # escape from bonds" (Free Spirit): the escape's own context, asked by `when`.
+        art = list(actor.skill_modifiers("escape artist", ctx={"maneuver": "escape"}))
         how = str(how or "").strip().lower()
         if how not in ("cmb", "escape artist"):
             how = ("escape artist" if sum(m.value for m in art) > sum(m.value for m in cmb)
@@ -7145,7 +7147,7 @@ class Engine:
         nobody holding, and `escape` answered "Nobody is holding" for its whole duration."""
         dc = int(held.payload["ends_when"]["escape"].get("dc") or 0)
         cmb = list(actor.cmb_modifiers("escape"))
-        art = list(actor.skill_modifiers("escape artist"))
+        art = list(actor.skill_modifiers("escape artist", ctx={"maneuver": "escape"}))
         how = str(how or "").strip().lower()
         if how not in ("cmb", "escape artist"):
             how = ("escape artist" if sum(m.value for m in art) > sum(m.value for m in cmb)
@@ -11849,7 +11851,7 @@ class Engine:
                 return self._escape_from(intent, actor, defender, partial, "cmb")
         self._ensure_encounter(intent.actor, intent.target)
 
-        mods = list(actor.cmb_modifiers(key))
+        mods = list(actor.cmb_modifiers(key, defender=defender))
         # Struck by the target while trying it: "apply that amount as a penalty to the
         # attack roll to perform the maneuver" (CRB, aonprd.com/Rules.aspx?ID=188). The
         # wounds before the provoked swing were written by `_provoked_by_maneuver`.
@@ -11887,7 +11889,8 @@ class Engine:
 
         flat_footed = self._flat_footed(defender) or self._unseen_attacker(defender, actor)
         cmd_mods = defender.cmd_modifiers(
-            flat_footed, maneuver=str(intent.params.get("manoeuvre") or "") or None)
+            flat_footed, maneuver=str(intent.params.get("manoeuvre") or "") or None,
+            attacker=actor)
         if loot and loot["fastened"]:
             cmd_mods = list(cmd_mods) + [Modifier(m["fastened_cmd"],
                                                   f"{loot['label']} is fastened")]
@@ -23672,10 +23675,10 @@ class Engine:
         through `_shove` (which stops at the first square that is blocked)."""
         word = str(rule["rider"])
         key = "drag" if word == "pull" else "bull rush"
-        roll = self.dice.d20(actor.cmb_modifiers(key), label=f"{word.title()} (CMB)",
-                             visibility="hidden")
+        roll = self.dice.d20(actor.cmb_modifiers(key, defender=defender),
+                             label=f"{word.title()} (CMB)", visibility="hidden")
         state.setdefault("rolls", []).append(roll.as_dict())
-        cmd = sum(m.value for m in defender.cmd_modifiers(maneuver=key))
+        cmd = sum(m.value for m in defender.cmd_modifiers(maneuver=key, attacker=actor))
         if not d20_succeeds(roll, cmd):
             return [{"effect": {"ref": defender.ref, "kind": "rider_resisted",
                                 "rider": word, "origin": origin},

@@ -1023,7 +1023,7 @@ def break_away(engine, intent, actor, held, how: str, partial: dict, *, to: str 
         maneuver="grapple")))
     cmd = sum(m.value for m in holder.cmd_modifiers(maneuver="grapple"))
     cmb = list(actor.cmb_modifiers("escape"))
-    art = list(actor.skill_modifiers("escape artist")) \
+    art = list(actor.skill_modifiers("escape artist", ctx={"maneuver": "escape"})) \
         if _trained_or_free(actor, "escape artist") else None
     how = {"slip": "escape artist", "force": "cmb"}.get(how, how)
     if how not in ("cmb", "escape artist") or (how == "escape artist" and art is None):

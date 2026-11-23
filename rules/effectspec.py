@@ -2448,11 +2448,20 @@ WHEN_KEYS: dict[str, str] = {
                    "an extra swing a full attack alone is owed (haste, Rapid Shot)",
     "two_weapon": "which hand of a two-weapon full attack swings: primary or off "
                   "(Actor.attack_modifiers)",
+    # Feat loop b1 (2026-11-22): the teamwork feats' "adjacent to an ally who also has
+    # this feat" and Solo Maneuvers' "the only one threatening", asked on the board.
+    "ally_beside": "an ally adjacent on the board holding a feat: {\"feat\": "
+                   "\"coordinated-defense\"}, with foe_larger for a foe larger than "
+                   "both (sheet.Situation.ally_beside)",
+    "sole_threat": "whether the bearer alone threatens the foe of the roll "
+                   "(sheet.Situation.sole_threat)",
 }
-_WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment", "choice"),
+_WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment", "choice",
+                                  "state"),
                        "attacker": ("type", "subtype")}
 _WHEN_COMPARE = ("lte", "gte", "lt", "gt", "eq")
-_WHEN_BOOLS = ("daylight", "underground", "wielder_casts", "resting", "full_attack")
+_WHEN_BOOLS = ("daylight", "underground", "wielder_casts", "resting", "full_attack",
+               "sole_threat")
 
 # What a roll may be made AGAINST — the `against` of a roll context, one word per danger,
 # each with the reader that passes it. A closed list, because the clause is answered by
@@ -2556,6 +2565,13 @@ def when_problems(when, where: str = "when") -> list[str]:
                                f"creature type. One of: {', '.join(CREATURE_TYPES)}.")
             if "alignment" in want and want["alignment"] not in ALIGNMENTS:
                 out.append(f"{where}.{key}.alignment is one of {', '.join(ALIGNMENTS)}.")
+        elif key == "ally_beside":
+            from . import feats as feats_mod
+
+            if (not isinstance(want, dict) or set(want) - {"feat", "foe_larger"}
+                    or str(want.get("feat") or "") not in feats_mod.all_feats()):
+                out.append(f"{where}.ally_beside is {{\"feat\": \"<a feat id>\"}}, with "
+                           f"an optional \"foe_larger\": true.")
         elif key in ("weapon", "armour", "bearer", "near"):
             if not isinstance(want, dict) or not want:
                 out.append(f"{where}.{key} is an object of the fields it asks.")
