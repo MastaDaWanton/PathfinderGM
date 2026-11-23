@@ -248,3 +248,12 @@ def test_make_whole_repairs_a_construct_by_caster_level():
     cast = [o for o in res.outcomes if o.op == "cast"][0]
     assert cast.effects[0]["dice"] == "5d6"
     assert made.hp > 1
+
+
+def test_a_mute_construct_never_speaks_up_on_its_own(table):
+    """Measured live 2026-11-22: a made homunculus ("Common (cannot speak)") interjected
+    'The absence of form is an optimal execution of the craft.' through the companion
+    remark call. A mute construct is never the one who speaks up."""
+    pc, s, _e, made = _made(table)
+    due = companions.interjection_due(s, [{"who": "player", "text": "x"}] * 20, [])
+    assert due is None or due["ref"] != made.ref

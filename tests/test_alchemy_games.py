@@ -46,6 +46,8 @@ HERB_METHODS = ["grind", "mix", "brew", "dry", "reduce", "extract", "infuse", "s
 FORGE_METHODS = ["smelt", "alloy", "forge", "quench", "temper", "fold", "hone", "assemble", "finish",
                  "strengthen"]
 ENCHANT_METHODS = ["prepare", "attune", "bind", "refine", "unbind", "cleanse"]
+# Animate (constructs) plays Bind's game, registered from bind.js right after it.
+ENCHANT_REGISTERED = ["prepare", "attune", "bind", "animate", "refine", "unbind", "cleanse"]
 TIER_NAMES = ["Crude", "Sound", "Fine", "Superior", "Flawless"]
 PLANETS = ["planet", "Planet", "Mars", "Saturn", "Jupiter", "Venus", "Mercury", "Moon", "Sun"]
 
@@ -692,10 +694,10 @@ def test_the_alchemy_games_come_by_registration(node_run):
     """Contracts §12: the eight register on the shared registry with `track: "alchemy"`. Measured
     on the live API: herbs first in their fixed order, then the forge's, the enchanter's and the
     alchemist's, and `methodsFor` keeps each bench to its own games."""
-    assert node_run["methods"] == HERB_METHODS + FORGE_METHODS + ENCHANT_METHODS + METHODS
+    assert node_run["methods"] == HERB_METHODS + FORGE_METHODS + ENCHANT_REGISTERED + METHODS
     assert node_run["alchemy"] == METHODS
     assert node_run["herb"] == HERB_METHODS and node_run["forge"] == FORGE_METHODS
-    assert node_run["enchant"] == ENCHANT_METHODS
+    assert node_run["enchant"] == ENCHANT_REGISTERED
 
 
 @pytest.mark.parametrize("method", METHODS)

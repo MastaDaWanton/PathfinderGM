@@ -212,6 +212,7 @@ def build_animate(plan, actor, body, where, now) -> None:
             plan.problems.append(f"The body needs {int(n)} {label}; you carry {have}.")
         else:
             plan.consumes.append((f"inv:{iid}", int(n), label))
+            plan.info.append(f"The body: {int(n)} {label}, with {b.get('words')}.")
     if b.get("forged"):
         bodies = forged_bodies(actor, str(b["forged"]))
         want = str((body or {}).get("body") or "").split(":", 1)[-1]
@@ -319,7 +320,7 @@ def collect(item, actor, res: dict) -> dict:
     key = next((k for k, st in (getattr(actor, "stock", {}) or {}).items() if st is item), "")
     if key:
         actor.stock.pop(key, None)
-    return {"said": f"The {res.get('name')} stirs and rises.",
+    return {"said": f"The {res.get('name')} stirs.",
             "product": {"key": "", "name": str(res.get("name") or ""),
                         "construct": {"template": res["construct"],
                                       "quality_index": int(res.get("quality_index", SOUND))}}}

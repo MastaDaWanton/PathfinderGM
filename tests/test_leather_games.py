@@ -46,6 +46,8 @@ HERB_METHODS = ["grind", "mix", "brew", "dry", "reduce", "extract", "infuse", "s
 FORGE_METHODS = ["smelt", "alloy", "forge", "quench", "temper", "fold", "hone", "assemble", "finish",
                  "strengthen"]
 ENCHANT_METHODS = ["prepare", "attune", "bind", "refine", "unbind", "cleanse"]
+# Animate (constructs) plays Bind's game, registered from bind.js right after it.
+ENCHANT_REGISTERED = ["prepare", "attune", "bind", "animate", "refine", "unbind", "cleanse"]
 ALCHEMY_METHODS = ["dissolve", "calcine", "filter", "distill", "react", "sublime", "bottle", "transmute"]
 TIER_NAMES = ["Crude", "Sound", "Fine", "Superior", "Flawless"]
 PLANETS = ["planet", "Planet", "Mars", "Saturn", "Jupiter", "Venus", "Mercury", "Moon", "Sun"]
@@ -572,7 +574,7 @@ def test_the_leather_games_come_by_registration(node_run):
     Measured on the live API: the herb, forge, enchant and alchemy lists are exactly what they
     were, the forge's Assemble is still the forge's, and `methodsFor("leather")` lists the eleven
     and the cut test under their keys."""
-    assert node_run["methods"] == (HERB_METHODS + FORGE_METHODS + ENCHANT_METHODS + ALCHEMY_METHODS
+    assert node_run["methods"] == (HERB_METHODS + FORGE_METHODS + ENCHANT_REGISTERED + ALCHEMY_METHODS
                                    + [f"leather.{n}" for n in GAMES_ALL])
     assert node_run["leather"] == [f"leather.{n}" for n in GAMES_ALL]
     assert node_run["forge"] == FORGE_METHODS and node_run["herb"] == HERB_METHODS

@@ -934,8 +934,14 @@ def interjection_due(scene, transcript, outcomes, *, answered=(), talking=(),
         return None
     if answered:
         return None
+    # A construct that cannot speak never speaks up. Measured live 2026-11-22: a made
+    # homunculus ("Common (cannot speak)") interjected "The absence of form is an optimal
+    # execution of the craft." — the interjection call is told who speaks and writes a line.
+    from rules import constructs
+
     party = [r for r, a in (getattr(scene, "actors", {}) or {}).items()
-             if is_companion(a) and not a.is_down and scene.conscious(r)]
+             if is_companion(a) and not a.is_down and scene.conscious(r)
+             and not constructs.mute(a)]
     if not party:
         return None
     arrived = arrived_at(scene, moved)

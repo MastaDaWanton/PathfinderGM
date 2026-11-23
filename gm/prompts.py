@@ -1297,7 +1297,14 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
                 # they would or would not"). The character is the manner line below and
                 # the attitude above; this says it is theirs to weigh. A claimed construct
                 # is the house rule's: it follows, obeys, and can be named.
-                if actor.has_state(states.OWNED_BY_YOU):
+                from rules import constructs as _constructs
+
+                if actor.has_state(states.OWNED_BY_YOU) and _constructs.mute(actor):
+                    # The book's construct: no voice, no mind of its own (Bestiary).
+                    bond += (f" {actor.name} BELONGS TO the player: a construct that "
+                             f"cannot speak and has no mind of its own; it does exactly "
+                             f"what the player tells it and never says a word.")
+                elif actor.has_state(states.OWNED_BY_YOU):
                     bond += (f" {actor.name} BELONGS TO the player, who claimed them, "
                              f"and is devoted: told plainly, {actor.name} does it, as "
                              f"literally as it was said.")
