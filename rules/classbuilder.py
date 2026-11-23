@@ -39,7 +39,7 @@ from dataclasses import dataclass, field as dc_field
 from . import classes as classes_mod, effectspec, resources
 from .registry import Field
 from .sheet import ACTOR_RULES
-from .tables import ABILITIES, SAVES, SKILLS, WEAPONS
+from .tables import ABILITIES, CONDITIONS, SAVES, SKILLS, WEAPONS
 
 MAX_LEVEL = 20
 # Path tiers run 1-5 because the two Control Blood tracks the level table can carry run
@@ -1119,7 +1119,54 @@ def _validate_grants(d: dict, path: dict, at: str, resolved_names: set,
 # (rules/metamagic.py), and the slot levels it costs.
 _FEAT_DOC_KEYS = frozenset({"modifiers", "tags", "budget", "choice", "attack_ability",
                             "cmb_ability", "not_yet", "requires", "requires_not",
-                            "stacks", "summoned", "summon_extra", "metamagic", "crit_range"})
+                            "stacks", "summoned", "summon_extra", "metamagic", "crit_range",
+                            "on_hit"})
+
+# What a feat's `on_hit` may lay on the creature a melee blow just struck (feat loop b1,
+# 2026-11-22): the attack riders' own executors (`Engine._RIDERS`), each key it reads.
+_ON_HIT_KINDS = {"bleed": {"kind", "when", "amount"},
+                 "save_condition": {"kind", "when", "condition", "save", "dc", "for"}}
+
+
+def _on_hit_problems(at: str, rules, doc: dict) -> list[str]:
+    """Everything wrong with a feat's `on_hit` riders, each with the fix named: Bloody
+    Assault's bleed, Dazing and Stunning Assault's Fortitude-or-condition."""
+    from . import classfeatures
+
+    if not isinstance(rules, list) or not rules:
+        return [f"{at}.on_hit: a list of riders, like [{{\"kind\": \"bleed\", "
+                f"\"amount\": \"1d4\"}}]."]
+    out: list[str] = []
+    for i, rule in enumerate(rules):
+        where = f"{at}.on_hit[{i}]"
+        kind = str((rule or {}).get("kind") or "") if isinstance(rule, dict) else ""
+        if kind not in _ON_HIT_KINDS:
+            out.append(f"{where}.kind: one of {', '.join(sorted(_ON_HIT_KINDS))}.")
+            continue
+        extra = sorted(set(rule) - _ON_HIT_KINDS[kind])
+        if extra:
+            out.append(f"{where}: unknown key(s) {', '.join(extra)}. A {kind} rider "
+                       f"carries: {', '.join(sorted(_ON_HIT_KINDS[kind]))}.")
+        if kind == "bleed" and not str(rule.get("amount") or "").strip():
+            out.append(f"{where}.amount: the bleed per round, \"1d4\" or \"2\".")
+        if kind == "save_condition":
+            if str(rule.get("condition") or "") not in CONDITIONS:
+                out.append(f"{where}.condition: a condition the table knows (dazed, "
+                           f"stunned ...).")
+            if str(rule.get("save") or "") not in ("fort", "ref", "will"):
+                out.append(f"{where}.save: fort, ref or will.")
+            trouble = resources.check(str(rule.get("dc") or ""))
+            if not rule.get("dc") or trouble:
+                out.append(f"{where}.dc: a formula over the sheet, like \"10 + bab\"."
+                           + (f" {trouble}" if trouble else ""))
+        when = rule.get("when")
+        if isinstance(when, dict) and when:
+            rest = {k: v for k, v in when.items() if k != "bearer"}
+            if rest:
+                out.extend(effectspec.when_problems(rest, f"{where}.when"))
+            out.extend(classfeatures._check_when(
+                {"bearer": when["bearer"]} if "bearer" in when else None, where, doc))
+    return out
 
 
 def _feat_funnel_targets() -> set[str]:
@@ -1308,6 +1355,8 @@ def validate_feat_document(feat_id: str, doc) -> list[str]:
             problems.append(
                 f"{at}.crit_range: {{\"multiply\": 2, \"scope\": {{\"weapon\": \"$target\"}}}} "
                 f"— the threat range doubled on the weapon the feat names.")
+    if doc.get("on_hit") is not None:
+        problems.extend(_on_hit_problems(at, doc["on_hit"], doc))
     sub = doc.get("cmb_ability")
     if sub is not None:
         from .tables import ABILITIES

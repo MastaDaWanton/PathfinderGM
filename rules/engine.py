@@ -11057,6 +11057,13 @@ class Engine:
                         actor, defender, weapon_key, intent.visibility or "player", weapon)):
                     state["effects"].append(extra["effect"])
                     state["tells"].append(extra["tell"])
+                # What a held feat lays on a melee hit (`_feat_riders`): Bloody Assault's
+                # bleed, Dazing and Stunning Assault's save-or-condition.
+                for extra in ([] if dancing else self._feat_riders(
+                        intent, actor, defender, weapon_key, weapon, state)):
+                    state["effects"].append(extra["effect"])
+                    if extra.get("tell"):
+                        state["tells"].append(extra["tell"])
                 # A forged blade's own riders — a wyvern-blood quench on the first wound
                 # of the day, viridium on the crit (plan §12.4).
                 for extra in self._item_riders(actor, defender, weapon,
@@ -23794,7 +23801,49 @@ class Engine:
                             "rounds_left": made_cond.rounds_left, "from": word,
                             "origin": origin},
                  "tell": f"{defender.name} fails ({said}) against {actor.name}'s {word} "
-                         f"and is {name} for {made_cond.rounds_left} rounds."}]
+                         f"and is {name} for {made_cond.rounds_left} round"
+                         f"{'' if made_cond.rounds_left == 1 else 's'}."}]
+
+    def _feat_riders(self, intent: Intent, actor: Actor, defender: Actor, weapon_key: str,
+                     weapon: dict, state: dict) -> list[dict]:
+        """What the attacker's feats lay on the creature this blow just hit: a document's
+        `on_hit` riders (feat loop b1, 2026-11-22), each run by the attack riders' own
+        executor (`_RIDERS`: the bleed, the save-or-condition), its `when` asked of the
+        blow's roll context and of the bearer (`classfeatures.holds`) — the stance a
+        declared option laid, a melee weapon. The DC is the document's formula over the
+        sheet ("10 + your base attack bonus"), never a number a plan wrote.
+
+        Measured before it: Bloody, Dazing and Stunning Assault had no document, so the -5
+        they are declared for bought nothing and a hit dazed nobody."""
+        from . import classfeatures, feats as feats_mod, resources
+
+        if defender.hp <= 0 or defender.is_dead or not getattr(actor, "feats", None):
+            return []
+        ctx = actor._roll_context(weapon_key, defender=defender)
+        if weapon.get("category") == "ranged":
+            ctx["weapon"] = dict(ctx["weapon"], category="ranged", ranged=True)
+        out: list[dict] = []
+        seen: set[str] = set()
+        for raw in actor.feats:
+            doc = feats_mod.document(raw)
+            if not doc or doc["id"] in seen or not doc.get("on_hit"):
+                continue
+            seen.add(doc["id"])
+            origin = f"rule:feat-{doc['id']}"
+            for rule in doc["on_hit"]:
+                if defender.hp <= 0 or defender.is_dead:
+                    break
+                if not classfeatures.holds(rule.get("when"), actor, ctx):
+                    continue
+                run = {**rule, "rider": doc["name"].lower()}
+                if rule.get("dc") is not None:
+                    try:
+                        run["dc"] = resources.evaluate(rule["dc"], actor)
+                    except resources.FormulaError:
+                        continue
+                out.extend(self._RIDERS[str(rule["kind"])](self, intent, actor, defender,
+                                                           run, origin, state))
+        return out
 
     # The tags a rogue talent's catalogue entry carries (content/class-options/
     # rogue-talents.json, held through `standing_tags`), in the order the engine picks one
@@ -25145,6 +25194,11 @@ class Engine:
             return "Rapid Shot is fired with a ranged weapon, not a " + str(w["name"]) + "."
         if "combat_expertise" in declared and ranged:
             return "Combat Expertise is declared with a melee weapon."
+        # Bloody, Dazing and Stunning Assault (APG): "a -5 penalty on all melee attack
+        # rolls ... to [bleed, daze, stun] opponents you hit with your melee attacks".
+        for c in ("bloody_assault", "dazing_assault", "stunning_assault"):
+            if c in declared and ranged:
+                return f"{said[c]} rides a melee attack, not a {w['name']}."
         if "piranha_strike" in declared:
             if params.get("power_attack"):
                 from . import feats as feats_mod
@@ -25185,6 +25239,17 @@ class Engine:
         # known for that round; `two_weapon` is passed for it by `_op_attack`.
         ("two_weapon", "two-weapon guard", "Two-Weapon Defense",
          "{name} keeps the second blade up as a guard."),
+        # Feat loop b1 (APG): "its effects last until your next turn" — the -5 and the
+        # rider on every melee hit until then, attacks of opportunity included.
+        ("bloody_assault", "bloody assault", "Bloody Assault",
+         "{name} swings to open wounds (Bloody Assault), less sure of every blow until "
+         "their next turn."),
+        ("dazing_assault", "dazing assault", "Dazing Assault",
+         "{name} swings to daze (Dazing Assault), less sure of every blow until their "
+         "next turn."),
+        ("stunning_assault", "stunning assault", "Stunning Assault",
+         "{name} swings to stun (Stunning Assault), less sure of every blow until their "
+         "next turn."),
     )
 
     @classmethod

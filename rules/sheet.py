@@ -347,7 +347,10 @@ OFF_HAND_FULL_STRENGTH = "two_weapon.off_hand.full_strength"
 # class-feature document's `choice` names and whose numbers that document carries. The
 # feat each is first offered by, for the refusal's name; `can_choose` reads the documents.
 ATTACK_CHOICES = ("power_attack", "deadly_aim", "piranha_strike", "combat_expertise",
-                  "fighting_defensively", "vital_strike", "cleave", "rapid_shot", "flurry")
+                  "fighting_defensively", "vital_strike", "cleave", "rapid_shot", "flurry",
+                  # Feat loop b1: the Power Attack family's -5 for a rider on every melee
+                  # hit "until your next turn" (APG), each a stance like Combat Expertise.
+                  "bloody_assault", "dazing_assault", "stunning_assault")
 # The options nobody needs a feat for (combat bar round 2, 2026-11-22). CRB, Combat
 # ("Fighting Defensively as a Standard Action"): "You can choose to fight defensively when
 # attacking" — anyone, with any attack. Its numbers are `defensive_dodge` and the stance
@@ -369,7 +372,9 @@ def defensive_dodge(actor, total: bool = False) -> int:
 ATTACK_CHOICE_FEATS = {"power_attack": "power-attack", "deadly_aim": "deadly-aim",
                        "piranha_strike": "piranha-strike",
                        "combat_expertise": "combat-expertise", "vital_strike": "vital-strike",
-                       "cleave": "cleave", "rapid_shot": "rapid-shot"}
+                       "cleave": "cleave", "rapid_shot": "rapid-shot",
+                       "bloody_assault": "bloody-assault", "dazing_assault": "dazing-assault",
+                       "stunning_assault": "stunning-assault"}
 
 _IMPLIED_GENDER = {"she": "woman", "he": "man"}
 

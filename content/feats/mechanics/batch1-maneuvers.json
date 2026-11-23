@@ -100,5 +100,49 @@
     "not_yet": [
       "a fear effect that fails to affect you does not yet give the +2 morale bonus on attack, weapon damage and CMB against its source for 1 round"
     ]
+  },
+  "bloody-assault": {
+    "choice": "bloody_assault",
+    "modifiers": [
+      {"type": "combat_mod", "target": "attack", "amount": -5, "bonus_type": "untyped",
+       "when": {"bearer": {"state": "buff.stance.bloody-assault"}, "weapon": {"ranged": false}},
+       "note": "on melee attack rolls until your next turn"},
+      {"type": "combat_mod", "target": "cmb", "amount": -5, "bonus_type": "untyped",
+       "when": {"bearer": {"state": "buff.stance.bloody-assault"}}}
+    ],
+    "on_hit": [
+      {"kind": "bleed", "amount": "1d4",
+       "when": {"bearer": {"state": "buff.stance.bloody-assault"}, "weapon": {"ranged": false}}}
+    ]
+  },
+  "dazing-assault": {
+    "choice": "dazing_assault",
+    "modifiers": [
+      {"type": "combat_mod", "target": "attack", "amount": -5, "bonus_type": "untyped",
+       "when": {"bearer": {"state": "buff.stance.dazing-assault"}, "weapon": {"ranged": false}},
+       "note": "on melee attack rolls until your next turn"},
+      {"type": "combat_mod", "target": "cmb", "amount": -5, "bonus_type": "untyped",
+       "when": {"bearer": {"state": "buff.stance.dazing-assault"}}}
+    ],
+    "on_hit": [
+      {"kind": "save_condition", "condition": "dazed", "save": "fort", "dc": "10 + bab",
+       "for": {"dice": "1", "unit": "round"},
+       "when": {"bearer": {"state": "buff.stance.dazing-assault"}, "weapon": {"ranged": false}}}
+    ]
+  },
+  "stunning-assault": {
+    "choice": "stunning_assault",
+    "modifiers": [
+      {"type": "combat_mod", "target": "attack", "amount": -5, "bonus_type": "untyped",
+       "when": {"bearer": {"state": "buff.stance.stunning-assault"}, "weapon": {"ranged": false}},
+       "note": "on melee attack rolls until your next turn"},
+      {"type": "combat_mod", "target": "cmb", "amount": -5, "bonus_type": "untyped",
+       "when": {"bearer": {"state": "buff.stance.stunning-assault"}}}
+    ],
+    "on_hit": [
+      {"kind": "save_condition", "condition": "stunned", "save": "fort", "dc": "10 + bab",
+       "for": {"dice": "1", "unit": "round"},
+       "when": {"bearer": {"state": "buff.stance.stunning-assault"}, "weapon": {"ranged": false}}}
+    ]
   }
 }

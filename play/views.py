@@ -824,6 +824,14 @@ _OPTION_SHAPES = {
     "cleave": ("strike", "Cleave",
                "One blow, and on a hit another at a foe beside them. Guard down until "
                "your next turn."),
+    "bloody_assault": ("swing", "Bloody Assault",
+                       "Less sure in melee until your next turn; every hit leaves a bleed."),
+    "dazing_assault": ("swing", "Dazing Assault",
+                       "Less sure in melee until your next turn; a hit dazes unless they "
+                       "resist."),
+    "stunning_assault": ("swing", "Stunning Assault",
+                         "Less sure in melee until your next turn; a hit stuns unless they "
+                         "resist."),
     "total_defense": ("act", "Total defense",
                       "Your standard action spent guarding: no attacks, and no attacks of "
                       "opportunity."),

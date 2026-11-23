@@ -507,6 +507,11 @@ TAGS: dict[str, tuple[str, ...]] = {
     "combat expertise": ("buff.stance.combat-expertise",),
     "cleaving":         ("buff.stance.cleaving",),
     "two-weapon guard": ("buff.stance.two-weapon-guard",),
+    # Feat loop b1: Bloody, Dazing and Stunning Assault, "its effects last until your
+    # next turn" (APG) — the same one-round stance, asked by tag by the feat documents.
+    "bloody assault":   ("buff.stance.bloody-assault",),
+    "dazing assault":   ("buff.stance.dazing-assault",),
+    "stunning assault": ("buff.stance.stunning-assault",),
     # Combat bar round 2, 2026-11-22: the book's two defensive choices, open to anyone
     # (CRB, Combat). Fighting defensively rides the attack it is declared with; total
     # defense is its own standard action, and "you can't make attacks of opportunity

@@ -175,3 +175,72 @@ def test_focused_discipline_against_fear_saves():
                for m in pc.save_modifiers("will", {"against": ("spell", "fear")}))
     assert not any(m.source == "Focused Discipline"
                    for m in pc.save_modifiers("will", {"against": ("spell",)}))
+
+
+# --- the assault feats: a declared -5 for a rider on every melee hit --------------------
+
+class _HitAndFail(Dice):
+    """The attack d20 lands on 15 and every save the riders roll on a 1."""
+
+    def roll(self, notation, modifiers=None, label="", visibility="hidden"):
+        if "save against" in (label or ""):
+            return self.given(1, modifiers, label)
+        if notation == "1d20" and "ttack" in (label or ""):
+            return self.given(15, modifiers, label)
+        return super().roll(notation, modifiers, label, visibility)
+
+
+def _assault(*feats: str, **params):
+    scene = Scene(location_id="5bbd0c40345f")
+    pc = load_pc("fixtures/pc-borin.json")
+    pc.level = 16                                   # BAB +16: every assault's prerequisite
+    pc.feats = list(pc.feats) + list(feats)
+    scene.add(pc)
+    scene.add(instantiate("ogre", scene=scene, name="the ogre"))
+    engine = Engine(scene, _HitAndFail(seed=3))
+    engine._ensure_encounter("pc")
+    scene.positions["pc"], scene.positions["c1"] = (6, 10), (7, 10)
+    scene.resync_zones()
+    res = engine.run(engine.validate([{"op": "attack", "actor": "pc", "target": "c1",
+                                       "visibility": "hidden", "params": params}]))
+    while res.awaiting:
+        res = engine.resume(15)
+    return pc, scene.get("c1"), next(o for o in res.outcomes if o.op == "attack")
+
+
+def test_stunning_assault_costs_five_and_stuns_on_a_failed_fortitude():
+    """APG: -5 on melee attack rolls and CMB, a hit stuns 1 round unless Fortitude DC 10 +
+    BAB (26 here). Before the document the feat bought nothing at all."""
+    pc, ogre, out = _assault("Stunning Assault", stunning_assault=True)
+    attack = next(r for r in out.rolls if r.label.startswith("Attack"))
+    assert any(m.source == "Stunning Assault" and m.value == -5 for m in attack.modifiers)
+    assert any(m.source == "Stunning Assault" and m.value == -5
+               for m in pc.cmb_modifiers("trip"))     # "until your next turn": the stance
+    assert ogre.has_condition("stunned")
+    assert "DC 26" in out.tell and "stunned for 1 round." in out.tell
+
+
+def test_dazing_assault_dazes_and_bloody_assault_bleeds():
+    pc, ogre, out = _assault("Dazing Assault", "Bloody Assault", dazing_assault=True,
+                             bloody_assault=True)
+    assert ogre.has_condition("dazed")
+    bleed = [e for e in ogre.effects if e.key == "bleed"]
+    assert bleed and bleed[0].periodic[0]["damage"] == "1d4"
+    assert bleed[0].origin == "rule:feat-bloody-assault"
+
+
+def test_an_assault_not_declared_lays_nothing():
+    pc, ogre, out = _assault("Stunning Assault")
+    assert not ogre.has_condition("stunned")
+    attack = next(r for r in out.rolls if r.label.startswith("Attack"))
+    assert not any(m.source == "Stunning Assault" for m in attack.modifiers)
+
+
+def test_an_assault_needs_its_feat_and_a_melee_weapon():
+    scene = Scene(location_id="5bbd0c40345f")
+    pc = load_pc("fixtures/pc-borin.json")
+    scene.add(pc)
+    assert pc.can_choose("dazing_assault")             # no feat: refused, with the name
+    pc.level, pc.feats = 16, list(pc.feats) + ["Dazing Assault"]
+    assert pc.can_choose("dazing_assault") is None
+    assert "dazing_assault" in pc.attack_choices()
