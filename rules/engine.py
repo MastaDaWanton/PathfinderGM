@@ -5257,6 +5257,10 @@ class Engine:
     # refusal of Stealth-while-watched named "a diversion first" and nothing could make one.
 
     DIVERSION_PENALTY = -10
+    # The feat documents' Stealth tags (content/feats/mechanics/batch1-maneuvers.json):
+    # Hellcat Stealth's hide while watched, Go Unnoticed's first-round hide.
+    HIDES_WHILE_OBSERVED = "stealth.while-observed"
+    UNNOTICED_BY_FLAT_FOOTED = "stealth.unnoticed.flat-footed"
 
     def _diversion(self, actor):
         """The live diversion `actor` made, as its ActiveEffect, or None. Live in this
@@ -8642,7 +8646,8 @@ class Engine:
             mods = actor.ability_check_modifiers(ability)
         else:
             mods, refused = self._skill_mods_or_refusal(
-                intent, actor, skill, opposed=bool(intent.params.get("opposed_by")))
+                intent, actor, skill, opposed=bool(intent.params.get("opposed_by")),
+                ctx=self._skill_use_ctx(intent, skill))
             if refused is not None:
                 return refused
         for (named_skill, flag), resolve in skilluses.OWN_DOORS.items():
@@ -8693,7 +8698,21 @@ class Engine:
             if not slipped:
                 diverted = self._diversion(actor)
                 away = set((diverted.payload or {}).get("from") or ()) if diverted else set()
+                # Go Unnoticed (APG): "During the first round of combat, flat-footed
+                # opponents are considered not to have noticed you yet for the purposes of
+                # Stealth checks" — a foe who has not acted yet is not watching.
+                if self.scene.in_encounter and actor.has_state(self.UNNOTICED_BY_FLAT_FOOTED):
+                    away |= {o.ref for o in self._watchers(actor)
+                             if not self._has_acted(o.ref) and self._flat_footed(o)}
                 watcher = self._watched_in_the_open(actor, ignore=away)
+                if (watcher is not None and diverted is None
+                        and actor.has_state(self.HIDES_WHILE_OBSERVED)):
+                    # Hellcat Stealth (Cheliax): "You may make Stealth checks in normal or
+                    # bright light even when observed, but at a -10 penalty." Watched in
+                    # the open is that light: dim light or darkness is concealment, and
+                    # concealment is no watcher (`_watched_in_the_open`).
+                    mods = [*mods, Modifier(-10, "hiding while watched (Hellcat Stealth)")]
+                    watcher = None
                 if watcher is not None:
                     return self._refuse(
                         intent, f"{watcher.name} is watching {actor.name}, and there is no "
@@ -8987,8 +9006,29 @@ class Engine:
             because=intent.because,
         )
 
+    @staticmethod
+    def _skill_use_ctx(intent: Intent, skill: str) -> dict | None:
+        """`{"skill_use": ...}` for the roll context of a check: the use with its own door
+        (`skilluses.OWN_DOORS`: feint, tumble ...), a Bluff made for a diversion, or a
+        Bluff against Sense Motive — a lie. What a feat's `when: {"skill_use": "lie"}`
+        asks (Stone-Faced: "to lie or conceal your feelings ... but not to feint"), and
+        `{"not": "feint"}` (Voice of the Sibyl's spoken word). Feat loop b1."""
+        from . import skilluses
+
+        said = str(skill or "").strip().lower()
+        use = next((flag for (named, flag) in skilluses.OWN_DOORS
+                    if named == said and intent.params.get(flag)), "")
+        opposed = intent.params.get("opposed_by")
+        if not use and said == "bluff":
+            if intent.params.get("diversion"):
+                use = "diversion"
+            elif isinstance(opposed, dict) and str(
+                    opposed.get("skill") or "").strip().lower() == "sense motive":
+                use = "lie"
+        return {"skill_use": use} if use else None
+
     def _skill_mods_or_refusal(self, intent: Intent, actor, skill: str,
-                               opposed: bool = False):
+                               opposed: bool = False, ctx: dict | None = None):
         """(the skill's modifiers, None), or ([], the Outcome saying why nothing is rolled)."""
         from .sheet import IllegalSheet
 
@@ -9009,7 +9049,7 @@ class Engine:
         # is right (1e knowledge checks are trained-only); the crash is not. Nothing is
         # rolled, the player is told why, and the turn survives.
         try:
-            return actor.skill_modifiers(skill, opposed=opposed), None
+            return actor.skill_modifiers(skill, opposed=opposed, ctx=ctx), None
         except IllegalSheet as exc:
             return [], Outcome(intent_id=intent.id, op="check", effects=[],
                                tell=f"{exc}. Nothing is rolled.", because=intent.because)
@@ -23579,12 +23619,14 @@ class Engine:
         return 10 + int(hd) // 2 + actor.ability_mod(ab)
 
     def _rider_save(self, defender: Actor, save: str, dc: int, label: str,
-                    state: dict, against: str = "") -> tuple[bool, str]:
+                    state: dict, against: str = "", attacker: Actor | None = None
+                    ) -> tuple[bool, str]:
         """The defender's save against a rider, the engine's roll (an NPC's intent: hidden,
         as `_distraction` and `_magic_gate` roll theirs), kept in the attack's rolls, and
         the words the tell quotes: "Fortitude 9 against DC 13"."""
-        roll = self.dice.d20(defender.save_modifiers(save, {"against": against}
-                                                     if against else None),
+        ctx = {**({"against": against} if against else {}),
+               **({"attacker_actor": attacker} if attacker is not None else {})}
+        roll = self.dice.d20(defender.save_modifiers(save, ctx or None),
                              label=label, visibility="hidden")
         state.setdefault("rolls", []).append(roll.as_dict())
         nat = natural_said(roll, dc)
@@ -23783,7 +23825,8 @@ class Engine:
         save = str(rule.get("save") or "fort")
         dc = self._printed_dc(actor, rule)
         made, said = self._rider_save(defender, save, dc,
-                                      f"{SAVES[save]} save against {word}", state)
+                                      f"{SAVES[save]} save against {word}", state,
+                                      attacker=actor)
         if made:
             return [{"effect": {"ref": defender.ref, "kind": "rider_resisted",
                                 "rider": word, "origin": origin},
@@ -23955,7 +23998,7 @@ class Engine:
             return out
         dc = self._printed_dc(actor, rule)
         made, said = self._rider_save(defender, "ref", dc, "Reflex save against catching "
-                                      "fire", state)
+                                      "fire", state, attacker=actor)
         if made:
             out.append({"effect": {"ref": defender.ref, "kind": "rider_resisted",
                                    "rider": "burn", "origin": origin},
@@ -24050,7 +24093,7 @@ class Engine:
                      "tell": ""}]
         save, dc = str(aff.get("save") or "fort"), int(aff.get("dc") or 10)
         made, said = self._rider_save(defender, save, dc, f"{SAVES[save]} save against "
-                                      f"{name}", state, against=kind)
+                                      f"{name}", state, against=kind, attacker=actor)
         if made:
             return [{"effect": {"ref": defender.ref, "kind": "rider_resisted",
                                 "rider": rule["rider"], "affliction": name,
@@ -28098,8 +28141,12 @@ class Engine:
             state["rolls"].extend(gut["rolls"])
             state["tells"].extend(gut["tells"])
         with self._guttered(guts[target.ref]["origins"]):
+            # Who cast it rides the context too: Dragonheart's "+1 ... against spells ...
+            # of creatures with the dragon type" asks `attacker` (feat loop b1).
             save_mods = target.save_modifiers(
-                save, {"against": effectspec.spell_against(spell)}) + list(extra)
+                save, {"against": effectspec.spell_against(spell),
+                       **({"attacker_actor": self.scene.actors[intent.actor]}
+                          if intent.actor in self.scene.actors else {})}) + list(extra)
         roll = self._roll_or_suspend_stage(
             intent, target, save_mods, f"{SAVES[save]} save against {spell.name}", dc,
             partial, state, "1d20", state_key="cast_state")

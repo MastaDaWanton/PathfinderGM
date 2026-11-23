@@ -114,7 +114,16 @@ def dc(use_id: str, subject, **names) -> int:
     """The row's DC, read off the subject's sheet plus what only the reader knows."""
     from . import resources
 
-    return resources.evaluate(row(use_id)["dc"], subject, names or None)
+    r = row(use_id)
+    value = resources.evaluate(r["dc"], subject, names or None)
+    # A subject whose tag makes the use harder against them, the row's `harder_with`
+    # (feat loop b1): Stone-Faced's "the DC for Sense Motive checks to get a hunch about
+    # you is 25 rather than 20" — the `faster_with` shape, asked of the subject.
+    harder = r.get("harder_with") or {}
+    if (harder.get("tag") and getattr(subject, "has_state", None)
+            and subject.has_state(harder["tag"])):
+        value = max(value, int(harder["dc"]))
+    return value
 
 
 # --- the action a use costs in a fight ------------------------------------------------------

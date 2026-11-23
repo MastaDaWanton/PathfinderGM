@@ -2455,6 +2455,8 @@ WHEN_KEYS: dict[str, str] = {
                    "both (sheet.Situation.ally_beside)",
     "sole_threat": "whether the bearer alone threatens the foe of the roll "
                    "(sheet.Situation.sole_threat)",
+    "skill_use": "which use of a skill the check is: lie, feint, diversion, tumble ... "
+                 "or {\"not\": \"feint\"} (Engine._skill_use_ctx)",
 }
 _WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment", "choice",
                                   "state"),
@@ -2496,6 +2498,12 @@ AGAINST: dict[str, str] = {
     "language-dependent": "a language-dependent effect",
     "bardic_performance": "a bard's performance (a class ability's `against`)",
     "tracks": "a Survival check to follow or identify tracks (Engine track op)",
+    # Feat loop b1: Careful Speaker's and Seen and Unseen's saves, off the spell's own
+    # school and subschool (`spell_against`); "mind-reading" is a divination that is
+    # also mind-affecting — detect thoughts, mind probe.
+    "divination": "a divination (the school)",
+    "scrying": "a scrying (the divination subschool)",
+    "mind-reading": "a mind-affecting divination: detect thoughts, mind probe",
 }
 
 
@@ -2513,6 +2521,8 @@ def spell_against(spell) -> tuple[str, ...]:
             part = part.strip()
             if part and part not in words:
                 words.append(part)
+    if "divination" in words and "mind-affecting" in words:
+        words.append("mind-reading")
     return tuple(words)
 
 # The situations a concentration check is made in (`Engine._concentrate`), as the
@@ -2565,6 +2575,11 @@ def when_problems(when, where: str = "when") -> list[str]:
                                f"creature type. One of: {', '.join(CREATURE_TYPES)}.")
             if "alignment" in want and want["alignment"] not in ALIGNMENTS:
                 out.append(f"{where}.{key}.alignment is one of {', '.join(ALIGNMENTS)}.")
+        elif key == "skill_use":
+            if not (isinstance(want, str) and want) and not (
+                    isinstance(want, dict) and set(want) == {"not"} and want["not"]):
+                out.append(f"{where}.skill_use is a use (\"lie\") or {{\"not\": "
+                           f"\"feint\"}}.")
         elif key == "ally_beside":
             from . import feats as feats_mod
 

@@ -244,3 +244,126 @@ def test_an_assault_needs_its_feat_and_a_melee_weapon():
     pc.level, pc.feats = 16, list(pc.feats) + ["Dazing Assault"]
     assert pc.can_choose("dazing_assault") is None
     assert "dazing_assault" in pc.attack_choices()
+
+
+# --- Stealth while watched: Hellcat Stealth, Go Unnoticed --------------------------------
+
+def _in_the_open(*feats: str, fight: bool = False):
+    """Noon in the open, the thug six squares off with a clear line: the case CRB p.106
+    refuses ("If people are observing you ... you can't use Stealth")."""
+    from rules.grid import Grid
+    from tests._places import stand_on
+
+    s = Scene(location_id="5bbd0c40345f", grid=Grid(20, 20))
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.feats = list(pc.feats) + list(feats)
+    s.add(pc, at=(5, 5))
+    s.add(instantiate("thug", scene=s, name=THUG), at=(11, 5))
+    stand_on(s, "urban")
+    s.clock_minutes = 12 * 60
+    if fight:
+        s.sides = {"us": ["pc"], "them": ["c1"]}
+        s.initiative = [("pc", 20), ("c1", 10)]
+        s.round, s.turn = 1, 0
+    e = Engine(s, Dice(seed=7))
+    res = e.run(e.validate([{
+        "op": "check", "actor": "pc", "because": "hide",
+        "params": {"skill": "stealth", "opposed_by": {"ref": "c1", "skill": "perception"}}}]))
+    while res.awaiting:
+        res = e.resume(10)
+    return pc, next(o for o in res.outcomes if o.op == "check")
+
+
+def test_hellcat_stealth_hides_in_plain_sight_at_minus_ten():
+    """Without the feat nothing is rolled (the refusal names cover or concealment); with it
+    the check is made, the -10 named on the roll."""
+    _, plain = _in_the_open()
+    assert plain.status == "refused"
+    _, hellcat = _in_the_open("Hellcat Stealth")
+    assert hellcat.status != "refused", hellcat.tell
+    roll = next(r for r in hellcat.rolls if "tealth" in r.label)
+    assert any(m.value == -10 and "Hellcat" in m.source for m in roll.modifiers)
+
+
+def test_go_unnoticed_only_against_a_foe_still_flat_footed_in_the_fight():
+    """APG: in the first round, a flat-footed foe (one who has not acted) has not noticed
+    you. Out of a fight the feat gives nothing: the thug is watching."""
+    _, outside = _in_the_open("Go Unnoticed")
+    assert outside.status == "refused"
+    _, first_round = _in_the_open("Go Unnoticed", fight=True)
+    assert first_round.status != "refused", first_round.tell
+    roll = next(r for r in first_round.rolls if "tealth" in r.label)
+    assert not any(m.value == -10 for m in roll.modifiers)
+
+
+# --- which use of a skill: lies, feints; the saves that ask who cast it -------------------
+
+def test_a_bluff_against_sense_motive_is_a_lie_and_a_feint_is_not():
+    """Stone-Faced's +4 and Careful Speaker's +2 are "to lie ... but not to feint"; Voice
+    of the Sibyl's +1 is every spoken Bluff, never a feint (APG, ISWG, UM)."""
+    from rules.intents import Intent
+
+    lie = Engine._skill_use_ctx(Intent(op="check", actor="pc", params={
+        "skill": "bluff", "opposed_by": {"ref": "c1", "skill": "sense motive"}}), "bluff")
+    feint = Engine._skill_use_ctx(Intent(op="check", actor="pc", params={
+        "skill": "bluff", "feint": True}), "bluff")
+    assert lie == {"skill_use": "lie"} and feint == {"skill_use": "feint"}
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.feats = list(pc.feats) + ["Stone-Faced", "Careful Speaker", "Voice of the Sibyl"]
+
+    def terms(ctx):
+        return {m.source: m.value for m in pc.skill_modifiers("bluff", ctx=ctx)}
+
+    lying = terms(lie)
+    assert lying["Stone-Faced"] == 4 and lying["Careful Speaker"] == 2
+    assert lying["Voice of the Sibyl"] == 1
+    feinting = terms(feint)
+    assert not {"Stone-Faced", "Careful Speaker", "Voice of the Sibyl"} & set(feinting)
+    pc.ranks["diplomacy"] = 10
+    assert {m.source: m.value for m in pc.skill_modifiers("diplomacy")}[
+        "Voice of the Sibyl"] == 3
+
+
+def test_stone_faced_raises_the_hunch_dc_about_you_to_25():
+    from rules import skilluses
+
+    pc = load_pc("fixtures/pc-kesst.json")
+    assert skilluses.dc(skilluses.HUNCH, pc) == 20
+    pc.feats = list(pc.feats) + ["Stone-Faced"]
+    assert skilluses.dc(skilluses.HUNCH, pc) == 25
+
+
+def test_careful_speaker_and_seen_and_unseen_read_the_spells_own_school():
+    """detect thoughts is divination and mind-affecting: "mind-reading" (`spell_against`);
+    scrying is the subschool. Careful Speaker's +2 Will reaches both, not a charm."""
+    from rules import effectspec, spells
+
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.feats = list(pc.feats) + ["Careful Speaker", "Seen and Unseen"]
+
+    def will(spell_id, feat):
+        ctx = {"against": effectspec.spell_against(spells.get(spell_id))}
+        return sum(m.value for m in pc.save_modifiers("will", ctx) if m.source == feat)
+
+    assert will("detect-thoughts", "Careful Speaker") == 2
+    assert will("scrying", "Careful Speaker") == 2
+    assert will("charm-person", "Careful Speaker") == 0
+    assert will("scrying", "Seen and Unseen") == 2
+    assert will("charm-person", "Seen and Unseen") == 0
+
+
+def test_dragonheart_on_a_save_against_a_dragons_rider():
+    """+1 on saves against a dragon-type creature's special attacks, read off who made it
+    (`attacker_actor`, now passed by the rider saves and the cast's saves)."""
+    scene, engine, pc, thug = _fight("Dragonheart")
+    drake = instantiate("pseudodragon", scene=scene)
+    scene.add(drake)
+    state: dict = {}
+    engine._rider_save(pc, "fort", 15, "Fortitude save against a sting", state,
+                       attacker=drake)
+    engine._rider_save(pc, "fort", 15, "Fortitude save against a sap", state,
+                       attacker=thug)
+    stung, sapped = state["rolls"]
+    assert any(m["value"] == 1 and "Dragonheart" in str(m.get("source"))
+               for m in stung["modifiers"])
+    assert not any("Dragonheart" in str(m.get("source")) for m in sapped["modifiers"])

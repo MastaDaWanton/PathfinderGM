@@ -8667,6 +8667,18 @@ def _when_holds(when, ctx: dict | None) -> bool:
                     return False
                 if not _is_of_kind(defender, field_name, value):
                     return False
+        elif key == "skill_use":
+            # Which use of a skill this check is (`Engine._skill_use_ctx`): "lie", "feint",
+            # "diversion" ... — or `{"not": "feint"}`, every use but those (Voice of the
+            # Sibyl's "if you do not use your voice ... such as using Bluff to feint").
+            have = str(ctx.get("skill_use") or "")
+            if isinstance(want, dict):
+                barred = want.get("not")
+                barred = barred if isinstance(barred, (list, tuple)) else [barred]
+                if have in {str(b) for b in barred}:
+                    return False
+            elif have != str(want):
+                return False
         elif key in ("ally_beside", "sole_threat"):
             # Board questions about the bearer and the foe of this roll (feat loop b1):
             # an ally beside with the same teamwork feat, the bearer alone threatening.
