@@ -356,6 +356,10 @@ QUICK_DRAW = "action.draw.free"
 # Double Slice's tag (its feat document): "Add your Strength bonus to damage rolls made
 # with your off-hand weapon" (APG). Asked by `strength_share`, never by the feat's name.
 OFF_HAND_FULL_STRENGTH = "two_weapon.off_hand.full_strength"
+# Improved Improvisation's tag (feat loop b2): every nonproficiency penalty halved — the
+# weapon's -4 here, a worn armour's or shield's check penalty on attacks in
+# `armour.attack_penalties`.
+NONPROFICIENCY_HALVED = "proficiency.nonproficient.halved"
 # The attack options a swing may declare (lane D, 2026-11-22), in the order the combat
 # bar offers them, each a boolean on the attack op (rules/intents.py) that a feat or
 # class-feature document's `choice` names and whose numbers that document carries. The
@@ -4109,8 +4113,13 @@ class Actor:
                 mods.append(Modifier(am, label))
 
             if not self.is_proficient(key):
-                mods.append(Modifier(NON_PROFICIENT_PENALTY,
-                                     f"not proficient with {w['name']}"))
+                # Improved Improvisation (ARG): "Your nonproficiency penalty with weapons,
+                # armor, and shields is halved" — its document's tag (feat loop b2).
+                halved = self.has_state(NONPROFICIENCY_HALVED)
+                mods.append(Modifier(int(NON_PROFICIENT_PENALTY / 2) if halved
+                                     else NON_PROFICIENT_PENALTY,
+                                     f"not proficient with {w['name']}"
+                                     + (" (halved)" if halved else "")))
             # "If your Strength bonus is less than the strength rating of the composite
             # bow, you can't effectively use it, so you take a –2 penalty on attacks with
             # it. The default composite longbow requires a Strength modifier of +0 or
@@ -4256,7 +4265,7 @@ class Actor:
         return stack(mods)
 
     def attack_sequence(self, weapon_key: str | None = None, full_attack: bool = False,
-                        choices=()) -> list[int]:
+                        choices=(), defender=None) -> list[int]:
         """How many attacks, at which iteration index. Iteratives are the exact kind of
         bookkeeping this app exists to carry.
 
@@ -4266,8 +4275,10 @@ class Actor:
         # `full_attack` in the context: haste's and Rapid Shot's extra are a full attack's
         # (`when: {"full_attack": true}`); Battle Blood's ki attack asks nothing and rides
         # a standard action too.
+        # `defender`: the one the swings are at, when known — Medusa's Wrath's extra
+        # strikes "must be made against a dazed, flat-footed ... foe" (feat loop b2).
         ctx = self._roll_context(weapon_key, full_attack=bool(full_attack),
-                                 **_declared(False, choices))
+                                 defender=defender, **_declared(False, choices))
         # A timed extra swing laid by an ability (`combat_mod` on `extra_attacks`, typed so
         # two of one kind give one): Battle Blood Ki Pool's "make 1 extra attack at highest
         # bonus" (content/classes/blood-bending.json), one more swing at iteration 0 on the
@@ -4319,7 +4330,7 @@ class Actor:
 
     def attack_plan(self, weapon_key: str | None = None,
                     full_attack: bool = False, choices=(),
-                    off_hand: str = "") -> list[tuple[str, int]]:
+                    off_hand: str = "", defender=None) -> list[tuple[str, int]]:
         """Every swing of this attack, as (weapon key, iteration) in the order thrown.
 
         A character's full attack is one weapon at falling bonuses, which is what
@@ -4337,7 +4348,8 @@ class Actor:
         w = self.weapon(key)
         printed = w.get("stat_block")
         if not printed:
-            plan = [(key, i) for i in self.attack_sequence(key, full_attack, choices)]
+            plan = [(key, i) for i in self.attack_sequence(key, full_attack, choices,
+                                                           defender=defender)]
             if off_hand and full_attack:
                 # Two-weapon fighting: "you can get one extra attack per round with that
                 # weapon" (CRB, Combat), and Improved/Greater add the -5 and -10 swings —
@@ -4568,7 +4580,9 @@ class Actor:
         # The kind of attack is always known here; whether this attacker flanks is asked
         # of the board the blow is made on (`position.flanking_with`), no board no flank.
         mods.extend(self._feat_mods("combat_mod", "ac",
-                                    self._ac_context(against, attacker), scoped=True))
+                                    self._ac_context(against, attacker,
+                                                     opportunity=bool(provoked_by)),
+                                    scoped=True))
         # An attack of opportunity this creature's own movement drew (`provoked_by`, set
         # by the engine on the swing it splices): Mobility's "+4 dodge bonus to Armor
         # Class against attacks of opportunity caused when you move out of or within a
@@ -4596,13 +4610,25 @@ class Actor:
                 mods.append(Modifier(-4, "helpless, against melee"))
         return stack(mods)
 
-    def _ac_context(self, against: str, attacker=None) -> dict:
+    def _ac_context(self, against: str, attacker=None, opportunity: bool = False) -> dict:
         """The roll context an AC is asked in: the attack's kind, who makes it, and
         whether they flank this creature on the board of the moment."""
         ctx: dict = {"attack": against, "flanked": False}
+        if opportunity:
+            ctx["opportunity"] = True
         if attacker is not None:
             ctx["attacker_actor"] = attacker
             scene = getattr(current_moment(), "scene", None)
+            # Reach Defense (Dragonslayer's Handbook): "against attacks of opportunity
+            # from opponents that are not adjacent to you" — on the board, edge to edge.
+            here = getattr(scene, "positions", {}).get(self.ref) if scene else None
+            there = getattr(scene, "positions", {}).get(attacker.ref) if scene else None
+            if here is not None and there is not None and getattr(scene, "grid", None):
+                from .grid import SQUARE_FT, distance_between
+
+                ctx["adjacent"] = distance_between(
+                    tuple(here[:2]), self.size or "medium",
+                    tuple(there[:2]), attacker.size or "medium") <= SQUARE_FT
             if scene is not None and against == "melee":
                 from . import position
 
@@ -8583,6 +8609,19 @@ def situated(scene):
         _MOMENT.reset(token)
 
 
+def aloft(actor) -> bool | None:
+    """Whether a creature is flying on the board of the moment: off the floor of its
+    square and able to be (`can_move_vertically` says "fly"). None with no board — a
+    question nobody can answer is no answer, and a `when` asking it fails closed."""
+    scene = getattr(current_moment(), "scene", None)
+    grid = getattr(scene, "grid", None)
+    spot = getattr(scene, "positions", {}).get(getattr(actor, "ref", "")) if scene else None
+    if grid is None or spot is None:
+        return None
+    level = spot[2] if len(spot) > 2 else 0
+    return bool(level > grid.ground(spot) and actor.can_move_vertically() == "fly")
+
+
 def current_moment() -> Moment | None:
     return _MOMENT.get()
 
@@ -8813,7 +8852,16 @@ def _when_holds(when, ctx: dict | None) -> bool:
                     # A held state of the one the roll is made against, by prefix (law 1):
                     # Kobold Style's "enemies denied their Dexterity bonus to AC" is
                     # `{"state": "state.exposed"}`, the tag `loses_dex_to_ac` asks.
-                    if not defender.has_state(str(value or "")):
+                    # A list is any one of them (feat loop b2): Medusa's Wrath's "a dazed,
+                    # flat-footed, paralyzed, staggered, stunned, or unconscious foe".
+                    held = value if isinstance(value, list) else [value]
+                    if not any(defender.has_state(str(v or "")) for v in held):
+                        return False
+                    continue
+                if field_name == "aloft":
+                    # Death from Below's "flying opponents" (feat loop b2): up in the air
+                    # on the board of the moment (`aloft`); no board, no answer.
+                    if aloft(defender) is not bool(value):
                         return False
                     continue
                 if field_name not in ("type", "subtype"):

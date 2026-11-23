@@ -323,6 +323,9 @@ class Scene:
     # leaves the turn open, so without a record a drink then a blow from the combat bar
     # was two standard actions. `move_spent`'s shape, for its reason: no second ticker.
     standard_spent: dict[str, int] = field(default_factory=dict)
+    # The round each combatant last made an attack on its own turn (feat loop b2):
+    # Furious Focus's "the first attack you make each turn" (APG). `move_spent`'s shape.
+    swung: dict[str, int] = field(default_factory=dict)
     # What the player's character last struck with this encounter — the weapon and the
     # lethality their own words chose — and what was in hand then, by ref. A blow that
     # names no means carries on with these (`Engine._standing_means`), as a standing action
@@ -2423,6 +2426,7 @@ class Scene:
         # would read as already spent.
         self.move_spent = {}
         self.standard_spent = {}
+        self.swung = {}
         self.sides = {}
         # The battlefield does NOT go with the fight any more (item 28, 2026-09-19): the
         # ground belongs to the place, the party is standing on it before and after, and
@@ -10292,11 +10296,13 @@ class Engine:
         # paladin's deflection is against the creature she smote (`_effect_scope_holds`).
         target_ac = defender.ac(against=weapon["category"],
                                 flat_footed=flat_footed or bool(flounders), attacker=actor,
-                                provoked_by=str(intent.params.get("provoked_by") or ""))
+                                provoked_by=str(intent.params.get("provoked_by") or (
+                                    "opportunity" if intent.params.get("reaction") else "")))
         # What the feint took off, given back to every swing after the first (the loop).
         feint_gain = (defender.ac(against=weapon["category"],
                                   flat_footed=unfeinted_ff or bool(flounders), attacker=actor,
-                                  provoked_by=str(intent.params.get("provoked_by") or ""))
+                                  provoked_by=str(intent.params.get("provoked_by") or (
+                                    "opportunity" if intent.params.get("reaction") else "")))
                       - target_ac) if feinted else 0
         # The AC's parts past the sheet's own number, (what, how much), so the tell can
         # state the number the roll was judged on and say what made it (`_ac_said`).
@@ -10382,7 +10388,7 @@ class Engine:
                 state["tells"].append(caught_said)
         # (weapon, iteration) per swing. One weapon for a character; for a monster, the
         # whole printed option — an owlbear's claw, claw, bite (`Actor.attack_plan`).
-        sequence = actor.attack_plan(weapon_key, full, choices, off_key)
+        sequence = actor.attack_plan(weapon_key, full, choices, off_key, defender=defender)
         # Which hand each swing is (`hands`, parallel to `sequence`): a two-weapon full
         # attack's off-hand swings follow the primary hand's (`Actor.attack_plan`).
         off_from = len(actor.attack_plan(weapon_key, True, choices)) if off_key else None
@@ -10395,7 +10401,7 @@ class Engine:
         # class it was built for.
         it = intent.params.get("iteration")
         if it is not None and not full and not coup:
-            whole = actor.attack_plan(weapon_key, True, choices, off_key)
+            whole = actor.attack_plan(weapon_key, True, choices, off_key, defender=defender)
             at = min(int(it), len(whole) - 1)
             sequence = [whole[at]]
             hands = [("primary" if at < off_from else "off") if off_from is not None else ""]
@@ -10531,6 +10537,10 @@ class Engine:
                 ac_note = _ac_said("AC", sheet_ac + feint_gain, flat_footed, ac_parts)
                 feint_gain = 0
             swing_key, iteration = sequence[state["i"]]
+            # The swing's own moment beside its declared options (feat loop b2): an attack
+            # of opportunity, or the first attack its maker makes this turn
+            # (`_swing_moment`), each a roll-context key a document's `when` asks.
+            swing_choices = choices + self._swing_moment(intent, actor, state)
             hand = hands[state["i"]] if state["i"] < len(hands) else (hands[0] if hands else "")
             # Each swing its own weapon: the bite of a claw-claw-bite full attack rolls
             # the bite's printed bonus and dice, not the claw's. The named weapon keeps
@@ -10596,7 +10606,7 @@ class Engine:
                                                   range_ft=self._gap_ft(actor, defender),
                                                   beside_weapons=self._beside_weapons(
                                                       actor, weapon),
-                                                  choices=choices, hand=hand,
+                                                  choices=swing_choices, hand=hand,
                                                   off_light=off_light)
                 atk_mods = atk_mods + self._situational_attack_mods(
                     actor, defender, weapon, range_pen)
@@ -10789,7 +10799,7 @@ class Engine:
             if state["stage"] == "confirm":
                 # Critical Focus's +4 (`Actor.confirm_modifiers`), on this roll alone.
                 confirm_mods = atk_mods if dancing else (
-                    list(atk_mods) + actor.confirm_modifiers(weapon_key, defender, choices))
+                    list(atk_mods) + actor.confirm_modifiers(weapon_key, defender, swing_choices))
                 confirm = self._roll_or_suspend_stage(
                     intent, actor, confirm_mods, f"Confirm critical ({weapon['name']})",
                     swing_ac, partial, state, "1d20",
@@ -10872,7 +10882,7 @@ class Engine:
                                                                               defender),
                                                         beside_weapons=self._beside_weapons(
                                                             actor, weapon),
-                                                        choices=choices, hand=hand))
+                                                        choices=swing_choices, hand=hand))
                 rider_col = "" if dancing else str(weapon.get("rider_column") or "")
                 if rider_col:
                     # Blood DMG + Fist DMG + STR, and BOTH dice are the player's.
@@ -32863,6 +32873,31 @@ class Engine:
             verdict="success" if made else "failure",
             effects=[{"ref": actor.ref, "kind": "break_free", "how": how, "made": made}],
             tell=tell, because=intent.because)
+
+    def _swing_moment(self, intent: Intent, actor, state: dict) -> tuple[str, ...]:
+        """The moment a swing is made in, as roll-context keys (feat loop b2, 2026-11-22):
+
+        - `opportunity`: an attack of opportunity (the engine's spliced `reaction`) —
+          Greater Snap Shot's "Whenever you make an attack of opportunity using a ranged
+          weapon and hit", Death from Below's "when you are allowed an attack of
+          opportunity against the flying opponent";
+        - `first_attack`: the first attack its maker makes this turn, on its own turn —
+          Furious Focus (APG): "you do not suffer Power Attack's penalty on melee attack
+          rolls on the first attack you make each turn. You still suffer the penalty on
+          any additional attacks, including attacks of opportunity." Out of a fight every
+          attack is its own turn's first.
+
+        Decided once per attack op and kept in its state, so a resume after the dice popup
+        answers as the first pass did."""
+        if intent.params.get("reaction"):
+            return ("opportunity",)
+        if "first_turn" not in state:
+            rnd = self.scene.round
+            state["first_turn"] = (not self.scene.in_encounter
+                                   or self.scene.swung.get(actor.ref) != rnd)
+            if self.scene.in_encounter:
+                self.scene.swung[actor.ref] = rnd
+        return ("first_attack",) if state["first_turn"] and state["i"] == 0 else ()
 
     def _gap_ft(self, actor, defender) -> float | None:
         """Feet between two creatures on the grid, or None when either is off it.

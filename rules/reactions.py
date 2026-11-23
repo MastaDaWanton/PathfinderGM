@@ -151,7 +151,27 @@ def budget_for(actor, name: str = "attack_of_opportunity") -> int:
             best = max(best, resources.evaluate(formula, actor))
         except resources.FormulaError:
             continue
-    return best
+    return best + extra_while_wielding(actor) if name == "attack_of_opportunity" else best
+
+
+# Elven Battle Training's tags (its feat document, feat loop b2): "if you are wielding one
+# of these melee weapons, you may make an additional attack of opportunity each round
+# (this bonus stacks with Combat Reflexes)" — `reactions.aoo.extra.wielding.<weapon key>`,
+# one more for each tag naming the weapon in hand. Added to the best budget, never taken
+# as one more `max`, because the book says it stacks.
+AOO_EXTRA_WIELDING = "reactions.aoo.extra.wielding"
+
+
+def extra_while_wielding(actor) -> int:
+    held = str(actor.wielded_key() or "").strip().lower() if hasattr(actor, "wielded_key") \
+        else ""
+    if not held or not hasattr(actor, "standing_tags"):
+        return 0
+    from . import weapons as weapons_mod
+
+    w = actor.weapon(held)
+    held = str(w.get("crafted_base") or weapons_mod.key_for(held) or held).lower()
+    return 1 if f"{AOO_EXTRA_WIELDING}.{held}" in set(actor.standing_tags()) else 0
 
 
 def reacts_flat_footed(actor, name: str = "attack_of_opportunity") -> bool:
@@ -198,11 +218,14 @@ def threatened_by(scene, watcher_ref: str, body: str = "medium") -> set:
     if disarmed_and_empty_handed(scene, watcher):
         return set()
     reach = _reach_of(watcher)
+    gap = reach_gap(watcher)
+    shot = ranged_threat(watcher)
+    if shot is not None:
+        reach, gap = shot, False
     if reach <= 0:
         return set()
     flat = gridmod.threatened_squares(anchor, watcher.size, reach=reach)
     threatened = set(flat)
-    gap = reach_gap(watcher)
     if gap:
         # A reach weapon cannot strike what is right beside you. Subtracting the adjacent
         # ring here rather than in `grid` keeps geometry ignorant of inventory.
@@ -264,6 +287,42 @@ def _own_weapons_off(scene, actor) -> list[str]:
     """What this creature owns that the props ledger has somewhere other than its hand."""
     return [str(r.get("from_")) for r in getattr(scene, "props", ()) or ()
             if r.get("owner") == actor.ref and r.get("from_")]
+
+
+# Snap Shot's tag (its feat document, feat loop b2): `threat.ranged.<feet>` — "While
+# wielding a ranged weapon with which you have Weapon Focus, you threaten squares within
+# 5 feet of you" (UC). The feet are the tag's leaf, so a feat that widens it (Improved
+# Snap Shot's 15 feet) is a document line: the longest held is the one that counts.
+RANGED_THREAT = "threat.ranged"
+
+
+def ranged_threat(actor) -> int | None:
+    """The feet a creature wielding a ranged weapon threatens, or None when what it holds
+    is not a ranged weapon (its reach is then the melee rule's).
+
+    CRB, Combat (and Snap Shot's Normal, UC): "While wielding a ranged weapon, you
+    threaten no squares and can make no attacks of opportunity with that weapon." Measured
+    2026-11-22 (feat loop b2): nothing asked, so an archer threatened the squares around
+    it with its bow and the attack of opportunity it took was a bow shot — the thing Snap
+    Shot exists to grant. Snap Shot's feet need Weapon Focus in the weapon in hand."""
+    try:
+        w = actor.weapon(actor.equipped)
+    except Exception:  # noqa: BLE001 - a body with nothing it can name in hand
+        return None
+    if str(w.get("category") or "") != "ranged":
+        return None
+    feet = 0
+    for tag in actor.standing_tags():
+        if str(tag).startswith(RANGED_THREAT + "."):
+            leaf = str(tag).rsplit(".", 1)[-1]
+            if leaf.isdigit():
+                feet = max(feet, int(leaf))
+    if feet:
+        from . import skilluses
+
+        if not skilluses._focus_in_hand(actor):
+            feet = 0
+    return feet
 
 
 def _reach_of(actor) -> int:

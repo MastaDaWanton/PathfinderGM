@@ -2472,15 +2472,23 @@ WHEN_KEYS: dict[str, str] = {
                    "both (sheet.Situation.ally_beside)",
     "sole_threat": "whether the bearer alone threatens the foe of the roll "
                    "(sheet.Situation.sole_threat)",
+    # Feat loop b2 (2026-11-22): the moment of the swing (`Engine._swing_moment`) and the
+    # board's answer about the one swinging at this creature (`Actor._ac_context`).
+    "opportunity": "whether the attack is an attack of opportunity (Engine._swing_moment; "
+                   "on the AC line, Actor._ac_context)",
+    "first_attack": "whether this is the first attack its maker makes this turn "
+                    "(Engine._swing_moment): Furious Focus",
+    "adjacent": "on the AC line, whether the one attacking stands adjacent on the board "
+                "(Actor._ac_context); no board, no answer",
     "skill_use": "which use of a skill the check is: lie, feint, diversion, tumble ... "
                  "or {\"not\": \"feint\"} (Engine._skill_use_ctx)",
 }
 _WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment", "choice",
-                                  "state"),
+                                  "state", "aloft"),
                        "attacker": ("type", "subtype")}
 _WHEN_COMPARE = ("lte", "gte", "lt", "gt", "eq")
 _WHEN_BOOLS = ("daylight", "underground", "wielder_casts", "resting", "full_attack",
-               "flanked", "sole_threat")
+               "flanked", "sole_threat", "opportunity", "first_attack", "adjacent")
 
 # What a roll may be made AGAINST — the `against` of a roll context, one word per danger,
 # each with the reader that passes it. A closed list, because the clause is answered by

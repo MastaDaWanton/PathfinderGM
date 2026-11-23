@@ -270,3 +270,157 @@ def test_jawbreaker_bleeds_only_a_held_helpless_or_stunned_foe():
     _use(e, "Jawbreaker")
     res = _swing(e, face=19)
     assert thug.has_state("state.bleeding") or thug.has_condition("bleed"), _tells(res)
+
+
+# --- the swing's moment, the AC line's board --------------------------------------------------
+
+from rules.grid import Grid  # noqa: E402
+from rules.sheet import situated  # noqa: E402
+
+
+def _wren(feats=(), level=8, **extra):
+    data = {"name": "Wren", "kind": "pc", "class": "fighter", "level": level,
+            "abilities": {"str": 16, "dex": 14, "con": 12, "int": 12, "wis": 12, "cha": 12},
+            "hp": 60, "weapons": ["greatsword", "longbow", "longsword"],
+            "equipped": "greatsword", "feats": list(feats), "ranks": {}}
+    data.update(extra)
+    return from_dict(data, ref="pc")
+
+
+def _board(*actors, foes=()):
+    s = Scene(location_id="5bbd0c40345f", grid=Grid(20, 20))
+    for a in actors:
+        s.add(a)
+    made = [s.add(instantiate(t, scene=s, name=f"{t} {i + 1}")) for i, t in enumerate(foes)]
+    return (s, Engine(s, Dice(seed=3)), *made)
+
+
+def _of(mods, name) -> list[int]:
+    return [m.value for m in mods if m.source == name]
+
+
+def _attack_roll(res) -> dict:
+    o = next(o for o in res.outcomes if o.op == "attack")
+    rolls = [r if isinstance(r, dict) else r.as_dict() for r in o.rolls]
+    return next(r for r in rolls if str(r.get("label", "")).startswith("Attack"))
+
+
+def _named(roll: dict, name: str) -> list[int]:
+    return [int(m["value"]) for m in roll.get("modifiers") or ()
+            if str(m.get("source") or m.get("label") or "") == name]
+
+
+def test_furious_focus_lifts_power_attacks_penalty_from_the_first_attack_each_turn():
+    """Furious Focus (APG): two-handed, "you do not suffer Power Attack's penalty on melee
+    attack rolls on the first attack you make each turn. You still suffer the penalty on
+    any additional attacks." Measured before: the -3 rode every swing of BAB +8's turn."""
+    pc = _wren(["Power Attack", "Furious Focus"])
+    s, e, thug = _board(pc, foes=["thug"])
+    thug.hp_max = thug.hp = 500
+    e._ensure_encounter("pc")
+    s.positions.update({"pc": (5, 5), thug.ref: (6, 5)})
+    first = _swing(e, target=thug.ref, face=10, power_attack=True)
+    second = _swing(e, target=thug.ref, face=10, power_attack=True)
+    assert _named(_attack_roll(first), "Furious Focus") == [3]
+    assert _named(_attack_roll(second), "Furious Focus") == []
+    one_handed = _wren(["Power Attack", "Furious Focus"], equipped="longsword")
+    assert _of(one_handed.attack_modifiers("longsword", power_attack=True,
+                                           choices=("first_attack",)), "Furious Focus") == []
+
+
+def test_reach_defense_dodges_an_attack_of_opportunity_from_a_foe_not_adjacent():
+    """Reach Defense: "+2 dodge bonus to Armor Class against attacks of opportunity from
+    opponents that are not adjacent to you"."""
+    pc = _wren(["Reach Defense"])
+    s, e, ogre = _board(pc, foes=["thug"])
+    s.positions.update({"pc": (5, 5), ogre.ref: (7, 5)})
+    with situated(s):
+        assert _of(pc.ac_modifiers(attacker=ogre, provoked_by="opportunity"),
+                   "Reach Defense") == [2]
+        assert _of(pc.ac_modifiers(attacker=ogre), "Reach Defense") == []
+        s.positions[ogre.ref] = (6, 5)
+        assert _of(pc.ac_modifiers(attacker=ogre, provoked_by="opportunity"),
+                   "Reach Defense") == []
+
+
+def test_death_from_below_on_an_attack_of_opportunity_at_a_flier():
+    pc = _wren(["Death from Below"])
+    s, e, bird = _board(pc, foes=["thug"])
+    s.positions.update({"pc": (5, 5), bird.ref: (6, 5, 1)})
+    bird.can_move_vertically = lambda: "fly"
+    with situated(s):
+        assert _of(pc.attack_modifiers(defender=bird, choices=("opportunity",)),
+                   "Death from Below") == [2]
+        assert _of(pc.attack_modifiers(defender=bird), "Death from Below") == []
+        s.positions[bird.ref] = (6, 5)
+        assert _of(pc.attack_modifiers(defender=bird, choices=("opportunity",)),
+                   "Death from Below") == []
+
+
+def test_a_bow_threatens_nothing_until_snap_shot_and_its_weapon_focus():
+    """CRB: "While wielding a ranged weapon, you threaten no squares." Measured before:
+    an archer threatened its neighbours and its attack of opportunity was a bow shot."""
+    from rules import reactions
+
+    archer = _wren(equipped="longbow")
+    s, e, thug = _board(archer, foes=["thug"])
+    s.positions.update({"pc": (5, 5), thug.ref: (6, 5)})
+    assert not reactions.threatens(s, "pc", (6, 5))
+    archer.feats = ["Snap Shot"]
+    assert not reactions.threatens(s, "pc", (6, 5)), "Snap Shot needs Weapon Focus"
+    archer.feats = ["Snap Shot", "Weapon Focus (longbow)"]
+    assert reactions.threatens(s, "pc", (6, 5))
+    assert not reactions.threatens(s, "pc", (8, 5))
+    archer.equipped = "greatsword"
+    assert reactions.threatens(s, "pc", (6, 5))
+
+
+def test_greater_snap_shot_adds_damage_and_confirmation_on_a_ranged_opportunity():
+    pc = _wren(["Greater Snap Shot"], level=16, equipped="longbow")
+    assert _of(pc.damage_modifiers("longbow", choices=("opportunity",)),
+               "Greater Snap Shot") == [4]
+    assert _of(pc.confirm_modifiers("longbow", choices=("opportunity",)),
+               "Greater Snap Shot") == [4]
+    assert _of(pc.damage_modifiers("longbow"), "Greater Snap Shot") == []
+    assert _of(pc.damage_modifiers("greatsword", choices=("opportunity",)),
+               "Greater Snap Shot") == []
+
+
+def test_elven_battle_training_guards_the_blade_and_adds_an_opportunity():
+    from rules import reactions
+
+    elf = _wren(["Elven Battle Training"], equipped="longsword")
+    assert _of(elf.cmd_modifiers(maneuver="disarm"), "Elven Battle Training") == [2]
+    assert _of(elf.cmd_modifiers(maneuver="trip"), "Elven Battle Training") == []
+    assert reactions.budget_for(elf) == 2
+    elf.feats.append("Combat Reflexes")
+    assert reactions.budget_for(elf) == 1 + max(1, 1 + elf.ability_mod("dex"))
+    elf.equipped = "greatsword"
+    assert _of(elf.cmd_modifiers(maneuver="disarm"), "Elven Battle Training") == []
+    assert reactions.budget_for(elf) == max(1, 1 + elf.ability_mod("dex"))
+
+
+def test_improved_improvisation_halves_nonproficiency_and_raises_untrained_to_four():
+    pc = _wren(["Improvisation", "Improved Improvisation"], weapons=["heavy flail"],
+               equipped="heavy flail", **{"class": "wizard"})
+    attack = pc.attack_modifiers("heavy flail")
+    assert any(m.value == -2 and "halved" in m.source for m in attack), attack
+    untrained = sum(m.value for m in pc.skill_modifiers("climb"))
+    pc.feats = ["Improvisation"]
+    assert untrained - sum(m.value for m in pc.skill_modifiers("climb")) == 2
+
+
+def test_medusas_wrath_strikes_twice_more_at_a_reeling_foe():
+    """Medusa's Wrath (CRB): a full attack with an unarmed strike gains "two additional
+    unarmed strikes at your highest base attack bonus ... against a dazed, flat-footed,
+    paralyzed, staggered, stunned, or unconscious foe"."""
+    monk = _pc("monk", 12, feats=["Medusa's Wrath"])
+    monk.equipped = "unarmed"
+    _scene, _e = _fight(monk)
+    thug = _scene.actors["c1"]
+    plain = monk.attack_plan("unarmed", True, defender=thug)
+    thug.add_condition("staggered", 3, source="test")
+    reeling = monk.attack_plan("unarmed", True, defender=thug)
+    assert len(reeling) == len(plain) + 2
+    assert [i for _k, i in reeling].count(0) == [i for _k, i in plain].count(0) + 2
+    assert len(monk.attack_plan("unarmed", False, defender=thug)) == 1
