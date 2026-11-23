@@ -2412,6 +2412,19 @@ class Scene:
             who.remove_effects(match=lambda e: any(
                 states.matches(str(t), states.SURPRISED)
                 or states.matches(str(t), states.ONE_ACTION_TURN) for t in e.tags or ()))
+        # A combat style is a fight's stance (rules/styles.py): the next fight starts in
+        # none, since a style "cannot be used before combat begins".
+        from . import styles as _styles
+
+        for who in list(self.people.values()):
+            gone = who.remove_effects(match=_styles.is_stance)
+            if gone:
+                self.log.append({"op": "style-ended", "ref": who.ref,
+                                 "tell": f"{who.name} lets {gone[0].name} go with the fight "
+                                         f"over.",
+                                 "effects": [{"ref": who.ref, "kind": "effect_ended",
+                                              "what": e.name, "why": "the fight ended",
+                                              "origin": e.origin} for e in gone]})
         self.initiative = []
         self.turn = -1
         self.round = 0
@@ -3935,7 +3948,7 @@ class Engine:
         # a 502 and the player's line popped — where this refusal gets its retry.
         needs_actor = intent.op in ("check", "save", "attack", "move", "cast",
                                     "sell", "buy", "use_item", "extinguish", "break_free",
-                                    "total_defense")
+                                    "total_defense", "style")
         if needs_actor and not self._known(intent.actor, extra):
             self._refuse_ref(intent, index, intent.actor, "actor", extra)
         # `_op_condition` lands on `to`, else the actor, else the target. `to` and the
@@ -25676,6 +25689,47 @@ class Engine:
                  f"class until their next turn, and no attacks of opportunity.",
             because=intent.because)
 
+    def _pay_swift(self, actor: Actor, what: str) -> str:
+        """Spend this round's swift action on `what`: why it cannot be, or "" once paid.
+
+        The one door a style's swift action goes through (feat loop b2-styles). There is no
+        swift-action record on the round yet — lane b2-actions builds the budget in
+        parallel — so today nothing is spent or refused here; joined to that budget at
+        merge, this body becomes its call and every caller is already routed through it."""
+        return ""
+
+    def _op_style(self, intent: Intent, partial: dict) -> Outcome:
+        """Enter a combat style (Ultimate Combat, Style Feats): a swift action, in a fight
+        only, one style at a time — entering one leaves the other (`rules/styles.py`). The
+        stance is an `ActiveEffect` tagged `style.<feat id>`; the follow-up feats'
+        documents ask for that tag. The combat bar's (`_attack_options`), never the
+        reader's (`intents.CODE_ONLY_OPS`)."""
+        from . import feats as feats_mod
+        from . import styles
+
+        actor = self.scene.actors[intent.actor]
+        fid = str(intent.params.get("style") or "").strip().lower()
+        feat, _ = feats_mod.resolve(fid)
+        fid = feat.id if feat is not None else fid
+        why = styles.refusal(actor, fid, self.scene.in_encounter)
+        if why:
+            return self._refuse(intent, why)
+        spent = self._pay_swift(actor, f"entering {feat.name}")
+        if spent:
+            return self._refuse(intent, spent, code="action_spent")
+        left = [e for e in actor.effects if styles.is_stance(e)]
+        actor.remove_effects(match=lambda e: styles.is_stance(e))
+        actor.apply_effect(styles.stance(feat))
+        effects = [{"ref": actor.ref, "kind": "effect_ended", "what": e.name,
+                    "why": "another style", "origin": e.origin} for e in left]
+        effects.append({"ref": actor.ref, "kind": "condition", "condition": feat.name,
+                        "origin": styles.ORIGIN.format(feat.id)})
+        tell = f"{actor.name} settles into {feat.name}"
+        if left:
+            tell += f", leaving {' and '.join(e.name for e in left)}"
+        return Outcome(intent_id=intent.id, op="style", effects=effects, tell=tell + ".",
+                       because=intent.because)
+
     def _cleave_next(self, actor: Actor, defender: Actor, weapon_key: str,
                      intent: Intent, hit: bool) -> tuple[dict | None, str]:
         """(the next blow of a cleave, its tell) — or (None, why there is none).
@@ -39709,11 +39763,9 @@ def _hand_free(actor) -> bool:
     """Whether a hand holds nothing (Deflect Arrows): the weapon in hand takes its hands
     (an unarmed strike none, a two-handed weapon both), a shield other than a buckler
     takes one — a buckler straps to the forearm and leaves the hand empty (CRB, Buckler)."""
-    key = actor.wielded_key()
-    used = 0 if key in ("", "unarmed") else max(1, int(actor.weapon(key).get("hands") or 1))
-    if str(actor.shield or "none").lower() not in ("none", "", "buckler"):
-        used += 1
-    return used < 2
+    from . import classfeatures
+
+    return classfeatures.free_hands(actor) >= 1
 
 
 def _cast_opener(actor, spell, bits: list[str], item: dict | None) -> str:

@@ -447,6 +447,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Acrobatics) and no attacks of opportunity until the next turn. Nothing to roll; the
     # combat bar's (`Engine._op_total_defense`), not offered to the reader.
     "total_defense": ((), (), "hidden"),
+    # Entering a combat style (Ultimate Combat, Style Feats): a swift action, in a fight,
+    # one style at a time. `style` is the style feat's id. The combat bar's
+    # (`Engine._op_style`), never the reader's (CODE_ONLY_OPS).
+    "style": (("style",), (), "hidden"),
     # Tearing loose of a tanglefoot bag's goo: `how` is "strength" (a DC 17 Strength
     # check) or "slash" (15 points of slashing damage dealt to the goo, which is hit
     # automatically). The engine owns both numbers (CRB, Goods and Services).
@@ -902,7 +906,7 @@ CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "looks_in", "defending", 
 # `bout` since 2026-11-18: the reader's `challenge` act at an arena (`acts_to_ops._challenge`).
 CODE_ONLY_OPS = frozenset({"job", "make", "craft", "greet", "commission", "harvest",
                            "disguise", "surrender", "bout", "live_off_land", "hunt",
-                           "hex_move", "hex_enter"})
+                           "hex_move", "hex_enter", "style"})
 # Ops only the author's own hand writes (`/cheat`, origin `author:`): left out of the
 # turn's op enum like the code-only ops, but offered to the cheat (`prompts.CHEAT_OPS`),
 # and refused by the engine from any other origin. `xp` since 2026-11-07 (audit #22): a

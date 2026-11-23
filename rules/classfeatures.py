@@ -379,7 +379,7 @@ MOD_KEYS = frozenset({"type", "target", "amount", "formula", "bonus_type", "when
 # any load carried or armor worn").
 MOD_TYPES = ("ability_mod", "skill_mod", "save_mod", "combat_mod", "speed")
 BEARER_KEYS = frozenset({"armour", "shield", "armoured", "load", "helpless", "pool",
-                         "terrain", "state", "wielding", "shield_kind"})
+                         "terrain", "state", "wielding", "shield_kind", "hands_free"})
 WEAPON_KEYS = frozenset({"applies_to", "damage_column", "strikes_as", "strikes_as_by_rank",
                          "when"})
 ARMOUR_KEYS = frozenset({"max_dex", "check_penalty", "unhindered"})
@@ -660,6 +660,17 @@ def bearer_facts(actor) -> dict:
             "terrain": places_mod.terrain_of(str(getattr(actor, "at", "") or ""))}
 
 
+def free_hands(actor) -> int:
+    """How many hands hold nothing: the weapon in hand takes its hands (an unarmed strike
+    none, a two-handed weapon both), a shield other than a buckler takes one — a buckler
+    straps to the forearm and leaves the hand empty (CRB, Buckler)."""
+    key = actor.wielded_key()
+    used = 0 if key in ("", "unarmed") else max(1, int(actor.weapon(key).get("hands") or 1))
+    if str(getattr(actor, "shield", "") or "none").lower() not in ("none", "", "buckler"):
+        used += 1
+    return max(0, 2 - used)
+
+
 def _load_band(actor) -> str | None:
     """The load band when encumbrance is enforced, else None (the clause then holds)."""
     from . import gear
@@ -697,8 +708,16 @@ def _bearer_holds(clause: dict, actor, pick: str = "") -> bool:
         elif key == "state":
             # A stance held as an ActiveEffect (Combat Expertise's, Cleave's): the term
             # is the document's, the effect only says it is on — law 1, a prefix
-            # question, so removing the effect takes the number with it (law 2).
-            if not actor.has_state(str(want or "")):
+            # question, so removing the effect takes the number with it (law 2). A list
+            # is every one of them (b2-styles: "while using Crane Style AND fighting
+            # defensively").
+            wants = want if isinstance(want, list) else [want]
+            if not all(actor.has_state(str(w or "")) for w in wants):
+                return False
+        elif key == "hands_free":
+            # "With at least one hand free" (Crane Wing, Snapping Turtle Style), "both
+            # hands free" (Tiger Claws): a count of empty hands (`free_hands`).
+            if free_hands(actor) < int(want or 1):
                 return False
         elif key == "terrain":
             word = pick if want == "$pick" else str(want or "")

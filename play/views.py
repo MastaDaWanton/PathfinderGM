@@ -1033,6 +1033,28 @@ def _attack_options(pc) -> dict:
         why=("Armour that slows you cannot tumble past foes."
              if skilluses._armour_slows(pc) else ""),
         op={"op": "check", "params": {"skill": "acrobatics", "tumble": True}})
+    # The combat styles the character knows (rules/styles.py: the index's `style` tag),
+    # each a swift action that stands them in its stance. What it changes is measured as
+    # the others are, on a copy with the stance laid; the one they stand in says so.
+    from rules import styles as styles_mod
+
+    standing = styles_mod.current(pc)
+    for feat in styles_mod.held(pc):
+        why = ("You are in this style." if feat.id in standing
+               else styles_mod.refusal(pc, feat.id, True))
+        try:
+            stanced = twin(effect=styles_mod.stance(feat))
+            says = _option_numbers(atk=to_hit(stanced, held) - to_hit(pc, held),
+                                   dmg=dmg(stanced, held) - dmg(pc, held),
+                                   ac=stanced.ac() - base_ac)
+        except Exception:  # noqa: BLE001 — unmeasured is said as such, never guessed
+            says = ""
+        options.append({"id": f"style:{feat.id}", "name": feat.name,
+                        "text": feat.description or feat.benefit, "shape": "act",
+                        "says": says.replace(" until your next turn", ""), "why": why,
+                        "refuse": {"strike": "", "full": ""}, "bonus": {}, "excludes": [],
+                        "action": "swift",
+                        "op": {"op": "style", "params": {"style": feat.id}}})
     return {"options": options, "off_hands": off_hands, "plans": plans}
 
 
@@ -4227,7 +4249,7 @@ def _put_back_free_actions(c, pending: list) -> None:
 # here, so a player on fire from a thrown flask, or glued by a tanglefoot bag, could only
 # type it and hope the planner sampled it. The bar offers each only while it applies.
 _COMBAT_OPS = {"attack", "move", "use_ability", "use_item", "manoeuvre", "cast",
-               "extinguish", "break_free", "escape", "total_defense", "check"}
+               "extinguish", "break_free", "escape", "total_defense", "check", "style"}
 # The checks the bar's Declare section may post (combat bar round 2, 2026-11-22): a feint
 # and a tumble, each to its own door (`skilluses.OWN_DOORS`). Any other check is a spoken
 # turn's, so `check` is not a door to every skill.
