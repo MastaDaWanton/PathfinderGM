@@ -422,7 +422,16 @@ def tumble(engine, intent, actor, mods, partial):
     rounds = int(r["outcome"]["rounds"])
     past, caught, effects = [], [], []
     for foe, value in dcs:
-        if roll.total >= value:
+        # A term against THIS foe (feat loop b2): Underfoot's "+4 dodge bonus on Acrobatics
+        # checks to move past opponents ... so long as they are larger than you", read with
+        # the foe in the context (`when.target.larger`), so it lands on their DC alone.
+        # The difference the foe makes, so a term that asks only the use (already in
+        # `mods`) is not counted twice.
+        against = sum(m.value for m in actor._feat_mods(
+            "skill_mod", "acrobatics", {"skill_use": "tumble", "target_actor": foe},
+            scoped=True)) - sum(m.value for m in actor._feat_mods(
+                "skill_mod", "acrobatics", {"skill_use": "tumble"}, scoped=True))
+        if roll.total + against >= value:
             actor.apply_effect(ActiveEffect(
                 name=f"tumbling past {foe.name}", kind="situation", key=f"tumble-{foe.ref}",
                 source=TUMBLE_SOURCE, origin="rule:tumble", duration="rounds",

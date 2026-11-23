@@ -436,7 +436,11 @@ def climb(engine, intent, actor, mods, partial):
                         f"to the ground before getting anywhere.")
             break
         catch_dc = value + int(row("skill.climb.catch")["adds"])
-        caught = _roll(engine, actor, mods, "Climb check (catch yourself)")
+        # A feat's term on this roll alone (feat loop b2): Shield Snag's "+4 bonus ... on
+        # Climb checks to catch yourself on a wall or slope when falling" with a shield.
+        caught = _roll(engine, actor, list(mods) + actor._feat_mods(
+            "skill_mod", "climb", {"skill_use": "catch"}, scoped=True),
+            "Climb check (catch yourself)")
         rolls.append(caught)
         if caught.total >= catch_dc:
             _cling(actor, at=at, top=top, dc=value)

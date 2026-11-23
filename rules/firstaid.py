@@ -25,6 +25,8 @@ engine's own rule. Nothing here stops that; it only gives the player the rule's 
 """
 from __future__ import annotations
 
+from . import states
+
 DC = 15
 SKILL = "heal"
 
@@ -48,7 +50,15 @@ def needs_aid(actor) -> bool:
     bleed's own tell promised that from the day it was laid; until lane E (2026-11-22)
     nothing kept the promise (the audit's measurement: `firstaid` treated only the
     dying, and `Actor.heal` removed no bleed)."""
-    return dying(actor) or bleeding(actor)
+    return dying(actor) or bleeding(actor) or lamed(actor)
+
+
+def lamed(actor) -> bool:
+    """Feet cut as if by caltrops (`state.wound.feet`, Footslasher): "until the creature
+    is successfully treated with a DC 15 Heal check or receives at least 1 point of
+    magical healing" (Rival Guide; CRB, Caltrops) — the same DC 15 first aid closes it."""
+    return bool(actor is not None and actor.has_state("state.wound.feet")
+                and not actor.has_state("state.down.dead"))
 
 
 def patient_of(engine, intent):
@@ -82,20 +92,24 @@ def stanch(patient, by: str) -> tuple[str, list[dict]]:
     """Every bleed on them stops: the effects carrying `state.wound.bleeding` are removed,
     so their damage stops with them (law 2). `by` names what stopped it, for the tell and
     the record. ("", []) when nothing was bleeding."""
+    feet = lamed(patient)
     gone = patient.remove_effects(match=lambda e: any(
         t == "state.wound.bleeding" or t.startswith("state.wound.bleeding.")
-        for t in (e.tags or ())))
+        or states.matches(str(t), "state.wound.feet") for t in (e.tags or ())))
     if not gone:
         return "", []
-    return (f"{patient.name} stops bleeding.",
-            [{"kind": "condition_removed", "ref": patient.ref, "condition": "bleed",
-              "by": by}])
+    bled = any(e.key != "footslashed" for e in gone)
+    said = " and ".join(w for w, on in (("stops bleeding", bled),
+                                         ("walks freely again", feet)) if on)
+    return (f"{patient.name} {said or 'stops bleeding'}.",
+            [{"kind": "condition_removed", "ref": patient.ref,
+              "condition": "bleed" if bled else "footslashed", "by": by}])
 
 
 def settle(healer, patient, succeeded: bool) -> tuple[str, list[dict]]:
     """What the check did to the patient: (the tell's clause, the effects). One DC 15
     check does both jobs it is for: the dying made stable, a bleed stopped."""
-    was_dying, was_bleeding = dying(patient), bleeding(patient)
+    was_dying, was_bleeding = dying(patient), bleeding(patient) or lamed(patient)
     if not succeeded:
         still = " and ".join(w for w, on in (("dying", was_dying), ("bleeding", was_bleeding))
                              if on) or "as they were"

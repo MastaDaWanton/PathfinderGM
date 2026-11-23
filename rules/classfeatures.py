@@ -746,11 +746,74 @@ def holds(when, actor, ctx: dict | None, pick: str = "") -> bool:
             return False
     if rest.get("target") == "$pick":
         rest["target"] = _enemy_clause(pick)
+    # Size against the BEARER's (feat loop b2): Risky Striker's "creatures two or more size
+    # categories larger than you", Underfoot's "a larger opponent". Only here does the
+    # bearer stand beside the roll, so the relative clause is answered here and the rest
+    # of the creature clause goes on to `_when_holds`.
+    for side, key in (("target", "target_actor"), ("attacker", "attacker_actor")):
+        clause = rest.get(side)
+        if isinstance(clause, dict) and ({"larger", "smaller", "unprovoked"} & set(clause)):
+            other = (ctx or {}).get(key)
+            if other is None or not size_holds(actor, other, clause):
+                return False
+            # Porcupine Defense's "if your opponent may make such attacks without
+            # provoking": the manoeuvre's own waiver tag on whoever makes it.
+            if "unprovoked" in clause:
+                from . import reactions
+
+                waived = other.has_state(reactions.unprovoking_tag(
+                    str((ctx or {}).get("maneuver") or "")))
+                if not (ctx or {}).get("maneuver") or waived != bool(clause["unprovoked"]):
+                    return False
+            clause = {k: v for k, v in clause.items()
+                      if k not in ("larger", "smaller", "unprovoked")}
+            if clause:
+                rest[side] = clause
+            else:
+                rest.pop(side)
+    # Outflank (APG): "Whenever you and an ally who also has this feat are flanking the
+    # same creature" — an ally this bearer flanks the roll's target with, on the board of
+    # the moment (`position.flanking_allies`), holding the feat named. No board, no flank.
+    fw = rest.pop("flanking_with", None)
+    if fw is not None:
+        from . import feats as feats_mod
+        from . import position
+        from .sheet import current_moment
+
+        scene = getattr(current_moment(), "scene", None)
+        foe = (ctx or {}).get("target_actor")
+        if scene is None or foe is None or not any(
+                str((fw or {}).get("feat") or "") in feats_mod._held(a)
+                for a in position.flanking_allies(scene, actor, foe)):
+            return False
     if not rest:
         return True
     from .sheet import _when_holds
 
     return _when_holds(rest, ctx)
+
+
+def size_steps(a, b) -> int:
+    """How many size categories `b` is larger than `a` (negative: smaller), by the book's
+    nine (`tables.SIZE_ORDER`); an unknown size is Medium."""
+    from .tables import SIZE_ORDER
+
+    def at(x):
+        s = str(getattr(x, "size", "") or "medium").lower()
+        return SIZE_ORDER.index(s) if s in SIZE_ORDER else SIZE_ORDER.index("medium")
+
+    return at(b) - at(a)
+
+
+def size_holds(bearer, other, clause: dict) -> bool:
+    """`{"larger": 2}`: `other` is at least two categories larger than the bearer;
+    `{"smaller": 1}`: at least one smaller."""
+    steps = size_steps(bearer, other)
+    if "larger" in clause and steps < int(clause["larger"]):
+        return False
+    if "smaller" in clause and -steps < int(clause["smaller"]):
+        return False
+    return True
 
 
 # --- the readers -------------------------------------------------------------------------

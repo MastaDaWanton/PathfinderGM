@@ -1,0 +1,163 @@
+{
+  "_about": [
+    "Feat loop, batch 2, lane b2-attack-b (2026-11-22): attack-shape and other combat feats",
+    "in the grammar core.json uses (rules/classbuilder.py validate_feat_document). Benefit",
+    "text from content/feats/feats.json, checked against aonprd.com FeatDisplay. New readers",
+    "this lane built, each for more than one feat: size against the bearer's",
+    "(`when.target.larger` / `smaller`, `when.attacker.larger`, `unprovoked`:",
+    "classfeatures.holds); the swing's kind as a roll-context choice (`attack_of_opportunity`,",
+    "`provoked_by_maneuver`: Engine._op_attack); `flanking_with` an ally holding a feat",
+    "(position.flanking_allies); the formula name `allies_threatening`; `on_hit` riders of",
+    "kind maneuver, demoralize, condition, ally_swing and free_swing (Engine._FEAT_RIDERS) and",
+    "`critical` / `nonlethal` in their `when`; an owed attack of opportunity queued by `run`",
+    "(Engine.owed_swing, effect kind owed_swing). A `not_yet` names a clause the engine does",
+    "not run; a feat carrying one is PARTIAL, never done."
+  ],
+  "risky-striker": {
+    "choice": "risky_striker",
+    "modifiers": [
+      {"type": "combat_mod", "target": "ac", "amount": -1, "bonus_type": "untyped",
+       "when": {"bearer": {"state": "buff.stance.risky-striking"}},
+       "note": "until your next turn"},
+      {"type": "combat_mod", "target": "damage", "formula": "2 + 2 * (bab // 4)",
+       "bonus_type": "untyped",
+       "when": {"bearer": {"state": "buff.stance.risky-striking"},
+                "weapon": {"ranged": false}, "target": {"larger": 2}},
+       "note": "melee damage against creatures two or more size categories larger"}
+    ]
+  },
+  "shield-of-swings": {
+    "choice": "shield_of_swings",
+    "modifiers": [
+      {"type": "combat_mod", "target": "ac", "amount": 4, "bonus_type": "shield",
+       "when": {"bearer": {"state": "buff.stance.shield-of-swings"}}},
+      {"type": "combat_mod", "target": "cmd", "amount": 4, "bonus_type": "shield",
+       "when": {"bearer": {"state": "buff.stance.shield-of-swings"}},
+       "note": "the damage halved while the stance holds is the engine's (Engine._op_attack)"}
+    ]
+  },
+  "pinpoint-targeting": {
+    "choice": "pinpoint_targeting"
+  },
+  "footslasher": {
+    "choice": "footslasher",
+    "modifiers": [
+      {"type": "combat_mod", "target": "attack", "amount": -2, "bonus_type": "untyped",
+       "when": {"choice": "footslasher"}}
+    ],
+    "on_hit": [
+      {"kind": "condition", "condition": "footslashed", "rounds": 14400,
+       "when": {"choice": "footslasher", "target": {"larger": 1},
+                "weapon": {"slashing_or_piercing": true}},
+       "tell": "{actor} hacks at {target}'s feet: half speed until the wound is treated or magically healed, or a day passes."}
+    ]
+  },
+  "sliding-axe-throw": {
+    "choice": "sliding_axe_throw",
+    "modifiers": [
+      {"type": "combat_mod", "target": "attack", "amount": -2, "bonus_type": "untyped",
+       "when": {"choice": "sliding_axe_throw"}}
+    ],
+    "on_hit": [
+      {"kind": "maneuver", "maneuver": "trip", "when": {"choice": "sliding_axe_throw"}}
+    ],
+    "not_yet": [
+      "ignores the shield of a target that is running or charging: the engine knows a flat-footed target (built) but holds no running or charging state yet (lane b2-actions builds the charge)"
+    ]
+  },
+  "shield-slam": {
+    "on_hit": [
+      {"kind": "maneuver", "maneuver": "bull rush", "attack_roll": true,
+       "prone_if_blocked": true, "when": {"weapon": {"shield_bash": true}}}
+    ]
+  },
+  "shield-snag": {
+    "on_hit": [
+      {"kind": "maneuver", "maneuver": "disarm", "attack_roll": true,
+       "unless_held": "shield-slam", "when": {"weapon": {"shield_bash": true}}}
+    ],
+    "modifiers": [
+      {"type": "skill_mod", "target": "climb", "amount": 4, "bonus_type": "untyped",
+       "when": {"skill_use": "catch", "bearer": {"shield": true}},
+       "note": "to catch yourself on a wall or slope when falling, using a shield"}
+    ],
+    "not_yet": [
+      "+4 on Strength checks to avoid being blown away by a strong wind: the engine rolls the wind only against fliers (bodyskills.fly), never a Strength check on the ground"
+    ]
+  },
+  "bashing-finish": {
+    "on_hit": [
+      {"kind": "free_swing", "when": {"critical": true, "weapon": {"ranged": false}}}
+    ]
+  },
+  "enforcer": {
+    "on_hit": [
+      {"kind": "demoralize", "rounds": "dealt", "crit_condition": "frightened",
+       "when": {"nonlethal": true, "weapon": {"ranged": false}}}
+    ]
+  },
+  "intimidating-confidence": {
+    "modifiers": [
+      {"type": "save_mod", "target": "fort", "amount": 1, "bonus_type": "untyped",
+       "when": {"against": "emotion"}},
+      {"type": "save_mod", "target": "ref", "amount": 1, "bonus_type": "untyped",
+       "when": {"against": "emotion"}},
+      {"type": "save_mod", "target": "will", "amount": 1, "bonus_type": "untyped",
+       "when": {"against": "emotion"}}
+    ],
+    "on_hit": [
+      {"kind": "demoralize", "crit_bonus": true, "all_threatened": true,
+       "when": {"critical": true}}
+    ]
+  },
+  "outflank": {
+    "modifiers": [
+      {"type": "combat_mod", "target": "attack", "amount": 2, "bonus_type": "untyped",
+       "when": {"flanking_with": {"feat": "outflank"}},
+       "note": "the flanking bonus rises from +2 to +4"}
+    ],
+    "on_hit": [
+      {"kind": "ally_swing", "flanking": true, "when": {"critical": true}}
+    ]
+  },
+  "seize-the-moment": {
+    "on_hit": [
+      {"kind": "ally_swing", "when": {"critical": true}}
+    ]
+  },
+  "vicious-stomp": {
+    "tags": ["attack.aoo.falls-prone"]
+  },
+  "spellbreaker": {
+    "tags": ["casting.foe.spellbreaker"]
+  },
+  "coordinated-distraction": {
+    "tags": ["casting.foe.coordinated-distraction"]
+  },
+  "swarm-strike": {
+    "modifiers": [
+      {"type": "combat_mod", "target": "attack", "formula": "1 + allies_threatening",
+       "bonus_type": "untyped", "when": {"choice": "attack_of_opportunity"}}
+    ]
+  },
+  "porcupine-defense": {
+    "modifiers": [
+      {"type": "combat_mod", "target": "attack", "amount": 2, "bonus_type": "untyped",
+       "when": {"choice": "provoked_by_maneuver", "target": {"larger": 1}},
+       "note": "on the attack of opportunity a larger foe's manoeuvre drew"},
+      {"type": "combat_mod", "target": "cmd", "amount": 2, "bonus_type": "untyped",
+       "when": {"attacker": {"larger": 1, "unprovoked": true}},
+       "note": "against a larger foe's manoeuvre that provokes nothing"}
+    ]
+  },
+  "underfoot": {
+    "modifiers": [
+      {"type": "skill_mod", "target": "acrobatics", "amount": 4, "bonus_type": "dodge",
+       "when": {"skill_use": "tumble", "target": {"larger": 1}},
+       "note": "to move past opponents larger than you"},
+      {"type": "combat_mod", "target": "ac_moving", "amount": 2, "bonus_type": "dodge",
+       "when": {"attacker": {"larger": 1}},
+       "note": "against a larger opponent's attack of opportunity drawn by moving"}
+    ]
+  }
+}

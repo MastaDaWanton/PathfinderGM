@@ -836,6 +836,20 @@ _OPTION_SHAPES = {
     "stunning_assault": ("swing", "Stunning Assault",
                          "Less sure in melee until your next turn; a hit stuns unless they "
                          "resist."),
+    "risky_striker": ("swing", "Risky Striker",
+                      "Less guarded until your next turn; more damage in melee against "
+                      "foes two sizes larger."),
+    "shield_of_swings": ("full", "Shield of Swings",
+                         "A full attack with a two-handed weapon at half damage, behind a "
+                         "+4 shield of swings until your next turn."),
+    "pinpoint_targeting": ("strike", "Pinpoint Targeting",
+                           "One shot that ignores the target's armour, natural armour and "
+                           "shield. Not if you move this round."),
+    "footslasher": ("strike", "Footslasher",
+                    "One blow at a larger foe's feet: less to hit, and a hit halves its "
+                    "speed."),
+    "sliding_axe_throw": ("swing", "Sliding Axe Throw",
+                          "A thrown axe along the ground: less to hit, a hit trips."),
     "total_defense": ("act", "Total defense",
                       "Your standard action spent guarding: no attacks, and no attacks of "
                       "opportunity."),
@@ -844,6 +858,11 @@ _OPTION_SHAPES = {
     "tumble": ("move", "Tumble", "Acrobatics against each foe's CMD, so the move past "
                                  "them provokes nothing."),
 }
+
+
+# Options whose whole effect is on the defender's side of the roll (Pinpoint Targeting's
+# armour ignored), so the sheet has no number of its own to show for them.
+_SAID_IN_WORDS = frozenset({"pinpoint_targeting"})
 
 
 def _signed(n: int) -> str:
@@ -995,6 +1014,8 @@ def _attack_options(pc) -> dict:
                     dice=pc.weapon_dice(held, (c,)) - pc.weapon_dice(held))
             except Exception:  # noqa: BLE001 — unmeasured is said as such, never guessed
                 opt["says"] = ""
+            if not opt["says"] and c in _SAID_IN_WORDS:
+                opt["says"] = text          # no number to measure: its effect is the AC
             if not opt["says"]:
                 opt["why"] = f"{name} changes nothing with the {pc.weapon(held)['name']}."
         options.append(opt)

@@ -2474,13 +2474,22 @@ WHEN_KEYS: dict[str, str] = {
                    "(sheet.Situation.sole_threat)",
     "skill_use": "which use of a skill the check is: lie, feint, diversion, tumble ... "
                  "or {\"not\": \"feint\"} (Engine._skill_use_ctx)",
+    # Feat loop b2: what the blow that just landed was, for an `on_hit` rider
+    # (`Engine._feat_riders`): Enforcer's "whenever you deal nonlethal damage",
+    # Intimidating Confidence's "when you confirm a critical hit".
+    "flanking_with": "flanking the roll's target with an ally who holds a feat: "
+                     "{\"feat\": \"outflank\"} (classfeatures.holds)",
+    "critical": "whether the hit was a confirmed critical (Engine._feat_riders)",
+    "nonlethal": "whether the hit dealt nonlethal damage (Engine._feat_riders)",
 }
+# `larger` / `smaller` (feat loop b2): size categories against the bearer's own, answered
+# by `classfeatures.holds` where the bearer is known (Risky Striker, Underfoot).
 _WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment", "choice",
-                                  "state"),
-                       "attacker": ("type", "subtype")}
+                                  "state", "larger", "smaller"),
+                       "attacker": ("type", "subtype", "larger", "smaller", "unprovoked")}
 _WHEN_COMPARE = ("lte", "gte", "lt", "gt", "eq")
 _WHEN_BOOLS = ("daylight", "underground", "wielder_casts", "resting", "full_attack",
-               "flanked", "sole_threat")
+               "flanked", "sole_threat", "critical", "nonlethal")
 
 # What a roll may be made AGAINST — the `against` of a roll context, one word per danger,
 # each with the reader that passes it. A closed list, because the clause is answered by
@@ -2647,6 +2656,11 @@ def when_problems(when, where: str = "when") -> list[str]:
                     isinstance(want, dict) and set(want) == {"not"} and want["not"]):
                 out.append(f"{where}.skill_use is a use (\"lie\") or {{\"not\": "
                            f"\"feint\"}}.")
+        elif key == "flanking_with":
+            from . import feats as feats_mod
+
+            if not isinstance(want, dict) or set(want) != {"feat"}                     or str(want.get("feat") or "") not in feats_mod.all_feats():
+                out.append(f"{where}.flanking_with is {{\"feat\": \"<a feat id>\"}}.")
         elif key == "ally_beside":
             from . import feats as feats_mod
 

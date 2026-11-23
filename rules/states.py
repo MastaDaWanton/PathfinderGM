@@ -517,6 +517,14 @@ TAGS: dict[str, tuple[str, ...]] = {
     "bloody assault":   ("buff.stance.bloody-assault",),
     "dazing assault":   ("buff.stance.dazing-assault",),
     "stunning assault": ("buff.stance.stunning-assault",),
+    # Feat loop b2: Risky Striker's and Shield of Swings' "until your next turn" (ARG, APG).
+    "risky striking":   ("buff.stance.risky-striking",),
+    "shield of swings": ("buff.stance.shield-of-swings",),
+    # Footslasher (Rival Guide): "affected as if by caltrops — its speed is reduced by
+    # half ... until the creature is successfully treated with a DC 15 Heal check or
+    # receives at least 1 point of magical healing". `state.wound` is what first aid and
+    # magical healing close (`firstaid.stanch`), `state.slowed` the half-speed question.
+    "footslashed":      ("state.slowed.footslashed", "state.wound.feet"),
     # Combat bar round 2, 2026-11-22: the book's two defensive choices, open to anyone
     # (CRB, Combat). Fighting defensively rides the attack it is declared with; total
     # defense is its own standard action, and "you can't make attacks of opportunity

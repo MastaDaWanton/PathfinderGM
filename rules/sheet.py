@@ -277,7 +277,8 @@ def feat_rank_name(skill: str) -> str:
 # The names a feat document's formula may ask beyond the sheet's (`Actor._feat_formula_
 # extra`): the ranks in the skill the term lands on, in any named skill, and the adjacent
 # allies holding the same feat. The validator probes formulas with these.
-FEAT_FORMULA_NAMES = ("ranks", "allies", *(feat_rank_name(s) for s in SKILLS))
+FEAT_FORMULA_NAMES = ("ranks", "allies", "allies_threatening",
+                      *(feat_rank_name(s) for s in SKILLS))
 # A feat's class-skill grant, `skill.class.$target` bound to each pick (`class_skills`).
 FEAT_CLASS_SKILL = "skill.class."
 
@@ -364,7 +365,12 @@ ATTACK_CHOICES = ("power_attack", "deadly_aim", "piranha_strike", "combat_expert
                   "fighting_defensively", "vital_strike", "cleave", "rapid_shot", "flurry",
                   # Feat loop b1: the Power Attack family's -5 for a rider on every melee
                   # hit "until your next turn" (APG), each a stance like Combat Expertise.
-                  "bloody_assault", "dazing_assault", "stunning_assault")
+                  "bloody_assault", "dazing_assault", "stunning_assault",
+                  # Feat loop b2: Risky Striker's and Shield of Swings' stances "until your
+                  # next turn", and three one-blow options (Pinpoint Targeting, Footslasher,
+                  # Sliding Axe Throw), each its feat document's `choice`.
+                  "risky_striker", "shield_of_swings", "pinpoint_targeting", "footslasher",
+                  "sliding_axe_throw")
 # The options nobody needs a feat for (combat bar round 2, 2026-11-22). CRB, Combat
 # ("Fighting Defensively as a Standard Action"): "You can choose to fight defensively when
 # attacking" — anyone, with any attack. Its numbers are `defensive_dodge` and the stance
@@ -388,7 +394,10 @@ ATTACK_CHOICE_FEATS = {"power_attack": "power-attack", "deadly_aim": "deadly-aim
                        "combat_expertise": "combat-expertise", "vital_strike": "vital-strike",
                        "cleave": "cleave", "rapid_shot": "rapid-shot",
                        "bloody_assault": "bloody-assault", "dazing_assault": "dazing-assault",
-                       "stunning_assault": "stunning-assault"}
+                       "stunning_assault": "stunning-assault",
+                       "risky_striker": "risky-striker", "shield_of_swings": "shield-of-swings",
+                       "pinpoint_targeting": "pinpoint-targeting",
+                       "footslasher": "footslasher", "sliding_axe_throw": "sliding-axe-throw"}
 
 _IMPLIED_GENDER = {"she": "woman", "he": "man"}
 
@@ -4574,7 +4583,10 @@ class Actor:
         # Class against attacks of opportunity caused when you move out of or within a
         # threatened area" (CRB p.131), its own target so no other AC term is asked twice.
         if provoked_by == "movement":
-            mods.extend(self._buff_mods("combat_mod", "ac_moving"))
+            # In the AC's context (feat loop b2): Underfoot's +2 is against "a larger
+            # opponent's" swing, asked of the attacker (`when.attacker.larger`).
+            mods.extend(self._buff_mods("combat_mod", "ac_moving",
+                                        self._ac_context(against, attacker)))
         if loses_dex:
             # Denied Dex is denied dodge too — 1e: "any situation that denies you your
             # Dexterity bonus also denies you dodge bonuses". A negative Dex stays: a
@@ -6547,7 +6559,7 @@ class Actor:
                         # of the skill being rolled, which `skill_modifiers` names in ctx.
                         if want == ALL_SKILLS and ctx and ctx.get("skill"):
                             extra["ranks"] = int(self.ranks.get(ctx["skill"], 0) or 0)
-                        extra.update(self._feat_formula_extra(spec["formula"], doc["id"]))
+                        extra.update(self._feat_formula_extra(spec["formula"], doc["id"], ctx))
                         try:
                             amount = resources.evaluate(spec["formula"], self, extra)
                         except resources.FormulaError:
@@ -6561,7 +6573,7 @@ class Actor:
             self._reading_feats = False
         return out
 
-    def _feat_formula_extra(self, formula: str, fid: str) -> dict:
+    def _feat_formula_extra(self, formula: str, fid: str, ctx: dict | None = None) -> dict:
         """The names only a feat's reader can answer (`FEAT_FORMULA_NAMES`), supplied
         when the formula asks them.
 
@@ -6582,9 +6594,32 @@ class Actor:
                 name = feat_rank_name(skill)
                 if name in text:
                     out[name] = int(self.ranks.get(skill, 0) or 0)
+        if "allies_threatening" in text:
+            out["allies_threatening"] = len(self.allies_threatening_with(
+                fid, (ctx or {}).get("target_actor")))
         if "allies" in text:
             out["allies"] = len(self.adjacent_allies_with(fid))
         return out
+
+    def allies_threatening_with(self, fid: str, foe) -> list:
+        """The allies (same side, up) who hold feat `fid` and threaten `foe` on the board
+        — Swarm Strike's "each ally who also has this feat and currently threatens that
+        foe" (feat loop b2). No board, no foe: nobody (`reactions.threatens`)."""
+        from . import feats as feats_mod
+        from . import position, reactions
+
+        scene = getattr(current_moment(), "scene", None)
+        here = getattr(scene, "actors", None) or {}
+        if foe is None or self.ref not in here or not getattr(scene, "has_grid", False):
+            return []
+        square = scene.positions.get(foe.ref)
+        if square is None:
+            return []
+        return [other for ref, other in here.items()
+                if ref not in (self.ref, foe.ref) and not other.is_down
+                and fid in feats_mod._held(other)
+                and position._same_side(scene, self.ref, ref)
+                and reactions.threatens(scene, ref, square, getattr(foe, "size", "medium"))]
 
     def adjacent_allies_with(self, fid: str) -> list:
         """The allies beside this creature (same side, up, within 5 ft) who hold feat
