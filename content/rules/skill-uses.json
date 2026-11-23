@@ -198,6 +198,7 @@
     "skill": "sense motive",
     "source": "CRB, Sense Motive (d20pfsrd.com/skills/sense-motive): 'Hunch: This use of the skill involves making a gut assessment of the social situation. You can get the feeling from another's behavior that something is wrong, such as when you're talking to an impostor. Alternatively, you can get the feeling that someone is trustworthy.' DC 20. 'Trying to gain information with Sense Motive generally takes at least 1 minute.' Retry: 'No, though you may make a Sense Motive check for each Bluff check made against you.'",
     "dc": "20",
+    "harder_with": {"tag": "skill.sense-motive.hunch.harder", "dc": 25, "source": "Stone-Faced (APG): the DC for Sense Motive checks to get a hunch about you is 25 rather than 20"},
     "action": "time",
     "outcome": {
       "tag": "knows.sensed.$of",

@@ -366,6 +366,8 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                     # attack swings in the other hand (`Engine._off_hand_refusal`).
                     "deadly_aim", "combat_expertise", "piranha_strike", "vital_strike",
                     "cleave", "rapid_shot", "flurry", "off_hand",
+                    # Feat loop b1: the assault feats' declared -5 (APG).
+                    "bloody_assault", "dazing_assault", "stunning_assault",
                     # Fighting defensively (CRB, Combat; combat bar round 2): anyone's,
                     # its stance laid by `Engine._lay_attack_stances`.
                     "fighting_defensively"), "player"),
@@ -847,6 +849,9 @@ PARAM_ALIASES = {
     "vital strike": "vital_strike",
     "rapid shot": "rapid_shot",
     "fighting defensively": "fighting_defensively",
+    "bloody assault": "bloody_assault",
+    "dazing assault": "dazing_assault",
+    "stunning assault": "stunning_assault",
     "flurry of blows": "flurry",
     "off hand": "off_hand",
     "opposed": "opposed_by",
@@ -1086,7 +1091,8 @@ FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "faile
                          "immersed", "feint", "tumble", "care", "display",
                          "deadly_aim", "combat_expertise", "piranha_strike",
                          "vital_strike", "cleave", "rapid_shot", "flurry",
-                         "fighting_defensively"})
+                         "fighting_defensively", "bloody_assault", "dazing_assault",
+                         "stunning_assault"})
 from .skilluses import OWN_DOORS as _OWN_DOORS  # noqa: E402 — the uses with their own door
 
 

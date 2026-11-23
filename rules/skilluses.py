@@ -114,7 +114,16 @@ def dc(use_id: str, subject, **names) -> int:
     """The row's DC, read off the subject's sheet plus what only the reader knows."""
     from . import resources
 
-    return resources.evaluate(row(use_id)["dc"], subject, names or None)
+    r = row(use_id)
+    value = resources.evaluate(r["dc"], subject, names or None)
+    # A subject whose tag makes the use harder against them, the row's `harder_with`
+    # (feat loop b1): Stone-Faced's "the DC for Sense Motive checks to get a hunch about
+    # you is 25 rather than 20" — the `faster_with` shape, asked of the subject.
+    harder = r.get("harder_with") or {}
+    if (harder.get("tag") and getattr(subject, "has_state", None)
+            and subject.has_state(harder["tag"])):
+        value = max(value, int(harder["dc"]))
+    return value
 
 
 # --- the action a use costs in a fight ------------------------------------------------------
@@ -263,13 +272,31 @@ def feint(engine, intent, actor, mods, partial):
         # shortcut: the round ticker runs at the top of the round, so 2 lasts through the
         # feinter's next turn and a little past it; a per-turn clock would end it exactly.
         rounds_left=int(out["rounds"]), tags=(f"{FEINTED}.{actor.ref}",),
-        payload={"by": actor.ref}))
+        payload={"by": actor.ref,
+                 **({"until_hit": True} if actor.has_state(RAGE_STANCE)
+                    and actor.has_state(unforbidden_tag("bluff", "feint")) else {})}))
     effects = [{"ref": target.ref, "kind": "condition", "condition": "feinted",
                 "by": actor.ref, "origin": "rule:feint"}]
     said = (f"{actor.name} feints at {target.name}{cost} and makes the bluff "
             f"check{dc_mod.by(margin)}: {target.name}'s guard is drawn, and {actor.name}'s "
             f"next melee attack on them, this turn or the next, finds them without their "
             f"Dexterity to their defence.")
+    partners = _feint_partners(engine, actor)
+    for ally in partners:
+        # Feint Partner (UC): "Whenever an ally who also has this feat successfully feints
+        # an opponent, that opponent also loses his Dexterity bonus to AC against the next
+        # attack you make against him before the end of the feinting ally's next turn" —
+        # the same per-feinter tag, in the partner's name, for the same rounds.
+        target.apply_effect(ActiveEffect(
+            name=f"feinted for {ally.name}", kind="situation", key=f"feinted-by-{ally.ref}",
+            source=FEINT_SOURCE, origin="rule:feat-feint-partner", duration="rounds",
+            rounds_left=int(out["rounds"]), tags=(f"{FEINTED}.{ally.ref}",),
+            payload={"by": ally.ref, "partner_of": actor.ref}))
+        effects.append({"ref": target.ref, "kind": "condition", "condition": "feinted",
+                        "by": ally.ref, "origin": "rule:feat-feint-partner"})
+    if partners:
+        said += (f" Feint Partner: {_and(p.name for p in partners)}'s next blow at "
+                 f"{target.name} finds the same opening.")
     if actor.has_state(out["greater_tag"]):
         target.apply_effect(ActiveEffect(
             name=f"off guard from {actor.name}'s feint", kind="situation",
@@ -284,19 +311,61 @@ def feint(engine, intent, actor, mods, partial):
                     margin=margin, effects=effects, tell=said)
 
 
+# Feint Partner's tag (content/feats/mechanics/batch1-maneuvers.json), a teamwork feat:
+# the feinter and the ally must both hold it.
+FEINT_PARTNER = "teamwork.feint-partner"
+
+
+def _feint_partners(engine, actor) -> list:
+    """The feinter's allies in this fight who share Feint Partner with them."""
+    from .position import _same_side
+
+    scene = engine.scene
+    if not actor.has_state(FEINT_PARTNER) or not (getattr(scene, "sides", None) or {}):
+        return []
+    return [o for ref, o in scene.actors.items()
+            if ref != actor.ref and not o.is_down and o.has_state(FEINT_PARTNER)
+            and _same_side(scene, actor.ref, ref)]
+
+
+def _and(names) -> str:
+    names = list(names)
+    return names[0] if len(names) == 1 else ", ".join(names[:-1]) + " and " + names[-1]
+
+
 def feinted(defender, attacker, weapon: dict | None) -> bool:
-    """Whether this blow is the feinter's next melee attack on a creature it feinted."""
-    if defender is None or attacker is None or not weapon \
-            or weapon.get("category") == "ranged" or weapon.get("thrown"):
+    """Whether this blow is the feinter's next melee attack on a creature it feinted — or,
+    for a Feint Partner's opening, the partner's next attack of any kind ("the next
+    attack you make against him", UC)."""
+    if defender is None or attacker is None or not weapon:
         return False
-    return defender.has_state(f"{FEINTED}.{attacker.ref}")
-
-
-def spend_feint(defender, attacker) -> None:
-    """The feint is used up by the attack that read it (Greater Feint's exposure stays
-    its round: it is against everybody, not against the next blow)."""
     tag = f"{FEINTED}.{attacker.ref}"
-    defender.remove_effects(match=lambda e: tag in (e.tags or ()))
+    if weapon.get("category") == "ranged" or weapon.get("thrown"):
+        return any(tag in (e.tags or ()) and (e.payload or {}).get("partner_of")
+                   for e in defender.effects)
+    return defender.has_state(tag)
+
+
+def spend_feint(defender, attacker, landed: bool = False) -> None:
+    """The feint is used up by the attack that read it (Greater Feint's exposure stays
+    its round: it is against everybody, not against the next blow). A raging feint made
+    with Tantrum "lasts only until the first time you hit the target" (Gnomes of
+    Golarion): its effect carries `until_hit`, and only a blow that landed spends it."""
+    tag = f"{FEINTED}.{attacker.ref}"
+    defender.remove_effects(match=lambda e: tag in (e.tags or ()) and (
+        landed or not (e.payload or {}).get("until_hit")))
+
+
+# A skill use let through an effect's ban on its skill (`Engine._forbidden_skill`):
+# `skill.unforbidden.<skill>.<use>`. Tantrum's (content/feats/mechanics/batch1-
+# maneuvers.json): "You may use the Bluff skill to feint while raging", which rage's ban on
+# Charisma skills otherwise refuses; and its raging feint lasts until a blow lands.
+UNFORBIDDEN = "skill.unforbidden"
+RAGE_STANCE = "buff.stance.rage"
+
+
+def unforbidden_tag(skill: str, use: str) -> str:
+    return f"{UNFORBIDDEN}.{'-'.join(str(skill).strip().lower().split())}.{use}"
 
 
 # --- tumble -----------------------------------------------------------------------------------

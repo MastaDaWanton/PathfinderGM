@@ -2465,12 +2465,22 @@ WHEN_KEYS: dict[str, str] = {
     "ally_adjacent": "an ally within 5 ft who holds the feat named: {\"feat\": "
                      "\"shielded-caster\"}, optionally \"shield\" (light, heavy) and "
                      "\"same_spell\" (sheet._when_holds)",
+    # Feat loop b1 (2026-11-22): the teamwork feats' "adjacent to an ally who also has
+    # this feat" and Solo Maneuvers' "the only one threatening", asked on the board.
+    "ally_beside": "an ally adjacent on the board holding a feat: {\"feat\": "
+                   "\"coordinated-defense\"}, with foe_larger for a foe larger than "
+                   "both (sheet.Situation.ally_beside)",
+    "sole_threat": "whether the bearer alone threatens the foe of the roll "
+                   "(sheet.Situation.sole_threat)",
+    "skill_use": "which use of a skill the check is: lie, feint, diversion, tumble ... "
+                 "or {\"not\": \"feint\"} (Engine._skill_use_ctx)",
 }
-_WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment", "choice"),
+_WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment", "choice",
+                                  "state"),
                        "attacker": ("type", "subtype")}
 _WHEN_COMPARE = ("lte", "gte", "lt", "gt", "eq")
 _WHEN_BOOLS = ("daylight", "underground", "wielder_casts", "resting", "full_attack",
-               "flanked")
+               "flanked", "sole_threat")
 
 # What a roll may be made AGAINST — the `against` of a roll context, one word per danger,
 # each with the reader that passes it. A closed list, because the clause is answered by
@@ -2524,6 +2534,12 @@ AGAINST: dict[str, str] = {
     "negative_energy": "a spell of negative energy, an inflict (Engine._cast_save)",
     "scroll": "casting from a scroll: its caster level (Engine._use_power) and the check to "
               "read one above the reader's level (Engine._spell_item_gate)",
+    # Feat loop b1: Careful Speaker's and Seen and Unseen's saves, off the spell's own
+    # school and subschool (`spell_against`); "mind-reading" is a divination that is
+    # also mind-affecting — detect thoughts, mind probe.
+    "divination": "a divination (the school)",
+    "scrying": "a scrying (the divination subschool)",
+    "mind-reading": "a mind-affecting divination: detect thoughts, mind probe",
 }
 
 
@@ -2548,6 +2564,8 @@ def spell_against(spell) -> tuple[str, ...]:
         words.append("area")
     if _lands_sleep(getattr(spell, "effects", None) or ()):
         words.append("sleep")
+    if "divination" in words and "mind-affecting" in words:
+        words.append("mind-reading")
     return tuple(words)
 
 
@@ -2624,6 +2642,18 @@ def when_problems(when, where: str = "when") -> list[str]:
                 out.append(f"{where}.ally_adjacent has only feat, shield and same_spell.")
             elif "shield" in want and want["shield"] not in ("light", "heavy"):
                 out.append(f"{where}.ally_adjacent.shield is light or heavy.")
+        elif key == "skill_use":
+            if not (isinstance(want, str) and want) and not (
+                    isinstance(want, dict) and set(want) == {"not"} and want["not"]):
+                out.append(f"{where}.skill_use is a use (\"lie\") or {{\"not\": "
+                           f"\"feint\"}}.")
+        elif key == "ally_beside":
+            from . import feats as feats_mod
+
+            if (not isinstance(want, dict) or set(want) - {"feat", "foe_larger"}
+                    or str(want.get("feat") or "") not in feats_mod.all_feats()):
+                out.append(f"{where}.ally_beside is {{\"feat\": \"<a feat id>\"}}, with "
+                           f"an optional \"foe_larger\": true.")
         elif key in ("weapon", "armour", "bearer", "near"):
             if not isinstance(want, dict) or not want:
                 out.append(f"{where}.{key} is an object of the fields it asks.")

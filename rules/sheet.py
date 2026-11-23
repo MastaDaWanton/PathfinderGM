@@ -361,7 +361,10 @@ OFF_HAND_FULL_STRENGTH = "two_weapon.off_hand.full_strength"
 # class-feature document's `choice` names and whose numbers that document carries. The
 # feat each is first offered by, for the refusal's name; `can_choose` reads the documents.
 ATTACK_CHOICES = ("power_attack", "deadly_aim", "piranha_strike", "combat_expertise",
-                  "fighting_defensively", "vital_strike", "cleave", "rapid_shot", "flurry")
+                  "fighting_defensively", "vital_strike", "cleave", "rapid_shot", "flurry",
+                  # Feat loop b1: the Power Attack family's -5 for a rider on every melee
+                  # hit "until your next turn" (APG), each a stance like Combat Expertise.
+                  "bloody_assault", "dazing_assault", "stunning_assault")
 # The options nobody needs a feat for (combat bar round 2, 2026-11-22). CRB, Combat
 # ("Fighting Defensively as a Standard Action"): "You can choose to fight defensively when
 # attacking" — anyone, with any attack. Its numbers are `defensive_dodge` and the stance
@@ -383,7 +386,9 @@ def defensive_dodge(actor, total: bool = False) -> int:
 ATTACK_CHOICE_FEATS = {"power_attack": "power-attack", "deadly_aim": "deadly-aim",
                        "piranha_strike": "piranha-strike",
                        "combat_expertise": "combat-expertise", "vital_strike": "vital-strike",
-                       "cleave": "cleave", "rapid_shot": "rapid-shot"}
+                       "cleave": "cleave", "rapid_shot": "rapid-shot",
+                       "bloody_assault": "bloody-assault", "dazing_assault": "dazing-assault",
+                       "stunning_assault": "stunning-assault"}
 
 _IMPLIED_GENDER = {"she": "woman", "he": "man"}
 
@@ -4759,7 +4764,8 @@ class Actor:
     # grappling than it should be.
 
     def cmb_modifiers(self, maneuver: str | None = None,
-                      power_attack: bool = False, choices=()) -> list[Modifier]:
+                      power_attack: bool = False, choices=(),
+                      defender=None) -> list[Modifier]:
         # Tiny or smaller creatures use Dex in place of Str for CMB, and so does a feat
         # document's `cmb_ability` (Agile Maneuvers, which did nothing before 2026-11-15).
         uses_dex = self.size in ("fine", "diminutive", "tiny")
@@ -4790,14 +4796,17 @@ class Actor:
         # damage_modifiers had: a `combat_mod` aimed at cmb was in the authoring
         # vocabulary, validated, saved, and absent from every manoeuvre roll. The
         # Improved/Greater <manoeuvre> family arrives here scoped to the manoeuvre.
+        # `defender`: the creature the manoeuvre is made against, so a term may ask of it
+        # (Kobold Style's "against enemies denied their Dexterity bonus"). Feat loop b1.
         mods.extend(self._buff_mods("combat_mod", "cmb",
                                     self._roll_context(None, maneuver=maneuver,
+                                                       defender=defender,
                                                        **_declared(power_attack,
                                                                    choices))))
         return stack([m for m in mods if m.value])
 
     def cmd_modifiers(self, flat_footed: bool = False,
-                      maneuver: str | None = None) -> list[Modifier]:
+                      maneuver: str | None = None, attacker=None) -> list[Modifier]:
         if self.flat_cmd is not None:
             # The print, moved by what Strength and Dexterity have done since
             # (`printed_shift`), so its Dex part is the creature's Dex now.
@@ -4844,8 +4853,16 @@ class Actor:
                     and not (loses and m.type == "dodge"))
         # 1e grants Improved <manoeuvre> to CMD as well as CMB; the old branch gave
         # CMB alone, and the document says both.
-        mods.extend(self._buff_mods("combat_mod", "cmd",
-                                    {"maneuver": maneuver} if maneuver else None))
+        # `attacker`: who makes the manoeuvre, which a term may ask of (`attacker`,
+        # Coordinated Defense's larger foe, Solo Maneuvers' lone one), and the moment,
+        # for the board questions (`ally_beside`, `sole_threat`). Feat loop b1.
+        ctx: dict = {"maneuver": maneuver} if maneuver else {}
+        if attacker is not None:
+            ctx["attacker_actor"] = attacker
+        sit = situation_of(self)
+        if sit is not None:
+            ctx["situation"] = sit
+        mods.extend(self._buff_mods("combat_mod", "cmd", ctx or None))
         return stack([m for m in mods if m.value])
 
     def cmd(self, flat_footed: bool = False) -> int:
@@ -8637,6 +8654,90 @@ class Situation:
         return False
 
 
+    def _placed(self, ref):
+        grid = getattr(self.scene, "grid", None)
+        pos = (getattr(self.scene, "positions", {}) or {}).get(ref)
+        return None if grid is None or pos is None else (pos[0], pos[1])
+
+    def ally_beside(self, want, foe=None) -> bool:
+        """Whether an ally stands adjacent to this creature holding the teamwork feat
+        `want["feat"]` (by document id) — "Whenever you are adjacent to an ally who also
+        has this feat" (APG, teamwork feats). With `foe_larger`, the foe of the roll is
+        also larger than both of them (Coordinated Defense's +4). Measured on the board
+        as flanking is (`position._same_side`, `grid.is_adjacent`): with no map there is no
+        adjacency, and the clause fails closed, as flanking's +2 does."""
+        from . import feats as feats_mod
+        from . import grid as gridmod
+        from . import position as position_mod
+
+        if not isinstance(want, dict) or not want.get("feat"):
+            return False
+        me = getattr(self.actor, "ref", None)
+        here = self._placed(me)
+        sides = getattr(self.scene, "sides", None) or {}
+        if here is None or not any(me in refs for refs in sides.values()):
+            return False
+        from .tables import SIZE_ORDER
+
+        order = list(SIZE_ORDER)
+        for ref, other in (getattr(self.scene, "actors", {}) or {}).items():
+            if ref == me or other.is_down or not position_mod._same_side(self.scene, me, ref):
+                continue
+            there = self._placed(ref)
+            if there is None or not gridmod.is_adjacent(here, self.actor.size or "medium",
+                                                       there, other.size or "medium"):
+                continue
+            if not any((feats_mod.document(raw) or {}).get("id") == want["feat"]
+                       for raw in other.feats or ()):
+                continue
+            if want.get("foe_larger"):
+                if foe is None:
+                    continue
+                try:
+                    big = order.index(foe.size or "medium")
+                    if not (big > order.index(self.actor.size or "medium")
+                            and big > order.index(other.size or "medium")):
+                        continue
+                except ValueError:
+                    continue
+            return True
+        return False
+
+    def sole_threat(self, foe) -> bool:
+        """Whether this creature threatens `foe` and nobody else against it does — Solo
+        Maneuvers' "whenever you are the only one threatening an opponent" (Bastards of
+        Golarion). Threat is `reactions.threatens` over the foe's footprint, the attack of
+        opportunity's own rule; the foe's own side does not count against it. No map, no
+        threat (`reactions.threatens`), so the clause fails closed."""
+        from . import grid as gridmod
+        from . import position as position_mod
+        from . import reactions
+
+        if foe is None or not getattr(self.scene, "has_grid", False):
+            return False
+        there = self._placed(foe.ref)
+        if there is None:
+            return False
+        squares = gridmod.footprint(there, foe.size or "medium")
+
+        def threatens(ref) -> bool:
+            return any(reactions.threatens(self.scene, ref, sq, foe.size or "medium")
+                       for sq in squares)
+
+        me = getattr(self.actor, "ref", None)
+        if not threatens(me):
+            return False
+        for ref, other in (getattr(self.scene, "actors", {}) or {}).items():
+            if ref in (me, foe.ref) or other.is_down:
+                continue
+            if position_mod._same_side(self.scene, foe.ref, ref) and (
+                    getattr(self.scene, "sides", None) or {}):
+                continue
+            if threatens(ref):
+                return False
+        return True
+
+
 def situation_of(actor) -> Situation | None:
     m = _MOMENT.get()
     return Situation(actor, m.scene) if m is not None else None
@@ -8708,10 +8809,42 @@ def _when_holds(when, ctx: dict | None) -> bool:
                     # documents: when alignment lands this branch is the only line that
                     # changes, and every holy sword narrows with it.
                     continue
+                if field_name == "state":
+                    # A held state of the one the roll is made against, by prefix (law 1):
+                    # Kobold Style's "enemies denied their Dexterity bonus to AC" is
+                    # `{"state": "state.exposed"}`, the tag `loses_dex_to_ac` asks.
+                    if not defender.has_state(str(value or "")):
+                        return False
+                    continue
                 if field_name not in ("type", "subtype"):
                     return False
                 if not _is_of_kind(defender, field_name, value):
                     return False
+        elif key == "skill_use":
+            # Which use of a skill this check is (`Engine._skill_use_ctx`): "lie", "feint",
+            # "diversion" ... — or `{"not": "feint"}`, every use but those (Voice of the
+            # Sibyl's "if you do not use your voice ... such as using Bluff to feint").
+            have = str(ctx.get("skill_use") or "")
+            if isinstance(want, dict):
+                barred = want.get("not")
+                barred = barred if isinstance(barred, (list, tuple)) else [barred]
+                if have in {str(b) for b in barred}:
+                    return False
+            elif have != str(want):
+                return False
+        elif key in ("ally_beside", "sole_threat"):
+            # Board questions about the bearer and the foe of this roll (feat loop b1):
+            # an ally beside with the same teamwork feat, the bearer alone threatening.
+            # Asked of the moment's scene (`Situation`); no moment or no map, no answer.
+            sit = ctx.get("situation")
+            foe = ctx.get("target_actor") or ctx.get("attacker_actor")
+            if sit is None:
+                return False
+            if key == "ally_beside":
+                if not sit.ally_beside(want, foe):
+                    return False
+            elif bool(want) != sit.sole_threat(foe):
+                return False
         elif key == "attacker":
             # Celestial bronze's DR "against magical beasts and monstrous humanoids": asked
             # of whoever made the blow. The damage path knows them only by the blow's

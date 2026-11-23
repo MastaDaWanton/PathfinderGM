@@ -68,7 +68,8 @@ from . import words as english
 from .tables import (
     CONDITIONS,
     ABILITY_FULL, AID_ANOTHER_BONUS, AID_ANOTHER_DC, MANEUVERS, SAVES, SIZE_ORDER,
-    ENERGY_DAMAGE, ability_check_of, maneuver_text, normalise_damage_type,
+    ENERGY_DAMAGE, ability_check_of, iterative_attacks, maneuver_text,
+    normalise_damage_type,
 )
 
 
@@ -5257,6 +5258,10 @@ class Engine:
     # refusal of Stealth-while-watched named "a diversion first" and nothing could make one.
 
     DIVERSION_PENALTY = -10
+    # The feat documents' Stealth tags (content/feats/mechanics/batch1-maneuvers.json):
+    # Hellcat Stealth's hide while watched, Go Unnoticed's first-round hide.
+    HIDES_WHILE_OBSERVED = "stealth.while-observed"
+    UNNOTICED_BY_FLAT_FOOTED = "stealth.unnoticed.flat-footed"
 
     def _diversion(self, actor):
         """The live diversion `actor` made, as its ActiveEffect, or None. Live in this
@@ -7029,11 +7034,11 @@ class Engine:
         hold = next((e for e in defender.effects if self._is_grapple(e)
                      and str((e.payload or {}).get("by") or "") == actor.ref), None)
         p = dict(hold.payload or {}) if hold is not None else {}
-        mods = list(actor.cmb_modifiers("grapple"))
+        mods = list(actor.cmb_modifiers("grapple", defender=defender))
         mods.append(Modifier(5, "maintaining the hold", "circumstance"))
         if int(p.get("hold_bonus") or 0):
             mods.append(Modifier(int(p["hold_bonus"]), str(p.get("hold_rider") or "grab")))
-        cmd = sum(m.value for m in defender.cmd_modifiers(maneuver="grapple"))
+        cmd = sum(m.value for m in defender.cmd_modifiers(maneuver="grapple", attacker=actor))
         state = partial.get("attack_state") or {}
         rolls: list[Roll] = []
         if defender.is_helpless or defender.is_down:
@@ -7094,9 +7099,11 @@ class Engine:
         check against the holder's CMD, a standard action that provokes nothing; success
         ends it for both. `how` is "cmb", "escape artist" or "" — the better of the two,
         as a player at the table would choose."""
-        cmd = sum(m.value for m in holder.cmd_modifiers(maneuver="grapple"))
-        cmb = list(actor.cmb_modifiers("escape"))
-        art = list(actor.skill_modifiers("escape artist"))
+        cmd = sum(m.value for m in holder.cmd_modifiers(maneuver="grapple", attacker=actor))
+        cmb = list(actor.cmb_modifiers("escape", defender=holder))
+        # An Escape Artist check to break free is one "made to escape a grapple or to
+        # escape from bonds" (Free Spirit): the escape's own context, asked by `when`.
+        art = list(actor.skill_modifiers("escape artist", ctx={"maneuver": "escape"}))
         how = str(how or "").strip().lower()
         if how not in ("cmb", "escape artist"):
             how = ("escape artist" if sum(m.value for m in art) > sum(m.value for m in cmb)
@@ -7145,7 +7152,7 @@ class Engine:
         nobody holding, and `escape` answered "Nobody is holding" for its whole duration."""
         dc = int(held.payload["ends_when"]["escape"].get("dc") or 0)
         cmb = list(actor.cmb_modifiers("escape"))
-        art = list(actor.skill_modifiers("escape artist"))
+        art = list(actor.skill_modifiers("escape artist", ctx={"maneuver": "escape"}))
         how = str(how or "").strip().lower()
         if how not in ("cmb", "escape artist"):
             how = ("escape artist" if sum(m.value for m in art) > sum(m.value for m in cmb)
@@ -8651,7 +8658,8 @@ class Engine:
             mods = actor.ability_check_modifiers(ability)
         else:
             mods, refused = self._skill_mods_or_refusal(
-                intent, actor, skill, opposed=bool(intent.params.get("opposed_by")))
+                intent, actor, skill, opposed=bool(intent.params.get("opposed_by")),
+                ctx=self._skill_use_ctx(intent, skill))
             if refused is not None:
                 return refused
         for (named_skill, flag), resolve in skilluses.OWN_DOORS.items():
@@ -8702,7 +8710,21 @@ class Engine:
             if not slipped:
                 diverted = self._diversion(actor)
                 away = set((diverted.payload or {}).get("from") or ()) if diverted else set()
+                # Go Unnoticed (APG): "During the first round of combat, flat-footed
+                # opponents are considered not to have noticed you yet for the purposes of
+                # Stealth checks" — a foe who has not acted yet is not watching.
+                if self.scene.in_encounter and actor.has_state(self.UNNOTICED_BY_FLAT_FOOTED):
+                    away |= {o.ref for o in self._watchers(actor)
+                             if not self._has_acted(o.ref) and self._flat_footed(o)}
                 watcher = self._watched_in_the_open(actor, ignore=away)
+                if (watcher is not None and diverted is None
+                        and actor.has_state(self.HIDES_WHILE_OBSERVED)):
+                    # Hellcat Stealth (Cheliax): "You may make Stealth checks in normal or
+                    # bright light even when observed, but at a -10 penalty." Watched in
+                    # the open is that light: dim light or darkness is concealment, and
+                    # concealment is no watcher (`_watched_in_the_open`).
+                    mods = [*mods, Modifier(-10, "hiding while watched (Hellcat Stealth)")]
+                    watcher = None
                 if watcher is not None:
                     return self._refuse(
                         intent, f"{watcher.name} is watching {actor.name}, and there is no "
@@ -9038,8 +9060,29 @@ class Engine:
                 mods = [*mods, Modifier(4 * steps, f"{mine} against {theirs}")]
         return mods
 
+    @staticmethod
+    def _skill_use_ctx(intent: Intent, skill: str) -> dict | None:
+        """`{"skill_use": ...}` for the roll context of a check: the use with its own door
+        (`skilluses.OWN_DOORS`: feint, tumble ...), a Bluff made for a diversion, or a
+        Bluff against Sense Motive — a lie. What a feat's `when: {"skill_use": "lie"}`
+        asks (Stone-Faced: "to lie or conceal your feelings ... but not to feint"), and
+        `{"not": "feint"}` (Voice of the Sibyl's spoken word). Feat loop b1."""
+        from . import skilluses
+
+        said = str(skill or "").strip().lower()
+        use = next((flag for (named, flag) in skilluses.OWN_DOORS
+                    if named == said and intent.params.get(flag)), "")
+        opposed = intent.params.get("opposed_by")
+        if not use and said == "bluff":
+            if intent.params.get("diversion"):
+                use = "diversion"
+            elif isinstance(opposed, dict) and str(
+                    opposed.get("skill") or "").strip().lower() == "sense motive":
+                use = "lie"
+        return {"skill_use": use} if use else None
+
     def _skill_mods_or_refusal(self, intent: Intent, actor, skill: str,
-                               opposed: bool = False):
+                               opposed: bool = False, ctx: dict | None = None):
         """(the skill's modifiers, None), or ([], the Outcome saying why nothing is rolled)."""
         from .sheet import IllegalSheet
 
@@ -9048,7 +9091,7 @@ class Engine:
         # Acrobatics, Fly, Intimidate, and Ride)" (CRB p.31). Before this nothing read the
         # clause (rage's own not_yet), and a raging barbarian's Diplomacy rolled as if
         # she were calm.
-        barred = _forbidden_skill(actor, str(skill))
+        barred = _forbidden_skill(actor, str(skill), (ctx or {}).get("skill_use", ""))
         if barred:
             return [], Outcome(intent_id=intent.id, op="check", effects=[], tell=barred,
                                because=intent.because)
@@ -9060,7 +9103,7 @@ class Engine:
         # is right (1e knowledge checks are trained-only); the crash is not. Nothing is
         # rolled, the player is told why, and the turn survives.
         try:
-            return actor.skill_modifiers(skill, opposed=opposed), None
+            return actor.skill_modifiers(skill, opposed=opposed, ctx=ctx), None
         except IllegalSheet as exc:
             return [], Outcome(intent_id=intent.id, op="check", effects=[],
                                tell=f"{exc}. Nothing is rolled.", because=intent.because)
@@ -10164,6 +10207,10 @@ class Engine:
             # riding it — a trip is not a way to finish somebody.
             full = False
         elif intent.params.get("manoeuvre"):
+            if partial.get("attack_state") is None:
+                why = self._maneuver_slot_refusal(intent, actor)
+                if why:
+                    return self._refuse(intent, why, code="maneuver_slot")
             done = self._resolve_maneuver(intent, actor, defender, weapon_key, partial)
             # A manoeuvre is an attack roll (CMB against CMD) at a creature: it ends a
             # hiding as a blow does. Only one that was rolled — a refusal did nothing.
@@ -11129,6 +11176,16 @@ class Engine:
                         actor, defender, weapon_key, intent.visibility or "player", weapon)):
                     state["effects"].append(extra["effect"])
                     state["tells"].append(extra["tell"])
+                # A raging feint (Tantrum) lasts until the first blow that lands.
+                if state.get("feinted"):
+                    skilluses.spend_feint(defender, actor, landed=True)
+                # What a held feat lays on a melee hit (`_feat_riders`): Bloody Assault's
+                # bleed, Dazing and Stunning Assault's save-or-condition.
+                for extra in ([] if dancing else self._feat_riders(
+                        intent, actor, defender, weapon_key, weapon, state)):
+                    state["effects"].append(extra["effect"])
+                    if extra.get("tell"):
+                        state["tells"].append(extra["tell"])
                 # A forged blade's own riders — a wyvern-blood quench on the first wound
                 # of the day, viridium on the crit (plan §12.4).
                 for extra in self._item_riders(actor, defender, weapon,
@@ -11914,6 +11971,37 @@ class Engine:
             params["square"] = square + list(start[2:3])
         raw["params"] = params
 
+    # The tag a Quick <manoeuvre> feat grants (UC): its standard-action manoeuvre may take
+    # the first swing of a full attack. `maneuver.in-place-of-attack.bull-rush` ...
+    IN_PLACE_OF_ATTACK = "maneuver.in-place-of-attack"
+
+    @classmethod
+    def _maneuver_slot_refusal(cls, intent: Intent, actor: Actor) -> str:
+        """Why this manoeuvre cannot stand in the full-attack swing it names (`iteration`),
+        or "". CRB: disarm, sunder and trip are made "in place of a melee attack", so in
+        any swing; every other manoeuvre "is a standard action" (APG, UC: "Normal: A bull
+        rush combat maneuver is a standard action"), and Quick Bull Rush, Dirty Trick,
+        Drag, Reposition and Steal let theirs replace "one of your melee attacks ... the
+        melee attack with the highest base attack bonus" — the first swing. Feat loop b1:
+        before it a swing slot could carry no manoeuvre at all."""
+        it = intent.params.get("iteration")
+        if it is None:
+            return ""
+        key = str(intent.params.get("manoeuvre") or "")
+        m = MANEUVERS.get(key) or {}
+        if m.get("in_place_of_attack"):
+            return ""
+        name = m.get("name", key)
+        tag = f"{cls.IN_PLACE_OF_ATTACK}.{'-'.join(key.split())}"
+        if not actor.has_state(tag):
+            return (f"A {name} is a standard action and cannot take a swing of a full "
+                    f"attack; make it on its own. (Trip, disarm and sunder can stand in "
+                    f"any swing.)")
+        if int(it or 0) != 0:
+            return (f"Quick {name.title()} takes the swing with the highest bonus, the "
+                    f"first of the full attack, not a later one.")
+        return ""
+
     def _resolve_maneuver(self, intent: Intent, actor: Actor, defender: Actor,
                           weapon_key: str, partial: dict) -> Outcome:
         """A combat manoeuvre: the same attack roll, with CMB instead of the attack
@@ -11935,7 +12023,15 @@ class Engine:
                 return self._escape_from(intent, actor, defender, partial, "cmb")
         self._ensure_encounter(intent.actor, intent.target)
 
-        mods = list(actor.cmb_modifiers(key))
+        mods = list(actor.cmb_modifiers(key, defender=defender))
+        # A manoeuvre standing in a later swing of a full attack is made at that swing's
+        # bonus (CRB: "in place of a melee attack"): the iterative's -5, -10, -15.
+        it = intent.params.get("iteration")
+        if it is not None and int(it or 0) > 0:
+            seq = iterative_attacks(actor.bab)
+            step = seq[min(int(it), len(seq) - 1)] - seq[0]
+            if step:
+                mods.append(Modifier(step, "a later swing of the full attack"))
         # Struck by the target while trying it: "apply that amount as a penalty to the
         # attack roll to perform the maneuver" (CRB, aonprd.com/Rules.aspx?ID=188). The
         # wounds before the provoked swing were written by `_provoked_by_maneuver`.
@@ -11973,7 +12069,8 @@ class Engine:
 
         flat_footed = self._flat_footed(defender) or self._unseen_attacker(defender, actor)
         cmd_mods = defender.cmd_modifiers(
-            flat_footed, maneuver=str(intent.params.get("manoeuvre") or "") or None)
+            flat_footed, maneuver=str(intent.params.get("manoeuvre") or "") or None,
+            attacker=actor)
         if loot and loot["fastened"]:
             cmd_mods = list(cmd_mods) + [Modifier(m["fastened_cmd"],
                                                   f"{loot['label']} is fastened")]
@@ -23656,12 +23753,14 @@ class Engine:
         return 10 + int(hd) // 2 + actor.ability_mod(ab)
 
     def _rider_save(self, defender: Actor, save: str, dc: int, label: str,
-                    state: dict, against: str = "") -> tuple[bool, str]:
+                    state: dict, against: str = "", attacker: Actor | None = None
+                    ) -> tuple[bool, str]:
         """The defender's save against a rider, the engine's roll (an NPC's intent: hidden,
         as `_distraction` and `_magic_gate` roll theirs), kept in the attack's rolls, and
         the words the tell quotes: "Fortitude 9 against DC 13"."""
-        roll = self.dice.d20(defender.save_modifiers(save, {"against": against}
-                                                     if against else None),
+        ctx = {**({"against": against} if against else {}),
+               **({"attacker_actor": attacker} if attacker is not None else {})}
+        roll = self.dice.d20(defender.save_modifiers(save, ctx or None),
                              label=label, visibility="hidden")
         state.setdefault("rolls", []).append(roll.as_dict())
         nat = natural_said(roll, dc)
@@ -23759,10 +23858,10 @@ class Engine:
         through `_shove` (which stops at the first square that is blocked)."""
         word = str(rule["rider"])
         key = "drag" if word == "pull" else "bull rush"
-        roll = self.dice.d20(actor.cmb_modifiers(key), label=f"{word.title()} (CMB)",
-                             visibility="hidden")
+        roll = self.dice.d20(actor.cmb_modifiers(key, defender=defender),
+                             label=f"{word.title()} (CMB)", visibility="hidden")
         state.setdefault("rolls", []).append(roll.as_dict())
-        cmd = sum(m.value for m in defender.cmd_modifiers(maneuver=key))
+        cmd = sum(m.value for m in defender.cmd_modifiers(maneuver=key, attacker=actor))
         if not d20_succeeds(roll, cmd):
             return [{"effect": {"ref": defender.ref, "kind": "rider_resisted",
                                 "rider": word, "origin": origin},
@@ -23860,7 +23959,8 @@ class Engine:
         save = str(rule.get("save") or "fort")
         dc = self._printed_dc(actor, rule)
         made, said = self._rider_save(defender, save, dc,
-                                      f"{SAVES[save]} save against {word}", state)
+                                      f"{SAVES[save]} save against {word}", state,
+                                      attacker=actor)
         if made:
             return [{"effect": {"ref": defender.ref, "kind": "rider_resisted",
                                 "rider": word, "origin": origin},
@@ -23878,7 +23978,49 @@ class Engine:
                             "rounds_left": made_cond.rounds_left, "from": word,
                             "origin": origin},
                  "tell": f"{defender.name} fails ({said}) against {actor.name}'s {word} "
-                         f"and is {name} for {made_cond.rounds_left} rounds."}]
+                         f"and is {name} for {made_cond.rounds_left} round"
+                         f"{'' if made_cond.rounds_left == 1 else 's'}."}]
+
+    def _feat_riders(self, intent: Intent, actor: Actor, defender: Actor, weapon_key: str,
+                     weapon: dict, state: dict) -> list[dict]:
+        """What the attacker's feats lay on the creature this blow just hit: a document's
+        `on_hit` riders (feat loop b1, 2026-11-22), each run by the attack riders' own
+        executor (`_RIDERS`: the bleed, the save-or-condition), its `when` asked of the
+        blow's roll context and of the bearer (`classfeatures.holds`) — the stance a
+        declared option laid, a melee weapon. The DC is the document's formula over the
+        sheet ("10 + your base attack bonus"), never a number a plan wrote.
+
+        Measured before it: Bloody, Dazing and Stunning Assault had no document, so the -5
+        they are declared for bought nothing and a hit dazed nobody."""
+        from . import classfeatures, feats as feats_mod, resources
+
+        if defender.hp <= 0 or defender.is_dead or not getattr(actor, "feats", None):
+            return []
+        ctx = actor._roll_context(weapon_key, defender=defender)
+        if weapon.get("category") == "ranged":
+            ctx["weapon"] = dict(ctx["weapon"], category="ranged", ranged=True)
+        out: list[dict] = []
+        seen: set[str] = set()
+        for raw in actor.feats:
+            doc = feats_mod.document(raw)
+            if not doc or doc["id"] in seen or not doc.get("on_hit"):
+                continue
+            seen.add(doc["id"])
+            origin = f"rule:feat-{doc['id']}"
+            for rule in doc["on_hit"]:
+                if defender.hp <= 0 or defender.is_dead:
+                    break
+                if not classfeatures.holds(rule.get("when"), actor, ctx):
+                    continue
+                run = {**rule, "rider": doc["name"].lower()}
+                if rule.get("dc") is not None:
+                    try:
+                        run["dc"] = resources.evaluate(rule["dc"], actor)
+                    except resources.FormulaError:
+                        continue
+                out.extend(self._RIDERS[str(rule["kind"])](self, intent, actor, defender,
+                                                           run, origin, state))
+        return out
 
     # The tags a rogue talent's catalogue entry carries (content/class-options/
     # rogue-talents.json, held through `standing_tags`), in the order the engine picks one
@@ -24069,7 +24211,7 @@ class Engine:
             return out
         dc = self._printed_dc(actor, rule)
         made, said = self._rider_save(defender, "ref", dc, "Reflex save against catching "
-                                      "fire", state)
+                                      "fire", state, attacker=actor)
         if made:
             out.append({"effect": {"ref": defender.ref, "kind": "rider_resisted",
                                    "rider": "burn", "origin": origin},
@@ -24164,7 +24306,7 @@ class Engine:
                      "tell": ""}]
         save, dc = str(aff.get("save") or "fort"), int(aff.get("dc") or 10)
         made, said = self._rider_save(defender, save, dc, f"{SAVES[save]} save against "
-                                      f"{name}", state, against=kind)
+                                      f"{name}", state, against=kind, attacker=actor)
         if made:
             return [{"effect": {"ref": defender.ref, "kind": "rider_resisted",
                                 "rider": rule["rider"], "affliction": name,
@@ -25359,6 +25501,11 @@ class Engine:
             return "Rapid Shot is fired with a ranged weapon, not a " + str(w["name"]) + "."
         if "combat_expertise" in declared and ranged:
             return "Combat Expertise is declared with a melee weapon."
+        # Bloody, Dazing and Stunning Assault (APG): "a -5 penalty on all melee attack
+        # rolls ... to [bleed, daze, stun] opponents you hit with your melee attacks".
+        for c in ("bloody_assault", "dazing_assault", "stunning_assault"):
+            if c in declared and ranged:
+                return f"{said[c]} rides a melee attack, not a {w['name']}."
         if "piranha_strike" in declared:
             if params.get("power_attack"):
                 from . import feats as feats_mod
@@ -25399,6 +25546,17 @@ class Engine:
         # known for that round; `two_weapon` is passed for it by `_op_attack`.
         ("two_weapon", "two-weapon guard", "Two-Weapon Defense",
          "{name} keeps the second blade up as a guard."),
+        # Feat loop b1 (APG): "its effects last until your next turn" — the -5 and the
+        # rider on every melee hit until then, attacks of opportunity included.
+        ("bloody_assault", "bloody assault", "Bloody Assault",
+         "{name} swings to open wounds (Bloody Assault), less sure of every blow until "
+         "their next turn."),
+        ("dazing_assault", "dazing assault", "Dazing Assault",
+         "{name} swings to daze (Dazing Assault), less sure of every blow until their "
+         "next turn."),
+        ("stunning_assault", "stunning assault", "Stunning Assault",
+         "{name} swings to stun (Stunning Assault), less sure of every blow until their "
+         "next turn."),
     )
 
     @classmethod
@@ -28325,6 +28483,8 @@ class Engine:
             state["tells"].extend(gut["tells"])
         caster = self.scene.actors.get(intent.actor)
         with self._guttered(guts[target.ref]["origins"]):
+            # Who cast it rides the context too: Dragonheart's "+1 ... against spells ...
+            # of creatures with the dragon type" asks `attacker` (feat loop b1).
             save_mods = target.save_modifiers(
                 save, {"against": effectspec.spell_against(spell)
                        + self._spell_source_words(caster, spell),
@@ -38842,8 +39002,13 @@ def _sized_weapon(w: dict, size: str) -> dict:
     return out
 
 
-def _forbidden_skill(actor, skill: str) -> str:
-    """The sentence refusing a skill an effect forbids (`payload.forbids`), or ""."""
+def _forbidden_skill(actor, skill: str, use: str = "") -> str:
+    """The sentence refusing a skill an effect forbids (`payload.forbids`), or "".
+
+    `use`: the skill's use (`Engine._skill_use_ctx`). A held tag
+    `skill.unforbidden.<skill>.<use>` lets that one use through every ban
+    (`skilluses.UNFORBIDDEN`): Tantrum's feint through the barbarian's, and nothing else."""
+    from . import skilluses
     from .tables import ABILITY_FULL, SKILLS
 
     row = SKILLS.get(str(skill).strip().lower())
@@ -38853,6 +39018,8 @@ def _forbidden_skill(actor, skill: str) -> str:
         p = e.payload if isinstance(e.payload, dict) else {}
         rule = (p.get("forbids") or {}).get("skills") or {}
         if not rule:
+            continue
+        if use and actor.has_state(skilluses.unforbidden_tag(skill, use)):
             continue
         spared = [str(s) for s in rule.get("except") or ()]
         if row[0] in (rule.get("abilities") or ()) and skill.strip().lower() not in spared:

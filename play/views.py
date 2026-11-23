@@ -783,6 +783,10 @@ def _attack_slots(pc, declare: bool = True) -> dict:
         "weapon": (pc.equipped or "unarmed"),
         "weapons": weapons,
         "replaceable": bool(getattr(pc, "paths", None)),
+        # The manoeuvres a full attack's swing may be instead (feat loop b1): disarm,
+        # sunder and trip in any swing (CRB "in place of a melee attack"), a Quick
+        # <manoeuvre> feat's in the first (`Engine._maneuver_slot_refusal`, the rule).
+        "slot_maneuvers": _slot_maneuvers(pc),
         # The flasks a Throw on the combat panel may name (`_flasks`): the owner ruled
         # alchemy's products work "also as thrown flasks", and the panel where attacks
         # are picked offered none (the bench-shell lane, 2026-10-07).
@@ -824,6 +828,14 @@ _OPTION_SHAPES = {
     "cleave": ("strike", "Cleave",
                "One blow, and on a hit another at a foe beside them. Guard down until "
                "your next turn."),
+    "bloody_assault": ("swing", "Bloody Assault",
+                       "Less sure in melee until your next turn; every hit leaves a bleed."),
+    "dazing_assault": ("swing", "Dazing Assault",
+                       "Less sure in melee until your next turn; a hit dazes unless they "
+                       "resist."),
+    "stunning_assault": ("swing", "Stunning Assault",
+                         "Less sure in melee until your next turn; a hit stuns unless they "
+                         "resist."),
     "total_defense": ("act", "Total defense",
                       "Your standard action spent guarding: no attacks, and no attacks of "
                       "opportunity."),
@@ -852,6 +864,21 @@ def _option_numbers(atk=0, dmg=0, ac=0, dice=0, swings=0) -> str:
     if ac:
         bits.append(f"{_signed(ac)} AC until your next turn")
     return ", ".join(bits)
+
+
+def _slot_maneuvers(pc) -> list[list[str]]:
+    """Per swing of the full attack, the manoeuvres that may stand in it — asked of the
+    engine's own refusal, so the bar offers nothing the engine would refuse."""
+    from rules.engine import Engine
+    from rules.intents import Intent
+    from rules.tables import MANEUVERS, iterative_attacks
+
+    out = []
+    for i in range(len(iterative_attacks(pc.bab))):
+        out.append([k for k in sorted(MANEUVERS) if not Engine._maneuver_slot_refusal(
+            Intent(op="attack", actor=pc.ref, params={"manoeuvre": k, "iteration": i}),
+            pc)])
+    return out
 
 
 def _attack_options(pc) -> dict:

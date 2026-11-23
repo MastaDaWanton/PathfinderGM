@@ -1017,7 +1017,11 @@ document.addEventListener("click", async e => {
     const options = (i) => `<option value="">weapon (${esc(shown(i))})</option>` +
       (arms.length > 1 ? arms.slice(1).map(w =>
       `<option value="w:${esc(w)}">${esc(w)} (${esc(shown(i, w))})</option>`).join("") : "") + ((STATE.attacks || {}).replaceable ? abil.map(a =>
-      `<option value="${esc(a.name)}">${esc(a.name)}</option>`).join("") : "");
+      `<option value="${esc(a.name)}">${esc(a.name)}</option>`).join("") : "") +
+      // A manoeuvre in the swing's place (disarm, sunder, trip anywhere; a Quick
+      // feat's in the first), from the engine's own list (`slot_maneuvers`).
+      (((STATE.attacks || {}).slot_maneuvers || [])[i] || []).map(m =>
+      `<option value="m:${esc(m)}">${esc(m)}</option>`).join("");
     // The off hand (CRB, Two-Weapon Fighting): what swings beside the weapon in hand.
     const offs = fullOn ? [] : (at.off_hands || []);
     const offRow = offs.length ? `<div class="cb-slot"><label>off hand</label>${
@@ -1041,10 +1045,12 @@ document.addEventListener("click", async e => {
       if (!v) return { op: "attack", target: COMBAT.target, params: { iteration: i, ...extra } };
       if (v.startsWith("w:")) return { op: "attack", target: COMBAT.target,
         params: { iteration: i, weapon: v.slice(2), ...extra } };
+      if (v.startsWith("m:")) return { op: "attack", target: COMBAT.target,
+        params: { iteration: i, manoeuvre: v.slice(2) } };
       return { op: "use_ability", params: { ability: v }, target: COMBAT.target };
     });
     const base = "Full attack: " + slots.map(v =>
-      v ? (v.startsWith("w:") ? v.slice(2) : v) : "weapon").join(", ") +
+      v ? (v.startsWith("w:") || v.startsWith("m:") ? v.slice(2) : v) : "weapon").join(", ") +
       (COMBAT.off ? ` and ${COMBAT.off} in the off hand` : "") + ` on ${targetName()}`;
     COMBAT.standard = { kind: "full", base, label: base + optionNote(true), actions };
     combatMenu(""); renderPlan(); return;
