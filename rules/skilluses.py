@@ -151,6 +151,9 @@ def _no_action_left(engine, actor, action: str, what: str) -> str:
                     f"standard action.")
     elif action == "full-round":
         return engine._coup_round_spent(actor, what)
+    elif action in ("swift", "immediate"):
+        # The one swift-or-immediate budget (`Engine._swift_refusal`, feat loop b2).
+        return engine._swift_refusal(actor, action == "immediate", what)
     return ""
 
 
@@ -164,6 +167,8 @@ def _spend_action(engine, actor, action: str) -> None:
         scene.move_spent[actor.ref] = scene.round
     if action in ("standard", "full-round"):
         scene.standard_spent[actor.ref] = scene.round
+    if action in ("swift", "immediate"):
+        engine._spend_swift(actor, action == "immediate")
 
 
 def _target(engine, intent):

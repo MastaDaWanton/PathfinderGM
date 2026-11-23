@@ -390,6 +390,8 @@ class Campaign:
             # The round a drink spent the standard action (2026-11-13): saved for the
             # reason `move_spent` is.
             "standard_spent": (dict(self.scene.standard_spent), {}),
+            # The round a swift or immediate action spent (feat loop b2): the same reason.
+            "swift_spent": (dict(self.scene.swift_spent), {}),
             # What the player last struck with this fight (`Scene.means`, 2026-10-09):
             # saved for the reason `move_spent` is, a fight put down mid-turn.
             "means": ({k: dict(v) for k, v in self.scene.means.items()}, {}),
@@ -500,6 +502,7 @@ class Campaign:
             move_spent={k: int(v) for k, v in (s.get("move_spent") or {}).items()},
             standard_spent={k: int(v) for k, v in
                             (s.get("standard_spent") or {}).items()},
+            swift_spent={k: int(v) for k, v in (s.get("swift_spent") or {}).items()},
             means={k: dict(v) for k, v in (s.get("means") or {}).items()
                    if isinstance(v, dict)},
             turn=s.get("turn", -1),

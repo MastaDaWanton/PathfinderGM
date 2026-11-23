@@ -370,7 +370,13 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                     "bloody_assault", "dazing_assault", "stunning_assault",
                     # Fighting defensively (CRB, Combat; combat bar round 2): anyone's,
                     # its stance laid by `Engine._lay_attack_stances`.
-                    "fighting_defensively"), "player"),
+                    "fighting_defensively",
+                    # Feat loop b2: a charge (anyone's), Spring Attack, Lunge, Whirlwind
+                    # Attack — declared booleans; `pin`, the grapple's pin option on a
+                    # maintaining check (CRB p.200); `chokehold` and `sleeper_hold`, the
+                    # feats' declared holds on it.
+                    "charge", "spring_attack", "lunge", "whirlwind_attack", "pin",
+                    "chokehold", "sleeper_hold"), "player"),
     # `lethality` because a Blood Bender paying for an ability in non-lethal
     # damage and one taking a sword are not in the same trouble.
     # `when`: the "against X only" clause a jar's or a flask's document carries (alchemy

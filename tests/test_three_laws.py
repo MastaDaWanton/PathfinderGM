@@ -447,7 +447,18 @@ _REACHES = {
     # And a caster level CHECK (the scroll above one's level, spell resistance).
     ("combat_mod", "caster_level"):
         lambda a: sum(m.value for m in a.caster_level_check_modifiers()),
+    # Feat loop b2: melee reach in feet (`reactions.reach_with`: Lunge, Combat Patrol),
+    # and what offsets a charge's -2 AC (`Engine._stance_terms`, Charge of the Righteous).
+    ("combat_mod", "reach"): lambda a: _reach(a),
+    ("combat_mod", "charge_ac"): lambda a: sum(m.value for m in a._buff_mods(
+        "combat_mod", "charge_ac", a._roll_context(None, charge=True))),
 }
+
+
+def _reach(a) -> int:
+    from rules import reactions
+
+    return reactions.reach_with(a, None)[0]
 
 
 def _spell_cl(a) -> int:

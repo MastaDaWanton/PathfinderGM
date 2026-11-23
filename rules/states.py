@@ -517,6 +517,22 @@ TAGS: dict[str, tuple[str, ...]] = {
     "bloody assault":   ("buff.stance.bloody-assault",),
     "dazing assault":   ("buff.stance.dazing-assault",),
     "stunning assault": ("buff.stance.stunning-assault",),
+    # Feat loop b2: a charge's open guard and Lunge's (CRB), both "until your next turn";
+    # the grapple's pin from the holder's side (CRB p.200, "you lose your Dexterity bonus
+    # to AC"), a chokehold on the one held (UC: "cannot breathe or speak"), Sleeper Hold's
+    # open guard (UC: "an additional -2 penalty to your AC"), and the next turn's price of
+    # an immediate step (Step Up, Sidestep: "you cannot take a 5-foot step during your
+    # next turn ... subtract 5 feet from your total movement").
+    "charging":       ("buff.stance.charging",),
+    # `reach.extended`: the one prefix `reactions._reach_more` asks before it reads any
+    # `reach` term — reach is asked per square, and the funnel is not free.
+    "lunging":        ("buff.stance.lunging", "reach.extended.lunge"),
+    "combat patrol":  ("buff.stance.combat-patrol", "reach.extended.patrol"),
+    "pinning":        ("buff.stance.pinning", "state.exposed.pinning"),
+    "choked":         ("state.silenced.choked",),
+    "sleeper hold":   ("buff.stance.sleeper-hold",),
+    "stepped":        ("movement.stepped",),
+    "spring attack":  ("buff.stance.spring-attack",),
     # Combat bar round 2, 2026-11-22: the book's two defensive choices, open to anyone
     # (CRB, Combat). Fighting defensively rides the attack it is declared with; total
     # defense is its own standard action, and "you can't make attacks of opportunity

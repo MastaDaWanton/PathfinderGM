@@ -911,6 +911,11 @@ MANEUVERS: dict[str, dict] = {
         "condition": "grappled",
         "also_grapples_attacker": True,
         "needs_two_hands": True,
+        # Feat loop b2: what a maintained hold may lay instead of damage — the pin (CRB
+        # p.200, "you can give your opponent the pinned condition") — and what a hold
+        # choked out lays (Sleeper Hold, UC: "falls unconscious for 1d4 rounds").
+        "pin_condition": "pinned",
+        "knockout_condition": "unconscious",
     },
     # "You move through the target's space"; the far side is where the mover ends, and
     # with no room there the tell says so rather than put two bodies in one square.
