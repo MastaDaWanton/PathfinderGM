@@ -7305,8 +7305,9 @@ class Engine:
         itself and a natural 20 not a success (`dice.d20_succeeds` is for saves).
 
         Not yet: the checks for vigorous or violent motion, weather, entangled, and
-        continuous damage (Table 8-5 rows the engine has no situation for), and Disruptive
-        (+4 to the defensive DC from a foe who holds it).
+        continuous damage (Table 8-5 rows the engine has no situation for), and the
+        Disruptive FEAT (+4 to the defensive DC from a foe who holds it). Disruptive SPELL's
+        check is built (the `disrupted` situation below, feat loop b1).
         """
         situations: list[tuple[str, int, str]] = []
         before = intent.params.get("struck_from")

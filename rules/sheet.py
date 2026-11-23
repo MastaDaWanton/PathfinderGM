@@ -32,7 +32,7 @@ if TYPE_CHECKING:   # annotation names only: each of these imports the sheet bac
 from .dice import Modifier, stack
 from .tables import (
     ABILITIES, ABILITY_FULL, ABILITY_NAMES, ARMOUR, ARMOUR_SPEED,
-    CONDITIONS, FEAT_TARGET_RE, LETHALITY_SWAP_PENALTY,
+    CONDITIONS, SPELL_STATES, FEAT_TARGET_RE, LETHALITY_SWAP_PENALTY,
     MANEUVERS, NON_PROFICIENT_PENALTY, SAVE_ABILITY, SAVES, SHIELDS, SIZES, SKILLS,
     SLOT_ORDER_LEFT, SLOT_ORDER_RIGHT, SLOT_RULES_LIMIT, SLOTS,
     WEAPONS, ENERGY_DAMAGE, ENERGY_VS_OBJECTS_HALVED, ability_modifier, bab_for,
@@ -65,11 +65,12 @@ class Condition:
 
     @property
     def name(self) -> str:
-        return CONDITIONS.get(self.key, {}).get("name", self.key.title())
+        return (CONDITIONS.get(self.key) or SPELL_STATES.get(self.key, {})).get(
+            "name", self.key.title())
 
     @property
     def data(self) -> dict:
-        return CONDITIONS.get(self.key, {})
+        return CONDITIONS.get(self.key) or SPELL_STATES.get(self.key, {})
 
 
 @dataclass

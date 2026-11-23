@@ -116,7 +116,7 @@ def document_problems(at: str, doc) -> list[str]:
 
 
 def _rider_problems(at: str, rider) -> list[str]:
-    from .tables import CONDITIONS
+    from .tables import CONDITIONS, SPELL_STATES
 
     if not isinstance(rider, dict) or sorted(set(rider) - set(RIDER_KEYS)):
         return [f"{at}: an object of {', '.join(RIDER_KEYS)}."]
@@ -125,7 +125,8 @@ def _rider_problems(at: str, rider) -> list[str]:
     if len(lays) != 1:
         out.append(f"{at}: exactly one of condition (a condition key), burn (times the "
                    f"spell's level, next turn) or trip (true).")
-    if "condition" in rider and str(rider["condition"]) not in CONDITIONS:
+    if "condition" in rider and str(rider["condition"]) not in {**CONDITIONS,
+                                                                **SPELL_STATES}:
         out.append(f"{at}.condition: {rider['condition']!r} is not a condition.")
     if "burn" in rider and (not isinstance(rider["burn"], int) or rider["burn"] < 1):
         out.append(f"{at}.burn: a whole number, the multiple of the spell's level.")

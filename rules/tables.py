@@ -278,18 +278,6 @@ CONDITIONS: dict[str, dict] = {
         "note": "-2 attack, -4 Dex, cannot move at full speed",
     },
     "staggered": {"name": "Staggered", "note": "one action per round"},
-    # Feat loop b1, 2026-11-22: what two metamagic feats lay (rules/metamagic.py).
-    # Concussive Spell (UM): "a -2 penalty on attack rolls, saving throws, skill checks, and
-    # ability checks" — shaken's numbers, and no fear in it. Disruptive Spell (APG): a
-    # concentration check for every spell cast, its DC on the condition's payload
-    # (`Engine._concentrate`).
-    "concussed": {
-        "name": "Concussed",
-        "attack": -2, "saves": -2, "skills": -2, "ability_checks": -2,
-        "note": "-2 on attack rolls, saves, skill and ability checks (Concussive Spell)",
-    },
-    "disrupted": {"name": "Disrupted",
-                  "note": "must make a concentration check to cast (Disruptive Spell)"},
     "stunned": {
         "name": "Stunned",
         "lose_dex_to_ac": True, "ac": -2, "note": "cannot act, loses Dex to AC, -2 AC",
@@ -405,6 +393,24 @@ CONDITIONS: dict[str, dict] = {
         "note": "+2 on attack rolls, ignores the opponent's Dex bonus to AC, and 50% "
                 "total concealment",
     },
+}
+
+# States the engine lays that the book does NOT name as conditions (Appendix 2 is
+# CONDITIONS' authority, `tests/test_reference.py`): a metamagic feat's penalty or gate,
+# read through `Condition.data` exactly as a condition row is.
+SPELL_STATES: dict[str, dict] = {
+    # Feat loop b1, 2026-11-22: what two metamagic feats lay (rules/metamagic.py).
+    # Concussive Spell (UM): "a -2 penalty on attack rolls, saving throws, skill checks, and
+    # ability checks" — shaken's numbers, and no fear in it. Disruptive Spell (APG): a
+    # concentration check for every spell cast, its DC on the condition's payload
+    # (`Engine._concentrate`).
+    "concussed": {
+        "name": "Concussed",
+        "attack": -2, "saves": -2, "skills": -2, "ability_checks": -2,
+        "note": "-2 on attack rolls, saves, skill and ability checks (Concussive Spell)",
+    },
+    "disrupted": {"name": "Disrupted",
+                  "note": "must make a concentration check to cast (Disruptive Spell)"},
 }
 
 # --- Difficulty bands ------------------------------------------------------------
