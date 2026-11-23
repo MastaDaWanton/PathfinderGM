@@ -114,16 +114,16 @@
     },
     {
       "id": "bench.enchant",
-      "v": 2,
+      "v": 3,
       "title": "The enchanting circle",
       "manual": "enchanting",
       "root": "enchant-methods",
       "steps": [
         {
-          "since": 2,
+          "since": 3,
           "anchor": "enchant-methods",
           "title": "Three steps in order",
-          "words": "Prepare lays a circle round a vessel, Attune seats essences on it, Bind makes it magic. Scribe writes a spell onto vellum; Wand binds one into a wand blank. Read, Identify and Unbind work beside them. A locked method names its level."
+          "words": "Prepare lays a circle round a vessel, Attune seats essences on it, Bind makes it magic. Animate wakes a construct; Scribe writes a scroll; Wand binds a wand. Read, Identify and Unbind work beside them. A locked method names its level."
         },
         {
           "since": 1,

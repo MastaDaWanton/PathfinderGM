@@ -91,6 +91,9 @@ class Row:
     # A thing the deed handles that is not here or not carried, as the engine's printed
     # answer (`things_not_here`): "Kesst Vayr is not carrying pelts."
     unheld: str = ""
+    # The skill a declared check is held to, when the engine's state decided it: words
+    # said to an animal are its handling (`_to_an_animal`).
+    skill: str = ""
 
     def record(self) -> dict:
         out = {"act": self.act, "ops": list(self.ops)}
@@ -1108,6 +1111,10 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                                else ["found", "travel"])
             if act in ("go", "seek") and a.get("here"):
                 approached = str(a["here"])
+            if act in ("talk", "request") and pc is not None \
+                    and _to_an_animal(row, a, scene, pc, approached):
+                rows.append(row)
+                continue
             if act == "talk" and not a.get("says") and pc is not None:
                 _greet(row, a, scene, pc, approached)
             if act == "go" and not a.get("place") and not row.ops and pc is not None:
@@ -1953,6 +1960,33 @@ def fold_price_talk(raw, notes=None):
                 continue
         out.append(r)
     return out
+
+
+def _to_an_animal(row: Row, a: dict, scene, pc, approached: str = "") -> bool:
+    """Words said to, or a thing asked of, an animal that cannot understand them: the deed
+    is Handle Animal (or a druid's wild empathy, for one not yet calm), declared as the
+    plan's check with the trick from the sampler's enum. True when it was.
+
+    The owner, 2026-11-22: animals "are unable to communicate without the use of magic",
+    and Handle Animal "functions almost as diplomacy". Decided off the target's tags
+    (`animals.understands`), never off the English; the person is the engine's finder's."""
+    from rules import animals
+    from rules import attitude as attitude_mod
+
+    words = " ".join(str(a.get("target") or "").split())
+    ref = person(scene, words) if words and words.lower() not in _PRONOUNS else ""
+    ref = ref or approached or (addressed(scene) if not words else "")
+    who = (getattr(scene, "actors", {}) or {}).get(ref) if ref else None
+    if who is None or who.is_pc or animals.understands(who, pc):
+        return False
+    calm = attitude_mod.step_of(attitude_mod.of(who)) >= attitude_mod.step_of("indifferent")
+    empathic = (pc.has_state("class.wild-empathy") and not calm
+                and animals.empathy_reaches(who) is not None)
+    row.ops = ["check"]
+    row.skill = "diplomacy" if empathic else "handle animal"
+    row.note = (f"{who.name} cannot understand words: "
+                + ("wild empathy, as Diplomacy" if empathic else "Handle Animal"))
+    return True
 
 
 def _greet(row: Row, a: dict, scene, pc, approached: str = "") -> None:

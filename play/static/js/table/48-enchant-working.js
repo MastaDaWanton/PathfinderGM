@@ -96,6 +96,7 @@
                                  : "A magic item from the shelf", { pick: "vessel" });
       }
     }
+    if (m === "animate") html += constructPick();
     if (m === "prepare") html += circleSlots();
     if (m === "attune" || m === "bind") html += seatRows(m);
     if (m === "bind") html += bindExtras();
@@ -237,6 +238,26 @@
       html += ink ? filled("Ink", ink, "ink") : empty("Ink", "An ink from the shelf to write with", { pick: "circle" });
     }
     return html + dropper(true);
+  }
+
+  // Animate's one choice: which construction line (the state's `constructs`, each with its
+  // lock in the server's words). Its body, essences and DC come back in the check.
+  function constructPick() {
+    var o = E.order, rows = (E.state && E.state.constructs) || [];
+    var pick = rows.filter(function (r) { return r.id === o.construct; })[0];
+    var html = '<h3 class="ew-h">The construct</h3>' +
+      '<label class="ew-choice" for="ew-construct"><span>Animate</span>' +
+      '<select id="ew-construct" class="v2-well ew-select" data-construct>' +
+      '<option value="">Choose</option>' + rows.map(function (r) {
+        return '<option value="' + esc(r.id) + '"' + (r.id === o.construct ? " selected" : "") +
+          (r.locked ? " disabled" : "") + '>' + esc(r.name) +
+          (r.locked ? " (" + esc(r.lock_reason) + ")" : "") + '</option>';
+      }).join("") + '</select></label>';
+    if (pick) {
+      html += '<p class="ew-hint">Body: ' + esc(pick.body) + '. ' + esc(E.moteWords(pick.motes)) +
+        ' of essence. Spells: ' + esc(pick.spells.join(", ")) + '.</p>';
+    }
+    return html;
   }
 
   function dropper(forMotes) {
@@ -490,5 +511,6 @@
       var hit = opts.filter(function (r) { return r.name.toLowerCase() === name; })[0];
       E.setSpell(hit ? hit.id : name.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""));
     }
+    if (e.target.id === "ew-construct") E.setConstruct(e.target.value);
   });
 })();

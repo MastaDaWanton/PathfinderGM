@@ -107,7 +107,8 @@ METHOD_GLYPHS: dict[str, dict[str, str]] = {
     # (UI plan §4); these serve only the old /craft/ page's station chips.
     "enchanter": {
         "prepare": "🖋️", "attune": "🧿", "bind": "🔗", "refine": "⚗️", "unbind": "⛓️",
-        "cleanse": "☀️", "read": "👁️", "identify": "🔍", "scroll": "📜", "wand": "🪄",
+        "cleanse": "☀️", "read": "👁️", "identify": "🔍", "animate": "🗿", "scroll": "📜",
+        "wand": "🪄",
     },
 }
 

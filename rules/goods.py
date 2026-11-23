@@ -699,6 +699,9 @@ class Good:
     kind: str = "gear"
     key: str = ""
     template: str = ""
+    # An animal's training as sold (rules/animals.py `purposes`): "combat riding" for the
+    # dealer's combat-trained line, "riding" or "heavy labor" for the rest.
+    trained: str = ""
 
     @property
     def label(self) -> str:
@@ -984,7 +987,8 @@ def stables_goods() -> list[Good]:
     for row in doc.get("animals") or []:
         out.append(Good(id=PREFIXES["mount"] + str(row["key"]), name=str(row["name"]),
                         price_gp=float(row["cost_gp"]), kind="mount",
-                        key=str(row["key"]), template=str(row.get("template") or "")))
+                        key=str(row["key"]), template=str(row.get("template") or ""),
+                        trained=str(row.get("trained") or "")))
     for row in doc.get("tack") or []:
         out.append(Good(id=PREFIXES["tack"] + str(row["key"]), name=str(row["name"]),
                         price_gp=float(row["cost_gp"]), kind="tack", key=str(row["key"]),
@@ -1041,8 +1045,17 @@ def deliver(scene, actor, found, count: int = 1) -> tuple[list[dict], str]:
                 name="travels with you", kind="bond", key=f"{source}:travels",
                 source=source, origin=f"bought:{actor.ref}", duration="until-dismissed",
                 tags=(states.TRAVELS_WITH_YOU,)))
+            # What it was trained for is what was paid for (round 3): the tricks a
+            # handler asks of it, and combat riding's control in battle (rules/animals.py).
+            trained = str(getattr(found, "trained", "") or "")
+            if trained:
+                from . import animals
+
+                animals.train_purpose(animal, trained, by=f"bought:{actor.ref}",
+                                      origin=f"bought:{actor.ref}")
             effects.append({"ref": animal.ref, "kind": "company", "travels": True,
-                            "bought_by": actor.ref})
+                            "bought_by": actor.ref,
+                            **({"trained": trained} if trained else {})})
             names.append(animal.name)
         return effects, (f" The {names[0]} is {actor.name}'s now, and goes where they go."
                          if len(names) == 1 else

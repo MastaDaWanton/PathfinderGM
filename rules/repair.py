@@ -103,6 +103,13 @@ def crafting_dc(subject, rule: dict) -> tuple[int, bool]:
             return int(printed), False
     except (TypeError, ValueError):
         pass
+    # The construction lines the circle's Animate reads (content/rules/constructs.json)
+    # are the book's DCs for the constructs they cover.
+    from . import constructs
+
+    line = constructs.row(str(getattr(subject, "from_template", "") or ""))
+    if line and line.get("dc"):
+        return int(line["dc"]), False
     return int(rule["crafting_dc"]), True
 
 

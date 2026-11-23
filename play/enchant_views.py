@@ -33,6 +33,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 
 from rules import crafting, effectspec, knowledge, sky, survival, worldclass
+from rules import constructs
 from rules import enchanter as en
 
 from . import bench_clock
@@ -238,6 +239,8 @@ def _state_body(c, pc) -> dict:
         # The spells Scribe and Wand may write at this level, known ones first (the
         # working's spell picker; `rules/spellitems.options`).
         "spell_items": _spell_item_options(pc, int(progress.level)),
+        # Animate's picker: every construction line and its lock (rules/constructs.py).
+        "constructs": constructs.view(int(progress.level)),
     }
 
 
@@ -494,6 +497,9 @@ def _still_there(pc, plan, now) -> str:
             have = int(getattr(st, "count", 0) or 0) if st is not None else 0
         if have < n:
             return f"The {names[k]} set aside for this step is gone. Nothing was done."
+    body = (plan.choices or {}).get("body") if plan.method == "animate" else None
+    if body and body not in (pc.stock or {}):
+        return "The body set aside for this step is gone. Nothing was done."
     v = plan.vessel
     if v is not None and not v.blank and en.find_vessel(pc, v.key, now) is None:
         return f"The {v.name} is no longer in your pack. Nothing was done."

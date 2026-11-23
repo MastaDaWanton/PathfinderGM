@@ -50,7 +50,7 @@ def test_each_level_opens_its_methods_rarity_and_ceiling(track):
     track put Bind at L1 but legendary work behind a level-5 deed; levels past 3 now read
     level 3's row and keep every method."""
     assert track.unlocked_methods(1) == ["prepare", "attune", "bind", "read", "identify",
-                                         "unbind", "scroll"]
+                                         "unbind", "animate", "scroll"]
     assert "refine" in track.unlocked_methods(2) and "cleanse" not in track.unlocked_methods(2)
     # Scribe (method `scroll`) at 1 and Wand at 2: the spell-items lane, 2026-11-22.
     assert "wand" in track.unlocked_methods(2) and "wand" not in track.unlocked_methods(1)

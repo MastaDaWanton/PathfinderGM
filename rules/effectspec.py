@@ -370,6 +370,11 @@ PERMISSIONS: dict[str, dict] = {
                           "tag": "permission.ward_mind_control", "reader": ""},
     "ward_summoned_contact": {"name": "Shielded from summoned creatures' touch",
                               "tag": "permission.ward_summoned_contact", "reader": ""},
+    # Speak with animals (round 3): the one magic the owner's ruling of 2026-11-22 names
+    # as what lets words reach an animal.
+    "speak_with_animals": {"name": "Speaks with animals",
+                           "tag": "permission.speak_with_animals",
+                           "reader": "animals.understands (say, greet, companions' orders)"},
 }
 
 

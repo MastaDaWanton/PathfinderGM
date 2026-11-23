@@ -1823,6 +1823,8 @@ def _land_spell_item(actor, plan: StepPlan, tier: int, now: int) -> tuple[dict, 
 _BUILD = {"prepare": _build_prepare, "attune": _build_attune, "bind": _build_bind,
           "refine": _build_refine, "unbind": _build_unbind, "cleanse": _build_cleanse,
           "scroll": _build_scribe, "wand": _build_wand}
+# Animate (constructs, owner ruling 2026-11-22) lives in rules/constructs.py.
+_BUILD["animate"] = lambda *a: _lane("constructs").build_animate(*a)
 
 
 def fits_for(plan: StepPlan, actor, now: int) -> dict:
@@ -2083,6 +2085,10 @@ def lines_for(plan: StepPlan) -> dict:
         what = "vellum and the ink" if m == "scroll" else "blank"
         return {"miss_small": "Miss by 1 to 4: the time is lost, nothing spent.",
                 "miss_big": f"Miss by 5 or more: the {what} spoil; the essences are kept."}
+    if m == "animate":
+        return {"miss_small": "Miss: the body does not stir. The time is lost; the body "
+                              "and the essences are kept.",
+                "miss_big": "Miss by 5 or more: the same."}
     return {"miss_small": "", "miss_big": ""}
 
 
@@ -2251,6 +2257,10 @@ def finish(actor, progress, plan: StepPlan, tier: int, *, engine=None, now: int 
         products += got["products"]
         discoveries += got["discoveries"]
         pay_first(f"unbound:{v.record.get('id') or v.key}", f"first unbinding of {v.name}")
+    elif plan.method == "animate":
+        work, said = _lane("constructs").land(actor, plan, tier, now=now)
+        products.append({"key": f"stock:{work.get('key')}", "name": plan.name_after,
+                         "state": "in_progress", "work": work})
     elif plan.method == "cleanse" and v is not None:
         st = _stock_of(actor, v.key)
         lifted = lift_curse(_item_record(v.key, st) or {})
@@ -2407,6 +2417,8 @@ def _collect_binding(item, actor) -> dict:
 
     block = inprogress.work_of(item) or {}
     res = block.get("result") or {}
+    if res.get("construct"):
+        return _lane("constructs").collect(item, actor, res)
     if not res.get("adds"):
         return {"said": f"You collect the {item.name}."}
     key = next((k for k, st in (getattr(actor, "stock", {}) or {}).items() if st is item), "")
@@ -2433,6 +2445,12 @@ def _collect_binding(item, actor) -> dict:
 
 
 def _cancel_binding(item, actor) -> dict:
+    from . import inprogress
+
+    res = (inprogress.work_of(item) or {}).get("result") or {}
+    if res.get("construct"):
+        return _lane("constructs").cancel(item, actor, res)
+
     from . import spellitems
 
     if spellitems.kind_of(item):
@@ -2459,8 +2477,13 @@ def _stop_words(item) -> str:
 def _register() -> None:
     from . import inprogress
 
+    def stop_words(item) -> str:
+        if ((inprogress.work_of(item) or {}).get("result") or {}).get("construct"):
+            return "The body comes back unmoving. The essences are spent."
+        return _stop_words(item)
+
     inprogress.register(TRACK_ID, collect=_collect_binding, cancel=_cancel_binding,
-                        icon="enchant", stop_words=_stop_words)
+                        icon="enchant", stop_words=stop_words)
 
 
 # =============================================================================================

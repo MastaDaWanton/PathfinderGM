@@ -39,8 +39,7 @@
   "Share spells: a spell with a range of you cast on the companion — the cast op does not yet re-target a personal spell.",
   "Devotion: +4 morale on Will saves against enchantment needs a save that knows its descriptor, which no save carries yet (rules/classfeatures.py says the same of bravery).",
   "Multiattack at 9th: no bonus feat or second bite is added yet.",
-  "A lost companion replaced after 24 hours of prayer: a companion that dies stays dead; nothing makes a new one yet.",
-  "Teaching tricks beyond the bonus tricks with Handle Animal."
+  "A lost companion replaced after 24 hours of prayer: a companion that dies stays dead; nothing makes a new one yet."
  ],
  "animals": {
   "ape": {

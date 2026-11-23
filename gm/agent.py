@@ -605,6 +605,9 @@ class GMAgent:
             # overruled op is kept on the record.
             check_skill = (judgement.declared_check_skill(player_input, self.engine.scene)
                            if "check" in detectors else "")
+            # Words to an animal: the check is Handle Animal (or wild empathy), held so by
+            # the act table off the animal's tags (`acts_to_ops._to_an_animal`).
+            check_skill = next((r.skill for r in self.rows if r.skill), check_skill)
             declared, overruled = interpret.supported(detectors, self.reading,
                                                       check_skill=check_skill)
             self.reading["overruled"] = overruled
@@ -1715,6 +1718,8 @@ class GMAgent:
                                                _owned_by(data.get("intents"), ref,
                                                          self.engine.scene))
                 turned = (companions.turning_on_the_party(self.engine.scene, ref, raw)
+                          or (companions.handled_unheeded(self.engine.scene, ref, raw)
+                              if friend else "")
                           or (companions.attack_against_its_reason(ref, raw)
                               if friend else "")
                           or (companions.attack_on_a_bystander(
@@ -1812,6 +1817,12 @@ class GMAgent:
                                                        not_ready=not_ready),
             other=others[0] if others else None, pc_ref=pc.ref if pc else "pc")
         messages = base
+        # A construct that cannot speak has no `say` to sample (rules/constructs.mute):
+        # it obeys or it does not, without a word.
+        from rules import constructs
+
+        ops = tuple(o for o in self.COMPANION_ANSWER_OPS
+                    if o != "say" or not constructs.mute(actor))
         attempts: list[Attempt] = []
         rejections: list[str] = []
         for n in range(max_attempts):
@@ -1820,7 +1831,7 @@ class GMAgent:
                                 temperature=0.7, num_predict=400,
                                 schema=prompts.turn_schema(
                                     fighting=False, refs=tuple(scene.actors),
-                                    ops=self.COMPANION_ANSWER_OPS))
+                                    ops=ops))
             attempts.append(Attempt("companion", reply.seconds, reply.model, reply.text))
             try:
                 data = reply.json()

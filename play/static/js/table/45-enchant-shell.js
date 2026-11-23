@@ -52,18 +52,21 @@
   // The methods themselves, their order, names and locks are the server's (`state.methods`).
   // What is here is copy: the Roll button's words, the flat stand-in's name for the step, and
   // the empty working's sentence. Keys 1-8 pick the eight methods in order (UI plan §6.1).
+  // Eleven methods since Animate, Scribe and Wand (2026-11-22): 1-9 and 0 pick the first ten.
   var KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
   var ROLL = { prepare: "Roll Prepare", attune: "Roll Attune", bind: "Roll Bind",
                refine: "Roll Refine", unbind: "Roll Unbind", cleanse: "Roll Cleanse",
-               read: "Read", identify: "Identify", scroll: "Roll Scribe", wand: "Roll Wand" };
+               animate: "Roll Animate", read: "Read", identify: "Identify",
+               scroll: "Roll Scribe", wand: "Roll Wand" };
   var TOOL = { prepare: "the circle", attune: "the seats", bind: "the binding",
                refine: "the dropper", unbind: "the sigils", cleanse: "the curse",
-               read: "a pinch", identify: "the study", scroll: "the pen", wand: "the blank" };
+               animate: "the body", read: "a pinch", identify: "the study", scroll: "the pen",
+               wand: "the blank" };
   // Two letters per method on the roundel: Read and Refine share an R, and at 1280 wide the
   // strip is icons only (bench.css). The engraved art waits on the owner's icon approval
   // (UI plan Q-UI1); a lettered roundel is the bench's own fallback, not a broken mask.
   var ABBR = { prepare: "Pr", attune: "At", bind: "Bi", refine: "Rf", unbind: "Ub",
-               cleanse: "Cl", read: "Rd", identify: "Id", scroll: "Sc", wand: "Wa" };
+               cleanse: "Cl", animate: "An", read: "Rd", identify: "Id", scroll: "Sc", wand: "Wa" };
   // The ritual's path (UI plan §6.1: "Prepare, then Attune, then Bind", the herb bench's
   // next-step button). Which step a vessel is ready for follows from its state, which is
   // the server's word on the shelf row.
@@ -87,7 +90,7 @@
   function blank(method) {
     return { method: method || null, vessel: "", circle: [], focus: "", seats: {}, choices: {},
              catalyst: "", hurry: false, phials: {}, essence: "", item: "", recipe: "",
-             spell: "", blank: "", ink: "" };
+             construct: "", spell: "", blank: "", ink: "" };
   }
   E.order = blank(null);
   var subs = {};
@@ -520,6 +523,9 @@
   // question about a step the player is not taking.
   E.body = function (extra) {
     var o = E.order, m = o.method, body = { method: m };
+    // Animate (rules/constructs.py): the construct named; the server picks its body and
+    // essences off the shelf and says which in the check's info.
+    if (m === "animate") body.construct = o.construct;
     if (m === "prepare") {
       body.vessel = o.vessel; body.circle = o.circle.slice();
       if (o.focus) body.focus = o.focus;
@@ -686,6 +692,12 @@
     if (E.busy || E.live) return;
     E.order.spell = String(id || "");
     E.result = null;
+    E.emit("order");
+    E.runCheck();
+  };
+  E.setConstruct = function (id) {
+    if (E.busy || E.live) return;
+    E.order.construct = String(id || "");
     E.emit("order");
     E.runCheck();
   };

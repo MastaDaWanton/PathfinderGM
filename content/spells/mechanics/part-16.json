@@ -2395,7 +2395,9 @@
    "effects": [
     {
      "type": "permission",
-     "target": "May ask questions of animals and receive answers from them."
+     "target": "May ask questions of animals and receive answers from them.",
+     "tag": "speak_with_animals",
+     "recipient": "self"
     },
     {
      "type": "narrative",

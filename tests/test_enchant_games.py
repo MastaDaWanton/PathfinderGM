@@ -33,9 +33,12 @@ CONTRACTS = ROOT / "docs" / "enchanting-contracts.md"
 HERB_GAMES = ROOT / "play" / "static" / "js" / "bench-games"
 FORGE_GAMES = ROOT / "play" / "static" / "js" / "forge-games"
 
-# Scribe and Wand (spell-items lane, 2026-11-22) play Prepare's order game with their own
-# pieces, so every rule below holds of them as of Prepare.
+# Scribe (`scroll`) and Wand (spell-items lane, 2026-11-22) play Prepare's order game with
+# their own pieces, so every rule below holds of them as of Prepare.
 METHODS = ["prepare", "attune", "bind", "refine", "unbind", "cleanse", "scroll", "wand"]
+# Animate (constructs) plays Bind's game, registered from bind.js right after it.
+REGISTERED = ["prepare", "attune", "bind", "animate", "refine", "unbind", "cleanse", "scroll",
+              "wand"]
 ORDER_GAMES = ["prepare", "unbind", "cleanse", "scroll", "wand"]
 HERB_METHODS = ["grind", "mix", "brew", "dry", "reduce", "extract", "infuse", "steep", "neutralize"]
 FORGE_METHODS = ["smelt", "alloy", "forge", "quench", "temper", "fold", "hone", "assemble", "finish",
@@ -524,8 +527,8 @@ def test_the_enchant_games_come_by_registration(node_run):
     """Contracts §13: the six register on the shared registry with `track: "enchant"`. Measured
     on the live API: herbs first in their fixed order, then the forge's, then the enchanter's,
     and `methodsFor` keeps each bench to its own games."""
-    assert node_run["methods"] == HERB_METHODS + FORGE_METHODS + METHODS
-    assert node_run["enchant"] == METHODS
+    assert node_run["methods"] == HERB_METHODS + FORGE_METHODS + REGISTERED
+    assert node_run["enchant"] == REGISTERED
     assert node_run["herb"] == HERB_METHODS and node_run["forge"] == FORGE_METHODS
 
 

@@ -94,8 +94,8 @@ changed for this build.
 - **Staffs and rods** (task item 4): not started. The study's staff needs a wielder's-own
   CL and DC branch in the cast door; rods would start with the six lesser metamagic rods on
   round 1's metamagic. Craft Staff and Craft Rod are retired with the rest.
-- **Constructs at the circle** (the owner's ruling names them): not started; the
-  mend-and-claim house rule (`content/rules/repairs.json`) is still the construct route.
+- **Constructs at the circle** are the constructs lane's (Animate, merged on
+  integrate/0.5.1-impl 92e7f06b), not this lane's.
 - **Loot:** printed wands and scrolls in stat blocks ("wand of cure light wounds (20
   charges)") are still not read off a body; only shops sell them.
 - Use Magic Device's other uses (activate blindly, emulate a race or an alignment,
