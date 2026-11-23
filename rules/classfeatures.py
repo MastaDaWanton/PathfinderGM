@@ -379,7 +379,7 @@ MOD_KEYS = frozenset({"type", "target", "amount", "formula", "bonus_type", "when
 # any load carried or armor worn").
 MOD_TYPES = ("ability_mod", "skill_mod", "save_mod", "combat_mod", "speed")
 BEARER_KEYS = frozenset({"armour", "shield", "armoured", "load", "helpless", "pool",
-                         "terrain", "state"})
+                         "terrain", "state", "wielding", "shield_kind"})
 WEAPON_KEYS = frozenset({"applies_to", "damage_column", "strikes_as", "strikes_as_by_rank",
                          "when"})
 ARMOUR_KEYS = frozenset({"max_dex", "check_penalty", "unhindered"})
@@ -703,6 +703,22 @@ def _bearer_holds(clause: dict, actor, pick: str = "") -> bool:
         elif key == "terrain":
             word = pick if want == "$pick" else str(want or "")
             if facts["terrain"] not in TERRAINS.get(word.strip().lower(), ()):
+                return False
+        elif key == "wielding":
+            # Feat loop b1: the weapon in hand, by its table key (Dueling Sword Mastery's
+            # "as long as you wield only a single dueling sword", Buckler Duelist's
+            # falcata). A crafted weapon answers to its base, as Weapon Focus's does.
+            from . import weapons as weapons_mod
+
+            held = str(actor.wielded_key() or "")
+            w = actor.weapon(held) if held else {}
+            held = str(w.get("crafted_base") or weapons_mod.key_for(held) or held).lower()
+            if held != str(want or "").strip().lower():
+                return False
+        elif key == "shield_kind":
+            # The shield on the arm by its table name: "buckler", "heavy shield".
+            worn = str(getattr(actor, "shield", "") or "none").strip().lower()
+            if worn != str(want or "").strip().lower():
                 return False
         else:
             return False                     # a key nobody can answer means no

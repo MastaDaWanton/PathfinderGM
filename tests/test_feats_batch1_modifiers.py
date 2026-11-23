@@ -390,3 +390,60 @@ def test_demoralize_charges_size_and_taunt_waives_it_with_bluff():
     assert _of(boar.skill_modifiers("intimidate"), "Boar Ferocity") == []
     thug = instantiate("thug", name="thug")
     assert _of(Engine._demoralize_mods(boar, thug, []), "Boar Ferocity") == [2]
+
+
+# --- second chunk: the bearer's weapon, monster lore, Motivating Display -----------------------
+
+def test_dueling_sword_mastery_and_buckler_duelist_ask_the_weapon_in_hand():
+    """Dueling Sword Mastery: "+2 bonus on Initiative checks as long as you start combat
+    with a dueling sword in your hand. As long as you wield only a single dueling sword in
+    one hand, you gain a +2 shield bonus to your AC". Buckler Duelist: "When fighting with
+    the falcata and buckler, your shield bonus to AC increases by +1 and you gain a +2
+    bonus on Acrobatics checks." A longsword in hand gets neither."""
+    a = _pc(["Dueling Sword Mastery"], weapons=["dueling-sword", "longsword"],
+            equipped="dueling-sword")
+    assert _of(a.initiative_modifiers(), "Dueling Sword Mastery") == [2]
+    assert _of(a.ac_modifiers(), "Dueling Sword Mastery") == [2]
+    a.equipped = "longsword"
+    assert _of(a.initiative_modifiers(), "Dueling Sword Mastery") == []
+    assert _of(a.ac_modifiers(), "Dueling Sword Mastery") == []
+    b = _pc(["Buckler Duelist"], weapons=["falcata"], equipped="falcata", shield="buckler")
+    assert _of(b.ac_modifiers(), "Buckler Duelist") == [1]
+    assert _of(b.skill_modifiers("acrobatics"), "Buckler Duelist") == [2]
+    b.shield = "light shield"
+    assert _of(b.skill_modifiers("acrobatics"), "Buckler Duelist") == []
+
+
+def test_demonologist_adds_two_when_recalling_a_demon():
+    """Demonologist: "+2 bonus on all Knowledge checks related to the Abyss or to demons".
+    Monster lore asks the check of the creature recalled; a dretch is a demon, a thug is
+    not. Driven through the check op's monster-lore door."""
+    a = _pc(["Demonologist"], ranks={"knowledge (planes)": 3, "knowledge (local)": 1})
+    s, e, dretch, thug = _board(a, foes=["dretch", "thug"])
+    res = _run(e, [{"op": "check", "actor": a.ref, "target": dretch.ref,
+                    "params": {"skill": "knowledge (planes)", "dc": {"band": "average"}}}])
+    assert ("Demonologist", 2) in [(m.source, m.value) for m in res.outcomes[0].rolls[0].modifiers]
+    res = _run(e, [{"op": "check", "actor": a.ref, "target": thug.ref,
+                    "params": {"skill": "knowledge (local)", "dc": {"band": "average"}}}])
+    assert "Demonologist" not in [m.source for m in res.outcomes[0].rolls[0].modifiers]
+
+
+def test_motivating_display_heartens_allies_who_see_it():
+    """Motivating Display: "your Intimidate check while using Dazzling Display also applies
+    to allies within 30 feet who can see you ... Each ally so affected gains a +1 morale
+    bonus on attack rolls and skill checks for the duration that it would normally be
+    shaken." Natural 20 on the display: the ally's DC is beaten and the buff lands."""
+    a = _pc(["Weapon Focus (longsword)", "Dazzling Display", "Motivating Display"],
+            ranks={"intimidate": 6})
+    ally = _pc(name="Ally")
+    s, e, thug = _board(a, ally, foes=["thug"])
+    e._ensure_encounter(a.ref, thug.ref)
+    s.sides = {"us": [a.ref, ally.ref], "them": [thug.ref]}
+    s.positions.update({a.ref: (5, 5), ally.ref: (5, 6), thug.ref: (6, 5)})
+    e.dice = Loaded(20)
+    before = _tot(ally.attack_modifiers())
+    res = _run(e, [{"op": "check", "actor": a.ref,
+                    "params": {"skill": "intimidate", "display": True}}])
+    assert "takes heart" in res.outcomes[0].tell
+    assert _tot(ally.attack_modifiers()) == before + 1
+    assert _of(ally.skill_modifiers("climb"), f"{a.name}'s Motivating Display") == [1]
