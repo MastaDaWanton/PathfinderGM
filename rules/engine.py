@@ -9038,7 +9038,7 @@ class Engine:
         # Acrobatics, Fly, Intimidate, and Ride)" (CRB p.31). Before this nothing read the
         # clause (rage's own not_yet), and a raging barbarian's Diplomacy rolled as if
         # she were calm.
-        barred = _forbidden_skill(actor, str(skill))
+        barred = _forbidden_skill(actor, str(skill), (ctx or {}).get("skill_use", ""))
         if barred:
             return [], Outcome(intent_id=intent.id, op="check", effects=[], tell=barred,
                                because=intent.because)
@@ -11102,6 +11102,9 @@ class Engine:
                         actor, defender, weapon_key, intent.visibility or "player", weapon)):
                     state["effects"].append(extra["effect"])
                     state["tells"].append(extra["tell"])
+                # A raging feint (Tantrum) lasts until the first blow that lands.
+                if state.get("feinted"):
+                    skilluses.spend_feint(defender, actor, landed=True)
                 # What a held feat lays on a melee hit (`_feat_riders`): Bloody Assault's
                 # bleed, Dazing and Stunning Assault's save-or-condition.
                 for extra in ([] if dancing else self._feat_riders(
@@ -38434,8 +38437,12 @@ def _sized_weapon(w: dict, size: str) -> dict:
     return out
 
 
-def _forbidden_skill(actor, skill: str) -> str:
-    """The sentence refusing a skill an effect forbids (`payload.forbids`), or ""."""
+def _forbidden_skill(actor, skill: str, use: str = "") -> str:
+    """The sentence refusing a skill an effect forbids (`payload.forbids`), or "".
+
+    `use`: the skill's use (`Engine._skill_use_ctx`). Tantrum's feint while raging is
+    let through rage's ban (`skilluses.FEINT_WHILE_RAGING`), and nothing else is."""
+    from . import skilluses
     from .tables import ABILITY_FULL, SKILLS
 
     row = SKILLS.get(str(skill).strip().lower())
@@ -38445,6 +38452,10 @@ def _forbidden_skill(actor, skill: str) -> str:
         p = e.payload if isinstance(e.payload, dict) else {}
         rule = (p.get("forbids") or {}).get("skills") or {}
         if not rule:
+            continue
+        if (use == "feint" and str(skill).strip().lower() == "bluff"
+                and skilluses.RAGING in (e.tags or ())
+                and actor.has_state(skilluses.FEINT_WHILE_RAGING)):
             continue
         spared = [str(s) for s in rule.get("except") or ()]
         if row[0] in (rule.get("abilities") or ()) and skill.strip().lower() not in spared:

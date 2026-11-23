@@ -412,3 +412,77 @@ def test_the_combat_bar_offers_each_swing_only_what_the_engine_takes():
     first, second = _slot_maneuvers(pc)
     assert set(first) == {"disarm", "sunder", "trip", "steal"}
     assert set(second) == {"disarm", "sunder", "trip"}
+
+
+# --- Tantrum: a feint while raging, lasting until a blow lands ---------------------------
+
+class _Faces(Dice):
+    def __init__(self, faces: dict):
+        super().__init__(seed=20261122)
+        self.faces = faces
+
+    def roll(self, notation, modifiers=None, label="", visibility="hidden"):
+        if str(notation).lstrip("1").startswith("d20"):
+            face = next((f for k, f in self.faces.items() if k in (label or "")), 10)
+            return self.given(face, modifiers, label)
+        return super().roll(notation, modifiers, label, visibility)
+
+
+def _raging(*feats: str, faces=None):
+    from rules.activeeffect import ActiveEffect
+
+    scene = Scene(location_id="5bbd0c40345f")
+    pc = load_pc("fixtures/pc-kesst.json")
+    pc.feats = list(pc.feats) + ["Improved Feint", *feats]
+    scene.add(pc)
+    scene.add(instantiate("thug", scene=scene, name=THUG))
+    engine = Engine(scene, _Faces(faces or {"Bluff": 20}))
+    engine._ensure_encounter("pc")
+    scene.positions["pc"], scene.positions["c1"] = (6, 10), (7, 10)
+    scene.resync_zones()
+    scene.acted.update(scene.actors)
+    # Rage's own ban, as the barbarian's document lays it (content/class-abilities).
+    pc.apply_effect(ActiveEffect(
+        name="Rage", kind="buff", key="rage", source="Rage", origin="ability:barbarian/rage",
+        tags=("buff.stance.rage",), payload={"forbids": {"skills": {
+            "abilities": ["cha", "dex", "int"],
+            "except": ["acrobatics", "fly", "intimidate", "ride"]}}}))
+    return scene, engine, pc, scene.get("c1")
+
+
+def _feint(engine):
+    res = engine.run(engine.validate([{"op": "check", "actor": "pc", "target": "c1",
+                                       "visibility": "hidden",
+                                       "params": {"skill": "bluff", "feint": True}}]))
+    return next(o for o in res.outcomes if o.op == "check")
+
+
+def test_rage_bars_the_feint_and_tantrum_lifts_the_bar_for_the_feint_alone():
+    """CRB rage: no Charisma-based skill while raging. Tantrum: "You may use the Bluff
+    skill to feint while raging" — and only to feint: a raging lie is still refused."""
+    scene, engine, pc, thug = _raging()
+    assert "no Charisma-based skill" in _feint(engine).tell
+    scene, engine, pc, thug = _raging("Tantrum")
+    made = _feint(engine)
+    assert made.verdict == "success", made.tell
+    assert thug.has_state("state.feinted.pc")
+    lie = engine.run(engine.validate([{"op": "check", "actor": "pc", "visibility": "hidden",
+                                       "params": {"skill": "bluff", "opposed_by": {
+                                           "ref": "c1", "skill": "sense motive"}}}]))
+    assert "no Charisma-based skill" in lie.outcomes[-1].tell
+
+
+def test_a_tantrum_feint_outlasts_a_miss_and_ends_on_the_hit():
+    """"The effect of the feint lasts only until the first time you hit the target": a
+    missed blow leaves the thug feinted; the blow that lands spends it."""
+    scene, engine, pc, thug = _raging("Tantrum", faces={"Bluff": 20, "ttack": 1})
+    _feint(engine)
+    engine.run(engine.validate([{"op": "attack", "actor": "pc", "target": "c1",
+                                 "visibility": "hidden", "params": {}}]))
+    assert thug.has_state("state.feinted.pc"), "a miss does not spend a Tantrum feint"
+    engine.dice.faces["ttack"] = 19
+    scene.round += 1
+    res = engine.run(engine.validate([{"op": "attack", "actor": "pc", "target": "c1",
+                                       "visibility": "hidden", "params": {}}]))
+    assert next(o for o in res.outcomes if o.op == "attack").verdict == "hit"
+    assert not thug.has_state("state.feinted.pc")

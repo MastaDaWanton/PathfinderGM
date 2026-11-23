@@ -272,7 +272,9 @@ def feint(engine, intent, actor, mods, partial):
         # shortcut: the round ticker runs at the top of the round, so 2 lasts through the
         # feinter's next turn and a little past it; a per-turn clock would end it exactly.
         rounds_left=int(out["rounds"]), tags=(f"{FEINTED}.{actor.ref}",),
-        payload={"by": actor.ref}))
+        payload={"by": actor.ref,
+                 **({"until_hit": True} if actor.has_state(RAGING)
+                    and actor.has_state(FEINT_WHILE_RAGING) else {})}))
     effects = [{"ref": target.ref, "kind": "condition", "condition": "feinted",
                 "by": actor.ref, "origin": "rule:feint"}]
     said = (f"{actor.name} feints at {target.name}{cost} and makes the bluff "
@@ -301,11 +303,20 @@ def feinted(defender, attacker, weapon: dict | None) -> bool:
     return defender.has_state(f"{FEINTED}.{attacker.ref}")
 
 
-def spend_feint(defender, attacker) -> None:
+def spend_feint(defender, attacker, landed: bool = False) -> None:
     """The feint is used up by the attack that read it (Greater Feint's exposure stays
-    its round: it is against everybody, not against the next blow)."""
+    its round: it is against everybody, not against the next blow). A raging feint made
+    with Tantrum "lasts only until the first time you hit the target" (Gnomes of
+    Golarion): its effect carries `until_hit`, and only a blow that landed spends it."""
     tag = f"{FEINTED}.{attacker.ref}"
-    defender.remove_effects(match=lambda e: tag in (e.tags or ()))
+    defender.remove_effects(match=lambda e: tag in (e.tags or ()) and (
+        landed or not (e.payload or {}).get("until_hit")))
+
+
+# Tantrum's tag (content/feats/mechanics/batch1-maneuvers.json): "You may use the Bluff
+# skill to feint while raging", which rage's ban on Charisma skills otherwise refuses.
+FEINT_WHILE_RAGING = "skill.bluff.feint.raging"
+RAGING = "buff.stance.rage"
 
 
 # --- tumble -----------------------------------------------------------------------------------
