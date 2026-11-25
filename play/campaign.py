@@ -1193,7 +1193,20 @@ def current(campaign_id: str | None = None) -> Campaign:
         c = _resume(campaign_id) or _begin(campaign_id)
         _heal_background(c)
         _LIVE[campaign_id] = c
+        _read_the_senses(c)
     return _LIVE[campaign_id]
+
+
+def _read_the_senses(c) -> None:
+    """The player's world's peoples' senses, read in the background if they have not been
+    (gm/race_senses.py; owner O6, 2026-11-25): a save made before the reading gains its
+    race's darkvision as soon as it lands, with nothing written onto the character."""
+    pc = c.scene.pc() if c is not None else None
+    world = str(getattr(pc, "race_world", "") or "") if pc is not None else ""
+    if world:
+        from gm import race_senses
+
+        race_senses.in_background(world, str(getattr(pc, "race", "") or ""))
 
 
 def _restore_from_backup(path: Path, why: Exception) -> Campaign | None:
