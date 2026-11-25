@@ -90185,7 +90185,7 @@
    "flat_attack": null,
    "flat_damage": "",
    "melee": "",
-   "ranged": "attack roll of +3 when using telekinesis to hurl objects or creatures, and can use the ability on objects or creatures of up to 75 pounds. If a poltergeist attempts to hurl a creature with this abilit",
+   "ranged": "telekinesis +3 (3d6 bludgeoning)",
    "flat_cmd": null,
    "cmb": null,
    "base_attack": 2,
