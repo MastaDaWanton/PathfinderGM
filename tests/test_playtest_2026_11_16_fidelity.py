@@ -83,6 +83,11 @@ def test_the_towns_talk_is_somebodys_words_at_a_free_moment():
     _rumour(s)
     assert cards.thread_to_pull(s, recent=[], turn=1) is None          # nobody to say it
     gardener = _person(s, "c25", "the gardener")
+    # On the town's rolls, as everyone the page shows is: once spoken with, the talk is
+    # hers to pass on; a stranger never opens with it (playtest 2026-11-23 O4).
+    from rules import population
+
+    population.keep_as_resident(s, gardener, s.at)
     engine = Engine(s, Dice(seed=1))
     engine.join_talk(gardener, how="you spoke to them")
     assert cards.thread_to_pull(s, recent=[], turn=1) is None          # she is busy
