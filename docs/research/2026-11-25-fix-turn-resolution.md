@@ -196,3 +196,57 @@ combat that is not an attack.
 - `page_line` reads three words.
 
 The root was the outcome reader, not the narrator's slot.
+
+## #12, owner ruling 2026-11-25: the player who starts the fight
+
+> "since if I am starting the fight I should be the only one ready for combat or aware they
+> are fighting, whatever I do before I make it clear I am planning to start a fight should
+> generally be okay, from walking up to the person to climbing up onto something as long
+> as the climbing itself wouldn't trigger anger."
+
+This supersedes the 2026-10-01 "only joins battle" design for a fight the player opens.
+
+**The book.** "If some but not all of the combatants are aware of their opponents, a
+surprise round happens … combatants who started the battle aware of their opponents each
+take a standard or move action" (CRB, Combat, Surprise, d20pfsrd above). The word is aware
+*of your opponents*. Someone who watches a stranger walk up does not yet know they face an
+opponent, so the other side starts the battle unaware and the player holds the surprise
+round. Nothing new is invented: this is `rules/surprise.py`'s round with a new reason for
+unawareness (`decide(opener=…)`).
+
+**Built.**
+- **Before the fight.** A reading `go` just before the blow, with no place (or a place that
+  names someone here), becomes the walk up to them (`acts_to_ops._walks_up`, `_up_to`,
+  using `judgement._approach_move`). It is an ordinary out-of-fight `move` with no speed
+  cap, and it alarms whoever the engine's own answer to a body coming nearer says it
+  alarms: the holding-ground roll, not words.
+- **Order.** `acts_to_ops.order` now matches the plan's copies of a built walk or blow by
+  op, target and square. Live, the strike had run before the walk.
+- **The opening.** The player's own blow opens the fight with `off_guard`, so every
+  combatant on the other side is unaware. The exception is one who had found the player
+  creeping up hidden (`surprise._saw_them_creep`): a noticed sneak is an act that alarms on
+  its own, and `test_a_thug_who_had_found_the_hider_is_not_surprised` keeps that.
+- **The surprise round's action.** The walk was done out of the fight, so it does not
+  spend the action (`_one_action_spent` counts only acts after the batch's
+  `battle_joined`). The blow is the player's one standard action and asks for their d20.
+
+**Where the book's limits cut the declared sequence short.**
+- **A full attack in the surprise round is one blow.** Said in the tell: "In the surprise
+  round there is time for one blow, not the full attack." Swift Strikes' extra swing does
+  not come either.
+- **"I strike him" from 40 ft walks nobody**, as the ruling says. The fight opens with the
+  foe unready, and the player's surprise round is ONE action, so at the bar they can walk
+  OR strike, not both. Saying the walk ("I walk over and strike him") is what gets both.
+- **A walk said after the blow** ("I strike him and walk to the door") is refused in the
+  batch that joined the fight (#3).
+
+**Not extended.** Spells, abilities and thrown flasks keep their own gates. Q31 ("the gate,
+not a surprise round") still governs a cast, so only the blow catches foes unready. That is
+an owner call if casts should too.
+
+**Tests changed to the ruling.**
+- `test_surprise_round.py::test_both_aware_means_no_surprise_round` now opens the fight
+  from the thug's side.
+- The face-to-face player blow is the new
+  `test_the_players_own_blow_catches_a_face_to_face_thug_unready`.
+- The "out of reach waits for the panel" tests still hold, since none of them says a walk.

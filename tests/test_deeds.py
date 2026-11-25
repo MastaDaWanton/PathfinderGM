@@ -131,11 +131,19 @@ def test_swinging_at_the_merchant_is_one_deed_however_many_blows():
     """Three blows in one fight, one counted -2. The defect: the first blow makes him
     hostile through `_foes_settle`, and a reader without the ledger's memory or the
     snapshot would have scored the later blows as fighting back — or, reading the record
-    alone, as three assaults."""
+    alone, as three assaults.
+
+    Since the owner's ruling of 2026-11-25 the player's own first blow opens the book's
+    surprise round (one action), so the order is walked back round to the player between
+    blows, as the creature loop does in play; before it, the three swings at a merchant
+    15 ft off each closed and struck inside one round nobody ever ended."""
     s, pc, e = _street()
     m = _person(s, "c1", "the merchant", hp=200)
     for _ in range(3):
         _hit(e, "pc", "c1")
+        for _turn in range(4):
+            if s.in_encounter and s.advance_turn() == "pc":
+                break
     rows = deeds.of(pc, "deed.violence")
     assert len(rows) == 1 and rows[0]["tag"] == "deed.violence.unprovoked", pc.deeds
     assert deeds.total(pc) == -2

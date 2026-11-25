@@ -68,7 +68,18 @@ def _mods(actor, skill: str, **kw) -> list:
         return []
 
 
-def decide(engine, sides: dict, ambushers=()) -> tuple[list[str], list[str], list]:
+def _saw_them_creep(scene, me, opener) -> bool:
+    """Whether `me` had found the opener creeping up hidden — a pinpoint or a hunch on a
+    hider (`awareness.HIDDEN`). Somebody hiding who has been noticed is somebody up to
+    something: that act alarms on its own (owner ruling 2026-11-25, "as long as the
+    climbing itself wouldn't trigger anger"), so the sight rules decide as before."""
+    if opener is None or not opener.has_state(awareness.HIDDEN):
+        return False
+    return bool(awareness.sees(scene, me, opener) or awareness.has_hunch(me, opener))
+
+
+def decide(engine, sides: dict, ambushers=(), opener: str = "") -> tuple[list[str],
+                                                                          list[str], list]:
     """(aware refs, unaware refs, rolls) for the combatants on `sides`.
 
     `ambushers`: refs that lay in wait. Each rolls Stealth once; every combatant on another
@@ -76,6 +87,12 @@ def decide(engine, sides: dict, ambushers=()) -> tuple[list[str], list[str], lis
     distance (the codebase's convention, `awareness.judge`: a total that meets the DC finds).
     shortcut: an ambush rolls for the ambushers the door names (its first creature), not the
     ones `join_fight` brings in after; upgrade if a mixed party of sneaks and brutes ambushes.
+
+    `opener`: the player whose own declared blow opens the fight. Owner ruling 2026-11-25:
+    "if I am starting the fight I should be the only one ready for combat or aware they are
+    fighting". The book's word is aware "of your opponents" (CRB, Surprise), and a person
+    who sees a stranger walk up does not yet know they face an opponent; so everybody on
+    the other side starts the battle unaware, and the player's side as the sight rules say.
     """
     scene = engine.scene
     refs = [r for refs_ in sides.values() for r in refs_
@@ -117,6 +134,10 @@ def decide(engine, sides: dict, ambushers=()) -> tuple[list[str], list[str], lis
         if not awareness.can_perceive(me):
             unaware.append(r)
             continue
+        if opener and opener in side_of and side_of.get(r) != side_of.get(opener) \
+                and not _saw_them_creep(scene, me, scene.actors.get(opener)):
+            unaware.append(r)                 # caught by the opener's blow (`opener`)
+            continue
 
         def notices(o) -> bool:
             if not (awareness.sees(scene, me, o) or awareness.has_hunch(me, o)):
@@ -145,12 +166,12 @@ def decide(engine, sides: dict, ambushers=()) -> tuple[list[str], list[str], lis
     return aware, unaware, rolls
 
 
-def begin(engine, sides: dict, ambushers=()) -> dict | None:
+def begin(engine, sides: dict, ambushers=(), opener: str = "") -> dict | None:
     """Decide, and lay the surprise round when some but not all are aware.
 
     Returns the record for the tell ({"aware", "unaware", "rolls"}), or None when there is
     no surprise round — "If no one or everyone starts the battle aware"."""
-    aware, unaware, rolls = decide(engine, sides, ambushers)
+    aware, unaware, rolls = decide(engine, sides, ambushers, opener)
     if not aware or not unaware:
         return None
     scene = engine.scene

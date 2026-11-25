@@ -74,15 +74,28 @@ def test_a_hidden_player_who_strikes_an_unaware_thug_gets_the_surprise_round():
     assert engine._flat_footed(thug)
 
 
-def test_both_aware_means_no_surprise_round():
-    """Face to face, nobody hidden: "If no one or everyone starts the battle aware, there is
-    no surprise round." Nothing is laid and nothing is said of one."""
+def test_the_players_own_blow_catches_a_face_to_face_thug_unready():
+    """Owner ruling 2026-11-25: "if I am starting the fight I should be the only one ready
+    for combat or aware they are fighting". Face to face, nobody hidden, the player's own
+    blow opens the fight: the thug did not know a fight was coming, so he is surprised and
+    the player holds the surprise round's one action (CRB, Surprise). Until the ruling this
+    test pinned the opposite ("both aware, no surprise round")."""
     scene, engine, pc, thug = _room()
     res = _run(engine, {"op": "attack", "actor": "pc", "target": "c1", "because": "brawl"})
     assert scene.in_encounter
+    assert thug.has_state(states.SURPRISED) and pc.has_state(states.ONE_ACTION_TURN)
+    assert any(o.op == "surprise" for o in res.outcomes)
+
+
+def test_both_aware_means_no_surprise_round():
+    """A fight the thug opens: "If no one or everyone starts the battle aware, there is no
+    surprise round." Nothing is laid and nothing is said of one — the 2026-11-25 ruling is
+    about the player starting it."""
+    scene, engine, pc, thug = _room()
+    engine._ensure_encounter("c1", target="pc")
+    assert scene.in_encounter
     assert not any(a.has_state(states.SURPRISED) or a.has_state(states.ONE_ACTION_TURN)
                    for a in scene.actors.values())
-    assert not any(o.op == "surprise" for o in res.outcomes)
 
 
 def test_a_thug_who_had_found_the_hider_is_not_surprised():

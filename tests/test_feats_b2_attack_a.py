@@ -571,17 +571,23 @@ def test_slaying_sprint_delivers_a_coup_de_grace_without_provoking():
 def test_surprising_combatant_bluffs_an_aware_foe_into_surprise():
     """Surprising Combatant (Blood of the Moon): a Bluff before the first round; an
     opponent aware of you who fails Sense Motive against it "is treated as if it were not
-    aware of you". Face to face there was no surprise round; a won bluff makes one."""
+    aware of you". Face to face there was no surprise round; a won bluff makes one.
+
+    Owner ruling 2026-11-25: the player's own BLOW now catches the other side unready by
+    itself, so the feat is tested where the fight is made plain first — squaring off (the
+    table's Start a fight), which leaves a face-to-face thug aware."""
     from rules import states
     from tests.test_surprise_round import _room, _run
 
+    plain = {"op": "attack", "actor": "pc", "target": "c1", "because": "squares off",
+             "params": {"squares_off": True}}
     scene, engine, pc, thug = _room({"Sense Motive": 1, "Bluff, Surprising": 20})
     pc.feats = list(pc.feats) + ["Surprising Combatant"]
-    _run(engine, {"op": "attack", "actor": "pc", "target": "c1", "because": "brawl"})
+    _run(engine, plain)
     assert thug.has_state(states.SURPRISED), "the thug never saw through the act"
     scene, engine, pc, thug = _room({"Sense Motive": 20, "Bluff, Surprising": 1})
     pc.feats = list(pc.feats) + ["Surprising Combatant"]
-    _run(engine, {"op": "attack", "actor": "pc", "target": "c1", "because": "brawl"})
+    _run(engine, plain)
     assert not thug.has_state(states.SURPRISED)
 
 
