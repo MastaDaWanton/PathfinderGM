@@ -66,6 +66,8 @@ TRIGGERS = {
 UNPROVOKING = "maneuver.unprovoking"
 # The movement twin (lane E, 2026-11-22): a won tumble past one watcher, ref in the leaf.
 TUMBLED_PAST = "movement.unprovoking"
+# Escape Route's tag (feat loop b2): moving beside an ally who holds it too provokes nothing.
+ESCAPE_ROUTE = "movement.escape-route"
 
 
 def unprovoking_tag(maneuver: str) -> str:
@@ -428,6 +430,19 @@ def provoked_by_move(scene, mover_ref: str, start, end) -> list[tuple[str, React
     arrived = set(gridmod.footprint(tuple(end), mover.size))
 
     from . import states
+
+    # Escape Route (UC, a teamwork feat): "An ally who also has this feat provokes no
+    # attacks of opportunity for moving through squares adjacent to you or within your
+    # space" — the squares around every such ally, taken off what the mover left (feat
+    # loop b2). Both hold the document's tag.
+    if mover.has_state(ESCAPE_ROUTE):
+        for ref, ally in scene.actors.items():
+            spot = scene.positions.get(ref)
+            if ref == mover_ref or spot is None or ally.is_down \
+                    or not ally.has_state(ESCAPE_ROUTE) or not _allied(scene, ref, mover_ref):
+                continue
+            left -= set(gridmod.footprint(tuple(spot[:2]), ally.size)) | set(
+                gridmod.threatened_squares(spot, ally.size, reach=gridmod.SQUARE_FT))
 
     out: list[tuple[str, Reaction]] = []
     for ref, watcher in scene.actors.items():

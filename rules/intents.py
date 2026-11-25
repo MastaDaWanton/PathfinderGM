@@ -314,6 +314,8 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                            # Lane E (2026-11-22): a skill use with its own row and door
                            # (rules/skilluses.py OWN_DOORS); `square` is where a tumble goes.
                            "feint", "tumble", "care", "display", "square",
+                           # Disengaging Feint's feint (feat loop b2, skilluses.feint).
+                           "disengage",
                            # Round 2 (skills-mind): the thing appraised or studied, and
                            # the subject a Knowledge question is about: names the engine
                            # grounds (`tradecraft.carries`, the world's own index), never
@@ -382,7 +384,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                     # Aid another in combat (CRB): "attack" or "ac", for the friend named
                     # by `aid_ally`; `aid_with` the action it is paid from (Swift Aid's
                     # swift, Team Up's move), else the standard.
-                    "aid", "aid_ally", "aid_with"), "player"),
+                    "aid", "aid_ally", "aid_with",
+                    # Feat loop b2: five more feats' declared options (sheet.ATTACK_CHOICES).
+                    "risky_striker", "shield_of_swings", "pinpoint_targeting",
+                    "footslasher", "sliding_axe_throw"), "player"),
     # `lethality` because a Blood Bender paying for an ability in non-lethal
     # damage and one taking a sword are not in the same trouble.
     # `when`: the "against X only" clause a jar's or a flask's document carries (alchemy
@@ -1108,7 +1113,10 @@ FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "faile
                          "deadly_aim", "combat_expertise", "piranha_strike",
                          "vital_strike", "cleave", "rapid_shot", "flurry",
                          "fighting_defensively", "bloody_assault", "dazing_assault",
-                         "stunning_assault", "scorpion_style", "second_chance"})
+                         "stunning_assault", "scorpion_style", "second_chance",
+                         "risky_striker", "shield_of_swings",
+                         "pinpoint_targeting", "footslasher", "sliding_axe_throw",
+                         "disengage"})
 from .skilluses import OWN_DOORS as _OWN_DOORS  # noqa: E402 — the uses with their own door
 
 

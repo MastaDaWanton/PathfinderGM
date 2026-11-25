@@ -537,6 +537,14 @@ TAGS: dict[str, tuple[str, ...]] = {
     "sleeper hold":   ("buff.stance.sleeper-hold",),
     "stepped":        ("movement.stepped",),
     "spring attack":  ("buff.stance.spring-attack",),
+    # Feat loop b2: Risky Striker's and Shield of Swings' "until your next turn" (ARG, APG).
+    "risky striking":   ("buff.stance.risky-striking",),
+    "shield of swings": ("buff.stance.shield-of-swings",),
+    # Footslasher (Rival Guide): "affected as if by caltrops — its speed is reduced by
+    # half ... until the creature is successfully treated with a DC 15 Heal check or
+    # receives at least 1 point of magical healing". `state.wound` is what first aid and
+    # magical healing close (`firstaid.stanch`), `state.slowed` the half-speed question.
+    "footslashed":      ("state.slowed.footslashed", "state.wound.feet"),
     # Combat bar round 2, 2026-11-22: the book's two defensive choices, open to anyone
     # (CRB, Combat). Fighting defensively rides the attack it is declared with; total
     # defense is its own standard action, and "you can't make attacks of opportunity
@@ -635,6 +643,9 @@ TOTAL_DEFENSE = "buff.stance.total-defense"
 # provide soft cover to creatures when ranged attacks pass through your square"
 # (`position.cover_of`).
 IGNORES_PARTIAL_CONCEALMENT = "miss_chance.ignore.partial.melee"
+# Greater Blind-Fight (APG), feat loop b2: total concealment fought as partial (20%) in
+# melee, and a pinpointed shooter's advantages gone at any range.
+TOTAL_CONCEALMENT_AS_PARTIAL = "miss_chance.total.as-partial.melee"
 SHIELD_BASH_KEEPS_GUARD = "shield.bash.keeps-guard"
 SHIELD_LOWERED = "buff.stance.shield-lowered"
 GIVES_NO_SOFT_COVER = "cover.soft.none"

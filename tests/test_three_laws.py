@@ -456,6 +456,8 @@ _REACHES = {
     ("combat_mod", "reach"): lambda a: _reach(a),
     ("combat_mod", "charge_ac"): lambda a: sum(m.value for m in a._buff_mods(
         "combat_mod", "charge_ac", a._roll_context(None, charge=True))),
+    # Feat loop b2: the Strength carrying capacity is figured from (Cut Your Losses).
+    ("combat_mod", "carry_str"): lambda a: _carry_str(a),
 }
 
 
@@ -463,6 +465,13 @@ def _reach(a) -> int:
     from rules import reactions
 
     return reactions.reach_with(a, None)[0]
+
+
+def _carry_str(a) -> int:
+    from rules import gear
+
+    got = gear.load(a)
+    return got["str"] + got["str_bonus"]
 
 
 def _spell_cl(a) -> int:

@@ -854,11 +854,28 @@ _OPTION_SHAPES = {
                                 "next turn."),
     "whirlwind_attack": ("strike", "Whirlwind Attack",
                          "The whole round: one blow at every foe in reach."),
+    "risky_striker": ("swing", "Risky Striker",
+                      "Less guarded until your next turn; more damage in melee against "
+                      "foes two sizes larger."),
+    "shield_of_swings": ("full", "Shield of Swings",
+                         "A full attack with a two-handed weapon at half damage, behind a "
+                         "+4 shield of swings until your next turn."),
+    "pinpoint_targeting": ("strike", "Pinpoint Targeting",
+                           "One shot that ignores the target's armour, natural armour and "
+                           "shield. Not if you move this round."),
+    "footslasher": ("strike", "Footslasher",
+                    "One blow at a larger foe's feet: less to hit, and a hit halves its "
+                    "speed."),
+    "sliding_axe_throw": ("swing", "Sliding Axe Throw",
+                          "A thrown axe along the ground: less to hit, a hit trips."),
     "total_defense": ("act", "Total defense",
                       "Your standard action spent guarding: no attacks, and no attacks of "
                       "opportunity."),
     "feint": ("act", "Feint", "Bluff against the target's guard: they lose their "
                               "Dexterity against your next melee blow."),
+    "disengaging_feint": ("act", "Disengaging Feint",
+                          "Bluff against the target's guard: win, and you may move away "
+                          "without their swing."),
     "tumble": ("move", "Tumble", "Acrobatics against each foe's CMD, so the move past "
                                  "them provokes nothing."),
     # Feat loop b2: the hold kept another way (CRB p.200, Pin; UC Chokehold; Dragon
@@ -870,6 +887,11 @@ _OPTION_SHAPES = {
     "sleeper_hold": ("act", "Sleeper Hold", "Keep the hold and choke them toward sleep; "
                                             "−2 AC while you do."),
 }
+
+
+# Options whose whole effect is on the defender's side of the roll (Pinpoint Targeting's
+# armour ignored), so the sheet has no number of its own to show for them.
+_SAID_IN_WORDS = frozenset({"pinpoint_targeting"})
 
 
 def _signed(n: int) -> str:
@@ -1027,6 +1049,8 @@ def _attack_options(pc) -> dict:
                      "lunge": "+5 ft reach this turn"}.get(c)
             if extra:
                 opt["says"] = ", ".join(x for x in (opt["says"], extra) if x)
+            if not opt["says"] and c in _SAID_IN_WORDS:
+                opt["says"] = text          # no number to measure: its effect is the AC
             if not opt["says"]:
                 opt["why"] = f"{name} changes nothing with the {pc.weapon(held)['name']}."
         options.append(opt)
@@ -1075,6 +1099,10 @@ def _attack_options(pc) -> dict:
         if pc.has_state(tag):
             own(key, says, why=not_holding, action="standard",
                 op={**hold_op, "params": {**hold_op["params"], key: True}})
+    if pc.has_state(skilluses.DISENGAGING_FEINT):
+        own("disengaging_feint", f"Bluff {_signed(skill('bluff'))} against the target's guard",
+            action="standard",
+            op={"op": "check", "params": {"skill": "bluff", "feint": True, "disengage": True}})
     own("tumble", f"Acrobatics {_signed(skill('acrobatics'))} against each foe's CMD",
         why=("Armour that slows you cannot tumble past foes."
              if skilluses._armour_slows(pc) else ""),

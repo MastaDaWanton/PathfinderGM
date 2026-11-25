@@ -630,7 +630,10 @@ VOCAB: dict[str, list[dict]] = {
         # the Righteous); `reach` is feet added to melee reach (`reactions.reach_with`:
         # Lunge on the bearer's own turn, Combat Patrol's widened threat).
         ("charge_ac", "AC penalty of a charge, offset"),
-        ("reach", "Melee reach, in feet"))],
+        ("reach", "Melee reach, in feet"),
+        # Feat loop b2: Cut Your Losses' "treat your Strength score as 2 higher for the
+        # purpose of determining your carrying capacity", read by `gear.encumbrance`.
+        ("carry_str", "Strength for carrying capacity"))],
     "sense": [{"id": k, "name": n} for k, n in (
         ("low_light", "Low-light vision"), ("darkvision", "Darkvision"),
         ("scent", "Scent"), ("tremorsense", "Tremorsense"),
@@ -2499,14 +2502,23 @@ WHEN_KEYS: dict[str, str] = {
                   "(sheet.Situation.ally_state)",
     "skill_use": "which use of a skill the check is: lie, feint, diversion, tumble ... "
                  "or {\"not\": \"feint\"} (Engine._skill_use_ctx)",
+    # Feat loop b2: what the blow that just landed was, for an `on_hit` rider
+    # (`Engine._feat_riders`): Enforcer's "whenever you deal nonlethal damage",
+    # Intimidating Confidence's "when you confirm a critical hit".
+    "flanking_with": "flanking the roll's target with an ally who holds a feat: "
+                     "{\"feat\": \"outflank\"} (classfeatures.holds)",
+    "critical": "whether the hit was a confirmed critical (Engine._feat_riders)",
+    "nonlethal": "whether the hit dealt nonlethal damage (Engine._feat_riders)",
 }
+# `larger` / `smaller` (feat loop b2): size categories against the bearer's own, answered
+# by `classfeatures.holds` where the bearer is known (Risky Striker, Underfoot).
 _WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment", "choice",
-                                  "state", "aloft"),
-                       "attacker": ("type", "subtype")}
+                                  "state", "aloft", "larger", "smaller"),
+                       "attacker": ("type", "subtype", "larger", "smaller", "unprovoked")}
 _WHEN_COMPARE = ("lte", "gte", "lt", "gt", "eq")
 _WHEN_BOOLS = ("daylight", "underground", "wielder_casts", "resting", "full_attack",
                "flanked", "sole_threat", "opportunity", "first_attack", "adjacent",
-               "own_turn")
+               "own_turn", "critical", "nonlethal")
 
 # What a roll may be made AGAINST — the `against` of a roll context, one word per danger,
 # each with the reader that passes it. A closed list, because the clause is answered by
@@ -2681,6 +2693,12 @@ def when_problems(when, where: str = "when") -> list[str]:
                     or not str(want.get("state") or "").strip()):
                 out.append(f"{where}.ally_state is {{\"feat\": \"<a feat id>\", "
                            f"\"state\": \"<a tag>\"}}.")
+        elif key == "flanking_with":
+            from . import feats as feats_mod
+
+            if not isinstance(want, dict) or set(want) != {"feat"} \
+                    or str(want.get("feat") or "") not in feats_mod.all_feats():
+                out.append(f"{where}.flanking_with is {{\"feat\": \"<a feat id>\"}}.")
         elif key == "ally_beside":
             from . import feats as feats_mod
 

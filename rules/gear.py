@@ -532,6 +532,12 @@ def load(actor) -> dict:
             lb += got
     strength = int(actor.ability_score("str")) if hasattr(actor, "ability_score") else 10
     bonus, by = carry_bonus(actor)
+    # And the funnel's own term (feat loop b2, Cut Your Losses): a feat beside the pack,
+    # each its own source, so the two add.
+    if hasattr(actor, "_buff_mods"):
+        for m in actor._buff_mods("combat_mod", "carry_str"):
+            bonus += int(m.value)
+            by = f"{by} and {m.source}" if by else m.source
     light, medium, heavy = capacity(strength + bonus, getattr(actor, "size", "medium"))
     lb = round(lb, 1)
     band = ("light" if lb <= light else "medium" if lb <= medium

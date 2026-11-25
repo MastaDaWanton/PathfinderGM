@@ -39,7 +39,7 @@ from dataclasses import dataclass, field as dc_field
 from . import classes as classes_mod, effectspec, resources
 from .registry import Field
 from .sheet import ACTOR_RULES
-from .tables import ABILITIES, CONDITIONS, SAVES, SKILLS, WEAPONS
+from .tables import ABILITIES, CONDITIONS, MANEUVERS, SAVES, SKILLS, WEAPONS
 
 MAX_LEVEL = 20
 # Path tiers run 1-5 because the two Control Blood tracks the level table can carry run
@@ -1164,7 +1164,19 @@ def _luck_problems(at: str, entries) -> list[str]:
 # What a feat's `on_hit` may lay on the creature a melee blow just struck (feat loop b1,
 # 2026-11-22): the attack riders' own executors (`Engine._RIDERS`), each key it reads.
 _ON_HIT_KINDS = {"bleed": {"kind", "when", "amount"},
-                 "save_condition": {"kind", "when", "condition", "save", "dc", "for"}}
+                 "save_condition": {"kind", "when", "condition", "save", "dc", "for"},
+                 # Feat loop b2 (`Engine._FEAT_RIDERS`): a free manoeuvre on the hit (Shield
+                 # Slam, Shield Snag, Sliding Axe Throw), a free demoralize (Enforcer,
+                 # Intimidating Confidence), a condition the hit lays (Footslasher), an
+                 # ally's attack of opportunity on a critical (Outflank, Seize the Moment)
+                 # and a free shield bash on one (Bashing Finish).
+                 "maneuver": {"kind", "when", "maneuver", "attack_roll", "prone_if_blocked",
+                              "unless_held"},
+                 "demoralize": {"kind", "when", "rounds", "crit_condition", "crit_bonus",
+                                "all_threatened"},
+                 "condition": {"kind", "when", "condition", "rounds", "tell"},
+                 "ally_swing": {"kind", "when", "flanking"},
+                 "free_swing": {"kind", "when"}}
 
 
 def _on_hit_problems(at: str, rules, doc: dict) -> list[str]:
@@ -1188,6 +1200,15 @@ def _on_hit_problems(at: str, rules, doc: dict) -> list[str]:
                        f"carries: {', '.join(sorted(_ON_HIT_KINDS[kind]))}.")
         if kind == "bleed" and not str(rule.get("amount") or "").strip():
             out.append(f"{where}.amount: the bleed per round, \"1d4\" or \"2\".")
+        if kind == "maneuver" and str(rule.get("maneuver") or "") not in MANEUVERS:
+            out.append(f"{where}.maneuver: a combat manoeuvre the table knows (trip, "
+                       f"bull rush, disarm ...).")
+        if kind == "condition":
+            from . import states as states_mod
+
+            if str(rule.get("condition") or "") not in set(CONDITIONS) | set(states_mod.TAGS):
+                out.append(f"{where}.condition: a condition the table or the vocabulary "
+                           f"(rules/states.py TAGS) knows.")
         if kind == "save_condition":
             from .states import TAGS as _TAGS
 

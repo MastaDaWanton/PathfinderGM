@@ -51,6 +51,8 @@ LORE_TRIED = "lore.tried.creature"
 LONG_TERM_CARE = "care.long-term"
 FEINT_SOURCE = "rule:feint"
 TUMBLE_SOURCE = "rule:tumble"
+# Disengaging Feint's document tag (feat loop b2): a feint that buys a step away.
+DISENGAGING_FEINT = "skill.bluff.feint.disengaging"
 
 # The check params that send a check to its use's own door (`Engine._op_check`), each
 # written by the act table from the reader's closed answers (gm/acts_to_ops.py).
@@ -239,6 +241,16 @@ def feint(engine, intent, actor, mods, partial):
                                       f"a creature lacking an Intelligence score is "
                                       f"impossible. Nothing is rolled.")
     action = _action_of(actor, r)
+    # Disengaging Feint (UC): "As a standard action, use Bluff to feint ... Instead of
+    # denying that opponent his Dexterity bonus to AC, a successful feint allows you to
+    # move up to your speed without provoking an attack of opportunity from the opponent
+    # you feinted for leaving the square you start in" (feat loop b2).
+    disengage = bool(intent.params.get("disengage"))
+    if disengage and not actor.has_state(DISENGAGING_FEINT):
+        return engine._refuse(intent, f"{actor.name} does not know how to feint to slip "
+                                      f"away (Disengaging Feint). Nothing is rolled.")
+    if disengage:
+        action = "standard"
     spent = _no_action_left(engine, actor, action, "a feint")
     if spent:
         return engine._refuse(intent, spent + " Nothing is rolled.", code="action_spent")
@@ -271,6 +283,21 @@ def feint(engine, intent, actor, mods, partial):
                         tell=f"{actor.name} feints at {target.name}{cost} and misses the "
                              f"bluff check by {-margin}: {target.name} is not fooled.")
     out = r["outcome"]
+    if disengage:
+        # The tumble's own waiver (`movement.unprovoking.<ref>`), which the next move
+        # spends: the move's swings are asked of the square it leaves, the one it began in.
+        actor.apply_effect(ActiveEffect(
+            name=f"slipping away from {target.name}", kind="situation",
+            key=f"tumble-{target.ref}", source=TUMBLE_SOURCE, origin="rule:feat-disengaging-feint",
+            duration="rounds", rounds_left=1, tags=(f"{UNPROVOKING}.{target.ref}",)))
+        return _outcome(intent, rolls=[roll], dc_value=value, basis=basis,
+                        verdict="success", margin=margin,
+                        effects=[{"ref": actor.ref, "kind": "tumble", "past": target.ref,
+                                  "origin": "rule:feat-disengaging-feint"}],
+                        tell=f"{actor.name} feints at {target.name} and makes the bluff "
+                             f"check{dc_mod.by(margin)}: {target.name} lunges at the "
+                             f"opening, and {actor.name} can step away without a swing "
+                             f"from them.")
     target.apply_effect(ActiveEffect(
         name=f"feinted by {actor.name}", kind="situation", key=f"feinted-by-{actor.ref}",
         source=FEINT_SOURCE, origin="rule:feint", duration="rounds",
@@ -427,7 +454,16 @@ def tumble(engine, intent, actor, mods, partial):
     rounds = int(r["outcome"]["rounds"])
     past, caught, effects = [], [], []
     for foe, value in dcs:
-        if roll.total >= value:
+        # A term against THIS foe (feat loop b2): Underfoot's "+4 dodge bonus on Acrobatics
+        # checks to move past opponents ... so long as they are larger than you", read with
+        # the foe in the context (`when.target.larger`), so it lands on their DC alone.
+        # The difference the foe makes, so a term that asks only the use (already in
+        # `mods`) is not counted twice.
+        against = sum(m.value for m in actor._feat_mods(
+            "skill_mod", "acrobatics", {"skill_use": "tumble", "target_actor": foe},
+            scoped=True)) - sum(m.value for m in actor._feat_mods(
+                "skill_mod", "acrobatics", {"skill_use": "tumble"}, scoped=True))
+        if roll.total + against >= value:
             actor.apply_effect(ActiveEffect(
                 name=f"tumbling past {foe.name}", kind="situation", key=f"tumble-{foe.ref}",
                 source=TUMBLE_SOURCE, origin="rule:tumble", duration="rounds",

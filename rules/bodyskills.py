@@ -58,6 +58,28 @@ MOUNTED_COMBAT = "skill.ride.mounted-combat"
 CLIMB_SOURCE, BALANCE_SOURCE, RIDE_SOURCE = "rule:climb", "rule:balance", "rule:ride"
 
 
+TRICK_RIDING = "skill.ride.trick-riding"
+
+
+def _trick_ridden(engine, rider, mods, dc: int, label: str):
+    """Trick Riding (CRB): "While wearing light or no armor, you do not need to make Ride
+    skill checks for any task listed in the Ride skill with a DC of 15 or lower." The
+    task is done without a die: a roll stands in at the face that meets the DC (shown as
+    such), so the callers' arithmetic and records stay one shape. None otherwise.
+    shortcut: a body whose Ride is so poor that a natural 20 misses DC 15 keeps the 20."""
+    from . import armour as armour_mod
+
+    if dc > 15 or not rider.has_state(TRICK_RIDING):
+        return None
+    worn = armour_mod.row("armour", str(getattr(rider, "armour", "none") or "none"))
+    if str(getattr(rider, "armour", "none") or "none") != "none" \
+            and str(worn.get("weight") or "") != "light":
+        return None
+    total = sum(int(getattr(m, "value", 0)) for m in mods or ())
+    return engine.dice.given(max(1, min(20, dc - total)), list(mods),
+                             label=f"{label} — no check needed (Trick Riding)")
+
+
 def _prone(actor, source: str, origin: str) -> None:
     """Down on the ground: the one condition 1e names for every way a body here falls."""
     actor.add_condition("prone", source=source, origin=origin)
@@ -436,7 +458,11 @@ def climb(engine, intent, actor, mods, partial):
                         f"to the ground before getting anywhere.")
             break
         catch_dc = value + int(row("skill.climb.catch")["adds"])
-        caught = _roll(engine, actor, mods, "Climb check (catch yourself)")
+        # A feat's term on this roll alone (feat loop b2): Shield Snag's "+4 bonus ... on
+        # Climb checks to catch yourself on a wall or slope when falling" with a shield.
+        caught = _roll(engine, actor, list(mods) + actor._feat_mods(
+            "skill_mod", "climb", {"skill_use": "catch"}, scoped=True),
+            "Climb check (catch yourself)")
         rolls.append(caught)
         if caught.total >= catch_dc:
             _cling(actor, at=at, top=top, dc=value)
@@ -819,7 +845,9 @@ def _thrown(engine, rider, steed, why: str):
     r = row("skill.ride.soft-fall")
     _unseat(rider, steed)
     _step_off(engine.scene, rider, steed)
-    roll = _roll(engine, rider, _skill_mods(rider, "ride"), "Ride check (soft fall)")
+    mods = _skill_mods(rider, "ride")
+    roll = _trick_ridden(engine, rider, mods, int(r["dc"]), "Ride check (soft fall)") \
+        or _roll(engine, rider, mods, "Ride check (soft fall)")
     if roll.total >= int(r["dc"]):
         return [roll], [{"ref": rider.ref, "kind": "dismount", "fell": True}], [
             f"{rider.name} {why} and lands on their feet (Ride {roll.total} against DC "
@@ -864,7 +892,8 @@ def spur(engine, intent, actor, mods, partial):
     if spent:
         return engine._refuse(intent, spent + " Nothing is rolled.", code="action_spent")
     value = int(r["dc"])
-    roll = engine._roll_or_suspend(intent, actor, list(mods), label="Ride check (spur)",
+    roll = _trick_ridden(engine, actor, mods, value, "Ride check (spur)") \
+        or engine._roll_or_suspend(intent, actor, list(mods), label="Ride check (spur)",
                                    dc=value, partial=partial)
     _spend_action(engine, actor, "move")
     margin = roll.total - value
@@ -899,7 +928,8 @@ def cover(engine, intent, actor, mods, partial):
     if refused:
         return refused
     value = int(r["dc"])
-    roll = engine._roll_or_suspend(intent, actor, list(mods), label="Ride check (cover)",
+    roll = _trick_ridden(engine, actor, mods, value, "Ride check (cover)") \
+        or engine._roll_or_suspend(intent, actor, list(mods), label="Ride check (cover)",
                                    dc=value, partial=partial)
     margin = roll.total - value
     if margin < 0:
@@ -934,7 +964,8 @@ def leap(engine, intent, actor, mods, partial):
         return engine._refuse(intent, "A leap is made to a distance: give distance_ft. "
                                       "Nothing is rolled.")
     value = int(r["dc"])
-    roll = engine._roll_or_suspend(intent, actor, list(mods), label="Ride check (leap)",
+    roll = _trick_ridden(engine, actor, mods, value, "Ride check (leap)") \
+        or engine._roll_or_suspend(intent, actor, list(mods), label="Ride check (leap)",
                                    dc=value, partial=partial)
     margin = roll.total - value
     if margin < 0:
@@ -975,10 +1006,16 @@ def mounted_combat(engine, attacker, defender, atk, state) -> str:
     if rider is None or rider.is_down or not rider.has_state(MOUNTED_COMBAT) \
             or mount_of(engine.scene, rider) is not defender:
         return ""
-    if any(e.kind == "item_spent" and e.key == "mounted-combat" for e in rider.effects):
+    # Trick Riding (CRB): "You can make a check using Mounted Combat to negate a hit on
+    # your mount twice per round instead of just once" — one spent-marker per use.
+    allowed = 2 if rider.has_state(TRICK_RIDING) else 1
+    if sum(1 for e in rider.effects
+           if e.kind == "item_spent" and str(e.key).startswith("mounted-combat")) >= allowed:
         return ""
     rider.apply_effect(ActiveEffect(
-        name="Mounted Combat used this round", kind="item_spent", key="mounted-combat",
+        name="Mounted Combat used this round", kind="item_spent",
+        key="mounted-combat" + ("-2" if any(e.kind == "item_spent" and e.key == "mounted-combat"
+                                            for e in rider.effects) else ""),
         source="feat:mounted-combat", origin="feat:mounted-combat", duration="rounds",
         rounds_left=1))
     roll = _roll(engine, rider, _skill_mods(rider, "ride"), "Ride check (Mounted Combat)")
@@ -1098,8 +1135,14 @@ def _treat(engine, intent, actor, mods, partial, *, key: str):
     held = (aff.payload or {}).get("affliction") or {}
     value = int(held.get("dc") or 10)
     save = str(held.get("save") or "fort")
-    roll = engine._roll_or_suspend(intent, actor, list(mods), label=f"Heal check (treat "
-                                   f"{kind})", dc=value, partial=partial)
+    from . import firstaid
+
+    if kind == "poison" and firstaid.medic_takes_ten(actor, patient, mods, value, exceed=True):
+        roll = engine.dice.given(10, list(mods), label="Heal check (treat poison, taking 10, "
+                                                       "Combat Medic)")
+    else:
+        roll = engine._roll_or_suspend(intent, actor, list(mods), label=f"Heal check (treat "
+                                       f"{kind})", dc=value, partial=partial)
     if kind == "disease":
         scene.advance(int(r["minutes"]))
     else:

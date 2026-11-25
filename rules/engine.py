@@ -6218,6 +6218,15 @@ class Engine:
                                 if e.get("kind") == "cleave" and e.get("attack")), None)
                 if carried is not None:
                     queue.insert(0, dict(carried.pop("attack")))
+            # A feat's owed swing (feat loop b2, `Engine.owed_swing`): an attack of
+            # opportunity a critical, a fall or a failed defensive cast granted, or Bashing
+            # Finish's free bash — engine-written, next in the queue, in the order earned.
+            if outcome.status == "resolved":
+                owed = [e for e in (outcome.effects or [])
+                        if e.get("kind") == "owed_swing" and e.get("attack")]
+                for e in reversed(owed):
+                    queue.insert(0, dict(e.pop("attack")))
+                queue[0:0] = self._falls_prone_swings(outcome)
             if intent.op == "use_item" and outcome.status == "resolved":
                 thrown = next((e for e in (outcome.effects or [])
                                if e.get("kind") == "thrown" and e.get("attack")), None)
@@ -6583,7 +6592,8 @@ class Engine:
                 "op": reaction.op, "actor": watcher, "target": actor_ref,
                 "because": f"{actor.name} tried to {params['manoeuvre']} them without "
                            f"the training to do it safely",
-                "params": {"full_attack": False, "reaction": reaction.id},
+                "params": {"full_attack": False, "reaction": reaction.id,
+                           "provoked_by": "maneuver"},
                 "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
             })
         if out:
@@ -7784,6 +7794,7 @@ class Engine:
             situations.append(("disrupted",
                                int((disrupted.payload or {}).get("dc", 10)) + level,
                                f"under {disrupted.source or 'a disruptive spell'}"))
+        situations = self._distracted(actor, situations)
         ctx_of = casting.spell_context(spell, adjacent_allies=self._adjacent_allies(actor))
         for kind, dc, why in situations:
             roll = self.dice.d20(actor.concentration_modifiers({**ctx_of, "casting": kind}),
@@ -7802,12 +7813,53 @@ class Engine:
                           "spell": spell.id, "name": spell.name, "situation": kind,
                           "dc": dc, "rolled": roll.total, "slot": pool,
                           "slots_left": casting.pool_left(actor, pool),
-                          "origin": "rule:concentration"}],
+                          "origin": "rule:concentration"}]
+                + (self._spellbreaker_swings(actor) if kind == "defensively" else []),
                 tell=(f"{actor.name} begins {spell.name}, {why}, and loses it: "
                       f"concentration {roll.total} against DC {dc}. The spell is lost"
                       + ("." if casting.at_will(level) else ", and its slot with it.")),
                 because=intent.because)
         return None
+
+    def _threatening_holders(self, caster, tag: str) -> list:
+        """The caster's foes who hold a feat (by its document's tag) and threaten the
+        caster's square on the board, able to react — no board, nobody."""
+        square = self.scene.positions.get(caster.ref)
+        if square is None or not self.scene.has_grid:
+            return []
+        return [w for r, w in self.scene.actors.items()
+                if w is not caster and not w.is_down and w.has_state(tag)
+                and self._against(w, caster)
+                and reactions.reactions_for(w)
+                and reactions.threatens(self.scene, r, square,
+                                        getattr(caster, "size", "medium"))]
+
+    def _distracted(self, caster, situations: list) -> list:
+        """Coordinated Distraction (Demon Hunter's Handbook): "When you and at least one
+        ally with this feat threaten the same enemy, the enemy treats the DC to cast spells
+        defensively as 2 higher for each threatening character with this feat. If you or
+        your allies are incapable of taking an attack of opportunity against the target
+        for any reason, the effects of this feat do not apply" — each holder must be able
+        to react (`reactions.reactions_for`), and at least two must stand there."""
+        holders = self._threatening_holders(caster, "casting.foe.coordinated-distraction")
+        if len(holders) < 2:
+            return situations
+        add = 2 * len(holders)
+        return [(k, dc + add, f"{why}, distracted by {len(holders)} foes")
+                if k == "defensively" else (k, dc, why) for k, dc, why in situations]
+
+    def _spellbreaker_swings(self, caster) -> list[dict]:
+        """Spellbreaker (APG): "Enemies in your threatened area that fail their checks to
+        cast spells defensively provoke attacks of opportunity from you" — each holder's
+        swing owed through `owed_swing`, queued behind the lost spell."""
+        out: list[dict] = []
+        for w in self._threatening_holders(caster, "casting.foe.spellbreaker"):
+            raw = self.owed_swing(w, caster, f"{caster.name} fumbled a spell cast "
+                                             f"defensively (Spellbreaker)")
+            if raw is not None:
+                out.append({"ref": w.ref, "kind": "owed_swing", "attack": raw,
+                            "target": caster.ref, "origin": "rule:feat-spellbreaker"})
+        return out
 
     @staticmethod
     def _wounds_left(actor) -> int:
@@ -9354,7 +9406,11 @@ class Engine:
                 intent.params.get("dc"), level, intent.params.get("circumstance")
             )
 
-        roll = self._roll_or_suspend(
+        medic = patient is not None and firstaid.medic_takes_ten(
+            actor, patient, mods, resolved_dc.final)
+        roll = self.dice.given(10, list(mods), label=f"{skill.title()} check (taking 10, "
+                                                     f"Combat Medic)") if medic \
+            else self._roll_or_suspend(
             intent, actor, mods,
             label=(f"{named} check to help {helped.name}" if helped is not None
                    else f"{named} check" if ability else f"{skill.title()} check"),
@@ -10612,6 +10668,25 @@ class Engine:
         from .sheet import ATTACK_CHOICES
 
         choices = tuple(c for c in ATTACK_CHOICES[1:] if intent.params.get(c))
+        # What kind of swing this is, for a document's `when` (feat loop b2): an attack of
+        # opportunity (`opportunity`, Swarm Strike's "+1 on your attack roll" — the key lane
+        # b2-attack-a's swing moment also answers), and one a combat manoeuvre drew
+        # (`choice: provoked_by_maneuver`, Porcupine Defense). Engine-written params only.
+        if intent.params.get("reaction") == "attack_of_opportunity":
+            choices += ("opportunity",) + (
+                ("provoked_by_maneuver",) if intent.params.get("provoked_by") == "maneuver"
+                else ())
+        # A cleave's later blow (`_cleave_next` writes `cleaving`): Goblin Cleaver's "+2
+        # circumstance bonus on attack rolls" is on "additional attacks" alone.
+        if intent.params.get("cleaving"):
+            choices += ("cleaving_on",)
+        # Pinpoint Targeting: "You do not gain the benefit of this feat if you move this
+        # round" — a move already made this round (`Scene.move_spent`) refuses it.
+        if ("pinpoint_targeting" in choices and partial.get("attack_state") is None
+                and self.scene.in_encounter
+                and self.scene.move_spent.get(actor.ref) == self.scene.round):
+            return self._refuse(intent, f"{actor.name} has moved this round; Pinpoint "
+                                        f"Targeting needs a shooter who stands still.")
         off_key = "" if dancing else str(intent.params.get("off_hand") or "").strip().lower()
         # A real weapon thrown (a dagger, a javelin, a throwing blade — anything with a
         # range increment): one throw, since the weapon leaves the hand with it, and the
@@ -10778,12 +10853,14 @@ class Engine:
         target_ac = defender.ac(against=weapon["category"],
                                 flat_footed=flat_footed or bool(flounders), attacker=actor,
                                 provoked_by=str(intent.params.get("provoked_by") or (
-                                    "opportunity" if intent.params.get("reaction") else "")))
+                                    "opportunity" if intent.params.get("reaction") == "attack_of_opportunity"
+                                    else "")))
         # What the feint took off, given back to every swing after the first (the loop).
         feint_gain = (defender.ac(against=weapon["category"],
                                   flat_footed=unfeinted_ff or bool(flounders), attacker=actor,
                                   provoked_by=str(intent.params.get("provoked_by") or (
-                                    "opportunity" if intent.params.get("reaction") else "")))
+                                    "opportunity" if intent.params.get("reaction") == "attack_of_opportunity"
+                                    else "")))
                       - target_ac) if feinted else 0
         # The AC's parts past the sheet's own number, (what, how much), so the tell can
         # state the number the roll was judged on and say what made it (`_ac_said`).
@@ -10802,6 +10879,25 @@ class Engine:
                 ac_parts.append(("armour and shield passed through",
                                  sum(m.value for m in kept) - target_ac))
                 target_ac = sum(m.value for m in kept)
+        # Pinpoint Targeting (CRB p.132): "The target does not gain any armor, natural
+        # armor, or shield bonuses to its Armor Class" — the typed terms, as brilliant
+        # energy's are dropped above (feat loop b2).
+        if "pinpoint_targeting" in choices:
+            kept = [m for m in defender.ac_modifiers(
+                        weapon["category"], flat_footed or bool(flounders), attacker=actor)
+                    if (m.type or "") not in ("armour", "shield", "natural armour")]
+            if sum(m.value for m in kept) < target_ac:
+                ac_parts.append(("armour, natural armour and shield pinpointed past",
+                                 sum(m.value for m in kept) - target_ac))
+                target_ac = sum(m.value for m in kept)
+        # Sliding Axe Throw: "If the target is flat-footed ... this attack ignores any
+        # bonuses to the target's AC from its shield."
+        if "sliding_axe_throw" in choices and flat_footed:
+            shield_ac = sum(m.value for m in defender.ac_modifiers(
+                weapon["category"], True, attacker=actor) if (m.type or "") == "shield")
+            if shield_ac > 0:
+                ac_parts.append(("the shield slid under", -shield_ac))
+                target_ac -= shield_ac
         worn_ac = target_ac
         if wet_defender:
             against = water.bonus_against(wet_defender)
@@ -11242,6 +11338,13 @@ class Engine:
                             f"{actor.name} strikes true through the {why}: in melee it "
                             f"gives no miss chance against them.")
                     chance = 0
+                # Greater Blind-Fight (APG): "you treat opponents with total concealment as
+                # if they had normal concealment (20% miss chance instead of 50%). You may
+                # still reroll" — melee, by the document's tag, after the partial waiver
+                # above so the 20 it leaves is still rolled (feat loop b2).
+                if chance >= 50 and weapon.get("category") != "ranged" \
+                        and actor.has_state(states.TOTAL_CONCEALMENT_AS_PARTIAL):
+                    chance, why = 20, f"{why}, fought blind"
                 if chance:
                     miss = self.dice.roll("1d100", label=f"miss chance ({why})",
                                           visibility="hidden")
@@ -11539,6 +11642,15 @@ class Engine:
                 # is a rule about the roll's result. Halved here, where the weapon's type
                 # and the swinger's footing are both known, and never below one: a hit
                 # that lands is a hit.
+                # Shield of Swings (APG): "reduce the damage by 1/2 ... The reduction in
+                # damage applies until the beginning of your next turn" — while its stance
+                # holds, every blow (attacks of opportunity too), never below one.
+                if actor.has_state("buff.stance.shield-of-swings"):
+                    amount = max(1, amount // 2)
+                    if not state.get("swings_said"):
+                        state["swings_said"] = True
+                        state["tells"].append(f"{actor.name}'s guarded swings land at half "
+                                              f"weight (Shield of Swings).")
                 wet_row = actor.water_row(self.scene.afloat(actor.ref))
                 if wet_row and water.damage_halved(wet_row, str(weapon["type"])):
                     amount = max(1, amount // 2)
@@ -11744,7 +11856,7 @@ class Engine:
                 # What a held feat lays on a melee hit (`_feat_riders`): Bloody Assault's
                 # bleed, Dazing and Stunning Assault's save-or-condition.
                 for extra in ([] if dancing else self._feat_riders(
-                        intent, actor, defender, weapon_key, weapon, state)):
+                        intent, actor, defender, weapon_key, weapon, state, choices)):
                     state["effects"].append(extra["effect"])
                     if extra.get("tell"):
                         state["tells"].append(extra["tell"])
@@ -13390,8 +13502,10 @@ class Engine:
         # maneuver checks to start and maintain a grapple" (Bestiary UMR), or the larger
         # racial bonus a block prints instead (the sargassum fiend's +8). Read only off an
         # intent the engine built and stamped `creature:` — never a param a plan writes.
+        # A feat's free manoeuvre on the hit is a rider too (feat loop b2, Sliding Axe
+        # Throw's "your opponent does not get an attempt to trip you in return").
         rider = intent.params.get("rider") if str(intent.origin or "").startswith(
-            "creature:") else None
+            ("creature:", "rule:feat-")) else None
         if rider and int(intent.params.get("rider_bonus") or 0):
             mods.append(Modifier(int(intent.params["rider_bonus"]), str(rider)))
         # Attempting to disarm while unarmed is -4; so is grappling without two hands.
@@ -25345,7 +25459,7 @@ class Engine:
                          f"{'' if made_cond.rounds_left == 1 else 's'}."}]
 
     def _feat_riders(self, intent: Intent, actor: Actor, defender: Actor, weapon_key: str,
-                     weapon: dict, state: dict) -> list[dict]:
+                     weapon: dict, state: dict, choices=()) -> list[dict]:
         """What the attacker's feats lay on the creature this blow just hit: a document's
         `on_hit` riders (feat loop b1, 2026-11-22), each run by the attack riders' own
         executor (`_RIDERS`: the bleed, the save-or-condition), its `when` asked of the
@@ -25367,6 +25481,16 @@ class Engine:
         ctx.update({c: True for c in ATTACK_CHOICES if intent.params.get(c)})
         if weapon.get("category") == "ranged":
             ctx["weapon"] = dict(ctx["weapon"], category="ranged", ranged=True)
+        # What this blow was (feat loop b2), for a rider's `when`: the options declared
+        # with it, whether it was a confirmed critical, whether it dealt nonlethal damage
+        # (Enforcer), a shield bash (Shield Slam), and how much it dealt (`dealt`).
+        blow = (state.get("blows") or [{}])[-1]
+        ctx.update({c: True for c in choices})
+        ctx["critical"] = bool(state.get("crit"))
+        ctx["nonlethal"] = bool(blow.get("nonlethal"))
+        ctx["weapon"] = dict(ctx["weapon"], shield_bash=bool(weapon.get("shield_bash")))
+        dealt = next((int(e.get("amount") or 0) for e in reversed(state.get("effects") or ())
+                      if e.get("ref") == defender.ref and "amount" in e), 0)
         out: list[dict] = []
         # Boar Style (Ultimate Combat): "once per round when you hit a single foe with two
         # or more unarmed strikes, you can tear flesh. When you do, you deal 2d6 bleed
@@ -25411,8 +25535,11 @@ class Engine:
                         run["dc"] = resources.evaluate(rule["dc"], actor)
                     except resources.FormulaError:
                         continue
-                out.extend(self._RIDERS[str(rule["kind"])](self, intent, actor, defender,
-                                                           run, origin, state))
+                run.update(weapon_key=weapon_key, dealt=dealt, feat=doc["id"],
+                           name=doc["name"])
+                ride = self._FEAT_RIDERS.get(str(rule["kind"])) \
+                    or self._RIDERS[str(rule["kind"])]
+                out.extend(ride(self, intent, actor, defender, run, origin, state))
         return out
 
     # Feat loop b2 (2026-11-22): what a held feat does after a blow lands, each its
@@ -25898,6 +26025,300 @@ class Engine:
                       "dice": r.get("dice") or "1", "drain": False}, o, s),
         "affliction": _rider_affliction,
         "energy_drain": _rider_energy_drain,
+    }
+
+    # --- feat loop b2: what a feat's `on_hit` lays beyond a bleed or a save ----------------
+
+    def owed_swing(self, watcher: Actor, foe: Actor, because: str,
+                   weapon: str = "") -> dict | None:
+        """An attack of opportunity a feat grants on an event (feat loop b2), as the raw
+        intent `run` queues — or None when none is owed. Outflank's "it provokes an attack
+        of opportunity from your ally", Seize the Moment's, Vicious Stomp's, Spellbreaker's.
+
+        The book's own gates, the ones every provoked swing meets: the watcher can react
+        (`reactions.reactions_for`: not in total defense, able to swing), threatens the
+        foe's square on the board (`reactions.threatens`; no board, no threat), and has an
+        attack of opportunity left this round (`_spend_reaction`, which also refuses the
+        flat-footed). `weapon` names what the swing must be made with (Vicious Stomp's
+        "must be an unarmed strike")."""
+        if watcher is None or foe is None or watcher.is_down or foe.is_down \
+                or watcher.ref == foe.ref:
+            return None
+        if not any(r.id == "attack_of_opportunity" for r in reactions.reactions_for(watcher)):
+            return None
+        square = self.scene.positions.get(foe.ref)
+        if square is None or not reactions.threatens(self.scene, watcher.ref, square,
+                                                     getattr(foe, "size", "medium")):
+            return None
+        if not self._spend_reaction(watcher.ref, "attack_of_opportunity"):
+            return None
+        params = {"full_attack": False, "reaction": "attack_of_opportunity"}
+        if weapon:
+            params["weapon"] = weapon
+        return {"op": "attack", "actor": watcher.ref, "target": foe.ref,
+                "because": because, "params": params,
+                "visibility": "player" if watcher.is_pc else "hidden"}
+
+    @staticmethod
+    def _owed(raw: dict | None, tell: str, origin: str) -> list[dict]:
+        """One owed swing as a rider's (effect, tell): the effect carries the raw intent,
+        which `run` queues next (`kind: owed_swing`), as a cleave's next blow is."""
+        if raw is None:
+            return []
+        return [{"effect": {"ref": raw["actor"], "kind": "owed_swing", "attack": raw,
+                            "target": raw["target"], "origin": origin},
+                 "tell": tell}]
+
+    def _rider_feat_maneuver(self, intent: Intent, actor: Actor, defender: Actor,
+                             rule: dict, origin: str, state: dict) -> list[dict]:
+        """A free combat manoeuvre a feat makes on the hit (feat loop b2).
+
+        Shield Slam (CRB): "Any opponents hit by your shield bash are also hit with a free
+        bull rush attack, substituting your attack roll for the combat maneuver check ...
+        does not provoke ... Opponents who cannot move back due to a wall or other surface
+        are knocked prone after moving the maximum possible distance." Shield Snag: the
+        same with a disarm. Sliding Axe Throw: "you may immediately make a trip attempt
+        against the target as a free action. If you fail to trip your opponent, your
+        opponent does not get an attempt to trip you in return."
+
+        `attack_roll`: the hit's own attack roll stands as the check (handed to
+        `_resolve_maneuver` as its parked CMB, so nothing is rolled twice). Never through
+        `validate`, so no attack of opportunity is owed. `unless_held` names a feat whose
+        manoeuvre takes this one's place (Shield Snag beside Shield Slam)."""
+        from . import feats as feats_mod
+
+        key = str(rule.get("maneuver") or "")
+        if key not in MANEUVERS or defender.is_down:
+            return []
+        if rule.get("unless_held") and str(rule["unless_held"]) in feats_mod._held(actor):
+            return []
+        if key == "trip" and (defender.has_state("state.position.prone")
+                              or self._untrippable(defender)):
+            return []
+        word = str(rule.get("rider") or key)
+        sub = Intent(op="attack", actor=actor.ref, target=defender.ref,
+                     because=f"{actor.name}'s {word}", visibility="hidden",
+                     id=f"{intent.id}.{key.replace(' ', '-')}",
+                     params={"manoeuvre": key, "rider": word},
+                     origin=origin, origin_name=word)
+        partial: dict = {}
+        if rule.get("attack_roll"):
+            hit = next((r for r in reversed(state.get("rolls") or ())
+                        if str(r.get("label") or "").startswith("Attack with")), None)
+            if hit is not None:
+                partial = {"attack_state": {"cmb": dict(hit)}}
+        before = self.scene.positions.get(defender.ref)
+        got = self._resolve_maneuver(sub, actor, defender,
+                                     str(rule.get("weapon_key") or actor.wielded_key()),
+                                     partial)
+        if not partial:
+            state.setdefault("rolls", []).extend(r.as_dict() for r in got.rolls)
+        out = [{"effect": e, "tell": ""} for e in got.effects]
+        out.append({"effect": {"ref": defender.ref, "kind": "rider", "rider": word,
+                               "verdict": got.verdict, "maneuver": key, "origin": origin},
+                    "tell": got.tell})
+        # Driven against a wall: fewer feet than the margin bought, on the board.
+        if (rule.get("prone_if_blocked") and got.verdict == "success" and before is not None
+                and not defender.is_down and not defender.has_state("state.position.prone")):
+            want = 5 * (1 + max(0, int(got.margin or 0)) // 5)
+            moved = sum(int(e.get("feet") or 0) for e in got.effects
+                        if e.get("kind") == "position" and e.get("ref") == defender.ref)
+            if moved < want:
+                from . import bodyskills
+
+                bodyskills._prone(defender, f"{actor.name}'s {word}", origin)
+                out.append({"effect": {"ref": defender.ref, "kind": "condition",
+                                       "condition": "prone", "origin": origin},
+                            "tell": f"Driven against something solid, {defender.name} "
+                                    f"goes down."})
+        return out
+
+    def _rider_demoralize(self, intent: Intent, actor: Actor, defender: Actor,
+                          rule: dict, origin: str, state: dict) -> list[dict]:
+        """A free Intimidate to demoralize after the hit (feat loop b2).
+
+        Enforcer (APG): "Whenever you deal nonlethal damage with a melee weapon, you can
+        make an Intimidate check to demoralize your target as a free action. If you are
+        successful, the target is shaken for a number of rounds equal to the damage dealt.
+        If your attack was a critical hit, your target is frightened for 1 round" —
+        `rounds: "dealt"`, `crit_condition`. Intimidating Confidence (ARG): "When you confirm a
+        critical hit, as a free action you can make an Intimidate check to demoralize one
+        creature you threaten. If you have the Dazzling Display feat ... all creatures you
+        threaten instead. You gain a +2 bonus on this check if your weapon has a x3
+        critical modifier, or +4 if it has a x4" — `crit_bonus`, `all_threatened`.
+
+        The roll is Demoralize's own (`_demoralize_mods`: size, Taunt, `against:
+        demoralize`) against the book's DC (`attitude.intimidate_dc`), rolled hidden as a
+        rider's roll is; a plain success is `_demoralize`'s 1 + 1 per 5 rounds."""
+        from . import attitude as attitude_mod
+        from . import morale
+
+        bonus = 0
+        if rule.get("crit_bonus"):
+            mult = int(actor.weapon(rule.get("weapon_key") or None).get("crit_mult") or 2)
+            bonus = 4 if mult >= 4 else 2 if mult == 3 else 0
+        foes = [defender]
+        if rule.get("all_threatened") and actor.has_state("skill.intimidate.dazzling-display"):
+            foes += [f for r, f in self.scene.actors.items()
+                     if f is not defender and not f.is_down and self._against(actor, f)
+                     and r in self.scene.positions
+                     and reactions.threatens(self.scene, actor.ref, self.scene.positions[r],
+                                             getattr(f, "size", "medium"))]
+        dealt = int(rule.get("dealt") or 0)
+        out: list[dict] = []
+        for foe in foes:
+            if foe.is_down:
+                continue
+            mods = self._demoralize_mods(actor, foe, [])
+            if bonus:
+                mods = list(mods) + [Modifier(bonus, f"x{4 if bonus == 4 else 3} critical")]
+            dc = attitude_mod.intimidate_dc(foe)
+            roll = self.dice.d20(mods, label=f"Intimidate to demoralize ({rule['rider']}, "
+                                             f"DC {dc})", visibility="hidden")
+            state.setdefault("rolls", []).append(roll.as_dict())
+            margin = roll.total - dc
+            if rule.get("rounds") == "dealt":
+                if margin < 0 or dealt <= 0:
+                    out.append({"effect": {"ref": foe.ref, "kind": "rider_resisted",
+                                           "rider": rule["rider"], "origin": origin},
+                                "tell": f"{_sentence(foe.name)} is not cowed "
+                                        f"({roll.total} against DC {dc})."})
+                    continue
+                cond = foe.add_condition(morale.SHAKEN_KEY, dealt, source=rule["rider"],
+                                         origin=origin)
+                fx = [{"ref": foe.ref, "kind": "condition", "condition": morale.SHAKEN_KEY,
+                       "rounds_left": cond.rounds_left, "origin": origin}]
+                line = f"{_sentence(foe.name)} is shaken for {dealt} rounds"
+                worse = str(rule.get("crit_condition") or "")
+                if worse and state.get("crit"):
+                    foe.add_condition(worse, 1, source=rule["rider"], origin=origin)
+                    fx.append({"ref": foe.ref, "kind": "condition", "condition": worse,
+                               "rounds_left": 1, "origin": origin})
+                    line += f", and {worse} for a round"
+                out.extend({"effect": e, "tell": ""} for e in fx[1:])
+                out.append({"effect": fx[0], "tell": f"{line} ({rule.get('name') or rule['rider']}: "
+                                                     f"{roll.total} against DC {dc})."})
+                continue
+            said, fx = self._demoralize(actor, foe, margin, "")
+            out.extend({"effect": e, "tell": ""} for e in fx)
+            out.append({"effect": {"ref": foe.ref, "kind": "rider", "rider": rule["rider"],
+                                   "origin": origin},
+                        "tell": f"{said} ({rule.get('name') or rule['rider']}: {roll.total} against "
+                                f"DC {dc})"})
+        return out
+
+    def _rider_condition(self, intent: Intent, actor: Actor, defender: Actor,
+                         rule: dict, origin: str, state: dict) -> list[dict]:
+        """A condition the hit itself lays, no save (feat loop b2): Footslasher's "if you
+        hit and deal at least 1 point of damage to the target, it is affected as if by
+        caltrops — its speed is reduced by half. This penalty lasts for 24 hours, or until
+        the creature is successfully treated with a DC 15 Heal check or receives at least 1
+        point of magical healing ... does not stack with itself" — one effect, laid again
+        only when the old one is gone. `rounds` is the duration (24 hours = 14,400)."""
+        key = str(rule.get("condition") or "")
+        if not key or defender.is_down or int(rule.get("dealt") or 0) <= 0:
+            return []
+        if any(e.key == key for e in defender.effects):
+            return [{"effect": {"ref": defender.ref, "kind": "rider_refused",
+                                "rider": rule["rider"], "why": "already", "origin": origin},
+                     "tell": ""}]
+        rounds = int(rule.get("rounds") or 1)
+        defender.add_condition(key, rounds, source=f"{actor.name}'s {rule['rider']}",
+                               origin=origin)
+        return [{"effect": {"ref": defender.ref, "kind": "condition", "condition": key,
+                            "rounds": rounds, "origin": origin},
+                 "tell": str(rule.get("tell") or "").format(target=defender.name,
+                                                             actor=actor.name)}]
+
+    def _rider_ally_swing(self, intent: Intent, actor: Actor, defender: Actor,
+                          rule: dict, origin: str, state: dict) -> list[dict]:
+        """A teamwork feat's swing on a confirmed critical (feat loop b2): every ally who
+        also holds the feat, threatens the foe and — `flanking` — is flanking it with this
+        attacker, gets an attack of opportunity (`owed_swing`). Outflank (APG): "whenever
+        you score a critical hit against the flanked creature, it provokes an attack of
+        opportunity from your ally". Seize the Moment (UC): "When an ally who also has this
+        feat confirms a critical hit against an opponent that you also threaten, you can
+        make an attack of opportunity against that opponent."""
+        from . import feats as feats_mod
+        from . import position as position_mod
+
+        if not state.get("crit") or defender.is_down:
+            return []
+        fid = str(rule.get("feat") or "")
+        out: list[dict] = []
+        for ally in list(self.scene.actors.values()):
+            if ally is actor or ally.is_down or fid not in feats_mod._held(ally) \
+                    or self._against(actor, ally):
+                continue
+            if rule.get("flanking") and ally not in position_mod.flanking_allies(
+                    self.scene, actor, defender):
+                continue
+            out.extend(self._owed(self.owed_swing(
+                ally, defender, f"{actor.name}'s critical opened {defender.name} up "
+                                f"({rule.get('name') or rule['rider']})"),
+                f"{actor.name}'s critical opens {defender.name} to {ally.name} "
+                f"({rule.get('name') or rule['rider']}).", origin))
+        return out
+
+    def _rider_free_swing(self, intent: Intent, actor: Actor, defender: Actor,
+                          rule: dict, origin: str, state: dict) -> list[dict]:
+        """One more blow as a free action on a confirmed critical (feat loop b2): Bashing
+        Finish's "Whenever you score a critical hit with a melee weapon, you can make a
+        shield bash attack against the same target using the same bonus as a free action"
+        — at the critical swing's own iterative, never off an attack of opportunity."""
+        if not state.get("crit") or defender.is_down or actor.shield_bash("shield") is None \
+                or intent.params.get("bashing_finish"):
+            return []
+        params = {"weapon": "shield", "bashing_finish": True}
+        if intent.params.get("iteration") is not None:
+            params["iteration"] = intent.params["iteration"]
+        elif state.get("i"):
+            params["iteration"] = int(state["i"])
+        raw = {"op": "attack", "actor": actor.ref, "target": defender.ref,
+               "id": f"{intent.id or 'attack'}-bash", "because": "Bashing Finish",
+               "visibility": intent.visibility or ("player" if actor.is_pc else "hidden"),
+               "params": params}
+        return [{"effect": {"ref": actor.ref, "kind": "owed_swing", "attack": raw,
+                            "target": defender.ref, "origin": origin},
+                 "tell": f"{actor.name} follows the critical with the shield "
+                         f"({rule.get('name') or rule['rider']})."}]
+
+    def _falls_prone_swings(self, outcome: "Outcome") -> list[dict]:
+        """Vicious Stomp (UC): "Whenever an opponent falls prone adjacent to you, that
+        opponent provokes an attack of opportunity from you. This attack must be an
+        unarmed strike." Read off the outcome's own condition records (a trip, a rider, a
+        bull rush into a wall), so the fall is the engine's, never a word; the holder is
+        asked by the document's tag (`attack.aoo.falls-prone`).
+        shortcut: a body that goes prone by another door (a spell's condition op, dropping
+        prone by choice) is seen only when its record says `condition: prone`."""
+        if not self.scene.in_encounter or not self.scene.has_grid:
+            return []
+        out: list[dict] = []
+        for e in outcome.effects or ():
+            if e.get("kind") != "condition" or e.get("condition") != "prone":
+                continue
+            foe = self.scene.actors.get(str(e.get("ref") or ""))
+            if foe is None or foe.is_down:
+                continue
+            for watcher in list(self.scene.actors.values()):
+                if watcher is foe or not watcher.has_state("attack.aoo.falls-prone") \
+                        or not self._against(watcher, foe):
+                    continue
+                gap = self._gap_ft(watcher, foe)
+                if gap is None or gap > 5:
+                    continue
+                raw = self.owed_swing(watcher, foe, f"{foe.name} fell at their feet "
+                                                    f"(Vicious Stomp)", weapon="unarmed")
+                if raw is not None:
+                    out.append(raw)
+        return out
+
+    _FEAT_RIDERS: ClassVar[dict] = {
+        "maneuver": _rider_feat_maneuver,
+        "demoralize": _rider_demoralize,
+        "condition": _rider_condition,
+        "ally_swing": _rider_ally_swing,
+        "free_swing": _rider_free_swing,
     }
 
     def _natural_riders(self, actor: Actor, defender: Actor,
@@ -27055,6 +27476,35 @@ class Engine:
         for c in ("bloody_assault", "dazing_assault", "stunning_assault"):
             if c in declared and ranged:
                 return f"{said[c]} rides a melee attack, not a {w['name']}."
+        # Feat loop b2. Risky Striker (ARG): "when you declare that you are making an attack
+        # action or a full-attack action with a melee weapon". Shield of Swings (APG):
+        # "When you take a full-attack action while wielding a two-handed weapon".
+        # Pinpoint Targeting (CRB): "As a standard action, make a single ranged attack".
+        # Footslasher (Rival Guide): "a standard action — you cannot use Footslasher as
+        # part of a full-attack action", with "a weapon that does piercing or slashing
+        # damage". Sliding Axe Throw (Dwarves of Golarion): "a ranged attack roll with an
+        # axe" — thrown.
+        if "risky_striker" in declared and ranged:
+            return "Risky Striker rides a melee attack, not a " + str(w["name"]) + "."
+        if "shield_of_swings" in declared:
+            if not full:
+                return "Shield of Swings is declared with a full attack."
+            if int(w.get("hands", 1) or 1) < 2 or ranged:
+                return (f"Shield of Swings needs a two-handed weapon in both hands, not a "
+                        f"{w['name']}.")
+        for c in ("pinpoint_targeting", "footslasher"):
+            if c in declared and full:
+                return (f"{said[c]} is a standard action — one blow — and cannot ride a "
+                        f"full attack.")
+        if "pinpoint_targeting" in declared and w.get("category") != "ranged":
+            return "Pinpoint Targeting is a ranged attack, not a " + str(w["name"]) + "."
+        if "footslasher" in declared and (ranged or not any(
+                t in str(w.get("type") or "").lower() for t in ("piercing", "slashing"))):
+            return (f"Footslasher is a piercing or slashing melee blow, not a "
+                    f"{w['name']}.")
+        if "sliding_axe_throw" in declared and (
+                not params.get("thrown") or "axes" not in weapons_mod.groups_of(key)):
+            return "Sliding Axe Throw is a thrown axe."
         if "piranha_strike" in declared:
             if params.get("power_attack"):
                 from . import feats as feats_mod
@@ -27114,6 +27564,14 @@ class Engine:
         ("stunning_assault", "stunning assault", "Stunning Assault",
          "{name} swings to stun (Stunning Assault), less sure of every blow until their "
          "next turn."),
+        # Feat loop b2: "The effects last until your next turn" (Risky Striker, ARG);
+        # "until the beginning of your next turn" (Shield of Swings, APG).
+        ("risky_striker", "risky striking", "Risky Striker",
+         "{name} drops their guard to strike at the big one (Risky Striker) until their "
+         "next turn."),
+        ("shield_of_swings", "shield of swings", "Shield of Swings",
+         "{name} turns the great weapon into a wall of swings: softer blows, a harder "
+         "guard until their next turn."),
     )
 
     @classmethod
@@ -27476,6 +27934,7 @@ class Engine:
         is engine-written into the queue (`run`), never parsed: `cleaving` lists the
         foes already struck, so a plain Cleave stops after one more and Great Cleave
         never comes back to a foe."""
+        from . import classfeatures
         from . import grid as grid_mod
         from . import position as position_mod
         from . import reactions as reactions_mod
@@ -27501,9 +27960,16 @@ class Engine:
                     or foe.has_state(states.BYSTANDER) \
                     or reactions_mod._allied(self.scene, actor.ref, ref):
                 continue
-            if grid_mod.distance_between(tuple(here), defender.size,
-                                         tuple(self.scene.positions[ref]),
-                                         foe.size) > grid_mod.SQUARE_FT:
+            # Goblin Cleaver (ARG): "you may take your additional attacks against any
+            # creature smaller than you that you threaten; your targets need not be
+            # adjacent to one another" — the document's tag (feat loop b2).
+            wider = actor.has_state("attack.cleave.any-smaller") \
+                and classfeatures.size_steps(actor, foe) < 0 \
+                and reactions_mod.threatens(self.scene, actor.ref,
+                                            self.scene.positions[ref], foe.size)
+            if not wider and grid_mod.distance_between(
+                    tuple(here), defender.size, tuple(self.scene.positions[ref]),
+                    foe.size) > grid_mod.SQUARE_FT:
                 continue
             if position_mod.out_of_reach(self.scene, actor, foe, weapon_key) is not None:
                 continue
@@ -30324,7 +30790,8 @@ class Engine:
             state["rolls"].extend(g_rolls)
             state["tells"].extend(said)
         with self._guttered(guts[target.ref]):
-            sr, whose = target.spell_resistance_rating()
+            sr, whose = target.spell_resistance_rating({"against": tuple(
+                effectspec.spell_against(spell)) + self._spell_source_words(actor, spell)})
         if sr <= 0:
             return False
         # Piercing Spell (UM): "treats the spell resistance of the target as 5 lower than
@@ -33656,6 +34123,9 @@ class Engine:
                 or not attacker.has_state(awareness.HIDDEN) \
                 or not awareness.locates(self.scene, defender, attacker):
             return False
+        # Greater Blind-Fight: "regardless of the range" (feat loop b2).
+        if defender.has_state(states.TOTAL_CONCEALMENT_AS_PARTIAL):
+            return True
         feet = self._gap_ft(attacker, defender)
         return feet is None or int(feet) <= 30
 
@@ -34678,7 +35148,10 @@ class Engine:
 
         Decided once per attack op and kept in its state, so a resume after the dice popup
         answers as the first pass did."""
-        if intent.params.get("reaction"):
+        # Only the one reaction that IS an attack of opportunity (`reactions.py`'s id):
+        # a feat's spliced rider (Panther Style's swift strike, Hamatula Strike) is not,
+        # the reading lane b2-attack-b's `choices` gives too (batch 2 merge).
+        if intent.params.get("reaction") == "attack_of_opportunity":
             return ("opportunity",)
         if "first_turn" not in state:
             rnd = self.scene.round

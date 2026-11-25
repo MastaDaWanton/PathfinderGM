@@ -199,10 +199,21 @@ def flanking_with(scene, actor, defender, weapon=None) -> str:
 
     if classfeatures.cannot_be_flanked(defender, actor):
         return ""
+    allies = flanking_allies(scene, actor, defender, weapon)
+    return str(allies[0].name) if allies else ""
+
+
+def flanking_allies(scene, actor, defender, weapon=None) -> list:
+    """Every ally this attacker flanks the defender with — `flanking_with`'s loop, whole,
+    for a question about WHICH ally (Outflank's "an ally who also has this feat", feat
+    loop b2). The improved-uncanny-dodge answer is `flanking_with`'s, asked first there."""
+    if getattr(scene, "grid", None) is None:
+        return []
     here = scene.positions.get(actor.ref)
     there = scene.positions.get(defender.ref)
     if here is None or there is None or not _melee(weapon):
-        return ""
+        return []
+    out = []
     for ref, other in scene.actors.items():
         if ref in (actor.ref, defender.ref) or other.is_down:
             continue
@@ -213,8 +224,8 @@ def flanking_with(scene, actor, defender, weapon=None) -> str:
             continue                      # flanking is a fact about one plane
         if flanking(tuple(here[:2]), tuple(ally[:2]),
                     tuple(there[:2]), defender.size):
-            return str(other.name)
-    return ""
+            out.append(other)
+    return out
 
 
 def cover_of(scene, actor, defender) -> str:
