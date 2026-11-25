@@ -955,8 +955,12 @@ function siteMap(v) {
       edge.computeLineDistances(); g.add(edge);
       g.add(new THREE.Mesh(new THREE.BoxGeometry(W, .1, D), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 })));   // something to press
     }
+    // A trap found and still armed (playtest 2026-11-23 O5): a dark pit ringed in the warning
+    // red of the slip, on the floor of a room built or chalked, and named on hover.
+    if (r.trap) { const ring = mesh(new THREE.CylinderGeometry(1.7, 1.7, .14, 20), mat(0x8a3a2c), false); ring.position.set(2.2, .3, 1.4); g.add(ring);
+      const pit = mesh(new THREE.CylinderGeometry(1.3, 1.3, .16, 20), mat(0x120d09), false); pit.position.set(2.2, .32, 1.4); g.add(pit); }
     place(g, r.id, x, z);
-    Object.assign(g.userData, { pickable: !here, name: bare(r.name), seen: !r.visited });
+    Object.assign(g.userData, { pickable: !here, name: bare(r.name) + (r.trap ? " (trap found)" : ""), seen: !r.visited });
   });
   // The way up, before the way in: an arrow pointing up, to the map the site lies under.
   const root = by[st.id];

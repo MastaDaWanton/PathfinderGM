@@ -1228,6 +1228,8 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                     _draw(row, a, pc)
             if act in ("other", "look", "use") and pc is not None and not row.intents:
                 _look_in(row, frame, i, scene, rows, places)
+            if act == "look" and pc is not None and not row.intents:
+                _look_at_way(row, a, scene, pc, places)
             if act == "disguise" and pc is not None:
                 _disguise(row, a, pc)
             if act == "challenge" and pc is not None:
@@ -1671,6 +1673,22 @@ def _look_in(row: Row, frame, i: int, scene, rows=(), places=()) -> None:
     row.intents.append({"op": "narrate_only", "actor": pc.ref,
                         "params": {"looks_in": _plain(said)},
                         "because": "the player looks inside"})
+
+
+def _look_at_way(row: Row, a: dict, scene, pc, places=()) -> None:
+    """Looking at one of the ways out of here ("I inspect the door to the vestry", "I peer
+    down the stairwell") is the engine's search for that way (`seeking: a door or way
+    on`): "Intentionally searching for stimulus is a move action" (CRB, Perception), and
+    the answer is the way as the searcher sees it (`dungeons.way_line`). Playtest
+    2026-11-23 O2: "I should be able to inspect the doors or hallways that lead to
+    different places". The record decides, by the names it holds, never the verb."""
+    from rules import dungeons
+
+    words = " ".join(str(a.get(k) or "") for k in ("object", "place")).strip()
+    if not dungeons.way_named(scene, places or (), str(getattr(scene, "at", "") or ""),
+                              words):
+        return
+    _search(row, {"object": words, "seeking": "a door or way on"}, pc)
 
 
 def _challenge(row: Row, a: dict, scene, pc) -> None:

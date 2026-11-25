@@ -319,7 +319,7 @@
     },
     {
       "id": "map.site",
-      "v": 1,
+      "v": 2,
       "title": "Below ground",
       "manual": "playing",
       "root": "places-board",
@@ -335,10 +335,10 @@
           }
         },
         {
-          "since": 1,
+          "since": 2,
           "anchor": "places-board",
           "title": "A quest and a mark",
-          "words": "Finding the way down into a dungeon opens a quest in the Journal and marks the place, so you can come back. Below ground, on the town and Region maps, lists every site you know.",
+          "words": "Finding the way down into a dungeon opens a quest in the Journal and marks the place, so you can come back. Ways in, on the town and Region maps, lists every site you know.",
           "source": {
             "file": "rules/dungeons.py",
             "literal": "finding the way down gives the quest (see `open_quest`)"

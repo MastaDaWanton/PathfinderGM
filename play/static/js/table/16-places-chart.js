@@ -272,17 +272,23 @@ const PlacesChart = (function () {
   // by leg, the engine's own minutes ("About N minutes on foot" was a guess from words in
   // the mock; `walk.minutes` is `outskirts.hop_minutes`, what the exits row words), and
   // Walk there. `said` is the line the last Walk there left, above the rest.
+  // A trap found there and still armed (playtest 2026-11-23 O5: "I found a pit trap but when
+  // I look on the local map I see nothing"). The engine's words; nothing unfound is sent.
+  function trapNote(n) {
+    return n && n.trap ? `<p class="trapnote">Found here: ${e(n.trap)}. Step round it, or disarm it.</p>` : "";
+  }
+
   function slip(pf, { sel = null, said = "", walking = null } = {}) {
     const here = (pf.nodes || []).find(n => n.current);
     let out = here ? `<div class="mapnote"><h3>${e(upper(here.name))} <small>you are here</small></h3>
       <p>Press a place for the way there. The drawing comes from the exits alone; the world
-      gives no coordinates, so distance on it means nothing.</p></div>` : "";
+      gives no coordinates, so distance on it means nothing.</p>${trapNote(here)}</div>` : "";
     const n = sel && (pf.nodes || []).find(x => x.id === sel && !x.current);
     if (n) {
       const legs = (n.walk && n.walk.legs) || [];
       const on = walking && walking === n.id;
       out = `<div class="mapnote picked"><h3>${e(upper(n.name))}${
-        n.visited ? "" : " <small>not yet visited</small>"}</h3>${legs.length
+        n.visited ? "" : " <small>not yet visited</small>"}</h3>${trapNote(n)}${legs.length
         ? `<ol class="route">${legs.map(x => `<li>${e(upper(x.name))}<span>${
             e(MINUTE_WORDS(x.time_words))}</span></li>`).join("")}</ol>
           <p>About ${Number(n.walk.minutes) || 0} ${Number(n.walk.minutes) === 1 ? "minute" : "minutes"} on foot, by the way above.</p>

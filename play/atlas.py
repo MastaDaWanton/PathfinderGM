@@ -34,7 +34,7 @@ writes the map down; places_found.py cites the same refusal). There is no forget
 """
 from __future__ import annotations
 
-from rules import geography, journey, ships, tutorialfacts
+from rules import dungeons, geography, journey, ships, tutorialfacts
 
 _MEMO: dict = {}
 
@@ -138,7 +138,7 @@ def known_places(engine, world) -> dict:
          "maps":  [nation ids whose map was read],
          "sites": [{"id", "name", "host", "here": room id | "",
                     "rooms": [{"id", "name", "parent", "exits": [...], "visited": bool,
-                               "about": str, "role": str, "door": str,
+                               "about": str, "role": str, "door": str, "trap": str,
                                "at": [column, row]}]}]}
 
     A room's `about`, `role` and `door` are sent only once it has been stood in: a room
@@ -245,7 +245,7 @@ def _sites(engine, been: set) -> list[dict]:
     passage (parent, child or exit) from one that has; a site is sent when any room is."""
     known = {p.id: p for p in engine.places()}
     founded = {d.get("id"): d for d in (engine.scene.founded or []) if isinstance(d, dict)}
-    roots = [p for p in known.values() if _underground(p.id) and not _underground(p.parent)]
+    roots = [p for p in known.values() if _site_root(p, known)]
     out = []
     for root in sorted(roots, key=lambda p: p.id):
         rooms = {pid: p for pid, p in known.items() if pid == root.id or pid.startswith(root.id + "/")}
@@ -283,10 +283,31 @@ def _sites(engine, been: set) -> list[dict]:
                 "about": p.about if entered else "",
                 "role": str(dungeon.get("role") or "") if entered else "",
                 "door": str(((dungeon.get("door") or {}).get("state")) or "") if entered else "",
+                # A trap found and still armed, entered or not: it is found from the room
+                # next door (playtest 2026-11-23 O5, the pit trap "not on the map").
+                "trap": dungeons.found_trap(engine.scene, pid),
                 "at": seat[pid],
             })
         out.append({"id": root.id, "name": root.name, "host": host, "here": here, "rooms": sent})
     return out
+
+
+def _site_root(p, known: dict) -> bool:
+    """Whether a place is the root of a site the Site map draws: an underground place under
+    ground that is not (the sewers, a cave), or a venture's head off land that is not town
+    ground (the ruins, the crypt, the tower on its hex). Playtest 2026-11-23 O3: only
+    `underground:` ids counted, so the tower's rooms below its trapdoor (a `ruins:`
+    venture) never reached the Site map and it could not be opened at all. The rooftops
+    and the back alley are town ground and stay on the town's map."""
+    from rules import places as places_mod
+
+    if _underground(p.id):
+        return not _underground(p.parent)
+    parent = known.get(p.parent)
+    return (getattr(p, "origin", "") == "venture"
+            and getattr(parent, "origin", "") != "venture"
+            and not _underground(p.parent)
+            and places_mod.terrain_of(p.id) != places_mod.URBAN)
 
 
 def _site_seats(rooms: dict, root: str) -> dict[str, list]:

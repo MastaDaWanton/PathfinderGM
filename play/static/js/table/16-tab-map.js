@@ -469,10 +469,11 @@ function siteSlip(st, pf) {
   return said + `<div class="mapnote"><h3>${esc(upFirst(st.name))}</h3>
     ${here ? `<p>You are in ${esc(here.name)}${here.about ? `: ${esc(here.about)}` : ""}.</p>` : ""}
     <p>${Number(entered)} ${entered === 1 ? "room" : "rooms"} entered${seen ? `, ${Number(seen)} seen and not yet entered` : ""}. Press a room for the way there.</p>
+    ${st.rooms.filter(r => r.trap).map(r => `<p class="trapnote">Found: ${esc(r.trap)} in ${esc(r.name)}.</p>`).join("")}
     <p><button type="button" class="v2-btn" data-maplevel="${esc(siteUp(st, pf))}" data-maparg="" data-tut="site-up">Back up${host ? ` to ${esc(host.name)}` : ""}</button></p></div>`;
 }
 function siteAbout(st) {
-  return "Rooms entered are built; rooms only seen are chalk outlines. Underground, the hour makes no difference. Zoom out past the site to go back up.";
+  return "Rooms entered are built; rooms only seen are chalk outlines. A ringed pit is a trap you found. Zoom out past the site to go back up.";
 }
 function siteKeys(st, pf) {
   return st.rooms.filter(r => r.id !== pf.here).map(r => [r.id, r.name]);
@@ -481,9 +482,9 @@ function siteKeys(st, pf) {
 function waysDown(s, pf) {
   const down = mapSites(s).filter(st => pf.nodes.some(n => n.id === st.host));
   if (!down.length) return "";
-  return `<div class="mapnote"><h3>Below ground</h3><p>${down.map(st => {
+  return `<div class="mapnote"><h3>Ways in</h3><p>${down.map(st => {
     const host = pf.nodes.find(n => n.id === st.host);
-    return `<button type="button" class="v2-btn" data-maplevel="site" data-maparg="${esc(st.id)}">${esc(upFirst(st.name))}</button> <small>under ${esc(host.name)}</small>`;
+    return `<button type="button" class="v2-btn" data-maplevel="site" data-maparg="${esc(st.id)}">${esc(upFirst(st.name))}</button> <small>at ${esc(host.name)}</small>`;
   }).join("<br>")}</p></div>`;
 }
 
