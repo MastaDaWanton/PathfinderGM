@@ -564,3 +564,44 @@ def test_combat_medic_takes_ten_on_an_ally_who_also_holds_it():
         "params": {"skill": "heal", "dc": 15}}])))
     heal = [r for o in res.outcomes for r in o.rolls if "Heal" in (r.label or "")]
     assert heal and "taking 10" in heal[0].label and heal[0].faces == [10]
+
+
+def test_trick_riding_needs_no_check_at_dc_fifteen_in_light_armour(monkeypatch):
+    """"You do not need to make Ride skill checks for any task ... with a DC of 15 or
+    lower" in light or no armour; a DC 20 task, or heavy armour, still rolls. And Mounted
+    Combat's negation twice a round instead of once."""
+    from rules import bodyskills
+    from rules.dice import Modifier
+
+    scene, engine, pc, thug = _fight(feats=["Trick Riding"], faces={"Ride": 1})
+    pc.armour = "leather"
+    got = bodyskills._trick_ridden(engine, pc, [Modifier(3, "Ride")], 15, "Ride check (x)")
+    assert got is not None and got.total >= 15 and "Trick Riding" in got.label
+    assert bodyskills._trick_ridden(engine, pc, [], 20, "Ride check (x)") is None
+    pc.armour = "full plate"
+    assert bodyskills._trick_ridden(engine, pc, [], 15, "Ride check (x)") is None
+
+    pc.feats.append("Mounted Combat")
+    monkeypatch.setattr(bodyskills, "rider_of", lambda s, steed: pc)
+    monkeypatch.setattr(bodyskills, "mount_of", lambda s, rider: thug)
+    atk = engine.dice.given(20, [Modifier(30, "x")], label="Attack")
+    state = {"rolls": [], "tells": []}
+    for _ in range(3):
+        bodyskills.mounted_combat(engine, None, thug, atk, state)
+    assert sum(1 for r in state["rolls"] if "Mounted Combat" in r["label"]) == 2
+
+
+def test_horn_of_the_criosphinx_doubles_strength_on_a_two_handed_charge():
+    """Borin, Str 17 (+3), a greatsword: 1.5 x 3 = 4 on any swing; on a charge (lane
+    b2-actions' `charge` option, its roll-context key) 2 x 3 = 6, so the feat adds 2. A
+    one-handed longsword charge adds nothing."""
+    scene, engine, pc, _ = _fight(feats=["Horn of the Criosphinx"])
+    pc.weapons = list(pc.weapons) + ["greatsword"]
+
+    def dmg(key, choices=()):
+        return sum(m.value for m in pc.damage_modifiers(key, choices=choices)
+                   if m.source == "Horn Of The Criosphinx" or "Criosphinx" in m.source)
+
+    assert dmg("greatsword") == 0
+    assert dmg("greatsword", ("charge",)) == 2 * 3 - (3 * 3) // 2
+    assert dmg("longsword", ("charge",)) == 0

@@ -204,5 +204,21 @@
     "not_yet": [
       "the tag is the shape lane b2-attack-a's Snap Shot reader asks (`reactions.ranged_threat`, threat.ranged.<feet>); until that lane merges nothing in this branch reads it"
     ]
+  },
+  "trick-riding": {
+    "tags": ["skill.ride.trick-riding"]
+  },
+  "horn-of-the-criosphinx": {
+    "modifiers": [
+      {"type": "combat_mod", "target": "damage",
+       "formula": "max(0, 2 * str_mod - (3 * str_mod) // 2)", "bonus_type": "untyped",
+       "when": {"choice": "charge", "weapon": {"hands": 2, "ranged": false}},
+       "note": "two times Strength on a charge with a two-handed weapon, not one and a half"},
+      {"type": "combat_mod", "target": "damage", "formula": "max(0, str_mod)",
+       "bonus_type": "untyped",
+       "when": {"choice": "charge", "weapon": {"key": "unarmed"},
+                "bearer": {"state": "class.unarmed-strike"}},
+       "note": "a monk with both hands empty: two times Strength, not one"}
+    ]
   }
 }
