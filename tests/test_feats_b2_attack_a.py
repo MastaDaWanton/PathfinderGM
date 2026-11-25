@@ -566,3 +566,20 @@ def test_slaying_sprint_delivers_a_coup_de_grace_without_provoking():
     res = _run(s, [_coup(down)])
     attacks = [o for o in res.outcomes if o.op == "attack"]
     assert [o.actor for o in attacks] == ["pc"], [o.tell for o in attacks]
+
+
+def test_surprising_combatant_bluffs_an_aware_foe_into_surprise():
+    """Surprising Combatant (Blood of the Moon): a Bluff before the first round; an
+    opponent aware of you who fails Sense Motive against it "is treated as if it were not
+    aware of you". Face to face there was no surprise round; a won bluff makes one."""
+    from rules import states
+    from tests.test_surprise_round import _room, _run
+
+    scene, engine, pc, thug = _room({"Sense Motive": 1, "Bluff, Surprising": 20})
+    pc.feats = list(pc.feats) + ["Surprising Combatant"]
+    _run(engine, {"op": "attack", "actor": "pc", "target": "c1", "because": "brawl"})
+    assert thug.has_state(states.SURPRISED), "the thug never saw through the act"
+    scene, engine, pc, thug = _room({"Sense Motive": 20, "Bluff, Surprising": 1})
+    pc.feats = list(pc.feats) + ["Surprising Combatant"]
+    _run(engine, {"op": "attack", "actor": "pc", "target": "c1", "because": "brawl"})
+    assert not thug.has_state(states.SURPRISED)
