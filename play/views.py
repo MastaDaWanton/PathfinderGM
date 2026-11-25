@@ -5499,6 +5499,31 @@ def _matter_told(agent) -> bool:
                for s in getattr(agent, "last_prose_slots", None) or ())
 
 
+def _creature_look(c, agent, who) -> str:
+    """A creature's look as a page sentence, written once per kind (gm/creature_look.py),
+    or "" for a person or a creature with no record."""
+    from gm import client as client_mod, creature_look
+    from gm.checks import creature_size
+    from rules import bestiary
+
+    if bestiary.has_a_people(who):
+        return ""
+    look = creature_look.held(c.scene, who)
+    if not look:
+        def size_said(passage, name):
+            return creature_size.ask(passage, name, model=agent.prose_model,
+                                     host=agent.prose_host, provider=agent.prose_provider,
+                                     api_key=agent.prose_key)
+
+        look, notes = creature_look.write(
+            who, chat=client_mod.chat, model=agent.prose_model, host=agent.prose_host,
+            provider=agent.prose_provider, api_key=agent.prose_key, size_said=size_said)
+        if notes:
+            c.turn_log.append({"kind": "creature-look", "ref": who.ref, "notes": notes})
+        creature_look.keep(c.scene, who, look)
+    return creature_look.sentence(who, look)
+
+
 def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             player_text=None):
     """Narrate what the engine decided, then let the world answer.
@@ -5923,13 +5948,38 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
             # to vary. The backstop is a floor, not an appendix: whoever is still owed one
             # gets it on the beat they next act in, and the person the player LOOKED at is
             # taken first because they asked.
+            # And every creature here and seen that has never been described, named on the
+            # page or not: the ramidreju fought in the tower was on no page until it bled
+            # out (playtest 2026-11-23 O1). Its look is written on first sight, from its
+            # own record (gm/creature_look.py), and once per kind.
+            owed |= set(judgement.creatures_unseen_described(c.scene))
             for ref in ([looked] if looked in owed else []) + sorted(owed - {looked}):
                 who = c.scene.actors.get(ref)
-                if who is None or not getattr(who, "appearance", ""):
+                if who is None:
                     continue
                 if c.scene.sees_nothing(c.scene.pc(), who):
                     # Unseen in the dark (playtest 2026-11-16 #57): owed, not given, so
                     # the face comes on the first beat there is light to see it by.
+                    continue
+                kin = str(getattr(who, "from_template", "") or "")
+                if not getattr(who, "appearance", "") and kin and any(
+                        o is not who and getattr(o, "described", False)
+                        and str(getattr(o, "from_template", "") or "") == kin
+                        for o in c.scene.actors.values()):
+                    # Its kind is described already: the second of two chickens.
+                    who.described = True
+                    continue
+                look = "" if getattr(who, "appearance", "") else _creature_look(c, agent, who)
+                if look:
+                    line = look
+                    text = narration_mod.place_the_face(text, who.name, line, ref=ref,
+                                                        attribution=attribution)
+                    ours.append(line)
+                    who.described = True
+                    repairs.append(f"nobody stands here undescribed: added {who.name}'s "
+                                   "look from its own record")
+                    break
+                if not getattr(who, "appearance", ""):
                     continue
                 # The people's line once per campaign; after that this person's own
                 # details (rules/faces.py, "a people described once").

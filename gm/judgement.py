@@ -9976,6 +9976,8 @@ def settle_descriptions(scene, beat: str, player_text: str = "",
     (`Actor.described_as`, two at most), so the brief can show the next beat how they
     were first described (`gm/brief/faces.py`, item 16.7).
     """
+    from rules import bestiary as bestiary_mod
+
     from .checks._people import name_words
     from .narration import _describes, describing_sentences, faceless
 
@@ -10000,14 +10002,40 @@ def settle_descriptions(scene, beat: str, player_text: str = "",
         here = _mentions(beat, name, ref=ref, attribution=attribution)
         if not here and not (addressed & set(name_words(name))):
             continue
-        if here and not faceless(beat, name):
-            # The beat did the job: a sentence about them carries a body word.
+        if here and not faceless(beat, name) and bestiary_mod.has_a_people(a):
+            # The beat did the job: a sentence about them carries a body word. Not for a
+            # creature: "a tiny clockwork spy hovering" has a body word and says nothing
+            # of how it looks (playtest 2026-11-23 O1); its look is its record's
+            # (gm/creature_look.py, `creatures_unseen_described`).
             a.described = True
             if not getattr(a, "described_as", None):
                 a.described_as = describing_sentences(beat, name)[:2]
             continue
         owed.append(ref)
     return owed
+
+
+def creatures_unseen_described(scene) -> list[str]:
+    """The creatures here (no people of their own, `bestiary.has_a_people`) never yet
+    described, whether or not this beat named them: a beast standing in front of the
+    player is seen whether the prose mentioned it or not (playtest 2026-11-23 O1 — the
+    ramidreju attacked on the venture's beat and was described on none). Not the hidden,
+    the downed, or one kept further in with no square (`planned.present`'s rule)."""
+    from rules import bestiary
+
+    out = []
+    zones = getattr(scene, "zones", None) or {}
+    squares = getattr(scene, "positions", None) or {}
+    for ref, a in (getattr(scene, "actors", {}) or {}).items():
+        if (a.is_pc or getattr(a, "described", False) or a.is_down
+                or a.has_state("state.hidden") or bestiary.has_a_people(a)
+                or not a._creature_doc()):
+            continue
+        if (not getattr(scene, "in_encounter", False) and zones.get(ref) == "far"
+                and ref not in squares):
+            continue
+        out.append(ref)
+    return out
 
 
 def _mentions(beat: str, name: str, *, ref: str = "", attribution=None) -> bool:
