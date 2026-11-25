@@ -20461,7 +20461,7 @@ class Engine:
                      else f"ground like this ({biomes.describe(biome).lower()})")
             return self._refuse(
                 intent, f"{actor.name} looks, and {where} {english.verb(where, 'holds', 'hold')}"
-                        f" no {spec['what']} to find.")
+                        f" no {str(spec['what']).removeprefix('the ')} to find.")
 
         hours = max(1, int(intent.params.get("hours", 1) or 1))
         dc = gathering.dc_for(spec, biome)
