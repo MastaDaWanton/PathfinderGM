@@ -260,3 +260,15 @@ Kept up to date by the loop after every batch.
 ## race: wayang (1)
 
 - Shadowy Dash
+
+## Class features no playable class has (feat loop batch 2)
+
+The feat's prerequisites read as takeable, but the clause it changes belongs to a class
+feature no playable class grants.
+
+- Rebounding Leap: leaping lance (an archetype's; the content has no archetypes)
+- Thoughtful Discernment: discern lies (inquisitor)
+- Adder Strike: poison use (alchemist, assassin)
+- Pinpoint Poisoner: poison use (alchemist, assassin)
+- Revelation Strike: an oracle's revelation
+- Kobold Flood: Kobold Groundling, a kobold feat
