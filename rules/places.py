@@ -763,11 +763,24 @@ def from_dict(d: dict) -> Place:
         origin=str(d.get("origin") or ""), kind=kind,
         # Shaped as its kind, not as its name: derived here, like every shape a stored
         # place has, so a save carries the kind and never the floor plan.
-        shape=shape_of_kind(kind, str(d.get("terrain") or "")),
+        shape=shape_of_kind(kind, str(d.get("terrain") or "")) or _dungeon_shape(d),
         # A hex of the region map carries how far out of its town it lies
         # (`hexes.place_doc`); no other stored place has a distance.
         miles=float(d.get("miles") or 0) if d.get("origin") == "hex" else 0.0,
     )
+
+
+def _dungeon_shape(d: dict):
+    """A room behind a dungeon's way down is under the ground (`Scene.underground`), so
+    it is shaped as underground ground is, roof and all — not as the ruin or crypt its id
+    was minted under. Playtest 2026-11-23 #1: the rooms below the tower's trapdoor had the
+    ruins' open-sky shape ("broken walls, and rubble where they fell", no ceiling), and
+    the page stacked the room's furniture "toward the open sky". None for any other place."""
+    if str(d.get("origin") or "") != "dungeon":
+        return None
+    from . import floorplan as floorplan_mod
+
+    return floorplan_mod.BY_TERRAIN["underground"]
 
 
 def shape_of_kind(kind: str, terrain: str = ""):

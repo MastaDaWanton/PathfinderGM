@@ -2160,8 +2160,6 @@ def light_now(scene, outcomes=None) -> str:
     a fight or a search is where poor sight changes what happens. The derivation is
     `checks.light_shown.sight`, which the check holding the page to it reads as well.
     Words, never numbers (law 3)."""
-    from rules import places as _places
-
     from .checks import light_shown
 
     if scene is None:
@@ -2172,6 +2170,22 @@ def light_now(scene, outcomes=None) -> str:
                     and "perception" in str(getattr(o, "tell", "") or "").lower()
                     for o in outcomes or ())
     seen = light_shown.sight(scene)
+    # Under the ground there is no sky to put over anybody (playtest 2026-11-23 #1: "under
+    # a dark, starry sky" in a vestibule below a trapdoor); said with every dark line.
+    sky = (" There is no sky here: no stars, no moon, no daylight."
+           if light_shown._underground(scene) else "")
+    # Total darkness the player sees in by darkvision, said every beat it holds (the
+    # owner, 2026-11-25: "make sure the GM notes the total darkness and properly
+    # acknowledges whether the PC can see"). "Darkvision is black and white only but
+    # otherwise like normal sight" (Bestiary, Universal Monster Rules); its range is
+    # words, never feet (law 3).
+    dark_eyes = light_shown.dark_seen(scene) if seen is None else None
+    if dark_eyes is not None:
+        return (f"THE LIGHT (engine fact, this moment): {dark_eyes['why']}, total darkness "
+                f"— and the player sees in it by darkvision: what is near them shows in "
+                f"shades of grey, sharp but with no colour at all, and past a short way "
+                f"there is only black. Say the darkness, and that they see through it; "
+                f"never a colour.{sky} No numbers.")
     if not (fighting or searching):
         # Pitch dark is said on every beat, not only a fight's: playtest 2026-11-16 #57,
         # a walk into an unlit cell block came back with scorched plaster, charcoal beams
@@ -2182,7 +2196,7 @@ def light_now(scene, outcomes=None) -> str:
         return (f"THE LIGHT (engine fact, this moment): {seen['why']}, pitch dark — the "
                 f"player sees nothing at all. Write only what they hear, smell and feel: "
                 f"no colours, no shapes, no faces, nothing of the room that would have to "
-                f"be seen. No numbers.")
+                f"be seen.{sky} No numbers.")
     if seen is None:
         # Lit where the player stands, in a place the night or the ground holds dark:
         # the light they fight in is a thing they carry, and its edge is part of it.
@@ -2205,11 +2219,10 @@ def light_now(scene, outcomes=None) -> str:
             return ""
         held = "; ".join("the light in the player's hand" if a.is_pc
                          else f"the light {a.name} carries" for a in carriers)
-        dark = "underground dark" if _places.terrain_of(
-            str(getattr(scene, "at", "") or "")) == "underground" else "night"
+        dark = "underground dark" if sky else "night"
         return (f"THE LIGHT (engine fact, this moment): {held} lights the ground close "
                 f"around it; past its edge is the {dark}, where shapes are hard to make "
-                f"out. Never sunlight or glare beyond it; no numbers.")
+                f"out. Never sunlight or glare beyond it.{sky} No numbers.")
     if seen["level"] == "dark":
         sight_words = ("pitch dark — the player can barely see their own hands; they "
                        "fight by sound and touch, and swing at where a noise was")
@@ -2219,7 +2232,7 @@ def light_now(scene, outcomes=None) -> str:
                        "wide at a shape that is not quite where it looked")
     return (f"THE LIGHT (engine fact, this moment): {seen['why']}, {sight_words}. It "
             f"shows in what they see and in how the blows find or miss their marks. "
-            f"Never sunlight or glare; no numbers.")
+            f"Never sunlight or glare.{sky} No numbers.")
 
 
 def body_now(pc, scene=None) -> str:

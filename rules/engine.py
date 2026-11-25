@@ -1484,8 +1484,8 @@ class Scene:
     def ambient_light(self) -> str:
         """The light where nothing is lit: by the place and the clock.
 
-        - A place under the ground (`terrain_of == "underground"`) is dark — "most
-          caverns", and an unlit dungeon.
+        - A place under the ground (`underground`: underground terrain, or a room behind
+          a dungeon's way down) is dark — "most caverns", and an unlit dungeon.
         - A roofed place on the surface (a tavern, a house, a shop) is normal: its own
           lamps, which the app does not count one by one. That is a reading, not the
           book: the book lights a room by its sources.
@@ -1502,7 +1502,7 @@ class Scene:
         at = str(getattr(self, "at", "") or "")
         if not at:
             return "normal"
-        if places_mod.terrain_of(at) == "underground":
+        if self.underground(at):
             return "dark"
         try:
             roofed = places_mod.is_indoors(at)
@@ -1513,6 +1513,29 @@ class Scene:
             return "normal"
         minute = int(getattr(self, "clock_minutes", 0) or 0) % sky.DAY
         return "bright" if sky.DAWN_MINUTE <= minute < sky.DUSK_MINUTE else "dim"
+
+    def underground(self, place_id: str | None = None) -> bool:
+        """Whether a place (where the party stands, by default) is under the ground: on
+        underground terrain, or a room behind a dungeon's way down.
+
+        Playtest 2026-11-23 #1: every room below the tower's locked trapdoor stood on the
+        ruins' own ground (`terrain_of` "ruins", the id the venture minted), so it was lit
+        by the night sky — six of the player's sixteen swings lost to a starlight miss
+        chance, and the narrator repaired into stars over an underground vestibule. The
+        owner, 2026-11-25: "yes underground is dark". Every way down in `dungeons.FEATURES`
+        is a descent (a trapdoor and steps, a ladder down a pit, a shaft, a stair under a
+        flagstone), so a dungeon room IS under the ground, whatever its id's terrain: the
+        CRB's "an unlit dungeon chamber" (Vision and Light). The room's record says so
+        (`origin` "dungeon"); the id is never rewritten, so an old save answers too.
+        A MUD marks the same thing as a room flag (ROOM_DARK), not by its sector."""
+        from . import dungeons as dungeons_mod, places as places_mod
+
+        pid = str(getattr(self, "at", "") or "") if place_id is None else str(place_id or "")
+        if not pid:
+            return False
+        if places_mod.terrain_of(pid) == "underground":
+            return True
+        return dungeons_mod.room(self, pid) is not None
 
     def lights(self) -> list[tuple[tuple, int, int, str]]:
         """Every light burning here: (square, normal radius ft, raised radius ft, name).
@@ -10916,7 +10939,8 @@ class Engine:
                 intent,
                 f"{defender.name} is behind total cover: there is no line to them from "
                 f"where {actor.name} is standing.")
-        cover_mods = position_mod.ac_mods(self.scene, actor, defender)
+        cover_mods = position_mod.ac_mods(self.scene, actor, defender) \
+            + self._dark_ac_mods(defender, actor)
         if cover_mods:
             target_ac += sum(m.value for m in cover_mods)
             ac_parts.extend((m.source, m.value) for m in cover_mods)
@@ -18925,7 +18949,8 @@ class Engine:
                     # each other in the middle of the road at the Red Gull".
                     met = None
                 elif not underway and (places_mod.setting_of(hop.id) == "under"
-                                       or hop.terrain == "underground"):
+                                       or hop.terrain == "underground"
+                                       or self.scene.underground(hop.id)):
                     # Under the ground is neither street nor road: playtest 2026-11-17
                     # #20, a sewer channel met the road's toll-keeper. What lives down
                     # there is the venture's own (`_inhabit`), and lies in wait. The way
@@ -18974,7 +18999,7 @@ class Engine:
             # the way still counts as dark; a per-room light needs lights kept per place.
             blind = pc is not None and self.scene.sees_nothing(pc)
             went_by_about = [{"name": p.name, "about": p.about} for p in kept if p.about
-                             and not (blind and places_mod.terrain_of(p.id) == "underground")]
+                             and not (blind and self.scene.underground(p.id))]
 
         # The gate reads the warrant (docs/wanted.md, reader one), now hop by hop in the
         # walk above, against the step actually taken — so a suspected character stopped
@@ -34143,10 +34168,33 @@ class Engine:
 
         if attacker is None or defender is None or attacker is defender:
             return False
+        # Or blind in the dark: "In areas of darkness, creatures without darkvision are
+        # effectively blinded" and a blinded creature "loses any Dexterity bonus to AC"
+        # (CRB, Vision and Light; Blinded). Owner, 2026-11-25 (playtest 2026-11-23 #1):
+        # combat in an unlit dungeon follows the book; darkvision in range removes it.
+        if self.blind_in_the_dark(defender, attacker):
+            return classfeatures.caught_flat_footed(defender)
         if not attacker.has_state(awareness.HIDDEN):
             return False
         return classfeatures.caught_flat_footed(defender) \
             and not awareness.sees(self.scene, defender, attacker)
+
+    def _dark_ac_mods(self, defender, attacker) -> list:
+        """Blinded's "-2 penalty to Armor Class" for a defender the dark blinds against
+        this attacker (`blind_in_the_dark`), as a named term of the AC the blow is judged
+        on, beside cover's — never a number folded in where nobody can see it."""
+        if self.blind_in_the_dark(defender, attacker):
+            return [Modifier(-2, "can't see in the dark")]
+        return []
+
+    def blind_in_the_dark(self, defender, attacker) -> bool:
+        """Whether `defender` is effectively blinded against `attacker` by darkness alone:
+        it cannot see where the attacker stands (`Scene.sees_nothing`, darkvision's range
+        read) and is not already blinded, whose own row charges the same penalties."""
+        if defender is None or attacker is None or defender is attacker \
+                or defender.has_state("state.senses.blinded"):
+            return False
+        return bool(self.scene.sees_nothing(defender, attacker))
 
     # --- what a blow can see (alchemy lane C) --------------------------------------------
 
@@ -34743,7 +34791,8 @@ class Engine:
             flat_footed = self._flat_footed(defender) or self._unseen_attacker(defender, actor)
             # A thrown flask is a ranged touch attack: a prone target is +4 against it.
             ac = defender.touch_ac(flat_footed, attacker=actor, against="ranged")
-            cover = position_mod.ac_mods(self.scene, actor, defender)
+            cover = position_mod.ac_mods(self.scene, actor, defender) \
+                + self._dark_ac_mods(defender, actor)
             # From the final number, as the attack's note is (`_ac_said`): this printed
             # the touch AC before cover's +4 and appended "with cover".
             note = _ac_said("touch AC", ac, flat_footed, [(m.source, m.value) for m in cover])

@@ -57,6 +57,7 @@ def _where_the_ground_is(scene) -> tuple[str, str]:
         return "", ""
     founded = getattr(scene, "founded", None) or ()
     name = places_mod.said_name(at, founded)
+    here = None
     try:
         here = places_mod.find(places_mod.for_scene(None, at, founded=founded), at)
         if here is not None and getattr(here, "name", ""):
@@ -64,7 +65,10 @@ def _where_the_ground_is(scene) -> tuple[str, str]:
     except Exception:      # noqa: BLE001 — a caption is never worth failing a turn over
         pass
     try:
-        about = str(floorplan.shape_for(at, places_mod.terrain_of(at)).about or "")
+        # The place's own shape when it has one: a dungeon room is underground ground,
+        # not the ruin its id was minted under (playtest 2026-11-23 #1).
+        about = str(floorplan.shape_for(at, places_mod.terrain_of(at),
+                                        getattr(here, "shape", None)).about or "")
     except Exception:      # noqa: BLE001
         about = ""
     return name, about
@@ -5203,12 +5207,17 @@ def _ask_the_gm(c, engine, question: str) -> str:
              if not crafts and not out_on_a_hex
              and (here or not hits or not gm_search.proper_noun(question))
              else "")
-    if not hits and not found and not here and not crafts:
+    # What the player sees by, and why the light cost them (playtest 2026-11-23 #13): the
+    # engine's reading, handed over whenever the light is poor or a blow was lost to it.
+    sight = [] if crafts else gm_answers.sight_facts(c, engine)
+    if not hits and not found and not here and not crafts and not sight:
         unknown = gm_search.unfiled(c.world, question)
         if unknown:
             return gm_search.nothing_filed(question, unknown, notes)
     record = ("\n".join(crafts) if crafts
               else gm_search.passages(c.world, hits, question, allow=allow))
+    if sight:
+        record = "\n".join(sight) + ("\n\n" + record if record else "")
     # What was kept back, and the line that says so.
     kept: list[str] = []
     if c.location is not None and notes:
