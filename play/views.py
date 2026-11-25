@@ -855,6 +855,14 @@ _OPTION_SHAPES = {
                               "Dexterity against your next melee blow."),
     "tumble": ("move", "Tumble", "Acrobatics against each foe's CMD, so the move past "
                                  "them provokes nothing."),
+    # Feat loop b2: the hold kept another way (CRB p.200, Pin; UC Chokehold; Dragon
+    # Empires Sleeper Hold) — each the maintaining check of a grapple the player holds.
+    "pin": ("act", "Pin", "Keep the hold and pin them instead of hurting them; you lose "
+                          "your Dexterity to AC while you do."),
+    "chokehold": ("act", "Chokehold", "A pin at −5 that stops their breath and their "
+                                      "spoken spells."),
+    "sleeper_hold": ("act", "Sleeper Hold", "Keep the hold and choke them toward sleep; "
+                                            "−2 AC while you do."),
 }
 
 
@@ -1047,6 +1055,20 @@ def _attack_options(pc) -> dict:
     own("feint", f"Bluff {_signed(skill('bluff'))} against the target's guard",
         action=skilluses._action_of(pc, feint),
         op={"op": "check", "params": {"skill": "bluff", "feint": True}})
+    # The maintaining check's options: only while the character holds somebody (their
+    # own grappled condition names them the grappler, `Engine._holds`'s question).
+    holding = any(str((e.payload or {}).get("grappler") or "") == pc.ref
+                  and pc.has_state("state.held") for e in pc.effects
+                  if e.kind == "condition")
+    not_holding = "" if holding else "Only while you hold someone in a grapple."
+    hold_op = {"op": "attack", "params": {"manoeuvre": "grapple"}}
+    own("pin", "pinned, your Dexterity lost to AC", why=not_holding,
+        action="standard", op={**hold_op, "params": {**hold_op["params"], "pin": True}})
+    for key, tag, says in (("chokehold", "grapple.chokehold", "−5 to keep the hold"),
+                           ("sleeper_hold", "grapple.sleeper-hold", "−2 AC")):
+        if pc.has_state(tag):
+            own(key, says, why=not_holding, action="standard",
+                op={**hold_op, "params": {**hold_op["params"], key: True}})
     own("tumble", f"Acrobatics {_signed(skill('acrobatics'))} against each foe's CMD",
         why=("Armour that slows you cannot tumble past foes."
              if skilluses._armour_slows(pc) else ""),

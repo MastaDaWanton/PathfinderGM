@@ -397,7 +397,7 @@ def test_the_combat_bar_offers_each_option_only_to_its_holder():
     # What anybody may declare (combat bar round 2): fighting defensively, total defense,
     # a feint and a tumble. No feat's option is offered without its feat.
     # Feat loop b2: and a charge (CRB, Combat, Charge), anyone's too.
-    anyone = {"fighting_defensively", "total_defense", "feint", "tumble", "charge"}
+    anyone = {"fighting_defensively", "total_defense", "feint", "tumble", "charge", "pin"}
     bare = _attack_slots(_pc(weapons=("longsword",)))
     assert {o["id"] for o in bare["options"]} == anyone
     held = _attack_slots(_pc(feats=["Power Attack", "Vital Strike", "Two-Weapon Fighting"],

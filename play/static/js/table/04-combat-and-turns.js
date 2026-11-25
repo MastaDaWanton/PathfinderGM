@@ -910,7 +910,9 @@ document.addEventListener("click", async e => {
     const no = optionRefusal(o);
     if (no) { $("#err").textContent = no; return; }
     $("#err").textContent = "";
-    if (o.shape === "strike" || (o.shape === "act" && o.op && o.op.op === "check")) {
+    // A check and a hold kept (Pin, feat loop b2) are made at the target.
+    const aimed = o.op && (o.op.op === "check" || o.op.op === "attack");
+    if (o.shape === "strike" || (o.shape === "act" && aimed)) {
       if (!COMBAT.target) { $("#err").textContent = "Pick a target first."; return; }
     }
     if (o.shape === "strike") {
@@ -918,8 +920,8 @@ document.addEventListener("click", async e => {
         actions: [{ op: "attack", target: COMBAT.target, params: { [o.id]: true } }] };
       restage(); combatMenu("");
     } else if (o.shape === "act") {
-      const step = { label: o.op.op === "check" ? `${o.name} at ${targetName()}` : o.name,
-        actions: [{ op: o.op.op, ...(o.op.op === "check" ? { target: COMBAT.target } : {}),
+      const step = { label: aimed ? `${o.name} at ${targetName()}` : o.name,
+        actions: [{ op: o.op.op, ...(aimed ? { target: COMBAT.target } : {}),
                     params: { ...(o.op.params || {}) } }] };
       // A move action (Improved Feint) sits beside the standard; anything else is it.
       if (o.action === "move") COMBAT.moveact = step;
