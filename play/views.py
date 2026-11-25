@@ -5218,7 +5218,10 @@ def _ask_the_gm(c, engine, question: str) -> str:
     # What the player sees by, and why the light cost them (playtest 2026-11-23 #13): the
     # engine's reading, handed over whenever the light is poor or a blow was lost to it.
     sight = [] if crafts else gm_answers.sight_facts(c, engine)
-    if not hits and not found and not here and not crafts and not sight:
+    # The light facts answer a question about seeing, never a name: in the dark, "/gm who
+    # is Zorblax Quixbane" skipped the refusal and the model guessed (prove_build, 0.5.1).
+    about_sight = bool(sight) and not gm_search.proper_noun(question)
+    if not hits and not found and not here and not crafts and not about_sight:
         unknown = gm_search.unfiled(c.world, question)
         if unknown:
             return gm_search.nothing_filed(question, unknown, notes)
