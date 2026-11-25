@@ -818,6 +818,11 @@ _READS_MECHANICS = {
         "views._finish makes for already_there, rather than the free prompt's reading of "
         "the tell's words ('You are at … now.'). Nothing it reads reaches the narrator; "
         "the arrival reaches it as the tell.",
+    "gm/planned.py:came_somewhere":
+        "decides only whether a stranger here gets a first-meeting reply slot (playtest "
+        "2026-11-23 O4): any act's biome effect with a new place — a walk, a venture, a "
+        "hex — the same test as `arriving`, wider. Nothing it reads reaches the narrator; "
+        "the arrival reaches it as the tell.",
     "gm/agent.py:_who_was_asked":
         "decides WHO answers a question asked before a walk (playtest 2026-11-16 N6), "
         "read off the walk's own biome effects: the place ids it left, where the person "

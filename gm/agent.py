@@ -2428,6 +2428,9 @@ class GMAgent:
         if undoubled != text:
             notes.append("a doubled word said once")
             text = undoubled
+        text, twice = narration_mod.drop_said_twice(text)
+        if twice:
+            notes.append(f"said twice in one passage: cut {twice[0][:60]!r}")
         opened = narration_mod.mend_orphan_close(text)
         if opened != text:
             notes.append("a line with no opening mark given one")

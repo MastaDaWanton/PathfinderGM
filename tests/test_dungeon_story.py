@@ -376,6 +376,12 @@ def test_the_town_talks_of_a_way_down_before_it_is_found_once(monkeypatch):
     carter = s.add(from_dict({"name": "the carter", "kind": "npc", "hp": 8, "hp_max": 8,
                               "abilities": {k: 10 for k in ("str", "dex", "con", "int",
                                                             "wis", "cha")}}, ref="c1"))
+    # Somebody of the town on its rolls, as everyone the page shows is (seen-people-are-
+    # real): spoken with, so the talk is theirs to pass on (playtest 2026-11-23 O4 — a
+    # stranger never opens with it).
+    from rules import population
+
+    population.keep_as_resident(s, carter, s.at)
     engine.join_talk(carter, how="you spoke to them")
     assert cards.thread_to_pull(s, recent=[], turn=1, world=WORLD) is None
     engine.end_talk(who=carter)

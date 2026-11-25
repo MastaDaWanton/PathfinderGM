@@ -244,7 +244,7 @@
       },
       "traces": ["Furniture stands shoved against the walls in a ring, some of it stacked to the ceiling.",
                  "Words are scrawled in the dust of a table, the same three words written over and over: I trusted them."],
-      "revelation": "In {lair} the ghost's own body lies where it fell, and the knife in its back bears the mark of a house still standing in {town}.",
+      "revelation": "In {lair} a skeleton lies where it fell, the remains of the one who became the ghost, and the knife in its back bears the mark of a house still standing in {town}.",
       "rumour": "folk hear weeping from under the ground at night, always at the same hour",
       "quest": "Find out who weeps below {where}"
     },

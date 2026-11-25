@@ -1883,7 +1883,8 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
                       **({"must_tell": must} if must else {}),
                       **({"outcome": result} if result else {}),
                       **({"verbatim": spoken, "typed": player_input}
-                         if spoken.strip() else {})})
+                         if spoken.strip() else {}),
+                      **({"echo": player_input} if lead else {})})
         employer = next((e.get("employer") for o in act
                          for e in (getattr(o, "effects", None) or [])
                          if isinstance(e, dict) and e.get("kind") == "job"
@@ -1920,7 +1921,7 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
             # the task" (the 2026-11-04 diagnosis; 6 of 6 re-asks of its recorded call),
             # and "I buy the silver bracelet", with nothing sold, "you purchase the silver
             # bracelet" (2 of 3). Asked as an attempt: 1 of 8 and 0 of 4.
-            slots.append({"key": "doing", "want": DOING_WANT,
+            slots.append({"key": "doing", "want": DOING_WANT, "echo": player_input,
                           "say": f'The player said: "{player_input}". The engine decided '
                                  "nothing of it this moment. Show the player starting on it "
                                  "where they are, in what they do or say, and nothing that "
@@ -1956,6 +1957,7 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
             matter["about"] = _one_line(pull.get("title"), 120)
         slots.append(matter)
     people = [p for p in present(engine) if p["can_answer"]]
+    everyone = list(people)
     if people and not fighting and not dead:
         # Who answers is the engine's (rough edge 2): measured live 2026-10-15, "'I have not
         # seen that particular face before today…' What do you do?" — nobody said it. The
@@ -2054,7 +2056,13 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
             # tell put the mite "further in" and the aside wrote "A small fey moves among
             # the shadows, continuing its silent work in the dark".
             people = [p for p in people if p["ref"] not in engaged and not p["further_in"]]
-        if speaker is None and people:
+        meet = (_first_meeting(engine, outcomes, everyone, matter, me)
+                if speaker is None else None)
+        if meet is not None:
+            # A stranger the party has just come upon reacts to them, and that is the
+            # beat's answer: no aside beside it going on with its work.
+            slots.append(meet)
+        elif speaker is None and people:
             names = ", ".join(f'{p["name"]} ({p["ref"]})' for p in people)
             slots.append({"key": "aside", "want": ASIDE_WANT,
                           "names": [p["name"] for p in people],
@@ -2062,6 +2070,81 @@ def build_plan(engine, player_input: str, outcomes, *, pull=None,
                                  "goes on with what they were already doing, in one "
                                  "sentence, without speaking."})
     return slots
+
+
+# Where a stranger's first sight of the player is written down: refs, once each, so a
+# person met is met once (`write` marks it when the slot stands on the page).
+MET_KEY = "met:eye"
+
+
+def came_somewhere(outcomes) -> bool:
+    """Whether this turn brought the party somewhere they were not: any act's biome effect
+    whose place is new — a walk (`arriving`), a venture into a site, a hex crossed."""
+    return any(e.get("kind") == "biome" and e.get("place")
+               and e.get("place") != e.get("was_place")
+               for o in outcomes or [] for e in (getattr(o, "effects", None) or [])
+               if isinstance(e, dict))
+
+
+def _first_meeting(engine, outcomes, people: list[dict], matter, me: str) -> dict | None:
+    """The reply slot for a stranger the party has just come upon, or None: they react to
+    the stranger before anything else — who are you, what do you want here, their own
+    name, or fear of them — as their own situation makes them.
+
+    The owner's "MUST FIX" (playtest 2026-11-23 O4): the lost scholar, trapped under a
+    haunted tower, met the player with "The folk in Branford speak often of the old mine"
+    — a rumour handed to him as the matter's carrier — "instead of questioning my presence
+    in the tower or introducing himself or being afraid that I might be a raider or a
+    robber". Prior art keeps the greeting a stage of its own, fired by an arrival the NPC
+    perceived: Diku mobprogs' greet_prog (only if the mob saw them come in), Emily Short's
+    "the NPC notices the player entering its space"; PF1e's Diplomacy starts a stranger at
+    an attitude, and rumours are Gather Information, hours in taverns. Talk of elsewhere
+    now waits until they have spoken (`cards._carrier`).
+
+    Who: a person (`bestiary.has_a_people`) who can answer, here and seen, not of the
+    party, a stranger by the engine's own record (`hooks.relationship`), not met before
+    (`MET_KEY`), on a beat that brought the party to them. One, never the room: a model
+    asked for N reactions answers in parallel."""
+    from rules import bestiary, hooks, places as places_mod, states
+    from rules import hexes as hexes_mod
+
+    if not came_somewhere(outcomes):
+        return None
+    scene = engine.scene
+    met = set((getattr(scene, "said", None) or {}).get(MET_KEY) or ())
+    came = set(getattr(scene, "came_along", ()) or ())
+    busy = {str(getattr(o, "actor", "") or "") for o in outcomes or []} - {"", me}
+    if matter:
+        busy |= {str(matter.get("giver_ref") or ""), str(matter.get("carrier_ref") or "")}
+    for p in people:
+        a = scene.actors.get(p["ref"])
+        if (a is None or p["further_in"] or p["ref"] in met or p["ref"] in came
+                or p["ref"] in busy or a.has_state(states.TRAVELS_WITH_YOU)
+                or not bestiary.has_a_people(a)
+                or hooks.relationship(scene, a) != hooks.STRANGER):
+            continue
+        # Their own situation, as the engine holds it: the first clause of their notes
+        # (the scholar's "came down to read the old inscriptions and stayed too long"),
+        # never the rest, which is what they know and theirs to tell when asked.
+        own = _one_line(str(getattr(a, "notes", "") or "").split(";")[0].split(". ")[0], 160)
+        at = str(getattr(scene, "at", "") or "")
+        wild = (hexes_mod.parse_place(at) is not None
+                or places_mod.setting_of(at) == "under")
+        where = (" here, far from any town, where a stranger could be anybody" if wild
+                 else "")
+        return {
+            "key": "reply", "want": REPLY_WANT, "speaker": p["ref"],
+            "speaker_name": p["name"], "meets": p["ref"],
+            **({"no_job": p["name"]} if not _holds_a_job(engine, p["ref"]) else {}),
+            "say": f"{p['name']} has never met the player and sees them now, a stranger"
+                   f"{where}. In their own voice (\"I\", never their own name or title), "
+                   f"{p['name']} reacts to the stranger first, as who they are and their "
+                   "own situation make them"
+                   + (f" ({own.rstrip('.')})" if own else "")
+                   + ": wary, welcoming or afraid, they may ask who the player is and what "
+                     "they want here, or say who they are. Only that: nothing of news, of "
+                     "other places or of what they have heard."}
+    return None
 
 
 # --- somebody else's turn in a fight (2026-11-04) ----------------------------------------
@@ -2483,6 +2566,28 @@ def misquoted(text: str, words: str) -> list[str]:
     return out
 
 
+def echoed(text: str, typed: str) -> list[str]:
+    """The sentences of a slot that put the player's own typed line in quote marks as if
+    spoken, when nothing in the turn was speech (no `say`, no quote marks in what they
+    typed). Playtest 2026-11-23 #175: "i finish the ramidreju", a deed the engine made
+    nothing of, came back 'You lean over the fallen beast … "I finish the ramidreju."' —
+    the command printed as a line of dialogue. AI Dungeon's Say mode quotes the player
+    only when the player chose it; Inform's topics are "not meant to be printed out
+    again" (WI 7.6). Code comparing strings: three words or more of the quotation, in the
+    player's own order."""
+    from . import speech
+
+    if not typed or any(q in typed for q in "\"“”"):
+        return []
+    said = " " + " ".join(re.findall(r"[a-z0-9']+", _folded(typed))) + " "
+    out = []
+    for a, b in speech.spans(text):
+        words = re.findall(r"[a-z0-9']+", _folded(text[a + 1:b - 1]))
+        if len(words) >= 3 and f" {' '.join(words)} " in said:
+            out.append(text[a:b])
+    return [x for x in narration_mod._sentences(text) if any(q in x for q in out)]
+
+
 # Speech verbs that say HOW a line was spoken, which is the player's to choose. Playtest
 # 2026-11-17b #9: '"A room for the night, and a hot meal. What do I owe you?" I ask the
 # barkeep' came back 'You look at the Korvu behind the bar and demand, "…"' — a polite
@@ -2603,6 +2708,10 @@ def write(engine, *, brief: str, outcomes, player_input: str, who: tuple,
     out.text = " ".join(s["wrote"] for s in out.slots if s.get("wrote")).strip()
     if not out.text:
         raise PlanFailed("every slot came back empty")
+    if isinstance(said, dict):
+        met = [s["meets"] for s in out.slots if s.get("meets") and s.get("wrote")]
+        if met:
+            said[MET_KEY] = list(dict.fromkeys([*(said.get(MET_KEY) or ()), *met]))
     return out
 
 
@@ -2871,6 +2980,45 @@ def _quoted_as_said(out: Planned, plan, slots, i, written, who, s: dict, text: s
     out.notes.append(f'the "{s["key"]}" slot misquoted the player twice — '
                      f'{"cut" if cut else "left"} {bad[0][:80]!r}')
     return cut or text
+
+
+# Somebody the player's words are about, said by a closed word: he, she, they and their
+# other forms. "you" is never one of them — it is the player's own word for the listener.
+_THIRD_PERSON = re.compile(r"\b(?:he|him|his|himself|she|her|hers|herself|they|them|their|"
+                           r"theirs|themselves)\b", re.I)
+
+
+def _pronouns_kept(out: Planned, plan, slots, i, written, who, s: dict, text: str, *,
+                   final: bool, lift, core: bool) -> str:
+    """The slot that reports the player's words keeps the somebody those words are about.
+    Playtest 2026-11-23 #223: "tell him that the way out is clear if he wishes to leave"
+    (told "to the effect that the way out is clear is he wishes to leave") came back "you
+    tell the scholar that the way out is clear and you wish to leave": the scholar's
+    leaving made the player's. Turning indirect speech round is a hard task of its own
+    (Lee et al. 2020, arXiv 2010.02600, built a 46,565-line dataset for "tell Bob I love
+    him"). So code only compares closed words: the words name somebody by he/she/they,
+    and the slot names nobody so. Asked once with it named; still lost, the engine's own
+    line stands in, which keeps the words as said."""
+    words = str(s.get("verbatim") or "")
+    if not _THIRD_PERSON.search(words) or _THIRD_PERSON.search(text):
+        return text
+    them = _THIRD_PERSON.search(words).group(0)
+    redo = (f"You wrote: {text!r}. The player's words were: \"{words}\". In them \"{them}\" is "
+            "somebody other than the player, and your sentence made it the player. Tell "
+            "their words with that person kept as they said it.")
+    text2, _data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
+                         core=core, redo=redo)
+    again = not text2 or not _THIRD_PERSON.search(text2)
+    out.calls[-1]["note"] = "lost who the words are about, named" + (" — still"
+                                                                      if again else "")
+    if not again:
+        out.notes.append(f'the "{s["key"]}" slot turned "{them}" in the player’s words '
+                         "into them — asked again, fixed")
+        return text2
+    line = engine_line(s.get("tells") or ())
+    out.notes.append(f'the "{s["key"]}" slot turned "{them}" in the player’s words into '
+                     f'them twice — the engine’s own line stands in')
+    return line or text
 
 
 def _knowledge_kept(out: Planned, plan, slots, i, written, who, s: dict, text: str, known,
@@ -3381,11 +3529,34 @@ def _write_slots(out: Planned, plan, slots, who, last: str, lift, check=None,
         if s.get("verbatim"):
             text = _quoted_as_said(out, plan, slots, i, written, who, s, text,
                                    final=final, lift=lift, core=core)
+            text = _pronouns_kept(out, plan, slots, i, written, who, s, text,
+                                  final=final, lift=lift, core=core)
             plain = plain_speech(text, str(s.get("typed") or ""))
             if plain != text:
                 out.notes.append(f'the "{s["key"]}" slot: how the player spoke is theirs — '
                                  f'the plain verb put back')
                 text = plain
+        elif s.get("echo"):
+            held = echoed(text, str(s["echo"]))
+            if held:
+                # The deed's own sentences stay; the line printed as speech goes. A slot
+                # that was nothing but the echo is asked once more with it named.
+                kept = narration_mod._cut_sentences(text, held).strip()
+                if not narration_mod._sentences(kept):
+                    text2, data2 = _ask(
+                        out, plan, slots, i, written, who, suggest=final, lift=lift,
+                        core=core, redo=f"You wrote: {text!r}. {held[0]} puts the player's "
+                                        "own words in quote marks as speech, and they did "
+                                        "not speak: show what they do, with no quotation.")
+                    out.calls[-1]["note"] = "echoed the player as speech, named"
+                    kept = (narration_mod._cut_sentences(text2, echoed(text2, s["echo"]))
+                            .strip() if text2 else "")
+                    if kept and final:
+                        data = data2
+                if narration_mod._sentences(kept):
+                    out.notes.append(f'the "{s["key"]}" slot printed the player’s line as '
+                                     f'speech: cut {held[0][:80]!r}')
+                    text = kept
         wrong = check(s["key"], text) if check is not None else ""
         if wrong:
             text2, data2 = _ask(out, plan, slots, i, written, who, suggest=final, lift=lift,
