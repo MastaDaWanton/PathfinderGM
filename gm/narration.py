@@ -230,7 +230,9 @@ _MARGIN = re.compile(r"\s+by \d+(?=[.,:;]|\s|$)")
 # a line of speech are left", `strip_turn_numbers`), taken off the line meant to tell it.
 _AMOUNT = re.compile(r"\s+for \d+(?!\s+(?:[A-Z][\w'-]*\s+)?(?:cp|sp|gp|pp|copper|silver|gold"
                      r"|platinum)\b)"
-                     r"(?:\s+(?:non-?lethal|points? of))?(?:\s+[a-z][a-z-]*){0,2}?"
+                     # Three words deep: a blow of two types is "for 15 bludgeoning and
+                     # piercing", which two left on the line (playtest 2026-11-23 #18).
+                     r"(?:\s+(?:non-?lethal|points? of))?(?:\s+[a-z][a-z-]*){0,3}?"
                      r"(?=\s*(?:[.,;:!?]|\(|$))")
 # The miss chance's rule clause in the engine's own phrasing (`Engine._attack`: "<who> finds
 # nothing there — <why>, <n>% miss chance (<roll>)."): the percentage is a number and the
@@ -289,9 +291,16 @@ def turn_numbers(outcomes) -> dict[str, set[str]]:
         # The words after each such number in the tell: its unit ("piercing",
         # "non-lethal bludgeoning") as the engine wrote it.
         tell = str(_field(o, "tell") or "")
-        for m in re.finditer(r"\b(\d+)((?:\s+[a-z][a-z-]*){1,2})", tell):
+        # A pair of types, "15 bludgeoning and piercing", is read with its "and", which is
+        # kept out of the units (the page's own "and" after an amount is not one) and
+        # joined back only between two of them (`found`, below). Read two words deep,
+        # "for 15 bludgeoning and" came out of "landing a blow for 15 bludgeoning and
+        # piercing damage" and left "landing a blow piercing damage" (playtest 2026-11-23
+        # #18).
+        for m in re.finditer(r"\b(\d+)(\s+[a-z][a-z-]*(?:\s+and\s+[a-z][a-z-]*"
+                             r"|\s+[a-z][a-z-]*)?)", tell):
             if m.group(1) in nums:
-                nums[m.group(1)] |= set(m.group(2).lower().split())
+                nums[m.group(1)] |= set(m.group(2).lower().split()) - {"and"}
     return nums
 
 
@@ -338,7 +347,8 @@ def strip_turn_numbers(text: str, outcomes) -> tuple[str, list[str]]:
         stuck: list[int] = []
         for n, units in nums.items():
             words = sorted(units | _UNITS, key=len, reverse=True)
-            unit = r"(?:\s+(?:non-?lethal|" + "|".join(re.escape(w) for w in words) + r"))"
+            unit = (r"(?:\s+(?:and\s+)?(?:non-?lethal|"
+                    + "|".join(re.escape(w) for w in words) + r"))")
             # Wrapped as the engine wraps it — a lead word before ("for 5", "against AC
             # 15") or a unit after ("5 damage") — never a bare digit: "the 3 men" is the
             # page's own.

@@ -2297,6 +2297,14 @@
   .face { flex-basis: 100%; margin: 2px 0 0; font-size: 15px; font-style: italic;
           color: #d2c7ad; }
   .face[hidden] { display: none; }
+  /* Start a fight (playtest 2026-11-23 #12): under the line about the person pressed,
+     dressed as the Here list's own buttons, the accent on its edge for a door that
+     cannot be walked back. */
+  .facefight { font: 400 15px/1.2 var(--body); letter-spacing: 0; font-variant: normal;
+               padding: 4px 12px; min-height: 32px; color: var(--ink); text-shadow: none;
+               border-color: var(--accent);
+               background: linear-gradient(rgba(40, 32, 22, .7), rgba(20, 16, 11, .7)); }
+  .facefight[hidden] { display: none; }
 
   /* The story: a readable measure with room either side. Palatino's zero is wide: 58ch
      at 18px measured inside the 62 to 72 characters a line the owner asked for. */
@@ -3869,6 +3877,7 @@
           <div class="herelist" id="here-list" role="group" aria-labelledby="here-label"></div>
         </div>
         <p class="face" id="face" aria-live="polite" hidden></p>
+        <button type="button" class="v2-btn facefight" id="face-fight" hidden></button>
       </div>
       <div id="story" class="story" role="log" aria-live="polite" aria-label="The story"
            tabindex="0"></div>
