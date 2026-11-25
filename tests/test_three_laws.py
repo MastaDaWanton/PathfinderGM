@@ -441,6 +441,10 @@ _REACHES = {
     ("combat_mod", "weapon_dice"): lambda a: a.weapon_dice(),
     ("combat_mod", "crit_confirm"): lambda a: sum(m.value for m in a.confirm_modifiers()),
     ("combat_mod", "ac_moving"): lambda a: a.ac(provoked_by="movement"),
+    # Feat loop b2-styles: the DEFENDER's term on a confirmation against them (Snapping
+    # Turtle Shell), read by the attack op's confirm stage off this funnel call.
+    ("combat_mod", "crit_confirm_against"):
+        lambda a: sum(m.value for m in a._buff_mods("combat_mod", "crit_confirm_against")),
     # Feat loop b1, 2026-11-22: the caster level a spell is cast at (Spell
     # Specialization), read by `casting.spell_caster_level` with the spell's context.
     ("combat_mod", "spell_cl"): lambda a: _spell_cl(a),
