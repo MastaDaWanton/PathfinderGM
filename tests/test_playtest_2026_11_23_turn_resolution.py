@@ -218,3 +218,91 @@ def test_the_bar_starts_a_fight_out_of_one(tmp_path):
     # order came back round to the player (`_finish` runs the loop when a foe is first).
     assert scene.current_ref() == "pc", scene.initiative
 
+
+
+# --- #12, owner ruling 2026-11-25: the player who starts the fight strikes first -------------
+
+def _far_thug():
+    from rules.bestiary import instantiate
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import load_pc
+
+    s = Scene(location_id="5bbd0c40345f")
+    s.add(load_pc("fixtures/pc-kesst.json"), at=(4, 10))
+    s.add(instantiate("thug", scene=s, name="the thug"), at=(12, 10))     # 40 ft off
+    from rules.grid import Grid
+
+    s.grid = Grid(width=20, height=20)
+    return s, Engine(s, Dice(seed=5))
+
+
+def test_walk_over_and_strike_walks_then_strikes_the_opening_blow():
+    """Owner ruling 2026-11-25, on #12 ("I walk over and strike the clockwork spy" from
+    40 ft only joined battle): what the player declares before the hostile act resolves
+    first as ordinary action, then the blow lands as the opening strike. The reading's
+    `go` (no place) before the blow becomes the walk up to the one struck
+    (`acts_to_ops._up_to`), out of the fight and with no speed cap; the blow then opens the
+    fight in reach and asks for the player's d20, the thug caught unready (surprised)."""
+    from gm import acts_to_ops, judgement
+    from rules import states
+
+    s, e = _far_thug()
+    said = "I walk over and strike the thug"
+    frame = {"question": False, "claims": [], "actions": [
+        {"act": "go", "span": "walk over"},
+        {"act": "attack", "target": "the thug", "span": "strike the thug"}]}
+    rows = acts_to_ops.table(frame, s, sentence=said)
+    acts_to_ops.victims(rows, frame, s)
+    # The turn's own chain: the plan's blow aimed (`inject_fight`), the built walk added
+    # (`apply`, as a copy), and the words' order (`order`). Live on the owner's save the
+    # strike ran BEFORE the walk, and the walk spent the surprise round's one action.
+    plan = [{"op": "attack", "actor": "pc", "target": "c1", "params": {"full_attack": False}}]
+    plan = judgement.inject_fight(plan, said, s, rows=rows, frame=frame)
+    plan = acts_to_ops.order(acts_to_ops.apply(plan, rows, frame, s), rows, frame)
+    assert [p["op"] for p in plan] == ["move", "attack"], plan
+    res = e.run(e.validate([dict(p, visibility="player", because="t") for p in plan]))
+    ops = [(o.op, o.status) for o in res.outcomes]
+    assert ("move", "resolved") in ops, ops
+    assert s.in_encounter and s.awaiting and s.awaiting["label"].startswith("Attack with"), ops
+    assert s.actors["c1"].has_state(states.SURPRISED)
+    assert s.actors["pc"].has_state(states.ONE_ACTION_TURN)
+
+
+def test_strike_him_from_forty_feet_still_walks_nobody():
+    """The same ruling's other half: "I strike him" from 40 ft says no walk, so nobody is
+    walked — the fight opens (the thug unready) and the blow waits for the bar, where the
+    book's surprise round gives the player one action: the walk or the blow, not both."""
+    from gm import acts_to_ops
+
+    s, e = _far_thug()
+    frame = {"question": False, "claims": [], "actions": [
+        {"act": "attack", "target": "the thug", "span": "strike the thug"}]}
+    rows = acts_to_ops.table(frame, s, sentence="I strike the thug")
+    acts_to_ops.victims(rows, frame, s)
+    assert not [i for r in rows for i in r.intents if i.get("op") == "move"]
+    blow = next(i for r in rows for i in r.intents if i.get("op") == "attack")
+    before = s.positions["pc"]
+    e.run(e.validate([dict(blow, visibility="player")]))
+    assert s.in_encounter and not s.awaiting and s.positions["pc"] == before
+
+
+def test_an_opening_full_attack_is_one_blow_in_the_surprise_round():
+    """The book's limit, said: the surprise round is one standard action (CRB), so an
+    opening full attack in reach is one blow, and the tell says why."""
+    from rules.bestiary import instantiate
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.sheet import load_pc
+
+    s = Scene(location_id="5bbd0c40345f")
+    s.add(load_pc("fixtures/pc-borin.json"))
+    s.actors["pc"].level = 8
+    s.add(instantiate("thug", scene=s, name="the thug"))
+    s.zones["c1"] = "engaged"
+    e = Engine(s, Dice(seed=5))
+    res = e.run(e.validate([{"op": "attack", "actor": "pc", "target": "c1", "because": "t",
+                             "params": {"weapon": "longsword", "full_attack": True}}]))
+    joined = next(o for o in res.outcomes if o.op == "attack")
+    assert "time for one blow" in joined.tell, joined.tell
+    assert s.awaiting and s.awaiting["label"].startswith("Attack with"), s.awaiting

@@ -4753,6 +4753,15 @@ class Engine:
         # "Surprise"), so the blow behind a closing walk would only be refused after it.
         if closing is not None and a.has_state(states.ONE_ACTION_TURN):
             return resolution
+        # In the surprise round the opener has one standard action (CRB, "Surprise"): a full
+        # attack declared is one blow, said, rather than refused whole (owner ruling
+        # 2026-11-25: the player who starts the fight strikes the opening blow).
+        cut = ""
+        if params.get("full_attack") and a.has_state(states.ONE_ACTION_TURN):
+            params["full_attack"] = False
+            params.pop("iteration", None)
+            cut = (" In the surprise round there is time for one blow, not the full "
+                   "attack.")
         try:
             blow = self.validate(([closing[0]] if closing is not None else []) + [
                 {"op": "attack", "actor": ref, "target": target,
@@ -4768,7 +4777,7 @@ class Engine:
         for o in resolution.outcomes:
             if opened in (o.effects or ()) and opened.get("opening"):
                 o.tell = (f"{opened['opening']} The first blow is {a.name}'s, and it comes "
-                          f"at once.")
+                          f"at once.{cut}")
                 self._articled(o)
                 opened["struck"] = True
         return self._drive([i.as_dict() for i in blow],
@@ -6825,7 +6834,16 @@ class Engine:
         if self.scene.move_spent.get(actor.ref) == rnd                 or self.scene.standard_spent.get(actor.ref) == rnd:
             return True
         # A blow the battle gate only deferred did nothing yet: it is the action to come.
+        # And what was done before the fight opened in this batch — the walk up to them —
+        # was done out of it, as ordinary action (owner ruling 2026-11-25): only the acts
+        # after the batch's `battle_joined` spend the surprise round.
+        so_far = list(getattr(self, "_so_far", None) or ())
+        joined_at = max((k for k, o in enumerate(so_far)
+                         if any(e.get("kind") == "battle_joined" for e in o.effects or ())),
+                        default=-1)
+        after = {id(o) for o in so_far[joined_at + 1:]} if joined_at >= 0 else None
         return any(not any(e.get("kind") == "battle_joined" for e in o.effects or ())
+                   and (after is None or id(o) in after)
                    for o in self._acted_in_batch(actor, self._ONE_ACTION_OPS))
 
     def _one_action_refusal(self, raw: dict) -> "Outcome | None":
@@ -10613,7 +10631,10 @@ class Engine:
         if partial.get("attack_state") is None and not coup and seen and not dancing:
             opened = False
             if not self.scene.in_encounter:
-                opened = self._ensure_encounter(intent.actor, intent.target)
+                # The player's own blow catches the other side unready (owner ruling
+                # 2026-11-25); squaring off is the fight made plain first, so it does not.
+                opened = self._ensure_encounter(intent.actor, intent.target,
+                                                off_guard=actor.is_pc and not squaring)
             elif intent.target in self.scene.actors and not any(
                     intent.target in refs for refs in self.scene.sides.values()):
                 # Swinging at a bystander brings them into the fight, and their kind
@@ -14278,7 +14299,7 @@ class Engine:
     }
 
     def _ensure_encounter(self, initiator: str, target: str | None = None,
-                          ambush: bool = False) -> bool:
+                          ambush: bool = False, off_guard: bool = False) -> bool:
         """Start a fight the moment someone swings, if one is not already running.
         Returns whether it opened one — the attack op defers its swing when it did.
 
@@ -14365,10 +14386,12 @@ class Engine:
         if target:
             self.rally(target)
         self._law_joins()
-        self._open_surprise(them if ambush else ())
+        # `off_guard`: the player's own declared blow opened it, and the other side did not
+        # know a fight was coming (owner ruling 2026-11-25, `surprise.decide`).
+        self._open_surprise(them if ambush else (), opener=initiator if off_guard else "")
         return True
 
-    def _open_surprise(self, ambushers=()) -> dict | None:
+    def _open_surprise(self, ambushers=(), opener: str = "") -> dict | None:
         """The surprise round, decided once as the fight forms (rules/surprise.py), for
         `_ensure_encounter`; `_op_begin_encounter` asks `surprise.begin` itself.
 
@@ -14380,7 +14403,7 @@ class Engine:
         the op that opened it (`_surprise_said_now`)."""
         from . import surprise
 
-        record = surprise.begin(self, self.scene.sides, ambushers)
+        record = surprise.begin(self, self.scene.sides, ambushers, opener)
         if record is None:
             return None
         self._surprise_said = record

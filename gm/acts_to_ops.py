@@ -1119,6 +1119,9 @@ def table(frame: dict | None, scene, *, places=(), sentence: str = "",
                 _greet(row, a, scene, pc, approached)
             if act == "go" and not a.get("place") and not row.ops and pc is not None:
                 _carry_on(row, scene, pc)
+            elif act == "go" and a.get("place") and not row.ops and pc is not None \
+                    and _walks_up(a, scene) and not getattr(scene, "in_encounter", False):
+                _up_to(row, scene, _walks_up(a, scene))
             elif act == "go" and a.get("place") and not row.ops and pc is not None:
                 # Somebody's home, with them standing here: the walk there together
                 # (`_home_together`) — else the town named whole, else nowhere known.
@@ -2941,6 +2944,44 @@ MANOEUVRE_OF_BLOW = {"shove": "bull rush", "grab": "grapple", "trip": "trip",
 # and the people standing HERE at plan time are not them.
 _FINDS_SOMEBODY_FIRST = frozenset({"go", "journey", "leave", "call_on", "break_in",
                                    "seek", "follow"})
+
+
+def _walks_up(a: dict, scene) -> str | None:
+    """Whether this action is a walk up to somebody standing here: `go` with no place and
+    no fixture ("I walk over"), which is the walk toward the blow after it — returned as
+    "" — or `go` whose place names a person here ("I walk up to the thug"), returned as
+    their ref. None for any other act: a walk to a room or a town finds people the engine
+    cannot see yet (`_FINDS_SOMEBODY_FIRST`). Read off the reader's closed slots and the
+    engine's people (`person`), never the sentence."""
+    from . import interpret
+
+    if not isinstance(a, dict) or a.get("act") != "go" or a.get("fixture") \
+            or a.get("within_place") is False or not interpret.acting(a):
+        return None
+    place = " ".join(str(a.get("place") or "").split())
+    if not place:
+        return ""
+    ref = person(scene, place)
+    pc = scene.pc() if hasattr(scene, "pc") else None
+    return ref if ref and (pc is None or ref != pc.ref) else None
+
+
+def _up_to(row: "Row", scene, ref: str) -> None:
+    """The walk up to `ref`, out of a fight: the peace-time move beside them
+    (`judgement._approach_move`, the square the move op accepts, no speed cap out of a
+    fight). Owner ruling 2026-11-25: what the player does before making plain they mean a
+    fight is ordinary, unhostile action, and only alarms anybody if the act itself would —
+    which the engine's own answers to a body coming nearer decide (the holding-ground
+    roll, `Engine._holding_ground_settles`), never these words."""
+    from . import judgement
+
+    who = scene.actors.get(ref)
+    if who is None or row.intents:
+        return
+    move = judgement._approach_move(scene, who)
+    if move is not None:
+        row.intents.append(move)
+        row.note = f"the walk up to {who.name}"
 # How far each zone is, in feet, for a scene with no map to measure on (rules/intents.py
 # ZONES; the squares `Scene.place_by_zone` lays them at).
 _ZONE_FEET = {"engaged": 5, "near": 15, "far": 40}
@@ -3069,8 +3110,15 @@ def victims(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list[str
             continue
         named_here = fighting and bool(person(scene, a.get("target"))) \
             and str(a.get("target") or "").lower() not in _PRONOUNS
-        if not named_here and any(interpret.acting(b) and b.get("act") in _FINDS_SOMEBODY_FIRST
-                                  for b in actions[:row.index]):
+        # The act just before the blow, when it is a walk up to somebody here ("I walk
+        # over and strike the spy"): no one new is found by it, so the blow is not left for
+        # after a finding (owner ruling 2026-11-25, `_walks_up`).
+        before = next((k for k in range(row.index - 1, -1, -1)
+                       if interpret.acting(actions[k])), None)
+        walk_up = None if before is None else _walks_up(actions[before], scene)
+        if not named_here and walk_up is None \
+                and any(interpret.acting(b) and b.get("act") in _FINDS_SOMEBODY_FIRST
+                        for b in actions[:row.index]):
             # In a fight nobody new is found: a blow at somebody named and standing here
             # is at them, whatever walk the line began with. Playtest 2026-11-15 #93:
             # "I leave the penguin, draw my dagger, put it to the captain's throat" was
@@ -3171,6 +3219,14 @@ def victims(rows: list[Row], frame: dict | None, scene, *, ask=None) -> list[str
             row.note = f"a feint at {victim.name} ({victim.ref}): {how}"
             notes.append(row.note)
             continue
+        if walk_up == "" and not fighting:
+            # "I walk over and strike him": the walk is toward the one struck, taken out of
+            # the fight before the blow opens it (owner ruling 2026-11-25). "I strike him"
+            # alone walks nobody: the blow from where the player stands is the engine's
+            # to hold for the bar (`Engine._their_first_blow`).
+            walk = next((r for r in rows if r.index == before), None)
+            if walk is not None:
+                _up_to(walk, scene, victim.ref)
         man = MANOEUVRE_OF_BLOW.get(str(a.get("blow") or ""))
         row.intents.append({"op": "attack", "actor": pc.ref, "target": victim.ref,
                             "because": f"the player attacks {victim.name}",
@@ -5128,9 +5184,26 @@ def order(raw, rows: list[Row], frame: dict | None = None) -> list:
         for op in (*r.ops, *(op for op in _PLACED_BY_ACT.get(r.act, ())
                              if op not in r.ops)):
             owners.setdefault(op, []).append(r.index)
+    # A built walk or blow that reached the plan as a copy (`apply` adds `dict(b)`), or the
+    # plan's own blow that `judgement.inject_fight` aimed at the victim a row built: matched
+    # by op, target and square. Owner ruling 2026-11-25, live: "I walk over and strike the
+    # clockwork spy" ran the strike before the walk, both unowned here, and the walk then
+    # spent the surprise round's one action the strike was owed.
+    def aim(i) -> tuple:
+        square = (i.get("params") or {}).get("square") if _op(i) == "move" else None
+        return (_op(i), str(i.get("target") or ""), tuple(square or ()))
+
+    by_aim: dict[tuple, int] = {}
+    for row_ in rows:
+        for i in row_.intents:
+            if _op(i) in ("move", "attack"):
+                by_aim.setdefault(aim(i), row_.index)
     slots, keyed = [], []
     for k, r in enumerate(raw):
         idx = by_built.get(id(r))
+        if idx is None and isinstance(r, dict) and _op(r) in ("move", "attack") \
+                and str(r.get("actor") or "pc").lower() in ("pc", "none", ""):
+            idx = by_aim.get(aim(r))
         if idx is None and len(owners.get(_op(r), ())) == 1:
             idx = owners[_op(r)][0]
         if idx is None and _op(r) == "say" and not owners.get("say") \
