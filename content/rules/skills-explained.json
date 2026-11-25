@@ -379,7 +379,7 @@
         {"text": "Search a dungeon room and the roll is set against the hidden ways and armed traps there and one room on.",
          "file": "rules/dungeons.py", "find": "def searched(engine, pc, total: int)", "use": "skill.perception.traps"},
         {"text": "When something lies in wait on the road, in the wild, the water or a lair, your Perception is rolled in secret against its Stealth. Beaten, you are surprised: it acts first and you lose the opening round.",
-         "file": "rules/surprise.py", "find": "def decide(engine, sides: dict, ambushers=())", "use": "skill.perception.ambush"}
+         "file": "rules/surprise.py", "find": "def decide(engine, sides: dict, ambushers=(), opener: str = \"\")", "use": "skill.perception.ambush"}
       ]
     },
     "perform": {

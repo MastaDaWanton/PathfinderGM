@@ -149,7 +149,7 @@
     "skill": "perception",
     "source": "CRB, Combat, Surprise: \"Determining awareness may call for Perception checks\"; opposed by the ambushers' Stealth, -1 per 10 ft (CRB p.102).",
     "action": "none",
-    "resolved_by": {"file": "rules/surprise.py", "find": "def decide(engine, sides: dict, ambushers=())"}
+    "resolved_by": {"file": "rules/surprise.py", "find": "def decide(engine, sides: dict, ambushers=(), opener: str = \"\")"}
   },
   "skill.perception.traps": {
     "name": "find traps and hidden ways",
