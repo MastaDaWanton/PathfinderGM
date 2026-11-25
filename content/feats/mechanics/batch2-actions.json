@@ -301,5 +301,10 @@
     "tags": [
       "aid.bodyguard"
     ]
+  },
+  "stand-still": {
+    "tags": [
+      "reaction.stand-still"
+    ]
   }
 }

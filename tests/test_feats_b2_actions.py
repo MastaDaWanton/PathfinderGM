@@ -551,3 +551,17 @@ def test_surprise_follow_through_denies_dexterity_to_the_second_foe_cleaved():
     assert not plain
     o = next(o for o in engine.run([intent]).outcomes if o.op == "attack")
     assert "flat-footed" in (o.dc or {}).get("explain", "") or "flat-footed" in o.tell
+
+
+def test_stand_still_stops_a_foe_walking_away():
+    """Stand Still: "you can make a combat maneuver check as your attack of opportunity. If
+    successful, the enemy cannot move for the rest of his turn." The thug walks off from
+    beside Kesst; her check (scripted high) stops him on his square."""
+    scene, engine, pc, thug = _fight(pc_at=(7, 10), feats=["Stand Still"],
+                                     dice=_Scripted(5))
+    scene.acted.add("pc")
+    scene.turn = 1
+    # Kesst rolls her own check on the dice popup: a 19.
+    res = _run(engine, {"op": "move", "actor": "c1", "params": {"square": [11, 10]}}, face=19)
+    assert any("stops the thug dead" in o.tell for o in res.outcomes)
+    assert scene.positions["c1"][:2] == (8, 10)

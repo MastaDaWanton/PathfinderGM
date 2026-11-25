@@ -6412,6 +6412,13 @@ class Engine:
         for watcher, reaction in fired:
             if not self._spend_reaction(watcher, reaction.budget):
                 continue
+            # Stand Still (CRB): a foe moving out of the holder's adjacent squares is met
+            # with a combat manoeuvre check in place of the swing (`_stand_still`).
+            w = self.scene.actors.get(watcher)
+            still = (why == "movement" and w is not None
+                     and w.has_state("reaction.stand-still")
+                     and (self.scene.distance_between(watcher, ref) or 99)
+                     <= gridmod.SQUARE_FT)
             out.append({
                 "op": reaction.op,
                 "actor": watcher,
@@ -6421,7 +6428,8 @@ class Engine:
                 # letting it inherit the attacker's iteratives would turn a fighter's
                 # threatened square into four free attacks a round.
                 "params": {"full_attack": False, "reaction": reaction.id,
-                           **({"provoked_by": why} if why else {})},
+                           **({"provoked_by": why} if why else {}),
+                           **({"stand_still": True} if still else {})},
                 "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
             })
         return out
@@ -10168,6 +10176,8 @@ class Engine:
         # Aid another (`_aid_another`, feat loop b2): a roll against AC 10, no blow.
         if intent.params.get("aid"):
             return self._aid_another(intent, actor, defender, partial)
+        if intent.params.get("stand_still") and intent.params.get("reaction"):
+            return self._stand_still(intent, actor, defender, partial)
         # A dancing weapon's own round (`_dance`): the blade swings, not its loosener — so
         # nothing of the loosener's but their base attack bonus rides it (no Strength, no
         # feats, no sneak attack, no charged blow), and nothing stops it but the reach.
@@ -12831,6 +12841,36 @@ class Engine:
                                  "origin": self.AID_ORIGIN}],
                        tell=f"{actor.name} distracts {foe.name} ({said}): {ally.name} has "
                             f"+{bonus} on the {how} {foe.name}.", because=intent.because)
+
+    def _stand_still(self, intent: Intent, actor, mover, partial: dict) -> Outcome:
+        """Stand Still (CRB): "When a foe provokes an attack of opportunity due to moving
+        through your adjacent squares, you can make a combat maneuver check as your attack
+        of opportunity. If successful, the enemy cannot move for the rest of his turn. An
+        enemy can still take the rest of his action, but cannot move." The check is the
+        holder's CMB against the mover's CMD; a success lays `movement.stopped` for the
+        round (the one ticker), which the move op refuses by (`_op_move`). Taken in place
+        of the swing whenever the holder may — the feat's whole point (owner call)."""
+        mods = list(actor.cmb_modifiers(None, defender=mover))
+        cmd = sum(m.value for m in mover.cmd_modifiers(attacker=actor))
+        roll = self._roll_or_suspend(intent, actor, mods, "Stand Still (CMB)", cmd, partial)
+        made = d20_succeeds(roll, cmd)
+        self._judge(roll, made)
+        said = f"{roll.total} against CMD {cmd}"
+        if not made:
+            return Outcome(intent_id=intent.id, op="attack", rolls=[roll], verdict="failure",
+                           effects=[{"kind": "stand_still", "ref": mover.ref, "made": False,
+                                     "by": actor.ref}],
+                           tell=f"{actor.name} tries to stop {mover.name} in their tracks "
+                                f"and cannot ({said}).", because=intent.because)
+        mover.apply_effect(ActiveEffect(
+            name="stopped in place", kind="situation", key="stopped",
+            source=f"{actor.name}'s Stand Still", origin="rule:feat-stand-still",
+            duration="rounds", rounds_left=1, tags=("movement.stopped",)))
+        return Outcome(intent_id=intent.id, op="attack", rolls=[roll], verdict="success",
+                       effects=[{"kind": "stand_still", "ref": mover.ref, "made": True,
+                                 "by": actor.ref, "origin": "rule:feat-stand-still"}],
+                       tell=f"{actor.name} stops {mover.name} dead ({said}): they go no "
+                            f"further this turn.", because=intent.because)
 
     def _aid_spent(self, intent: Intent, outcome: "Outcome") -> None:
         """The aid another bonus covers one attack: the friend's next attack against that
@@ -32064,6 +32104,16 @@ class Engine:
                 because=intent.because,
             )
 
+        if square is not None and self.scene.has_grid \
+                and actor.has_state("movement.stopped") \
+                and tuple(square)[:2] != tuple(self.scene.positions.get(ref) or ())[:2]:
+            # Stopped by Stand Still (`_stand_still`): "cannot move for the rest of his
+            # turn".
+            return Outcome(
+                intent_id=intent.id, op="move", status="prevented",
+                effects=[{"ref": ref, "kind": "move_stopped", "why": "stand still"}],
+                tell=f"{actor.name} is held where they stand and goes no further this turn.",
+                because=intent.because)
         if square is not None and self.scene.has_grid \
                 and actor.has_state("state.held.glued") \
                 and tuple(square)[:2] != tuple(self.scene.positions.get(ref) or ())[:2]:
