@@ -70,6 +70,15 @@ def _enter(engine, style, who="pc"):
     return _run(engine, [{"op": "style", "actor": who, "params": {"style": style}}])
 
 
+def _turn_of(scene, ref: str) -> None:
+    """Move the fight on to `ref`'s turn of a new round. Entering a style spends the swift
+    action (`Engine._spend_swift`, b2-actions' budget, joined at the batch 2 merge), so a
+    test that enters a second style, or meets a blow with an immediate Sense Motive, has to
+    stand on a later turn: on the same turn the swift is gone, as the book has it."""
+    scene.round += 1
+    scene.turn = [r for r, _ in scene.initiative].index(ref)
+
+
 def _named(mods, name: str) -> int:
     return sum(m.value for m in mods if str(m.source).startswith(name))
 
@@ -104,6 +113,7 @@ def test_a_style_is_one_stance_entered_in_a_fight_and_left_with_it():
     assert _enter(engine, "crane-style").outcomes[0].tell == \
         "Borin Achereth settles into Crane Style."
     assert pc.has_state("style.crane-style")
+    _turn_of(scene, "pc")
     said = _enter(engine, "snake-style").outcomes[0].tell
     assert said == "Borin Achereth settles into Snake Style, leaving Crane Style."
     assert pc.has_state("style.snake-style") and not pc.has_state("style.crane-style")
@@ -140,6 +150,7 @@ def test_a_creature_that_knows_a_style_takes_it_on_its_first_turn():
     thug.feats += ["improved unarmed strike", "dodge", "crane style"]
     thug.char_class = "monk"
     plan = [{"op": "attack", "actor": thug.ref, "target": "pc"}]
+    _turn_of(scene, thug.ref)
     got = styles.npc_stance(scene, thug.ref, plan)
     assert got[0] == {"op": "style", "actor": thug.ref, "params": {"style": "crane-style"},
                       "because": "its fighting stance"}
@@ -355,6 +366,7 @@ def test_snake_style_reads_the_blow_and_stands_its_sense_motive_for_the_ac():
     pc = _monk("snake style", level=3, ranks={"acrobatics": 1, "sense motive": 3})
     scene, engine, pc, thug = _fight(pc)
     _enter(engine, "snake-style")
+    _turn_of(scene, thug.ref)
     engine.dice = Faces([19], match="Sense Motive")
     first = _run(engine, [{"op": "attack", "actor": thug.ref, "target": "pc",
                            "visibility": "hidden"}]).outcomes[0]

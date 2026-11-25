@@ -624,7 +624,13 @@ VOCAB: dict[str, list[dict]] = {
         # energy, descriptor, subschool) — Spell Specialization's "treat your caster level
         # as being two higher for all level-variable effects of the spell", Bloatmage
         # Initiate's "+1 caster level". Not `caster_level`, which is a CHECK's bonus.
-        ("spell_cl", "Caster level of a spell cast"))],
+        ("spell_cl", "Caster level of a spell cast"),
+        # Feat loop b2, 2026-11-22: `charge_ac` is what a charge's -2 AC is offset by, asked
+        # in the charge's context with the one charged (`Engine._stance_terms`: Charge of
+        # the Righteous); `reach` is feet added to melee reach (`reactions.reach_with`:
+        # Lunge on the bearer's own turn, Combat Patrol's widened threat).
+        ("charge_ac", "AC penalty of a charge, offset"),
+        ("reach", "Melee reach, in feet"))],
     "sense": [{"id": k, "name": n} for k, n in (
         ("low_light", "Low-light vision"), ("darkvision", "Darkvision"),
         ("scent", "Scent"), ("tremorsense", "Tremorsense"),
@@ -2484,6 +2490,13 @@ WHEN_KEYS: dict[str, str] = {
                     "(Engine._swing_moment): Furious Focus",
     "adjacent": "on the AC line, whether the one attacking stands adjacent on the board "
                 "(Actor._ac_context); no board, no answer",
+    # Feat loop b2: whether the roll is made on the bearer's own turn (Lunge's "until the
+    # end of your turn"), and an ally anywhere in the fight holding a feat and a state
+    # (Horde Charge's "charging during the same round as an ally with this feat").
+    "own_turn": "whether it is the bearer's own turn (reactions.reach_with)",
+    "ally_state": "an ally in the fight holding a feat and a state: {\"feat\": "
+                  "\"horde-charge\", \"state\": \"buff.stance.charging\"} "
+                  "(sheet.Situation.ally_state)",
     "skill_use": "which use of a skill the check is: lie, feint, diversion, tumble ... "
                  "or {\"not\": \"feint\"} (Engine._skill_use_ctx)",
 }
@@ -2492,7 +2505,8 @@ _WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment"
                        "attacker": ("type", "subtype")}
 _WHEN_COMPARE = ("lte", "gte", "lt", "gt", "eq")
 _WHEN_BOOLS = ("daylight", "underground", "wielder_casts", "resting", "full_attack",
-               "flanked", "sole_threat", "opportunity", "first_attack", "adjacent")
+               "flanked", "sole_threat", "opportunity", "first_attack", "adjacent",
+               "own_turn")
 
 # What a roll may be made AGAINST — the `against` of a roll context, one word per danger,
 # each with the reader that passes it. A closed list, because the clause is answered by
@@ -2659,6 +2673,14 @@ def when_problems(when, where: str = "when") -> list[str]:
                     isinstance(want, dict) and set(want) == {"not"} and want["not"]):
                 out.append(f"{where}.skill_use is a use (\"lie\") or {{\"not\": "
                            f"\"feint\"}}.")
+        elif key == "ally_state":
+            from . import feats as feats_mod
+
+            if (not isinstance(want, dict) or set(want) != {"feat", "state"}
+                    or str(want.get("feat") or "") not in feats_mod.all_feats()
+                    or not str(want.get("state") or "").strip()):
+                out.append(f"{where}.ally_state is {{\"feat\": \"<a feat id>\", "
+                           f"\"state\": \"<a tag>\"}}.")
         elif key == "ally_beside":
             from . import feats as feats_mod
 

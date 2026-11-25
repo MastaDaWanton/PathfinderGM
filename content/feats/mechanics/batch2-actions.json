@@ -1,0 +1,307 @@
+{
+  "_about": [
+    "Feat loop, batch 2, actions lane (2026-11-22): the action-economy feats and the",
+    "manoeuvre leftovers of batch 1. Each benefit is the book's (aonprd.com FeatDisplay, the",
+    "source named in feats.json), every number through the funnel. The machinery they share",
+    "was built once: the swift/immediate budget (Engine._spend_swift, Scene.swift_spent), the",
+    "charge (Engine._charge_before), the grapple's pin (Engine._maintain_grapple), and the",
+    "riders a feat lays on a hit, a critical or a manoeuvre (`on_crit`, `on_hit`, `tags`).",
+    "What still does not run is each document's `not_yet`. Loaded beside core.json by",
+    "rules/feats.py; nothing here is in another lane's file."
+  ],
+  "spring-attack": {
+    "choice": "spring_attack"
+  },
+  "whirlwind-attack": {
+    "choice": "whirlwind_attack"
+  },
+  "lunge": {
+    "choice": "lunge",
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "reach",
+        "amount": 5,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "buff.stance.lunging"
+          },
+          "own_turn": true
+        },
+        "note": "Lunge: 5 ft more reach until the end of your turn"
+      },
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": -2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "buff.stance.lunging"
+          }
+        },
+        "note": "Lunge: -2 AC until your next turn"
+      }
+    ]
+  },
+  "charge-of-the-righteous": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "charge_ac",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "target": {
+            "type": "undead"
+          }
+        },
+        "note": "no charge penalty to AC against an undead creature"
+      },
+      {
+        "type": "combat_mod",
+        "target": "charge_ac",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "target": {
+            "type": "outsider",
+            "alignment": "evil"
+          }
+        },
+        "note": "no charge penalty to AC against an evil outsider"
+      }
+    ]
+  },
+  "horde-charge": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "charge",
+          "ally_state": {
+            "feat": "horde-charge",
+            "state": "buff.stance.charging"
+          }
+        },
+        "note": "charging in the same round as an ally with Horde Charge"
+      },
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "charge",
+          "ally_state": {
+            "feat": "horde-charge",
+            "state": "buff.stance.charging"
+          }
+        },
+        "note": "charging in the same round as an ally with Horde Charge"
+      }
+    ]
+  },
+  "felling-smash": {
+    "tags": [
+      "rider.felling-smash"
+    ]
+  },
+  "felling-escape": {
+    "tags": [
+      "rider.felling-escape"
+    ]
+  },
+  "drag-down": {
+    "tags": [
+      "rider.drag-down"
+    ]
+  },
+  "hamatula-strike": {
+    "tags": [
+      "rider.hamatula-strike"
+    ],
+    "not_yet": [
+      "the impaled foe's -4 grapple check to damage it with the piercing weapon, as an attack action, is not offered: the hold deals the grapple's ordinary damage"
+    ]
+  },
+  "underhanded-teamwork": {
+    "tags": [
+      "teamwork.underhanded"
+    ]
+  },
+  "improved-underhanded-teamwork": {
+    "tags": [
+      "teamwork.underhanded.improved"
+    ],
+    "not_yet": [
+      "the foe's action to remove the first condition does not also remove the second (no action removes a dirty trick's condition yet)"
+    ]
+  },
+  "dirty-trick-master": {
+    "tags": [
+      "maneuver.dirty-trick.master"
+    ],
+    "not_yet": [
+      "the worsened condition's \"until the opponent uses a standard action to remove the condition\" ending is not offered (no action removes a dirty trick's condition yet)"
+    ]
+  },
+  "bull-rush-strike": {
+    "tags": [
+      "crit.maneuver.bull-rush"
+    ]
+  },
+  "disarming-strike": {
+    "tags": [
+      "crit.maneuver.disarm"
+    ]
+  },
+  "repositioning-strike": {
+    "tags": [
+      "crit.maneuver.reposition"
+    ]
+  },
+  "sundering-strike": {
+    "tags": [
+      "crit.maneuver.sunder"
+    ]
+  },
+  "tripping-strike": {
+    "tags": [
+      "crit.maneuver.trip"
+    ]
+  },
+  "step-up": {
+    "tags": [
+      "movement.step-up"
+    ]
+  },
+  "following-step": {
+    "tags": [
+      "movement.step-up.following"
+    ]
+  },
+  "step-up-and-strike": {
+    "tags": [
+      "movement.step-up.strike"
+    ]
+  },
+  "chokehold": {
+    "tags": [
+      "grapple.chokehold"
+    ],
+    "not_yet": [
+      "the choked foe does not hold its breath or begin suffocating (the breath clock runs only under water)"
+    ]
+  },
+  "pinning-knockout": {
+    "tags": [
+      "grapple.pinning-knockout"
+    ]
+  },
+  "pinning-rend": {
+    "tags": [
+      "grapple.pinning-rend"
+    ]
+  },
+  "sleeper-hold": {
+    "tags": [
+      "grapple.sleeper-hold"
+    ],
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": -2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "buff.stance.sleeper-hold"
+          }
+        },
+        "note": "Sleeper Hold: -2 AC while choking a foe out"
+      }
+    ]
+  },
+  "surprise-follow-through": {
+    "tags": [
+      "attack.cleave.surprise"
+    ]
+  },
+  "uncanny-defense": {
+    "modifiers": [
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "formula": "(4 + min(1, ranks_acrobatics // 3)) // 2",
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "buff.stance.fighting-defensively"
+          }
+        },
+        "note": "half the dodge bonus of fighting defensively (Cautious Fighter's +4, +5 trained)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "formula": "(4 + min(1, ranks_acrobatics // 3)) // 2",
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "buff.stance.fighting-defensively"
+          }
+        },
+        "note": "half the dodge bonus of fighting defensively"
+      },
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "formula": "(6 + 2 * min(1, ranks_acrobatics // 3)) // 2",
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "buff.stance.total-defense"
+          }
+        },
+        "note": "half the dodge bonus of total defense (Cautious Fighter's +6, +8 trained)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "formula": "(6 + 2 * min(1, ranks_acrobatics // 3)) // 2",
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "buff.stance.total-defense"
+          }
+        },
+        "note": "half the dodge bonus of total defense"
+      }
+    ]
+  },
+  "swift-aid": {
+    "tags": [
+      "aid.swift"
+    ]
+  },
+  "team-up": {
+    "tags": [
+      "aid.team-up"
+    ]
+  },
+  "bodyguard": {
+    "tags": [
+      "aid.bodyguard"
+    ]
+  },
+  "stand-still": {
+    "tags": [
+      "reaction.stand-still"
+    ]
+  }
+}

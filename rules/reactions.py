@@ -368,9 +368,34 @@ def reach_with(actor, weapon_key: str | None) -> tuple[int, bool]:
     from . import weapons as weapons_mod
 
     natural = gridmod.natural_reach(actor.size)
+    more = _reach_more(actor)
     if weapon_key and weapons_mod.has_trait(weapon_key, "reach"):
-        return natural * 2, True
-    return natural, False
+        return natural * 2 + more, True
+    return natural + more, False
+
+
+def _reach_more(actor) -> int:
+    """Feet the bearer's effects and feats add to melee reach (the `reach` target, feat
+    loop b2): Lunge's "+5 feet until the end of your turn" (`when: {"own_turn": true}`),
+    Combat Patrol's widened threat. Asked with the moment, so `own_turn` is answered by
+    the scene's own turn order; no moment, no own turn."""
+    if not hasattr(actor, "_buff_mods"):
+        return 0
+    if not actor.has_state("reach.extended") and not any(
+            isinstance(m, dict) and m.get("target") == "reach"
+            for e in getattr(actor, "effects", ()) for m in (e.modifiers or ())):
+        return 0
+    from .sheet import situation_of
+
+    sit = situation_of(actor)
+    ctx: dict = {"own_turn": bool(sit is not None and getattr(sit.scene, "current_ref", None)
+                                  and sit.scene.current_ref() == actor.ref)}
+    if sit is not None:
+        ctx["situation"] = sit
+    try:
+        return max(0, sum(m.value for m in actor._buff_mods("combat_mod", "reach", ctx)))
+    except Exception:  # noqa: BLE001 — a sheet the documents cannot read reaches as it is
+        return 0
 
 
 def provoked_by_move(scene, mover_ref: str, start, end) -> list[tuple[str, Reaction]]:

@@ -192,8 +192,8 @@ compiled `rules` — grab/trip/push/pull as free manoeuvres, poison and disease 
 frequency to the printed cure, across `Scene.advance` and a save), paralysis, bleed, burn,
 attach, constrict, ability damage; a swarm's distraction is `_distraction`) — energy drain
 is reported, not applied (negative levels stay `engine=False`), and 358 rider documents are
-`unsupported` with a reason; the grapple is maintained (`Engine.grapple_turn`, damage only —
-no move/pin/tie-up), escaped (`escape` op and reader act) and ended (`_grapples_settle`,
+`unsupported` with a reason; the grapple is maintained (`Engine.grapple_turn`, damage, or
+the pin a player declares since feat loop b2 — no move/tie-up), escaped (`escape` op and reader act) and ended (`_grapples_settle`,
 `Scene.end_encounter`) since 2026-11-01, tests/test_grapple_held.py; feat actions
 (Cleave, Vital Strike) are CLOSED since 2026-11-22 as declared attack options, not
 `find_ability` branches — a document's `choice` (Power Attack's shape) checked by

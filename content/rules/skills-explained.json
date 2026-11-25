@@ -433,7 +433,7 @@
         {"text": "A mount not trained for combat riding has to be controlled in a fight: DC 20, a move action, before you attack or cast that round. Miss it and you can do nothing else that round. A combat-trained mount needs no roll.",
          "file": "rules/bodyskills.py", "find": "def control_in_battle(engine, intent, rider):", "use": "skill.ride.control"}
       ],
-      "not_yet": "Guiding with your knees, staying in the saddle when hit, directing a combat-trained mount's own attack, a mount falling under you, and the mounted charge (there is no charge yet).",
+      "not_yet": "Guiding with your knees, staying in the saddle when hit, directing a combat-trained mount's own attack, a mount falling under you, and the mounted charge (a charge on foot is built; a rider's charge on the steed's legs is not).",
       "not_yet_uses": ["skill.ride.guide", "skill.ride.stay-in-saddle", "skill.ride.fight", "skill.ride.mount-falls"]
     },
     "sense motive": {

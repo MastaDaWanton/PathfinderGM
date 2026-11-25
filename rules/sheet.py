@@ -372,12 +372,16 @@ ATTACK_CHOICES = ("power_attack", "deadly_aim", "piranha_strike", "combat_expert
                   "bloody_assault", "dazing_assault", "stunning_assault",
                   # Feat loop b2-styles: Scorpion Style's one unarmed strike (a standard
                   # action) and Second Chance's reroll of a full attack's first miss.
-                  "scorpion_style", "second_chance")
+                  "scorpion_style", "second_chance",
+                  # Feat loop b2 (2026-11-22): the action-shaped options. A charge is
+                  # anyone's (CRB, Combat, Charge); Spring Attack, Lunge and Whirlwind
+                  # Attack are their feats' (`Engine._charge_before`, `_whirlwind`).
+                  "charge", "spring_attack", "lunge", "whirlwind_attack")
 # The options nobody needs a feat for (combat bar round 2, 2026-11-22). CRB, Combat
 # ("Fighting Defensively as a Standard Action"): "You can choose to fight defensively when
 # attacking" — anyone, with any attack. Its numbers are `defensive_dodge` and the stance
 # the engine lays (`Engine._stance_terms`).
-UNIVERSAL_CHOICES = frozenset({"fighting_defensively"})
+UNIVERSAL_CHOICES = frozenset({"fighting_defensively", "charge"})
 
 
 def defensive_dodge(actor, total: bool = False) -> int:
@@ -397,7 +401,9 @@ ATTACK_CHOICE_FEATS = {"power_attack": "power-attack", "deadly_aim": "deadly-aim
                        "cleave": "cleave", "rapid_shot": "rapid-shot",
                        "bloody_assault": "bloody-assault", "dazing_assault": "dazing-assault",
                        "stunning_assault": "stunning-assault",
-                       "scorpion_style": "scorpion-style", "second_chance": "second-chance"}
+                       "scorpion_style": "scorpion-style", "second_chance": "second-chance",
+                       "spring_attack": "spring-attack", "lunge": "lunge",
+                       "whirlwind_attack": "whirlwind-attack"}
 
 _IMPLIED_GENDER = {"she": "woman", "he": "man"}
 
@@ -4180,6 +4186,10 @@ class Actor:
             mods.append(Modifier(LETHALITY_SWAP_PENALTY, swap))
         if hand:
             mods.append(self.two_weapon_penalty(hand, off_light))
+        # CRB, Combat, Charge: "you get a +2 bonus on the attack roll". On the charge's own
+        # blow only; the -2 AC is the stance the engine lays (`Engine._stance_terms`).
+        if "charge" in (choices or ()):
+            mods.append(Modifier(2, "charging"))
 
         mods.extend(self._condition_mods("attack"))
         if not ranged:
@@ -8764,6 +8774,30 @@ class Situation:
             return True
         return False
 
+    def ally_state(self, want) -> bool:
+        """Whether another creature on this one's side of the fight holds the feat
+        `want["feat"]` (by document id) and the state `want["state"]` (by prefix, law 1).
+        Feat loop b2: Horde Charge's ally who charged this round holds the one-round
+        charging stance. No sides, no allies: fails closed."""
+        from . import feats as feats_mod
+        from . import position as position_mod
+
+        if not isinstance(want, dict) or not want.get("feat") or not want.get("state"):
+            return False
+        me = getattr(self.actor, "ref", None)
+        sides = getattr(self.scene, "sides", None) or {}
+        if not any(me in refs for refs in sides.values()):
+            return False
+        for ref, other in (getattr(self.scene, "actors", {}) or {}).items():
+            if ref == me or not position_mod._same_side(self.scene, me, ref):
+                continue
+            if not other.has_state(str(want["state"])):
+                continue
+            if any((feats_mod.document(raw) or {}).get("id") == want["feat"]
+                   for raw in other.feats or ()):
+                return True
+        return False
+
     def sole_threat(self, foe) -> bool:
         """Whether this creature threatens `foe` and nobody else against it does — Solo
         Maneuvers' "whenever you are the only one threatening an opponent" (Bastards of
@@ -8901,6 +8935,13 @@ def _when_holds(when, ctx: dict | None) -> bool:
                 if have in {str(b) for b in barred}:
                     return False
             elif have != str(want):
+                return False
+        elif key == "ally_state":
+            # An ally in the fight holding the feat and the state (feat loop b2): Horde
+            # Charge's "charging during the same round as an ally with this feat" asks the
+            # ally's one-round charging stance. No moment, no answer.
+            sit = ctx.get("situation")
+            if sit is None or not sit.ally_state(want):
                 return False
         elif key in ("ally_beside", "sole_threat"):
             # Board questions about the bearer and the foe of this roll (feat loop b1):

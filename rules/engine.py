@@ -327,6 +327,13 @@ class Scene:
     # The round each combatant last made an attack on its own turn (feat loop b2):
     # Furious Focus's "the first attack you make each turn" (APG). `move_spent`'s shape.
     swung: dict[str, int] = field(default_factory=dict)
+    # The round whose turn's swift action is spent, by ref (feat loop b2, 2026-11-22). CRB,
+    # Combat, Action Types: "You can perform only a single swift action per turn", and an
+    # immediate action taken when it is not your turn "counts as your swift action for
+    # your next turn" — so the key is the round of the TURN it spends, which an immediate
+    # off-turn may set one round ahead (`Engine._spend_swift`). `move_spent`'s shape and
+    # reason: no second ticker, a stale entry is a round that is not this one.
+    swift_spent: dict[str, int] = field(default_factory=dict)
     # What the player's character last struck with this encounter — the weapon and the
     # lethality their own words chose — and what was in hand then, by ref. A blow that
     # names no means carries on with these (`Engine._standing_means`), as a standing action
@@ -2441,6 +2448,7 @@ class Scene:
         self.move_spent = {}
         self.standard_spent = {}
         self.swung = {}
+        self.swift_spent = {}
         self.sides = {}
         # The battlefield does NOT go with the fight any more (item 28, 2026-09-19): the
         # ground belongs to the place, the party is standing on it before and after, and
@@ -2621,6 +2629,7 @@ class Scene:
         self.acted.discard(ref)
         self.move_spent.pop(ref, None)
         self.standard_spent.pop(ref, None)
+        self.swift_spent.pop(ref, None)
         self.spawn_feet.pop(ref, None)
         # Leaked by three of the four old depart doors and persisted, so a stale age was
         # waiting for whoever wore the ref next; with refs never reused it is merely
@@ -4536,7 +4545,8 @@ class Engine:
             if defender is not None \
                     and (self.scene.in_encounter or intent.params.get("coup_de_grace")) \
                     and not intent.params.get("undecided") \
-                    and not ({intent.actor, defender.ref} & set(moved)):
+                    and not ({intent.actor, defender.ref} & set(moved)) \
+                    and not any(intent.params.get(k) for k in self._WALKS_ITS_OWN):
                 why = self._reach_refusal(intent, actor, defender, key)
                 # One move reaches them: the blow stands, and `_drive` walks the closing
                 # step in front of it (the owner's ruling, 2026-09-29). The attacker is
@@ -4552,6 +4562,12 @@ class Engine:
                         f"attack: {why}", "legality", index, code="out_of_reach",
                         for_a_person=self._reach_refusal(intent, actor, defender, key,
                                                          voice="person"))
+
+    # The declared options that compose their own walk or reach (feat loop b2): a charge
+    # and a Spring Attack walk before the blow (`_charge_before`), a lunge reaches 5 ft
+    # further, a whirlwind strikes whoever is in reach (`_whirlwind_before`). Validation's
+    # reach is not theirs to answer; each says its own refusal at the op.
+    _WALKS_ITS_OWN: ClassVar[tuple] = ("charge", "spring_attack", "lunge", "whirlwind_attack")
 
     # --- Running --------------------------------------------------------------------
 
@@ -6006,6 +6022,13 @@ class Engine:
             # an attack of opportunity that drops the attacker stops the blow behind it
             # (`_op_attack`'s "never swings"). Asked once per blow — the flag — and never
             # on a resume, which is the same blow part-way through its dice.
+            # Whirlwind Attack: one blow at each foe in reach, each its own intent
+            # (`_whirlwind_before`), or the refusal in place of the one declared.
+            if not partial and raw.get("op") == "attack" \
+                    and (raw.get("params") or {}).get("whirlwind_attack"):
+                whirl = self._whirlwind_before(raw)
+                queue[0:1] = whirl
+                continue
             if not partial and not raw.pop("_closed", False):
                 step = self._close_before(raw)
                 if step is not None:
@@ -6014,6 +6037,7 @@ class Engine:
                     # attack after a move, which the rule does not allow (`_one_blow_left`;
                     # this blow is the queue's first, already made single by the step).
                     self._one_blow_left(str(raw.get("actor") or ""), queue)
+                    self._spring_rest(raw, queue)
                     queue[0:0] = [step]
                     raw["_closed"] = True
                     continue
@@ -6085,6 +6109,16 @@ class Engine:
                 self._coup_paid(intent, outcome, queue)
             # The surprise round's one action, spent where a later request can see it.
             self._one_action_paid(intent, outcome)
+            # What a feat lets its bearer do on the back of this (`_riders_after`,
+            # `_step_up_after`): spliced next, each paid from a swift or immediate action.
+            rider_said: list = []
+            if intent.op == "attack":
+                self._aid_spent(intent, outcome)
+            if intent.op in ("attack", "escape", "check"):
+                more, rider_said = self._riders_after(intent, outcome)
+                queue[0:0] = more
+            elif intent.op == "move":
+                queue[0:0] = self._step_up_after(intent, outcome)
             # The deeds this act holds, read off its own records against the snapshot,
             # and carried on its outcome for the history line. Every outcome is read, not
             # only the player's: a death the player's blow caused can land in anybody's
@@ -6114,6 +6148,7 @@ class Engine:
                         outcome, effects=list(outcome.effects) + list(told.effects),
                         tell=f"{outcome.tell} {told.tell}".strip())
             outcomes.append(outcome)
+            outcomes.extend(rider_said)
             caught = self._surprise_said_now()
             if caught is not None:
                 outcomes.append(caught)
@@ -6398,6 +6433,8 @@ class Engine:
             return []                   # asked by the op itself: `_leaving_the_fight`
         if raw.get("op") == "attack" and (raw.get("params") or {}).get("manoeuvre"):
             return self._provoked_by_maneuver(raw)
+        if raw.get("op") == "attack":
+            return self._bodyguards(raw)
         if raw.get("op") == "cast":
             return self._provoked_by_casting(raw)
         if raw.get("op") == "use_item":
@@ -6430,6 +6467,13 @@ class Engine:
         for watcher, reaction in fired:
             if not self._spend_reaction(watcher, reaction.budget):
                 continue
+            # Stand Still (CRB): a foe moving out of the holder's adjacent squares is met
+            # with a combat manoeuvre check in place of the swing (`_stand_still`).
+            w = self.scene.actors.get(watcher)
+            still = (why == "movement" and w is not None
+                     and w.has_state("reaction.stand-still")
+                     and (self.scene.distance_between(watcher, ref) or 99)
+                     <= gridmod.SQUARE_FT)
             out.append({
                 "op": reaction.op,
                 "actor": watcher,
@@ -6439,7 +6483,8 @@ class Engine:
                 # letting it inherit the attacker's iteratives would turn a fighter's
                 # threatened square into four free attacks a round.
                 "params": {"full_attack": False, "reaction": reaction.id,
-                           **({"provoked_by": why} if why else {})},
+                           **({"provoked_by": why} if why else {}),
+                           **({"stand_still": True} if still else {})},
                 "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
             })
         return out
@@ -6770,13 +6815,21 @@ class Engine:
         if op not in self._ONE_ACTION_OPS or not self.scene.in_encounter:
             return None
         params = raw.get("params") or {}
-        if params.get("reaction"):
+        # A whirlwind's own blows were let through as one action when it was declared
+        # (they are refused there, below), and a charge's blow behind its walk is the
+        # partial charge's one standard action (CRB: "If you are able to take only a
+        # standard action on your turn, you can still charge").
+        if params.get("reaction") or params.get("whirl") or params.get("charged") is not None:
             return None
         actor = self.scene.actors.get(str(raw.get("actor") or ""))
         if actor is None or not actor.has_state(states.ONE_ACTION_TURN):
             return None
         why = ""
-        if self._one_action_spent(actor):
+        if op == "attack" and (params.get("spring_attack") or params.get("whirlwind_attack")) \
+                and not params.get("charge"):
+            why = (f"and {'Spring Attack' if params.get('spring_attack') else 'Whirlwind Attack'}"
+                   f" takes the whole round.")
+        elif self._one_action_spent(actor):
             why = "and it is spent. Nothing more is done this round."
         elif op == "attack" and params.get("coup_de_grace"):
             why = "and a coup de grâce takes the whole round."
@@ -6817,6 +6870,64 @@ class Engine:
                             code="standard_spent")
 
     COUP_UNPROVOKING = "coup_de_grace.unprovoking"      # Slaying Sprint's tag
+    # --- the swift and immediate action (feat loop b2, 2026-11-22) -------------------
+    #
+    # CRB, Combat, Action Types: "You can perform only a single swift action per turn";
+    # "An immediate action is very similar to a swift action, but can be performed at any
+    # time — even if it's not your turn ... Using an immediate action on your turn is the
+    # same as using a swift action and counts as your swift action for that turn. You
+    # cannot use another immediate action or a swift action until after your next turn if
+    # you have used an immediate action when it is not currently your turn ... You also
+    # cannot use an immediate action if you are flat-footed." One record,
+    # `Scene.swift_spent`: the round of the turn whose swift is gone. Foundry PF1 keeps no
+    # such budget (the GM counts); Owlcat's CRPGs keep one per turn and refill it at the
+    # turn's start, which is this record's reading — an immediate taken off-turn writes the
+    # round of the bearer's NEXT turn, so it refills only after that turn.
+
+    def _swift_turn(self, actor) -> int | None:
+        """The round whose turn's swift action an act taken now would spend, or None out
+        of a fight (no turns, nothing counted). On the bearer's own turn this round's;
+        off it, this round's when their slot is still to come, else the next round's."""
+        sc = self.scene
+        if not sc.in_encounter:
+            return None
+        if sc.current_ref() == actor.ref:
+            return sc.round
+        order = [r for r, _ in sc.initiative]
+        if actor.ref not in order:
+            return sc.round
+        return sc.round if order.index(actor.ref) > sc.turn % len(order) else sc.round + 1
+
+    def _swift_refusal(self, actor, immediate: bool = False, what: str = "") -> str:
+        """Why this actor cannot take a swift (or, `immediate`, an immediate) action now,
+        or "". Asks and spends nothing (`_spend_swift` spends)."""
+        turn = self._swift_turn(actor)
+        if turn is None:
+            return ""
+        name, what = actor.name, (what or "that")
+        mine = self.scene.current_ref() == actor.ref
+        if not mine and not immediate:
+            return f"{name} can take a swift action only on their own turn, and {what} is one."
+        if not mine and self._flat_footed(actor):
+            return (f"{name} is flat-footed and cannot take an immediate action yet, and "
+                    f"{what} is one.")
+        if self.scene.swift_spent.get(actor.ref) == turn:
+            return (f"{name} has already used the swift action of this turn"
+                    + ("" if mine else " or the next") + f", and {what} needs it.")
+        return ""
+
+    def _spend_swift(self, actor, immediate: bool = False, what: str = "") -> str | None:
+        """Spend this actor's swift action (an immediate off their turn spends the next
+        turn's): None when spent (or out of a fight, where nothing is counted), else the
+        sentence refusing it. The one door every swift or immediate act goes through —
+        a quickened or swift spell (`_op_cast`), a feat's swift rider, a style entered."""
+        why = self._swift_refusal(actor, immediate, what)
+        if why:
+            return why
+        turn = self._swift_turn(actor)
+        if turn is not None:
+            self.scene.swift_spent[actor.ref] = turn
+        return None
 
     def _coup_provokes(self, intent: Intent, actor, defender, weapon_key: str) -> None:
         """The attacks of opportunity a coup de grâce in a fight draws, raised as
@@ -6932,7 +7043,11 @@ class Engine:
         if feet is None:
             a, b = tuple(went["from"])[:2], tuple(went["to"])[:2]
             feet = max(abs(a[0] - b[0]), abs(a[1] - b[1])) * gridmod.SQUARE_FT
-        if int(feet) <= gridmod.SQUARE_FT:
+        mover_actor = self.scene.actors.get(mover)
+        # Step Up's price (`_step_up_after`): "you cannot take a 5-foot step during your
+        # next turn" — a walk of one square is a move action then.
+        if int(feet) <= gridmod.SQUARE_FT and not (
+                mover_actor is not None and mover_actor.has_state("movement.stepped")):
             return
         self._one_blow_left(mover, queue)
 
@@ -6940,14 +7055,24 @@ class Engine:
         """What a coup de grâce delivered in a fight leaves of the round: nothing. The move
         is spent (`Scene.move_spent`), and every blow of the same attacker's still queued
         behind it is marked (`after_coup`) and refused in words — the `after_close` shape."""
+        whole = intent.params.get("coup_de_grace") or (
+            intent.params.get("charged") is not None
+            and (intent.params.get("charge") or intent.params.get("spring_attack")))
         if not self.scene.in_encounter or outcome.status != "resolved" \
-                or not intent.params.get("coup_de_grace") or intent.params.get("reaction"):
+                or not whole or intent.params.get("reaction"):
             return
         self.scene.move_spent[intent.actor] = self.scene.round
+        # A charge and a Spring Attack are full-round actions too (CRB; feat loop b2):
+        # the standard action is gone with the move.
+        if not intent.params.get("coup_de_grace"):
+            self.scene.standard_spent[intent.actor] = self.scene.round
+        said = ("coup" if intent.params.get("coup_de_grace") else
+                "charge" if intent.params.get("charge") else "Spring Attack")
         for later in queue:
             if later.get("op") == "attack" and later.get("actor") == intent.actor \
                     and not (later.get("params") or {}).get("reaction"):
-                later["params"] = dict(later.get("params") or {}, after_coup=True)
+                later["params"] = dict(later.get("params") or {},
+                                       after_coup=True if said == "coup" else said)
 
     def _grappler_of(self, actor):
         """Who holds this creature, off its grapple condition's `payload["by"]`
@@ -7015,10 +7140,14 @@ class Engine:
                  "why": why}]
 
     def _end_grapple(self, a, b, why: str) -> list[dict]:
-        """Both halves of one grapple, off both creatures."""
+        """Both halves of one grapple, off both creatures — and the holder's own pin
+        and Sleeper Hold stance with it (`_pin_hold`)."""
         recs = self._let_go_of(a, b.ref, why) if a is not None and b is not None else []
         if a is not None and b is not None:
             recs += self._let_go_of(b, a.ref, why)
+            for one, other in ((a, b), (b, a)):
+                one.remove_effects(match=lambda e, o=other: str(
+                    (e.payload or {}).get("pinning") or "") == o.ref)
         return recs
 
     def _grapples_settle(self) -> list:
@@ -7053,7 +7182,11 @@ class Engine:
                     why = f"{holder.name} is dead"
                 elif held.is_dead:
                     why = f"{held.name} is dead"
-                elif holder.is_down and not (e.payload or {}).get("attached"):
+                elif (holder.is_down and not (e.payload or {}).get("attached")
+                      and str((e.payload or {}).get("grappler") or "") != held.ref):
+                    # Not when the one down is the one HELD (this half's `by` is the
+                    # victim when `held` started the grapple): a hold on a senseless body
+                    # is kept — Sleeper Hold's knockout left the grapple standing (UC).
                     why = f"{holder.name} is down and can hold nothing"
                 else:
                     feet = self.scene.distance_between(held.ref, holder.ref)
@@ -7133,6 +7266,34 @@ class Engine:
         p = dict(hold.payload or {}) if hold is not None else {}
         mods = list(actor.cmb_modifiers("grapple", defender=defender))
         mods.append(Modifier(5, "maintaining the hold", "circumstance"))
+        # Chokehold (UC): "you can attempt a grapple combat maneuver with a -5 penalty on
+        # the check. If you succeed, you have pinned your opponent and hold the opponent in
+        # a chokehold" — a pin, at -5, once the hold is not a chokehold already.
+        choke = bool(intent.params.get("chokehold")) and actor.has_state("grapple.chokehold") \
+            and not defender.has_state("state.silenced.choked")
+        if choke:
+            from .tables import SIZE_ORDER
+
+            order = list(SIZE_ORDER)
+            try:
+                big = order.index(defender.size or "medium") - order.index(actor.size or "medium")
+            except ValueError:
+                big = 0
+            if big > 1:
+                return self._refuse(intent, f"A chokehold takes a foe at most one size larger "
+                                            f"than {actor.name}.")
+            mods.append(Modifier(-5, "a chokehold"))
+        pin = bool(intent.params.get("pin")) or choke
+        # Sleeper Hold (Dragon Empires): "You must declare that you are using this feat
+        # before you make a combat maneuver check to maintain a grapple ... When you use
+        # this feat, you take an additional -2 penalty to your AC" (its document's term on
+        # the stance).
+        sleeper = bool(intent.params.get("sleeper_hold")) and actor.has_state("grapple.sleeper-hold")
+        if sleeper:
+            actor.apply_effect(ActiveEffect(
+                name="sleeper hold", kind="buff", key="sleeper hold", source="Sleeper Hold",
+                origin="rule:feat-sleeper-hold", duration="rounds", rounds_left=1,
+                tags=states.tags_for("sleeper hold"), payload={"pinning": defender.ref}))
         if int(p.get("hold_bonus") or 0):
             mods.append(Modifier(int(p["hold_bonus"]), str(p.get("hold_rider") or "grab")))
         cmd = sum(m.value for m in defender.cmd_modifiers(maneuver="grapple", attacker=actor))
@@ -7158,7 +7319,19 @@ class Engine:
                                 "origin": str(p.get("hold_origin") or intent.origin or "")}]
         tells = [f"{actor.name} keeps hold of {defender.name} ({said})."]
         then = p.get("hold_then") or []
-        if any(t.get("kind") == "constrict" for t in then):
+        if sleeper and hold is not None:
+            done = self._sleeper_hold(actor, defender, hold, rolls)
+            effects.extend(done["effects"])
+            tells.extend(done["tells"])
+        if pin:
+            # CRB p.200, Grapple: "Pin: You can give your opponent the pinned condition ...
+            # Despite pinning your opponent, you still only have the grappled condition,
+            # but you lose your Dexterity bonus to AC." The pin is this round's option, in
+            # place of damage; "pinned supersedes the grapple condition" (FAQ).
+            done = self._pin_hold(actor, defender, hold, choke)
+            effects.extend(done["effects"])
+            tells.extend(done["tells"])
+        elif any(t.get("kind") == "constrict" for t in then):
             done = self._on_hold(actor, defender, then, str(p.get("hold_origin") or ""), state)
             for d in done:
                 effects.append(d["effect"])
@@ -7175,9 +7348,21 @@ class Engine:
                                  label=f"Grapple damage ({weapon.get('name') or key})",
                                  visibility="hidden" if not actor.is_pc else "player")
             rolls.append(dmg)
-            hit = self._apply_damage(defender, max(0, dmg.total),
+            amount = max(0, dmg.total)
+            lethality = weapons_mod.lethality_of(weapon)
+            pinned_feat = self._pinned_damage_feats(actor, defender, weapon, key)
+            if "knockout" in pinned_feat and lethality == "nonlethal":
+                # Pinning Knockout (UC): "While you have an opponent pinned, when you
+                # succeed at a grapple combat maneuver check to deal an opponent nonlethal
+                # damage ... double your damage result."
+                amount *= 2
+                tells.append(f"{actor.name} bears down on the pinned {defender.name} "
+                             f"(Pinning Knockout): the blow counts twice.")
+            hit = self._apply_damage(defender, amount,
                                      str(weapon.get("type") or "bludgeoning"),
-                                     lethality=weapons_mod.lethality_of(weapon))
+                                     lethality=lethality)
+            if "rend" in pinned_feat and hit.get("amount"):
+                effects.extend(self._pinning_rend(actor, defender, weapon, tells))
             hit["origin"] = str(p.get("hold_origin") or intent.origin or "")
             hit["weapon"] = str(weapon.get("name") or key)
             effects.append(hit)
@@ -7189,6 +7374,142 @@ class Engine:
                        effects=effects + crossed,
                        tell=" ".join(tells) + self._hp_state_tell(crossed),
                        because=intent.because)
+
+    def _pin_hold(self, actor, defender, hold, choke: bool) -> dict:
+        """Give the one held the pinned condition in place of the grappled one, its holder
+        kept (`payload.by`, the same hold), and the holder its lost Dexterity (`pinning`,
+        removed with the grapple, `_end_grapple`). A chokehold's `state.silenced.choked`
+        rides the pinned condition itself, so it ends with the pin — "When the grapple is
+        ended, so is the chokehold" — and a creature that does not breathe, is immune to
+        bleed or to critical hits is pinned and not choked (UC)."""
+        from . import coup_de_grace as coup_mod
+
+        out = {"effects": [], "tells": []}
+        payload = dict(hold.payload or {}) if hold is not None else {
+            "by": actor.ref, "grappler": actor.ref}
+        if not defender.has_state("state.held.pinned"):
+            if hold is not None:
+                defender.remove_effects(match=lambda e, h=hold: e is h)
+            pin = MANEUVERS["grapple"]["pin_condition"]
+            defender.add_condition(pin, source=f"pinned by {actor.name}")
+            for e in defender.effects:
+                if e.kind == "condition" and e.key == pin:
+                    e.payload = dict(e.payload or {}, **payload)
+            out["effects"].append({"ref": defender.ref, "kind": "condition",
+                                   "condition": "pinned", "from": "grapple", "by": actor.ref})
+            out["tells"].append(f"{actor.name} pins {defender.name}.")
+        if not actor.has_state("state.exposed.pinning"):
+            actor.apply_effect(ActiveEffect(
+                name="pinning", kind="situation", key="pinning",
+                source=f"pinning {defender.name}", origin="rule:grapple-pin",
+                tags=states.tags_for("pinning"), payload={"pinning": defender.ref}))
+        if choke:
+            immune = states.immune_to(
+                defender, "bleed", "bleed") or defender.has_state("immune.bleed") \
+                or bool(coup_mod.crit_immunity(defender)) or not self._breathes(defender)
+            if immune:
+                out["tells"].append(f"{defender.name} has no throat to choke; the pin holds "
+                                    f"and nothing more.")
+            else:
+                held = next(e for e in defender.effects
+                            if e.key == MANEUVERS["grapple"]["pin_condition"])
+                held.tags = tuple(held.tags or ()) + states.tags_for("choked")
+                out["effects"].append({"ref": defender.ref, "kind": "condition",
+                                       "condition": "choked", "from": "Chokehold",
+                                       "origin": "rule:feat-chokehold"})
+                out["tells"].append(f"{actor.name} locks {defender.name} in a chokehold: no "
+                                    f"breath, no words, no spell with a spoken part.")
+        return out
+
+    @staticmethod
+    def _breathes(creature) -> bool:
+        """Whether this body breathes: the book's "does not breathe" is the undead's and
+        the construct's trait (Bestiary, creature types), asked of the type tag."""
+        return not (creature.has_state("type.undead") or creature.has_state("type.construct")
+                    or creature.has_state("immune.breath"))
+
+    def _pinned_damage_feats(self, actor, defender, weapon: dict, key: str) -> set[str]:
+        """Which of Pinning Knockout and Pinning Rend this grapple's damage carries: the
+        holder's tag, the one held pinned, "an unarmed strike or a light or one-handed
+        weapon", and not "immune to critical hits" (UC)."""
+        from . import coup_de_grace as coup_mod
+
+        if not defender.has_state("state.held.pinned") or coup_mod.crit_immunity(defender):
+            return set()
+        if not (key == "unarmed" or weapon.get("light") or int(weapon.get("hands") or 1) == 1):
+            return set()
+        return {n for n in ("knockout", "rend") if actor.has_state(f"grapple.pinning-{n}")}
+
+    def _pinning_rend(self, actor, defender, weapon: dict, tells: list) -> list[dict]:
+        """Pinning Rend (UC): "that opponent also takes bleed damage equal to your unarmed
+        strike or weapon damage dice" — the bleed rider's shape (`Bleeding Critical`), its
+        dice the weapon's own, the worse bleed kept (CRB, Bleed: "Bleeding effects do not
+        stack with each other unless they deal different kinds of damage")."""
+        if states.immune_to(defender, "bleed", "bleed") or defender.has_state("immune.bleed"):
+            tells.append(f"{defender.name} does not bleed.")
+            return []
+        origin = "rule:feat-pinning-rend"
+        dice = str(actor.damage_dice("unarmed" if weapon.get("name", "").lower().startswith(
+            "unarmed") else (weapon.get("key") or "unarmed")) or weapon.get("damage") or "1d3")
+        defender.remove_effects(match=lambda e: e.origin == origin)
+        defender.apply_effect(ActiveEffect(
+            name="Bleed", kind="condition", key="bleed",
+            source=f"{actor.name}'s Pinning Rend", origin=origin,
+            tags=states.tags_for("bleed"),
+            payload={"stopped_by": "a DC 15 Heal check or any magical healing"},
+            periodic=[{"per": "round", "damage": dice, "damage_type": "untyped"}]))
+        tells.append(f"{actor.name} tears at the pinned {defender.name} (Pinning Rend): "
+                     f"{dice} bleed a round until a DC 15 Heal check or magical healing.")
+        return [{"ref": defender.ref, "kind": "condition", "condition": "bleed",
+                 "per_round": dice, "origin": origin}]
+
+    def _sleeper_hold(self, actor, defender, hold, rolls: list) -> dict:
+        """Sleeper Hold (Dragon Empires Primer): "If you maintain a grapple for a number of
+        consecutive rounds equal to your opponent's Constitution bonus (minimum 1 round),
+        you can attempt to knock out your opponent. The victim must succeed at a Fortitude
+        save (DC 10 + 1/2 your character level + your Str modifier) or else it falls
+        unconscious for 1d4 rounds. Each successive round you attempt this, the target
+        takes a cumulative -1 penalty on its saving throw ... Creatures that are immune to
+        bleed damage, stunning, or critical hits are immune to this ability." The count
+        rides the hold itself (`payload.sleeper`), so it ends with the grapple."""
+        from . import coup_de_grace as coup_mod
+
+        out = {"effects": [], "tells": []}
+        p = dict(hold.payload or {})
+        rounds = int(p.get("sleeper") or 0) + 1
+        tries = int(p.get("sleeper_tries") or 0)
+        hold.payload = dict(p, sleeper=rounds)
+        need = max(1, defender.ability_mod("con"))
+        if (states.immune_to(defender, "bleed", "bleed") or defender.has_state("immune.bleed")
+                or defender.has_state("immune.stun") or coup_mod.crit_immunity(defender)):
+            out["tells"].append(f"{defender.name} cannot be choked out.")
+            return out
+        if rounds < need:
+            out["tells"].append(f"{actor.name} tightens the hold on {defender.name} "
+                                f"(Sleeper Hold, {rounds} of {need} rounds).")
+            return out
+        dc = 10 + int(actor.hit_dice) // 2 + actor.ability_mod("str")
+        mods = list(defender.save_modifiers("fort"))
+        if tries:
+            mods.append(Modifier(-tries, "Sleeper Hold, each round after the first"))
+        roll = self.dice.d20(mods, label=f"Fortitude save (Sleeper Hold, DC {dc})",
+                             visibility="hidden")
+        rolls.append(roll)
+        hold.payload = dict(hold.payload, sleeper_tries=tries + 1)
+        if d20_succeeds(roll, dc):
+            out["tells"].append(f"{defender.name} fights the hold off and stays awake "
+                                f"(Fortitude {roll.total} against DC {dc}).")
+            return out
+        n = self.dice.roll("1d4", label="Sleeper Hold (rounds)", visibility="hidden").total
+        out_cold = MANEUVERS["grapple"]["knockout_condition"]
+        defender.add_condition(out_cold, rounds=n, source=f"{actor.name}'s Sleeper Hold")
+        out["effects"].append({"ref": defender.ref, "kind": "condition",
+                               "condition": "unconscious", "rounds": n,
+                               "origin": "rule:feat-sleeper-hold"})
+        out["tells"].append(f"{defender.name} goes limp in {actor.name}'s hold, unconscious "
+                            f"for {n} round{'' if n == 1 else 's'} (Fortitude {roll.total} "
+                            f"against DC {dc}).")
+        return out
 
     def _escape_from(self, intent: Intent, actor, holder, partial: dict,
                      how: str = "") -> Outcome:
@@ -9983,6 +10304,11 @@ class Engine:
                 "refs",
             )
         defender = self.scene.actors[targets[0]]
+        # Aid another (`_aid_another`, feat loop b2): a roll against AC 10, no blow.
+        if intent.params.get("aid"):
+            return self._aid_another(intent, actor, defender, partial)
+        if intent.params.get("stand_still") and intent.params.get("reaction"):
+            return self._stand_still(intent, actor, defender, partial)
         # A dancing weapon's own round (`_dance`): the blade swings, not its loosener — so
         # nothing of the loosener's but their base attack bonus rides it (no Strength, no
         # feats, no sneak attack, no charged blow), and nothing stops it but the reach.
@@ -10025,8 +10351,11 @@ class Engine:
                 return held
         # A drink this round was the standard action (owner ruling 2026-11-13). A thrown
         # flask's attack was asked at the throw (`_op_use_item`), its dose already spent.
+        if partial.get("attack_state") is None and intent.params.get("whirl_refused"):
+            return self._refuse(intent, str(intent.params["whirl_refused"]),
+                                code="whirlwind_refused")
         if partial.get("attack_state") is None and not dancing \
-                and intent.params.get("mode") != "splash":
+                and intent.params.get("mode") != "splash" and not intent.params.get("whirl"):
             spent = self._standard_spent_refusal(intent, actor)
             if spent is not None:
                 return spent
@@ -10041,9 +10370,11 @@ class Engine:
         # A blow behind a coup de grâce the same attacker delivered in this fight
         # (`_coup_paid`): the coup took the whole round (CRB p.197, a full-round action).
         if partial.get("attack_state") is None and intent.params.get("after_coup"):
+            whole = intent.params["after_coup"]
             return self._refuse(
-                intent, f"{actor.name} spent the whole round on the coup de grâce. Nothing "
-                        f"more is rolled.")
+                intent, f"{actor.name} spent the whole round on the "
+                        f"{'coup de grâce' if whole is True else whole}. Nothing more is "
+                        f"rolled.")
         # The same arithmetic after a draw (`_draw_paid`): drawing is a move action, so one
         # blow is left — or none, when the draw came after a move at base attack +0.
         drew_left = intent.params.get("after_draw")
@@ -10108,6 +10439,23 @@ class Engine:
         # combatant. And only where a blow will land now: inside a running fight, or a
         # coup de grace (resolved on the spot, fight or none). A swing that opens a
         # fight is deferred below and rolls nothing, so there is no blow to measure.
+        # A charge or a Spring Attack whose walk could not be composed (`_charge_before`):
+        # the reason, said, and nothing rolled. Asked before the reach, whose words would
+        # name a square to walk to instead.
+        if (partial.get("attack_state") is None and not self._battle_joined
+                and self.scene.in_encounter and not intent.params.get("reaction")
+                and (intent.params.get("charge") or intent.params.get("spring_attack"))
+                and intent.params.get("charged") is None):
+            why = str(intent.params.get("charge_refused") or "")
+            if not why:
+                found = self._charge_path(
+                    actor, defender, weapon_key,
+                    2 * int(getattr(actor, "speed_feet", 0) or 0),
+                    straight=bool(intent.params.get("charge")))
+                why = found if isinstance(found, str) else (
+                    f"{actor.name} could not make the walk the "
+                    f"{'charge' if intent.params.get('charge') else 'Spring Attack'} needs.")
+            return self._refuse(intent, why, code="charge_refused")
         if (partial.get("attack_state") is None and not self._battle_joined
                 and (self.scene.in_encounter or intent.params.get("coup_de_grace"))):
             out_of_reach = self._reach_refusal(intent, actor, defender, weapon_key,
@@ -10401,6 +10749,11 @@ class Engine:
         flat_footed = self._flat_footed(defender) or (
             self._unseen_attacker(defender, actor)
             and not self._pinpointed_shooter(defender, actor, weapon))
+        # Surprise Follow-Through (ARG): "When using Cleave or Great Cleave, the second foe
+        # you attack on your turn is denied its Dexterity bonus against you" — the first
+        # blow the cleave carries on into (`cleaving` lists the one struck before it).
+        if len(intent.params.get("cleaving") or ()) == 1                 and actor.has_state("attack.cleave.surprise"):
+            flat_footed = True
         # A feint this attacker landed (rules/skilluses.py): "the next melee attack you make
         # against the target does not allow him to use his Dexterity bonus to AC" (CRB,
         # Combat, Feint) — this blow's first swing only, uncanny dodge or not. Asked once
@@ -10492,7 +10845,10 @@ class Engine:
             guard = ("two_weapon",) if (off_key and off_key != "unarmed"
                                          and actor.has_state("two_weapon.defense")) else ()
             state["tells"].extend(self._lay_attack_stances(
-                actor, () if intent.params.get("cleaving") else choices + guard))
+                actor, () if intent.params.get("cleaving") else choices + guard,
+                defender=defender))
+            if intent.params.get("lunge_tell"):
+                state["tells"].append(str(intent.params["lunge_tell"]))
             state["tells"].extend(self._lower_shield_for_bash(actor, weapon, off_key))
             state["seen"] = seen
             # Down when the blow comes (`Actor.is_down`: dying, unconscious): insensible to
@@ -11412,6 +11768,16 @@ class Engine:
                     for extra in self._critical_feat(actor, defender, weapon):
                         state["effects"].append(extra["effect"])
                         state["tells"].append(extra["tell"])
+                    # A Strike feat's manoeuvre on the critical (`_crit_strike`).
+                    for extra in ([] if dancing else self._crit_strike(
+                            intent, actor, defender, weapon_key, weapon, state)):
+                        state["effects"].append(extra["effect"])
+                        if extra.get("tell"):
+                            state["tells"].append(extra["tell"])
+                # The confirmation's total is this swing's alone: both of its readers
+                # (`_feat_after_hit`, `_crit_strike`) have had it, so the next swing starts
+                # without it (batch 2 merge: the first reader cleared it for the second).
+                state.pop("confirm_total", None)
                 # A blanch is spent by the hit it just struck as (`_spend_on_hit`).
                 for extra in self._spend_on_hit(actor, weapon):
                     state["effects"].append(extra["effect"])
@@ -12075,6 +12441,758 @@ class Engine:
                 params["after_draw"] = left
             later["params"] = params
 
+    # --- the charge and Spring Attack: a move composed before the blow (feat loop b2) ----
+    #
+    # CRB, Combat, Charge (d20pfsrd.com/gamemastering/combat, read 2026-11-22): "Charging
+    # is a special full-round action that allows you to move up to twice your speed and
+    # attack during the action ... You must move before your attack, not after. You must
+    # move at least 10 feet (2 squares) and may move up to double your speed directly toward
+    # the designated opponent. If you move a distance equal to your speed or less, you can
+    # also draw a weapon during a charge attack ... You must have a clear path toward the
+    # opponent, and nothing can hinder your movement (such as difficult terrain or
+    # obstacles). You must move to the closest space from which you can attack the
+    # opponent. If this space is occupied or otherwise blocked, you can't charge. If any
+    # line from your starting space to the ending space passes through a square that blocks
+    # movement, slows movement, or contains a creature (even an ally), you can't charge ...
+    # After moving, you may make a single melee attack. You get a +2 bonus on the attack
+    # roll and take a -2 penalty to your AC until the start of your next turn." And "If you
+    # are able to take only a standard action on your turn, you can still charge, but you
+    # are only allowed to move up to your speed (instead of up to double your speed)."
+    #
+    # The walk is a real `move` spliced in front of the blow, as the closing step is
+    # (`_close_before`): it provokes through `_reactions_before`, is told, and spends the
+    # move. Prior art: Owlcat's Kingmaker/WotR charge refuses a path through any creature
+    # and stops at the first square in reach, as this does; TemplePlus's charge likewise.
+    # Foundry PF1 leaves the path to the GM. The line test is centre to centre — the one
+    # sampled line, not "any line" between the two spaces' corners, which no VTT measures
+    # and which would refuse charges a table allows (owner call, said in the report).
+
+    def _charge_path(self, actor, defender, weapon_key: str, budget: int,
+                     straight: bool = True):
+        """((x, y), feet) for the charge's walk, or the sentence refusing it.
+
+        `straight`: the charge's own clauses (closest space, the clear straight line, at
+        least 10 ft). Spring Attack walks any route (`straight=False`): the closing step's
+        cheapest square (`position.square_in_reach`), and still at least 10 ft."""
+        from . import position as position_mod
+
+        sc = self.scene
+        grid = getattr(sc, "grid", None)
+        start = sc.positions.get(actor.ref)
+        there = sc.positions.get(defender.ref)
+        what = "A charge" if straight else "Spring Attack"
+        if grid is None or start is None or there is None:
+            return f"{what} is measured on the map, and there is none here."
+        miss = position_mod.out_of_reach(sc, actor, defender, weapon_key)
+        if miss is None:
+            return (f"{defender.name} is already within reach: {what.lower()} must move at "
+                    f"least 10 ft before the blow.")
+        reach, gap = miss.reach, miss.gap
+        if not straight:
+            found = position_mod.square_in_reach(sc, actor, defender, reach, gap)
+            if found is None:
+                return f"There is no open square in reach of {defender.name}."
+            if found[1] < 2 * gridmod.SQUARE_FT:
+                return (f"{what} must move at least 10 ft before the blow, and "
+                        f"{defender.name} is only {found[1]} ft of walking away.")
+            if found[1] > budget:
+                return (f"{defender.name} is {found[1]} ft of walking away and "
+                        f"{actor.name} has {budget} ft for {what}.")
+            return found
+        level = tuple(start[2:3])
+        here = tuple(start[:2])
+        taken = position_mod.occupancy_toward(sc, actor, defender)
+        span = reach // gridmod.SQUARE_FT + gridmod.size_squares(defender.size) + 1
+        spots = []
+        for dy in range(-span - 1, span + gridmod.size_squares(actor.size) + 1):
+            for dx in range(-span - 1, span + gridmod.size_squares(actor.size) + 1):
+                sq = (there[0] + dx, there[1] + dy)
+                if not grid.inside(sq):
+                    continue
+                feet = gridmod.distance_between(sq + level, actor.size, there,
+                                                defender.size)
+                if feet > reach or (gap and feet <= gridmod.SQUARE_FT):
+                    continue
+                spots.append((gridmod.distance(here, sq), sq))
+        if not spots:
+            return f"There is no space in reach of {defender.name} to charge to."
+        nearest = min(d for d, _ in spots)
+        # Ties to the square squarest-on to the target, as `position.square_in_reach`.
+        closest = sorted((sq for d, sq in spots if d == nearest),
+                         key=lambda q: ((q[0] - there[0]) ** 2 + (q[1] - there[1]) ** 2,
+                                        q[1], q[0]))
+        why = ""
+        for sq in closest:
+            if not all(grid.passable(p) and p not in taken
+                       for p in gridmod.footprint(sq, actor.size)):
+                why = (f"The closest space to strike {defender.name} from is taken or "
+                       f"blocked, so {actor.name} cannot charge.")
+                continue
+            blocked = self._charge_line_blocked(actor, here, sq, taken)
+            if blocked:
+                why = blocked
+                continue
+            if nearest < 2 * gridmod.SQUARE_FT:
+                return (f"A charge must move at least 10 ft, and the closest space to "
+                        f"strike {defender.name} from is {nearest} ft away.")
+            if nearest > budget:
+                return (f"{defender.name} is {nearest} ft away in a straight line, and a "
+                        f"charge covers {budget} ft for {actor.name}.")
+            return sq, nearest
+        return why
+
+    def _charge_line_blocked(self, actor, a, b, taken) -> str:
+        """The sentence naming what stops the straight line from `a` to `b`, or "": a
+        square that blocks movement, slows it (difficult terrain) or holds a creature,
+        under the charger's footprint anywhere along the line, centre to centre."""
+        grid = self.scene.grid
+        n = max(abs(b[0] - a[0]), abs(b[1] - a[1]))
+        seen: set = set()
+        for i in range(1, n + 1):
+            anchor = (round(a[0] + (b[0] - a[0]) * i / n), round(a[1] + (b[1] - a[1]) * i / n))
+            for p in gridmod.footprint(anchor, actor.size):
+                if p in seen:
+                    continue
+                seen.add(p)
+                if not grid.passable(p):
+                    return f"Something solid stands in the line of the charge at {p}."
+                if p in grid.difficult:
+                    return (f"The line of the charge crosses difficult ground at {p}, and "
+                            f"nothing may hinder a charge.")
+                if p in taken:
+                    return (f"Somebody stands in the line of the charge at {p} — even an "
+                            f"ally stops one.")
+        return ""
+
+    def _charge_before(self, raw: dict, intent: Intent, actor, defender,
+                       weapon_key: str) -> dict | None:
+        """The walk a charge or a Spring Attack is owed, as a move spliced before the blow,
+        or None with the refusal written into the blow's params (`charge_refused`, code
+        only) for `_op_attack` to say. Only in a fight: out of one the battle gate defers
+        the blow and nothing walks (`_close_before`)."""
+        if not self.scene.in_encounter:
+            return None
+        params = dict(intent.params)
+        spring = bool(params.get("spring_attack")) and not params.get("charge")
+        what = "Spring Attack" if spring else "a charge"
+        why = self._coup_round_spent(actor, what, "Nothing is rolled.")
+        # Spring Attack: "You cannot use this ability to attack a foe that is adjacent to
+        # you at the start of your turn" — read at the action (the turn's first act).
+        if not why and actor.blocking_key("move"):
+            why = f"{actor.name} cannot move, and {what} is a move."
+        speed = int(getattr(actor, "speed_feet", 0) or 0)
+        one_action = actor.has_state(states.ONE_ACTION_TURN)
+        budget = speed if (spring or one_action) else 2 * speed
+        found = why or self._charge_path(actor, defender, weapon_key, budget,
+                                         straight=not spring)
+        if isinstance(found, str):
+            raw["params"] = dict(params, charge_refused=found)
+            return None
+        (x, y), feet = found
+        params.update(full_attack=False, charged=int(feet))
+        params.pop("iteration", None)
+        raw["params"] = params
+        if spring:
+            # "without provoking any attacks of opportunity from the target of your
+            # attack": the tumble's waiver shape, the mover's tag naming the one foe, held
+            # for the round so the walk after the blow is spared too.
+            actor.apply_effect(ActiveEffect(
+                name=f"springing past {defender.name}", kind="situation",
+                key=f"spring-{defender.ref}", source="Spring Attack",
+                origin="rule:feat-spring-attack", duration="rounds", rounds_left=1,
+                tags=(f"{reactions.TUMBLED_PAST}.{defender.ref}",)))
+        return {"op": "move", "actor": actor.ref, "id": f"{intent.id}-charge",
+                "target": None, "visibility": intent.visibility,
+                "because": f"{'springing at' if spring else 'charging'} {defender.name}",
+                "params": {"square": [x, y], "closing_on": defender.ref,
+                           "charging": "spring" if spring else "charge"}}
+
+    def _spring_rest(self, raw: dict, queue: list) -> None:
+        """Spring Attack's walk after the blow: "the total distance that you move cannot
+        be greater than your speed". The feet the walk before cost are written onto the
+        same actor's next move still queued (`spring_left`, code only), which `_op_move`
+        holds the walk to."""
+        params = raw.get("params") or {}
+        if not params.get("spring_attack") or params.get("charged") is None:
+            return
+        actor = self.scene.actors.get(str(raw.get("actor") or ""))
+        if actor is None:
+            return
+        left = max(0, int(getattr(actor, "speed_feet", 0) or 0) - int(params["charged"]))
+        for later in queue[1:]:
+            if later.get("op") == "move" and later.get("actor") == actor.ref:
+                later["params"] = dict(later.get("params") or {}, spring_left=left)
+                break
+
+    # --- what a feat lets its bearer do on the back of something that just happened ------
+    #
+    # Feat loop b2, 2026-11-22. The "X, then as a swift/immediate action Y" feats: Felling
+    # Smash's trip after a Power Attack hit, Felling Escape's after breaking a grapple, Drag
+    # Down's trip back at whoever tripped you, the dirty-trick teamwork feats, Hamatula
+    # Strike's grapple on a piercing wound, Step Up's following step. Each is read off the
+    # outcome's own records (who hit, who fell, who broke free), paid from the one swift or
+    # immediate budget (`_spend_swift`), and spliced next in the queue as an ordinary
+    # intent, so the player rolls their own die for it and it provokes as the book says.
+    # `reaction` names the feat on the spliced intent: it is no one's turn's own action, so
+    # the round's records (`standard_spent`, the surprise round's one action, the closing
+    # step) leave it alone, as they leave an attack of opportunity.
+
+    _RIDER_TAG = "rider"
+
+    def _riders_after(self, intent: Intent, outcome: "Outcome") -> tuple[list, list]:
+        """(the intents the feats splice next, the outcomes they tell without a roll)."""
+        if not self.scene.in_encounter or outcome.status != "resolved":
+            return [], []
+        actor = self.scene.actors.get(intent.actor or "")
+        if actor is None:
+            return [], []
+        out: list[dict] = []
+        told: list = []
+        params = intent.params or {}
+        effects = outcome.effects or []
+        targets = intent.targets()
+        foe = self.scene.actors.get(targets[0]) if targets else None
+
+        def rider(who, at, why: str, feat: str, extra: dict, immediate: bool) -> None:
+            if who is None or at is None or who.is_down or at.is_down or at.is_dead:
+                return
+            if who.blocking_key("attack"):
+                return
+            if self._spend_swift(who, immediate, why) is not None:
+                return
+            out.append({"op": "attack", "actor": who.ref, "target": at.ref,
+                        "id": f"{intent.id}-{feat}",
+                        "visibility": "player" if who.is_pc else "hidden",
+                        "because": why,
+                        "params": {"full_attack": False, "reaction": feat, **extra}})
+
+        trip_by = {e.get("ref") for e in effects
+                   if e.get("kind") == "condition" and e.get("condition") == "prone"
+                   and e.get("from") == "trip"}
+        if intent.op == "attack" and not params.get("reaction") and foe is not None:
+            hit = any(e.get("kind") == "damage" and e.get("ref") == foe.ref
+                      for e in effects) or outcome.verdict == "hit"
+            # Felling Smash (UC): "If you use the attack action to make a single melee
+            # attack at your highest base attack bonus while using Power Attack and you
+            # hit an opponent, you can spend a swift action to attempt a trip".
+            if (hit and actor.has_state(f"{self._RIDER_TAG}.felling-smash")
+                    and params.get("power_attack") and not params.get("full_attack")
+                    and not params.get("manoeuvre") and int(params.get("iteration") or 0) == 0
+                    and not any(params.get(k) for k in self._WALKS_ITS_OWN)
+                    and actor.weapon(params.get("weapon") or None).get("category") != "ranged"
+                    and not foe.has_state("state.position.prone")):
+                rider(actor, foe, f"{actor.name} follows the blow with a trip (Felling "
+                                  f"Smash)", "felling-smash", {"manoeuvre": "trip"}, False)
+            # Hamatula Strike (Cheliax): "Whenever you damage an opponent with a piercing
+            # weapon, you can immediately make a grapple check" — a free check, no action.
+            w = actor.weapon(params.get("weapon") or None)
+            if (hit and not params.get("manoeuvre")
+                    and actor.has_state(f"{self._RIDER_TAG}.hamatula-strike")
+                    and "piercing" in str(w.get("type") or "").lower()
+                    and not self._holds(actor, foe) and not self._holds(foe, actor)
+                    and not foe.has_state("state.held")):
+                out.append({"op": "attack", "actor": actor.ref, "target": foe.ref,
+                            "id": f"{intent.id}-hamatula",
+                            "visibility": "player" if actor.is_pc else "hidden",
+                            "because": f"{actor.name} drives the point home to pin "
+                                       f"{foe.name} on it (Hamatula Strike)",
+                            "params": {"full_attack": False, "reaction": "hamatula-strike",
+                                       "manoeuvre": "grapple"}})
+            # Drag Down (UC): "Whenever an opponent successfully trips you, you can attempt
+            # to trip that opponent as an immediate action."
+            if params.get("manoeuvre") == "trip" and foe.ref in trip_by \
+                    and foe.has_state(f"{self._RIDER_TAG}.drag-down"):
+                rider(foe, actor, f"{foe.name} drags {actor.name} down too (Drag Down)",
+                      "drag-down", {"manoeuvre": "trip"}, True)
+            # The dirty-trick teamwork feats (PFS Primer): "Whenever an ally who also has
+            # this feat performs a dirty trick combat maneuver against a foe you both
+            # threaten, you can use an immediate action to increase the inflicted
+            # condition's duration by 1 round" — and Improved's second trick instead.
+            if params.get("manoeuvre") == "dirty trick" and outcome.verdict == "success":
+                more, said = self._underhanded(intent, actor, foe)
+                out.extend(more)
+                told.extend(said)
+        # Felling Escape (UC): "When you break an opponent's grapple with a combat maneuver
+        # check or Escape Artist check, you can spend a swift action to make a trip
+        # attempt against that opponent."
+        broke = next((e for e in effects if e.get("kind") == "escape" and e.get("made")
+                      and e.get("ref") == actor.ref), None)
+        if broke is not None and actor.has_state(f"{self._RIDER_TAG}.felling-escape"):
+            holder = self.scene.actors.get(str(broke.get("from") or ""))
+            rider(actor, holder, f"{actor.name} turns the escape into a trip (Felling "
+                                 f"Escape)", "felling-escape", {"manoeuvre": "trip"}, False)
+        return out, told
+
+    def _underhanded(self, intent: Intent, actor, foe) -> tuple[list, list]:
+        """Underhanded Teamwork's extra round, and Improved Underhanded Teamwork's second
+        trick, for each ally of the trickster who holds the feat and threatens the foe
+        too ("a foe you both threaten", `reactions.threatens`), each paid from that ally's
+        immediate action. The extra round is laid on the trick's own condition (its
+        origin, `rule:dirty-trick`), through the effect itself; the second trick is a
+        dirty trick of the ally's own, spliced like any rider."""
+        from . import feats as feats_mod
+        from . import position as position_mod
+
+        if foe is None or not self.scene.has_grid or foe.ref not in self.scene.positions:
+            return [], []
+
+        def holds(who, fid) -> bool:
+            return any((feats_mod.document(raw) or {}).get("id") == fid
+                       for raw in who.feats or ())
+
+        if not holds(actor, "underhanded-teamwork"):
+            return [], []
+        sq = gridmod.footprint(tuple(self.scene.positions[foe.ref][:2]), foe.size or "medium")
+
+        def threat(ref) -> bool:
+            return any(reactions.threatens(self.scene, ref, q, foe.size or "medium")
+                       for q in sq)
+
+        if not threat(actor.ref):
+            return [], []
+        trick = next((e for e in foe.effects if e.rounds_left and str(
+            e.source or "").startswith("dirty trick by")), None)
+        out: list[dict] = []
+        told: list = []
+        for ref, ally in self.scene.actors.items():
+            if ref in (actor.ref, foe.ref) or ally.is_down \
+                    or not position_mod._same_side(self.scene, actor.ref, ref) \
+                    or not threat(ref):
+                continue
+            if holds(ally, "improved-underhanded-teamwork") and holds(
+                    actor, "improved-underhanded-teamwork"):
+                if self._spend_swift(ally, True, "a second dirty trick") is None:
+                    out.append({"op": "attack", "actor": ref, "target": foe.ref,
+                                "id": f"{intent.id}-underhanded-{ref}",
+                                "visibility": "player" if ally.is_pc else "hidden",
+                                "because": f"{ally.name} piles a second trick on "
+                                           f"{foe.name} (Improved Underhanded Teamwork)",
+                                "params": {"full_attack": False,
+                                           "reaction": "improved-underhanded-teamwork",
+                                           "manoeuvre": "dirty trick"}})
+                continue
+            if trick is not None and holds(ally, "underhanded-teamwork") \
+                    and self._spend_swift(ally, True, "Underhanded Teamwork") is None:
+                trick.rounds_left = int(trick.rounds_left) + 1
+                told.append(Outcome(
+                    intent_id=intent.id, op="attack", actor=ref,
+                    effects=[{"ref": foe.ref, "kind": "condition_extended",
+                              "condition": trick.key, "rounds": trick.rounds_left,
+                              "by": ref, "origin": "rule:feat-underhanded-teamwork"}],
+                    tell=f"{ally.name} keeps {foe.name} off balance a round longer "
+                         f"(Underhanded Teamwork): {trick.key} for {trick.rounds_left} "
+                         f"rounds.", because="Underhanded Teamwork"))
+        return out, told
+
+    def _step_up_after(self, intent: Intent, outcome: "Outcome") -> list[dict]:
+        """Step Up (APG): "Whenever an adjacent foe attempts to take a 5-foot step away
+        from you, you may also make a 5-foot step as an immediate action so long as you
+        end up adjacent to the foe that triggered this ability. If you take this step, you
+        cannot take a 5-foot step during your next turn. If you take an action to move
+        during your next turn, subtract 5 feet from your total movement." Following Step:
+        "you may move up to 10 feet. You may still take a 5-foot step during your next
+        turn, and any movement you make using this feat does not subtract any distance".
+        Step Up and Strike: "you may also make a single melee attack against that foe at
+        your highest base attack bonus. This attack counts as one of your attacks of
+        opportunity for the round."
+
+        Read off the move's own position record: a walk of one square (5 ft, the step) by
+        a creature that stood beside a Step Up holder and does not after it. The follower
+        is put on the nearest open square beside the stepper within its 5 (or 10) feet,
+        through the move op — taken for the player too, the step being all gain for the
+        one who holds the feat (owner call). The next turn's price is a timed effect
+        (`stepped`: its speed term and the `movement.stepped` tag `_move_paid` asks)."""
+        if not self.scene.in_encounter or not self.scene.has_grid \
+                or outcome.status != "resolved":
+            return []
+        went = next((e for e in outcome.effects or () if e.get("kind") == "position"
+                     and e.get("from") is not None and e.get("to") is not None), None)
+        if went is None:
+            return []
+        ref = str(went.get("ref") or "")
+        mover = self.scene.actors.get(ref)
+        if mover is None or (intent.params or {}).get("reaction"):
+            return []
+        a, b = tuple(went["from"])[:2], tuple(went["to"])[:2]
+        if gridmod.distance(a, b) != gridmod.SQUARE_FT:
+            return []
+        from . import position as position_mod
+
+        out: list[dict] = []
+        for wref, w in list(self.scene.actors.items()):
+            if wref == ref or w.is_down or not w.has_state("movement.step-up") \
+                    or position_mod._same_side(self.scene, wref, ref) \
+                    or w.blocking_key("move") or wref not in self.scene.positions:
+                continue
+            here = tuple(self.scene.positions[wref][:2])
+            if not gridmod.is_adjacent(here, w.size, a, mover.size) \
+                    or gridmod.is_adjacent(here, w.size, b, mover.size):
+                continue
+            reach = 2 * gridmod.SQUARE_FT if w.has_state("movement.step-up.following") \
+                else gridmod.SQUARE_FT
+            taken = self.scene.occupied(ignore=wref)
+            spots = sorted(
+                (gridmod.distance(here, (x, y)), (x - b[0]) ** 2 + (y - b[1]) ** 2, y, x)
+                for x in range(here[0] - 2, here[0] + 3) for y in range(here[1] - 2, here[1] + 3)
+                if (x, y) != here and self.scene.grid.inside((x, y))
+                and gridmod.distance(here, (x, y)) <= reach
+                and all(self.scene.grid.passable(q) and q not in taken
+                        for q in gridmod.footprint((x, y), w.size))
+                and gridmod.is_adjacent((x, y), w.size, b, mover.size))
+            if not spots:
+                continue
+            if self._spend_swift(w, True, "Step Up") is not None:
+                continue
+            _, _, y, x = spots[0]
+            out.append({"op": "move", "actor": wref, "id": f"{intent.id}-stepup-{wref}",
+                        "target": None, "visibility": "player" if w.is_pc else "hidden",
+                        "because": f"{w.name} steps up after {mover.name} (Step Up)",
+                        "params": {"square": [x, y], "reaction": "step-up"}})
+            if not w.has_state("movement.step-up.following"):
+                nxt = self._swift_turn(w) or self.scene.round
+                w.apply_effect(ActiveEffect(
+                    name="stepped up", kind="situation", key="stepped",
+                    source="Step Up", origin="rule:feat-step-up", duration="rounds",
+                    rounds_left=max(1, nxt - self.scene.round + 1),
+                    tags=states.tags_for("stepped"),
+                    modifiers=[{"kind": "speed", "target": "land", "amount": -5,
+                                "bonus_type": "untyped",
+                                "note": "Step Up: 5 ft less movement this turn"}]))
+            if w.has_state("movement.step-up.strike") and self._spend_reaction(
+                    wref, "attack_of_opportunity"):
+                out.append({"op": "attack", "actor": wref, "target": ref,
+                            "id": f"{intent.id}-stepstrike-{wref}",
+                            "visibility": "player" if w.is_pc else "hidden",
+                            "because": f"{w.name} follows {mover.name} in with a blow "
+                                       f"(Step Up and Strike)",
+                            "params": {"full_attack": False,
+                                       "reaction": "attack_of_opportunity"}})
+        return out
+
+    # The "<manoeuvre> Strike" feats (APG): "Whenever you score a critical hit with a melee
+    # attack, you can [manoeuvre] your opponent, in addition to the normal damage dealt by
+    # the attack. If your confirmation roll exceeds your opponent's CMD, you may [do it] as
+    # if from the [manoeuvre] combat maneuver ... This does not provoke an attack of
+    # opportunity." Special: "You can only apply the effects of one of the following feats
+    # to a given critical hit ... You may choose to use this feat after you make your
+    # confirmation roll." Each feat's document tag, in the sheet's feat order.
+    CRIT_STRIKES: ClassVar[dict] = {
+        "crit.maneuver.bull-rush": "bull rush", "crit.maneuver.disarm": "disarm",
+        "crit.maneuver.reposition": "reposition", "crit.maneuver.sunder": "sunder",
+        "crit.maneuver.trip": "trip"}
+
+    def _crit_strike(self, intent: Intent, actor: Actor, defender: Actor, weapon_key: str,
+                     weapon: dict, state: dict) -> list[dict]:
+        """The one manoeuvre a confirmed critical carries for a holder of a Strike feat,
+        decided on the confirmation roll's own total against the CMD for that manoeuvre.
+        The first held feat whose manoeuvre the roll beats and the foe can suffer (size,
+        something in hand to disarm or sunder, not already prone) is taken — the player's
+        choice made for them, the best the roll allows (owner call). Its consequence goes
+        through the manoeuvre's own applicator (`_MANEUVER_OUTCOMES`, the prone condition,
+        the sunder's item damage), so it is the same rule as the manoeuvre made on its own."""
+        from . import feats as feats_mod
+        from .tables import SIZE_ORDER
+
+        total = state.get("confirm_total")
+        if total is None or weapon.get("category") == "ranged" or defender.hp <= 0 \
+                or defender.is_dead:
+            return []
+        held = [self.CRIT_STRIKES[t] for raw in actor.feats
+                for t in ((feats_mod.document(raw) or {}).get("tags") or ())
+                if t in self.CRIT_STRIKES]
+        order = list(SIZE_ORDER)
+        for key in dict.fromkeys(held):
+            m = MANEUVERS[key]
+            limit = m.get("size_limit")
+            try:
+                if limit is not None and order.index(defender.size or "medium") - order.index(
+                        actor.size or "medium") > int(limit):
+                    continue
+            except ValueError:
+                pass
+            if key == "trip" and defender.has_state("state.position.prone"):
+                continue
+            if key in ("disarm", "sunder") and not self._held_items(defender):
+                continue
+            cmd = sum(x.value for x in defender.cmd_modifiers(
+                self._flat_footed(defender), maneuver=key, attacker=actor))
+            if int(total) <= cmd:
+                continue
+            margin = int(total) - cmd
+            origin = f"rule:feat-{key.replace(' ', '-')}-strike"
+
+            def say(template: str, capital: bool = True, **values) -> str:
+                return maneuver_text(template, actor.name, defender.name, capital=capital,
+                                     **values)
+
+            done: list[dict] = []
+            if key == "trip":
+                defender.add_condition(m["condition"], source=f"{actor.name}'s Tripping Strike")
+                done = [{"ref": defender.ref, "kind": "condition", "condition": m["condition"],
+                         "from": "trip"}]
+                clause = say(m["effect"], False)
+            elif key == "sunder":
+                item = self._held_items(defender)[0]
+                dmg = self.dice.roll(weapon["damage"], actor.damage_modifiers(weapon_key),
+                                     label=f"Sundering Strike ({weapon['name']}) against "
+                                           f"{defender.name}'s {item}",
+                                     visibility="hidden")
+                state.setdefault("rolls", []).append(dmg.as_dict())
+                res = defender.damage_item(item, max(0, dmg.total), str(weapon["type"]),
+                                           tuple(weapon.get("strikes_as") or ()))
+                done = [{"kind": "item_damage", "ref": defender.ref, "owner": defender.ref,
+                         "weapon": weapon["name"], **res}]
+                clause = (f"{defender.name}'s {item} takes {res['taken']} through hardness "
+                          f"{res['hardness']} ({res['hp']}/{res['hp_max']} left)"
+                          + (", broken" if res.get("broken") else "")
+                          + (", destroyed" if res.get("destroyed") else ""))
+            else:
+                clause, extra, done = self._MANEUVER_OUTCOMES[m["outcome"]](
+                    self, m, intent, actor, defender, margin, weapon_key, None, say)
+            for d in done:
+                d.setdefault("origin", origin)
+            name = {"bull rush": "Bull Rush", "disarm": "Disarming", "reposition":
+                    "Repositioning", "sunder": "Sundering", "trip": "Tripping"}[key]
+            return [{"effect": d, "tell": ""} for d in done[1:]] + [{
+                "effect": done[0] if done else {"ref": defender.ref, "kind": "crit_strike",
+                                                "maneuver": key, "origin": origin},
+                "tell": f"{actor.name}'s critical carries through ({name} Strike, "
+                        f"{total} against CMD {cmd}): {clause}."}]
+        return []
+
+    # --- aid another in combat (CRB, Combat, Aid Another; feat loop b2) ----------------
+    #
+    # "In melee combat, you can help a friend attack or defend by distracting or
+    # interfering with an opponent. If you're in position to make a melee attack on an
+    # opponent that is engaging a friend in melee combat, you can attempt to aid your
+    # friend as a standard action. You make an attack roll against AC 10. If you succeed,
+    # your friend gains either a +2 bonus on his next attack roll against that opponent or
+    # a +2 bonus to AC against that opponent's next attack (your choice), as long as that
+    # attack comes before the beginning of your next turn. Multiple characters can aid the
+    # same friend, and similar bonuses stack." Before this only a skill check could be
+    # aided (`_aid_lands`). The bonus is an ActiveEffect on the friend scoped `vs` the
+    # opponent (`_effect_scope_holds`, smite's shape), spent by the one attack it is for
+    # (`_aid_spent`). Swift Aid (APG): "As a swift action ... +1"; Team Up (APG): "When you
+    # and at least two of your allies are adjacent to an opponent, you can attempt the aid
+    # another action as a move action"; Bodyguard (APG): "When an adjacent ally is
+    # attacked, you may use an attack of opportunity to attempt the aid another action to
+    # improve your ally's AC" (`_bodyguards`).
+    AID_ORIGIN = "rule:aid-another"
+
+    def _aid_another(self, intent: Intent, actor, foe, partial: dict) -> Outcome:
+        from . import position as position_mod
+
+        params = intent.params or {}
+        kind = "ac" if str(params.get("aid") or "").lower() == "ac" else "attack"
+        ally = self.scene.actors.get(str(params.get("aid_ally") or ""))
+        reaction = bool(params.get("reaction"))
+        if not self.scene.in_encounter:
+            return self._refuse(intent, "Aid another is a fight's action, and no fight is on.")
+        if ally is None or ally.ref in (actor.ref, foe.ref) or ally.is_down \
+                or not position_mod._same_side(self.scene, actor.ref, ally.ref):
+            return self._refuse(intent, f"Aid another helps a friend in the fight against "
+                                        f"{foe.name}; name the friend.")
+        key = (params.get("weapon") or actor.wielded_key() or "unarmed").lower()
+        if self.scene.has_grid and position_mod.out_of_reach(self.scene, actor, foe, key):
+            return self._refuse(intent, f"{actor.name} must be in position to strike "
+                                        f"{foe.name} in melee to aid against them.")
+        bonus, paid = 2, "standard"
+        if not reaction and "aid_paid" not in partial:
+            want = str(params.get("aid_with") or "")
+            team = sum(1 for r, a in self.scene.actors.items()
+                       if r not in (actor.ref, foe.ref) and not a.is_down
+                       and position_mod._same_side(self.scene, actor.ref, r)
+                       and self.scene.distance_between(r, foe.ref) is not None
+                       and self.scene.distance_between(r, foe.ref) <= gridmod.SQUARE_FT)
+            beside = (self.scene.distance_between(actor.ref, foe.ref) or 99) <= gridmod.SQUARE_FT
+            options = []
+            if want in ("", "standard"):
+                options.append("standard")
+            if want in ("", "move") and actor.has_state("aid.team-up") and beside and team >= 2:
+                options.append("move")
+            if want in ("", "swift") and actor.has_state("aid.swift"):
+                options.append("swift")
+            if want == "swift":
+                options = [o for o in options if o == "swift"] + options
+            from . import skilluses
+
+            paid = next((o for o in options if not skilluses._no_action_left(
+                self, actor, o, "aid another")), "")
+            if not paid:
+                return self._refuse(intent, f"{actor.name} has no action left for aid another "
+                                            f"this turn.", code="standard_spent")
+            skilluses._spend_action(self, actor, paid)
+            partial["aid_paid"] = paid
+        else:
+            paid = str(partial.get("aid_paid") or ("reaction" if reaction else "standard"))
+        if paid == "swift":
+            bonus = 1
+        mods = list(actor.attack_modifiers(key, defender=foe))
+        roll = self._roll_or_suspend(intent, actor, mods, f"Aid another ({kind}) against AC 10",
+                                     10, partial, extra_partial={"aid_paid": paid})
+        made = d20_succeeds(roll, 10)
+        self._judge(roll, made)
+        said = f"{roll.total} against AC 10"
+        if not made:
+            return Outcome(intent_id=intent.id, op="attack", rolls=[roll], verdict="failure",
+                           effects=[{"kind": "aid", "ref": ally.ref, "made": False,
+                                     "against": foe.ref, "by": actor.ref}],
+                           tell=f"{actor.name} tries to draw {foe.name}'s attention from "
+                                f"{ally.name} and fails ({said}).", because=intent.because)
+        # "before the beginning of your next turn": one round on the one ticker, the
+        # stances' approximation (it ends at the top of the round).
+        rounds = 1
+        how = "next attack against" if kind == "attack" else "guard against the next blow of"
+        ally.apply_effect(ActiveEffect(
+            name=f"aided against {foe.name}", kind="buff",
+            key=f"aid-{actor.ref}-{foe.ref}-{kind}", source=f"{actor.name}'s aid",
+            origin=self.AID_ORIGIN, duration="rounds", rounds_left=rounds,
+            payload={"aid": kind, "vs": foe.ref},
+            modifiers=[{"kind": "combat_mod", "target": kind, "amount": bonus,
+                        "bonus_type": "circumstance", "vs": foe.ref,
+                        "note": f"aid another from {actor.name}"}]))
+        return Outcome(intent_id=intent.id, op="attack", rolls=[roll], verdict="success",
+                       effects=[{"kind": "aid", "ref": ally.ref, "made": True, "aid": kind,
+                                 "bonus": bonus, "against": foe.ref, "by": actor.ref,
+                                 "origin": self.AID_ORIGIN}],
+                       tell=f"{actor.name} distracts {foe.name} ({said}): {ally.name} has "
+                            f"+{bonus} on the {how} {foe.name}.", because=intent.because)
+
+    def _stand_still(self, intent: Intent, actor, mover, partial: dict) -> Outcome:
+        """Stand Still (CRB): "When a foe provokes an attack of opportunity due to moving
+        through your adjacent squares, you can make a combat maneuver check as your attack
+        of opportunity. If successful, the enemy cannot move for the rest of his turn. An
+        enemy can still take the rest of his action, but cannot move." The check is the
+        holder's CMB against the mover's CMD; a success lays `movement.stopped` for the
+        round (the one ticker), which the move op refuses by (`_op_move`). Taken in place
+        of the swing whenever the holder may — the feat's whole point (owner call)."""
+        mods = list(actor.cmb_modifiers(None, defender=mover))
+        cmd = sum(m.value for m in mover.cmd_modifiers(attacker=actor))
+        roll = self._roll_or_suspend(intent, actor, mods, "Stand Still (CMB)", cmd, partial)
+        made = d20_succeeds(roll, cmd)
+        self._judge(roll, made)
+        said = f"{roll.total} against CMD {cmd}"
+        if not made:
+            return Outcome(intent_id=intent.id, op="attack", rolls=[roll], verdict="failure",
+                           effects=[{"kind": "stand_still", "ref": mover.ref, "made": False,
+                                     "by": actor.ref}],
+                           tell=f"{actor.name} tries to stop {mover.name} in their tracks "
+                                f"and cannot ({said}).", because=intent.because)
+        mover.apply_effect(ActiveEffect(
+            name="stopped in place", kind="situation", key="stopped",
+            source=f"{actor.name}'s Stand Still", origin="rule:feat-stand-still",
+            duration="rounds", rounds_left=1, tags=("movement.stopped",)))
+        return Outcome(intent_id=intent.id, op="attack", rolls=[roll], verdict="success",
+                       effects=[{"kind": "stand_still", "ref": mover.ref, "made": True,
+                                 "by": actor.ref, "origin": "rule:feat-stand-still"}],
+                       tell=f"{actor.name} stops {mover.name} dead ({said}): they go no "
+                            f"further this turn.", because=intent.because)
+
+    def _aid_spent(self, intent: Intent, outcome: "Outcome") -> None:
+        """The aid another bonus covers one attack: the friend's next attack against that
+        opponent, or that opponent's next attack against the friend — spent by the attack
+        that just resolved, hit or miss."""
+        if intent.op != "attack" or outcome.status != "resolved" \
+                or (intent.params or {}).get("aid") or (intent.params or {}).get("manoeuvre"):
+            return
+        targets = intent.targets()
+        attacker = self.scene.actors.get(intent.actor or "")
+        foe = self.scene.actors.get(targets[0]) if targets else None
+        if attacker is None or foe is None:
+            return
+        attacker.remove_effects(match=lambda e: e.origin == self.AID_ORIGIN and (
+            e.payload or {}).get("aid") == "attack" and (e.payload or {}).get("vs") == foe.ref)
+        foe.remove_effects(match=lambda e: e.origin == self.AID_ORIGIN and (
+            e.payload or {}).get("aid") == "ac" and (e.payload or {}).get("vs") == attacker.ref)
+
+    def _bodyguards(self, raw: dict) -> list[dict]:
+        """Bodyguard's aid, owed before an attack lands on its holder's adjacent ally: from
+        each holder beside the one attacked who threatens the attacker and has an attack of
+        opportunity left, spent on it (`_spend_reaction`). Taken for the player too — the
+        feat exists to spend the swing so (owner call)."""
+        params = raw.get("params") or {}
+        if params.get("reaction") or params.get("aid") or params.get("manoeuvre") \
+                or not self.scene.has_grid:
+            return []
+        from . import position as position_mod
+
+        attacker = str(raw.get("actor") or "")
+        target = str(raw.get("target") or "")
+        if target not in self.scene.actors or attacker not in self.scene.actors:
+            return []
+        out: list[dict] = []
+        for ref, guard in self.scene.actors.items():
+            if ref in (attacker, target) or guard.is_down \
+                    or not guard.has_state("aid.bodyguard") \
+                    or not position_mod._same_side(self.scene, ref, target) \
+                    or (self.scene.distance_between(ref, target) or 99) > gridmod.SQUARE_FT \
+                    or attacker not in self.scene.positions:
+                continue
+            body = self.scene.actors[attacker].size or "medium"
+            squares = gridmod.footprint(tuple(self.scene.positions[attacker][:2]), body)
+            if not any(reactions.threatens(self.scene, ref, q, body) for q in squares):
+                continue
+            if not reactions.reactions_for(guard) or not self._spend_reaction(
+                    ref, "attack_of_opportunity"):
+                continue
+            out.append({"op": "attack", "actor": ref, "target": attacker,
+                        "id": f"{raw.get('id') or 'attack'}-bodyguard-{ref}",
+                        "visibility": "player" if guard.is_pc else "hidden",
+                        "because": f"{guard.name} guards {self.scene.actors[target].name} "
+                                   f"(Bodyguard)",
+                        "params": {"full_attack": False, "reaction": "bodyguard",
+                                   "aid": "ac", "aid_ally": target}})
+        return out
+
+    def _whirlwind_before(self, raw: dict) -> list:
+        """Whirlwind Attack (CRB): "When you use the full-attack action, you can give up
+        your regular attacks and instead make one melee attack at your highest base attack
+        bonus against each opponent within reach. You must make a separate attack roll
+        against each opponent." The declared blow becomes one blow per foe in reach — on
+        the other side, standing, located, in reach of the weapon from where the attacker
+        stands — each at the highest bonus (`whirl`, code only, so the round's records do
+        not refuse the second), and the round is spent. Or one refusal outcome in its
+        place, as a declared intent the op will refuse (`whirl_refused`)."""
+        from . import awareness
+        from . import position as position_mod
+
+        params = dict(raw.get("params") or {})
+        params.pop("whirlwind_attack", None)
+        actor = self.scene.actors.get(str(raw.get("actor") or ""))
+
+        def refused(why: str) -> list:
+            return [dict(raw, params=dict(params, whirl_refused=why))]
+
+        if actor is None:
+            return refused("Nobody is there to whirl.")
+        why = Engine._attack_choice_refusal(
+            actor, str(params.get("weapon") or actor.wielded_key()).lower(),
+            dict(raw.get("params") or {}))
+        if why:
+            return refused(why)
+        if not self.scene.in_encounter or not self.scene.has_grid:
+            return refused("Whirlwind Attack is a full attack in a fight, measured on the "
+                           "map.")
+        spent = self._coup_round_spent(actor, "Whirlwind Attack")
+        if spent:
+            return refused(spent)
+        key = str(params.get("weapon") or actor.wielded_key()).lower()
+        foes = [a for r, a in self.scene.actors.items()
+                if r != actor.ref and not a.is_down
+                and not position_mod._same_side(self.scene, actor.ref, r)
+                and awareness.locates(self.scene, actor, a)
+                and position_mod.out_of_reach(self.scene, actor, a, key) is None]
+        if not foes:
+            return refused(f"Nobody stands within {actor.name}'s reach to whirl at.")
+        self.scene.move_spent[actor.ref] = self.scene.round
+        self.scene.standard_spent[actor.ref] = self.scene.round
+        params.update(full_attack=False, whirl=True)
+        params.pop("iteration", None)
+        return [dict(raw, id=f"{raw.get('id') or 'whirl'}-{i}", target=foe.ref,
+                     because=raw.get("because") or "Whirlwind Attack",
+                     params=dict(params, **({"whirl_first": True} if i == 0 else {})))
+                for i, foe in enumerate(foes)]
+
     def _close_before(self, raw: dict) -> dict | None:
         """The move intent a blow one move short is owed, spliced in front of it by
         `_drive`; None for anything else.
@@ -12108,6 +13226,18 @@ class Engine:
         if not awareness.locates(self.scene, actor, defender):
             return None
         weapon_key = (intent.params.get("weapon") or actor.wielded_key()).lower()
+        if intent.params.get("lunge") and self.scene.in_encounter \
+                and not intent.params.get("reaction") and actor.can_choose("lunge") is None \
+                and not actor.has_state(states.tags_for("lunging")[0]):
+            # Lunge (CRB): "You must decide to use this ability before any attacks are
+            # made" — laid before the reach is measured, so the closing step and the blow
+            # both see the longer reach; its tell rides the blow (`lunge_tell`, code only).
+            said = self._lay_attack_stances(actor, ("lunge",), defender=defender)
+            raw["params"] = dict(raw.get("params") or {}, lunge_tell=" ".join(said))
+            intent = _intent_from_dict(raw)
+        if (intent.params.get("charge") or intent.params.get("spring_attack")) \
+                and not intent.params.get("reaction"):
+            return self._charge_before(raw, intent, actor, defender, weapon_key)
         found = self._closing_step(intent, actor, defender, weapon_key)
         if found is None:
             return None
@@ -12140,8 +13270,9 @@ class Engine:
         tactic as TemplePlus repaired it — move toward the target, and stop once in reach
         (github.com/GrognardsFromHell/TemplePlus/wiki/Changelog: the approach "checks for
         proximity before executing", which ended its "endless zig zag till end of turn").
-        One move action at the creature's land speed (`speed_feet`); a double move or a
-        charge is a full-round action this engine does not compose. A fly speed is not
+        One move action at the creature's land speed (`speed_feet`); a double move is not
+        composed, and a charge is a declared option of its own (`_charge_before`, feat
+        loop b2), never this walk. A fly speed is not
         read: `_check_move` budgets every move by land speed, and a walk this composes
         must be one that check would accept.
 
@@ -12777,6 +13908,9 @@ class Engine:
                     del owner.goods[name]
                 break
 
+    _DIRTY_WORSE: ClassVar[dict] = {"dazzled": "dazed", "entangled": "pinned",
+                                    "shaken": "frightened", "sickened": "nauseated"}
+
     def _outcome_trick(self, m, intent, actor, defender, margin, weapon_key, loot, say):
         # The attacker's choice, subject to the GM — here the intent's `trick`, checked
         # against the six at parse; the gentlest when none was named.
@@ -12784,6 +13918,20 @@ class Engine:
         if trick not in m["tricks"]:
             trick = m["default_trick"]
         rounds = 1 + max(0, margin) // 5
+        # Dirty Trick Master (Bastards of Golarion): against a foe "still affected by a
+        # condition inflicted by a previous dirty trick (whether your own or another
+        # creature's) ... dazzled to become dazed, entangled to become pinned, shaken to
+        # become frightened, and sickened to become nauseated. This worsened condition
+        # replaces the previous dirty trick condition, and lasts for the duration of the
+        # dirty trick (including any rounds remaining from the previous dirty trick
+        # condition)". The bearer's document tag.
+        prev = next((e for e in defender.effects if e.rounds_left and str(
+            e.source or "").startswith(f"{m['name']} by ")), None)
+        worse = self._DIRTY_WORSE.get(str(prev.key)) if prev is not None else None
+        if worse and actor.has_state("maneuver.dirty-trick.master"):
+            rounds += int(prev.rounds_left or 0)
+            defender.remove_effects(match=lambda e, p=prev: e is p)
+            trick = worse
         defender.add_condition(trick, rounds=rounds,
                                source=f"{m['name']} by {actor.name}")
         return (say(m["effect"], False, trick=trick,
@@ -13030,6 +14178,7 @@ class Engine:
         self.scene.round = 1
         self.scene.move_spent = {}
         self.scene.standard_spent = {}
+        self.scene.swift_spent = {}
         self.end_talk("a fight starts")
         sides = {"pc": pc_side, "them": [r for r in them if r in standing]}
         self.scene.sides = sides
@@ -24353,7 +25502,6 @@ class Engine:
                                        "rule:feat-impact-critical-shot"},
                             "tell": f"{defender.name} takes the shot's impact standing "
                                     f"({total} against CMD {cmd})."})
-        state.pop("confirm_total", None)
         return out
 
     def _free_demoralize(self, actor: Actor, foes: list, why: str) -> list[dict]:
@@ -25878,6 +27026,26 @@ class Engine:
         if off and not full:
             return ("A second weapon in the off hand swings in a full attack: make it with "
                     "Full attack.")
+        # Feat loop b2. CRB, Charge: "you may make a single melee attack", never a full
+        # attack; Spring Attack "a single melee attack" as a full-round action; Whirlwind
+        # Attack gives up the full attack's swings for one at each foe; Lunge rides any
+        # melee attack. None of the three walks is the attack action, so neither Vital
+        # Strike nor Cleave rides them.
+        walks = [c for c in ("charge", "spring_attack", "whirlwind_attack") if c in declared]
+        if len(walks) > 1:
+            return (f"{said[walks[0]]} and {said[walks[1]]} are each a whole round; choose "
+                    f"one.")
+        for c in walks + (["lunge"] if "lunge" in declared else []):
+            if ranged:
+                return f"{said[c]} is made with a melee weapon, not a {w['name']}."
+        for c in walks:
+            if full or params.get("manoeuvre") or params.get("coup_de_grace"):
+                return (f"{said[c]} is its own full-round action, one blow"
+                        + (" at each foe in reach" if c == "whirlwind_attack" else "")
+                        + "; make it on its own.")
+            for other in ("vital_strike", "cleave"):
+                if other in declared:
+                    return f"{said[other]} is the attack action and cannot ride {said[c]}."
         if "rapid_shot" in declared and not ranged:
             return "Rapid Shot is fired with a ranged weapon, not a " + str(w["name"]) + "."
         if "combat_expertise" in declared and ranged:
@@ -25935,13 +27103,21 @@ class Engine:
         ("dazing_assault", "dazing assault", "Dazing Assault",
          "{name} swings to daze (Dazing Assault), less sure of every blow until their "
          "next turn."),
+        # Feat loop b2. CRB, Combat, Charge: "you take a -2 penalty to your AC until the
+        # start of your next turn" — anyone's, so the stance carries its own term
+        # (`_stance_terms`). Lunge (CRB): "a -2 penalty to your AC until your next turn",
+        # its reach the feat document's, on the lunger's own turn (`reactions.reach_with`).
+        ("charge", "charging", "Charge",
+         "{name} charges, guard open until their next turn."),
+        ("lunge", "lunging", "Lunge",
+         "{name} lunges, reaching further and open to a counter until their next turn."),
         ("stunning_assault", "stunning assault", "Stunning Assault",
          "{name} swings to stun (Stunning Assault), less sure of every blow until their "
          "next turn."),
     )
 
     @classmethod
-    def _lay_attack_stances(cls, actor: Actor, choices) -> list[str]:
+    def _lay_attack_stances(cls, actor: Actor, choices, defender=None) -> list[str]:
         """Lay the one-round stance of each declared option that has one, and say so.
 
         The effect carries only its tag (`states.COMBAT_EXPERTISE`, `states.CLEAVING`):
@@ -25961,18 +27137,29 @@ class Engine:
             actor.apply_effect(ActiveEffect(
                 name=key, kind="buff", key=key, source=name, origin=origin,
                 duration="rounds", rounds_left=1, tags=states.tags_for(key),
-                modifiers=cls._stance_terms(actor, choice)))
+                modifiers=cls._stance_terms(actor, choice, defender)))
             if not again:
                 said.append(tell.format(name=actor.name))
         return said
 
     @staticmethod
-    def _stance_terms(actor: Actor, choice: str) -> list[dict]:
+    def _stance_terms(actor: Actor, choice: str, defender=None) -> list[dict]:
         """The numbers a stance carries itself - only a choice no document holds.
 
         Fighting defensively (CRB, Combat): "-4 penalty on all attacks in a round", a
         combat manoeuvre being an attack roll, and the dodge bonus (`defensive_dodge`).
-        A feat's stance carries only its tag; the feat document holds its terms."""
+        A feat's stance carries only its tag; the feat document holds its terms.
+
+        A charge's -2 AC (CRB), less what the bearer's documents waive for THIS charge:
+        the `charge_ac` target asked in the charge's own roll context, with the one
+        charged as its target — Charge of the Righteous's "when you charge an undead
+        creature or an evil outsider, you do not take the -2 penalty"."""
+        if choice == "charge":
+            ctx = actor._roll_context(None, defender=defender, charge=True)
+            waived = sum(m.value for m in actor._buff_mods("combat_mod", "charge_ac", ctx))
+            n = min(0, -2 + waived)
+            return ([{"kind": "combat_mod", "target": "ac", "amount": n, "bonus_type": "",
+                      "note": "charging"}] if n else [])
         if choice != "fighting_defensively":
             return []
         why = "fighting defensively"
@@ -26118,7 +27305,7 @@ class Engine:
                 and not defender.loses_dex_to_ac
                 and not defender.has_state("spent.snake-style")
                 and awareness.sees(self.scene, defender, actor)
-                and not self._pay_swift(defender, "a Snake Style check")):
+                and not self._pay_swift(defender, "a Snake Style check", immediate=True)):
             defender.apply_effect(ActiveEffect(
                 name="snake style used", kind="buff", key="snake style used",
                 source="Snake Style", origin="rule:feat-snake-style", duration="rounds",
@@ -26204,7 +27391,7 @@ class Engine:
             return []
         if not self._spend_reaction(mover.ref, "panther-style"):
             return []
-        if not mover.has_state("action.panther-claw.free")                 and self._pay_swift(mover, "a retaliatory strike"):
+        if not mover.has_state("action.panther-claw.free")                 and self._pay_swift(mover, "a retaliatory strike", immediate=True):
             return []
         return [{"op": "attack", "actor": mover.ref, "target": foe.ref,
                  "because": "a retaliatory strike (Panther Style)",
@@ -26230,14 +27417,11 @@ class Engine:
                if improved else ", giving up the rest of the attack (Second Chance)."))
         return True
 
-    def _pay_swift(self, actor: Actor, what: str) -> str:
-        """Spend this round's swift action on `what`: why it cannot be, or "" once paid.
-
-        The one door a style's swift action goes through (feat loop b2-styles). There is no
-        swift-action record on the round yet — lane b2-actions builds the budget in
-        parallel — so today nothing is spent or refused here; joined to that budget at
-        merge, this body becomes its call and every caller is already routed through it."""
-        return ""
+    def _pay_swift(self, actor: Actor, what: str, immediate: bool = False) -> str:
+        """Spend the swift action on `what` (an `immediate` one off the bearer's turn spends
+        the next turn's): why it cannot be, or "" once paid. The styles' door onto lane
+        b2-actions' one budget, `_spend_swift` (joined at the batch 2 merge)."""
+        return self._spend_swift(actor, immediate=immediate, what=what) or ""
 
     def _op_style(self, intent: Intent, partial: dict) -> Outcome:
         """Enter a combat style (Ultimate Combat, Style Feats): a swift action, in a fight
@@ -28301,6 +29485,14 @@ class Engine:
             spent = self._standard_spent_refusal(intent, actor)
             if spent is not None:
                 return spent
+        if state is None and ("swift" in timing or "immediate" in timing) \
+                and not intent.params.get("reaction"):
+            # The turn's one swift action (`_spend_swift`, feat loop b2): a quickened or
+            # swift spell cast in a fight spends it. Before it two quickened spells and a
+            # swift one were cast in one turn for nothing.
+            why = self._spend_swift(actor, "immediate" in timing, f"casting {spell.name}")
+            if why:
+                return self._refuse(intent, why, code="swift_spent")
         if state is None and meta:
             slow = self._metamagic_round_refusal(intent, actor, spell)
             if slow is not None:
@@ -28312,6 +29504,14 @@ class Engine:
             # is spent. The refusal is the moment the curse is found the hard way.
             from . import armour as armour_mod
 
+            # Unable to speak (a chokehold, UC: "cannot breathe or speak, and thus cannot
+            # cast spells that have a verbal component"): asked of `state.silenced`, the
+            # copy's own components, so a silent spell passes. Feat loop b2.
+            if "V" in [str(c).strip().upper() for c in spell.components or ()] \
+                    and actor.has_state("state.silenced"):
+                return self._refuse(intent, f"{actor.name} cannot speak the words of "
+                                            f"{spell.name}. Nothing is spent.",
+                                    code="silenced")
             barred = actor.barred_from_casting(arcane=armour_mod.is_arcane(actor))
             if barred is not None:
                 found = self._curse_said(actor, barred, found=True)
@@ -31499,6 +32699,16 @@ class Engine:
             )
 
         if square is not None and self.scene.has_grid \
+                and actor.has_state("movement.stopped") \
+                and tuple(square)[:2] != tuple(self.scene.positions.get(ref) or ())[:2]:
+            # Stopped by Stand Still (`_stand_still`): "cannot move for the rest of his
+            # turn".
+            return Outcome(
+                intent_id=intent.id, op="move", status="prevented",
+                effects=[{"ref": ref, "kind": "move_stopped", "why": "stand still"}],
+                tell=f"{actor.name} is held where they stand and goes no further this turn.",
+                because=intent.because)
+        if square is not None and self.scene.has_grid \
                 and actor.has_state("state.held.glued") \
                 and tuple(square)[:2] != tuple(self.scene.positions.get(ref) or ())[:2]:
             # A tanglefoot bag's glue (CRB: "glued to the floor and unable to move"):
@@ -31521,6 +32731,16 @@ class Engine:
                                         f"check first.", code="in_a_pit")
         if square is not None and self.scene.has_grid:
             from_square = self.scene.positions.get(ref)
+            # Spring Attack's walk after the blow (`_spring_rest`): "the total distance
+            # that you move cannot be greater than your speed".
+            left = intent.params.get("spring_left")
+            if left is not None and from_square is not None:
+                cost = self._move_cost(ref, from_square, tuple(square))
+                if cost is not None and int(cost) > int(left):
+                    return self._refuse(
+                        intent, f"Spring Attack's walk is {actor.name}'s speed in all, and "
+                                f"{left} ft of it is left after the blow; {tuple(square)} "
+                                f"is {cost} ft away.", code="too_far")
             bumped = self._unseen_in_the_way(actor, from_square, tuple(square))
             if bumped is not None:
                 square = bumped[1]
@@ -31567,7 +32787,8 @@ class Engine:
             # The move action, spent: a body that crossed the grid in a fight has walked
             # this round, and the closing step before a blow asks (`_closing_step`).
             if self.scene.in_encounter and from_square is not None \
-                    and tuple(from_square) != tuple(square):
+                    and tuple(from_square) != tuple(square) \
+                    and not intent.params.get("reaction"):
                 self.scene.move_spent[ref] = self.scene.round
             effect = {"ref": ref, "kind": "position", "from": from_square,
                       "to": tuple(square), "feet": cost, "zone": zone}
@@ -31608,6 +32829,12 @@ class Engine:
                 tell = (f"{actor.name} closes {cost} ft on {foe.name} to strike."
                         if cost is not None else
                         f"{actor.name} closes on {foe.name} to strike.")
+                charging = str(intent.params.get("charging") or "")
+                if charging:
+                    effect["charging"] = charging
+                    tell = (f"{actor.name} charges {cost} ft straight at {foe.name}."
+                            if charging == "charge" else
+                            f"{actor.name} springs {cost} ft in at {foe.name}.")
             elif toward is not None:
                 tell = self._toward_tell(actor, toward, cost, effect)
             # A hidden mover: how far it went is the DC table's row ("moving at half
@@ -32314,6 +33541,7 @@ class Engine:
         self.scene.round = 1
         self.scene.move_spent = {}
         self.scene.standard_spent = {}
+        self.scene.swift_spent = {}
         self.end_talk("a fight starts")
         # Nobody has acted at the top of round one, so everyone is flat-footed until
         # their first turn comes round.
