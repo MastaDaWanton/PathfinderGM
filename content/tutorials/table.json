@@ -5,7 +5,7 @@
   "tutorials": [
     {
       "id": "table",
-      "v": 1,
+      "v": 2,
       "title": "The table",
       "manual": "playing",
       "root": "pen",
@@ -27,17 +27,19 @@
           "source": {"file": "gm/prompts.py", "literal": "I take no action. Carry the scene on from where it stopped"}
         },
         {
-          "since": 1,
+          "since": 2,
           "anchor": "exits",
           "title": "The ways on",
-          "words": "These are the ways on from here. Press one to attach it to your turn, then Say to go; the time on it is real time passing. The suggestions below are offers, never orders: you can always write something else.",
+          "words": "Ways on holds the places you can go from here. Pick one to attach it to your turn, then Say to go; the time on it is real time passing. The suggestions above the pen are offers, never orders.",
+          "controls": [{"tut": "exits", "label": "Ways on"}],
           "source": {"file": "play/static/js/table/11-exits.js", "literal": "A click ATTACHES the place, as a spell is attached, and Say sends it"}
         },
         {
-          "since": 1,
+          "since": 2,
           "anchor": "pen-actions",
           "title": "Beside the pen",
           "buttons": [
+            {"tut": "pen-more", "label": "More", "words": "Holds Craft action, Spells and your abilities; Craft action alone stands here instead."},
             {"tut": "craft-action", "label": "Craft action", "words": "Forage, prospect, skin, gather or buy material, told as part of the story."},
             {"tut": "spells-btn", "label": "Spells", "words": "Casters only: choose a spell to cast with this turn."},
             {"tut": "help-table", "label": "?", "words": "Shows these tips again."}
@@ -454,7 +456,7 @@
     },
     {
       "id": "tab.spells",
-      "v": 1,
+      "v": 2,
       "title": "The Spells tab",
       "manual": "playing",
       "root": "page-spells",
@@ -479,11 +481,11 @@
           "words": "The last column lists what you can choose from, and spells a level owes your book wait across the top. A choice the rules refuse says why."
         },
         {
-          "since": 1,
-          "anchor": "spells-btn",
+          "since": 2,
+          "anchor": "pen-more",
           "title": "Casting from the story",
-          "words": "The Spells button beside Say does the same from the table. Write what you cast at, and press Say.",
-          "controls": [{"tut": "spells-btn", "label": "Spells"}]
+          "words": "Spells, under More beside Say, does the same from the table. Write what you cast at, and press Say.",
+          "controls": [{"tut": "pen-more", "label": "More"}, {"tut": "spells-btn", "label": "Spells"}]
         }
       ]
     },

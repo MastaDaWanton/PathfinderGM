@@ -408,7 +408,10 @@ function markSpellAnchors(open) {
 function openSpellPicker(anchor) {
   const p = spellPop();
   if (!p) return;
-  SPELLS.anchor = anchor || document.getElementById("spellbtn");
+  // Spells lives behind More now (11-exits.js), which folds as it is pressed: the picker
+  // opens against the door, and focus comes back to it.
+  const opener = anchor || document.getElementById("spellbtn");
+  SPELLS.anchor = typeof visibleOr === "function" ? visibleOr(opener) : opener;
   SPELLS.returnTo = null;
   SPELLS.chose = false;
   if (HAS_POPOVER) { if (!p.matches(":popover-open")) p.showPopover(); }
@@ -465,7 +468,7 @@ document.addEventListener("click", e => {
     const cast = document.getElementById("cb-cast");
     if (inAFight() && cast && cast.offsetParent !== null) {
       openSpellPicker(cast);
-      SPELLS.returnTo = opener;
+      SPELLS.returnTo = typeof visibleOr === "function" ? visibleOr(opener) : opener;
     } else {
       openSpellPicker(opener);
     }

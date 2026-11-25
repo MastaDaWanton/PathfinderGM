@@ -204,7 +204,12 @@ document.addEventListener("click", e => {
   const btn = e.target.closest && e.target.closest("#exits .exitbtn");
   if (!btn) return;
   if (btn.getAttribute("aria-disabled") === "true") { exitWhy(btn); return; }
+  // The door folds first (its focus goes back to Ways on), then the box takes focus,
+  // where the player writes how they go or presses Say.
+  closePenPop("wayspop");
   toggleExit(btn.dataset.exit);
+  const input = document.getElementById("input");
+  if (input && input.focus && penOpen("wayspop") === false) input.focus({ preventScroll: true });
 });
 
 // The reason for a shut way, as a visible line while it is pointed at or focused.
@@ -265,5 +270,125 @@ document.addEventListener("click", e => {
     b.setAttribute("aria-pressed", String(b.dataset.passage === attachedExitId())));
 });
 
+// --- the pen's two doors (2026-11-25) --------------------------------------------------
+// The owner: "the bar where we are typing has become very crowded. lets organize and hide
+// the locations and other buttons so that it feels clean again." Measured on their dungeon
+// save at 1400x950: the desk above the pen held 836px of controls in a 283px box, eleven
+// of them ways out. The ways on now sit behind Ways on (n), and Craft action, Spells and
+// the abilities behind More, each one labelled click from the box
+// (docs/research/2026-11-25-clean-composer.md). The rows inside are the same rows, drawn
+// by the same code; only where they live changed.
+
+const penPop = id => document.getElementById(id);
+// true / false for a popover door, null where there is none (the node tests' page).
+function penOpen(id) {
+  const p = penPop(id);
+  return p && p.matches ? p.matches(":popover-open") : null;
+}
+function closePenPop(id) {
+  if (penOpen(id)) penPop(id).hidePopover();
+}
+
+// A control inside a closed door cannot take focus; its door can. Used wherever focus
+// goes back to Craft action or Spells after a panel or a bench closes.
+function visibleOr(el) {
+  if (!el || !el.getClientRects || el.getClientRects().length) return el;
+  const pop = el.closest && el.closest(".penpop");
+  const door = pop && document.querySelector(`[popovertarget="${pop.id}"]`);
+  return door && door.getClientRects().length ? door : document.getElementById("input");
+}
+
+// Above its door, where the eye already is, right edges together; below only when there is
+// more room there. Measured before it opens (`beforetoggle`), so it never paints in the
+// UA's centre first: the width is the CSS one, given here, not read from the box.
+const PEN_POP_WIDTH = { wayspop: 560, morepop: 420 };
+function placePenPop(pop) {
+  const door = document.querySelector(`[popovertarget="${pop.id}"]`);
+  if (!door) return;
+  const r = door.getBoundingClientRect();
+  const vw = document.documentElement.clientWidth, vh = window.innerHeight;
+  const w = Math.min(PEN_POP_WIDTH[pop.id] || 420, vw - 24);
+  pop.style.width = `${w}px`;
+  pop.style.left = `${Math.round(Math.max(12, Math.min(r.right - w, vw - w - 12)))}px`;
+  pop.style.right = "auto";
+  const above = r.top - 16, below = vh - r.bottom - 16;
+  if (above >= 220 || above >= below) {
+    pop.style.top = "auto";
+    pop.style.bottom = `${Math.round(vh - r.top + 8)}px`;
+    pop.style.maxHeight = `${Math.round(Math.max(140, Math.min(480, above)))}px`;
+  } else {
+    pop.style.bottom = "auto";
+    pop.style.top = `${Math.round(r.bottom + 8)}px`;
+    pop.style.maxHeight = `${Math.round(Math.max(140, Math.min(480, below)))}px`;
+  }
+}
+
+// The door shows only when something is behind it, and says how many ways there are, so a
+// player knows there is somewhere to go without opening it. In a fight it wears the alarm
+// border, because every way behind it is a withdraw.
+function renderWaysDoor(s) {
+  const door = document.getElementById("waysbtn");
+  const box = document.getElementById("exits");
+  if (!door || !box || !box.querySelectorAll) return;
+  const n = box.hidden ? 0 : box.querySelectorAll(".exitbtn").length;
+  door.hidden = !n;
+  const count = document.getElementById("ways-n");
+  if (count) count.textContent = n ? `(${n})` : "";
+  door.classList.toggle("risky", !!(((s && s.scene) || {}).in_encounter) && n > 0);
+  if (!n) closePenPop("wayspop");
+}
+
+// More is never a one-item menu (Discord's complaint, Stream's rule; the critic pass on the
+// research): with no spells and no abilities, Craft action stands in More's place as a
+// plain button, and goes back inside when there is something to keep it company.
+function fitMore() {
+  const more = document.getElementById("morebtn");
+  const craft = document.getElementById("craftaction");
+  const home = document.getElementById("pp-craft-g");
+  if (!more || !craft || !home) return;
+  const spells = document.getElementById("spellbtn");
+  const magic = document.getElementById("pp-magic-g");
+  if (magic && spells) magic.hidden = spells.hidden;
+  const abilities = document.getElementById("abilities");
+  const company = (spells && !spells.hidden) || !!(abilities && abilities.children.length);
+  if (company) {
+    if (craft.parentElement !== home) home.append(craft);
+    more.hidden = false;
+  } else {
+    if (craft.parentElement === home) more.before(craft);
+    more.hidden = true;
+    closePenPop("morepop");
+  }
+}
+
+(function wirePenDoors() {
+  for (const id of ["wayspop", "morepop"]) {
+    const pop = penPop(id);
+    if (!pop || !pop.addEventListener) continue;
+    if (typeof pop.showPopover !== "function") {
+      // No popover in this browser: the rows stand inline as they did, and the doors go.
+      pop.removeAttribute("popover");
+      pop.classList.add("inline");
+      const door = document.querySelector(`[popovertarget="${id}"]`);
+      if (door) door.remove();
+      continue;
+    }
+    pop.addEventListener("beforetoggle", e => { if (e.newState === "open") placePenPop(pop); });
+  }
+  // A choice in More acts and the tray folds, before the action's own listener (on the
+  // document) runs: the spell picker then opens against More (10-spells.js `visibleOr`).
+  const more = penPop("morepop");
+  if (more && more.addEventListener) {
+    more.addEventListener("click", e => {
+      if (e.target.closest && e.target.closest("button")) closePenPop("morepop");
+    });
+  }
+  window.addEventListener("resize", () => {
+    for (const id of ["wayspop", "morepop"]) if (penOpen(id)) placePenPop(penPop(id));
+  });
+})();
+
 onRender(s => renderExits(s));
 onRender(s => renderPassageOffer(s));
+onRender(s => renderWaysDoor(s));
+onRender(() => fitMore());

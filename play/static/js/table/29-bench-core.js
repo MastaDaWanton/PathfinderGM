@@ -397,6 +397,8 @@
       }
       var back = opener && document.contains(opener) && !opener.closest("[inert]") ? opener
                : (o.home && $id(o.home));
+      // Craft action sits behind the pen's More door, shut by now: focus goes to the door.
+      if (typeof visibleOr === "function") back = visibleOr(back);
       opener = null;
       if (back && typeof back.focus === "function") back.focus();
     };
