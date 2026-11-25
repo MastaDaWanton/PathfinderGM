@@ -5538,7 +5538,8 @@ class Engine:
         # way down or a trap (the owner, 2026-11-20 #19: "If I look for a river and it
         # tells me there are no tracks this is a bug"). Somebody hiding is still noticed
         # on the roll: "Most Perception checks are reactive" (CRB p.102).
-        fx, found = self._player_finds(pc, roll.total, True, ways=named is None)
+        fx, found = self._player_finds(pc, roll.total, True,
+                                       ways=named is None or seeking == "a door or way on")
         took = (" over two minutes" if take == 20 else "")
         # A heard way in is looked for by a search for a place or for nothing named, not
         # by a search for the locket (live 2026-11-20: that search walked into the mine).
@@ -5552,6 +5553,36 @@ class Engine:
                            because=intent.because)
         answer, got = (self._sought_line(pc, here, named, sought) if named is not None
                        else ("", False))
+        # A place sought, or the reader not naming a kind at all (live 2026-11-25: "I look
+        # around for the different ways to go" was read with no `seeking`), and nothing on
+        # the record answering to the words.
+        place_missed = (named is None and seeking in ("", "a place") and bool(sought)
+                        and not found)
+        if seeking == "a door or way on" or place_missed:
+            # The ways on, each as the searcher sees it (playtest 2026-11-23 #5/O2: "the
+            # way down" was "not found" beside the trapdoor named on arrival; "the
+            # different ways to go" was "not found" in a room with three). One way named
+            # answers about that way; else every way out of here. A place sought that is
+            # not on the record is said to be so, by its words, and the ways on follow:
+            # what the searcher CAN see is the answer to choose by.
+            from . import dungeons
+
+            one = dungeons.way_named(self.scene, self.places(), here.id, sought)
+            ways = ([dungeons.way_line(self, here.id, one)] if one
+                    else dungeons.ways_on(self, here.id))
+            lead = (f"{pc.name} searches {here.name}{took} for {sought} and finds nothing "
+                    f"here by that name." if place_missed and not one
+                    else f"{pc.name} searches {here.name}{took}.")
+            tell = " ".join([lead, *found, *ways] if ways else
+                            [lead, *found, f"There is no way on out of {here.name}."])
+            # The ways are this act's own facts to tell (`room_facts`, as an arrival's
+            # trace is): live 2026-11-25, told only as a tell, the page said the search
+            # "reveals nothing" and the slot invented hidden seams (beat_verify read a made
+            # search with no effect as one that found nothing).
+            seen = [{"kind": "room_facts", "at": here.id, "facts": ways}] if ways else []
+            return Outcome(intent_id=intent.id, op="check", rolls=[roll],
+                           verdict="success" if found or ways else "failure",
+                           effects=[*fx, *seen], tell=tell.strip(), because=intent.because)
         if named is None and sought and not found:
             # Nothing on the engine's record answers to the words, and nothing hidden
             # was found: said about THAT thing, never about tracks or doors.
@@ -5660,8 +5691,12 @@ class Engine:
         if obj.id == here.id:
             return f"{pc.name} is at {obj.name}.", True
         if obj.id in (here.exits or ()):
-            return (f"{cap(obj.name)} is close by: the way there is open from "
-                    f"{here.name}."), True
+            # The way there as the searcher sees it: its door, a trap found on it, what is
+            # in sight beyond (playtest 2026-11-23 O2). It said "the way there is open"
+            # of a locked trapdoor.
+            from . import dungeons
+
+            return dungeons.way_line(self, here.id, obj.id), True
         return f"{cap(obj.name)} is not here, at {here.name}.", False
 
     # A rumoured way in found at its landmark when the place has no hex DC of its own

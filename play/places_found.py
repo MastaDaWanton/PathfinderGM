@@ -73,7 +73,8 @@ visited — against a turn that waits on a local model for tens of seconds.
                  "near": bool,              # one way from where the party stands
                  "i": int,                  # index into `layout` (below)
                  "walk": {"legs": [leg, ...], "minutes": int} | None,
-                 "why": str}],              # when walk is None: why not (else "")
+                 "why": str,                # when walk is None: why not (else "")
+                 "trap": str}],             # a trap found there, still armed (else "")
       "edges": [{"from", "to", "group",     # group: next_door / outside
                  "dashed": bool,            # outside the walls: drawn dashed
                  "time_words", "minutes",
@@ -109,6 +110,8 @@ visited — against a turn that waits on a local model for tens of seconds.
 from __future__ import annotations
 
 from collections import deque
+
+from rules import dungeons
 
 from . import exits as exits_mod
 from . import town_seats
@@ -174,6 +177,8 @@ def chart(engine, world) -> dict:
             "walk": ({"legs": legs, "minutes": sum(x["minutes"] for x in legs)}
                      if legs else None),
             "why": why,
+            # A trap found here and still armed (playtest 2026-11-23 O5), else "".
+            "trap": dungeons.found_trap(scene, pid),
         })
 
     links = sorted({tuple(sorted((index[p.id], index[x])))

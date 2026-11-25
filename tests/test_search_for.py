@@ -82,7 +82,10 @@ def test_a_search_for_a_cave_with_none_known_says_there_is_none_here(worlds):
     s, e, pc = _party(worlds)
     out = _search(e, "the cave everyone has a story about", "a place")
     assert "the cave everyone has a story about" in out.tell, out.tell
-    assert "does not find it here" in out.tell
+    # Said about that thing by its words, then the ways on that ARE here (playtest
+    # 2026-11-23 #5: "the way down" was answered "does not find it" beside the trapdoor).
+    assert "finds nothing here by that name" in out.tell
+    assert "track" not in out.tell.lower()
 
 
 def test_a_search_for_a_place_close_by_says_where_it_is(worlds):
@@ -92,7 +95,8 @@ def test_a_search_for_a_place_close_by_says_where_it_is(worlds):
     if near is None:
         pytest.skip("nothing next door")
     out = _search(e, near.name, "a place")
-    assert "close by" in out.tell, out.tell
+    # The way there as the searcher sees it (`dungeons.way_line`, playtest 2026-11-23 O2).
+    assert f"The way to {near.name}" in out.tell or f"The way back to {near.name}" in out.tell,         out.tell
 
 
 def test_the_reader_carries_what_a_search_is_for(worlds):

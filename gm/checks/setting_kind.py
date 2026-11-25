@@ -62,7 +62,8 @@ _AT_A_DISTANCE = re.compile(
 
 
 def _where(ctx):
-    """(the place's name, its words, whether it has a roof), or None with no answer."""
+    """(the place's name, its words, whether it has a roof, every known place's name), or
+    None with no answer."""
     from rules import places
 
     try:
@@ -78,35 +79,53 @@ def _where(ctx):
                                    getattr(here, "shape", None))
     except Exception:  # noqa: BLE001 — unknown roof: judge no room words
         roofed = True
-    return str(here.name or ""), words, roofed
+    names = {" ".join(str(p.name or "").lower().split()) for p in known} - {""}
+    return str(here.name or ""), words, roofed, names
 
 
-def cues_in(narration: str, words, roofed: bool) -> list[str]:
+def _in_a_name(narration: str, m, names) -> bool:
+    """Whether a cue lies inside a longer place name the engine holds: "the room" of "the
+    room that moves" is a room's name, not furniture (live 2026-11-25: the narration of the
+    ways out of the cold hall lost its sentence naming the room that moves, cut as "the
+    room" under the open sky; the owner's record at t=231 too)."""
+    low = narration.lower()
+    for n in names:
+        if len(n) <= len(m.group(0)):
+            continue
+        for hit in re.finditer(re.escape(n), low):
+            if hit.start() <= m.start() and m.end() <= hit.end():
+                return True
+    return False
+
+
+def cues_in(narration: str, words, roofed: bool, names=()) -> list[str]:
     """The wrong kind of place's furniture in a stretch of narration, as written."""
     if _AT_A_DISTANCE.search(narration):
         return []
     found: list[str] = []
     if not (set(words) & _TAVERN_WORDS):
-        found += [" ".join(m.group(0).split()) for m in _TAVERN.finditer(narration)]
+        found += [" ".join(m.group(0).split()) for m in _TAVERN.finditer(narration)
+                  if not _in_a_name(narration, m, names)]
     if not roofed:
-        found += [" ".join(m.group(0).split()) for m in _ROOM.finditer(narration)]
+        found += [" ".join(m.group(0).split()) for m in _ROOM.finditer(narration)
+                  if not _in_a_name(narration, m, names)]
     return found
 
 
-def flagged_in(sentence: str, words, roofed: bool) -> list[str]:
+def flagged_in(sentence: str, words, roofed: bool, names=()) -> list[str]:
     from gm import speech
 
     return [c for is_speech, chunk in speech.split(sentence) if not is_speech
-            for c in cues_in(chunk, words, roofed)]
+            for c in cues_in(chunk, words, roofed, names)]
 
 
 def find(ctx) -> list[Finding]:
     got = _where(ctx)
     if got is None:
         return []
-    name, words, roofed = got
+    name, words, roofed, names = got
     flagged = [(s, cues) for s in _space.sentences(ctx.text)
-               if (cues := flagged_in(s, words, roofed))]
+               if (cues := flagged_in(s, words, roofed, names))]
     if not flagged:
         return []
     said = list(dict.fromkeys(c for _s, cs in flagged for c in cs))
@@ -129,13 +148,13 @@ def backstop(ctx, text: str, findings: list) -> tuple[str, list[str]]:
     got = _where(ctx)
     if got is None:
         return text, []
-    _name, words, roofed = got
+    _name, words, roofed, names = got
     notes: list[str] = []
     for f in findings:
         if f.kind != "wrong-kind-of-place":
             continue
         for s in f.sentences:
-            if s in text and flagged_in(s, words, roofed):
+            if s in text and flagged_in(s, words, roofed, names):
                 text = re.sub(r"\s*" + re.escape(s), "", text, count=1).strip()
                 notes.append(f"wrong kind of place: cut {s[:80]!r}")
     return text, notes

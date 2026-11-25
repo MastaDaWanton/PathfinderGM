@@ -201,8 +201,13 @@ SEARCH_WHERE = ("elsewhere", "here")
 # stream), so the reader names it. Water sought out in the wild is still `fend` (CRB
 # p.107, the owner's 2026-11-17 #6), which waters the party; `seeking: water` is for a
 # search the reader files as one (the town's well). `anything` is a search for whatever is hidden (a
-# hatch, a way down, a trap, somebody hiding) or names nothing at all.
-SEEKING = ("anything", "a person", "a place", "a thing", "water")
+# hatch, a way down, a trap, somebody hiding) or names nothing at all. `a door or way on`
+# (2026-11-25, playtest 2026-11-23 #5/O2) is a look for the ways out of where the player
+# stands, or at one of them ("the way down", "the different ways to go", "the door to the
+# vestry"): the engine tells each way as the searcher sees it (`dungeons.way_line`). Both
+# searches in that record were "not found" beside a trapdoor named on arrival and in a room
+# with three ways out.
+SEEKING = ("anything", "a person", "a place", "a thing", "water", "a door or way on")
 TAKES = ("roll", "ten", "twenty")
 # `until` since 2026-11-01, on `wait` and `rest`: the time of day the words wait or sleep
 # until, as a closed choice the sampler holds. The owner's report that day (Corvin): "wait
@@ -921,7 +926,8 @@ _DEMOS = [
          {"span": "go down to the docks", "place": "the docks", "act": "go"}]}),
     ("I find the trapdoor and drop down into the cellars.",
      {"question": False, "claims": [], "actions": [
-         {"span": "find the trapdoor", "object": "the trapdoor", "act": "search"},
+         {"span": "find the trapdoor", "object": "the trapdoor", "where": "here",
+          "seeking": "a door or way on", "act": "search"},
          {"span": "drop down into the cellars", "place": "the cellars", "act": "go"}]}),
     ("I pick up the lantern, light it and peer down the stairwell.",
      {"question": False, "claims": [], "actions": [

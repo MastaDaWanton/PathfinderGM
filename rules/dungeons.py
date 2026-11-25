@@ -712,6 +712,98 @@ def doors_from(engine, here_id: str) -> list[tuple[str, dict]]:
     return out
 
 
+def _door_on_way(scene, a: str, b: str) -> dict | None:
+    """The door on the way between two adjacent places, in any state (a room's door is
+    on the way from its parent), or None when the way has no door."""
+    for near, far in ((a, b), (b, a)):
+        rec = _rec(scene, far) or {}
+        d = (rec.get("dungeon") or {}).get("door")
+        if d and rec.get("parent") == near:
+            return d
+    return None
+
+
+def found_trap(scene, place_id: str) -> str:
+    """The found, still-armed trap of a dungeon room as words ("a pit trap", "a poison
+    needle trap on its door"), or "". Knowledge only: an unfound trap is never named, so
+    nothing unknown reaches the map (playtest 2026-11-23 O5)."""
+    trap = (room(scene, place_id) or {}).get("trap")
+    if not trap or not trap.get("found") or not trap.get("armed"):
+        return ""
+    name = traps()[trap["id"]]["name"]
+    return f"{name} on its door" if trap.get("on") == "door" else name
+
+
+def way_line(engine, here_id: str, far_id: str) -> str:
+    """One way on from here, as the searcher can see it: where it leads, the door and how
+    to open it, a trap found on it, whether the party has been there, and what is in sight
+    beyond. Playtest 2026-11-23 #5/O2: "I should be able to inspect the doors or hallways
+    that lead to different places in order to make a decision on where I want to go."
+
+    By the book: "A closed door blocks line of sight" (CRB, Doors), so the room beyond is
+    told only through an open way, and only when the searcher sees at all (CRB p.172). A
+    MUD exit's own description, seen on `look <direction>` (CircleMUD's world files), is
+    the shape; the words are the engine's record, never a model's. Research:
+    docs/research/2026-11-25-way-forward.md."""
+    known = engine.places()
+    here = places_mod.find(known, here_id)
+    far = places_mod.find(known, far_id)
+    if far is None:
+        return ""
+    pc = engine.scene.pc()
+    back = here is not None and far.id == here.parent
+    lead = f"The way {'back ' if back else ''}to {far.name}"
+    shut = door_between(engine.scene, here_id, far_id)
+    door = _door_on_way(engine.scene, here_id, far_id)
+    if shut is not None:
+        bits = [f"{lead} is shut.", shut_line(engine.scene, here_id, far_id)]
+    elif door is not None:
+        # A door once shut keeps its name ("the locked trapdoor"); say it is open now.
+        opened = "now open" if door.get("force") or door.get("pick") else "standing open"
+        bits = [f"{lead} is through {door['name']}, {opened}."]
+    else:
+        bits = [f"{lead} is open."]
+    trap = found_trap(engine.scene, far.id)
+    if trap:
+        bits.append(f"{_cap(trap)} was found there.")
+    been = far.id in engine.scene.places_been()
+    if pc is not None and engine.scene.sees_nothing(pc):
+        bits.append("It is too dark to see what lies beyond.")
+    elif shut is None and far.about:
+        bits.append(f"{'You have been there' if been else 'In sight beyond'}: "
+                    f"{far.about.rstrip('.')}.")
+    else:
+        bits.append("You have been there." if been else "You have not been there yet.")
+    return " ".join(bits)
+
+
+def ways_on(engine, here_id: str) -> list[str]:
+    """`way_line` for every way out of here the engine shows. A hidden way down is not
+    one until it is found: before then it is not an exit at all."""
+    here = places_mod.find(engine.places(), here_id)
+    return [w for x in (getattr(here, "exits", ()) or ()) if (w := way_line(engine, here_id, x))]
+
+
+def way_named(scene, places, here_id: str, words) -> str:
+    """The id of the way out of here that `words` name, by names the engine holds: the
+    place's own name, or the last word of its door's name ("the trapdoor", "the door"), as
+    `shut_door_named` matches them. "" when they name none."""
+    said = " ".join(str(words or "").lower().split())
+    here = places_mod.find(places, here_id)
+    if not said or here is None:
+        return ""
+    by_id = {p.id: p for p in places}
+    exits = [x for x in (here.exits or ()) if x in by_id]
+    for x in exits:
+        if by_id[x].name.lower() in said:
+            return x
+    # By the door's noun only when one door answers: "the door" with three doors out of
+    # here names none of them.
+    hits = [x for x in exits if (d := _door_on_way(scene, here_id, x))
+            and (str(d.get("name") or "").lower().split() or [""])[-1] in said.split()]
+    return hits[0] if len(hits) == 1 else ""
+
+
 def _party(engine) -> list:
     from . import states
 
