@@ -192,7 +192,7 @@
     ],
     "not_yet": [
       "piercing damage added to your unarmed strikes: an unarmed strike's damage type is fixed",
-      "demoralize as a free action on tearing flesh: Boar Style has no document"
+      "demoralize as a free action on tearing flesh (Boar Style tears it, b2-styles): no door demoralizes as a free action off a hit"
     ]
   },
   "motivating-display": {
