@@ -323,6 +323,9 @@ class Scene:
     # leaves the turn open, so without a record a drink then a blow from the combat bar
     # was two standard actions. `move_spent`'s shape, for its reason: no second ticker.
     standard_spent: dict[str, int] = field(default_factory=dict)
+    # The round each combatant last made an attack on its own turn (feat loop b2):
+    # Furious Focus's "the first attack you make each turn" (APG). `move_spent`'s shape.
+    swung: dict[str, int] = field(default_factory=dict)
     # What the player's character last struck with this encounter — the weapon and the
     # lethality their own words chose — and what was in hand then, by ref. A blow that
     # names no means carries on with these (`Engine._standing_means`), as a standing action
@@ -2423,6 +2426,7 @@ class Scene:
         # would read as already spent.
         self.move_spent = {}
         self.standard_spent = {}
+        self.swung = {}
         self.sides = {}
         # The battlefield does NOT go with the fight any more (item 28, 2026-09-19): the
         # ground belongs to the place, the party is standing on it before and after, and
@@ -5431,6 +5435,7 @@ class Engine:
     # One Perception search is a move action (CRB p.102); taking 20 takes twenty times
     # as long (CRB p.86): twenty rounds, two minutes.
     TAKE_20_ROUNDS = 20
+    TAKE_20_AS_MOVE = "skill.perception.take-20.move"      # Perfect Awareness's tag
 
     def _player_search(self, intent: Intent, pc, mods, partial: dict) -> Outcome:
         """The player searches where they are: one Perception result, their own die or a
@@ -5457,7 +5462,25 @@ class Engine:
             take = int(intent.params.get("take") or 0)
         except (TypeError, ValueError):
             take = 0
-        if take and self.scene.in_encounter:
+        # Perfect Awareness (Faiths & Philosophies): "Once per day, you can take 20 on a
+        # Perception check as a move action" — in a fight too, and in a move action's
+        # time rather than twenty searches' (feat loop b2). Its document's tag; the day's
+        # use is a pool on the one store, refilled by a night's rest.
+        quick = take == 20 and pc.has_state(self.TAKE_20_AS_MOVE)
+        if quick:
+            from . import resources, skilluses
+
+            resources.define(pc, {"id": "perfect awareness", "max": 1,
+                                  "refresh": "rest.night", "source": "Perfect Awareness"})
+            left = pc.pool("perfect awareness")
+            spent = skilluses._no_action_left(self, pc, "move", "taking 20 at a glance")
+            if left is None or left.current < 1 or spent:
+                if self.scene.in_encounter or spent:
+                    return self._refuse(intent, spent or (
+                        f"{pc.name} has used Perfect Awareness today; it comes back with a "
+                        f"night's rest."), code="threatened")
+                quick = False
+        if take and self.scene.in_encounter and not quick:
             return self._refuse(intent, f"{pc.name} cannot take {take} in the middle of a "
                                         f"fight: threats and distractions rule it out "
                                         f"(CRB p.86). A search here is a single roll.",
@@ -5466,7 +5489,12 @@ class Engine:
         if take:
             roll = self.dice.given(take, mods, label=label)
             roll.taken = True
-            if take == 20:
+            if quick:
+                pc.spend_pool("perfect awareness", 1)
+                skilluses._spend_action(self, pc, "move")
+                label += " (Perfect Awareness, a move action)"
+                roll.label = label
+            elif take == 20:
                 self.scene.advance(self.TAKE_20_ROUNDS // 10, rounds=self.TAKE_20_ROUNDS)
         else:
             # The number to beat is whatever hides here, unknown to the searcher.
@@ -6105,6 +6133,10 @@ class Engine:
             # blow that brought it in.
             if intent.op == "move" and outcome.status == "resolved":
                 queue[0:0] = self._reactions_on_arrival(outcome)
+            # A feint that drew a guard opens the foe to a partner's swing (Improved Feint
+            # Partner, `_reactions_after_feint`): next in the queue, as the arrival's is.
+            if intent.op == "check" and outcome.status == "resolved":
+                queue[0:0] = self._reactions_after_feint(outcome)
             # The plan's placeholders (new1…) become the refs just made, in everything
             # still queued — rewritten in the queue itself, so a turn that suspends for
             # the player's roll later on carries real refs into the save.
@@ -6387,6 +6419,40 @@ class Engine:
                            **({"provoked_by": why} if why else {})},
                 "visibility": "player" if self.scene.actors[watcher].is_pc else "hidden",
             })
+        return out
+
+    # Improved Feint Partner's tag (its feat document, feat loop b2).
+    FEINT_PARTNER_OPENS = "teamwork.feint-partner.improved"
+
+    def _reactions_after_feint(self, outcome: "Outcome") -> list[dict]:
+        """Improved Feint Partner (UC): "Whenever an ally who also has this feat
+        successfully feints against an opponent, that opponent provokes an attack of
+        opportunity from you." Read off the feint's own record (`rule:feint`), owed to
+        each ally holding the feat who threatens the foe, off their allowance
+        (`_swings_at`). No board, no threatened square, no swing — the reactions rule."""
+        if not self.scene.in_encounter or not self.scene.has_grid:
+            return []
+        from .position import _same_side
+
+        out: list[dict] = []
+        for e in outcome.effects or ():
+            if e.get("kind") != "condition" or e.get("condition") != "feinted" \
+                    or e.get("origin") != "rule:feint":
+                continue
+            feinter = self.scene.actors.get(str(e.get("by") or ""))
+            foe_ref = str(e.get("ref") or "")
+            spot = self.scene.positions.get(foe_ref)
+            if feinter is None or spot is None \
+                    or not feinter.has_state(self.FEINT_PARTNER_OPENS):
+                continue
+            fired = [(ref, reactions.attack_of_opportunity(ally))
+                     for ref, ally in self.scene.actors.items()
+                     if ref not in (feinter.ref, foe_ref) and not ally.is_down
+                     and ally.has_state(self.FEINT_PARTNER_OPENS)
+                     and _same_side(self.scene, feinter.ref, ref)
+                     and reactions.reactions_for(ally)
+                     and reactions.threatens(self.scene, ref, tuple(spot[:2]))]
+            out += self._swings_at(foe_ref, fired, why="feint")
         return out
 
     def _reactions_on_arrival(self, outcome: "Outcome") -> list[dict]:
@@ -6727,6 +6793,8 @@ class Engine:
                                        "action. A move is still theirs to take."),
                             code="standard_spent")
 
+    COUP_UNPROVOKING = "coup_de_grace.unprovoking"      # Slaying Sprint's tag
+
     def _coup_provokes(self, intent: Intent, actor, defender, weapon_key: str) -> None:
         """The attacks of opportunity a coup de grâce in a fight draws, raised as
         `_ReactionsOwed` at the blow's point of commitment, the way `_leaving_the_fight`
@@ -6750,6 +6818,12 @@ class Engine:
             return
         if self.scene.has_grid and position_mod.out_of_reach(
                 self.scene, actor, defender, weapon_key) is not None:
+            return
+        # Slaying Sprint (UC): "Performing a coup de grace does not provoke attacks of
+        # opportunity. You can use this feat only when wielding a light or one-handed
+        # weapon" — its document's tag (feat loop b2).
+        if actor.has_state(self.COUP_UNPROVOKING) and weapon.get("category") == "melee" and (
+                weapon.get("light") or int(weapon.get("hands", 1) or 1) <= 1):
             return
         owed: list[dict] = []
         for watcher, reaction in reactions.provoked_by_action(self.scene, actor.ref):
@@ -7312,9 +7386,9 @@ class Engine:
         itself and a natural 20 not a success (`dice.d20_succeeds` is for saves).
 
         Not yet: the checks for vigorous or violent motion, weather, entangled, and
-        continuous damage (Table 8-5 rows the engine has no situation for), and the
-        Disruptive FEAT (+4 to the defensive DC from a foe who holds it). Disruptive SPELL's
-        check is built (the `disrupted` situation below, feat loop b1).
+        continuous damage (Table 8-5 rows the engine has no situation for). The Disruptive
+        FEAT's +4 is built (feat loop b2, `_disrupted_by`), as is Disruptive SPELL's check
+        (the `disrupted` situation below, feat loop b1).
         """
         situations: list[tuple[str, int, str]] = []
         before = intent.params.get("struck_from")
@@ -7342,7 +7416,15 @@ class Engine:
                 situations.append(("damaged", 10 + taken + level,
                                    f"struck for {taken} while casting"))
         if bool(intent.params.get("defensively")):
-            situations.append(("defensively", 15 + 2 * level, "casting defensively"))
+            # Disruptive (CRB): "The DC to cast spells defensively increases by +4 for all
+            # enemies that are within your threatened area ... only if you are aware of
+            # the enemy's location and are capable of taking an attack of opportunity"
+            # (feat loop b2) — `_disrupted_by`.
+            near = self._disrupted_by(actor)
+            situations.append(("defensively", 15 + 2 * level + (4 if near else 0),
+                               "casting defensively"
+                               + (f" within {near.name}'s reach (Disruptive)" if near
+                                  else "")))
         if actor.has_state("state.held.grappled") or actor.has_state("state.held.pinned"):
             holder = self._grappler_of(actor)
             if holder is not None:
@@ -7580,6 +7662,30 @@ class Engine:
             if states.attitude_of(a) == "hostile":
                 out.append(r)
         return out
+
+    # Disruptive's tag (its feat document, feat loop b2).
+    DISRUPTS_DEFENSIVE_CASTING = "reactions.disrupts.casting-defensively"
+
+    def _disrupted_by(self, caster) -> "Actor | None":
+        """The first foe holding Disruptive who threatens this caster's square, knows where
+        the caster is (`awareness.locates`) and still has an attack of opportunity this
+        round — the feat's three conditions; None with no board."""
+        from . import awareness
+
+        spot = self.scene.positions.get(caster.ref)
+        if not self.scene.has_grid or spot is None:
+            return None
+        for ref, foe in self.scene.actors.items():
+            if foe is caster or foe.is_down or not self._against(foe, caster) \
+                    or not foe.has_state(self.DISRUPTS_DEFENSIVE_CASTING) \
+                    or not reactions.reactions_for(foe) \
+                    or not reactions.threatens(self.scene, ref, tuple(spot[:2])) \
+                    or not awareness.locates(self.scene, foe, caster):
+                continue
+            used = self.scene.reacted.get(f"{ref}:attack_of_opportunity", 0)
+            if used < reactions.budget_for(foe):
+                return foe
+        return None
 
     def _spend_reaction(self, ref: str, budget: str) -> bool:
         """Take one from this creature's allowance, or refuse.
@@ -10292,11 +10398,13 @@ class Engine:
         # paladin's deflection is against the creature she smote (`_effect_scope_holds`).
         target_ac = defender.ac(against=weapon["category"],
                                 flat_footed=flat_footed or bool(flounders), attacker=actor,
-                                provoked_by=str(intent.params.get("provoked_by") or ""))
+                                provoked_by=str(intent.params.get("provoked_by") or (
+                                    "opportunity" if intent.params.get("reaction") else "")))
         # What the feint took off, given back to every swing after the first (the loop).
         feint_gain = (defender.ac(against=weapon["category"],
                                   flat_footed=unfeinted_ff or bool(flounders), attacker=actor,
-                                  provoked_by=str(intent.params.get("provoked_by") or ""))
+                                  provoked_by=str(intent.params.get("provoked_by") or (
+                                    "opportunity" if intent.params.get("reaction") else "")))
                       - target_ac) if feinted else 0
         # The AC's parts past the sheet's own number, (what, how much), so the tell can
         # state the number the roll was judged on and say what made it (`_ac_said`).
@@ -10382,7 +10490,7 @@ class Engine:
                 state["tells"].append(caught_said)
         # (weapon, iteration) per swing. One weapon for a character; for a monster, the
         # whole printed option — an owlbear's claw, claw, bite (`Actor.attack_plan`).
-        sequence = actor.attack_plan(weapon_key, full, choices, off_key)
+        sequence = actor.attack_plan(weapon_key, full, choices, off_key, defender=defender)
         # Which hand each swing is (`hands`, parallel to `sequence`): a two-weapon full
         # attack's off-hand swings follow the primary hand's (`Actor.attack_plan`).
         off_from = len(actor.attack_plan(weapon_key, True, choices)) if off_key else None
@@ -10395,7 +10503,7 @@ class Engine:
         # class it was built for.
         it = intent.params.get("iteration")
         if it is not None and not full and not coup:
-            whole = actor.attack_plan(weapon_key, True, choices, off_key)
+            whole = actor.attack_plan(weapon_key, True, choices, off_key, defender=defender)
             at = min(int(it), len(whole) - 1)
             sequence = [whole[at]]
             hands = [("primary" if at < off_from else "off") if off_from is not None else ""]
@@ -10531,6 +10639,10 @@ class Engine:
                 ac_note = _ac_said("AC", sheet_ac + feint_gain, flat_footed, ac_parts)
                 feint_gain = 0
             swing_key, iteration = sequence[state["i"]]
+            # The swing's own moment beside its declared options (feat loop b2): an attack
+            # of opportunity, or the first attack its maker makes this turn
+            # (`_swing_moment`), each a roll-context key a document's `when` asks.
+            swing_choices = choices + self._swing_moment(intent, actor, state)
             hand = hands[state["i"]] if state["i"] < len(hands) else (hands[0] if hands else "")
             # Each swing its own weapon: the bite of a claw-claw-bite full attack rolls
             # the bite's printed bonus and dice, not the claw's. The named weapon keeps
@@ -10596,7 +10708,7 @@ class Engine:
                                                   range_ft=self._gap_ft(actor, defender),
                                                   beside_weapons=self._beside_weapons(
                                                       actor, weapon),
-                                                  choices=choices, hand=hand,
+                                                  choices=swing_choices, hand=hand,
                                                   off_light=off_light)
                 atk_mods = atk_mods + self._situational_attack_mods(
                     actor, defender, weapon, range_pen)
@@ -10789,13 +10901,14 @@ class Engine:
             if state["stage"] == "confirm":
                 # Critical Focus's +4 (`Actor.confirm_modifiers`), on this roll alone.
                 confirm_mods = atk_mods if dancing else (
-                    list(atk_mods) + actor.confirm_modifiers(weapon_key, defender, choices))
+                    list(atk_mods) + actor.confirm_modifiers(weapon_key, defender, swing_choices))
                 confirm = self._roll_or_suspend_stage(
                     intent, actor, confirm_mods, f"Confirm critical ({weapon['name']})",
                     swing_ac, partial, state, "1d20",
                 )
                 state["rolls"].append(confirm.as_dict())
                 state["crit"] = confirm.total >= swing_ac
+                state["confirm_total"] = confirm.total     # Impact Critical Shot's CMD test
                 self._judge(confirm, state["crit"])
                 state["stage"] = "damage"
 
@@ -10822,6 +10935,28 @@ class Engine:
                 state["stage"] = "attack"
                 continue
 
+            # Touch of Serenity (APG): "the attack deals no damage and bestows no other
+            # effect or condition" but its own — a charge that wounds nothing goes past
+            # the damage and every other rider to the charge alone (feat loop b2).
+            if state["stage"] == "damage" and not dancing and any(
+                    (e.payload["charge"] or {}).get("no_damage")
+                    for e in self._charges_for(actor, weapon_key, weapon)):
+                state["dealt"] = 0
+                state["tells"].append(f"{actor.name}'s blow lands on {defender.name} "
+                                      f"without harm.")
+                state.setdefault("blows", []).append({
+                    "result": "hit", "ref": defender.ref, "weapon": str(
+                        weapon.get("name") or weapon_key), "in_hand": _in_hand(
+                        weapon, weapon_key), "type": "", "nonlethal": True,
+                    "critical": False, "severity": blow_severity(0, defender.hp_max or 1),
+                    "left": left_after(defender)})
+                for extra in self._deliver_charges(actor, defender, weapon_key,
+                                                   intent.visibility or "player", weapon):
+                    state["effects"].append(extra["effect"])
+                    state["tells"].append(extra["tell"])
+                state["i"] += 1
+                state["stage"] = "attack"
+                continue
             if state["stage"] == "damage":
                 # Fortification, asked once per swing before anything is rolled for it:
                 # a confirmed critical or sneak attack dice against a fortified body
@@ -10850,7 +10985,7 @@ class Engine:
                                                                               defender),
                                                         beside_weapons=self._beside_weapons(
                                                             actor, weapon),
-                                                        choices=choices, hand=hand))
+                                                        choices=swing_choices, hand=hand))
                 rider_col = "" if dancing else str(weapon.get("rider_column") or "")
                 if rider_col:
                     # Blood DMG + Fist DMG + STR, and BOTH dice are the player's.
@@ -11173,7 +11308,9 @@ class Engine:
                 # A blow charged before the roll — stunning fist's save — spends itself on
                 # the first hit with the weapon it names (`_deliver_charges`).
                 for extra in ([] if dancing else self._deliver_charges(
-                        actor, defender, weapon_key, intent.visibility or "player", weapon)):
+                        actor, defender, weapon_key, intent.visibility or "player", weapon,
+                        full=bool(intent.params.get("full_attack"))
+                        or intent.params.get("iteration") is not None)):
                     state["effects"].append(extra["effect"])
                     state["tells"].append(extra["tell"])
                 # A raging feint (Tantrum) lasts until the first blow that lands.
@@ -11183,6 +11320,14 @@ class Engine:
                 # bleed, Dazing and Stunning Assault's save-or-condition.
                 for extra in ([] if dancing else self._feat_riders(
                         intent, actor, defender, weapon_key, weapon, state)):
+                    state["effects"].append(extra["effect"])
+                    if extra.get("tell"):
+                        state["tells"].append(extra["tell"])
+                # What a held feat does once a blow has landed (feat loop b2): Cornugon
+                # Smash's demoralize, Dreadful Carnage's at a fall, Two-Weapon Rend, Impact
+                # Critical Shot (`_feat_after_hit`).
+                for extra in ([] if dancing else self._feat_after_hit(
+                        actor, defender, weapon, power, hand, state)):
                     state["effects"].append(extra["effect"])
                     if extra.get("tell"):
                         state["tells"].append(extra["tell"])
@@ -24022,6 +24167,121 @@ class Engine:
                                                            run, origin, state))
         return out
 
+    # Feat loop b2 (2026-11-22): what a held feat does after a blow lands, each its
+    # document's tag, asked with `has_state` — never the feat's name.
+    DEMORALIZE_ON_POWER_HIT = "demoralize.on-hit.power-attack"     # Cornugon Smash
+    DEMORALIZE_ON_DROP = "demoralize.on-drop"                      # Dreadful Carnage
+    TWO_WEAPON_REND = "two_weapon.rend"                            # Two-Weapon Rend
+    IMPACT_CRITICAL = "critical.ranged.impact"                     # Impact Critical Shot
+
+    def _feat_after_hit(self, actor: Actor, defender: Actor, weapon: dict, power: bool,
+                        hand: str, state: dict) -> list[dict]:
+        """A held feat's free action once a blow has landed (feat loop b2, 2026-11-22).
+
+        - Cornugon Smash (Cheliax): "When you damage an opponent with a Power Attack, you
+          may make an immediate Intimidate check as a free action to attempt to
+          demoralize your opponent."
+        - Dreadful Carnage (APG): "Whenever you reduce an enemy to 0 or fewer hit points,
+          you can make an Intimidate check to demoralize all enemies within 30 feet as a
+          free action. Enemies that cannot see both you and the enemy you reduced ... are
+          unaffected."
+        - Two-Weapon Rend (CRB): "If you hit an opponent with both your primary hand and
+          your off-hand weapon, you deal an additional 1d10 points of damage plus 1-1/2
+          times your Strength modifier. You can only deal this additional damage once
+          each round."
+        - Impact Critical Shot (UC): on a ranged critical, "if your confirmation roll
+          exceeds your opponent's CMD, you can ... knock that target prone as if from a
+          trip combat maneuver" (the bull rush is the other choice; see the document).
+
+        "You can" and "may": the engine always takes them, since each only hurts the foe
+        (owner call). Every demoralize goes through the one door (`_demoralize`)."""
+        out: list[dict] = []
+        dealt = int(state.get("dealt") or 0)
+        melee = weapon.get("category") == "melee"
+        if power and melee and dealt > 0 and actor.has_state(self.DEMORALIZE_ON_POWER_HIT) \
+                and defender.hp > 0 and not defender.is_dead:
+            out.extend(self._free_demoralize(actor, [defender], "Cornugon Smash"))
+        if dealt > 0 and defender.hp <= 0 and actor.has_state(self.DEMORALIZE_ON_DROP) \
+                and not state.get("carnage_said"):
+            state["carnage_said"] = True
+            from . import awareness
+
+            side = next((k for k, refs in (self.scene.sides or {}).items()
+                         if actor.ref in refs), None)
+            foes = [a for k, refs in (self.scene.sides or {}).items() if k != side
+                    for a in (self.scene.actors.get(r) for r in refs)
+                    if a is not None and a is not defender and not a.is_down
+                    and awareness.sees(self.scene, a, actor)
+                    and awareness.sees(self.scene, a, defender)
+                    and not a.has_state("state.senses.blinded")
+                    and ((g := self._gap_ft(actor, a)) is None or g <= 30)]
+            if foes:
+                out.extend(self._free_demoralize(actor, foes, "Dreadful Carnage"))
+        if hand and dealt > 0 and actor.has_state(self.TWO_WEAPON_REND):
+            hit = state.setdefault("rend_hands", {}).setdefault(defender.ref, [])
+            if hand not in hit:
+                hit.append(hand)
+            if {"primary", "off"} <= set(hit) and not state.get("rended") \
+                    and defender.hp > -defender.hp_max:
+                state["rended"] = True
+                bonus = int(1.5 * max(0, actor.ability_mod("str")))
+                roll = self.dice.roll("1d10", [Modifier(bonus, "1-1/2 Str")] if bonus else [],
+                                      label="Two-Weapon Rend (1d10 + 1-1/2 Str)",
+                                      visibility="player")
+                state["rolls"].append(roll.as_dict())
+                more = self._apply_damage(defender, max(1, roll.total), weapon["type"])
+                more["origin"] = "rule:feat-two-weapon-rend"
+                out.append({"effect": more,
+                            "tell": f"{actor.name}'s two blades rend {defender.name} for "
+                                    f"{more['amount']} more (Two-Weapon Rend)."})
+        if state.get("crit") and weapon.get("category") == "ranged" \
+                and actor.has_state(self.IMPACT_CRITICAL) and defender.hp > 0:
+            total = int(state.get("confirm_total") or 0)
+            cmd = defender.cmd()
+            if total > cmd and not defender.has_state("state.position.prone"):
+                # "as if from a trip combat maneuver": the trip row's own condition.
+                defender.add_condition(MANEUVERS["trip"]["condition"], None,
+                                       source=f"{actor.name}'s impact shot",
+                                       origin="rule:feat-impact-critical-shot")
+                out.append({"effect": {"ref": defender.ref, "kind": "condition",
+                                       "condition": "prone",
+                                       "origin": "rule:feat-impact-critical-shot"},
+                            "tell": f"The shot's impact ({total} against CMD {cmd}) knocks "
+                                    f"{defender.name} off their feet: prone."})
+            elif total <= cmd:
+                out.append({"effect": {"ref": defender.ref, "kind": "rider_resisted",
+                                       "rider": "impact", "origin":
+                                       "rule:feat-impact-critical-shot"},
+                            "tell": f"{defender.name} takes the shot's impact standing "
+                                    f"({total} against CMD {cmd})."})
+        state.pop("confirm_total", None)
+        return out
+
+    def _free_demoralize(self, actor: Actor, foes: list, why: str) -> list[dict]:
+        """One Intimidate roll, read against each foe with its own size terms and DC (CRB
+        p.99: 10 + Hit Dice + Wis), through the one Demoralize door — a free action, so it
+        spends nothing. The roll shows in the dice log (`visibility` player)."""
+        from . import attitude as attitude_mod
+
+        face = self.dice.roll("1d20", label=f"Intimidate ({why}: demoralize)",
+                              visibility="player")
+        out: list[dict] = [{"effect": {"ref": actor.ref, "kind": "check",
+                                       "skill": "intimidate", "face": face.total,
+                                       "origin": f"rule:feat-{why.lower().replace(' ', '-')}"},
+                            "tell": ""}]
+        for foe in foes:
+            mods = self._demoralize_mods(actor, foe, [])
+            total = face.total + sum(m.value for m in mods)
+            dc = attitude_mod.intimidate_dc(foe)
+            said, fx = self._demoralize(actor, foe, total - dc, "")
+            for e in fx:
+                out.append({"effect": e, "tell": ""})
+            out.append({"effect": {"ref": foe.ref, "kind": "demoralize", "total": total,
+                                   "dc": dc, "from": why},
+                        "tell": f"{why}: Intimidate {total} against {foe.name}'s DC {dc}. "
+                                f"{said}"})
+        return out
+
     # The tags a rogue talent's catalogue entry carries (content/class-options/
     # rogue-talents.json, held through `standing_tags`), in the order the engine picks one
     # when more than one is held: "Only one talent marked sneak_attack may apply to a
@@ -25320,6 +25580,8 @@ class Engine:
                               f"({roll.total} against {pct}%).")
         return False
 
+    WHIP_THROUGH_ARMOUR = "weapon.whip.through-armour"      # Whip Mastery's tag
+
     def _harmless_blow(self, actor: Actor, defender: Actor, weapon: dict,
                        struck_as: tuple, incorporeal: bool) -> str:
         """Why this blow does nothing at all, or "".
@@ -25340,6 +25602,22 @@ class Engine:
                 if kind != "object" and _is_of_kind(defender, "type", kind):
                     return (f"The {name} passes through {defender.name} without harm: "
                             f"brilliant energy cannot hurt the {kind}.")
+        # The whip (CRB, Weapon Descriptions): "A whip deals no damage to any creature
+        # with an armor bonus of +1 or higher or a natural armor bonus of +3 or higher."
+        # Whip Mastery's "you can deal damage with a whip despite a creature's armor
+        # bonus or natural armor bonus" is its document's tag (feat loop b2). Measured
+        # before: a whip lashed a knight in full plate as it lashed a beggar.
+        from . import weapons as weapons_mod
+
+        base = str(weapon.get("crafted_base") or weapons_mod.key_for(
+            str(weapon.get("key") or weapon.get("name") or "")) or "")
+        if base == "whip" and not actor.has_state(self.WHIP_THROUGH_ARMOUR):
+            worn = defender.ac_modifiers(attacker=actor)
+            armour = sum(m.value for m in worn if (m.type or "") == "armour")
+            hide = sum(m.value for m in worn if (m.type or "") == "natural armour")
+            if armour >= 1 or hide >= 3:
+                return (f"The whip cracks against {defender.name}'s "
+                        f"{'armour' if armour >= 1 else 'hide'} and does no harm.")
         if not incorporeal or {"magic", "ghost_touch"} & set(struck_as):
             return ""
         natural = bool(weapon.get("natural") or weapon.get("stat_block"))
@@ -32840,6 +33118,31 @@ class Engine:
             effects=[{"ref": actor.ref, "kind": "break_free", "how": how, "made": made}],
             tell=tell, because=intent.because)
 
+    def _swing_moment(self, intent: Intent, actor, state: dict) -> tuple[str, ...]:
+        """The moment a swing is made in, as roll-context keys (feat loop b2, 2026-11-22):
+
+        - `opportunity`: an attack of opportunity (the engine's spliced `reaction`) —
+          Greater Snap Shot's "Whenever you make an attack of opportunity using a ranged
+          weapon and hit", Death from Below's "when you are allowed an attack of
+          opportunity against the flying opponent";
+        - `first_attack`: the first attack its maker makes this turn, on its own turn —
+          Furious Focus (APG): "you do not suffer Power Attack's penalty on melee attack
+          rolls on the first attack you make each turn. You still suffer the penalty on
+          any additional attacks, including attacks of opportunity." Out of a fight every
+          attack is its own turn's first.
+
+        Decided once per attack op and kept in its state, so a resume after the dice popup
+        answers as the first pass did."""
+        if intent.params.get("reaction"):
+            return ("opportunity",)
+        if "first_turn" not in state:
+            rnd = self.scene.round
+            state["first_turn"] = (not self.scene.in_encounter
+                                   or self.scene.swung.get(actor.ref) != rnd)
+            if self.scene.in_encounter:
+                self.scene.swung[actor.ref] = rnd
+        return ("first_attack",) if state["first_turn"] and state["i"] == 0 else ()
+
     def _gap_ft(self, actor, defender) -> float | None:
         """Feet between two creatures on the grid, or None when either is off it.
 
@@ -34941,6 +35244,16 @@ class Engine:
         refused = self._ability_refusal(actor, name, doc)
         if refused:
             return self._refuse(intent, f"Nothing takes hold. {refused}", code="ability_refused")
+        # The light the user must stand in (`light`): Blinding Flash's "You must be in an
+        # area of bright light to use this feat" — the board's light where they stand
+        # (`Scene.light_at`), the ambient light with no board.
+        if doc.get("light"):
+            levels = self.scene.LIGHT_LEVELS
+            lit = self.scene.light_at(self.scene.positions.get(actor.ref), actor)
+            if levels.index(lit) < levels.index(str(doc["light"])):
+                return self._refuse(intent, f"Nothing takes hold. {name} needs {doc['light']}"
+                                            f" light, and the light here is {lit}.",
+                                    code="ability_refused")
         # A Blood Pool of the user's on this floor to draw on (`spends_pool`): Siphon
         # Pool's "absorb a Blood Pool". Refused before the price, with what makes one.
         drawn = int(doc.get("spends_pool") or 0)
@@ -35010,6 +35323,12 @@ class Engine:
             pool = actor.pool(str(cost["pool"]))
             pool_start = pool.current if pool is not None else None
             paid = actor.spend_pool(str(cost["pool"]), int(cost.get("amount", 1) or 1))
+            # The pool's own wait (`cooldown`): Punishing Kick's "no more than once per
+            # round" is a one-round wait after each use (feat loop b2).
+            if pool is not None and pool.cooldown_dice:
+                actor.start_cooldown(str(cost["pool"]), self.dice.roll(
+                    pool.cooldown_dice, label=f"{cost['pool']} cooldown",
+                    visibility="hidden").total)
             records.append({"ref": actor.ref, "kind": "resource", "pool": str(cost["pool"]),
                             "spent": paid.get("spent", 0), "left": paid.get("current", 0),
                             "origin": origin})
@@ -35402,6 +35721,15 @@ class Engine:
             wrong = self._class_ability_wrong_target(doc, name, other)
             if wrong:
                 return [], wrong
+            # A gaze (Blinding Flash, Dragon Empires Primer: "This feat functions as a gaze
+            # attack ... does not work on creatures that are already blinded"): only on a
+            # creature that can see the user (`awareness.sees`) and is not blind.
+            from . import awareness
+
+            if doc.get("gaze") and (other.has_state("state.senses.blinded")
+                                    or not awareness.sees(self.scene, other, actor)):
+                return [], (f"{name} works on a creature that can see {actor.name}, and "
+                            f"{other.name} cannot. Nothing is spent.")
             feet = doc.get("range_ft") or doc.get("reach_ft") or doc.get("radius_ft")
             if not near(other, feet):
                 gap = self.scene.distance_between(actor.ref, other.ref)
@@ -35409,8 +35737,9 @@ class Engine:
                             f"{feet} ft.")
             return [other], ""
         radius = doc.get("radius_ft")
-        if affects == "allies":
-            pool = [a for a in here if not self._against(actor, a) and not a.is_down]
+        if affects in ("allies", "others"):
+            pool = [a for a in here if not self._against(actor, a) and not a.is_down
+                    and not (affects == "others" and a is actor)]
         elif affects == "enemies":
             pool = [a for a in here if self._against(actor, a) and not a.is_down]
         else:
@@ -35901,10 +36230,16 @@ class Engine:
             what = (" or ".join(c["weapons"][:1]) if c.get("weapons")
                     else str(c.get("category") or "") or "")
             swing = f"{what} blow" if what else "blow"
-            if c.get("save"):
+            if c.get("push_ft"):
+                line += f" The next {swing} this round, if it hits, drives the foe back."
+            elif c.get("save"):
+                # Crushing Blow's failed save leaves a penalty, not a condition (b2).
+                worse = c["condition"] or ", ".join(
+                    f"{m['amount']:+d} {m['target'].upper()}"
+                    for m in (c.get("on_fail") or {}).get("modifiers") or ()) or "bleeding"
                 line += (f" The next {swing} this round, if it hits: "
                          f"{SAVES.get(c['save'], c['save'])} DC {c['dc']} or "
-                         f"{c['condition']}.")
+                         f"{worse}.")
             else:
                 line += f" It rides the next {swing} this round, hit or miss."
         return {"records": records, "said": line.strip()}
@@ -35920,12 +36255,28 @@ class Engine:
                 "save": str(save.get("save", "fort")) if save else "",
                 "dc": ca.amount(save.get("dc"), actor) if save else 0,
                 "condition": str(doc.get("charge_condition") or charge.get("condition")
-                                 or "stunned"),
+                                 or ("" if charge.get("on_fail") else "stunned")),
                 "rounds": doc.get("charge_rounds"),
                 "rounds_dice": doc.get("charge_rounds_dice"),
                 "immune_types": list(charge.get("immune_types") or ()),
                 "immune_subtypes": list(charge.get("immune_subtypes") or ()),
-                "immune_crit": bool(charge.get("immune_crit"))}
+                "immune_crit": bool(charge.get("immune_crit")),
+                # The activated feats' shapes (feat loop b2, 2026-11-22; class_abilities
+                # docstring): who the blow works on, a blow that wounds nothing (Touch
+                # of Serenity), a push in place of the save (Punishing Kick), what a
+                # failed save leaves besides a condition (Crushing Blow's AC, worked out
+                # now with the user's Wisdom; Jawbreaker's bleed), and Gorgon's Fist's
+                # "single unarmed melee attack" that no full attack carries.
+                **{k: charge[k] for k in ("target_requires", "target_requires_not",
+                                          "target_said", "no_damage", "single_attack")
+                   if charge.get(k)},
+                **({"push_ft": int(doc["charge_push_ft"])} if doc.get("charge_push_ft")
+                   else {}),
+                **({"on_fail": {"modifiers": ca.modifiers(
+                    (charge["on_fail"] or {}).get("modifiers"), actor),
+                    "rounds": (charge["on_fail"] or {}).get("rounds"),
+                    "bleed": (charge["on_fail"] or {}).get("bleed")}}
+                   if charge.get("on_fail") else {})}
 
     @staticmethod
     def _charges_for(actor: Actor, weapon_key: str, weapon: dict | None = None
@@ -36005,7 +36356,8 @@ class Engine:
         return out
 
     def _deliver_charges(self, actor: Actor, defender: Actor, weapon_key: str,
-                         visibility: str = "player", weapon: dict | None = None) -> list[dict]:
+                         visibility: str = "player", weapon: dict | None = None,
+                         full: bool = False) -> list[dict]:
         """Spend a charged blow on the hit that just landed — stunning fist's save.
 
         Read off the effect's payload, not a name: any document that arms the next hit
@@ -36017,6 +36369,15 @@ class Engine:
         for e in self._charges_for(actor, weapon_key, weapon):
             c = e.payload["charge"]
             actor.remove_effects(match=lambda x, e=e: x is e)
+            unfit = self._charge_unfit(c, defender, full)
+            if unfit:
+                out.append({"effect": {"ref": defender.ref, "kind": "charge_spent",
+                                       "what": e.name, "origin": e.origin},
+                            "tell": f"{e.name} has no hold on {defender.name}: {unfit}."})
+                continue
+            if c.get("push_ft"):
+                out.extend(self._charge_push(actor, defender, e, int(c["push_ft"])))
+                continue
             if not c.get("save"):
                 # A damage-only charge has done its work in the roll's funnel already.
                 out.append({"effect": {"ref": actor.ref, "kind": "charge_spent",
@@ -36056,6 +36417,10 @@ class Engine:
             if c.get("rounds_dice"):
                 rounds = self.dice.roll(str(c["rounds_dice"]), label=f"{e.name}: rounds",
                                         visibility=visibility).total
+            if c.get("on_fail"):
+                out.extend(self._charge_on_fail(defender, e, c["on_fail"], line))
+                if not c.get("condition"):
+                    continue
             defender.add_condition(str(c["condition"]), int(rounds) if rounds else None,
                                    source=e.name, origin=e.origin)
             out.append({"effect": {"ref": defender.ref, "kind": "condition",
@@ -36067,6 +36432,89 @@ class Engine:
                             "condition": c["condition"], "from": e.name})
                         + (f" It lasts {rounds} round{'s' if rounds != 1 else ''}."
                            if rounds else "")})
+        return out
+
+    @staticmethod
+    def _charge_unfit(c: dict, defender: Actor, full: bool) -> str:
+        """Why an armed blow does nothing to the creature it hit, or "" (feat loop b2).
+
+        Gorgon's Fist (CRB): "against a foe whose speed is reduced ... This feat has no
+        effect on targets that are staggered", and it is "a single unarmed melee attack"
+        made as a standard action, so a full attack's blow carries none of it. Jawbreaker
+        (UC): "an opponent that is grappled, helpless, or stunned". Tag queries, the
+        target's words the document's own."""
+        if c.get("single_attack") and full:
+            return "it is a single blow, made as a standard action, not a full attack's"
+        need = c.get("target_requires") or ()
+        bars = c.get("target_requires_not") or ()
+        if (need and not any(defender.has_state(str(q)) for q in need)) \
+                or any(defender.has_state(str(q)) for q in bars):
+            return f"it works only against {c.get('target_said') or 'another kind of foe'}"
+        return ""
+
+    def _charge_push(self, actor: Actor, defender: Actor, e: ActiveEffect,
+                     feet: int) -> list[dict]:
+        """Punishing Kick's push (APG): "it is moved 5 feet directly away from you. This
+        movement does not provoke attacks of opportunity, and the target must end this
+        move in a safe space it can stand in" — `_push_line`, forced movement that stops
+        at a wall or a body, as a bull rush's does. No board, no feet to move."""
+        here = self.scene.positions.get(actor.ref)
+        there = self.scene.positions.get(defender.ref)
+        if not self.scene.has_grid or here is None or there is None:
+            return [{"effect": {"ref": defender.ref, "kind": "charge_spent", "what": e.name,
+                                "origin": e.origin},
+                     "tell": f"{e.name} drives {defender.name} back a step."}]
+        step = ((there[0] > here[0]) - (there[0] < here[0]),
+                (there[1] > here[1]) - (there[1] < here[1]))
+        moved = self._push_line(defender.ref, step, max(1, feet // 5)) if step != (0, 0) \
+            else 0
+        return [{"effect": {"ref": defender.ref, "kind": "pushed", "squares": moved,
+                            "to": list(self.scene.positions.get(defender.ref) or ()),
+                            "from": e.name, "origin": e.origin},
+                 "tell": (f"{e.name} drives {defender.name} {moved * 5} feet back."
+                          if moved else f"{e.name} meets {defender.name} braced against "
+                                        f"something solid; they do not move.")}]
+
+    def _charge_on_fail(self, defender: Actor, e: ActiveEffect, spec: dict,
+                        line: str) -> list[dict]:
+        """What a failed save against an armed blow leaves besides a condition (feat loop
+        b2): Crushing Blow's "reduce the target's AC by an amount equal to your Wisdom
+        modifier for 1 minute. This penalty does not stack with other penalties applied
+        due to Crushing Blow" — one effect by the blow's origin, laid again rather than
+        added to; Jawbreaker's "1d4 points of bleed damage". Through the one applicator."""
+        out: list[dict] = []
+        if spec.get("modifiers"):
+            defender.remove_effects(match=lambda x: x.origin == e.origin
+                                    and x.key == e.name.lower())
+            rounds = int(spec.get("rounds") or 1)
+            defender.apply_effect(ActiveEffect(
+                name=e.name, kind="condition", key=e.name.lower(), source=e.name,
+                origin=e.origin, duration="rounds", rounds_left=rounds,
+                modifiers=[dict(m) for m in spec["modifiers"]]))
+            said = ", ".join(f"{m['amount']:+d} {m['target'].upper()}"
+                             for m in spec["modifiers"])
+            out.append({"effect": {"ref": defender.ref, "kind": "condition",
+                                   "condition": e.name.lower(),
+                                   "modifiers": spec["modifiers"], "rounds": rounds,
+                                   "origin": e.origin},
+                        "tell": f"{line}; {e.name} leaves them {said} for {rounds} rounds."})
+        if spec.get("bleed"):
+            if states.immune_to(defender, "bleed", "bleed") or defender.has_state("immune.bleed"):
+                out.append({"effect": {"ref": defender.ref, "kind": "rider_refused",
+                                       "rider": "bleed", "origin": e.origin},
+                            "tell": f"{line}, but {defender.name} does not bleed."})
+            else:
+                defender.apply_effect(ActiveEffect(
+                    name="Bleed", kind="condition", key="bleed", source=e.name,
+                    origin=e.origin, tags=states.tags_for("bleed"),
+                    payload={"stopped_by": "a DC 15 Heal check or any magical healing"},
+                    periodic=[{"per": "round", "damage": str(spec["bleed"]),
+                               "damage_type": "untyped"}]))
+                out.append({"effect": {"ref": defender.ref, "kind": "condition",
+                                       "condition": "bleed", "per_round": str(spec["bleed"]),
+                                       "origin": e.origin},
+                            "tell": f"{line}; {e.name} leaves them bleeding "
+                                    f"{spec['bleed']} a round."})
         return out
 
     def _end_class_stance(self, actor: Actor, eff: ActiveEffect) -> tuple[list[dict], list[str]]:

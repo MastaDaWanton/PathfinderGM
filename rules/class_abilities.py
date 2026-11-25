@@ -118,6 +118,21 @@ data — both leave it to the table — so `hit_dice` and `only` are this gramma
   it would be harmed, and counts among the undead it heals (Death's Embrace).
 - `effect.on`: `"failed"` — the effect lands only on those who failed the save.
   `effect.vulnerable`: a damage type the creature is vulnerable to for `rounds`.
+- `feat` (feat loop b2, 2026-11-22): a file whose `class` is "feat" holds the activated
+  feats — Sociable's move action, Punishing Kick's declared blow — each document had by a
+  character holding the feat its `feat` names (a feats.json id), whatever their class.
+  The same executor, so a feat's move-action buff is a class ability's in every field.
+- `light`: the least light the user must stand in ("bright": Blinding Flash), read off the
+  board (`Scene.light_at`); `gaze`: the creature aimed at must see the user and not be
+  blind (`awareness.sees`).
+- `charge` gained (feat loop b2) `target_requires` / `target_requires_not` / `target_said`
+  (whom the armed blow works on: Gorgon's Fist's slowed foe), `single_attack` (no full
+  attack carries it), `no_damage` (Touch of Serenity), `on_fail` (`modifiers` and
+  `rounds`, `bleed`: what a failed save leaves besides a condition — Crushing Blow's AC,
+  Jawbreaker's bleed); a choice's overlay `charge_push_ft` pushes in place of the save
+  (Punishing Kick's "push your target 5 feet").
+- `affects: "others"`: the user's allies but never the user — Shared Insight's "all
+  friendly creatures", where Sociable says "(including yourself)" and is `allies`.
 - `charge` gained `category` ("melee"), `modifiers` (a damage-only charge: Destructive
   Smite), `spent_on` ("swing", the default — a miss ruins it — or "hit"); `save` is
   optional now.
@@ -147,7 +162,7 @@ from pathlib import Path
 _DOCS: dict | None = None
 
 ACTIONS = ("free", "swift", "immediate", "move", "standard", "full-round")
-AFFECTS = ("self", "target", "ally", "allies", "enemies", "all")
+AFFECTS = ("self", "target", "ally", "allies", "others", "enemies", "all")
 _KINDS = ("combat_mod", "save_mod", "ability_mod", "skill_mod", "speed")
 
 
@@ -166,7 +181,14 @@ def documents() -> dict[str, dict]:
         if folder.is_dir():
             for path in sorted(folder.glob("*.json")):
                 doc = json.loads(path.read_text(encoding="utf-8"))
-                out[str(doc.get("class", path.stem)).strip().lower()] = doc
+                cid = str(doc.get("class", path.stem)).strip().lower()
+                if cid in out:
+                    # Two files of one kind (the feat lanes each write their own file):
+                    # one list, never the later file silently replacing the earlier.
+                    out[cid] = {**out[cid], "abilities": list(
+                        out[cid].get("abilities") or ()) + list(doc.get("abilities") or ())}
+                    continue
+                out[cid] = doc
         _DOCS = out
     return _DOCS
 
@@ -311,7 +333,8 @@ DOC_KEYS = frozenset({
     "requires_choice", "requires_not", "requires_said", "roll", "roll_as", "save",
     "selective", "self", "self_action", "source", "target_requires",
     "target_requires_said", "tell", "tell_off", "text", "toggle", "undead",
-    "undead_only", "charge_condition", "charge_rounds", "charge_rounds_dice"})
+    "undead_only", "charge_condition", "charge_rounds", "charge_rounds_dice", "feat",
+    "charge_push_ft", "gaze", "light"})
 SELF_KEYS = frozenset({"ends_when", "forbids", "modifiers", "natural_weapons", "rounds",
                        "strikes_as", "tags", "vs_target"})
 EFFECT_KEYS = frozenset({"condition", "modifiers", "on", "rounds", "skill_modifiers",
@@ -405,6 +428,21 @@ def dice(spec: dict, actor) -> str:
 
 # --- finding them ---------------------------------------------------------------------------
 
+FEAT_KIND = "feat"
+
+
+def feat_ids(actor) -> set[str]:
+    """The feats.json ids this creature holds, by the one normaliser (`feats.resolve`)."""
+    from . import feats as feats_mod
+
+    out: set[str] = set()
+    for raw in getattr(actor, "feats", None) or ():
+        feat, _target = feats_mod.resolve(raw)
+        if feat is not None:
+            out.add(feat.id)
+    return out
+
+
 def _docs_for(actor) -> list[dict]:
     """Every document this character's class carries, plus their domains' powers, each
     stamped with the `class` it came from (the provenance stem)."""
@@ -421,6 +459,10 @@ def _docs_for(actor) -> list[dict]:
     # copies of the power's own arrival that could drift). The power's variant fills
     # `$energy` and its kind (a red dragon's claws burn with fire), and its `by_level`
     # rungs are laid over the document (claws grow at 7th).
+    held = feat_ids(actor)
+    for doc in (documents().get(FEAT_KIND) or {}).get("abilities") or ():
+        if str(doc.get("feat") or "") in held:
+            out.append({**doc, "class": FEAT_KIND})
     from . import grantedpowers
 
     kinds = grantedpowers.kinds()
@@ -805,6 +847,13 @@ def validate_documents(docs: dict | None = None) -> list[str]:
                                     + (f" in {d['entry']!r}" if d.get("entry") else "")
                                     + " — `power` names a key in that kind's powers file "
                                       "(rules/grantedpowers.py).")
+        elif cid == FEAT_KIND:
+            from . import feats as feats_mod
+
+            for d in file.get("abilities") or ():
+                if str(d.get("feat") or "") not in feats_mod.all_feats():
+                    problems.append(f"feat: {d.get('name')!r} names no feat — `feat` is "
+                                    f"the feats.json id that grants it ({d.get('feat')!r}).")
         else:
             cls = classes_mod.all_classes().get(cid)
             if not cls:

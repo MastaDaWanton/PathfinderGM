@@ -390,6 +390,9 @@ class Campaign:
             # The round a drink spent the standard action (2026-11-13): saved for the
             # reason `move_spent` is.
             "standard_spent": (dict(self.scene.standard_spent), {}),
+            # The round each combatant last attacked on its own turn (Furious Focus's
+            # first attack, feat loop b2): saved for the reason `move_spent` is.
+            "swung": (dict(self.scene.swung), {}),
             # What the player last struck with this fight (`Scene.means`, 2026-10-09):
             # saved for the reason `move_spent` is, a fight put down mid-turn.
             "means": ({k: dict(v) for k, v in self.scene.means.items()}, {}),
@@ -500,6 +503,7 @@ class Campaign:
             move_spent={k: int(v) for k, v in (s.get("move_spent") or {}).items()},
             standard_spent={k: int(v) for k, v in
                             (s.get("standard_spent") or {}).items()},
+            swung={k: int(v) for k, v in (s.get("swung") or {}).items()},
             means={k: dict(v) for k, v in (s.get("means") or {}).items()
                    if isinstance(v, dict)},
             turn=s.get("turn", -1),

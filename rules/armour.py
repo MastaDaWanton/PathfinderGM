@@ -258,14 +258,20 @@ def attack_penalties(actor) -> list[tuple[int, str]]:
     penalty of anything worn unproficiently (CRB "Armor Proficiency": "The penalty for
     nonproficiency with armor stacks with the penalty for shields"), and the tower
     shield's own −2. Read by `Actor.attack_modifiers` into the one funnel."""
+    from .sheet import NONPROFICIENCY_HALVED
+
     out: list[tuple[int, str]] = []
     a_key = str(getattr(actor, "armour", "none") or "none")
     s_key = str(getattr(actor, "shield", "none") or "none")
     a, s = worn_rows(actor)
+    # Improved Improvisation (ARG): "Your nonproficiency penalty with weapons, armor, and
+    # shields is halved" — rounded toward nothing, the smaller penalty (owner call b2).
+    halve = actor.has_state(NONPROFICIENCY_HALVED) if hasattr(actor, "has_state") else False
+    cut, said = ((lambda n: int(n / 2)), " (halved)") if halve else ((lambda n: n), "")
     if a_key != "none" and a.get("acp") and not proficient_with(actor, "armour", a_key):
-        out.append((int(a["acp"]), f"not proficient with {a['name']}"))
+        out.append((cut(int(a["acp"])), f"not proficient with {a['name']}{said}"))
     if s_key != "none" and s.get("acp") and not proficient_with(actor, "shield", s_key):
-        out.append((int(s["acp"]), f"not proficient with {s['name']}"))
+        out.append((cut(int(s["acp"])), f"not proficient with {s['name']}{said}"))
     if s_key != "none" and s.get("attack"):
         out.append((int(s["attack"]), f"{s['name']} (encumbering)"))
     return out

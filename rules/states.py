@@ -425,6 +425,7 @@ TAGS: dict[str, tuple[str, ...]] = {
     # concentration gate; Burning Spell's clinging fire is its periodic damage only.
     "concussed":   ("state.impaired.concussed",),
     "disrupted":   ("state.casting.disrupted",),
+    "serene":      ("state.pacified.serene",),
     "burning-spell": ("state.wound.burning-spell",),
     "invisible":   ("state.hidden.invisible",),
     # A won Stealth check, held (rules/awareness.py, 2026-10-30): "Creatures that fail to
@@ -952,6 +953,9 @@ BLOCKS: dict[str, frozenset[str]] = {
     # Hanging along a mount's flank (CRB, Ride: "You can't attack or cast spells while
     # using your mount as cover"; rules/bodyskills.py `cover`).
     "state.position.mount-cover": frozenset(("attack", "cast")),
+    # Touch of Serenity (APG): no spell and no attack for the round, an attack of
+    # opportunity included (`reactions.reactions_for` asks `blocking_key("attack")`).
+    "state.pacified.serene": frozenset(("attack", "cast")),
 }
 
 

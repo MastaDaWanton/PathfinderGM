@@ -414,6 +414,10 @@ SPELL_STATES: dict[str, dict] = {
     },
     "disrupted": {"name": "Disrupted",
                   "note": "must make a concentration check to cast (Disruptive Spell)"},
+    # Feat loop b2, 2026-11-22: Touch of Serenity (APG): "the target cannot cast spells or
+    # attack (including attacks of opportunity and attacks as immediate actions) for 1
+    # round" — a feat's state, not the book's condition table; `states.BLOCKS` stops it.
+    "serene": {"name": "Serene", "note": "cannot cast spells or attack (Touch of Serenity)"},
 }
 
 # --- Difficulty bands ------------------------------------------------------------

@@ -1,0 +1,704 @@
+{
+  "_about": [
+    "Feat loop, batch 2, lane b2-attack-a (2026-11-22): the second half of the audit's",
+    "'attack-shape / other combat' sort, most of which are passive or situational, built as",
+    "each Benefit says (content/feats/feats.json, checked against aonprd.com FeatDisplay).",
+    "The feats a character USES (Sociable's move action, Punishing Kick's declared blow) are",
+    "documents in content/class-abilities/feats-b2-attack-a.json, run by the class-ability",
+    "executor; their entry here is empty, or carries the `not_yet` that keeps them PARTIAL.",
+    "New readers this lane built: the swing's moment (`opportunity`, `first_attack`:",
+    "Engine._swing_moment), the AC line's `opportunity` and `adjacent` (Actor._ac_context),",
+    "a target `aloft` (sheet.aloft), a ranged weapon's threat (reactions.ranged_threat), an",
+    "extra attack of opportunity while wielding (reactions.extra_while_wielding)."
+  ],
+  "sociable": {},
+  "shared-insight": {},
+  "shared-manipulation": {},
+  "punishing-kick": {},
+  "touch-of-serenity": {},
+  "gorgon-s-fist": {},
+  "crushing-blow": {},
+  "blinding-flash": {
+    "not_yet": [
+      "'a weapon or shield with a polished or reflective surface': gear records no finish, so a bare-handed user is not refused"
+    ]
+  },
+  "jawbreaker": {
+    "not_yet": [
+      "'unable to use its mouth to attack, speak clearly, and employ verbal spell components' until the bleed ends: nothing asks for a working mouth"
+    ]
+  },
+  "reach-defense": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 2,
+        "bonus_type": "dodge",
+        "when": {
+          "opportunity": true,
+          "adjacent": false
+        },
+        "note": "against attacks of opportunity from opponents not adjacent to you"
+      }
+    ]
+  },
+  "death-frombelow": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 2,
+        "bonus_type": "circumstance",
+        "when": {
+          "opportunity": true,
+          "target": {
+            "aloft": true
+          }
+        },
+        "note": "an attack of opportunity against a flying opponent"
+      }
+    ],
+    "not_yet": [
+      "'when you have set a weapon against a charge': no readied action sets a weapon against a charge yet (the charge lane's machinery)"
+    ]
+  },
+  "snap-shot": {
+    "tags": [
+      "threat.ranged.5"
+    ]
+  },
+  "greater-snap-shot": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "formula": "2 + 2 * min(1, bab // 16) + 2 * min(1, bab // 20)",
+        "bonus_type": "untyped",
+        "when": {
+          "opportunity": true,
+          "weapon": {
+            "ranged": true
+          }
+        },
+        "note": "an attack of opportunity with a ranged weapon that hits"
+      },
+      {
+        "type": "combat_mod",
+        "target": "crit_confirm",
+        "formula": "2 + 2 * min(1, bab // 16) + 2 * min(1, bab // 20)",
+        "bonus_type": "untyped",
+        "when": {
+          "opportunity": true,
+          "weapon": {
+            "ranged": true
+          }
+        }
+      }
+    ]
+  },
+  "furious-focus": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "formula": "1 + bab // 4",
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "power_attack",
+          "first_attack": true,
+          "weapon": {
+            "category": "melee",
+            "strength_share": 1.5
+          }
+        },
+        "note": "Power Attack's penalty lifted from the first attack each turn, two-handed"
+      }
+    ]
+  },
+  "elven-battle-training": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "longbow"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "longbow"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "composite-longbow"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "composite-longbow"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "shortbow"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "shortbow"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "composite-shortbow"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "composite-shortbow"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "longsword"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "longsword"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "rapier"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "rapier"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "elven-curve-blade"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "elven-curve-blade"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "elven-branched-spear"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "elven-branched-spear"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "elven-leafblade"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "elven-leafblade"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "disarm"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "elven-thornblade"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "sunder"
+        },
+        "when": {
+          "bearer": {
+            "wielding": "elven-thornblade"
+          }
+        }
+      }
+    ],
+    "tags": [
+      "reactions.aoo.extra.wielding.longsword",
+      "reactions.aoo.extra.wielding.rapier",
+      "reactions.aoo.extra.wielding.elven-curve-blade",
+      "reactions.aoo.extra.wielding.elven-branched-spear",
+      "reactions.aoo.extra.wielding.elven-leafblade",
+      "reactions.aoo.extra.wielding.elven-thornblade"
+    ]
+  },
+  "improved-improvisation": {
+    "tags": [
+      "proficiency.nonproficient.halved"
+    ],
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "all",
+        "formula": "2 * (1 - min(1, ranks))",
+        "bonus_type": "untyped",
+        "note": "Improvisation's +2 on skills you have no ranks in raised to +4"
+      }
+    ]
+  },
+  "medusa-s-wrath": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "extra_attacks",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "full_attack": true,
+          "weapon": {
+            "key": "unarmed"
+          },
+          "target": {
+            "state": [
+              "state.unable.dazed",
+              "state.position.flat-footed",
+              "state.unable.paralyzed",
+              "state.impaired.staggered",
+              "state.unable.stunned",
+              "state.down.unconscious"
+            ]
+          }
+        },
+        "note": "two more unarmed strikes at your highest bonus, against a dazed, flat-footed, paralyzed, staggered, stunned or unconscious foe"
+      }
+    ]
+  },
+  "cornugon-smash": {
+    "tags": [
+      "demoralize.on-hit.power-attack"
+    ]
+  },
+  "dreadful-carnage": {
+    "tags": [
+      "demoralize.on-drop"
+    ]
+  },
+  "two-weapon-rend": {
+    "tags": [
+      "two_weapon.rend"
+    ]
+  },
+  "impact-critical-shot": {
+    "tags": [
+      "critical.ranged.impact"
+    ],
+    "not_yet": [
+      "the bull rush in place of the trip ('push your opponent back as if from the bull rush combat maneuver ... you cannot move with the target'): the engine always takes the trip"
+    ]
+  },
+  "improved-feint-partner": {
+    "tags": [
+      "teamwork.feint-partner.improved"
+    ]
+  },
+  "disruptive": {
+    "tags": [
+      "reactions.disrupts.casting-defensively"
+    ]
+  },
+  "whip-mastery": {
+    "tags": [
+      "lethality.either.whip",
+      "weapon.whip.through-armour"
+    ]
+  },
+  "slaying-sprint": {
+    "tags": [
+      "coup_de_grace.unprovoking"
+    ],
+    "not_yet": [
+      "'move up to half your speed instead of taking a 5-foot step when taking a full-round action to perform a coup de grace': the coup still spends the move (Scene.move_spent), so no move follows it"
+    ]
+  },
+  "surprising-combatant": {
+    "tags": [
+      "surprise.bluffs-awareness"
+    ]
+  },
+  "perfect-awareness": {
+    "tags": [
+      "skill.perception.take-20.move"
+    ]
+  },
+  "arcane-armor-mastery": {
+    "not_yet": [
+      "a swift action to cut the round's arcane spell failure by 20% in place of Arcane Armor Training's 10%: Arcane Armor Training itself is lane b2-attack-b's, and the swift-action budget lane b2-actions'"
+    ]
+  },
+  "nimble-moves": {
+    "not_yet": [
+      "5 feet of difficult terrain a round moved as normal terrain, and a 5-foot step into difficult terrain: nothing lifts difficult terrain's double cost for the first 5 feet a round (the move op prices it, rules/grid.py)"
+    ]
+  },
+  "ride-by-attack": {
+    "not_yet": [
+      "moving after a mounted charge in the same line, and no attack of opportunity from the foe charged: the charge is lane b2-actions' machinery"
+    ]
+  },
+  "snatch-arrows": {
+    "not_yet": [
+      "catching the deflected missile and throwing a thrown weapon back at once: Deflect Arrows turns the shot aside, and no reader catches it into a free hand"
+    ]
+  },
+  "blood-of-heroes": {
+    "not_yet": [
+      "two hero points a level instead of one: the app keeps no hero points (APG optional system)"
+    ]
+  },
+  "ki-throw": {
+    "not_yet": [
+      "a won unarmed trip throws the target prone into any square you threaten: the trip leaves it prone in its own square"
+    ]
+  },
+  "under-and-over": {
+    "not_yet": [
+      "an immediate-action trip at +2 against a larger foe whose grapple failed, provoking nothing: the immediate-action budget is lane b2-actions'"
+    ]
+  },
+  "cleave-through": {
+    "not_yet": [
+      "a free 5-foot step between Cleave's attacks that brings a new foe into reach: Cleave's extra blows are chosen from those threatened when it is declared"
+    ]
+  },
+  "giant-killer": {
+    "not_yet": [
+      "Goblin Cleaver's extra Cleave attacks on creatures one size larger or smaller (lane b2-attack-b's feat), and their +2 circumstance against humanoids (giant)"
+    ]
+  },
+  "orc-hewer": {
+    "not_yet": [
+      "Goblin Cleaver's extra Cleave attacks on creatures your size or smaller (lane b2-attack-b's feat), and their +2 circumstance against humanoids (orc)"
+    ]
+  },
+  "archon-diversion": {
+    "not_yet": [
+      "Archon Style's lowered penalty, move-action use and the diverted blow: Archon Style is lane b2-styles'"
+    ]
+  },
+  "bear-hug": {
+    "not_yet": [
+      "a grapple without provoking against a foe held by Beartrap Bite (lane b2-attack-b's feat), and +2 damage against a foe you grapple: no grapple-damage term asks who holds whom yet"
+    ]
+  },
+  "wolf-savage": {
+    "not_yet": [
+      "a swift action after 10 damage to a prone foe with a natural weapon or unarmed strike: Fortitude or a bestow curse disfigurement — the swift budget (lane b2-actions) and Wolf Style (lane b2-styles)"
+    ]
+  },
+  "fast-crawl": {
+    "not_yet": [
+      "moving at half speed while prone, and a 5-foot step while crawling: no move asks whether the mover is prone, so a crawl is not priced or allowed by rule"
+    ]
+  },
+  "friend-to-animals": {
+    "not_yet": [
+      "a standard action: animals within 30 feet save (Will) or cannot attack you until you or your allies attack them — no state yet refuses a creature's attack on one named ref"
+    ]
+  },
+  "witty-feint": {
+    "not_yet": [
+      "a dodge bonus to AC against the feinted foe equal to your weapon training bonus, in place of denying his Dexterity: nothing reads the weapon training bonus for the weapon in hand by itself"
+    ]
+  },
+  "shadow-gambit": {
+    "not_yet": [
+      "ending an ongoing figment to strike a foe in or beside it for 1d6 per spell level: figments are not run as standing illusions"
+    ]
+  },
+  "extend-the-bulwark": {
+    "not_yet": [
+      "a free action giving an adjacent ally with the feat half your armour bonus as circumstance AC for a round while you lose it"
+    ]
+  },
+  "collective-recollection": {
+    "not_yet": [
+      "a free-action aid another on an ally's trained Knowledge check within 30 feet, sharing what it learns"
+    ]
+  },
+  "emergency-attunement": {
+    "not_yet": [
+      "a standard-action Spellcraft check (DC 10 + spell level) to swap an ongoing abjuration or transmutation's chosen option at half its remaining duration"
+    ]
+  },
+  "uncanny-activation": {
+    "not_yet": [
+      "+1 caster level when beating a Use Magic Device DC by 5 on a spell completion or trigger item, +2 for an extra charge by 10: Use Magic Device has no activation door yet"
+    ]
+  },
+  "out-of-the-sun": {
+    "not_yet": [
+      "a move-action feint after a melee hit that opens the foe to an adjacent ally with the feat, +2/+4 in bright light or sunlight"
+    ]
+  },
+  "mounted-blade": {
+    "not_yet": [
+      "a second attack at -5 on a foe beside the first after a Ride-By Attack hit: Ride-By Attack is not built (the charge, lane b2-actions)"
+    ]
+  },
+  "circling-offense": {
+    "not_yet": [
+      "+1 dodge against attacks of opportunity from a larger creature while an ally with the feat is in its reach, and its misses provoking from those allies"
+    ]
+  },
+  "jaguar-pounce": {
+    "not_yet": [
+      "the first melee attack of a charge or Spring Attack against a flat-footed or helpless foe threatens as Improved Critical: charge and Spring Attack are lane b2-actions'"
+    ]
+  },
+  "broken-wing-gambit": {
+    "not_yet": [
+      "a free action after a hit granting the foe +2 attack and damage against you, its attack then provoking from allies with the feat"
+    ]
+  },
+  "cavalry-formation": {
+    "not_yet": [
+      "mounts sharing squares and charging through allied mounts: no mounted combat on the board yet"
+    ]
+  },
+  "clustered-shots": {
+    "not_yet": [
+      "damage reduction applied once to the total of a full attack's ranged hits on one foe: each hit meets the reduction alone"
+    ]
+  },
+  "deceptive-exchange": {
+    "not_yet": [
+      "handing the feinted foe a held one-handed object in place of denying its Dexterity"
+    ]
+  },
+  "dimensional-dervish": {
+    "not_yet": [
+      "a full attack split by abundant step or dimension door teleports between the attacks (Dimensional Assault is lane b2-attack-b's)"
+    ]
+  },
+  "disengaging-flourish": {
+    "not_yet": [
+      "a standard-action Bluff against every foe threatening you, then a move at speed that provokes none of those fooled"
+    ]
+  },
+  "improved-two-weapon-feint": {
+    "not_yet": [
+      "forgoing the first primary-hand attack of a two-weapon full attack to feint, the foe denied Dexterity for the rest of your turn"
+    ]
+  },
+  "two-weapon-feint": {
+    "not_yet": [
+      "forgoing the first primary-hand attack of a two-weapon full attack to make a feint"
+    ]
+  },
+  "mocking-dance": {
+    "not_yet": [
+      "the 5-foot or full-speed move before a performance combat check, +2 to it: performance combat (Ultimate Combat optional system) is not built"
+    ]
+  },
+  "net-maneuvering": {
+    "not_yet": [
+      "tripping or disarming with a net in melee (+2 on the disarm), and dragging or repositioning a foe the net entangles"
+    ]
+  },
+  "pin-down": {
+    "not_yet": [
+      "a foe you threaten taking a 5-foot step or withdrawing provokes from you; a hit stops the move and deals no damage — attacks of opportunity on a step are lane b2-actions'"
+    ]
+  },
+  "raging-hurler": {
+    "not_yet": [
+      "while raging: two-handed weapons thrown as a standard action, thrown range increments doubled, improvised objects picked up as part of the throw"
+    ]
+  },
+  "school-strike": {
+    "not_yet": [
+      "a swift action after an unarmed hit to deliver a chosen one-target arcane school power: the swift budget is lane b2-actions', and school powers are not aimed through a blow"
+    ]
+  },
+  "thunder-and-fang": {
+    "not_yet": [
+      "an earth breaker one-handed beside a skull shield that keeps its shield bonus and counts as light for two-weapon penalties"
+    ]
+  }
+}

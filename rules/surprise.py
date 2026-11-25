@@ -47,6 +47,7 @@ from __future__ import annotations
 from . import awareness, states
 
 ORIGIN = "rule:surprise"
+BLUFFS_AWARENESS = "surprise.bluffs-awareness"      # Surprising Combatant's tag
 SURPRISED_KEY = "surprised"
 ROUND_KEY = "surprise round"
 
@@ -90,6 +91,22 @@ def decide(engine, sides: dict, ambushers=()) -> tuple[list[str], list[str], lis
                                visibility="hidden")
         rolls.append(roll)
         stealth[r] = roll.total
+    # Surprising Combatant (Blood of the Moon): "after initiative is rolled but before the
+    # first round of combat begins, you can attempt a Bluff check as a free action. Each
+    # opponent who is aware of you must succeed at a Sense Motive check (DC equal to the
+    # result of your Bluff check). Failure means that an opponent is treated as if it were
+    # not aware of you" — its document's tag; one Bluff each, one Sense Motive per
+    # opponent against it, rolled by the engine in secret as the ambush's are (feat loop
+    # b2, 2026-11-22). Always attempted: it only ever hides the bluffer.
+    bluff: dict[str, int] = {}
+    for r in refs:
+        a = scene.actors[r]
+        if a.has_state(BLUFFS_AWARENESS):
+            roll = engine.dice.d20(_mods(a, "bluff"), label=f"{a.name} Bluff, Surprising "
+                                   f"Combatant", visibility="hidden")
+            rolls.append(roll)
+            bluff[r] = roll.total
+    read: dict[tuple[str, str], bool] = {}
     spot: dict[str, int] = {}
     aware, unaware = [], []
     for r in refs:
@@ -104,6 +121,15 @@ def decide(engine, sides: dict, ambushers=()) -> tuple[list[str], list[str], lis
         def notices(o) -> bool:
             if not (awareness.sees(scene, me, o) or awareness.has_hunch(me, o)):
                 return False
+            if o.ref in bluff:
+                if (r, o.ref) not in read:
+                    roll = engine.dice.d20(_mods(me, "sense motive", opposed=True),
+                                           label=f"{me.name} Sense Motive, against "
+                                                 f"{o.name}'s Bluff", visibility="hidden")
+                    rolls.append(roll)
+                    read[(r, o.ref)] = roll.total >= bluff[o.ref]
+                if not read[(r, o.ref)]:
+                    return False
             if o.ref not in stealth:
                 return True
             if r not in spot:

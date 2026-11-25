@@ -1,0 +1,212 @@
+{
+  "class": "feat",
+  "_source": "Feat loop b2, lane b2-attack-a (2026-11-22): the feats a character USES — a move action that lifts the allies around them, a blow declared before the roll. Each is had by a holder of the feat its `feat` names (rules/class_abilities.py `_docs_for`), whatever their class, and run by the one executor the class abilities use (`Engine._use_class_ability`). Benefit text from content/feats/feats.json, the book's (aonprd.com FeatDisplay, the source named there).",
+  "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
+  "abilities": [
+    {
+      "key": "sociable",
+      "name": "Sociable",
+      "feat": "sociable",
+      "level": 1,
+      "source": "Sociable (APG): 'As a move action, you grant all friendly creatures within 30 feet who can see or hear you (including yourself) a +2 bonus on Diplomacy checks for a number of rounds equal to your Charisma modifier (minimum 1 round).'",
+      "text": "Move action: you and your allies within 30 feet gain +2 on Diplomacy for Cha rounds.",
+      "action": "move",
+      "affects": "allies",
+      "radius_ft": 30,
+      "effect": {
+        "modifiers": [{"type": "skill_mod", "target": "diplomacy", "amount": 2, "bonus_type": "untyped"}],
+        "rounds": "max(1, cha_mod)"
+      },
+      "tell": "{name} sets everyone at ease."
+    },
+    {
+      "key": "shared insight",
+      "name": "Shared Insight",
+      "feat": "shared-insight",
+      "level": 1,
+      "source": "Shared Insight (APG): 'As a move action, you can grant all friendly creatures within 30 feet who can see or hear you a +2 bonus on Perception checks for a number of rounds equal to your Wisdom modifier (minimum 1 round).' Sociable, its sister feat, says '(including yourself)'; this one does not, so the user is not among them.",
+      "text": "Move action: your allies within 30 feet gain +2 on Perception for Wis rounds.",
+      "action": "move",
+      "affects": "others",
+      "radius_ft": 30,
+      "effect": {
+        "modifiers": [{"type": "skill_mod", "target": "perception", "amount": 2, "bonus_type": "untyped"}],
+        "rounds": "max(1, wis_mod)"
+      },
+      "tell": "{name} points out what the others had missed."
+    },
+    {
+      "key": "shared manipulation",
+      "name": "Shared Manipulation",
+      "feat": "shared-manipulation",
+      "level": 1,
+      "source": "Shared Manipulation (ARG): 'As a move action, you can grant all friendly creatures within 30 feet who can see or hear you a +2 bonus on Bluff or Intimidate checks (choose which skill to affect each time you use this ability) for a number of rounds equal to your Charisma modifier (minimum 1 round).'",
+      "text": "Move action: your allies within 30 feet gain +2 on Bluff or Intimidate (your choice) for Cha rounds.",
+      "action": "move",
+      "affects": "others",
+      "radius_ft": 30,
+      "choice": {
+        "kind": "mode",
+        "options": {
+          "bluff": {
+            "aliases": ["lie", "lies", "deceive"],
+            "effect": {
+              "modifiers": [{"type": "skill_mod", "target": "bluff", "amount": 2, "bonus_type": "untyped"}],
+              "rounds": "max(1, cha_mod)"
+            }
+          },
+          "intimidate": {
+            "aliases": ["threaten", "intimidation"],
+            "effect": {
+              "modifiers": [{"type": "skill_mod", "target": "intimidate", "amount": 2, "bonus_type": "untyped"}],
+              "rounds": "max(1, cha_mod)"
+            }
+          }
+        }
+      },
+      "tell": "{name} sets the tone for the others to follow."
+    },
+    {
+      "key": "blinding flash",
+      "name": "Blinding Flash",
+      "feat": "blinding-flash",
+      "level": 1,
+      "source": "Blinding Flash (Dragon Empires Primer): 'As a move action, you can expertly angle the blade of your weapon or shield to reflect light into an opponent's eyes, dazzling your foe for 1 round. This feat functions as a gaze attack, and the target must make a Fortitude save (DC 10 + 1/2 your character level + your Dex modifier) to resist the effect ... does not work on creatures that are already blinded ... You must be in an area of bright light to use this feat.'",
+      "text": "Move action, in bright light: a foe who can see you saves (Fort) or is dazzled for a round.",
+      "action": "move",
+      "affects": "target",
+      "aim": "foe",
+      "harmful": true,
+      "gaze": true,
+      "light": "bright",
+      "save": {"save": "fort", "dc": "10 + level // 2 + dex_mod", "success": "negates"},
+      "effect": {"condition": "dazzled", "rounds": 1},
+      "tell": "{name} turns the light off the metal into {target}'s eyes.",
+      "not_yet": [
+        "'a weapon or shield with a polished or reflective surface': gear here records no finish, so the flash is not refused for a bare-handed user"
+      ]
+    },
+    {
+      "key": "punishing kick",
+      "name": "Punishing Kick",
+      "feat": "punishing-kick",
+      "level": 1,
+      "source": "Punishing Kick (APG): declared before the attack roll (a miss ruins it); on a hit, damage as normal and push the target 5 feet directly away (no attack of opportunity, a safe square) or knock it prone unless it makes a Fortitude save, DC 10 + 1/2 level + Wis; once a day per four levels (a monk: his monk level), no more than once a round.",
+      "text": "Your next unarmed hit this round: push the foe 5 feet, or knock it prone unless it saves (Fort).",
+      "action": "free",
+      "pool": {"id": "punishing kick", "max": "max(level // 4, level_monk)", "refresh": "rest.night", "cooldown": "1"},
+      "cost": {"pool": "punishing kick", "amount": 1},
+      "aim": "foe",
+      "charge": {
+        "weapons": ["unarmed", "unarmed strike"],
+        "spent_on": "swing",
+        "save": {"save": "fort", "dc": "10 + level // 2 + wis_mod"}
+      },
+      "choice": {
+        "kind": "condition",
+        "default": "prone",
+        "options": {
+          "prone": {"charge_condition": "prone", "aliases": ["trip", "knock down", "knock prone"]},
+          "push": {"charge_push_ft": 5, "aliases": ["shove", "push back", "drive back"]}
+        }
+      },
+      "tell": "{name} sets up a punishing kick."
+    },
+    {
+      "key": "touch of serenity",
+      "name": "Touch of Serenity",
+      "feat": "touch-of-serenity",
+      "level": 1,
+      "source": "Touch of Serenity (APG): declared before the attack roll (a miss ruins it); on a hit the attack deals no damage and bestows no other effect or condition, but the target cannot cast spells or attack (attacks of opportunity and immediate attacks included) for 1 round unless it makes a Will save, DC 10 + 1/2 level + Wis; once a day per four levels (a monk: his monk level), no more than once a round.",
+      "text": "Your next unarmed hit this round wounds nothing; the foe saves (Will) or cannot attack or cast for a round.",
+      "action": "free",
+      "pool": {"id": "touch of serenity", "max": "max(level // 4, level_monk)", "refresh": "rest.night", "cooldown": "1"},
+      "cost": {"pool": "touch of serenity", "amount": 1},
+      "aim": "foe",
+      "charge": {
+        "weapons": ["unarmed", "unarmed strike"],
+        "spent_on": "swing",
+        "no_damage": true,
+        "save": {"save": "will", "dc": "10 + level // 2 + wis_mod"},
+        "condition": "serene"
+      },
+      "charge_rounds": 1,
+      "tell": "{name} gathers a stillness into the next touch."
+    },
+    {
+      "key": "gorgon's fist",
+      "name": "Gorgon's Fist",
+      "feat": "gorgon-s-fist",
+      "level": 1,
+      "aliases": ["gorgons fist", "gorgon fist"],
+      "source": "Gorgon's Fist (CRB): 'As a standard action, make a single unarmed melee attack against a foe whose speed is reduced (such as from Scorpion Style). If the attack hits, you deal damage normally and the target is staggered until the end of your next turn unless it makes a Fortitude saving throw (DC 10 + 1/2 your character level + your Wis modifier). This feat has no effect on targets that are staggered.'",
+      "text": "Your next single unarmed hit on a slowed foe: Fortitude save or staggered until your next turn ends.",
+      "action": "free",
+      "aim": "foe",
+      "charge": {
+        "weapons": ["unarmed", "unarmed strike"],
+        "spent_on": "swing",
+        "single_attack": true,
+        "target_requires": ["state.slowed"],
+        "target_requires_not": ["state.impaired.staggered"],
+        "target_said": "a foe whose speed is reduced and who is not already staggered",
+        "save": {"save": "fort", "dc": "10 + level // 2 + wis_mod"},
+        "condition": "staggered"
+      },
+      "charge_rounds": 2,
+      "tell": "{name} measures a blow for the slowed foe."
+    },
+    {
+      "key": "crushing blow",
+      "name": "Crushing Blow",
+      "feat": "crushing-blow",
+      "level": 1,
+      "source": "Crushing Blow (UC): 'You can make a Stunning Fist attempt as a full-round action. If successful, instead of stunning your target, you reduce the target's AC by an amount equal to your Wisdom modifier for 1 minute. This penalty does not stack with other penalties applied due to Crushing Blow.' The attempt is a Stunning Fist use (Fortitude, DC 10 + 1/2 level + Wis; the creatures stunning fist cannot stun are spared).",
+      "text": "Full-round: your next unarmed hit spends a Stunning Fist; Fortitude save or AC lowered by your Wisdom for a minute.",
+      "action": "full-round",
+      "pool": {"id": "stunning fist", "max": "max(level // 4, level_monk)", "refresh": "rest.night"},
+      "cost": {"pool": "stunning fist", "amount": 1},
+      "aim": "foe",
+      "charge": {
+        "weapons": ["unarmed", "unarmed strike"],
+        "spent_on": "swing",
+        "save": {"save": "fort", "dc": "10 + level // 2 + wis_mod"},
+        "immune_types": ["construct", "ooze", "plant", "undead"],
+        "immune_subtypes": ["incorporeal"],
+        "immune_crit": true,
+        "on_fail": {
+          "modifiers": [{"type": "combat_mod", "target": "ac", "formula": "-max(0, wis_mod)", "bonus_type": "untyped"}],
+          "rounds": 10
+        }
+      },
+      "tell": "{name} winds up a crushing blow."
+    },
+    {
+      "key": "jawbreaker",
+      "name": "Jawbreaker",
+      "feat": "jawbreaker",
+      "level": 1,
+      "source": "Jawbreaker (UC): 'When you make a successful Stunning Fist attempt against an opponent that is grappled, helpless, or stunned, instead of imparting any other Stunning Fist effect, you can cripple that opponent's mouth, dealing normal unarmed strike damage and 1d4 points of bleed damage. Until the bleed damage ends, the target is unable to use its mouth to attack, speak clearly, and employ verbal spell components. A creature that is immune to critical hits or that has no discernible mouth is immune.'",
+      "text": "Your next unarmed hit on a held, helpless or stunned foe spends a Stunning Fist: Fortitude save or 1d4 bleed.",
+      "action": "free",
+      "pool": {"id": "stunning fist", "max": "max(level // 4, level_monk)", "refresh": "rest.night"},
+      "cost": {"pool": "stunning fist", "amount": 1},
+      "aim": "foe",
+      "charge": {
+        "weapons": ["unarmed", "unarmed strike"],
+        "spent_on": "swing",
+        "target_requires": ["state.held.grappled", "state.held.pinned", "state.helpless", "state.unable.stunned"],
+        "target_said": "a grappled, helpless or stunned foe",
+        "save": {"save": "fort", "dc": "10 + level // 2 + wis_mod"},
+        "immune_types": ["construct", "ooze", "plant", "undead"],
+        "immune_subtypes": ["incorporeal"],
+        "immune_crit": true,
+        "on_fail": {"bleed": "1d4"}
+      },
+      "tell": "{name} aims for the jaw.",
+      "not_yet": [
+        "'unable to use its mouth to attack, speak clearly, and employ verbal spell components' until the bleed ends: no reader asks for a working mouth — a bite, speech or a V component"
+      ]
+    }
+  ]
+}
