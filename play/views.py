@@ -4365,7 +4365,14 @@ def combat_act(request):
     # to dress it as a Knowledge (Arcana) check it then failed as untrained, and let an
     # `advance_time` ride along. A free action spends no time and asks nobody's
     # permission; everything else out of combat is still a spoken turn.
-    if not scene.in_encounter:
+    # And Start a fight (playtest 2026-11-23 #12, the owner's note): one attack that
+    # squares off and strikes nothing, so the player enters the fight and plans the first
+    # turn on this bar instead of declaring a blow the battle gate then holds.
+    starting = (not scene.in_encounter and len(actions) == 1
+                and isinstance(actions[0], dict)
+                and str(actions[0].get("op", "")).lower() == "attack"
+                and (actions[0].get("params") or {}).get("squares_off") is True)
+    if not scene.in_encounter and not starting:
         if end_turn or any(str(a.get("op", "")).lower() != "use_ability"
                            for a in actions if isinstance(a, dict)) or not actions:
             return JsonResponse({"error": "No fight is on."}, status=409)
@@ -4467,7 +4474,8 @@ def combat_act(request):
     # A free action is remembered for the next spoken turn, so the narrator hears about
     # it without a turn ever having been spent on it. In-memory on purpose: it is a note
     # between two turns of one sitting, not campaign state.
-    if not end_turn and label:
+    # Not Start a fight: its narration is this reply's, not a note for the next turn.
+    if not end_turn and label and not starting:
         c.pending_free = list(getattr(c, "pending_free", []) or []) + [label]
 
     # A turn the player has not finished does not pass to anybody. This is what
@@ -6132,7 +6140,14 @@ def _finish(c, agent, resolution, narration, player_input, plan, hand_over=True,
     # the panel, with the shopkeeper never acting (live, 2026-10-16). The turn ends here.
     if joined and _told_by_its_blows(resolution):
         joined = False
-    if hand_over and not joined and not _only_spoke(c.scene, resolution):
+    # A fight joined with the turn on somebody else — the order's top when the player
+    # squared off and lost initiative, or an aware foe's surprise round — is theirs to
+    # take now; held, the bar sat on "waiting on the spy" with nothing to press.
+    pc_now = c.scene.pc()
+    theirs_first = (joined and c.scene.in_encounter and pc_now is not None
+                    and c.scene.current_ref() not in (None, pc_now.ref))
+    if ((hand_over and not joined) or theirs_first) \
+            and not _only_spoke(c.scene, resolution):
         _run_npc_turns(c, agent)
     # A death outside a fight — the law's sentence carried out (rules/trial.py) — ends the
     # campaign in this reply, as a death on the creatures' turns does inside one. Measured

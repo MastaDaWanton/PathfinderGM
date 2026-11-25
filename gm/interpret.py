@@ -1249,9 +1249,11 @@ _DEMOS = [
     # a take of the thing "body", and never a craft at a bench. A blow before either is its
     # own deed, and the loot's target is whose body even when the words say "her body".
     # None of these is a probe or a labelled line.
-    ("I finish off the jackal and go through its pack.",
+    # "Finish" bare, not "finish off": playtest 2026-11-23 #4, "i finish the ramidreju"
+    # (dying on the floor) was read `consume`, the way one finishes a drink.
+    ("I finish the jackal and go through its pack.",
      {"question": False, "claims": [], "actions": [
-         {"span": "finish off the jackal", "target": "the jackal", "blow": "finishing",
+         {"span": "finish the jackal", "target": "the jackal", "blow": "finishing",
           "cost": "quick", "act": "attack"},
          {"span": "go through its pack", "target": "its pack", "act": "loot"}]}),
     # The killing stroke and an ordinary blow meant to kill (2026-11-04, `blow`): finishing

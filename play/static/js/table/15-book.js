@@ -68,7 +68,44 @@ function renderBookHead(s) {
   const who = people.find(a => a.ref === BOOK_PERSON);
   $("#face").hidden = !who;
   $("#face").textContent = who ? bookStanding(who) : "";
+
+  // Start a fight with them (playtest 2026-11-23 #12, the owner's note: "being able to
+  // enter combat yourself to plan the strike"): the fight forms, initiative is rolled, and
+  // the first turn is planned on the combat bar — Foundry's Begin Combat, Baldur's Gate
+  // 3's turn-based toggle. Offered out of a fight only, never at one of the player's own
+  // people, a body that cannot fight back, or while the player cannot act. The engine
+  // refuses the same cases itself (`Engine._op_attack`, `squares_off`).
+  const fight = $("#face-fight");
+  const sc = (s && s.scene) || {};
+  const can = !!who && !sc.in_encounter && !sc.pc_down && who.stance !== "ally"
+    && !who.helpless && who.hp > 0;
+  fight.hidden = !can;
+  fight.textContent = can ? `Start a fight with ${who.name}` : "";
+  fight.dataset.target = can ? who.ref : "";
 }
+
+document.addEventListener("click", async e => {
+  // The Here list opens the line about the one pressed, and closes it pressed again.
+  const person = e.target.closest && e.target.closest("#here-list [data-person]");
+  if (person) {
+    BOOK_PERSON = BOOK_PERSON === person.dataset.person ? null : person.dataset.person;
+    renderBookHead(STATE);
+    return;
+  }
+  const fight = e.target.closest && e.target.closest("#face-fight");
+  if (!fight || !fight.dataset.target) return;
+  const name = fight.textContent.replace(/^Start a fight with /, "");
+  busy(true);
+  try {
+    const d = await post("/api/combat/act", {
+      actions: [{ op: "attack", target: fight.dataset.target,
+                  params: { squares_off: true } }],
+      label: `I start a fight with ${name}.`, end_turn: false });
+    BOOK_PERSON = null;          // the line closes as the fight opens
+    render(d);
+  } catch (err) { $("#err").textContent = err.message; }
+  finally { busy(false); }
+});
 
 onRender(function bookHead(s, prev) {
   renderBookHead(s);

@@ -344,6 +344,9 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                     # 1e's coup de grâce: a declared choice, like `power_attack`; the
                     # engine refuses it at anybody who is not helpless.
                     "coup_de_grace",
+                    # Entering a fight with no blow (the table's Start a fight): the
+                    # fight forms, the order is initiative's (`Engine._op_attack`).
+                    "squares_off",
                     # "lethal" or "nonlethal", when the swing deals the other kind
                     # than its weapon does: a sap swung to kill, a sword turned to the
                     # flat. Absent means the weapon's own; the -4 is the engine's.
@@ -908,7 +911,9 @@ CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "looks_in", "defending", 
                               "ends_when", "pace", "diversion", "past", "together",
                               # A held player's save (`Engine.held_save_turn`) names the
                               # hold it ends; honoured only with an engine origin.
-                              "breaks"})
+                              "breaks",
+                              # The table's Start a fight (play/views.py `combat_act`).
+                              "squares_off"})
 # Ops only code writes: left out of the plan's op enum (gm/prompts.py) and dropped from a
 # plan that writes one anyway (`acts_to_ops.apply`). A job is offered, taken and turned
 # down by the reader's closed answer about the player's own words, never by the planner:
@@ -1116,7 +1121,7 @@ FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "faile
                          "stunning_assault", "scorpion_style", "second_chance",
                          "risky_striker", "shield_of_swings",
                          "pinpoint_targeting", "footslasher", "sliding_axe_throw",
-                         "disengage"})
+                         "disengage", "squares_off"})
 from .skilluses import OWN_DOORS as _OWN_DOORS  # noqa: E402 — the uses with their own door
 
 

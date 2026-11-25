@@ -4568,6 +4568,7 @@ class Engine:
             if defender is not None \
                     and (self.scene.in_encounter or intent.params.get("coup_de_grace")) \
                     and not intent.params.get("undecided") \
+                    and not intent.params.get("squares_off") \
                     and not ({intent.actor, defender.ref} & set(moved)) \
                     and not any(intent.params.get(k) for k in self._WALKS_ITS_OWN):
                 why = self._reach_refusal(intent, actor, defender, key)
@@ -4737,7 +4738,9 @@ class Engine:
         # in one turn); a single blow rolled on the PLAYER's own die, which `_drive`
         # suspends for exactly as a panel strike does, is not that. The encounter still
         # forms first and the initiator still holds the turn.
-        if a is None or target not in self.scene.actors:
+        # Squaring off declared no blow (`squares_off`): there is none to roll.
+        if a is None or target not in self.scene.actors or (
+                (opened.get("params") or {}).get("squares_off")):
             return resolution
         holding = (self.scene.initiative[self.scene.turn][0]
                    if self.scene.initiative and 0 <= self.scene.turn < len(self.scene.initiative)
@@ -4763,8 +4766,15 @@ class Engine:
         # The player is never walked anywhere they did not say: their blow rolls now only
         # when what they hold already reaches — the bow at the spy, the fist at the jaw.
         # Out of reach (a thrown dagger opened at ten feet while a rapier is in hand),
-        # the blow waits for the combat panel, as every player blow used to.
+        # the blow waits for the combat panel, as every player blow used to. Playtest
+        # 2026-11-23 #12 met this twice ("I punch the poltergeist" at 35 ft); the answer
+        # is the table's Start a fight (`squares_off`), which lets the player enter the
+        # fight and plan the walk and the blow on the bar, not a walk taken for them.
         if a.is_pc and closing is not None:
+            return resolution
+        # Nor anybody's walk in the surprise round: one standard OR move action (CRB,
+        # "Surprise"), so the blow behind a closing walk would only be refused after it.
+        if closing is not None and a.has_state(states.ONE_ACTION_TURN):
             return resolution
         try:
             blow = self.validate(([closing[0]] if closing is not None else []) + [
@@ -6354,7 +6364,9 @@ class Engine:
                                      "params": {"weapon": "unarmed"},
                                      "because": "provoked past bearing"})
             # Anyone who has done something is no longer flat-footed.
-            if intent.actor and intent.op in ("attack", "check", "move", "save"):
+            # Squaring off did nothing (`squares_off`): its flat-footedness waits on a turn.
+            if intent.actor and intent.op in ("attack", "check", "move", "save") \
+                    and not (intent.op == "attack" and intent.params.get("squares_off")):
                 self.scene.acted.add(intent.actor)
             self.scene.log.append(outcome.as_dict())
             if len(self.scene.log) > self.scene.LOG_KEPT:
@@ -10571,6 +10583,7 @@ class Engine:
                     f"{'charge' if intent.params.get('charge') else 'Spring Attack'} needs.")
             return self._refuse(intent, why, code="charge_refused")
         if (partial.get("attack_state") is None and not self._battle_joined
+                and not intent.params.get("squares_off")
                 and (self.scene.in_encounter or intent.params.get("coup_de_grace"))):
             out_of_reach = self._reach_refusal(intent, actor, defender, weapon_key,
                                                voice="tell")
@@ -10607,6 +10620,21 @@ class Engine:
         # never meets the gate below: finishing a bound prisoner opens no battle, and the
         # blow is resolved on the spot, never deferred. `rules/coup_de_grace.py`.
         coup = bool(intent.params.get("coup_de_grace"))
+        # Entering the fight with no blow (`squares_off`, the table's Start a fight; playtest
+        # 2026-11-23 #12 and the owner's note on it): the fight forms as a swing would form
+        # it, and then the order is the book's — initiative, highest first, the surprise
+        # round for the aware (CRB, Combat, "How Combat Works") — and the player plans the
+        # turn on the combat bar when it comes. Foundry's combat tracker ("Begin Combat"),
+        # Baldur's Gate 3's turn-based toggle and Owlcat's turn-based mode all give the
+        # player this door; docs/research/2026-11-25-fix-turn-resolution.md.
+        squaring = bool(intent.params.get("squares_off")) and partial.get("attack_state") is None
+        if squaring:
+            if self.scene.in_encounter:
+                return self._refuse(intent, "The fight is already on.", code="in_a_fight")
+            if defender.is_down or defender.is_helpless or coup:
+                return self._refuse(intent, f"{defender.name} cannot fight back: there is "
+                                            f"no fight to start with them.",
+                                    code="cannot_fight_back")
         # In a fight a coup de grâce costs the whole round and provokes (CRB p.197; the
         # owner's ruling 2026-11-04, "by the book"): asked here, before the Stealth contest
         # below rolls anything, so the rerun behind the attacks of opportunity rolls nothing
@@ -10626,7 +10654,9 @@ class Engine:
 
         held = partial.get("attack_state")
         sniping: list = []
+        # Squaring off is no shot from hiding: nothing is struck to be perceived or not.
         seen = (bool(held.get("seen", True)) if held is not None
+                else True if squaring
                 else attitude_mod.perceived(self, actor, defender, rolls=sniping))
         # The moment of first violence opens the battle and stops there. Measured in
         # play (2026-08-27): a spoken turn spawned an opponent, began the encounter,
@@ -10648,14 +10678,26 @@ class Engine:
                 # with them.
                 self.join_fight(intent.target)
                 self.rally(intent.target)
+            if squaring and not opened:
+                return self._refuse(intent, f"There is no fight to start with "
+                                            f"{defender.name} here.", code="no_fight")
             if opened or self._battle_joined:
                 self._battle_joined = True
+                if squaring:
+                    # No action was declared, so none is kept: the order from its top,
+                    # as `_op_begin_encounter` points it, the unaware walked past.
+                    self.scene.acted = set()
+                    self.scene.turn = -1
+                    self.scene.turn_is_next = False
+                    self.scene.advance_turn()
                 # The initiator keeps the action they declared — the rule
                 # _ensure_encounter has always applied, now honoured whichever door
                 # opened the fight. Without this, a GM-proposed begin_encounter left
                 # the turn on the initiative winner and the hand-over gave the other
                 # side the first swing the announcement had just promised the player.
                 for i, (ref, _) in enumerate(self.scene.initiative):
+                    if squaring:
+                        break
                     if ref == intent.actor:
                         self.scene.turn = i
                         self.scene.acted.add(intent.actor)
@@ -10669,7 +10711,8 @@ class Engine:
                         for r in refs if r in self.scene.actors
                         and not self.scene.actors[r].is_down]
                 # The blow declared is the fight's means from here (`_standing_means`).
-                self._remember_means(actor, intent, weapon_key)
+                if not squaring:
+                    self._remember_means(actor, intent, weapon_key)
                 return Outcome(
                     intent_id=intent.id, op="attack",
                     # The declared params ride along, so the initiator's blow that
@@ -10990,8 +11033,12 @@ class Engine:
         footing = target_ac - worn_ac
         footing_parts = [p for p in ac_parts if p[0] != "armour and shield passed through"]
 
+        # `down_at_start`: whether the body was already on the floor when this attack began
+        # (kept in the state, so a resume from the dice popup still knows), for the held
+        # swing's tell below.
         state = partial.get("attack_state") or {"i": 0, "stage": "attack", "rolls": [],
-                                                "effects": [], "tells": []}
+                                                "effects": [], "tells": [],
+                                                "down_at_start": bool(defender.is_down)}
         if held is None:
             # A stance the declared option lays "until your next turn" (Combat
             # Expertise, Cleave): one round on the one ticker, its numbers the feat
@@ -11149,9 +11196,18 @@ class Engine:
             # guard is for is the swing QUEUED behind one that dropped them.
             # Not mid-way through the swing that dropped them: back from the popup in
             # `after_hit`, that swing's dose and riders are still owed.
+            #
+            # Said only of a body that was down BEFORE this attack. Playtest 2026-11-23
+            # #11: the Swift Strikes swing queued behind the one that broke the clockwork
+            # spy (and the second chicken) told "hits the clockwork spy for 15 … The
+            # clockwork spy is already down; Shadow holds the blow. The clockwork spy is
+            # broken" — "already down" on the blow that downed it, which the narrator
+            # copied (#211). The state line behind it (`_hp_state_tell`) says the fall;
+            # the queued swing that never came is not a deed to tell.
             if defender.is_down and state["i"] and state["stage"] != "after_hit":
-                state["tells"].append(
-                    f"{defender.name} is already down; {actor.name} holds the blow.")
+                if state.get("down_at_start"):
+                    state["tells"].append(
+                        f"{defender.name} is already down; {actor.name} holds the blow.")
                 break
             if swift_at is not None and state["i"] == swift_at                     and not state.get("swift_said"):
                 state["swift_said"] = True
@@ -17741,6 +17797,9 @@ class Engine:
         # Out on a water hex in a rowboat or swimming (feat/sea-hexes): no road starts on
         # the water. Live 2026-11-21, a party rowed out of Harpost walked its road to
         # Grotburrow from the boat. Landfall first, on the region map.
+        held_here = self._held_by_the_fight_just_joined(intent)
+        if held_here is not None:
+            return held_here
         afloat = self.afloat()[0]
         if afloat in ("boat", "swim"):
             return self._refuse(
@@ -18469,6 +18528,30 @@ class Engine:
             return None
         return keeper
 
+    def _held_by_the_fight_just_joined(self, intent: Intent) -> Outcome | None:
+        """A walk off refused in the batch that opened a fight here, or None.
+
+        Playtest 2026-11-23 #3: "I attack the scholar" went with a place chip for the cold
+        hall still attached. The blow opened the fight (initiative, sides, the board) and
+        the chip's travel then ran behind it: "The fight is left behind. Left behind: the
+        lost scholar." A blow and a walk to the next room both ran in one turn, and the
+        fight the player started was over before anybody's first swing. By the book the
+        moment the blow is declared combat begins (CRB, Combat, "How Combat Works":
+        initiative, then turns), and leaving it is a move on one's turn in the order, not
+        a scene change taken in the same breath. The words win over the chip — they are
+        the act; the chip was the way out — and the walk is refused, said, so the page
+        does not tell a walk nobody took."""
+        if not (self._battle_joined and self.scene.in_encounter):
+            return None
+        from . import places as places_mod
+
+        where = str(intent.params.get("place") or intent.params.get("to") or "")
+        found = places_mod.find(self.places(), where, near=self.scene.at or "") if where \
+            else None
+        to = f" to {found.name}" if found is not None and getattr(found, "name", "") else ""
+        return self._refuse(intent, f"Battle is joined here: the way on{to} waits until "
+                                    f"the fight is done.", code="fight_just_joined")
+
     def _a_step_within(self, place: str) -> bool:
         """Whether a travel to `place` stays inside the venture or the ship the party is
         in — the sewers' outfall from their main channel, the deck from the hold. Those
@@ -18544,6 +18627,9 @@ class Engine:
             return self._refuse(intent, f"{self.scene.pc().name} is at the bottom of the "
                                         f"pit: climbing out is a DC {pit['climb']} Climb "
                                         f"check first.", code="in_a_pit")
+        held_here = self._held_by_the_fight_just_joined(intent)
+        if held_here is not None:
+            return held_here
 
         # One journey a turn (item 35). A plan may name a whole route — measured
         # 2026-09-19 on "I find the mayor and grab him by the collar", which came back
@@ -24710,7 +24796,8 @@ class Engine:
         from . import places as places_mod
         from . import trial as trial_mod
 
-        held = trial_mod.on_travel(self, intent, partial)
+        held = (trial_mod.on_travel(self, intent, partial)
+                or self._held_by_the_fight_just_joined(intent))
         if held is not None:
             return held
         kind = str(intent.params.get("kind") or "").strip().lower()
