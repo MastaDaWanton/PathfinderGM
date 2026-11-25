@@ -24239,7 +24239,9 @@ class Engine:
             total = int(state.get("confirm_total") or 0)
             cmd = defender.cmd()
             if total > cmd and not defender.has_state("state.position.prone"):
-                defender.add_condition("prone", None, source=f"{actor.name}'s impact shot",
+                # "as if from a trip combat maneuver": the trip row's own condition.
+                defender.add_condition(MANEUVERS["trip"]["condition"], None,
+                                       source=f"{actor.name}'s impact shot",
                                        origin="rule:feat-impact-critical-shot")
                 out.append({"effect": {"ref": defender.ref, "kind": "condition",
                                        "condition": "prone",
