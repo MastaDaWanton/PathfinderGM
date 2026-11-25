@@ -522,7 +522,12 @@ def creation_options(request):
     gm_client.warm_roles("narrator", "prose")
     # The world the forge was opened from decides which races it offers: that
     # world's own peoples first, the Core seven after when the table allows them.
-    return JsonResponse(creation.options(str(request.GET.get("world", "")).strip()))
+    world = str(request.GET.get("world", "")).strip()
+    # Their senses read from the world's own words meanwhile (gm/race_senses.py).
+    from gm import race_senses
+
+    race_senses.in_background(world)
+    return JsonResponse(creation.options(world))
 
 
 def house_rules(request):

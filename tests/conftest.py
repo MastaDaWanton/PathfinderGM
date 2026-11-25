@@ -143,6 +143,12 @@ def _no_test_waits_on_the_written_opening(monkeypatch):
     from gm import deed_reader as deed_reader_mod
 
     monkeypatch.setattr(deed_reader_mod, "ENABLED", False)
+    # And the race-senses reader (gm/race_senses.py): a background read of a world's
+    # peoples on every campaign load and forge listing. tests/test_race_senses.py
+    # drives it with scripted replies.
+    from gm import race_senses as race_senses_mod
+
+    monkeypatch.setattr(race_senses_mod, "ENABLED", False)
     # And the tells check of planned narration (gm/planned.py `_tells_kept`, the repair gate
     # `agent.tells_gate`): a read per planned beat and per kept repair, which a test that
     # turns the read back on to script ITS replies did not order. Measured the day it

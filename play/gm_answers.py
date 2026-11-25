@@ -1073,6 +1073,64 @@ def _herbs_named(pc, question: str) -> list[str]:
     return out
 
 
+SIGHT_RULE = (
+    "THE RULE (Core Rulebook, Vision and Light; Bestiary, darkvision): dim light gives "
+    "concealment, a 20% miss chance; darkness gives total concealment, a 50% miss chance, "
+    "and a creature without darkvision in darkness is effectively blinded (-2 AC, no "
+    "Dexterity bonus to AC). Darkvision sees in darkness and in dim light as if they were "
+    "lit, in black and white, out to its range: a target within that range has no miss "
+    "chance from the light at all. Low-light vision sees twice as far by a dim light and "
+    "does nothing in darkness. None of these senses adds to an attack roll.")
+
+
+def sight_facts(c, engine) -> list[str]:
+    """What the player sees by and why the light cost them, off the engine, for a `/gm`
+    aside — when the light is poor where they stand or a blow was lost to it last turn.
+
+    Playtest 2026-11-23 #13: "/gm I have dark vision dim light doesnt matter to me why did
+    dim light make me miss?" went to the model with nothing about sight in its grounding,
+    and it answered "Darkvision ... doesn't give you a bonus to your accuracy" — the rule
+    backwards (darkvision removes the dim light's miss chance) and the real reason unsaid:
+    Shadow had no darkvision. The model is handed the engine's own readers
+    (`Actor.eyes`, `Scene.light_at`, the miss tells `Engine._concealment_of` wrote) and the
+    rule in the book's words, so it explains the verdict instead of guessing one."""
+    from gm.checks import light_shown
+
+    scene = c.scene
+    pc = scene.pc() if scene is not None else None
+    if pc is None or not hasattr(scene, "light_at"):
+        return []
+    try:
+        eyes = pc.eyes()
+        level = scene.light_at(scene.positions.get(pc.ref), viewer=pc)
+    except Exception:  # noqa: BLE001 — no light reading, nothing said about it
+        return []
+    misses = []
+    for entry in reversed(c.turn_log or []):
+        outcomes = entry.get("outcomes")
+        if outcomes:
+            misses = light_shown.light_misses([o.get("tell") for o in outcomes])
+            break
+    if level not in ("dim", "dark") and not misses:
+        return []
+    dark_ft = int(eyes.get("darkvision") or 0)
+    senses = [f"darkvision out to {dark_ft} feet" if dark_ft else "no darkvision",
+              "low-light vision" if eyes.get("low_light") else "no low-light vision"]
+    under = scene.underground() if hasattr(scene, "underground") else False
+    where = {"dark": "darkness" + (", under the ground with nothing lit" if under else ""),
+             "dim": "dim light (night under the open sky)",
+             }.get(level, f"{level} light")
+    out = [f"WHAT {pc.name.upper()} SEES BY (engine facts): " + "; ".join(senses) + ".",
+           f"THE LIGHT where {pc.name} stands now: {where}."]
+    for m in misses:
+        out.append(f"LAST TURN, A BLOW LOST TO THE LIGHT: {m['who']} found nothing there "
+                   f"— {m['why']}" + (f", because {pc.name} has no darkvision"
+                                      if not dark_ft and pc.name.lower() in m['who'].lower()
+                                      else "") + ".")
+    out.append(SIGHT_RULE)
+    return out
+
+
 def craft_facts(c, engine, question: str) -> list[str]:
     """The grounding for a crafting question, or [] when it is not one."""
     if not asks_about_crafts(question):

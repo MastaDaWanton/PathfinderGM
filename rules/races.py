@@ -1368,6 +1368,16 @@ def draft(name: str, phrases, *, size_hint: str = "", speed_hint: str = "",
                     traits.append(line)
                 if waits and waits not in not_yet:
                     not_yet.append(waits)
+    # The senses a model read out of these same words (`senses_read`), added beside
+    # whatever the card stated: the owner's O6 ruling reaches a stated card too.
+    read = senses_read(world, _sense_key(name, people_id), _sense_words(phrases, about))
+    for tag in read or ():
+        if tag in tags:
+            continue
+        tags.append(tag)
+        line = TAG_MEANS[tag][0]
+        if line not in traits:
+            traits.append(line)
     size = size_hint.strip().lower() if size_hint in SIZES else (
         "small" if _SMALL.search(low) else "medium")
     if _LARGE.search(low) and size == "medium":
@@ -1430,17 +1440,15 @@ def written_for(world) -> dict[str, dict]:
             if d.get("world") and d["world"].lower() in (key, name)}
 
 
-def from_world(world) -> list[dict]:
-    """The races a world ships with: the ones its author wrote (`play.races[]`, the
-    contract in docs/campaign-format.md) and, when that list is absent, one per people
-    whose entry describes a body.
+def _world_cards(world) -> list[tuple[str, list[str], dict]]:
+    """Each race a world ships with, as (name, its words, `draft`'s keyword arguments):
+    the ones its author wrote (`play.races[]`, the contract in docs/campaign-format.md)
+    and, when that list is absent, one per people whose entry describes a body.
 
-    Both branches are live. World Bible has written race cards since schema 1.1, so the
-    first is the normal path for a current export and the second is what a 1.0 world — or
-    one whose author wrote no cards — still gets. The difference is not cosmetic: a card
-    can carry `strengths`/`weakness` and a derived people cannot, because an anatomy fact
-    says what a body looks like and never what it is good at."""
-    out: list[dict] = []
+    One reading of the export for both of its readers — `from_world`, which drafts each,
+    and `sense_sources`, which hands the same words to the sense reader (gm/race_senses.py)
+    — so the words a reading was made from are the words the draft holds it against."""
+    out: list[tuple[str, list[str], dict]] = []
     world_id = world_key(world)
     play = getattr(world, "play", None) or {}
     written = play.get("races") if isinstance(play, dict) else None
@@ -1450,23 +1458,139 @@ def from_world(world) -> list[dict]:
                 continue
             phrases = [*(raw.get("body") or []), *(raw.get("senses") or []),
                        *(raw.get("movement") or [])]
-            out.append(draft(raw["name"], phrases, size_hint=str(raw.get("size") or ""),
-                             speed_hint=str(raw.get("speed") or ""),
-                             about=str(raw.get("about") or ""),
-                             strengths=raw.get("strengths") or (),
-                             weakness=str(raw.get("weakness") or ""),
-                             granted=raw.get("grants") or (),
-                             origin=f"world:{raw.get('people_id') or raw.get('id') or slug(raw['name'])}",
-                             people_id=str(raw.get("people_id") or ""), world=world_id))
+            out.append((raw["name"], phrases, dict(
+                size_hint=str(raw.get("size") or ""),
+                speed_hint=str(raw.get("speed") or ""),
+                about=str(raw.get("about") or ""),
+                strengths=raw.get("strengths") or (),
+                weakness=str(raw.get("weakness") or ""),
+                granted=raw.get("grants") or (),
+                origin=f"world:{raw.get('people_id') or raw.get('id') or slug(raw['name'])}",
+                people_id=str(raw.get("people_id") or ""), world=world_id)))
         return out
     for ent in (getattr(world, "entities", None) or {}).values():
         if not is_species(ent):
             continue
         facts = _facts(ent)
         phrases = [str(facts.get(k) or "") for k in _ANATOMY_KEYS]
-        out.append(draft(ent.name, phrases, about=str(facts.get("Anatomy") or ""),
-                         origin=f"world:{ent.id}", people_id=str(ent.id), world=world_id))
+        out.append((ent.name, phrases, dict(
+            about=str(facts.get("Anatomy") or ""), origin=f"world:{ent.id}",
+            people_id=str(ent.id), world=world_id)))
     return out
+
+
+def from_world(world) -> list[dict]:
+    """The races a world ships with (`_world_cards`), each drafted.
+
+    Both branches of `_world_cards` are live. World Bible has written race cards since
+    schema 1.1, so the first is the normal path for a current export and the second is
+    what a 1.0 world — or one whose author wrote no cards — still gets. The difference is
+    not cosmetic: a card can carry `strengths`/`weakness` and a derived people cannot,
+    because an anatomy fact says what a body looks like and never what it is good at."""
+    return [draft(name, phrases, **kw) for name, phrases, kw in _world_cards(world)]
+
+
+def sense_sources(world) -> list[dict]:
+    """What the sense reader reads, one row per race the world ships: {"world", "key",
+    "name", "words"} — `words` exactly the text `draft` checks a reading against."""
+    out = []
+    for name, phrases, kw in _world_cards(world):
+        out.append({"world": kw["world"], "key": _sense_key(name, kw.get("people_id", "")),
+                    "name": str(name).strip(),
+                    "words": _sense_words(phrases, kw.get("about", ""))})
+    return out
+
+
+# --- senses read from a people's own words (playtest 2026-11-23 #2, owner O6) ---------
+#
+# The owner, 2026-11-25: "if an undine doesn't have darkvision it is an oversight, how
+# could they live underwater otherwise." Aurvantis's Undine card states two tags
+# (`amphibious`, `move.swim.30`) and its words say "sees clearly underwater"; a card that
+# states its tags was read for nothing else (the 2026-09-16 ruling, `draft`), so the PC had
+# no darkvision and lost 6 of 16 swings below the tower to a light miss chance. Paizo's
+# own undine has darkvision 60 ft (ARG; d20pfsrd.com/races/other-races/featured-races/
+# arg-undine), which agrees with the owner and is NOT what decides it: the world owns its
+# peoples, so the senses are read out of THIS world's words, for every people alike.
+#
+# Models read, code validates (owner, 2026-10-03): a model reads the words into the
+# closed list `SENSE_TAGS` under a schema (gm/race_senses.py), once per people, and the
+# answer is stored here, stamped with the reader's version and the words' own checksum —
+# a re-exported world whose words changed is read again, never served a stale answer
+# (CLAUDE.md: version-stamp what is cached outside the install). This side keeps only the
+# tags in the vocabulary, in its order, and adds them to the race the way a stated tag is
+# added, so every character of the race — an existing save included — has them the next
+# time its race document is read (`world_shared`).
+SENSE_TAGS = ("sense.darkvision.60", "sense.low-light", "sense.scent",
+              "sense.blindsense.30")
+SENSE_READING_VERSION = 1
+_READINGS: dict[str, tuple] = {}
+
+
+def _sense_words(phrases, about: str = "") -> str:
+    return " ".join(" ".join(str(p).split()) for p in (*phrases, about) if str(p).strip())
+
+
+def _sense_key(name: str, people_id: str = "") -> str:
+    return str(people_id or "").strip() or slug(name)
+
+
+def _readings_path() -> Path:
+    return _under(str(settings.CAMPAIGN_DIR), True, "homebrew", "race-senses.json")
+
+
+def _words_sum(words: str) -> str:
+    return format(zlib.crc32(str(words).encode("utf-8")), "08x")
+
+
+def _readings() -> dict:
+    path = _readings_path()
+    try:
+        stamp = path.stat().st_mtime_ns
+    except OSError:
+        return {}
+    hit = _READINGS.get(str(path))
+    if hit is not None and hit[0] == stamp:
+        return hit[1]
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        files.unreadable(path, exc)
+        data = {}
+    got = data.get("readings") if isinstance(data, dict) \
+        and data.get("version") == SENSE_READING_VERSION else None
+    got = got if isinstance(got, dict) else {}
+    _READINGS[str(path)] = (stamp, got)
+    return got
+
+
+def senses_read(world: str, key: str, words: str) -> list[str] | None:
+    """The senses read from these words, or None when they have not been read (or were
+    read from other words, or by another version of the reader)."""
+    row = _readings().get(f"{world}/{key}")
+    if not isinstance(row, dict) or row.get("sum") != _words_sum(words):
+        return None
+    return valid_senses(row.get("tags") or ())
+
+
+def valid_senses(tags) -> list[str]:
+    """Only the vocabulary's sense tags, in its order — whatever a reader answered."""
+    got = {str(t).strip() for t in (tags or ()) if isinstance(t, str)}
+    return [t for t in SENSE_TAGS if t in got]
+
+
+def remember_senses(world: str, key: str, words: str, tags) -> list[str]:
+    """Store one reading and drop the per-world race cache, so the next `world_shared`
+    drafts the race with it. Returns the tags kept."""
+    kept = valid_senses(tags)
+    path = _readings_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    rows = dict(_readings())
+    rows[f"{world}/{key}"] = {"sum": _words_sum(words), "tags": kept}
+    files.write_text(path, json.dumps({"version": SENSE_READING_VERSION, "readings": rows},
+                                      indent=1, ensure_ascii=False))
+    _READINGS.pop(str(path), None)
+    _CACHE.pop("worlds", None)
+    return kept
 
 
 def _covered(written: dict) -> set[str]:

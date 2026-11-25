@@ -1744,3 +1744,33 @@ note) should agree with the miles at that rate.
 Every unmeasured `by: sea` route in an export is 1,008 miles or more, every `by: river` route
 72 or more, and no description of a sea crossing in the export's prose is shorter than three
 weeks under sail.
+
+## 36. A people's senses in `grants[]`, agreeing with how they live
+
+*Asked 2026-11-25 (fix/senses-and-light; docs/research/2026-11-25-fix-senses-light.md).
+Optional: without it this app reads each people's senses out of its own words with a model
+(gm/race_senses.py) and adds them beside the card's stated tags, which is how every world
+plays from 0.5.1.*
+
+Playtest 2026-11-23 #2. Aurvantis's Undine card states `amphibious` and `move.swim.30` and
+says "sees clearly underwater" and "gills at the throat", and states no sense. So the
+player's undine had no darkvision in the dark rooms under a tower. The owner, 2026-11-25:
+"if an undine doesn't have darkvision it is an oversight, how could they live underwater
+otherwise." A card that states its tags is meant to be the whole truth about the body
+(ask 1.5's `grants[]`), so a sense the people's life needs and the card leaves out is a
+gap on the export's side.
+
+**Shape.** No new field. When the card's own words (`body`, `senses`, `movement`, `about`)
+say or imply a sense, `grants[]` carries its tag from this closed list:
+
+| tag | when |
+|---|---|
+| `sense.darkvision.60` | they see without light: they live under water, under the ground or in other lightless places, or the words say they see in the dark |
+| `sense.low-light` | they see well by dusk, moon or starlight: night hunters and night workers |
+| `sense.scent` | they smell keenly enough to track |
+| `sense.blindsense.30` | they find things without sight: echoes, vibration, tremor |
+
+### Done when
+
+Every race card's `grants[]` names each sense its words say or its way of life needs, and
+the fixture worlds agree: Aurvantis's Undine grants `sense.darkvision.60`.

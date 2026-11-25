@@ -185,10 +185,8 @@ def sight(scene) -> dict | None:
         return None
     if level not in ("dim", "dark") or int(eyes.get("darkvision") or 0):
         return None
-    from rules import places as places_mod
 
-    at = str(getattr(scene, "at", "") or "")
-    if ambient == "dark" and places_mod.terrain_of(at) == "underground":
+    if ambient == "dark" and _underground(scene):
         why = "underground, with nothing lit"
     elif ambient == "dark":
         why = "nothing lit"
@@ -201,6 +199,52 @@ def sight(scene) -> dict | None:
     for _sq, _r, _rr, name in (scene.lights() if hasattr(scene, "lights") else ()):
         lights.append(name)
     return {"level": level, "why": why, "lights": lights}
+
+
+def _underground(scene) -> bool:
+    """`Scene.underground`, for a scene that has it (a bare test double may not)."""
+    reader = getattr(scene, "underground", None)
+    if callable(reader):
+        try:
+            return bool(reader())
+        except Exception:   # noqa: BLE001 — unknown ground reads as not underground
+            return False
+    from rules import places as places_mod
+
+    return places_mod.terrain_of(str(getattr(scene, "at", "") or "")) == "underground"
+
+
+def dark_seen(scene) -> dict | None:
+    """The player stands in darkness and sees by darkvision: {"level": "dark", "why",
+    "feet", "darkvision": True}, else None.
+
+    The owner, 2026-11-25 (playtest 2026-11-23 #1): "make sure the GM notes the total
+    darkness and properly acknowledges whether the PC can see." `sight` answers for the
+    player WITHOUT darkvision (pitch dark, sees nothing); this is the other half, off the
+    same engine readers: darkness where the player stands, nothing lit there
+    (`Scene.light_at` "dark"), and a darkvision range (`Actor.eyes`). "Darkvision is black
+    and white only but otherwise like normal sight" (Bestiary, Universal Monster Rules)."""
+    pc = scene.pc() if scene is not None and hasattr(scene, "pc") else None
+    if pc is None or not hasattr(scene, "light_at"):
+        return None
+    try:
+        level = scene.light_at(scene.positions.get(pc.ref), viewer=pc)
+        feet = int((pc.eyes() if hasattr(pc, "eyes") else {}).get("darkvision") or 0)
+    except Exception:       # noqa: BLE001
+        return None
+    if level != "dark" or not feet:
+        return None
+    return {"level": "dark", "darkvision": True, "feet": feet, "lights": [],
+            "why": "underground, with nothing lit" if _underground(scene) else "nothing lit"}
+
+
+# The sky, which no sentence may put over a place under the ground: playtest 2026-11-23
+# #1, "You fight amidst the rubble and broken walls of the narthex under a dark, starry
+# sky" and furniture "stacked high toward the open sky" in rooms below a trapdoor. A
+# closed list of what is only ever overhead outdoors.
+SKY = re.compile(
+    r"\b(?:sky|skies|stars?|starry|starlight|starlit|moon|moons|moonlight|moonlit|"
+    r"sunlight|sunshine|sunlit|daylight|open air|the heavens)\b", re.I)
 
 
 def _fighting(ctx) -> bool:
@@ -250,12 +294,15 @@ def _lit_by_the_scene(narration: str, lights: list[str]) -> bool:
     return any(re.search(rf"\b{re.escape(w)}\w*", low) for w in words)
 
 
-def _contradictions(text: str, seen: dict | None, misses: list[dict]) -> list[str]:
+def _contradictions(text: str, seen: dict | None, misses: list[dict],
+                    under: bool = False) -> list[str]:
     out = []
     for w, n in page_sentences(text):
         if NUMBERS.search(n) and (seen or misses):
             out.append(w)
         elif seen and BRIGHT.search(n) and not _lit_by_the_scene(n, seen["lights"]):
+            out.append(w)
+        elif under and SKY.search(n):
             out.append(w)
     return out
 
@@ -280,37 +327,66 @@ def _anchor(text: str, *, blow: bool) -> str:
 
 
 def _owed(ctx, text: str) -> tuple[dict | None, list[dict]]:
-    """(the player's poor sight when this beat owes it, the light misses it owes)."""
+    """(the player's poor sight when this beat owes it, the light misses it owes).
+
+    Dim light is owed in a fight or a search; darkness on every turn beat, and for a
+    player who sees in it by darkvision too (`dark_seen`) — the owner, 2026-11-25: "make
+    sure the GM notes the total darkness and properly acknowledges whether the PC can
+    see" (playtest 2026-11-23 #1)."""
     if not str(text or "").strip():
         return None, []
     misses = light_misses(ctx.tells)
     seen = None
-    if ctx.door == "turn" and (_fighting(ctx) or _searching(ctx)):
+    if ctx.door == "turn":
         seen = sight(ctx.scene)
+        if seen is not None and seen["level"] != "dark" \
+                and not (_fighting(ctx) or _searching(ctx)):
+            seen = None
+        if seen is None:
+            seen = dark_seen(ctx.scene)
     return seen, misses
+
+
+def _under(ctx) -> bool:
+    """The party is under the ground, where no sentence may show a sky (`SKY`)."""
+    return _underground(getattr(ctx, "scene", None))
 
 
 def _words(level: str) -> str:
     return "pitch dark" if level == "dark" else "dim, the light poor"
 
 
+def _sees(seen: dict) -> str:
+    """What the player can see, in words for a fix: darkvision's grey world, or nothing."""
+    if seen.get("darkvision"):
+        return ("the player sees in it by darkvision: everything near them in shades of "
+                "grey, with no colour at all, and black beyond a short way")
+    if seen["level"] == "dark":
+        return "the player sees nothing at all, only hears, smells and feels"
+    return "the player can barely make out shapes"
+
+
 def find(ctx) -> list[Finding]:
     text = ctx.text
     seen, misses = _owed(ctx, text)
-    if not seen and not misses:
+    under = _under(ctx)
+    if not seen and not misses and not under:
         return []
     out: list[Finding] = []
-    bad = _contradictions(text, seen, misses)
+    bad = _contradictions(text, seen, misses, under)
     if bad:
         level = (seen or {}).get("level") or ("dark" if any(m["why"] == "darkness"
                                                              for m in misses) else "dim")
+        sky = ("The party is under the ground: there is no sky here, no stars, no moon "
+               "and no daylight. " if under else "")
         out.append(Finding(
             "light-contradicted",
-            f"the engine holds it {level} here; the page says otherwise or prints the "
-            f"rule: {bad[0][:90]!r}",
-            (f"It is {_words(level)} here — nobody can see well. Rewrite the sentence so "
-             f"the light is as poor as it is: no sun, no glare, no bright light, and no "
-             f"numbers or game terms. Keep everything else it says."),
+            f"the engine holds it {level} here{' and under the ground' if under else ''}; "
+            f"the page says otherwise or prints the rule: {bad[0][:90]!r}",
+            (f"{sky}It is {_words(level)} here — "
+             + (_sees(seen) if seen else "nobody can see well")
+             + ". Rewrite the sentence so the light is as it is: no sun, no glare, no "
+               "bright light, and no numbers or game terms. Keep everything else it says."),
             weight=2, sentences=tuple(bad)))
     if misses and not _miss_shown(text):
         m = misses[0]
@@ -328,13 +404,16 @@ def find(ctx) -> list[Finding]:
             weight=2, sentences=(where,) if where else ()))
     elif seen and not _gloom_shown(text):
         where = _anchor(text, blow=_fighting(ctx))
+        doing = ("a fight" if _fighting(ctx) else "a search" if _searching(ctx)
+                 else "a beat")
         out.append(Finding(
             "light-left-off-the-page",
-            f"a {'fight' if _fighting(ctx) else 'search'} in {seen['level']} light "
-            f"({seen['why']}) and the page shows nothing of it",
-            (f"It is {_words(seen['level'])} here ({seen['why']}): the player can barely "
-             f"make out shapes. Rewrite the sentence so it ALSO shows how little they can "
-             f"see — keeping everything else it says. No numbers."),
+            f"{doing} in {seen['level']} light ({seen['why']}"
+            f"{', seen by darkvision' if seen.get('darkvision') else ''}) and the page "
+            f"shows nothing of it",
+            (f"It is {_words(seen['level'])} here ({seen['why']}): {_sees(seen)}. Rewrite "
+             f"the sentence so it ALSO shows the dark and what the player can see in it — "
+             f"keeping everything else it says. No numbers."),
             weight=1, sentences=(where,) if where else ()))
     return out
 
@@ -387,6 +466,15 @@ POOL: dict[str, tuple[str, ...]] = {
         "Everything past arm's reach is grey shapes and shadow in the dim.",
         "You squint into the gloom, and faces are lost to it beyond a few paces.",
     ),
+    # Darkness seen by darkvision (`dark_seen`): the dark said, and the grey sight in it.
+    "gloom:darkvision": (
+        "It is pitch dark here, and your eyes find the place anyway, in shades of grey with "
+        "no colour to anything.",
+        "No light reaches this place; you see it all the same, flat and grey and "
+        "colourless, until the dark closes in a short way off.",
+        "The dark here is total, but not to your eyes: the stone and the shapes around you "
+        "stand out in grey, drained of every colour.",
+    ),
     "gloom:dark": (
         "It is dark, near pitch black, and you can barely see your own hands.",
         "In the darkness you fight by sound and by touch more than by sight.",
@@ -427,9 +515,10 @@ def backstop(ctx, text: str, findings) -> tuple[str, list[str]]:
 
     notes: list[str] = []
     seen, misses = _owed(ctx, text)
-    if not seen and not misses:
+    under = _under(ctx)
+    if not seen and not misses and not under:
         return text, notes
-    for bad in _contradictions(text, seen, misses):
+    for bad in _contradictions(text, seen, misses, under):
         if bad in text and len(page_sentences(text)) > 1:
             text = cut(text, [bad])
             notes.append(f"light contradicted: cut {bad[:60]!r}")
@@ -444,7 +533,7 @@ def backstop(ctx, text: str, findings) -> tuple[str, list[str]]:
         text = narration_mod.put_before_the_hand_back(text, line)
         notes.append(f"a blow lost to the light left off the page: wrote {line[:60]!r}")
     elif seen and not _gloom_shown(text):
-        cell = f"gloom:{seen['level']}"
+        cell = "gloom:darkvision" if seen.get("darkvision") else f"gloom:{seen['level']}"
         line = _pick(ctx, cell)
         text = narration_mod.put_before_the_hand_back(text, line)
         notes.append(f"poor light left off the page: wrote {line[:60]!r}")

@@ -630,9 +630,13 @@ def see_lines(brief: str, engine, said=None) -> list[str]:
         from .checks import light_shown
 
         seen = light_shown.sight(engine.scene)
+        # Total darkness seen by darkvision is said too (playtest 2026-11-23 #1).
+        dark_eyes = None if seen else light_shown.dark_seen(engine.scene)
     except Exception:  # noqa: BLE001 — no light reading, no light line
-        seen = None
-    light = [f"the light: {seen['level']} ({seen['why']})"] if seen else []
+        seen = dark_eyes = None
+    light = ([f"the light: {seen['level']} ({seen['why']})"] if seen else
+             [f"the light: none, total darkness ({dark_eyes['why']}); the player sees by "
+              f"darkvision, in greys without colour"] if dark_eyes else [])
     return rest + light + hour
 
 
