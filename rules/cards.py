@@ -1188,6 +1188,18 @@ def _carrier(scene, giver_ref: str):
 
         if not bestiary.has_a_people(a):
             continue        # a mite or a gull carries no word of anybody's trouble
+        from . import hooks
+
+        if hooks.relationship(scene, a) == hooks.STRANGER:
+            # Talk is what you get once talking, never a greeting (owner, playtest
+            # 2026-11-23 O4, "MUST FIX"): the lost scholar met under a haunted tower opened
+            # with "The folk in Branford speak often of the old mine". Every tradition
+            # looked at keeps the greeting its own stage — a mobprog's greet_prog fires on
+            # an arrival the mob saw, Emily Short's conversation opens with the NPC noticing
+            # the player, PF1e's Gather Information is hours in taverns — and a stranger
+            # first meets the player (`planned._first_meeting`). docs/research/
+            # 2026-11-25-people-and-arrivals.md.
+            continue
         return a
     return None
 

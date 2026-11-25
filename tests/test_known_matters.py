@@ -134,7 +134,14 @@ def test_a_go_between_needs_somebody_here_to_carry_it(worlds):
     assert alone is None or alone["id"] != quest.id, alone
     farmer = instantiate("guildhand", scene=s, name="Orla Venn")
     s.add(farmer)
-    got = _pull(s, turn=80, recent=recent)
+    # A stranger carries nobody's matter: talk is what you get once talking, never a
+    # greeting (playtest 2026-11-23 O4, the owner's "MUST FIX"). Spoken with, she does.
+    stranger = _pull(s, turn=80, recent=recent)
+    assert stranger is None or stranger["id"] != quest.id, stranger
+    from rules import population
+
+    population.met(s, population.keep_as_resident(s, farmer, s.at))
+    got = _pull(s, turn=120, recent=recent)
     assert got is not None and got["id"] == quest.id, got
     assert got["approach"] == "go_between" and got["carrier"]["name"] == "Orla Venn"
     assert "Orla Venn, who is here, mentions" in got["text"]
