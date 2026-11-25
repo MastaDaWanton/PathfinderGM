@@ -1276,7 +1276,7 @@ class Actor:
         return [(d, name, origin) for d, name, origin, bearer in self._worn_walk()
                 if bearer]
 
-    def spell_resistance_rating(self) -> tuple[int, str]:
+    def spell_resistance_rating(self, ctx: dict | None = None) -> tuple[int, str]:
         """(SR, whose) — the best of a stat block's printed SR and what is worn (armour
         of spell resistance, CRB: "grants the wearer spell resistance"). SR does not
         stack: the highest applies (CRB, Spell Resistance: "only the highest SR
@@ -1297,7 +1297,9 @@ class Actor:
         # Until 2026-10-06 nothing read it: tests/test_three_laws.py carried it on the
         # inert list "until something rolls to overcome SR", and lane C built the roll.
         # The best one applies, as above; SR is never summed.
-        for m in self._buff_mods("combat_mod", "spell_resistance"):
+        # `ctx`: what the spell is (feat loop b2) — Focused Disbelief's SR "applies only
+        # against spells ... covered by the Divine Defiance feat", `against: divine_spell`.
+        for m in self._buff_mods("combat_mod", "spell_resistance", ctx):
             if m.value > best:
                 best, why = int(m.value), m.source
         for spec, name, _ in self.worn_specs_of("spell_resistance"):

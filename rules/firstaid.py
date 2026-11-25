@@ -53,6 +53,25 @@ def needs_aid(actor) -> bool:
     return dying(actor) or bleeding(actor) or lamed(actor)
 
 
+COMBAT_MEDIC = "skill.heal.combat-medic"
+
+
+def medic_takes_ten(healer, patient, mods, dc: int, exceed: bool = False) -> bool:
+    """Combat Medic (UC, teamwork): "Whenever you use Heal to provide first aid, treat
+    caltrop wounds, or treat poison on an ally who also has this feat, you provoke no
+    attacks of opportunity, and can take 10 on the check. Unlike with other teamwork
+    feats, allies that are paralyzed, stunned, unconscious, or cannot otherwise act still
+    count." Both hold the document's tag, the patient is somebody else, and the 10 is
+    taken only when it does the job (`exceed`: treat poison must beat the DC) — the
+    choice a player makes, made for them (owner call, feat loop b2). No Heal check
+    provokes in this engine, so the first clause has nothing to waive."""
+    if healer is None or patient is None or healer is patient \
+            or not healer.has_state(COMBAT_MEDIC) or not patient.has_state(COMBAT_MEDIC):
+        return False
+    total = 10 + sum(int(getattr(m, "value", 0)) for m in mods or ())
+    return total > dc if exceed else total >= dc
+
+
 def lamed(actor) -> bool:
     """Feet cut as if by caltrops (`state.wound.feet`, Footslasher): "until the creature
     is successfully treated with a DC 15 Heal check or receives at least 1 point of

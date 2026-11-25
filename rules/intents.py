@@ -314,6 +314,8 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                            # Lane E (2026-11-22): a skill use with its own row and door
                            # (rules/skilluses.py OWN_DOORS); `square` is where a tumble goes.
                            "feint", "tumble", "care", "display", "square",
+                           # Disengaging Feint's feint (feat loop b2, skilluses.feint).
+                           "disengage",
                            # Round 2 (skills-mind): the thing appraised or studied, and
                            # the subject a Knowledge question is about: names the engine
                            # grounds (`tradecraft.carries`, the world's own index), never
@@ -1096,7 +1098,8 @@ FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "faile
                          "vital_strike", "cleave", "rapid_shot", "flurry",
                          "fighting_defensively", "bloody_assault", "dazing_assault",
                          "stunning_assault", "risky_striker", "shield_of_swings",
-                         "pinpoint_targeting", "footslasher", "sliding_axe_throw"})
+                         "pinpoint_targeting", "footslasher", "sliding_axe_throw",
+                         "disengage"})
 from .skilluses import OWN_DOORS as _OWN_DOORS  # noqa: E402 — the uses with their own door
 
 

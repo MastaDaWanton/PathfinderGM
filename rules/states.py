@@ -623,6 +623,9 @@ TOTAL_DEFENSE = "buff.stance.total-defense"
 # provide soft cover to creatures when ranged attacks pass through your square"
 # (`position.cover_of`).
 IGNORES_PARTIAL_CONCEALMENT = "miss_chance.ignore.partial.melee"
+# Greater Blind-Fight (APG), feat loop b2: total concealment fought as partial (20%) in
+# melee, and a pinpointed shooter's advantages gone at any range.
+TOTAL_CONCEALMENT_AS_PARTIAL = "miss_chance.total.as-partial.melee"
 SHIELD_BASH_KEEPS_GUARD = "shield.bash.keeps-guard"
 SHIELD_LOWERED = "buff.stance.shield-lowered"
 GIVES_NO_SOFT_COVER = "cover.soft.none"

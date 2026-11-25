@@ -447,7 +447,16 @@ _REACHES = {
     # And a caster level CHECK (the scroll above one's level, spell resistance).
     ("combat_mod", "caster_level"):
         lambda a: sum(m.value for m in a.caster_level_check_modifiers()),
+    # Feat loop b2: the Strength carrying capacity is figured from (Cut Your Losses).
+    ("combat_mod", "carry_str"): lambda a: _carry_str(a),
 }
+
+
+def _carry_str(a) -> int:
+    from rules import gear
+
+    got = gear.load(a)
+    return got["str"] + got["str_bonus"]
 
 
 def _spell_cl(a) -> int:

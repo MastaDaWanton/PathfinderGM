@@ -855,6 +855,9 @@ _OPTION_SHAPES = {
                       "opportunity."),
     "feint": ("act", "Feint", "Bluff against the target's guard: they lose their "
                               "Dexterity against your next melee blow."),
+    "disengaging_feint": ("act", "Disengaging Feint",
+                          "Bluff against the target's guard: win, and you may move away "
+                          "without their swing."),
     "tumble": ("move", "Tumble", "Acrobatics against each foe's CMD, so the move past "
                                  "them provokes nothing."),
 }
@@ -1050,6 +1053,10 @@ def _attack_options(pc) -> dict:
     own("feint", f"Bluff {_signed(skill('bluff'))} against the target's guard",
         action=skilluses._action_of(pc, feint),
         op={"op": "check", "params": {"skill": "bluff", "feint": True}})
+    if pc.has_state(skilluses.DISENGAGING_FEINT):
+        own("disengaging_feint", f"Bluff {_signed(skill('bluff'))} against the target's guard",
+            action="standard",
+            op={"op": "check", "params": {"skill": "bluff", "feint": True, "disengage": True}})
     own("tumble", f"Acrobatics {_signed(skill('acrobatics'))} against each foe's CMD",
         why=("Armour that slows you cannot tumble past foes."
              if skilluses._armour_slows(pc) else ""),

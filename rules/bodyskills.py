@@ -1102,8 +1102,14 @@ def _treat(engine, intent, actor, mods, partial, *, key: str):
     held = (aff.payload or {}).get("affliction") or {}
     value = int(held.get("dc") or 10)
     save = str(held.get("save") or "fort")
-    roll = engine._roll_or_suspend(intent, actor, list(mods), label=f"Heal check (treat "
-                                   f"{kind})", dc=value, partial=partial)
+    from . import firstaid
+
+    if kind == "poison" and firstaid.medic_takes_ten(actor, patient, mods, value, exceed=True):
+        roll = engine.dice.given(10, list(mods), label="Heal check (treat poison, taking 10, "
+                                                       "Combat Medic)")
+    else:
+        roll = engine._roll_or_suspend(intent, actor, list(mods), label=f"Heal check (treat "
+                                       f"{kind})", dc=value, partial=partial)
     if kind == "disease":
         scene.advance(int(r["minutes"]))
     else:

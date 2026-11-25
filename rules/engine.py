@@ -8955,7 +8955,11 @@ class Engine:
                 intent.params.get("dc"), level, intent.params.get("circumstance")
             )
 
-        roll = self._roll_or_suspend(
+        medic = patient is not None and firstaid.medic_takes_ten(
+            actor, patient, mods, resolved_dc.final)
+        roll = self.dice.given(10, list(mods), label=f"{skill.title()} check (taking 10, "
+                                                     f"Combat Medic)") if medic \
+            else self._roll_or_suspend(
             intent, actor, mods,
             label=(f"{named} check to help {helped.name}" if helped is not None
                    else f"{named} check" if ability else f"{skill.title()} check"),
@@ -10184,13 +10188,18 @@ class Engine:
         from .sheet import ATTACK_CHOICES
 
         choices = tuple(c for c in ATTACK_CHOICES[1:] if intent.params.get(c))
-        # What kind of swing this is, for a document's `when: {"choice": ...}` (feat loop
-        # b2): an attack of opportunity (Swarm Strike's "+1 on your attack roll"), and one a
-        # combat manoeuvre drew (Porcupine Defense). Engine-written params, never declared.
+        # What kind of swing this is, for a document's `when` (feat loop b2): an attack of
+        # opportunity (`opportunity`, Swarm Strike's "+1 on your attack roll" — the key lane
+        # b2-attack-a's swing moment also answers), and one a combat manoeuvre drew
+        # (`choice: provoked_by_maneuver`, Porcupine Defense). Engine-written params only.
         if intent.params.get("reaction") == "attack_of_opportunity":
-            choices += ("attack_of_opportunity",) + (
+            choices += ("opportunity",) + (
                 ("provoked_by_maneuver",) if intent.params.get("provoked_by") == "maneuver"
                 else ())
+        # A cleave's later blow (`_cleave_next` writes `cleaving`): Goblin Cleaver's "+2
+        # circumstance bonus on attack rolls" is on "additional attacks" alone.
+        if intent.params.get("cleaving"):
+            choices += ("cleaving_on",)
         # Pinpoint Targeting: "You do not gain the benefit of this feat if you move this
         # round" — a move already made this round (`Scene.move_spent`) refuses it.
         if ("pinpoint_targeting" in choices and partial.get("attack_state") is None
@@ -10795,6 +10804,13 @@ class Engine:
                             f"{actor.name} strikes true through the {why}: in melee it "
                             f"gives no miss chance against them.")
                     chance = 0
+                # Greater Blind-Fight (APG): "you treat opponents with total concealment as
+                # if they had normal concealment (20% miss chance instead of 50%). You may
+                # still reroll" — melee, by the document's tag, after the partial waiver
+                # above so the 20 it leaves is still rolled (feat loop b2).
+                if chance >= 50 and weapon.get("category") != "ranged" \
+                        and actor.has_state(states.TOTAL_CONCEALMENT_AS_PARTIAL):
+                    chance, why = 20, f"{why}, fought blind"
                 if chance:
                     miss = self.dice.roll("1d100", label=f"miss chance ({why})",
                                           visibility="hidden")
@@ -26137,6 +26153,7 @@ class Engine:
         is engine-written into the queue (`run`), never parsed: `cleaving` lists the
         foes already struck, so a plain Cleave stops after one more and Great Cleave
         never comes back to a foe."""
+        from . import classfeatures
         from . import grid as grid_mod
         from . import position as position_mod
         from . import reactions as reactions_mod
@@ -26162,9 +26179,16 @@ class Engine:
                     or foe.has_state(states.BYSTANDER) \
                     or reactions_mod._allied(self.scene, actor.ref, ref):
                 continue
-            if grid_mod.distance_between(tuple(here), defender.size,
-                                         tuple(self.scene.positions[ref]),
-                                         foe.size) > grid_mod.SQUARE_FT:
+            # Goblin Cleaver (ARG): "you may take your additional attacks against any
+            # creature smaller than you that you threaten; your targets need not be
+            # adjacent to one another" — the document's tag (feat loop b2).
+            wider = actor.has_state("attack.cleave.any-smaller") \
+                and classfeatures.size_steps(actor, foe) < 0 \
+                and reactions_mod.threatens(self.scene, actor.ref,
+                                            self.scene.positions[ref], foe.size)
+            if not wider and grid_mod.distance_between(
+                    tuple(here), defender.size, tuple(self.scene.positions[ref]),
+                    foe.size) > grid_mod.SQUARE_FT:
                 continue
             if position_mod.out_of_reach(self.scene, actor, foe, weapon_key) is not None:
                 continue
@@ -28969,7 +28993,8 @@ class Engine:
             state["rolls"].extend(g_rolls)
             state["tells"].extend(said)
         with self._guttered(guts[target.ref]):
-            sr, whose = target.spell_resistance_rating()
+            sr, whose = target.spell_resistance_rating({"against": tuple(
+                effectspec.spell_against(spell)) + self._spell_source_words(actor, spell)})
         if sr <= 0:
             return False
         # Piercing Spell (UM): "treats the spell resistance of the target as 5 lower than
@@ -32273,6 +32298,9 @@ class Engine:
                 or not attacker.has_state(awareness.HIDDEN) \
                 or not awareness.locates(self.scene, defender, attacker):
             return False
+        # Greater Blind-Fight: "regardless of the range" (feat loop b2).
+        if defender.has_state(states.TOTAL_CONCEALMENT_AS_PARTIAL):
+            return True
         feet = self._gap_ft(attacker, defender)
         return feet is None or int(feet) <= 30
 

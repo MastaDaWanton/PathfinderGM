@@ -478,3 +478,89 @@ def test_enforcer_s_critical_frightens_for_a_round_as_well():
     thug.hp = thug.hp_max = 200
     _attack(engine, lethality="nonlethal")
     assert thug.has_state("state.fear.frightened") and thug.has_state("state.fear.shaken")
+
+
+# --- the second chunk ----------------------------------------------------------------------------
+
+def test_greater_blind_fight_fights_total_concealment_as_twenty_percent():
+    """Before: a melee blow at an invisible thug met a 50% miss chance whatever the feats.
+    Greater Blind-Fight rolls it as 20% (the miss-chance die's label says so)."""
+    scene, engine, pc, thug = _fight(feats=["Greater Blind-Fight"],
+                                     faces={"Attack with": 18, "Damage": 1, "miss": 99})
+    thug.hp = thug.hp_max = 200
+    thug.add_buff("concealment", "miss_chance", 50, source="test darkness", rounds=10)
+    labels = [r["label"] for r in _rolls(_attack(engine), "miss chance")]
+    assert labels and all("fought blind" in label for label in labels)
+
+
+def test_goblin_cleaver_adds_two_on_the_follow_up_blow_at_a_goblinoid():
+    scene, engine, pc, _ = _fight(feats=["Goblin Cleaver"])
+    goblin = instantiate("goblin", scene=scene, name="a goblin")
+    first = sum(m.value for m in pc.attack_modifiers(defender=goblin, choices=("cleave",)))
+    later = sum(m.value for m in pc.attack_modifiers(defender=goblin,
+                                                     choices=("cleave", "cleaving_on")))
+    assert later - first == 2
+    thug = scene.get("c1")
+    assert sum(m.value for m in pc.attack_modifiers(
+        defender=thug, choices=("cleave", "cleaving_on"))) == sum(
+        m.value for m in pc.attack_modifiers(defender=thug, choices=("cleave",)))
+
+
+def test_focused_disbelief_resists_divine_spells_only():
+    """SR 11 + level (12 at 1st) against a divine caster's spell; none against arcane."""
+    scene, engine, pc, _ = _fight(feats=["Focused Disbelief"])
+    assert pc.spell_resistance_rating({"against": ("spell", "divine_spell")})[0] == 12
+    assert pc.spell_resistance_rating({"against": ("spell", "arcane_spell")})[0] == 0
+    assert pc.spell_resistance_rating()[0] == 0
+
+
+def test_cut_your_losses_carries_as_if_two_stronger():
+    from rules import gear
+
+    scene, engine, pc, _ = _fight()
+    before = gear.load(pc)["heavy"]
+    pc.feats.append("Cut Your Losses")
+    after = gear.load(pc)
+    assert after["heavy"] == gear.capacity(after["str"] + after["str_bonus"])[2] > before
+
+
+def test_escape_route_lets_an_ally_slip_past_beside_you():
+    """Kesst steps away from the thug out of a square beside Borin: with both holding
+    Escape Route, the thug's attack of opportunity is not owed."""
+    from rules import reactions
+
+    for feats, owed in (([], True), (["Escape Route"], False)):
+        scene, engine, pc, thug = _fight(feats=feats, ally=((8, 11), feats),
+                                         at=((7, 12), (8, 10)))
+        got = reactions.provoked_by_move(scene, "ally", (8, 11), (8, 14))
+        assert bool([r for r, _ in got if r == "c1"]) is owed
+
+
+def test_disengaging_feint_buys_a_step_away_instead_of_an_opening():
+    scene, engine, pc, thug = _fight(feats=["Disengaging Feint"], faces={"Bluff": 20})
+    res = _settle(engine, engine.run(engine.validate([{
+        "op": "check", "actor": "pc", "target": "c1", "visibility": "hidden",
+        "params": {"skill": "bluff", "feint": True, "disengage": True}}])))
+    assert "step away" in res.outcomes[0].tell
+    assert pc.has_state("movement.unprovoking.c1")
+    assert not thug.has_state("state.feinted")
+    from rules import reactions
+
+    assert not [r for r, _ in reactions.provoked_by_move(scene, "pc", (6, 10), (2, 10))
+                if r == "c1"]
+
+
+def test_combat_medic_takes_ten_on_an_ally_who_also_holds_it():
+    """Kesst dying at -2; Borin's first aid (Heal +1) takes 10 only beside the feat on both,
+    and only when 10 does it — rolled as a 10 the dice never threw."""
+    scene, engine, pc, _ = _fight(feats=["Combat Medic"], ally=((7, 11), ["Combat Medic"]),
+                                  faces={"Heal": 1})
+    pc.ranks["heal"] = 5
+    kesst = scene.get("ally")
+    kesst.hp = -2
+    kesst.apply_hp_state()
+    res = _settle(engine, engine.run(engine.validate([{
+        "op": "check", "actor": "pc", "target": "ally", "visibility": "hidden",
+        "params": {"skill": "heal", "dc": 15}}])))
+    heal = [r for o in res.outcomes for r in o.rolls if "Heal" in (r.label or "")]
+    assert heal and "taking 10" in heal[0].label and heal[0].faces == [10]

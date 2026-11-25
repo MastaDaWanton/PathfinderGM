@@ -620,7 +620,10 @@ VOCAB: dict[str, list[dict]] = {
         # energy, descriptor, subschool) — Spell Specialization's "treat your caster level
         # as being two higher for all level-variable effects of the spell", Bloatmage
         # Initiate's "+1 caster level". Not `caster_level`, which is a CHECK's bonus.
-        ("spell_cl", "Caster level of a spell cast"))],
+        ("spell_cl", "Caster level of a spell cast"),
+        # Feat loop b2: Cut Your Losses' "treat your Strength score as 2 higher for the
+        # purpose of determining your carrying capacity", read by `gear.encumbrance`.
+        ("carry_str", "Strength for carrying capacity"))],
     "sense": [{"id": k, "name": n} for k, n in (
         ("low_light", "Low-light vision"), ("darkvision", "Darkvision"),
         ("scent", "Scent"), ("tremorsense", "Tremorsense"),
@@ -2479,6 +2482,7 @@ WHEN_KEYS: dict[str, str] = {
     # Intimidating Confidence's "when you confirm a critical hit".
     "flanking_with": "flanking the roll's target with an ally who holds a feat: "
                      "{\"feat\": \"outflank\"} (classfeatures.holds)",
+    "opportunity": "whether the attack is an attack of opportunity (Engine._op_attack)",
     "critical": "whether the hit was a confirmed critical (Engine._feat_riders)",
     "nonlethal": "whether the hit dealt nonlethal damage (Engine._feat_riders)",
 }
@@ -2489,7 +2493,7 @@ _WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment"
                        "attacker": ("type", "subtype", "larger", "smaller", "unprovoked")}
 _WHEN_COMPARE = ("lte", "gte", "lt", "gt", "eq")
 _WHEN_BOOLS = ("daylight", "underground", "wielder_casts", "resting", "full_attack",
-               "flanked", "sole_threat", "critical", "nonlethal")
+               "flanked", "sole_threat", "opportunity", "critical", "nonlethal")
 
 # What a roll may be made AGAINST — the `against` of a roll context, one word per danger,
 # each with the reader that passes it. A closed list, because the clause is answered by
@@ -2659,7 +2663,8 @@ def when_problems(when, where: str = "when") -> list[str]:
         elif key == "flanking_with":
             from . import feats as feats_mod
 
-            if not isinstance(want, dict) or set(want) != {"feat"}                     or str(want.get("feat") or "") not in feats_mod.all_feats():
+            if not isinstance(want, dict) or set(want) != {"feat"} \
+                    or str(want.get("feat") or "") not in feats_mod.all_feats():
                 out.append(f"{where}.flanking_with is {{\"feat\": \"<a feat id>\"}}.")
         elif key == "ally_beside":
             from . import feats as feats_mod

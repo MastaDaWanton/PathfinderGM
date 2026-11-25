@@ -5,8 +5,8 @@
     "text from content/feats/feats.json, checked against aonprd.com FeatDisplay. New readers",
     "this lane built, each for more than one feat: size against the bearer's",
     "(`when.target.larger` / `smaller`, `when.attacker.larger`, `unprovoked`:",
-    "classfeatures.holds); the swing's kind as a roll-context choice (`attack_of_opportunity`,",
-    "`provoked_by_maneuver`: Engine._op_attack); `flanking_with` an ally holding a feat",
+    "classfeatures.holds); the swing's kind (`opportunity`, and the choice `provoked_by_maneuver`:",
+    "Engine._op_attack); `flanking_with` an ally holding a feat",
     "(position.flanking_allies); the formula name `allies_threatening`; `on_hit` riders of",
     "kind maneuver, demoralize, condition, ally_swing and free_swing (Engine._FEAT_RIDERS) and",
     "`critical` / `nonlethal` in their `when`; an owed attack of opportunity queued by `run`",
@@ -137,7 +137,7 @@
   "swarm-strike": {
     "modifiers": [
       {"type": "combat_mod", "target": "attack", "formula": "1 + allies_threatening",
-       "bonus_type": "untyped", "when": {"choice": "attack_of_opportunity"}}
+       "bonus_type": "untyped", "when": {"opportunity": true}}
     ]
   },
   "porcupine-defense": {
@@ -158,6 +158,51 @@
       {"type": "combat_mod", "target": "ac_moving", "amount": 2, "bonus_type": "dodge",
        "when": {"attacker": {"larger": 1}},
        "note": "against a larger opponent's attack of opportunity drawn by moving"}
+    ]
+  },
+  "greater-blind-fight": {
+    "tags": ["miss_chance.ignore.partial.melee", "miss_chance.total.as-partial.melee"]
+  },
+  "goblin-cleaver": {
+    "tags": ["attack.cleave.any-smaller"],
+    "modifiers": [
+      {"type": "combat_mod", "target": "attack", "amount": 2, "bonus_type": "circumstance",
+       "when": {"choice": "cleaving_on", "target": {"subtype": "goblinoid"}},
+       "note": "on Cleave's additional attacks against goblinoids"}
+    ]
+  },
+  "focused-disbelief": {
+    "modifiers": [
+      {"type": "combat_mod", "target": "spell_resistance", "formula": "11 + level",
+       "bonus_type": "untyped", "when": {"against": "divine_spell"},
+       "note": "only against the divine spells Divine Defiance covers"}
+    ],
+    "not_yet": [
+      "lowering the resistance for 1 round as a standard action: the engine has no way to lower spell resistance, so an ally's divine spell still meets it"
+    ]
+  },
+  "cut-your-losses": {
+    "modifiers": [
+      {"type": "combat_mod", "target": "carry_str", "amount": 2, "bonus_type": "untyped",
+       "note": "Strength counts 2 higher for carrying capacity"}
+    ],
+    "not_yet": [
+      "picking up an unattended object or an unconscious ally during a full-round withdraw without provoking: the withdraw picks nothing up on the way"
+    ]
+  },
+  "escape-route": {
+    "tags": ["movement.escape-route"]
+  },
+  "disengaging-feint": {
+    "tags": ["skill.bluff.feint.disengaging"]
+  },
+  "combat-medic": {
+    "tags": ["skill.heal.combat-medic"]
+  },
+  "improved-snap-shot": {
+    "tags": ["threat.ranged.15"],
+    "not_yet": [
+      "the tag is the shape lane b2-attack-a's Snap Shot reader asks (`reactions.ranged_threat`, threat.ranged.<feet>); until that lane merges nothing in this branch reads it"
     ]
   }
 }
