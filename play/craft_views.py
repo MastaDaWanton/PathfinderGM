@@ -1395,7 +1395,7 @@ def craft_action(request):
     # (`_narrate_outcome`): fed the tell of the work and the haul — not the mastery,
     # which the tally line says, and not the encounter, which has its own scene call
     # below — and groomed by the checks every spoken turn gets. When something is
-    # waiting, the engine's fact that they make for one last spot goes in as a tell of
+    # waiting, the engine's fact that they head for another spot goes in as a tell of
     # its own, so the closing ends on the walk and the scene call sets what is there.
     from rules.engine import Outcome
 
@@ -1407,8 +1407,12 @@ def craft_action(request):
         if enc is not None:
             told.append(Outcome(
                 intent_id="", op="stance", effects=[], because="",
-                tell=f"When the work is done, {pc.name} makes for one last "
-                     f"{enc.get('spot') or 'patch'} of the same."))
+                # Never "one last": playtest 2026-11-23 #194, the spot was a stand (of
+                # oak, of reeds), and "makes for one last stand of the same" came back as
+                # a shadow "rising to offer one final, defiant stand" — a creature made
+                # out of an idiom. The scene call below says what is really there.
+                tell=f"When the work is done, {pc.name} heads a little way off, to "
+                     f"another {enc.get('spot') or 'patch'} of the same."))
         line = (f"I go out {spec['sets_out']} for "
                 f"{'an hour' if hours == 1 else f'{hours} hours'}.")
         closing = _narrate_outcome(c, opening, told, line)

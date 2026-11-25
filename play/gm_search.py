@@ -263,6 +263,17 @@ def search(world, question: str, limit: int = 3, threshold: float = THRESHOLD) -
     # favours a short document, and the one passage the player wanted was cut off at
     # the limit. Stable, so the rest keep their order.
     asked = " " + " ".join(re.findall(r"[a-z0-9'’-]+", str(question).lower())) + " "
+    if not proper_noun(question):
+        # A person is asked about by name. Playtest 2026-11-23 #241: "/gm I have tried to
+        # read the repeating words but I get nothing" brought Ratta Farrow and two Rosalies
+        # (-7.9 each, on the common words of their records), and the answer named all three
+        # as "the world's record" on a question about a table in the room. Inform's scope
+        # (WI 18.29) is the precedent: what is not in scope is no candidate at all. Events,
+        # places and peoples are still found by their words ("the salt fever").
+        words = set(asked.split())
+        hits = [h for h in hits if h.kind != "character"
+                or words & {w for w in re.findall(r"[a-z0-9'’-]+", h.name.lower())
+                            if len(w) > 2}]
     hits.sort(key=lambda h: 0 if f" {h.name.lower()} " in asked else 1)
     hits = hits[:limit]
     for h in hits:
