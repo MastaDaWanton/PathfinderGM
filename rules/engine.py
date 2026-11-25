@@ -13054,8 +13054,9 @@ class Engine:
         tactic as TemplePlus repaired it — move toward the target, and stop once in reach
         (github.com/GrognardsFromHell/TemplePlus/wiki/Changelog: the approach "checks for
         proximity before executing", which ended its "endless zig zag till end of turn").
-        One move action at the creature's land speed (`speed_feet`); a double move or a
-        charge is a full-round action this engine does not compose. A fly speed is not
+        One move action at the creature's land speed (`speed_feet`); a double move is not
+        composed, and a charge is a declared option of its own (`_charge_before`, feat
+        loop b2), never this walk. A fly speed is not
         read: `_check_move` budgets every move by land speed, and a walk this composes
         must be one that check would accept.
 

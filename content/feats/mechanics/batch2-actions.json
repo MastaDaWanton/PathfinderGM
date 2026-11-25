@@ -173,9 +173,6 @@
   "tripping-strike": {
     "tags": [
       "crit.maneuver.trip"
-    ],
-    "not_yet": [
-      "\"if you are tripped during your own trip attempt, you can drop your weapon to avoid being tripped\" is not offered"
     ]
   },
   "step-up": {
