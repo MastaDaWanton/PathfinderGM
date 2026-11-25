@@ -137,7 +137,8 @@ document.addEventListener("click", e => {
     const panel = document.getElementById("craftpanel");
     if (panel) panel.hidden = true;
     shellCraftExpanded(false);
-    const b = document.getElementById("craftaction");
+    const craft = document.getElementById("craftaction");
+    const b = typeof visibleOr === "function" ? visibleOr(craft) : craft;
     if (b) b.focus({ preventScroll: true });
     return;
   }

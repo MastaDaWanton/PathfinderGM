@@ -414,13 +414,18 @@ def test_a_shop_shut_for_the_night_is_greyed_in_the_keepers_words(worlds):
 
 # --- the page's own furniture ---------------------------------------------------------------
 
-def test_the_row_is_on_the_page_above_the_input_and_says_no_dashes():
-    """The mount point sits in the footer before the say form, the script is loaded in
+def test_the_row_is_on_the_page_behind_its_door_and_says_no_dashes():
+    """The mount point sits inside the pen's Ways on popover, right after its door (the
+    owner, 2026-11-25: the bar had "become very crowded"; the desk above the pen measured
+    836px of controls in a 283px box, eleven of them ways out). The script is loaded in
     the asset idiom after the spells, and the row's own words carry no em or en dash and
     no arrow (the owner's UI rule)."""
     root = Path(__file__).resolve().parent.parent
     page = (root / "play/templates/play/table.html").read_text(encoding="utf-8")
-    assert page.index('id="exits"') < page.index('id="sayform"')
+    door, pop, row = (page.index('id="waysbtn"'), page.index('id="wayspop"'),
+                      page.index('id="exits"'))
+    assert page.index('id="sayform"') < door < pop < row
+    assert 'popovertarget="wayspop"' in page[door:pop]
     assert page.index("js/table/10-spells.js") < page.index("js/table/11-exits.js")
     code = (root / "play/static/js/table/11-exits.js").read_text(encoding="utf-8")
     strings = [line for line in code.splitlines() if not line.lstrip().startswith("//")]

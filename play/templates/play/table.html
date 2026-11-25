@@ -2469,6 +2469,40 @@
   #passage-offer .passbtn:hover { color: #f4e6c0; border-color: var(--accent); }
   #passage-offer .passbtn[aria-pressed="true"] { border-color: var(--accent); color: #f4e6c0; }
 
+  /* The pen's two doors, Ways on and More (2026-11-25, the owner: "the bar where we are
+     typing has become very crowded"). Each opens a native popover in the top layer, placed
+     above its door by 11-exits.js; nothing in the desk moves when one opens. No `display`
+     on the closed popover: a display rule that outranks the UA's hidden one is how the
+     0.2.13 harvest sheet ate every click, so the layout is given only while it is open. */
+  .pen-door .pen-count { color: var(--dim); letter-spacing: 0; font-variant: normal; }
+  .pen-door:hover .pen-count { color: var(--ink); }
+  .pen-door.risky { border-color: var(--alarm); }
+  .penpop { position: fixed; inset: auto; margin: 0; z-index: 62; overflow-y: auto;
+            padding: 14px 16px; color: var(--ink); font: 15px/1.45 var(--body);
+            background: linear-gradient(#211a13, #15110c); border: 1px solid var(--gold-dim);
+            border-radius: 3px; box-shadow: var(--bevel), var(--sh-3); }
+  .penpop:popover-open { display: grid; gap: 12px; align-content: start; }
+  .penpop #exits .ex-list { flex-wrap: wrap; overflow-x: visible; }
+  /* The popovers sit inside the pen's actions in the DOM (so Tab walks from a door into
+     its popover), and `.actions .v2-btn` would hold every button at its one-line width:
+     "the hills 24 miles north-east of Branford" ran 45px out of the box. */
+  .actions .penpop .v2-btn { flex: 0 1 auto; min-width: 0; }
+  /* One row a purpose: its name in the ways-on rows' label column, its buttons beside it,
+     one under another, so a second ability never wraps under the label. */
+  #morepop .pp-group, #morepop #abilities { display: grid; grid-template-columns: 84px minmax(0, 1fr);
+                                            align-items: center; gap: 8px 10px; padding: 0; }
+  #morepop .pp-group > button, #morepop .abilitybtn { grid-column: 2; justify-self: start; }
+  #morepop .abrow-label { grid-row: 1; grid-column: 1; }
+  #morepop .pp-group[hidden], #morepop #abilities:empty { display: none; }
+  #morepop .pp-h, #morepop .abrow-label { flex: 0 0 84px; margin: 0; color: var(--dim);
+            font: 400 13px/1.2 var(--display); letter-spacing: .12em; font-variant: small-caps;
+            text-shadow: var(--engraved); }
+  #morepop .v2-btn, #morepop .abilitybtn { min-height: 40px; }
+  /* A browser with no popover (Safari before 17, on the LAN) gets the old inline rows:
+     11-exits.js takes the popover attribute off, and the doors with it. */
+  .penpop.inline { position: static; padding: 0; border: 0; background: none; box-shadow: none;
+                   display: grid; gap: 8px; flex: 1 0 100%; }
+
   /* The pen: the say line and the other actions share a line while there is room for
      both, and the actions drop below the pen, never between its halves, when not. */
   .pen { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; position: relative; }
@@ -3978,11 +4012,10 @@
            `scene.passage_offer`): the exits row's own passage rows, attached the same way;
            above the row, where a player in the conversation looks first. -->
       <div id="passage-offer" role="group" aria-label="Berths offered"></div>
-      <!-- The ways on from here (I6, 11-exits.js): `scene.exits` from the engine's own
-           place graph, grouped, with the rules' reason on any way that is shut. -->
-      <nav id="exits" data-tut="exits" aria-label="From here" hidden></nav>
+      <!-- The ways on and the abilities moved into the pen's two doors (Ways on, More):
+           measured on the owner's dungeon save 2026-11-25, this box held 836px of
+           controls in 283px, eleven of them ways out. -->
       <div id="suggestions" role="group" aria-label="Suggested actions"></div>
-      <div id="abilities"></div>
     </div>
     <div id="err" aria-live="polite"></div>
     <form id="sayform" class="pen" autocomplete="off">
@@ -4005,16 +4038,43 @@
              doing and the world takes its beat (the owner's ruling on Continue). -->
         <button type="button" id="carryon" data-tut="continue" class="v2-btn is-quiet"
                 title="You keep to what you were doing and the scene moves on">Continue</button>
-        <button type="button" id="craftaction" data-tut="craft-action" class="v2-btn is-quiet" aria-expanded="false"
-                aria-controls="craftpanel"
-                title="Forage, prospect, skin, gather, buy: every way of getting material"
-                >Craft action</button>
-        <!-- Shown by 10-spells.js when the character casts spells at all. Opened by script
-             rather than `popovertarget`, because the combat bar's Cast… opens the same
-             picker and one opener has to know where the other left it. -->
-        <button type="button" id="spellbtn" data-tut="spells-btn" class="v2-btn is-quiet" aria-controls="spellpop"
-                aria-haspopup="dialog" aria-expanded="false"
-                title="Choose a spell to cast this turn" hidden>Spells</button>
+        <!-- The pen's two doors (docs/research/2026-11-25-clean-composer.md): the box stays
+             the hero, and what is rare or a set of choices sits one labelled click away.
+             Native popovers: Esc and a click outside close them, focus comes back to the
+             door. Each popover follows its door, so Tab walks straight into it. Placed by
+             11-exits.js by measurement, as the spell picker is. -->
+        <button type="button" id="waysbtn" data-tut="exits" class="v2-btn is-quiet pen-door"
+                popovertarget="wayspop" aria-haspopup="dialog" hidden
+                title="The places you can go from here">Ways on <span class="pen-count" id="ways-n"></span></button>
+        <div id="wayspop" class="penpop" popover="auto" role="dialog" aria-label="Ways on from here">
+          <!-- The ways on from here (I6, 11-exits.js): `scene.exits` from the engine's own
+               place graph, grouped, with the rules' reason on any way that is shut. -->
+          <nav id="exits" aria-label="From here" hidden></nav>
+        </div>
+        <!-- More hides itself when Craft action would be alone in it: then Craft action
+             stands here as a plain button (11-exits.js `fitMore`), never a one-item menu. -->
+        <button type="button" id="morebtn" data-tut="pen-more" class="v2-btn is-quiet pen-door"
+                popovertarget="morepop" aria-haspopup="dialog"
+                title="Craft action, spells and your abilities">More</button>
+        <div id="morepop" class="penpop" popover="auto" role="dialog" aria-label="More">
+          <div class="pp-group" id="pp-craft-g" role="group" aria-labelledby="pp-craft">
+            <span class="pp-h" id="pp-craft">Crafting</span>
+            <button type="button" id="craftaction" data-tut="craft-action" class="v2-btn is-quiet" aria-expanded="false"
+                    aria-controls="craftpanel"
+                    title="Forage, prospect, skin, gather, buy: every way of getting material"
+                    >Craft action</button>
+          </div>
+          <!-- Shown by 10-spells.js when the character casts spells at all. Opened by
+               script rather than `popovertarget`, because the combat bar's Cast… opens the
+               same picker and one opener has to know where the other left it. -->
+          <div class="pp-group" id="pp-magic-g" role="group" aria-labelledby="pp-magic">
+            <span class="pp-h" id="pp-magic">Magic</span>
+            <button type="button" id="spellbtn" data-tut="spells-btn" class="v2-btn is-quiet" aria-controls="spellpop"
+                    aria-haspopup="dialog" aria-expanded="false"
+                    title="Choose a spell to cast this turn" hidden>Spells</button>
+          </div>
+          <div id="abilities"></div>
+        </div>
         <!-- The table's tips again (js/tutorials.js). -->
         <button type="button" class="tut-help" data-tut="help-table" data-tut-help="table"
                 aria-label="Show the tips for the table">?</button>
