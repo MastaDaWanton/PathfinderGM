@@ -19,6 +19,7 @@ tell, here is the sentence" is the honest answer and the useful one.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from pathfindergm import files
@@ -108,7 +109,24 @@ class Feat:
 
 def from_dict(d: dict) -> Feat:
     known = Feat.__dataclass_fields__
-    return Feat(**{k: v for k, v in d.items() if k in known})
+    feat = Feat(**{k: v for k, v in d.items() if k in known})
+    _monk_alternative(feat)
+    return feat
+
+
+# "base attack bonus +2 or monk level 1st" (the style feats, Ultimate Combat): the
+# extractor typed the BAB half and dropped the other, so a 1st-level monk (BAB +0) was
+# refused Crane Style, which the book lets him take. Feat loop b2-styles, measured
+# 2026-11-22: 33 feats print the alternative, every one of them "or monk level N".
+_MONK_ALT = re.compile(r"base attack bonus \+(\d+) or monk level (\d+)")
+
+
+def _monk_alternative(feat: Feat) -> None:
+    """Attach the printed monk-level alternative to the BAB prerequisite it qualifies."""
+    for m in _MONK_ALT.finditer(feat.prerequisites_text or ""):
+        for cond in feat.prerequisites:
+            if cond.get("kind") == "bab" and int(cond.get("value", -1)) == int(m.group(1)):
+                cond["or_class"] = {"class": "monk", "value": int(m.group(2))}
 
 
 _ALL: dict[str, Feat] | None = None
@@ -382,6 +400,9 @@ def _check(actor, cond: dict) -> bool | None:
     if kind == "ability":
         return actor.ability_score(cond["ability"]) >= int(cond["value"])
     if kind == "bab":
+        alt = cond.get("or_class")
+        if alt and _check(actor, {"kind": "class_level", **alt}):
+            return True
         return actor.bab >= int(cond["value"])
     if kind == "character_level":
         return actor.level >= int(cond["value"])
@@ -442,7 +463,9 @@ def describe(cond: dict) -> str:
     if kind == "ability":
         return f"{cond['ability'].title()} {cond['value']}"
     if kind == "bab":
-        return f"base attack bonus +{cond['value']}"
+        alt = cond.get("or_class")
+        tail = f" or {alt['class']} level {alt['value']}" if alt else ""
+        return f"base attack bonus +{cond['value']}{tail}"
     if kind == "character_level":
         return f"character level {cond['value']}"
     if kind == "caster_level":

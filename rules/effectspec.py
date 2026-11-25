@@ -615,6 +615,10 @@ VOCAB: dict[str, list[dict]] = {
         ("weapon_dice", "Extra weapon damage dice"),
         ("crit_confirm", "Rolls to confirm a critical"),
         ("ac_moving", "AC against attacks of opportunity for moving"),
+        # Feat loop b2-styles: what a DEFENDER's feat does to the attacker's roll to
+        # confirm a critical against them (Snapping Turtle Shell's "your enemies take a
+        # -4 penalty on critical confirmation rolls against you"), read at the confirm.
+        ("crit_confirm_against", "Rolls to confirm a critical against you"),
         # Feat loop b1, 2026-11-22: the caster level a spell is CAST at, read by
         # `casting.spell_caster_level` with the spell's roll context (school, spell,
         # energy, descriptor, subschool) — Spell Specialization's "treat your caster level

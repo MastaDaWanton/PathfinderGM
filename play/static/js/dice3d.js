@@ -625,6 +625,13 @@
     "#d3d-acts button.ghost{opacity:.55;flex:0 0 auto;font-size:12px;padding:11px 12px}",
     "#d3d-acts button.ghost:hover{opacity:1}",
     "#d3d-own{display:none;gap:6px;margin-bottom:10px}",
+    // The luck row (rules/luck.py): the feats a roll may call on, the mat's own buttons.
+    "#d3d-luck{display:none;flex-wrap:wrap;gap:6px;margin-bottom:10px}",
+    "#d3d-luck.on{display:flex}",
+    "#d3d-luck button{flex:1 1 140px;cursor:pointer;border-radius:2px;padding:8px 10px;",
+    "color:#d9c08a;background:#0c0a08;border:1px solid #5a4a32;font:400 13px/1.25 Georgia,serif}",
+    "#d3d-luck button:hover,#d3d-luck button[aria-pressed=true]{border-color:#c9a86a;",
+    "color:#f0dcae}",
     "#d3d-own.on{display:flex}",
     "#d3d-own input{flex:1;padding:10px;text-align:center;border-radius:2px;color:#d9c08a;",
     "background:#0c0a08;border:1px solid #7a6543;font:400 17px/1 'Cinzel',Georgia,serif;",
@@ -659,6 +666,7 @@
       '<div id="d3d-verdict"></div>' +
       '<div id="d3d-note"></div>' +
       '<div id="d3d-own"><input type="number" id="d3d-face"></div>' +
+      '<div id="d3d-luck"></div>' +
       '<div id="d3d-acts">' +
       '<button id="d3d-go" data-tut="dice-roll">Roll</button>' +
       '<button class="ghost" id="d3d-debug" data-tut="dice-own" title="Enter the result of a die you rolled ' +
@@ -809,6 +817,9 @@
     mat.querySelector("#d3d-verdict").className = "";
     mat.querySelector("#d3d-note").textContent = "";
     mat.querySelector("#d3d-own").classList.remove("on");
+    mat.querySelector("#d3d-luck").classList.remove("on");
+    mat.querySelector("#d3d-luck").innerHTML = "";
+    mat.querySelector("#d3d-go").style.display = "";
     mat.querySelector("#d3d-debug").style.display = "none";
     mat.querySelector("#d3d-go").textContent = "…";
     mat.querySelector("#d3d-go").disabled = true;
@@ -1182,6 +1193,40 @@
           mat.classList.remove("on");
         }
         done(value);
+      }
+      // The luck the server offers on this roll (`opts.luck`, rules/luck.py): each
+      // choice is the server's — its id, its words — and the pick rides the roll's post
+      // (`opts.luck.picked`). `before` toggles a bonus on the throw to come; `reroll`
+      // throws the die again; `bonus` and `keep` take the die already down (`luck.face`).
+      var lk = opts.luck;
+      if (lk && lk.choices && lk.choices.length) {
+        var row = mat.querySelector("#d3d-luck");
+        row.innerHTML = lk.choices.map(function (c, i) {
+          return '<button type="button" data-luck="' + i + '"' +
+            (c.kind === "before" ? ' aria-pressed="false"' : "") + ">" + esc(c.text) +
+            "</button>";
+        }).join("");
+        row.classList.add("on");
+        // Asked after the die is down: no fresh throw unless a reroll is chosen.
+        if (lk.face != null) mat.querySelector("#d3d-go").style.display = "none";
+        row.onclick = function (e) {
+          var b = e.target.closest("[data-luck]");
+          if (!b) return;
+          var c = lk.choices[Number(b.dataset.luck)];
+          if (c.kind === "before") {
+            lk.picked = lk.picked === c.id ? null : c.id;
+            b.setAttribute("aria-pressed", String(lk.picked === c.id));
+          } else if (c.kind === "reroll") {
+            lk.picked = c.id;
+            row.classList.remove("on");
+            mat.querySelector("#d3d-go").style.display = "";
+            mat.querySelector("#d3d-go").click();
+          } else {
+            lk.picked = c.id;
+            row.classList.remove("on");
+            close(lk.face);
+          }
+        };
       }
       mat.querySelector("#d3d-go").onclick = function () {
         var v = null;

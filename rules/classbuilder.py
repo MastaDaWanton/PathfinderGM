@@ -1120,7 +1120,46 @@ def _validate_grants(d: dict, path: dict, at: str, resolved_names: set,
 _FEAT_DOC_KEYS = frozenset({"modifiers", "tags", "budget", "choice", "attack_ability",
                             "cmb_ability", "not_yet", "requires", "requires_not",
                             "stacks", "summoned", "summon_extra", "metamagic", "crit_range",
-                            "on_hit"})
+                            "on_hit",
+                            # Feat loop b2-styles: rerolls and after-the-die bonuses.
+                            "luck"})
+
+# The keys a feat's `luck` entry may carry (rules/luck.py, which reads them).
+_LUCK_KEYS = frozenset({"reroll", "bonus", "ally_save", "on_reroll", "surge", "rolls",
+                        "per_day", "bonus_type"})
+
+
+def _luck_problems(at: str, entries) -> list[str]:
+    """Everything wrong with a feat's `luck` list (rules/luck.py), with the fix named."""
+    from . import luck as luck_mod
+
+    if not isinstance(entries, list):
+        return [f"{at}.luck: a list of entries, each one of {', '.join(luck_mod.KINDS)}."]
+    out = []
+    for i, e in enumerate(entries):
+        where = f"{at}.luck[{i}]"
+        if not isinstance(e, dict):
+            out.append(f"{where}: an object.")
+            continue
+        bad = sorted(set(e) - _LUCK_KEYS)
+        if bad:
+            out.append(f"{where}: unknown key(s) {', '.join(bad)}; an entry carries "
+                       f"{', '.join(sorted(_LUCK_KEYS))}.")
+        kinds = [k for k in luck_mod.KINDS if k in e]
+        if len(kinds) != 1:
+            out.append(f"{where}: exactly one of {', '.join(luck_mod.KINDS)}.")
+        if "reroll" in e and e["reroll"] not in ("natural_1", "any"):
+            out.append(f"{where}.reroll: \"natural_1\" or \"any\".")
+        if "bonus" in e and (not isinstance(e["bonus"], dict) or not e["bonus"]
+                             or set(e["bonus"]) - {"before", "after"}):
+            out.append(f"{where}.bonus: {{\"before\": 8, \"after\": 4}}.")
+        rolls = e.get("rolls", [])
+        if not isinstance(rolls, list) or not all(isinstance(r, str) and r for r in rolls):
+            out.append(f"{where}.rolls: a list of roll kinds — attack, save, save.fort, "
+                       f"skill, skill.disable device, ability, d20.")
+        if not isinstance(e.get("per_day", 0), int) or int(e.get("per_day", 0)) < 0:
+            out.append(f"{where}.per_day: a count of uses a day, or left out for no limit.")
+    return out
 
 # What a feat's `on_hit` may lay on the creature a melee blow just struck (feat loop b1,
 # 2026-11-22): the attack riders' own executors (`Engine._RIDERS`), each key it reads.
@@ -1150,9 +1189,17 @@ def _on_hit_problems(at: str, rules, doc: dict) -> list[str]:
         if kind == "bleed" and not str(rule.get("amount") or "").strip():
             out.append(f"{where}.amount: the bleed per round, \"1d4\" or \"2\".")
         if kind == "save_condition":
-            if str(rule.get("condition") or "") not in CONDITIONS:
+            from .states import TAGS as _TAGS
+
+            if str(rule.get("condition") or "") not in CONDITIONS \
+                    and str(rule.get("condition") or "") not in _TAGS:
                 out.append(f"{where}.condition: a condition the table knows (dazed, "
                            f"stunned ...).")
+            span = rule.get("for")
+            if span is not None and (not isinstance(span, dict) or (
+                    span.get("formula") and resources.check(str(span["formula"])))):
+                out.append(f"{where}.for: {{\"dice\": \"1d4\", \"unit\": \"round\"}} or "
+                           f"{{\"formula\": \"wis_mod\", \"unit\": \"round\"}}.")
             if str(rule.get("save") or "") not in ("fort", "ref", "will"):
                 out.append(f"{where}.save: fort, ref or will.")
             trouble = resources.check(str(rule.get("dc") or ""))
@@ -1180,8 +1227,17 @@ def _feat_funnel_targets() -> set[str]:
     for cls in classes_mod.all_classes().values():
         out |= {f"pool.{str(p.get('id')).strip().lower()}" for p in cls.get("pools") or ()}
 
+    # Feat loop b2-styles: energy resistance (`Actor.resistance` reads `resist.<energy>`)
+    # and a charged ability's save DC (`Engine._resolve_charge` reads `<key>.dc`, Mantis
+    # Style's "+2 bonus to the DC of effects you deliver with your Stunning Fist").
+    from .tables import ENERGY_DAMAGE
+
+    out |= {f"resist.{e}" for e in ENERGY_DAMAGE}
+
     def walk(node):
         if isinstance(node, dict):
+            if isinstance(node.get("charge"), dict) and node.get("key"):
+                out.add(f"{str(node['key']).strip().lower().replace(' ', '-')}.dc")
             if isinstance(node.get("pool"), dict) and node["pool"].get("id"):
                 out.add(f"pool.{str(node['pool']['id']).strip().lower()}")
             prefix = node.get("bonus_from")
@@ -1366,6 +1422,8 @@ def validate_feat_document(feat_id: str, doc) -> list[str]:
                 f"— the threat range doubled on the weapon the feat names.")
     if doc.get("on_hit") is not None:
         problems.extend(_on_hit_problems(at, doc["on_hit"], doc))
+    if doc.get("luck") is not None:
+        problems.extend(_luck_problems(at, doc["luck"]))
     sub = doc.get("cmb_ability")
     if sub is not None:
         from .tables import ABILITIES

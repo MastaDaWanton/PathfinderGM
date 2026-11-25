@@ -23,7 +23,7 @@ const COMBAT = { target: null, move: null, standard: null, swift: null, frees: [
 //   `swing`  rides every blow staged (Power Attack, Fight defensively) — a toggle;
 //   `full`   changes what Full attack is made of (Rapid Shot, a flurry) — a toggle;
 //   `strike` is one blow of its own (Vital Strike, Cleave) — stages the action;
-//   `act`    is a whole action (Total defense, Feint) — stages the action;
+//   `act`    is a whole action (Total defense, Feint, entering a style) — stages it;
 //   `move`   rides the move (Tumble) — a toggle.
 function attackOptions() { return ((STATE && STATE.attacks) || {}).options || []; }
 
@@ -278,6 +278,12 @@ function stepOf(key) {
   if (key === "standard") {
     return { label: COMBAT.standard.label, said: COMBAT.standard.label.toLowerCase(),
              actions: COMBAT.standard.actions };
+  }
+  // A Declare option's swift action (entering a style) is staged as a whole step, its
+  // own op; a swift ability from the menu is its name.
+  if (key === "swift" && typeof COMBAT.swift === "object") {
+    return { label: COMBAT.swift.label, said: COMBAT.swift.label.toLowerCase(),
+             name: COMBAT.swift.label, actions: COMBAT.swift.actions };
   }
   const name = key === "swift" ? COMBAT.swift : COMBAT.frees[Number(key.slice(5))];
   const kind = key === "swift" ? "Swift" : "Free";
@@ -921,8 +927,10 @@ document.addEventListener("click", async e => {
       const step = { label: o.op.op === "check" ? `${o.name} at ${targetName()}` : o.name,
         actions: [{ op: o.op.op, ...(o.op.op === "check" ? { target: COMBAT.target } : {}),
                     params: { ...(o.op.params || {}) } }] };
-      // A move action (Improved Feint) sits beside the standard; anything else is it.
+      // A move action (Improved Feint) sits beside the standard, a swift one (a combat
+      // style) in the swift slot; anything else is it.
       if (o.action === "move") COMBAT.moveact = step;
+      else if (o.action === "swift") COMBAT.swift = step;
       else { COMBAT.standard = step; combatMenu(""); }
     } else {
       if (COMBAT.opts.has(o.id)) COMBAT.opts.delete(o.id);
@@ -1149,7 +1157,8 @@ async function sendRoll(face, shown) {
   busy(true);
   let state = null;
   const logBefore = (STATE && STATE.log) || [];
-  try { state = await post("/api/roll", { face: landed }); }
+  const luck = shown.luck && shown.luck.picked;
+  try { state = await post("/api/roll", luck ? { face: landed, luck } : { face: landed }); }
   catch (e) { $("#err").className = ""; $("#err").textContent = e.message; }
   finally { busy(false); }
   // The turn this die finished is over, so the "Not yet done: …" its first reply put up

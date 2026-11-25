@@ -192,7 +192,7 @@
     ],
     "not_yet": [
       "piercing damage added to your unarmed strikes: an unarmed strike's damage type is fixed",
-      "demoralize as a free action on tearing flesh: Boar Style has no document"
+      "demoralize as a free action on tearing flesh (Boar Style tears it, b2-styles): no door demoralizes as a free action off a hit"
     ]
   },
   "motivating-display": {
@@ -233,7 +233,7 @@
     ],
     "not_yet": [
       "piercing damage with your unarmed strikes: an unarmed strike's damage type is fixed",
-      "the style itself, and its immediate-action Sense Motive as AC: no style stance is entered here"
+      "the immediate-action Sense Motive is rolled by the engine for the player too, on the first attack each round, rather than asked"
     ]
   }
 }

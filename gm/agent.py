@@ -1717,6 +1717,11 @@ class GMAgent:
                 raw, rearmed = judgement.rearm(self.engine.scene, ref,
                                                _owned_by(data.get("intents"), ref,
                                                          self.engine.scene))
+                # A style it knows, stood in on its first turn of the fight (by the
+                # book: entering one is a swift action, `rules/styles.py`).
+                from rules import styles as styles_mod
+
+                raw = styles_mod.npc_stance(self.engine.scene, ref, raw)
                 turned = (companions.turning_on_the_party(self.engine.scene, ref, raw)
                           or (companions.handled_unheeded(self.engine.scene, ref, raw)
                               if friend else "")

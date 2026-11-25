@@ -518,6 +518,9 @@ TAGS: dict[str, tuple[str, ...]] = {
     "bloody assault":   ("buff.stance.bloody-assault",),
     "dazing assault":   ("buff.stance.dazing-assault",),
     "stunning assault": ("buff.stance.stunning-assault",),
+    # Scorpion Style (CRB): "the target's base land speed is reduced to 5 feet". Read by
+    # `Actor.speed_feet`; a save_condition rider lays it (feat loop b2-styles).
+    "hobbled": ("state.hampered.speed-5",),
     # Combat bar round 2, 2026-11-22: the book's two defensive choices, open to anyone
     # (CRB, Combat). Fighting defensively rides the attack it is declared with; total
     # defense is its own standard action, and "you can't make attacks of opportunity

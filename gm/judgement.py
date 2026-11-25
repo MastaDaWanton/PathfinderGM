@@ -2107,7 +2107,8 @@ _ATTACK_PARAMS = {"weapon", "full_attack", "manoeuvre", "power_attack", "iterati
                   # The feat options a swing may declare (rules/intents.py, lane D).
                   "deadly_aim", "combat_expertise", "piranha_strike", "vital_strike",
                   "cleave", "rapid_shot", "flurry", "off_hand",
-                  "bloody_assault", "dazing_assault", "stunning_assault"}
+                  "bloody_assault", "dazing_assault", "stunning_assault",
+                  "scorpion_style", "second_chance"}
 
 
 def normalize_attacks(raw_intents, scene):
