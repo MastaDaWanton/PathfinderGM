@@ -505,5 +505,200 @@
     "tags": [
       "skill.perception.take-20.move"
     ]
+  },
+  "arcane-armor-mastery": {
+    "not_yet": [
+      "a swift action to cut the round's arcane spell failure by 20% in place of Arcane Armor Training's 10%: Arcane Armor Training itself is lane b2-attack-b's, and the swift-action budget lane b2-actions'"
+    ]
+  },
+  "nimble-moves": {
+    "not_yet": [
+      "5 feet of difficult terrain a round moved as normal terrain, and a 5-foot step into difficult terrain: nothing lifts difficult terrain's double cost for the first 5 feet a round (the move op prices it, rules/grid.py)"
+    ]
+  },
+  "ride-by-attack": {
+    "not_yet": [
+      "moving after a mounted charge in the same line, and no attack of opportunity from the foe charged: the charge is lane b2-actions' machinery"
+    ]
+  },
+  "snatch-arrows": {
+    "not_yet": [
+      "catching the deflected missile and throwing a thrown weapon back at once: Deflect Arrows turns the shot aside, and no reader catches it into a free hand"
+    ]
+  },
+  "blood-of-heroes": {
+    "not_yet": [
+      "two hero points a level instead of one: the app keeps no hero points (APG optional system)"
+    ]
+  },
+  "ki-throw": {
+    "not_yet": [
+      "a won unarmed trip throws the target prone into any square you threaten: the trip leaves it prone in its own square"
+    ]
+  },
+  "under-and-over": {
+    "not_yet": [
+      "an immediate-action trip at +2 against a larger foe whose grapple failed, provoking nothing: the immediate-action budget is lane b2-actions'"
+    ]
+  },
+  "cleave-through": {
+    "not_yet": [
+      "a free 5-foot step between Cleave's attacks that brings a new foe into reach: Cleave's extra blows are chosen from those threatened when it is declared"
+    ]
+  },
+  "giant-killer": {
+    "not_yet": [
+      "Goblin Cleaver's extra Cleave attacks on creatures one size larger or smaller (lane b2-attack-b's feat), and their +2 circumstance against humanoids (giant)"
+    ]
+  },
+  "orc-hewer": {
+    "not_yet": [
+      "Goblin Cleaver's extra Cleave attacks on creatures your size or smaller (lane b2-attack-b's feat), and their +2 circumstance against humanoids (orc)"
+    ]
+  },
+  "archon-diversion": {
+    "not_yet": [
+      "Archon Style's lowered penalty, move-action use and the diverted blow: Archon Style is lane b2-styles'"
+    ]
+  },
+  "bear-hug": {
+    "not_yet": [
+      "a grapple without provoking against a foe held by Beartrap Bite (lane b2-attack-b's feat), and +2 damage against a foe you grapple: no grapple-damage term asks who holds whom yet"
+    ]
+  },
+  "wolf-savage": {
+    "not_yet": [
+      "a swift action after 10 damage to a prone foe with a natural weapon or unarmed strike: Fortitude or a bestow curse disfigurement — the swift budget (lane b2-actions) and Wolf Style (lane b2-styles)"
+    ]
+  },
+  "fast-crawl": {
+    "not_yet": [
+      "moving at half speed while prone, and a 5-foot step while crawling: no move asks whether the mover is prone, so a crawl is not priced or allowed by rule"
+    ]
+  },
+  "friend-to-animals": {
+    "not_yet": [
+      "a standard action: animals within 30 feet save (Will) or cannot attack you until you or your allies attack them — no state yet refuses a creature's attack on one named ref"
+    ]
+  },
+  "witty-feint": {
+    "not_yet": [
+      "a dodge bonus to AC against the feinted foe equal to your weapon training bonus, in place of denying his Dexterity: nothing reads the weapon training bonus for the weapon in hand by itself"
+    ]
+  },
+  "shadow-gambit": {
+    "not_yet": [
+      "ending an ongoing figment to strike a foe in or beside it for 1d6 per spell level: figments are not run as standing illusions"
+    ]
+  },
+  "extend-the-bulwark": {
+    "not_yet": [
+      "a free action giving an adjacent ally with the feat half your armour bonus as circumstance AC for a round while you lose it"
+    ]
+  },
+  "collective-recollection": {
+    "not_yet": [
+      "a free-action aid another on an ally's trained Knowledge check within 30 feet, sharing what it learns"
+    ]
+  },
+  "emergency-attunement": {
+    "not_yet": [
+      "a standard-action Spellcraft check (DC 10 + spell level) to swap an ongoing abjuration or transmutation's chosen option at half its remaining duration"
+    ]
+  },
+  "uncanny-activation": {
+    "not_yet": [
+      "+1 caster level when beating a Use Magic Device DC by 5 on a spell completion or trigger item, +2 for an extra charge by 10: Use Magic Device has no activation door yet"
+    ]
+  },
+  "out-of-the-sun": {
+    "not_yet": [
+      "a move-action feint after a melee hit that opens the foe to an adjacent ally with the feat, +2/+4 in bright light or sunlight"
+    ]
+  },
+  "mounted-blade": {
+    "not_yet": [
+      "a second attack at -5 on a foe beside the first after a Ride-By Attack hit: Ride-By Attack is not built (the charge, lane b2-actions)"
+    ]
+  },
+  "circling-offense": {
+    "not_yet": [
+      "+1 dodge against attacks of opportunity from a larger creature while an ally with the feat is in its reach, and its misses provoking from those allies"
+    ]
+  },
+  "jaguar-pounce": {
+    "not_yet": [
+      "the first melee attack of a charge or Spring Attack against a flat-footed or helpless foe threatens as Improved Critical: charge and Spring Attack are lane b2-actions'"
+    ]
+  },
+  "broken-wing-gambit": {
+    "not_yet": [
+      "a free action after a hit granting the foe +2 attack and damage against you, its attack then provoking from allies with the feat"
+    ]
+  },
+  "cavalry-formation": {
+    "not_yet": [
+      "mounts sharing squares and charging through allied mounts: no mounted combat on the board yet"
+    ]
+  },
+  "clustered-shots": {
+    "not_yet": [
+      "damage reduction applied once to the total of a full attack's ranged hits on one foe: each hit meets the reduction alone"
+    ]
+  },
+  "deceptive-exchange": {
+    "not_yet": [
+      "handing the feinted foe a held one-handed object in place of denying its Dexterity"
+    ]
+  },
+  "dimensional-dervish": {
+    "not_yet": [
+      "a full attack split by abundant step or dimension door teleports between the attacks (Dimensional Assault is lane b2-attack-b's)"
+    ]
+  },
+  "disengaging-flourish": {
+    "not_yet": [
+      "a standard-action Bluff against every foe threatening you, then a move at speed that provokes none of those fooled"
+    ]
+  },
+  "improved-two-weapon-feint": {
+    "not_yet": [
+      "forgoing the first primary-hand attack of a two-weapon full attack to feint, the foe denied Dexterity for the rest of your turn"
+    ]
+  },
+  "two-weapon-feint": {
+    "not_yet": [
+      "forgoing the first primary-hand attack of a two-weapon full attack to make a feint"
+    ]
+  },
+  "mocking-dance": {
+    "not_yet": [
+      "the 5-foot or full-speed move before a performance combat check, +2 to it: performance combat (Ultimate Combat optional system) is not built"
+    ]
+  },
+  "net-maneuvering": {
+    "not_yet": [
+      "tripping or disarming with a net in melee (+2 on the disarm), and dragging or repositioning a foe the net entangles"
+    ]
+  },
+  "pin-down": {
+    "not_yet": [
+      "a foe you threaten taking a 5-foot step or withdrawing provokes from you; a hit stops the move and deals no damage — attacks of opportunity on a step are lane b2-actions'"
+    ]
+  },
+  "raging-hurler": {
+    "not_yet": [
+      "while raging: two-handed weapons thrown as a standard action, thrown range increments doubled, improvised objects picked up as part of the throw"
+    ]
+  },
+  "school-strike": {
+    "not_yet": [
+      "a swift action after an unarmed hit to deliver a chosen one-target arcane school power: the swift budget is lane b2-actions', and school powers are not aimed through a blow"
+    ]
+  },
+  "thunder-and-fang": {
+    "not_yet": [
+      "an earth breaker one-handed beside a skull shield that keeps its shield bonus and counts as light for two-weapon penalties"
+    ]
   }
 }
