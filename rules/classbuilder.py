@@ -1189,9 +1189,17 @@ def _on_hit_problems(at: str, rules, doc: dict) -> list[str]:
         if kind == "bleed" and not str(rule.get("amount") or "").strip():
             out.append(f"{where}.amount: the bleed per round, \"1d4\" or \"2\".")
         if kind == "save_condition":
-            if str(rule.get("condition") or "") not in CONDITIONS:
+            from .states import TAGS as _TAGS
+
+            if str(rule.get("condition") or "") not in CONDITIONS \
+                    and str(rule.get("condition") or "") not in _TAGS:
                 out.append(f"{where}.condition: a condition the table knows (dazed, "
                            f"stunned ...).")
+            span = rule.get("for")
+            if span is not None and (not isinstance(span, dict) or (
+                    span.get("formula") and resources.check(str(span["formula"])))):
+                out.append(f"{where}.for: {{\"dice\": \"1d4\", \"unit\": \"round\"}} or "
+                           f"{{\"formula\": \"wis_mod\", \"unit\": \"round\"}}.")
             if str(rule.get("save") or "") not in ("fort", "ref", "will"):
                 out.append(f"{where}.save: fort, ref or will.")
             trouble = resources.check(str(rule.get("dc") or ""))
@@ -1219,8 +1227,17 @@ def _feat_funnel_targets() -> set[str]:
     for cls in classes_mod.all_classes().values():
         out |= {f"pool.{str(p.get('id')).strip().lower()}" for p in cls.get("pools") or ()}
 
+    # Feat loop b2-styles: energy resistance (`Actor.resistance` reads `resist.<energy>`)
+    # and a charged ability's save DC (`Engine._resolve_charge` reads `<key>.dc`, Mantis
+    # Style's "+2 bonus to the DC of effects you deliver with your Stunning Fist").
+    from .tables import ENERGY_DAMAGE
+
+    out |= {f"resist.{e}" for e in ENERGY_DAMAGE}
+
     def walk(node):
         if isinstance(node, dict):
+            if isinstance(node.get("charge"), dict) and node.get("key"):
+                out.add(f"{str(node['key']).strip().lower().replace(' ', '-')}.dc")
             if isinstance(node.get("pool"), dict) and node["pool"].get("id"):
                 out.add(f"pool.{str(node['pool']['id']).strip().lower()}")
             prefix = node.get("bonus_from")

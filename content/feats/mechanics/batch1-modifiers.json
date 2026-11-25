@@ -233,7 +233,7 @@
     ],
     "not_yet": [
       "piercing damage with your unarmed strikes: an unarmed strike's damage type is fixed",
-      "the style itself, and its immediate-action Sense Motive as AC: no style stance is entered here"
+      "the immediate-action Sense Motive is rolled by the engine for the player too, on the first attack each round, rather than asked"
     ]
   }
 }

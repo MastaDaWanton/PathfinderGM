@@ -379,7 +379,8 @@ MOD_KEYS = frozenset({"type", "target", "amount", "formula", "bonus_type", "when
 # any load carried or armor worn").
 MOD_TYPES = ("ability_mod", "skill_mod", "save_mod", "combat_mod", "speed")
 BEARER_KEYS = frozenset({"armour", "shield", "armoured", "load", "helpless", "pool",
-                         "terrain", "state", "wielding", "shield_kind", "hands_free"})
+                         "terrain", "state", "wielding", "shield_kind", "hands_free",
+                         "loses_dex"})
 WEAPON_KEYS = frozenset({"applies_to", "damage_column", "strikes_as", "strikes_as_by_rank",
                          "when"})
 ARMOUR_KEYS = frozenset({"max_dex", "check_penalty", "unhindered"})
@@ -713,6 +714,11 @@ def _bearer_holds(clause: dict, actor, pick: str = "") -> bool:
             # defensively").
             wants = want if isinstance(want, list) else [want]
             if not all(actor.has_state(str(w or "")) for w in wants):
+                return False
+        elif key == "loses_dex":
+            # "While denied your Dexterity bonus to AC you are also denied this
+            # resistance" (Djinni Spirit and its kin): the sheet's own answer.
+            if bool(getattr(actor, "loses_dex_to_ac", False)) != bool(want):
                 return False
         elif key == "hands_free":
             # "With at least one hand free" (Crane Wing, Snapping Turtle Style), "both

@@ -91,6 +91,11 @@ def variables(actor) -> Mapping:
         # DMG Purge's "regain half of Non-Lethal damage taken" (Blood Bending).
         "nonlethal": lambda: getattr(actor, "nonlethal", 0),
         "bab": lambda: actor.bab,
+        # The style feats' "your base attack bonus or monk level, whichever is higher"
+        # (b2-styles): the character's level when they are a monk, else 0. Single-classed,
+        # as the sheet is (`feats._check`'s class_level).
+        "monk_level": lambda: (actor.level if str(getattr(actor, "char_class", "") or "")
+                               .strip().lower() == "monk" else 0),
     }
 
     # A branching class tiers its abilities against its own track rather than against

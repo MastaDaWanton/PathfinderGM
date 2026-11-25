@@ -6122,6 +6122,10 @@ class Engine:
             # there (`reactions.provoked_by_entering`) — after the move, not before it,
             # so the swing is measured where it landed. Next in the queue, ahead of the
             # blow that brought it in.
+            # The blows an attack owes back (Crane Riposte's attack of opportunity on
+            # a missed or deflected blow): next in the queue, behind the attack.
+            if intent.op == "attack" and outcome.status == "resolved":
+                queue[0:0] = self._retorts(outcome) + self._panther_retort(intent)
             if intent.op == "move" and outcome.status == "resolved":
                 queue[0:0] = self._reactions_on_arrival(outcome)
             # The plan's placeholders (new1…) become the refs just made, in everything
@@ -10503,6 +10507,10 @@ class Engine:
                 f"{actor.name} strikes to kill.")
 
         named_key, named = weapon_key, weapon
+        # Second Chance spent on the first miss, resumed from the dice popup: the rest of
+        # the full attack is forgone (`_second_chance`).
+        if state.get("second_chance") == "forgo":
+            sequence = sequence[:1]
         while state["i"] < len(sequence):
             # Stop swinging at somebody who has already gone down. Measured in the
             # tavern: the thug dropped to -5 on the first swing of a Swift Strikes pair,
@@ -10594,6 +10602,20 @@ class Engine:
                         swing_note = _ac_said(
                             "touch AC", touch, flat_footed,
                             [("the ghost touch armour counting", worn), *footing_parts])
+            # Crane Wing (b2-styles): the +4 dodge against the designated blow, or the
+            # deflection held ready under total defense (`_crane_wing`).
+            wing = self._crane_wing(actor, defender, weapon, state,
+                                    flat_footed or bool(flounders)) \
+                if state["stage"] == "attack" else ""
+            if wing == "dodge":
+                swing_ac += 4
+                swing_note = f"{swing_note}, +4 dodge (Crane Wing)"
+            # Snake Style (b2-styles): a Sense Motive check in place of the AC.
+            guard = self._snake_guard(actor, defender, state, swing_ac,
+                                      flat_footed or bool(flounders)) \
+                if state["stage"] == "attack" else None
+            if guard is not None:
+                swing_ac, swing_note = guard, f"Sense Motive {guard} (Snake Style)"
             # The defender rides in the roll context, so a term that is "against fey"
             # (cold iron's, contract §2) is asked of THIS defender and nobody else.
             if dancing:
@@ -10622,6 +10644,10 @@ class Engine:
                                                   off_light=off_light)
                 atk_mods = atk_mods + self._situational_attack_mods(
                     actor, defender, weapon, range_pen)
+                # Improved Second Chance (APG): the rest of the attacks "albeit at a -5
+                # penalty to each attack" once the first miss was rerolled.
+                if state.get("second_chance") == "improved" and state["i"] > 0:
+                    atk_mods = atk_mods + [Modifier(-5, "Improved Second Chance")]
 
             # A crowd makes no attack roll. Pathfinder's troop subtype: instead of attacks,
             # "they deal automatic damage to any creature within reach or whose space they
@@ -10663,6 +10689,14 @@ class Engine:
                 # Kept for the swing: vorpal asks "upon a roll of natural 20 (followed by
                 # a successful roll to confirm)" at the damage stage, a popup later.
                 state["natural"] = natural
+                riposte = self._crane_after(actor, defender, wing, atk, swing_ac, state)
+                if riposte == "deflected":
+                    state.setdefault("blows", []).append(
+                        {"result": "miss", "how": "deflected", "ref": defender.ref,
+                         "weapon": str(weapon.get("name") or weapon_key),
+                         "in_hand": _in_hand(weapon, weapon_key)})
+                    state["i"] += 1
+                    continue
                 if natural == 1:
                     self._judge(atk, False)
                     state.setdefault("blows", []).append(
@@ -10678,6 +10712,10 @@ class Engine:
                     # spent ("destroyed or rendered useless", CRB "Ammunition").
                     if counts_ammo:
                         state["ammo_missed"] = int(state.get("ammo_missed", 0)) + 1
+                    if self._second_chance(actor, state, choices):
+                        if state["second_chance"] == "forgo":
+                            sequence = sequence[:1]
+                        continue
                     state["i"] += 1
                     continue
                 if not d20_succeeds(atk, swing_ac):
@@ -10695,6 +10733,10 @@ class Engine:
                     state["tells"].extend(self._charges_missed(actor, weapon_key, weapon))
                     if counts_ammo:
                         state["ammo_missed"] = int(state.get("ammo_missed", 0)) + 1
+                    if self._second_chance(actor, state, choices):
+                        if state["second_chance"] == "forgo":
+                            sequence = sequence[:1]
+                        continue
                     state["i"] += 1
                     continue
                 # Concealment: displacement, blur, entropic shield and invisibility all
@@ -10812,6 +10854,9 @@ class Engine:
                 # Critical Focus's +4 (`Actor.confirm_modifiers`), on this roll alone.
                 confirm_mods = atk_mods if dancing else (
                     list(atk_mods) + actor.confirm_modifiers(weapon_key, defender, choices))
+                # And the defender's (Snapping Turtle Shell's -4 against you, b2-styles).
+                confirm_mods = list(confirm_mods) + defender._buff_mods(
+                    "combat_mod", "crit_confirm_against")
                 confirm = self._roll_or_suspend_stage(
                     intent, actor, confirm_mods, f"Confirm critical ({weapon['name']})",
                     swing_ac, partial, state, "1d20",
@@ -24021,9 +24066,30 @@ class Engine:
         if defender.hp <= 0 or defender.is_dead or not getattr(actor, "feats", None):
             return []
         ctx = actor._roll_context(weapon_key, defender=defender)
+        # The options this blow was declared with (Scorpion Style's one unarmed strike):
+        # each a key a rider's `when: {"choice": ...}` asks, as an attack term's does.
+        from .sheet import ATTACK_CHOICES
+
+        ctx.update({c: True for c in ATTACK_CHOICES if intent.params.get(c)})
         if weapon.get("category") == "ranged":
             ctx["weapon"] = dict(ctx["weapon"], category="ranged", ranged=True)
         out: list[dict] = []
+        # Boar Style (Ultimate Combat): "once per round when you hit a single foe with two
+        # or more unarmed strikes, you can tear flesh. When you do, you deal 2d6 bleed
+        # damage with the attack." Counted per foe across the round (a spent marker holds
+        # the once a round), the bleed through the riders' own executor.
+        if weapon_key == "unarmed" and actor.has_state("unarmed.tear-flesh") \
+                and actor.has_state("style.boar-style"):
+            hits = state.setdefault("unarmed_hits", {})
+            hits[defender.ref] = int(hits.get(defender.ref, 0)) + 1
+            if hits[defender.ref] >= 2 and not actor.has_state("spent.boar-style"):
+                actor.apply_effect(ActiveEffect(
+                    name="flesh torn", kind="buff", key="flesh torn", source="Boar Style",
+                    origin="rule:feat-boar-style", duration="rounds", rounds_left=1,
+                    tags=("spent.boar-style",)))
+                out.extend(self._rider_bleed(intent, actor, defender,
+                                             {"amount": "2d6", "rider": "torn flesh"},
+                                             "rule:feat-boar-style", state))
         seen: set[str] = set()
         for raw in actor.feats:
             doc = feats_mod.document(raw)
@@ -24037,6 +24103,15 @@ class Engine:
                 if not classfeatures.holds(rule.get("when"), actor, ctx):
                     continue
                 run = {**rule, "rider": doc["name"].lower()}
+                span = rule.get("for") or {}
+                if span.get("formula"):
+                    # "for a number of rounds equal to your Wisdom modifier": the formula
+                    # over the sheet, at least a round.
+                    try:
+                        n = max(1, resources.evaluate(span["formula"], actor))
+                    except resources.FormulaError:
+                        continue
+                    run["for"] = {"dice": str(n), "unit": span.get("unit") or "round"}
                 if rule.get("dc") is not None:
                     try:
                         run["dc"] = resources.evaluate(rule["dc"], actor)
@@ -25507,7 +25582,7 @@ class Engine:
         w = actor.weapon(key)
         ranged = w.get("category") == "ranged" or bool(params.get("thrown"))
         said = {c: c.replace("_", " ").title() for c in declared}
-        for c in ("vital_strike", "cleave"):
+        for c in ("vital_strike", "cleave", "scorpion_style"):
             if c in declared and full:
                 return (f"{said[c]} is the attack action — one blow — and cannot ride a "
                         f"full attack. Strike once with it, or make the full attack "
@@ -25515,7 +25590,11 @@ class Engine:
         if "vital_strike" in declared and "cleave" in declared:
             return ("Vital Strike and Cleave are each the whole attack action; choose one "
                     "of them.")
-        for c in ("rapid_shot", "flurry"):
+        # Scorpion Style (CRB): "you must make a single unarmed attack as a standard
+        # action"; Second Chance (APG): "When making a full attack".
+        if "scorpion_style" in declared and key != "unarmed":
+            return f"Scorpion Style is a single unarmed strike, not a blow with a {w['name']}."
+        for c in ("rapid_shot", "flurry", "second_chance"):
             if c in declared and not full:
                 return f"{said[c]} is a full attack: make it with Full attack."
         if off and not full:
@@ -25699,6 +25778,179 @@ class Engine:
             tell=f"{actor.name} gives up attacking to guard (total defense): +{n} armour "
                  f"class until their next turn, and no attacks of opportunity.",
             because=intent.because)
+
+    # Crane Wing's tags (its feat document's): the wing itself, and Crane Riposte's
+    # attack of opportunity on the blow it turned.
+    CRANE_WING = "defense.crane-wing"
+    CRANE_RIPOSTE = "defense.crane-riposte"
+    CRANE_SPENT = "spent.crane-wing"
+
+    def _crane_wing(self, actor: Actor, defender: Actor, weapon: dict, state: dict,
+                    flat_footed: bool) -> str:
+        """Crane Wing (Ultimate Combat), as this swing meets it: "dodge", "deflect" or "".
+
+        "Once per round, when fighting defensively with at least one hand free, you can
+        designate one melee attack being made against you before the roll is made. You
+        receive a +4 dodge bonus to AC against that attack. If you are using the total
+        defense action instead, you can deflect one melee attack that would normally hit
+        you ... you must be aware of the attack and not flat-footed." A follow-up of Crane
+        Style, so only in its stance (`rules/styles.py`). The designated blow is the first
+        melee blow of the round (the defender's player is not asked; owner call), the
+        deflection the first that would hit. Decided once per swing and kept in the
+        attack's state, so a resume from the dice popup decides nothing twice."""
+        from . import awareness, classfeatures
+
+        key = f"wing:{state['i']}"
+        if key in state:
+            return state[key]
+        mode = ""
+        if (weapon.get("category") != "ranged" and not flat_footed
+                and defender.has_state(self.CRANE_WING)
+                and defender.has_state("style.crane-style")
+                and not defender.has_state(self.CRANE_SPENT)
+                and not defender.loses_dex_to_ac
+                and classfeatures.free_hands(defender) >= 1
+                and awareness.sees(self.scene, defender, actor)):
+            if defender.has_state(states.TOTAL_DEFENSE):
+                mode = "deflect"
+            elif defender.has_state(states.FIGHTING_DEFENSIVELY):
+                mode = "dodge"
+                self._crane_spend(defender)
+                state["tells"].append(f"{defender.name} turns a wing to meet {actor.name}'s "
+                                      f"blow (Crane Wing, +4 dodge).")
+        state[key] = mode
+        return mode
+
+    def _snake_guard(self, actor: Actor, defender: Actor, state: dict, ac: int,
+                     flat_footed: bool) -> int | None:
+        """Snake Style (Ultimate Combat): "when an opponent targets you with a melee or
+        ranged attack, you can spend an immediate action to make a Sense Motive check. You
+        can use the result as your AC or touch AC against that attack. You must be aware of
+        the attack and not flat-footed." The immediate action is the round's one swift
+        (`_pay_swift`), taken on the first attack each round and used when it beats the
+        AC; rolled by the engine for everybody, the player's included (owner call: a
+        popup in the middle of a foe's turn). Kept in the attack's state per swing."""
+        from . import awareness
+
+        key = f"snake:{state['i']}"
+        if key in state:
+            return state[key]
+        out = None
+        if (defender.has_state("style.snake-style") and not flat_footed
+                and not defender.loses_dex_to_ac
+                and not defender.has_state("spent.snake-style")
+                and awareness.sees(self.scene, defender, actor)
+                and not self._pay_swift(defender, "a Snake Style check")):
+            defender.apply_effect(ActiveEffect(
+                name="snake style used", kind="buff", key="snake style used",
+                source="Snake Style", origin="rule:feat-snake-style", duration="rounds",
+                rounds_left=1, tags=("spent.snake-style",)))
+            check = self.dice.d20(defender.skill_modifiers("sense motive"),
+                                  label=f"{defender.name} Sense Motive (Snake Style)",
+                                  visibility="player")
+            state["rolls"].append(check.as_dict())
+            if check.total > ac:
+                out = check.total
+                state["tells"].append(f"{defender.name} reads {actor.name}'s blow coming "
+                                      f"(Snake Style): Sense Motive {check.total} stands "
+                                      f"for their guard.")
+        state[key] = out
+        return out
+
+    @staticmethod
+    def _crane_spend(defender: Actor) -> None:
+        defender.apply_effect(ActiveEffect(
+            name="crane wing used", kind="buff", key="crane wing used",
+            source="Crane Wing", origin="rule:feat-crane-wing", duration="rounds",
+            rounds_left=1, tags=(Engine.CRANE_SPENT,)))
+
+    def _crane_after(self, actor: Actor, defender: Actor, wing: str, atk: Roll,
+                     swing_ac: int, state: dict) -> str:
+        """The rolled blow against a crane's wing: "deflected" when total defense turns
+        a hit into a miss, and the riposte owed — Crane Riposte (Ultimate Combat): the
+        designated attack "provokes an attack of opportunity from you if it misses", and
+        a deflection under total defense lets you make one "even though you could not
+        normally do so". Laid in the attack's effects as a `retort` (`_retorts`)."""
+        key = f"wing_done:{state['i']}"
+        if not wing or key in state:
+            return state.get(key, "")
+        hit = atk.natural != 1 and d20_succeeds(atk, swing_ac)
+        out = ""
+        if wing == "deflect" and hit:
+            self._crane_spend(defender)
+            out = "deflected"
+            state["tells"].append(f"{defender.name} deflects {actor.name}'s blow with a "
+                                  f"crane's wing (Crane Wing): it does nothing.")
+        if defender.has_state(self.CRANE_RIPOSTE) and (out or (wing == "dodge" and not hit)):
+            state["effects"].append({"kind": "retort", "ref": defender.ref, "at": actor.ref,
+                                     "budget": "attack_of_opportunity",
+                                     "origin": "rule:feat-crane-riposte",
+                                     "why": "Crane Riposte"})
+        state[key] = out
+        return out
+
+    def _retorts(self, outcome: "Outcome") -> list[dict]:
+        """The swings an attack's effects say are owed back (`retort`), each off its
+        swinger's allowance (`_spend_reaction`) and through the one attack op."""
+        out = []
+        for e in outcome.effects or ():
+            if e.get("kind") != "retort":
+                continue
+            by, at = str(e.get("ref") or ""), str(e.get("at") or "")
+            who = self.scene.actors.get(by)
+            if who is None or at not in self.scene.actors or who.is_down:
+                continue
+            budget = str(e.get("budget") or "")
+            if budget == "attack_of_opportunity" and not self._spend_reaction(by, budget):
+                continue
+            out.append({"op": "attack", "actor": by, "target": at,
+                        "because": str(e.get("why") or ""),
+                        "params": {"full_attack": False, "reaction": budget or "retort",
+                                   **({"weapon": e["weapon"]} if e.get("weapon") else {})},
+                        "visibility": "player" if who.is_pc else "hidden"})
+        return out
+
+    def _panther_retort(self, intent: Intent) -> list[dict]:
+        """Panther Style (Ultimate Combat): "when an opponent makes an attack of
+        opportunity against you for moving through a threatened square, you can spend a
+        swift action to make a retaliatory unarmed strike attack against that opponent.
+        Your attack is resolved after the triggering attack of opportunity." Panther Claw
+        makes it a free action, "a number of retaliatory unarmed strikes on your turn equal
+        to your Wisdom modifier" — the count is the feats' `budget` ("panther-style", one
+        by the style), spent through the one allowance (`_spend_reaction`)."""
+        if intent.params.get("provoked_by") != "movement":
+            return []
+        mover = self.scene.actors.get(str(intent.target or ""))
+        foe = self.scene.actors.get(str(intent.actor or ""))
+        if mover is None or foe is None or mover.is_down                 or not mover.has_state("style.panther-style"):
+            return []
+        if not self._spend_reaction(mover.ref, "panther-style"):
+            return []
+        if not mover.has_state("action.panther-claw.free")                 and self._pay_swift(mover, "a retaliatory strike"):
+            return []
+        return [{"op": "attack", "actor": mover.ref, "target": foe.ref,
+                 "because": "a retaliatory strike (Panther Style)",
+                 "params": {"full_attack": False, "reaction": "panther-style",
+                            "weapon": "unarmed"},
+                 "visibility": "player" if mover.is_pc else "hidden"}]
+
+    @staticmethod
+    def _second_chance(actor: Actor, state: dict, choices) -> bool:
+        """Second Chance (APG): "When making a full attack, if you miss on your first
+        attack, you can forgo making any other attacks for the rest of your turn to reroll
+        that attack at your highest base attack bonus." Declared with the full attack (the
+        combat bar's `second_chance`), so the choice to forgo is made before the miss and
+        taken on it. Improved Second Chance (its document's tag) keeps the rest at -5
+        (`_op_attack`). True when the first swing is to be rolled again."""
+        if "second_chance" not in choices or state["i"] != 0 or state.get("second_chance"):
+            return False
+        improved = actor.has_state("attack.second-chance.improved")
+        state["second_chance"] = "improved" if improved else "forgo"
+        state["tells"].append(
+            f"{actor.name} takes a second chance at the blow"
+            + (" and keeps the rest of the attack at -5 (Improved Second Chance)."
+               if improved else ", giving up the rest of the attack (Second Chance)."))
+        return True
 
     def _pay_swift(self, actor: Actor, what: str) -> str:
         """Spend this round's swift action on `what`: why it cannot be, or "" once paid.
@@ -35979,11 +36231,18 @@ class Engine:
         from . import class_abilities as ca
 
         save = charge.get("save") or {}
+        # Its DC through the funnel at `<key>.dc` (b2-styles: Mantis Style's "+2 bonus to
+        # the DC of effects you deliver with your Stunning Fist", while in the style).
+        from .dice import stack
+
+        slug = str(doc.get("key") or "").strip().lower().replace(" ", "-")
+        more = sum(m.value for m in stack(actor._buff_mods("combat_mod", f"{slug}.dc"))) \
+            if slug and save else 0
         return {"weapons": [str(w).lower() for w in charge.get("weapons") or ()],
                 "category": str(charge.get("category") or ""),
                 "spent_on": str(charge.get("spent_on") or "swing"),
                 "save": str(save.get("save", "fort")) if save else "",
-                "dc": ca.amount(save.get("dc"), actor) if save else 0,
+                "dc": (ca.amount(save.get("dc"), actor) + more) if save else 0,
                 "condition": str(doc.get("charge_condition") or charge.get("condition")
                                  or "stunned"),
                 "rounds": doc.get("charge_rounds"),

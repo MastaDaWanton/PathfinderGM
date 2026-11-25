@@ -836,6 +836,12 @@ _OPTION_SHAPES = {
     "stunning_assault": ("swing", "Stunning Assault",
                          "Less sure in melee until your next turn; a hit stuns unless they "
                          "resist."),
+    "scorpion_style": ("strike", "Scorpion Style",
+                       "One unarmed strike; a hit cuts their speed to 5 feet unless they "
+                       "resist."),
+    "second_chance": ("full", "Second Chance",
+                      "A full attack: if the first blow misses, roll it again and make no "
+                      "other attack."),
     "total_defense": ("act", "Total defense",
                       "Your standard action spent guarding: no attacks, and no attacks of "
                       "opportunity."),

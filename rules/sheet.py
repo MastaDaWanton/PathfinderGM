@@ -364,7 +364,10 @@ ATTACK_CHOICES = ("power_attack", "deadly_aim", "piranha_strike", "combat_expert
                   "fighting_defensively", "vital_strike", "cleave", "rapid_shot", "flurry",
                   # Feat loop b1: the Power Attack family's -5 for a rider on every melee
                   # hit "until your next turn" (APG), each a stance like Combat Expertise.
-                  "bloody_assault", "dazing_assault", "stunning_assault")
+                  "bloody_assault", "dazing_assault", "stunning_assault",
+                  # Feat loop b2-styles: Scorpion Style's one unarmed strike (a standard
+                  # action) and Second Chance's reroll of a full attack's first miss.
+                  "scorpion_style", "second_chance")
 # The options nobody needs a feat for (combat bar round 2, 2026-11-22). CRB, Combat
 # ("Fighting Defensively as a Standard Action"): "You can choose to fight defensively when
 # attacking" — anyone, with any attack. Its numbers are `defensive_dodge` and the stance
@@ -388,7 +391,8 @@ ATTACK_CHOICE_FEATS = {"power_attack": "power-attack", "deadly_aim": "deadly-aim
                        "combat_expertise": "combat-expertise", "vital_strike": "vital-strike",
                        "cleave": "cleave", "rapid_shot": "rapid-shot",
                        "bloody_assault": "bloody-assault", "dazing_assault": "dazing-assault",
-                       "stunning_assault": "stunning-assault"}
+                       "stunning_assault": "stunning-assault",
+                       "scorpion_style": "scorpion-style", "second_chance": "second-chance"}
 
 _IMPLIED_GENDER = {"she": "woman", "he": "man"}
 
@@ -2784,6 +2788,10 @@ class Actor:
         # (CRB). Asked of the tag, after everything else, so no boot or potion moves it.
         if self.has_state("state.held.glued"):
             base = 0
+        # Hobbled (Scorpion Style's "base land speed is reduced to 5 feet"): asked of the
+        # tag, after the halving, so nothing lends it back more than the five feet.
+        if self.has_state("state.hampered.speed-5"):
+            base = min(base, 5)
         # Rounded down to a whole square. A speed of 22 feet lets you cross four squares,
         # not four and a bit, and carrying the remainder makes the fifth square arrive one
         # move sooner than it should.
@@ -4719,8 +4727,11 @@ class Actor:
         against a hand. Measured 2026-11-07 (ponytail audit #38) when this always asked
         for melee: a prone goblin's ranged touch AC was 9, where it is 17.
         """
-        return [m for m in self.ac_modifiers(against, flat_footed, attacker)
-                if (m.type or "") not in self._TOUCH_IGNORES] +             self._buff_mods("combat_mod", "touch_ac")
+        # Stacked again with the touch terms: two shield-typed touch terms (Snapping
+        # Turtle Clutch's +1 and Shell's +2) are the better one, never the sum (b2-styles).
+        return stack([m for m in self.ac_modifiers(against, flat_footed, attacker)
+                      if (m.type or "") not in self._TOUCH_IGNORES]
+                     + self._buff_mods("combat_mod", "touch_ac"))
 
     def touch_ac(self, flat_footed: bool = False, attacker=None,
                  against: str = "melee") -> int:
@@ -5075,7 +5086,11 @@ class Actor:
                       for s, _, _ in self.worn_specs_of("resistance")
                       if normalise_damage_type(str(s.get("target") or "")) == want),
                      default=0)
-        return max(printed, tagged, forged)
+        # A feat's or an effect's, through the funnel at `resist.<energy>` (b2-styles:
+        # Djinni Spirit's "electricity resistance equal to your base attack bonus or monk
+        # level ... while using Djinni Style", its `when` the stance and the Dexterity).
+        fed = sum(m.value for m in stack(self._buff_mods("combat_mod", f"resist.{want}")))
+        return max(printed, tagged, forged, fed)
 
     def vulnerable_to(self, dtype: str) -> bool:
         want = normalise_damage_type(dtype)

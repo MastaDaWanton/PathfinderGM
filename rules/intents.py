@@ -368,6 +368,8 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                     "cleave", "rapid_shot", "flurry", "off_hand",
                     # Feat loop b1: the assault feats' declared -5 (APG).
                     "bloody_assault", "dazing_assault", "stunning_assault",
+                    # Feat loop b2-styles: Scorpion Style, Second Chance.
+                    "scorpion_style", "second_chance",
                     # Fighting defensively (CRB, Combat; combat bar round 2): anyone's,
                     # its stance laid by `Engine._lay_attack_stances`.
                     "fighting_defensively"), "player"),
@@ -1096,7 +1098,7 @@ FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "faile
                          "deadly_aim", "combat_expertise", "piranha_strike",
                          "vital_strike", "cleave", "rapid_shot", "flurry",
                          "fighting_defensively", "bloody_assault", "dazing_assault",
-                         "stunning_assault"})
+                         "stunning_assault", "scorpion_style", "second_chance"})
 from .skilluses import OWN_DOORS as _OWN_DOORS  # noqa: E402 — the uses with their own door
 
 
