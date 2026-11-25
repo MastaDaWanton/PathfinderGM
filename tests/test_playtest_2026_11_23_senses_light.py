@@ -180,17 +180,14 @@ def test_the_gm_aside_is_handed_the_players_sight_and_the_reason_for_the_miss():
 def test_poor_light_never_lets_an_unknown_name_past_the_refusal():
     """prove_build on 0.5.1: in the dark, "/gm who is Zorblax Quixbane" skipped the code's
     refusal because the light facts were present, and the model guessed at a nobody. The
-    light facts hold the refusal back only for a question that names no one (#13's)."""
-    import inspect
-
-    from play import gm_search, views
+    light facts hold the refusal back only for a question that names no one (#13's). The
+    gate in `_ask_the_gm` is proved end to end on the frozen build by tools/prove_build.py
+    (check_the_gm_reads_the_world_through_fts5); this pins the reading it turns on."""
+    from play import gm_search
 
     assert not gm_search.proper_noun(
         "/gm I have dark vision dim light doesnt matter to me why did dim light make me miss?")
     assert gm_search.proper_noun("/gm who is Zorblax Quixbane")
-    src = inspect.getsource(views._ask_the_gm)
-    assert "about_sight = bool(sight) and not gm_search.proper_noun(question)" in src
-    assert "not crafts and not about_sight:" in src
 
 
 # --- #2 / O6: senses read from the world's own words -------------------------------------
