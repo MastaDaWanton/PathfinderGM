@@ -230,7 +230,14 @@ def _rewrite_reply():
             "boards before he answers you. \"The docks? Ask anybody who hauls there,\" he "
             "says, rubbing the back of his neck. \"They all know who signs the sheets.\" "
             "He looks past you toward the water, where a cart is being loaded in the "
-            "half-light. A dog noses through a heap of straw by the well. ") * 2
+            "half-light. A dog noses through a heap of straw by the well. ")
+    # A second paragraph of its own, not the first twice: the page pass cuts a passage
+    # that says itself again (`narration.said_twice`, playtest 2026-11-23 #171).
+    body += ("Gulls wheel over the rooftops toward the harbour. A porter trundles an empty "
+             "barrow past the fishmonger's stall, its wheel squeaking on every turn. Two "
+             "women argue over the price of salt at a trestle by the fountain, neither "
+             "willing to give a copper. The smell of tar and brine drifts up from the "
+             "quay, and somewhere a bell marks the change of the watch. ")
     return _Reply(json.dumps({"narration": body + _SHIPPED_TAIL}))
 
 

@@ -713,6 +713,63 @@ def drop_repeated_beats(text: str, earlier: list[str] | None) -> tuple[str, int]
     return " ".join(kept), cut
 
 
+# Words too common to say two sentences say the same thing.
+_TWICE_STOP = frozenset(
+    "the a an and of to in on at with into onto from your you their they them its it his "
+    "her he she is are was were be been as for by that this then than but or so still "
+    "there here over under through toward towards".split())
+
+
+def _said_twice_spans(text: str) -> list[tuple[int, int]]:
+    """The spans of `said_twice`'s sentences in `text`, by position: a sentence the
+    passage holds word for word twice is cut once, its first telling kept (`_cut_sentences`
+    cuts every copy of a string)."""
+    text = text or ""
+    blank = speech.blanked(text)
+    out: list[tuple[int, int]] = []
+    seen: list[tuple[set, set, set]] = []
+    for m in _SENTENCE.finditer(blank):
+        raw = text[m.start():m.end()]
+        if raw != m.group(0) or speech.opens(raw):
+            continue        # speech is the speaker's to repeat
+        words = _same_words(raw).split()
+        # The same close, four words or more: a sentence told again in other words keeps
+        # its point and changes its opening. "gains +47 str (Power leaf)" and "gains +47
+        # con (Power leaf)" share nearly every word and are two facts (ysolde, measured).
+        grams = {tuple(words[-4:])} if len(words) >= 4 else set()
+        own = {w for w in words if w not in _TWICE_STOP and len(w) > 2}
+        # Numbers apart, two sentences are two facts: "fails a Will save (5 against DC
+        # 10)" and "(6 against DC 11)" are two saves, not one told twice.
+        nums = {w for w in words if any(ch.isdigit() for ch in w)}
+        if own and any(grams & g and nums == n and len(own & o) * 5 >= len(own) * 3
+                       for g, o, n in seen):
+            out.append((m.start() + len(raw) - len(raw.lstrip()), m.end()))
+            continue
+        seen.append((grams, own, nums))
+    return out
+
+
+def said_twice(text: str) -> list[str]:
+    """The narration sentences that say again what an earlier sentence of the same passage
+    said: the same last four words, and three in five of the later one's own words
+    already there. Playtest 2026-11-23 #171: "Ramidreju falls to the ground, unconscious
+    and dying. The creature collapses to the ground, unconscious and dying." — the same
+    down, twice, in one beat. A prose-quality pattern (CLAUDE.md: detect mechanically);
+    `drop_repeated_beats` holds the beat to the ones before it, this holds it to itself.
+    Speech is exempt, as there: a speaker may repeat themselves. Measured over the 1,539
+    GM lines of the owner's ten saves: one hit, #171."""
+    return [" ".join((text or "")[a:b].split()) for a, b in _said_twice_spans(text)]
+
+
+def drop_said_twice(text: str) -> tuple[str, list[str]]:
+    """`text` with each sentence `said_twice` finds cut, and what was cut. Never the whole
+    passage: the first telling always stays."""
+    spans = _said_twice_spans(text)
+    if not spans:
+        return text or "", []
+    return _without(text, spans).strip(), [" ".join(text[a:b].split()) for a, b in spans]
+
+
 # --- people from nowhere: the deterministic end of it ------------------------------------
 #
 # `invented-name` shipped unrepaired 23 of 41 times across the live saves — worse than a
@@ -5888,8 +5945,16 @@ def a_face_for(name: str, appearance: str) -> str:
     # Playtest 2026-11-15 #75: "Miorintha: Short stature, dark hair, Kelvaxian tattoos
     # Each breath pulls at your wounds" — the label form read as a sheet pasted into the
     # prose, with no full stop before the next sentence. The words stay the world's.
-    said = said[:1].lower() + said[1:] if said[1:2].islower() else said
-    return f"You see {name}: {said}" + ("" if said.endswith((".", "!", "?")) else ".")
+    # Mid-sentence, an article is not capitalised: "You see The chicken: A scrawny hen"
+    # (the creature looks of playtest 2026-11-23 O1 are the first to come this way).
+    lead = said.split()[0] if said.split() else ""
+    said = (said[:1].lower() + said[1:] if said[1:2].islower() or lead in _ARTICLES
+            else said)
+    seen = name[:1].lower() + name[1:] if name.split()[0] in _ARTICLES else name
+    return f"You see {seen}: {said}" + ("" if said.endswith((".", "!", "?")) else ".")
+
+
+_ARTICLES = ("The", "A", "An")
 
 
 def _someone_elses(sentence: str, ref: str, attribution=None) -> bool:
