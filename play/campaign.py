@@ -656,6 +656,7 @@ class Campaign:
             from rules import dungeons
 
             dungeons.mend_quest_words(engine)
+            dungeons.mend_traces(engine)
         # The alchemist's half of the alchemy conversion (plan §18): what an old alchemist
         # now knows, the one-time notice, and the old chain recipes dropped. Needs the
         # campaign's recipes beside the character, which is why it is here and not in

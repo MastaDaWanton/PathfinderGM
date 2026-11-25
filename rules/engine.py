@@ -19071,11 +19071,16 @@ class Engine:
                     met = None
                 elif not underway and (places_mod.setting_of(hop.id) == "under"
                                        or hop.terrain == "underground"
-                                       or self.scene.underground(hop.id)):
+                                       or self.scene.underground(hop.id)
+                                       or dungeons_mod.is_room(hop)):
                     # Under the ground is neither street nor road: playtest 2026-11-17
                     # #20, a sewer channel met the road's toll-keeper. What lives down
                     # there is the venture's own (`_inhabit`), and lies in wait. The way
-                    # in from the surface (`underway`) is still the road's.
+                    # in from the surface (`underway`) is still the road's. Nor is a
+                    # dungeon room, whatever its terrain says: playtest 2026-11-23 #7, the
+                    # walk into the death room (terrain "ruins", so the road's table) met
+                    # "The road is not empty: two chickens are on it", and the fight it
+                    # started kept the room from being stocked until the second visit.
                     met = None
                 elif places_mod.setting_of(hop.id) == "in":
                     met = ontheway.street(self.dice, level,
@@ -19616,8 +19621,10 @@ class Engine:
         # onto the room's own ground.
         more: list[dict] = []
         # A fight this walk brought along or ran into is no reason to skip the room: the
-        # player is in it (#55/#65), and the room is still said.
-        if moved and (not self.scene.in_encounter or chasing or waiting):
+        # player is in it (#55/#65), and the room is still said. Nor a meeting on the
+        # way: playtest 2026-11-23 O7, the death room's poltergeist and coffer were
+        # placed only on the second visit because the first arrived in a fight.
+        if moved:
             from . import dungeons
 
             more, said = dungeons.arrived(self, going_to)
@@ -20600,7 +20607,7 @@ class Engine:
                      else f"ground like this ({biomes.describe(biome).lower()})")
             return self._refuse(
                 intent, f"{actor.name} looks, and {where} {english.verb(where, 'holds', 'hold')}"
-                        f" no {spec['what']} to find.")
+                        f" no {str(spec['what']).removeprefix('the ')} to find.")
 
         hours = max(1, int(intent.params.get("hours", 1) or 1))
         dc = gathering.dc_for(spec, biome)
@@ -20673,7 +20680,10 @@ class Engine:
             # What the engine just put in the pack, remembered (`_mark_granted`): a page
             # that then shows "a cluster of monkshood" by the player's feet is describing
             # these, and "I take the monkshood" is answered "already in the pack".
-            self._mark_granted(actor, f"the {spec['what']} {actor.name} gathered",
+            # "the smith's supplies" already has its article ("the the smith's supplies
+            # Shadow gathered", playtest 2026-11-23).
+            what = str(spec["what"]).removeprefix("the ")
+            self._mark_granted(actor, f"the {what} {actor.name} gathered",
                                result["found"], names)
         span = f"{worked} hour{'s' if worked != 1 else ''}"
         verb = str(spec.get("verb") or "searching")
@@ -20796,8 +20806,16 @@ class Engine:
         a seam of salt, a stand of oak, out of the rock or out of the undergrowth.
         `fresh` stamps the clock on what is carried, which herbs need and stone does not.
         """
+        from . import dungeons as dungeons_mod
         from . import gathering
 
+        if dungeons_mod.room(self.scene, str(self.scene.at or "")) is not None:
+            # A dungeon's rooms are stocked once, by the dungeon (`dungeons.generate`):
+            # playtest 2026-11-23 #10/O7, an hour's gathering in the narthex drew a
+            # clockwork spy off the open-ground table onto "the find of a lifetime" in a
+            # flooded temple. B/X and the Five Room Dungeon key a room's contents; the
+            # wilderness forage table is not the dungeon's.
+            return ""
         pc = self.scene.pc()
         # The party's APL, with the PC counted at the trade's level when the trade is the
         # lower (a first-level herbalist on a fifth-level body forages as a first-level
@@ -36050,7 +36068,7 @@ class Engine:
         inside = (box.get("contents") or {}).get("goods") or {}
         moved = []
         for thing, n in list(inside.items()):
-            taker.goods[thing] = taker.goods.get(thing, 0) + int(n or 1)
+            self._out_of_the_box(taker, box, thing, int(n or 1))
             moved.append(f"{n} × {thing}" if int(n or 1) != 1 else str(thing))
         inside.clear()
         said = ([goods.purse_line(got, coins)] if cp else []) + moved
@@ -36064,6 +36082,22 @@ class Engine:
                       "count": cp, "how": "emptied", "from": name, "to": taker.ref,
                       "items": moved, "purse": dict(taker.purse),
                       "goods": dict(taker.goods)}])
+
+    @staticmethod
+    def _out_of_the_box(taker, box: dict, thing: str, n: int) -> None:
+        """One thing out of a container into the taker's hands. A hoard's reward
+        (`treasure.hoard`, its catalogue id kept on the box as `hoard`) is delivered as the
+        counter delivers it (`goods.deliver`): a looted potion drinkable, a sword on the
+        weapons list, a scroll readable. Anything else, a gem among them, goes in the pack
+        by its name, as every box's goods always did."""
+        from . import treasure
+
+        gid = (box.get("hoard") or {}).get(thing)
+        good = treasure.good_of(gid) if gid else None
+        if good is not None:
+            goods.deliver(None, taker, good, n)
+            return
+        taker.goods[thing] = taker.goods.get(thing, 0) + n
 
     def _give_money(self, intent: Intent, item: str, taker, giver, source) -> Outcome:
         """Coin with no amount named — "the coins", "the payment", "the money".
@@ -36540,6 +36574,10 @@ class Engine:
             if box["goods"][key] <= 0:
                 del box["goods"][key]
             item = key
+            if taker is not None and key in (source.get("hoard") or {}):
+                # A hoard's reward is the catalogue's thing (`_out_of_the_box`).
+                self._out_of_the_box(taker, source, key, moved)
+                return self._gave(intent, taker, None, key, moved, denom)
         elif giver is not None:
             if denom:
                 held, key = giver.purse, denom

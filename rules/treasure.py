@@ -209,3 +209,121 @@ def take_from_fallen(scene, pc, rng=None) -> tuple[int, list[str]]:
                 total += got
                 names.append(foe.name)
     return total, names
+
+
+# --- a hoard as things, not a sum ---------------------------------------------------------
+#
+# The owner, playtest 2026-11-23 O8: a haunted coffer held 150 gp "and nothing else ...
+# money is nice but the preference should be to give it out in the form of items either
+# jewels or weapons or potions etc." Ultimate Equipment's treasure generation says the same
+# (legacy.aonprd.com/ultimateEquipment/appendix.html, read 2026-11-25): "Select a number of
+# rewards whose total gold piece value is equal to the total value of the treasure", take
+# "the largest reward her budget allows", then fill the rest with "lesser rewards and coins".
+# Gems "can generally be traded for their full value" (types B and C), which is why a gem
+# sells at its value (`pricing.what_a_shop_pays_for_goods`) where a sword sells at half.
+#
+# The rewards are the catalogue's own, at its own prices, so a looted thing is the same
+# record a counter sells: the 44 classic potions and oils (`goods.potion_goods`), the
+# scrolls, wands and wondrous items (`goods.magic_item_goods`), the plain weapons, suits and
+# shields of the Core tables, and the gems of UE's grades (`GEMS`). Delivered through
+# `goods.deliver`, so a looted potion is drinkable and a looted sword is swingable. No model
+# names any of it.
+
+# Ultimate Equipment's gem grades (same page): least semi-precious 5 + 2d4 gp, lesser
+# 25 + 2d4 x 5, semi-precious 50 + 2d4 x 10, greater semi-precious 250 + 2d4 x 50, lesser
+# precious 500 + 2d4 x 100, greater precious 2,500 + 2d4 x 500. Each grade at its mean
+# (10, 50, 100, 500, 1,000, 5,000), so a gem's name is its price, wherever it is sold; a few
+# of each grade's own stones, by the book's own names.
+GEMS: dict[str, int] = {
+    "agate": 10, "azurite": 10, "hematite": 10, "malachite": 10, "obsidian": 10,
+    "tigereye": 10, "turquoise": 10,
+    "bloodstone": 50, "carnelian": 50, "moonstone": 50, "onyx": 50, "peridot": 50,
+    "zircon": 50,
+    "amber": 100, "amethyst": 100, "garnet": 100, "jade": 100, "jet": 100,
+    "tourmaline": 100,
+    "aquamarine": 500, "opal": 500, "black pearl": 500, "topaz": 500,
+    "emerald": 1000, "ruby": 1000, "sapphire": 1000,
+    "star sapphire": 5000, "large diamond": 5000,
+}
+
+# The most separate rewards one hoard is laid out in: a chest of eleven things is a shop.
+HOARD_MOST = 6
+
+# The arms a hoard holds: the Core Rulebook's common weapons, suits and shields, by the
+# tables' own keys. Measured on the first cut, which drew from every simple and martial
+# row: a temple's coffer held a spring blade, an underwater light crossbow and a combat
+# scabbard. A short list is the shape of UE's type E, which names armour and weapons a
+# fighter carries rather than every row of the equipment chapter.
+HOARD_ARMS = frozenset({
+    "dagger", "light-mace", "heavy-mace", "morningstar", "spear", "longspear",
+    "handaxe", "short-sword", "rapier", "scimitar", "battleaxe", "longsword", "warhammer",
+    "greataxe", "greatsword", "falchion", "glaive", "halberd", "shortbow",
+    "longbow", "light-crossbow", "heavy-crossbow",
+    "studded leather", "chain shirt", "scale mail", "breastplate", "chainmail",
+    "light shield", "heavy shield",
+})
+
+
+def gem_value(name: str) -> int | None:
+    """A gem's value by its name ("a garnet", "Garnet"), or None for anything else."""
+    low = " ".join(str(name or "").lower().split())
+    for art in ("a ", "an "):
+        low = low.removeprefix(art)
+    return GEMS.get(low)
+
+
+def _rewards() -> dict[str, list]:
+    """(name, price, good id) by kind, cached: what a hoard is laid out from."""
+    global _REWARDS
+    if _REWARDS is None:
+        from . import goods
+
+        arms = [g for t in ("weapons", "armour", "shields") for g in goods.table_goods(t)
+                if g.key in HOARD_ARMS]
+        _REWARDS = {
+            "potion": [(g.name, g.price_gp, g.id) for g in goods.potion_goods()],
+            "magic": [(g.name, g.price_gp, g.id) for g in goods.magic_item_goods()
+                      if g.price_gp > 0],
+            "arms": [(g.name, g.price_gp, g.id) for g in arms],
+            "gem": [(name, float(v), "") for name, v in GEMS.items()],
+        }
+    return _REWARDS
+
+
+_REWARDS: dict | None = None
+
+
+def good_of(good_id: str):
+    """The catalogue good a hoard reward was laid out from, by its id, or None."""
+    from . import goods
+
+    pools = (goods.potion_goods(), goods.magic_item_goods(),
+             *(goods.table_goods(t) for t in ("weapons", "armour", "shields")))
+    return next((g for pool in pools for g in pool if g.id == good_id), None)
+
+
+def hoard(rng, gp: int) -> tuple[dict[str, int], dict[str, str], int]:
+    """A hoard of `gp` as things: ({name: count}, {name: good id}, the coin left over).
+
+    UE's order: the largest reward the budget allows, then lesser ones. Each pick takes a
+    kind at random among the kinds something still fits in, then one of the dearest third
+    of what fits, so a hoard holds a few good things rather than a heap of cheap ones;
+    what no reward fits is coin. A gem has no good id: it is carried by its name, and sold
+    by its value (`gem_value`). `rng` is a `random.Random`, seeded by the caller, so the
+    same chest holds the same things every time it is asked."""
+    left = float(max(0, int(gp)))
+    things: dict[str, int] = {}
+    ids: dict[str, str] = {}
+    pools = _rewards()
+    for _ in range(HOARD_MOST):
+        kinds = [k for k in sorted(pools) if any(p <= left for _n, p, _i in pools[k])]
+        if not kinds:
+            break
+        fits = sorted((r for r in pools[rng.choice(kinds)] if r[1] <= left),
+                      key=lambda r: (-r[1], r[0]))
+        name, price, gid = fits[rng.randrange(max(1, len(fits) // 3))]
+        things[name] = things.get(name, 0) + 1
+        if gid:
+            ids[name] = gid
+        left -= price
+    return things, ids, int(left)

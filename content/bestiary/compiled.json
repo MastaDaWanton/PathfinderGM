@@ -193378,16 +193378,42 @@
   "poltergeist": {
    "attacks": {
     "melee": [],
-    "ranged": []
+    "ranged": [
+     [
+      {
+       "name": "telekinesis",
+       "key": "telekinesis",
+       "count": 1,
+       "bonuses": [
+        3
+       ],
+       "automatic": false,
+       "touch": false,
+       "category": "ranged",
+       "base": "",
+       "natural": false,
+       "kind": "",
+       "dice": "3d6",
+       "bonus": 0,
+       "crit_range": null,
+       "crit_mult": null,
+       "nonlethal": false,
+       "type": "bludgeoning",
+       "extra": [],
+       "riders": [],
+       "amounts": {},
+       "ability": "",
+       "drain": false,
+       "class": "body",
+       "mode": "",
+       "rules": []
+      }
+     ]
+    ]
    },
    "carries": [],
-   "unread": [
-    "ranged: attack roll of +3 when using telekinesis to hurl objects",
-    "ranged: creatures",
-    "ranged: and can use the ability on objects",
-    "ranged: creatures of up to 75 pounds. If a poltergeist attempts to hurl a creature with this abilit"
-   ],
-   "source_hash": "58a5fa6b9262bf72",
+   "unread": [],
+   "source_hash": "6676350a675a03f2",
    "compiler": 3
   },
   "pony": {

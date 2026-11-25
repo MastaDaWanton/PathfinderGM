@@ -532,6 +532,12 @@ def goods_worth(name: str) -> float:
     for key, row in goods.GEAR.items():
         if low in (key, str(row.get("name", "")).lower()):
             return float(row.get("cost_gp") or 0) or UNLISTED_GP
+    from . import treasure
+
+    gem = treasure.gem_value(low)
+    if gem is not None:
+        # A hoard's gem (`treasure.GEMS`, Ultimate Equipment's grades).
+        return float(gem)
     entry = goods.known_item(low)
     if entry and entry.get("cost_gp") not in (None, "", 0):
         try:
@@ -552,7 +558,12 @@ def goods_worth(name: str) -> float:
 def what_a_shop_pays_for_goods(name: str, *, seller=None, town="") -> float:
     """Half of `goods_worth`, less for somebody the watch wants: the same rule
     `what_a_shop_pays` applies to a jar off the bench, for a thing out of the pack."""
-    return round(goods_worth(name) * SHOP_BUYS_AT / markup_for(seller, town), 2)
+    from . import treasure
+
+    # Gems "can generally be traded for their full value" (Ultimate Equipment, treasure
+    # types B and C), where everything else sells at the CRB's half.
+    share = 1.0 if treasure.gem_value(name) is not None else SHOP_BUYS_AT
+    return round(goods_worth(name) * share / markup_for(seller, town), 2)
 
 
 def what_a_shop_pays(item, *, seller=None, town="") -> float:

@@ -312,10 +312,12 @@ def obtainable(obtain_kind: str, *, biome: str | None = None,
     character actually finds is a roll the excursion makes, not a question the catalogue
     can settle.
 
-    A material with no biomes listed is available on any ground — water is water
-    wherever you are standing — and that is deliberately not the same as a material
-    listing biomes that exclude here. "Empty is not the same as absent" applies to
-    ground as much as to form fields.
+    A material with no biomes listed is available on any ground, and that is deliberately
+    not the same as a material listing biomes that exclude here. "Empty is not the same
+    as absent" applies to ground as much as to form fields. Water lists its ground now:
+    playtest 2026-11-23 #10, a smith's hour in a dry vestibule under a ruin came back with
+    8 Water and the guarded "find of a lifetime" was 24 more, because "water is water
+    wherever you are standing" put it on ruin and dungeon floors and in the desert.
 
     A creature is matched on name fragments, longest first, the way the leatherworker
     matches hides: "young red dragon" must find the dragon entries without a bestiary

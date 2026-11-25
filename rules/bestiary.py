@@ -1282,6 +1282,13 @@ def kind_names(template: str) -> set[str]:
     if row:
         if row.get("creature_type"):
             out.add(str(row["creature_type"]).lower())
+        if str(row.get("creature_type") or "").lower() == "undead" \
+                and "incorporeal" in str(row.get("subtype") or "").lower():
+            # The plain words for a bodiless dead thing, which no printed name says:
+            # playtest 2026-11-23 #8, "I talk to the ghost" in the death room found nobody
+            # (population-miss "ghost") with the poltergeist the quest was about floating
+            # there. Read off the block's own type and subtype, never its name.
+            out |= {"ghost", "spirit"}
         if ground_stated(row) and row.get("name"):
             out.add(str(row["name"]).lower())
     return {" ".join(n.split()) for n in out if n.strip()}

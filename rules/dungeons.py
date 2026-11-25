@@ -61,8 +61,11 @@ steps round it (an owner call); a touch trap sits on a door and fires on whoever
 door until it is disarmed.
 
 **Treasure** is the CRB's Treasure Values per Encounter at the party's APL
-(`treasure._BY_CR`), rolled 50-150% as `treasure.worth` rolls it, as coin in a container
-on the props ledger, which `give` already empties.
+(`treasure._BY_CR`; the climax at the row above, a guarded fight's), rolled 50-150% as
+`treasure.worth` rolls it, laid out as things by Ultimate Equipment's rule
+(`treasure.hoard`: potions, scrolls and wands, arms, gems, the rest coin) in a container
+on the props ledger, which `give` already empties. A tag's `anchor` (the weeping ghost's
+body and the dagger in it) lies in its lair.
 
 Every room is a founded place (`origin` "dungeon"), saved in `Scene.founded` with its state
 under `dungeon`, walked by `travel`, and on the place chart one exit beyond where the party
@@ -562,9 +565,10 @@ def generate(head_id: str, kind: str, spot_id: str, terrain: str, feature: dict,
         trap_rows = own or trap_rows
     traces = _traces(concept, slots or {}, layer) if concept is not None else [""] * n
 
-    def worth(share: float) -> int:
+    def worth(share: float, at: float | None = None) -> int:
         roll = r.randint(1, 6) + r.randint(1, 6)
-        return max(1, round(centre * share * (0.5 + (roll - 2) / 10.0)))
+        return max(1, round((centre if at is None else at) * share
+                            * (0.5 + (roll - 2) / 10.0)))
 
     def door() -> dict | None:
         if kind not in _HAS_DOORS:
@@ -643,7 +647,11 @@ def generate(head_id: str, kind: str, spot_id: str, terrain: str, feature: dict,
             # the trap and empty rooms get, until treasure types are read.
             d["cache_gp"] = worth(0.5)
         if last:
-            d["cache_gp"] = worth(1.0)
+            # The climax is a guarded fight, drawn a step over the party ("guards and
+            # lairs may be challenging", `encounter_budget`), and the CRB's table pays an
+            # encounter by its CR: the row above the APL. Playtest 2026-11-23 O7, "almost
+            # no loot": the boss's coffer was priced as an average fight's.
+            d["cache_gp"] = worth(1.0, treasure._BY_CR[max(0, min(20, int(apl) + 1))])
         out.append({"id": pid, "name": label, "about": about, "terrain": terrain,
                     "exits": [], "described_only": False, "within": "", "parent": parent,
                     "owner": "", "origin": ORIGIN, "kind": "", "dungeon": d})
@@ -1037,6 +1045,29 @@ def meet_ally(engine, place, concept: dict, head: dict) -> tuple[list[dict], str
               "dungeon": concept["tag"]}], said)
 
 
+def _anchor(engine, place, concept: dict) -> tuple[list[dict], str]:
+    """What ties the tag's dead to the lair, made real in it: the tag's `anchor`
+    (content/dungeons/tags.json), a body lying here and the things it holds, each a prop
+    on the room's ground that a hand can take. (effects, the tell's sentence)
+
+    Playtest 2026-11-23 O8: the revelation said "the ghost's own body lies where it fell,
+    and the knife in its back", and the room held neither. The Bestiary's poltergeist
+    "is bound to a specific place", typically where it died or where its remains rest
+    (Bestiary 2, legacy.aonprd.com/bestiary2/poltergeist.html), and the haunt's anchor
+    belongs in its room. A tag without an anchor places nothing."""
+    spec = story()["tags"][concept["tag"]].get("anchor")
+    if not spec:
+        return [], ""
+    turn = int(engine.scene.clock_minutes)
+    fx = []
+    for name in [spec["body"], *(spec.get("holds") or ())]:
+        engine.scene.props.append({
+            "name": name, "owner": "", "from_": "", "state": "intact", "turn": turn,
+            "at": place.id, "origin": f"rule:dungeon/{concept['tag']}"})
+        fx.append({"kind": "prop_placed", "at": place.id, "name": name})
+    return fx, fill(spec["said"], {})
+
+
 def _town(engine) -> str:
     """The settlement's own name, from the world."""
     w = getattr(engine, "world", None)
@@ -1273,16 +1304,28 @@ def arrived(engine, place) -> tuple[list[dict], list[str]]:
                     name, dressed = reward["container"], reward["said"]
                 else:
                     name = st["builders"][concept["builders"]["id"]]["cache"]
+            # The CRB's value laid out as things (`treasure.hoard`, owner O8 of playtest
+            # 2026-11-23: a coffer of 150 gp "and nothing else"), seeded off the room so
+            # the same chest holds the same things whenever it is first opened.
+            from . import treasure
+
+            things, ids, coin = treasure.hoard(_rng(place.id, "hoard"), int(d["cache_gp"]))
             engine.scene.props.append({
                 "name": name, "owner": "", "from_": "", "state": "intact",
                 "turn": int(engine.scene.clock_minutes), "at": place.id,
-                "contents": {"purse": {"gp": int(d["cache_gp"])}, "goods": {}},
-                "origin": f"rule:treasure/{d['of']}"})
+                "contents": {"purse": {"gp": coin} if coin else {}, "goods": things},
+                "hoard": ids, "origin": f"rule:treasure/{d['of']}"})
             fx.append({"kind": "treasure_placed", "at": place.id, "container": name})
-            # Dressed as the concept's goods, and still the CRB's value in coin: what it
-            # holds is the purse the ledger carries, never goods nobody priced.
+            # Dressed as the concept's goods; what it holds is the record's, said when it
+            # is opened (`Engine._looks_in`), never goods nobody priced.
             bits.append(f"{_cap(name)} is here, and in it {dressed}." if dressed
                         else f"There is {name} here.")
+        if d["role"] == "climax" and concept is not None:
+            got, said = _anchor(engine, place, concept)
+            fx.extend(got)
+            if said:
+                bits.append(said)
+                story_said.append(said)
     onward = doors_from(engine, place.id)
     for far, door in onward:
         dest = places_mod.find(engine.places(), far)
@@ -1618,6 +1661,29 @@ def mend_quest_words(engine) -> None:
             card.title = title
             card.keys = cards_mod.keys_from(title, *[o["text"] for o in card.objectives])
             cards_mod._store(engine.scene, card)
+
+
+# A trace the content once wrote and has since rewritten: (tag, index in its `traces`).
+# Playtest 2026-11-23 #6, "the same three words written over and over" named no words;
+# reading them gave nothing, and two asides could not say them either.
+_RETIRED_TRACES = {
+    "Words are scrawled in the dust of a table, the same three words written over and "
+    "over.": ("weeping-ghost", 1),
+}
+
+
+def mend_traces(engine) -> None:
+    """A room minted with a retired trace gets the one the content writes now, so the
+    owner's game, which stands in that dungeon, reads the words. Matched on the old
+    sentence whole and never re-filled from the slots: {town} is the town the party
+    stood in at minting, and the party may be elsewhere now. Asked on load beside
+    `mend_quest_words`; a no-op on a save that needs none."""
+    tags = story()["tags"]
+    for rec in engine.scene.founded:
+        d = rec.get("dungeon") or {}
+        hit = _RETIRED_TRACES.get(str(d.get("trace") or ""))
+        if hit is not None and hit[0] in tags:
+            d["trace"] = fill(tags[hit[0]]["traces"][hit[1]], {})
 
 
 def settle(engine) -> list:
