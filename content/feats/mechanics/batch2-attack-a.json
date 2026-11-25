@@ -500,5 +500,10 @@
     "tags": [
       "surprise.bluffs-awareness"
     ]
+  },
+  "perfect-awareness": {
+    "tags": [
+      "skill.perception.take-20.move"
+    ]
   }
 }

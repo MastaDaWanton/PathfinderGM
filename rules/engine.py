@@ -5435,6 +5435,7 @@ class Engine:
     # One Perception search is a move action (CRB p.102); taking 20 takes twenty times
     # as long (CRB p.86): twenty rounds, two minutes.
     TAKE_20_ROUNDS = 20
+    TAKE_20_AS_MOVE = "skill.perception.take-20.move"      # Perfect Awareness's tag
 
     def _player_search(self, intent: Intent, pc, mods, partial: dict) -> Outcome:
         """The player searches where they are: one Perception result, their own die or a
@@ -5461,7 +5462,25 @@ class Engine:
             take = int(intent.params.get("take") or 0)
         except (TypeError, ValueError):
             take = 0
-        if take and self.scene.in_encounter:
+        # Perfect Awareness (Faiths & Philosophies): "Once per day, you can take 20 on a
+        # Perception check as a move action" — in a fight too, and in a move action's
+        # time rather than twenty searches' (feat loop b2). Its document's tag; the day's
+        # use is a pool on the one store, refilled by a night's rest.
+        quick = take == 20 and pc.has_state(self.TAKE_20_AS_MOVE)
+        if quick:
+            from . import resources, skilluses
+
+            resources.define(pc, {"id": "perfect awareness", "max": 1,
+                                  "refresh": "rest.night", "source": "Perfect Awareness"})
+            left = pc.pool("perfect awareness")
+            spent = skilluses._no_action_left(self, pc, "move", "taking 20 at a glance")
+            if left is None or left.current < 1 or spent:
+                if self.scene.in_encounter or spent:
+                    return self._refuse(intent, spent or (
+                        f"{pc.name} has used Perfect Awareness today; it comes back with a "
+                        f"night's rest."), code="threatened")
+                quick = False
+        if take and self.scene.in_encounter and not quick:
             return self._refuse(intent, f"{pc.name} cannot take {take} in the middle of a "
                                         f"fight: threats and distractions rule it out "
                                         f"(CRB p.86). A search here is a single roll.",
@@ -5470,7 +5489,12 @@ class Engine:
         if take:
             roll = self.dice.given(take, mods, label=label)
             roll.taken = True
-            if take == 20:
+            if quick:
+                pc.spend_pool("perfect awareness", 1)
+                skilluses._spend_action(self, pc, "move")
+                label += " (Perfect Awareness, a move action)"
+                roll.label = label
+            elif take == 20:
                 self.scene.advance(self.TAKE_20_ROUNDS // 10, rounds=self.TAKE_20_ROUNDS)
         else:
             # The number to beat is whatever hides here, unknown to the searcher.

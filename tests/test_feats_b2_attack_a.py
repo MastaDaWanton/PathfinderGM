@@ -583,3 +583,22 @@ def test_surprising_combatant_bluffs_an_aware_foe_into_surprise():
     pc.feats = list(pc.feats) + ["Surprising Combatant"]
     _run(engine, {"op": "attack", "actor": "pc", "target": "c1", "because": "brawl"})
     assert not thug.has_state(states.SURPRISED)
+
+
+def test_perfect_awareness_takes_twenty_in_a_fight_once_a_day():
+    """Perfect Awareness: "Once per day, you can take 20 on a Perception check as a move
+    action." Without it a take 20 is refused in a fight (CRB p.86) and costs two minutes."""
+    from tests.test_search_and_take import _room as _search_room, _run as _search
+
+    s, engine = _search_room()
+    s.initiative, s.turn = [("pc", 15)], 0
+    s.round = 1
+    s.pc().feats = list(s.pc().feats) + ["Perfect Awareness"]
+    before = s.clock_minutes
+    out = _search(engine, "check", {"skill": "perception", "search": True, "take": 20})
+    assert out.status != "refused", out.tell
+    assert out.rolls[0].faces == [20] and s.clock_minutes == before
+    assert s.move_spent.get("pc") == s.round
+    s.round = 2
+    again = _search(engine, "check", {"skill": "perception", "search": True, "take": 20})
+    assert again.status == "refused" and "today" in again.tell
