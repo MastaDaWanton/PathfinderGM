@@ -325,14 +325,17 @@ def test_harvesting_needs_a_carcass_and_matches_what_died():
 
 
 def test_buying_and_gathering_are_offered_and_populated():
-    """The other two excursions. Water is available on any ground — a material with no
-    biomes listed is not the same as one whose biomes exclude here."""
+    """The other two excursions. Water was on any ground (its biomes empty) until
+    playtest 2026-11-23 #10, when a smith gathered 8 Water in a dry vestibule under a
+    ruin; it lists the ground water is found on now, and a desert has none."""
     bought = blacksmith.obtainable("bought")
     assert len(bought) > 40 and all(m.price_gp for m in bought)
-    anywhere = {m.id for m in blacksmith.obtainable("gathered", biome="desert")}
-    assert "water" in anywhere
-    assert "peat" not in anywhere          # peat is a bog thing
-    assert "quenching-brine" not in anywhere   # and brine is a tideline thing
+    desert = {m.id for m in blacksmith.obtainable("gathered", biome="desert")}
+    assert "water" not in desert
+    meadow = {m.id for m in blacksmith.obtainable("gathered", biome="grassland")}
+    assert "water" in meadow
+    assert "peat" not in meadow            # peat is a bog thing
+    assert "quenching-brine" not in meadow     # and brine is a tideline thing
     assert {"gather", "buy"} <= set(blacksmith.ACQUISITION)
     # `salvage` left with the other carcass excursions (leatherworking lane C).
     assert "salvage" not in blacksmith.ACQUISITION

@@ -4275,7 +4275,7 @@
    "text": "The oldest bath, always to hand. Quenches fast and hard, leaving the piece a point harder, in a narrow window that cracks a careless blade.",
    "risky": false,
    "source": "harvested",
-   "biomes": [],
+   "biomes": ["urban", "farmland", "grassland", "forest", "jungle", "swamp", "hills", "mountain", "tundra", "coast", "water"],
    "effects": [],
    "effects_converted": true,
    "obtain": "gathered",
