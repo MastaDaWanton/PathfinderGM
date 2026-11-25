@@ -376,7 +376,11 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                     # maintaining check (CRB p.200); `chokehold` and `sleeper_hold`, the
                     # feats' declared holds on it.
                     "charge", "spring_attack", "lunge", "whirlwind_attack", "pin",
-                    "chokehold", "sleeper_hold"), "player"),
+                    "chokehold", "sleeper_hold",
+                    # Aid another in combat (CRB): "attack" or "ac", for the friend named
+                    # by `aid_ally`; `aid_with` the action it is paid from (Swift Aid's
+                    # swift, Team Up's move), else the standard.
+                    "aid", "aid_ally", "aid_with"), "player"),
     # `lethality` because a Blood Bender paying for an ability in non-lethal
     # damage and one taking a sword are not in the same trouble.
     # `when`: the "against X only" clause a jar's or a flask's document carries (alchemy

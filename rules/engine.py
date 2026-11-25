@@ -6067,6 +6067,8 @@ class Engine:
             # What a feat lets its bearer do on the back of this (`_riders_after`,
             # `_step_up_after`): spliced next, each paid from a swift or immediate action.
             rider_said: list = []
+            if intent.op == "attack":
+                self._aid_spent(intent, outcome)
             if intent.op in ("attack", "escape", "check"):
                 more, rider_said = self._riders_after(intent, outcome)
                 queue[0:0] = more
@@ -6376,6 +6378,8 @@ class Engine:
             return []                   # asked by the op itself: `_leaving_the_fight`
         if raw.get("op") == "attack" and (raw.get("params") or {}).get("manoeuvre"):
             return self._provoked_by_maneuver(raw)
+        if raw.get("op") == "attack":
+            return self._bodyguards(raw)
         if raw.get("op") == "cast":
             return self._provoked_by_casting(raw)
         if raw.get("op") == "use_item":
@@ -10161,6 +10165,9 @@ class Engine:
                 "refs",
             )
         defender = self.scene.actors[targets[0]]
+        # Aid another (`_aid_another`, feat loop b2): a roll against AC 10, no blow.
+        if intent.params.get("aid"):
+            return self._aid_another(intent, actor, defender, partial)
         # A dancing weapon's own round (`_dance`): the blade swings, not its loosener — so
         # nothing of the loosener's but their base attack bonus rides it (no Strength, no
         # feats, no sneak attack, no charged blow), and nothing stops it but the reach.
@@ -10601,6 +10608,11 @@ class Engine:
         flat_footed = self._flat_footed(defender) or (
             self._unseen_attacker(defender, actor)
             and not self._pinpointed_shooter(defender, actor, weapon))
+        # Surprise Follow-Through (ARG): "When using Cleave or Great Cleave, the second foe
+        # you attack on your turn is denied its Dexterity bonus against you" — the first
+        # blow the cleave carries on into (`cleaving` lists the one struck before it).
+        if len(intent.params.get("cleaving") or ()) == 1                 and actor.has_state("attack.cleave.surprise"):
+            flat_footed = True
         # A feint this attacker landed (rules/skilluses.py): "the next melee attack you make
         # against the target does not allow him to use his Dexterity bonus to AC" (CRB,
         # Combat, Feint) — this blow's first swing only, uncanny dodge or not. Asked once
@@ -12721,6 +12733,160 @@ class Engine:
                 "tell": f"{actor.name}'s critical carries through ({name} Strike, "
                         f"{total} against CMD {cmd}): {clause}."}]
         return []
+
+    # --- aid another in combat (CRB, Combat, Aid Another; feat loop b2) ----------------
+    #
+    # "In melee combat, you can help a friend attack or defend by distracting or
+    # interfering with an opponent. If you're in position to make a melee attack on an
+    # opponent that is engaging a friend in melee combat, you can attempt to aid your
+    # friend as a standard action. You make an attack roll against AC 10. If you succeed,
+    # your friend gains either a +2 bonus on his next attack roll against that opponent or
+    # a +2 bonus to AC against that opponent's next attack (your choice), as long as that
+    # attack comes before the beginning of your next turn. Multiple characters can aid the
+    # same friend, and similar bonuses stack." Before this only a skill check could be
+    # aided (`_aid_lands`). The bonus is an ActiveEffect on the friend scoped `vs` the
+    # opponent (`_effect_scope_holds`, smite's shape), spent by the one attack it is for
+    # (`_aid_spent`). Swift Aid (APG): "As a swift action ... +1"; Team Up (APG): "When you
+    # and at least two of your allies are adjacent to an opponent, you can attempt the aid
+    # another action as a move action"; Bodyguard (APG): "When an adjacent ally is
+    # attacked, you may use an attack of opportunity to attempt the aid another action to
+    # improve your ally's AC" (`_bodyguards`).
+    AID_ORIGIN = "rule:aid-another"
+
+    def _aid_another(self, intent: Intent, actor, foe, partial: dict) -> Outcome:
+        from . import position as position_mod
+
+        params = intent.params or {}
+        kind = "ac" if str(params.get("aid") or "").lower() == "ac" else "attack"
+        ally = self.scene.actors.get(str(params.get("aid_ally") or ""))
+        reaction = bool(params.get("reaction"))
+        if not self.scene.in_encounter:
+            return self._refuse(intent, "Aid another is a fight's action, and no fight is on.")
+        if ally is None or ally.ref in (actor.ref, foe.ref) or ally.is_down \
+                or not position_mod._same_side(self.scene, actor.ref, ally.ref):
+            return self._refuse(intent, f"Aid another helps a friend in the fight against "
+                                        f"{foe.name}; name the friend.")
+        key = (params.get("weapon") or actor.wielded_key() or "unarmed").lower()
+        if self.scene.has_grid and position_mod.out_of_reach(self.scene, actor, foe, key):
+            return self._refuse(intent, f"{actor.name} must be in position to strike "
+                                        f"{foe.name} in melee to aid against them.")
+        bonus, paid = 2, "standard"
+        if not reaction and "aid_paid" not in partial:
+            want = str(params.get("aid_with") or "")
+            team = sum(1 for r, a in self.scene.actors.items()
+                       if r not in (actor.ref, foe.ref) and not a.is_down
+                       and position_mod._same_side(self.scene, actor.ref, r)
+                       and self.scene.distance_between(r, foe.ref) is not None
+                       and self.scene.distance_between(r, foe.ref) <= gridmod.SQUARE_FT)
+            beside = (self.scene.distance_between(actor.ref, foe.ref) or 99) <= gridmod.SQUARE_FT
+            options = []
+            if want in ("", "standard"):
+                options.append("standard")
+            if want in ("", "move") and actor.has_state("aid.team-up") and beside and team >= 2:
+                options.append("move")
+            if want in ("", "swift") and actor.has_state("aid.swift"):
+                options.append("swift")
+            if want == "swift":
+                options = [o for o in options if o == "swift"] + options
+            from . import skilluses
+
+            paid = next((o for o in options if not skilluses._no_action_left(
+                self, actor, o, "aid another")), "")
+            if not paid:
+                return self._refuse(intent, f"{actor.name} has no action left for aid another "
+                                            f"this turn.", code="standard_spent")
+            skilluses._spend_action(self, actor, paid)
+            partial["aid_paid"] = paid
+        else:
+            paid = str(partial.get("aid_paid") or ("reaction" if reaction else "standard"))
+        if paid == "swift":
+            bonus = 1
+        mods = list(actor.attack_modifiers(key, defender=foe))
+        roll = self._roll_or_suspend(intent, actor, mods, f"Aid another ({kind}) against AC 10",
+                                     10, partial, extra_partial={"aid_paid": paid})
+        made = d20_succeeds(roll, 10)
+        self._judge(roll, made)
+        said = f"{roll.total} against AC 10"
+        if not made:
+            return Outcome(intent_id=intent.id, op="attack", rolls=[roll], verdict="failure",
+                           effects=[{"kind": "aid", "ref": ally.ref, "made": False,
+                                     "against": foe.ref, "by": actor.ref}],
+                           tell=f"{actor.name} tries to draw {foe.name}'s attention from "
+                                f"{ally.name} and fails ({said}).", because=intent.because)
+        # "before the beginning of your next turn": one round on the one ticker, the
+        # stances' approximation (it ends at the top of the round).
+        rounds = 1
+        how = "next attack against" if kind == "attack" else "guard against the next blow of"
+        ally.apply_effect(ActiveEffect(
+            name=f"aided against {foe.name}", kind="buff",
+            key=f"aid-{actor.ref}-{foe.ref}-{kind}", source=f"{actor.name}'s aid",
+            origin=self.AID_ORIGIN, duration="rounds", rounds_left=rounds,
+            payload={"aid": kind, "vs": foe.ref},
+            modifiers=[{"kind": "combat_mod", "target": kind, "amount": bonus,
+                        "bonus_type": "circumstance", "vs": foe.ref,
+                        "note": f"aid another from {actor.name}"}]))
+        return Outcome(intent_id=intent.id, op="attack", rolls=[roll], verdict="success",
+                       effects=[{"kind": "aid", "ref": ally.ref, "made": True, "aid": kind,
+                                 "bonus": bonus, "against": foe.ref, "by": actor.ref,
+                                 "origin": self.AID_ORIGIN}],
+                       tell=f"{actor.name} distracts {foe.name} ({said}): {ally.name} has "
+                            f"+{bonus} on the {how} {foe.name}.", because=intent.because)
+
+    def _aid_spent(self, intent: Intent, outcome: "Outcome") -> None:
+        """The aid another bonus covers one attack: the friend's next attack against that
+        opponent, or that opponent's next attack against the friend — spent by the attack
+        that just resolved, hit or miss."""
+        if intent.op != "attack" or outcome.status != "resolved" \
+                or (intent.params or {}).get("aid") or (intent.params or {}).get("manoeuvre"):
+            return
+        targets = intent.targets()
+        attacker = self.scene.actors.get(intent.actor or "")
+        foe = self.scene.actors.get(targets[0]) if targets else None
+        if attacker is None or foe is None:
+            return
+        attacker.remove_effects(match=lambda e: e.origin == self.AID_ORIGIN and (
+            e.payload or {}).get("aid") == "attack" and (e.payload or {}).get("vs") == foe.ref)
+        foe.remove_effects(match=lambda e: e.origin == self.AID_ORIGIN and (
+            e.payload or {}).get("aid") == "ac" and (e.payload or {}).get("vs") == attacker.ref)
+
+    def _bodyguards(self, raw: dict) -> list[dict]:
+        """Bodyguard's aid, owed before an attack lands on its holder's adjacent ally: from
+        each holder beside the one attacked who threatens the attacker and has an attack of
+        opportunity left, spent on it (`_spend_reaction`). Taken for the player too — the
+        feat exists to spend the swing so (owner call)."""
+        params = raw.get("params") or {}
+        if params.get("reaction") or params.get("aid") or params.get("manoeuvre") \
+                or not self.scene.has_grid:
+            return []
+        from . import position as position_mod
+
+        attacker = str(raw.get("actor") or "")
+        target = str(raw.get("target") or "")
+        if target not in self.scene.actors or attacker not in self.scene.actors:
+            return []
+        out: list[dict] = []
+        for ref, guard in self.scene.actors.items():
+            if ref in (attacker, target) or guard.is_down \
+                    or not guard.has_state("aid.bodyguard") \
+                    or not position_mod._same_side(self.scene, ref, target) \
+                    or (self.scene.distance_between(ref, target) or 99) > gridmod.SQUARE_FT \
+                    or attacker not in self.scene.positions:
+                continue
+            body = self.scene.actors[attacker].size or "medium"
+            squares = gridmod.footprint(tuple(self.scene.positions[attacker][:2]), body)
+            if not any(reactions.threatens(self.scene, ref, q, body) for q in squares):
+                continue
+            if not reactions.reactions_for(guard) or not self._spend_reaction(
+                    ref, "attack_of_opportunity"):
+                continue
+            out.append({"op": "attack", "actor": ref, "target": attacker,
+                        "id": f"{raw.get('id') or 'attack'}-bodyguard-{ref}",
+                        "visibility": "player" if guard.is_pc else "hidden",
+                        "because": f"{guard.name} guards {self.scene.actors[target].name} "
+                                   f"(Bodyguard)",
+                        "params": {"full_attack": False, "reaction": "bodyguard",
+                                   "aid": "ac", "aid_ally": target}})
+        return out
 
     def _whirlwind_before(self, raw: dict) -> list:
         """Whirlwind Attack (CRB): "When you use the full-attack action, you can give up

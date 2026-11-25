@@ -229,5 +229,77 @@
         "note": "Sleeper Hold: -2 AC while choking a foe out"
       }
     ]
+  },
+  "surprise-follow-through": {
+    "tags": [
+      "attack.cleave.surprise"
+    ]
+  },
+  "uncanny-defense": {
+    "modifiers": [
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "formula": "(4 + min(1, ranks_acrobatics // 3)) // 2",
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "buff.stance.fighting-defensively"
+          }
+        },
+        "note": "half the dodge bonus of fighting defensively (Cautious Fighter's +4, +5 trained)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "formula": "(4 + min(1, ranks_acrobatics // 3)) // 2",
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "buff.stance.fighting-defensively"
+          }
+        },
+        "note": "half the dodge bonus of fighting defensively"
+      },
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "formula": "(6 + 2 * min(1, ranks_acrobatics // 3)) // 2",
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "buff.stance.total-defense"
+          }
+        },
+        "note": "half the dodge bonus of total defense (Cautious Fighter's +6, +8 trained)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "formula": "(6 + 2 * min(1, ranks_acrobatics // 3)) // 2",
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "buff.stance.total-defense"
+          }
+        },
+        "note": "half the dodge bonus of total defense"
+      }
+    ]
+  },
+  "swift-aid": {
+    "tags": [
+      "aid.swift"
+    ]
+  },
+  "team-up": {
+    "tags": [
+      "aid.team-up"
+    ]
+  },
+  "bodyguard": {
+    "tags": [
+      "aid.bodyguard"
+    ]
   }
 }

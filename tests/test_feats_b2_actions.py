@@ -467,3 +467,87 @@ def test_the_declare_section_offers_charge_and_the_held_action_feats():
     assert not opts["spring_attack"]["why"] and not opts["whirlwind_attack"]["why"]
     scene, engine, pc, thug = _fight()
     assert "spring_attack" not in {o["id"] for o in _attack_options(pc)["options"]}
+
+
+# --- aid another, and the feats on it ----------------------------------------------------
+
+def _aid_fight(feats=(), ally_at=(9, 10), **kw):
+    scene, engine, pc, thug = _fight(pc_at=(7, 10), feats=feats, ally_at=ally_at,
+                                     dice=_Scripted(15), **kw)
+    return scene, engine, pc, thug, scene.get("ally")
+
+
+def test_aid_another_gives_the_friend_two_on_the_next_blow_against_that_foe():
+    """CRB, Aid Another: an attack roll against AC 10, a standard action; "+2 bonus on his
+    next attack roll against that opponent". Before this only a skill check could be aided.
+    Borin's next swing at the thug carries the +2, and the one after it does not."""
+    scene, engine, pc, thug, borin = _aid_fight()
+    res = _run(engine, _attack(aid="attack", aid_ally="ally"))
+    assert res.outcomes[0].verdict == "success" and scene.standard_spent["pc"] == scene.round
+    first = next(o for o in _run(engine, _attack(by="ally")).outcomes if o.op == "attack")
+    assert _terms(first, "Attack with").get("Kesst Vayr's aid") == 2
+    again = next(o for o in _run(engine, _attack(by="ally")).outcomes if o.op == "attack")
+    assert "Kesst Vayr's aid" not in _terms(again, "Attack with")
+
+
+def test_swift_aid_is_plus_one_for_the_swift_action_and_team_up_a_move():
+    """Swift Aid: "As a swift action ... a +1 bonus"; Team Up: "When you and at least two
+    of your allies are adjacent to an opponent, ... the aid another action as a move
+    action"."""
+    scene, engine, pc, thug, borin = _aid_fight(feats=["Swift Aid"])
+    _run(engine, _attack(aid="ac", aid_ally="ally", aid_with="swift"))
+    aid = next(e for e in borin.effects if e.origin == "rule:aid-another")
+    assert aid.modifiers[0]["amount"] == 1 and scene.swift_spent["pc"] == scene.round
+    assert "pc" not in scene.standard_spent
+    scene, engine, pc, thug, borin = _aid_fight(feats=["Team Up"])
+    friend = load_pc("fixtures/pc-thessaly.json")
+    friend.ref, friend.kind = "friend", "npc"
+    scene.add(friend)
+    third = "friend"
+    scene.positions[third] = (8, 9)
+    scene.sides["pc"].append(third)
+    scene.standard_spent["pc"] = scene.round
+    res = _run(engine, _attack(aid="attack", aid_ally="ally"))
+    assert res.outcomes[0].verdict == "success" and scene.move_spent["pc"] == scene.round
+
+
+def test_bodyguard_spends_an_attack_of_opportunity_on_the_ally_s_guard():
+    """Bodyguard: "When an adjacent ally is attacked, you may use an attack of opportunity
+    to attempt the aid another action to improve your ally's AC." The thug swings at Borin
+    beside Kesst; her aid lands first and his roll is against AC +2."""
+    scene, engine, pc, thug, borin = _aid_fight(feats=["Bodyguard"], ally_at=(8, 9))
+    scene.acted.update({"pc", "ally"})
+    scene.turn = 2
+    res = _run(engine, _attack(by="c1", target="ally"))
+    assert any(e.get("kind") == "aid" and e.get("made") for o in res.outcomes
+               for e in o.effects)
+    assert not any(e.origin == "rule:aid-another" for e in borin.effects)   # spent
+    assert scene.reacted
+
+
+def test_uncanny_defense_adds_half_the_defensive_dodge_to_reflex_and_cmd():
+    """Uncanny Defense: "While fighting defensively or taking the total defense action, you
+    gain a bonus on your Reflex saving throws and to your CMD equal to 1/2 of the dodge
+    bonus" — with Cautious Fighter's +4 when fighting defensively, +2."""
+    scene, engine, pc, thug = _fight(feats=["Cautious Fighter", "Uncanny Defense"])
+    ref, cmd = (sum(m.value for m in pc.save_modifiers("ref")), pc.cmd())
+    engine._lay_attack_stances(pc, ("fighting_defensively",))
+    assert sum(m.value for m in pc.save_modifiers("ref")) - ref == 2
+    assert pc.cmd() - cmd >= 2
+
+
+def test_surprise_follow_through_denies_dexterity_to_the_second_foe_cleaved():
+    """Surprise Follow-Through: "When using Cleave ... the second foe you attack on your
+    turn is denied its Dexterity bonus against you." The cleave's carried blow is rolled
+    against the second thug's flat-footed AC."""
+    scene, engine, pc, thug = _fight(pc_at=(7, 10), feats=["Surprise Follow-Through"])
+    from rules.intents import Intent
+
+    # The carried blow is engine-written (`_cleave_on`), never parsed: built so here.
+    intent = Intent(op="attack", actor="pc", target="c1", visibility="hidden",
+                    params={"cleaving": ["c9"], "cleave": True})
+    scene.acted.add("c1")
+    plain = engine._flat_footed(thug)
+    assert not plain
+    o = next(o for o in engine.run([intent]).outcomes if o.op == "attack")
+    assert "flat-footed" in (o.dc or {}).get("explain", "") or "flat-footed" in o.tell
