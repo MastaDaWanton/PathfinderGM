@@ -109,7 +109,11 @@ def _tell(c, resolution, line: str) -> JsonResponse:
         # 2026-11-20 #4: a move ended on the look's line, with no question).
         c.transcript.append({"who": "gm", "text": "What do you do?"})
     pc = c.scene.pc()
-    c.history.append({"role": "user", "content": f"(From the region map: {line})"})
+    # A refused move is history only as the try and its refusal (owner ask 2026-11-26 A4):
+    # "(From the region map: I set out north-east ...)" read to the next turn's narrator as
+    # a journey made.
+    c.history.append({"role": "user", "content": (f"(From the region map: {line})" if done
+                                                  else f"(From the region map, tried and refused: {line})")})
     c.history.append({"role": "assistant", "content": " ".join(x for x in (closing, tell) if x)})
     from play import history as history_mod
 

@@ -24060,6 +24060,12 @@ class Engine:
                 raise ValueError
         except (TypeError, ValueError):
             return self._refuse(intent, "hex_move needs `hex`: the hex's [q, r].")
+        # Below ground first, before the day's hours or the water (owner ask 2026-11-26 A4):
+        # from the tower's dungeon the travel-day refusal answered instead, and read on the
+        # page as a day on the road that never happened.
+        below = self._hex_held_below(pc)
+        if below:
+            return self._refuse(intent, below)
         dest = g.cell(*to)
         far = hexes.distance(here, to)
         rides = self.party_rides()
@@ -24337,6 +24343,50 @@ class Engine:
         tell = " ".join(t for t in tells if t).strip() + (xp_line or "")
         return Outcome(intent_id=intent.id, op="hex_move", rolls=rolls, effects=effects,
                        tell=tell, because=intent.because)
+
+    def _hex_held_below(self, pc) -> str:
+        """Why a hex move is refused from under the ground, naming the way up, or "".
+
+        Owner ask 2026-11-26 A4. PF1e moves at three scales (CRB, Movement: tactical,
+        local "for exploring an area", overland "for getting from place to place"); the
+        region map is the overland one, and a dungeon is walked at the local one. CRPGs
+        hand over to the world map only at an area's exit (Baldur's Gate's map edge,
+        Kingmaker's compass rose), roguelikes only by the up stairs, so the way out is
+        walked first. A site on the surface (the tower's own floors, the ruins' gate) is
+        still walked out of by the move itself, as playtest 2026-11-20 #4 built it."""
+        from . import hexes, places as places_mod
+
+        at = self.scene.at or ""
+        if not self.scene.underground(at):
+            return ""
+        by = {p.id: p for p in self.places()}
+        top, seen = at, set()
+        while top in by and top not in seen and self.scene.underground(top):
+            seen.add(top)
+            top = by[top].parent
+        here, up = by.get(at), by.get(top)
+        # And on to the open ground itself when the site stands on a hex (the tower's own
+        # floors lie between its trapdoor and the hills), so the way named ends where a hex
+        # move can start; under a town, the place over the way down is that ground.
+        ground = top
+        while ground in by and hexes.in_site(ground) and ground not in seen:
+            seen.add(ground)
+            ground = by[ground].parent
+        if ground not in by:
+            ground = top
+        if up is None or here is None:
+            return (f"{pc.name} is below ground, and the region map is walked from open "
+                    "ground: find the way back up first.")
+        hops = ([by[h].name for h in places_mod.route(list(by.values()), at, ground)]
+                or [by[ground].name])
+        if len(hops) == 1:
+            way = f"back up to {hops[0]}"
+        else:
+            through = hops[:-1]
+            said = through[0] if len(through) == 1 else (", ".join(through[:-1]) + " and " + through[-1])
+            way = f"back through {said} to {hops[-1]}"
+        return (f"{pc.name} is in {here.name}, below {up.name}, and the region map is walked "
+                f"from open ground. Leave first: {way}, then choose the hex again.")
 
     def _op_hex_enter(self, intent: Intent, partial: dict) -> Outcome:
         """Into the site of the hex the party stands in, once it has been spotted: the

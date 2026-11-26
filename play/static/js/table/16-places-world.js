@@ -321,6 +321,10 @@ async function hexAct(url, body) {
       finally { busy(false); }
       if (landed) await landed; else Dice3D.close();
     }
+    // A refused move is said on the Region's own slip, where the press was (owner ask
+    // 2026-11-26 A4: refused from a dungeon, the board showed nothing and the page's line
+    // read like a day on the road).
+    if (typeof MAPV === "object") MAPV.said = d.refused && d.tell ? d.tell : "";
     render(await getState());
   } catch (err) {
     const e = document.getElementById("err"); if (e) e.textContent = err.message;
