@@ -1,0 +1,124 @@
+{
+  "_about": [
+    "Feat loop, batch 3, lane b3-martial (2026-11-26): rage and its feats, wild shape,",
+    "companions, the rogue's strikes and the class-feature strike feats. Each benefit is the",
+    "book's (content/feats/feats.json, checked against aonprd.com FeatDisplay 2026-11-26).",
+    "New grammar this lane built: `triggers` (rules/feat_events.py: a pool gain on a",
+    "critical dealt or taken, or a fall), `precision` (extra precision dice on a blow),",
+    "`choice_slots` (a class choice's extra pick), and the defender's once-a-day guards as",
+    "`budget` keys read by rules/feat_events.py. Tags name what the engine asks; what still",
+    "does not run is each document's `not_yet`."
+  ],
+  "shadow-strike": {
+    "tags": ["precision.through-concealment"]
+  },
+  "bludgeoner": {
+    "tags": ["lethality.nonlethal.bludgeoning"]
+  },
+  "shrewd-tactician": {
+    "tags": ["flanking.no-bonus-against"],
+    "modifiers": [
+      {"type": "skill_mod", "target": "sense motive", "amount": 3, "bonus_type": "untyped",
+       "when": {"against": "feint"},
+       "note": "Sense Motive to resist a foe's Bluff to feint in combat"}
+    ]
+  },
+  "survivor": {
+    "budget": {"negate_critical_or_precision": "1"},
+    "modifiers": [
+      {"type": "combat_mod", "target": "con_check", "amount": 5, "bonus_type": "untyped",
+       "when": {"against": "stabilize"},
+       "note": "Constitution checks to stabilize while dying"}
+    ]
+  },
+  "resilient-brute": {
+    "budget": {"critical_half_nonlethal": "1 + min(1, bab // 10)"}
+  },
+  "flanking-foil": {
+    "tags": ["flank.foil"]
+  },
+  "cleaving-finish": {
+    "tags": ["attack.cleaving-finish"]
+  },
+  "violent-display": {
+    "tags": ["display.on-precision-or-critical"]
+  },
+  "betraying-blow": {
+    "tags": ["nonlethal.betraying-blow"]
+  },
+  "hold-the-blade": {
+    "tags": ["reaction.disarm-on-flank"]
+  },
+  "hammer-the-gap": {
+    "tags": ["damage.consecutive-hits"]
+  },
+  "knockout-artist": {
+    "tags": ["damage.unarmed-precision"]
+  },
+  "precise-strike": {
+    "precision": [
+      {"dice": "1d6", "when": {"flanking_with": {"feat": "precise-strike"},
+                               "weapon": {"category": "melee"}}}
+    ]
+  },
+  "belier-s-bite": {
+    "on_hit": [
+      {"kind": "bleed", "amount": "1d4", "when": {"weapon": {"key": "unarmed"}}}
+    ]
+  },
+  "devastating-strike": {
+    "modifiers": [
+      {"type": "combat_mod", "target": "damage", "formula": "min(6, 2 * weapon_dice)",
+       "bonus_type": "untyped", "when": {"choice": "vital_strike"},
+       "note": "+2 on each extra weapon damage die Vital Strike and its successors grant (+6 maximum), multiplied on a critical"}
+    ]
+  },
+  "witchbreaker": {
+    "modifiers": [
+      {"type": "save_mod", "target": "fort", "amount": 2, "bonus_type": "untyped",
+       "when": {"against": "hag_or_witch"}},
+      {"type": "save_mod", "target": "ref", "amount": 2, "bonus_type": "untyped",
+       "when": {"against": "hag_or_witch"}},
+      {"type": "save_mod", "target": "will", "amount": 2, "bonus_type": "untyped",
+       "when": {"against": "hag_or_witch"}}
+    ],
+    "not_yet": [
+      "'whenever you score a critical hit against such a creature, any allies under the effects of a mind-affecting effect from that creature may attempt a new save': no ally's charm or compulsion records which creature laid it for a fresh save to answer"
+    ]
+  },
+  "gore-fiend": {
+    "triggers": [
+      {"on": "crit_dealt", "once_per_round": true, "gain": {"pool": "rage", "amount": 1},
+       "when": {"bearer": {"state": "buff.stance.rage"}, "weapon": {"category": "melee"}}},
+      {"on": "crit_taken", "once_per_round": true, "gain": {"pool": "rage", "amount": 1},
+       "when": {"bearer": {"state": "buff.stance.rage"}}}
+    ]
+  },
+  "gore-fiend-orcs": {
+    "triggers": [
+      {"on": "crit_dealt", "once_per_round": true, "gain": {"pool": "rage", "amount": 1},
+       "when": {"bearer": {"state": "buff.stance.rage"}, "weapon": {"category": "melee"}}},
+      {"on": "crit_taken", "once_per_round": true, "gain": {"pool": "rage", "amount": 1},
+       "when": {"bearer": {"state": "buff.stance.rage"}}}
+    ]
+  },
+  "thrill-of-the-kill": {
+    "triggers": [
+      {"on": "felled", "once_per_round": true, "gain": {"pool": "rage", "amount": 1},
+       "foe": {"hd_gte_bearer": true}, "when": {"bearer": {"state": "buff.stance.rage"}}}
+    ]
+  },
+  "thrill-of-the-kill-orcs": {
+    "triggers": [
+      {"on": "felled", "once_per_round": true, "gain": {"pool": "rage", "amount": 1},
+       "foe": {"hd_gte_bearer": true}, "when": {"bearer": {"state": "buff.stance.rage"}}}
+    ]
+  },
+  "raging-deathblow": {
+    "triggers": [
+      {"on": "felled", "gain": {"pool": "rage", "amount": 1, "crit_extra": 1,
+                                "beyond_max": true},
+       "foe": {"cr_gte_level": true}, "when": {"bearer": {"state": "buff.stance.rage"}}}
+    ]
+  }
+}

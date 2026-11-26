@@ -32,6 +32,7 @@ from . import crafting
 from . import dc as dc_mod
 from . import effectspec
 from . import metamagic
+from . import feat_events
 from . import finish_uses
 from . import foraging
 from . import ingredients as ing_mod
@@ -10268,6 +10269,15 @@ class Engine:
         # alchemy plan §16.7). Unasked until alchemy lane C, so the clause had no reader.
         if ctx is None and str(intent.gate or "").startswith("poison"):
             ctx = {"against": "poison"}
+        # A hag's own ability called for this save (`creature:<template>`): Witchbreaker's
+        # "+2 ... against the hexes, spells, spell-like abilities, and supernatural
+        # abilities of witches and hags" (feat loop b3).
+        from . import feat_events
+
+        if feat_events.origin_is_hag_or_witch(intent.origin):
+            got = (ctx or {}).get("against") or ()
+            got = (got,) if isinstance(got, str) else tuple(got)
+            ctx = {**(ctx or {}), "against": got + ("hag_or_witch",)}
         # An unreliable cloak or ring that lends this save its bonus is used by the save
         # (`_save_gutters`): rolled once, kept across the dice popup.
         gut = partial.get("save_gutter")
@@ -10901,7 +10911,13 @@ class Engine:
         if actor.has_state(states.IN_A_BOUT) and defender is not None \
                 and defender.has_state(states.IN_A_BOUT):
             lethality = "nonlethal"
-        pulled = usual == "lethal" and lethality == "nonlethal"
+        # Pulled is a lethal weapon dealing nonlethal at the -4 â€” not a fist Improved
+        # Unarmed Strike lets strike either way, nor a club Bludgeoner pulls for free
+        # (feat loop b3: both waive the -4 in `lethality_swap`, and a rogue's nonlethal
+        # unarmed sneak attack is the book's own example; measured before, a monk-trained
+        # rogue's pulled fist lost its sneak dice).
+        pulled = usual == "lethal" and lethality == "nonlethal" \
+            and bool(actor.lethality_swap(weapon_key, lethality))
 
         if coup:
             from . import coup_de_grace as coup_mod
@@ -11607,6 +11623,8 @@ class Engine:
                 self._judge(confirm, state["crit"])
                 if state["crit"]:
                     self._surge(actor, "a confirmed critical hit")
+                    feat_events.crit_events(self, actor, defender, weapon_key, weapon,
+                                            state)
                 state["stage"] = "damage"
 
             if state["stage"] == "damage" and printed.get("ability"):
@@ -11728,6 +11746,8 @@ class Engine:
                     pulled=pulled)
                 if sneak_dice and state.get("fortified"):
                     sneak_dice, sneak_why = "", ""     # turned by the armour; said above
+                sneak_dice, sneak_why = feat_events.negate_precision(   # Survivor (b3)
+                    defender, sneak_dice, sneak_why, state)
                 if sneak_dice:
                     if "sneak_total" not in state:
                         sneak_roll = self._roll_or_suspend_stage(
@@ -11752,6 +11772,14 @@ class Engine:
                         # letter is raised: `capitalize()` lowercases the rest, and it
                         # turned "Troop, Goblin" into "Troop, goblin".
                         else sneak_why[:1].upper() + sneak_why[1:] + ".")
+                # Feat loop b3: a held feat's precision dice (Precise Strike) and its
+                # terms on this damage roll (Hammer the Gap, Knockout Artist).
+                if not dancing:
+                    dmg_mods = dmg_mods + feat_events.precision_dice(
+                        self, intent, actor, defender, weapon_key, weapon, state, partial)
+                    dmg_mods = dmg_mods + feat_events.damage_terms(
+                        self, intent, actor, defender, weapon, state, mult, lethality,
+                        flat_footed or defender.loses_dex_to_ac)
                 # "plus 1d6 fire", "plus 2d6 cold": a second packet of a second type,
                 # rolled here BEFORE the main die for the reason the rider and sneak
                 # dice are — a suspension after damage had landed would land it twice
@@ -11910,9 +11938,20 @@ class Engine:
                         state["tells"].append(
                             f"Half the blow passes through {defender.name}'s "
                             f"insubstantial form.")
+                # Resilient Brute (feat loop b3): half a critical's damage as nonlethal.
+                amount, spared = feat_events.half_nonlethal(defender, amount, state,
+                                                            lethality)
                 hit = self._apply_damage(defender, amount, weapon["type"],
                                          traits=struck_as + attacker_traits(actor),
                                          lethality=lethality)
+                if spared:
+                    bruise = self._apply_damage(defender, spared, weapon["type"],
+                                                traits=struck_as + attacker_traits(actor),
+                                                lethality="nonlethal")
+                    bruise["origin"] = "rule:feat-resilient-brute"
+                    state["effects"].append(bruise)
+                    state["tells"].append(f"{bruise.get('amount', spared)} of it lands as "
+                                          f"bruising, nonlethal.")
                 if printed:
                     # Whose numbers these were: the stat block's, by the provenance
                     # vocabulary stage 8 gave every other amount.
@@ -12034,6 +12073,14 @@ class Engine:
                 # Critical Shot (`_feat_after_hit`).
                 for extra in ([] if dancing else self._feat_after_hit(
                         actor, defender, weapon, power, hand, state)):
+                    state["effects"].append(extra["effect"])
+                    if extra.get("tell"):
+                        state["tells"].append(extra["tell"])
+                # Feat loop b3: what a held feat answers once a blow has landed â€” a fall
+                # (Thrill of the Kill), the struck foe's mark (Flanking Foil), and more
+                # (`_b3_after_hit`).
+                for extra in ([] if dancing else feat_events.after_hit(
+                        self, intent, actor, defender, weapon_key, weapon, state, choices)):
                     state["effects"].append(extra["effect"])
                     if extra.get("tell"):
                         state["tells"].append(extra["tell"])
@@ -25506,7 +25553,11 @@ class Engine:
         """The defender's save against a rider, the engine's roll (an NPC's intent: hidden,
         as `_distraction` and `_magic_gate` roll theirs), kept in the attack's rolls, and
         the words the tell quotes: "Fortitude 9 against DC 13"."""
-        ctx = {**({"against": against} if against else {}),
+        from . import feat_events
+
+        words = tuple(w for w in (against, "hag_or_witch" if feat_events.is_hag_or_witch(
+            attacker) else "") if w)
+        ctx = {**({"against": words if len(words) > 1 else words[0]} if words else {}),
                **({"attacker_actor": attacker} if attacker is not None else {})}
         roll = self.dice.d20(defender.save_modifiers(save, ctx or None),
                              label=label, visibility="hidden")
@@ -33058,6 +33109,10 @@ class Engine:
             out.append("arcane_spell" if armour_mod.is_arcane(caster) else "divine_spell")
         if "negative" in casting.spell_context(spell).get("energy", ()):
             out.append("negative_energy")
+        from . import feat_events
+
+        if feat_events.is_hag_or_witch(caster):          # Witchbreaker (feat loop b3)
+            out.append("hag_or_witch")
         return tuple(out)
 
     def _focused_dc(self, spell, dc: int, target: Actor, state: dict) -> int:
@@ -35494,7 +35549,12 @@ class Engine:
         # `state.hidden` alone — the rule written two ways (ponytail audit): a rogue
         # stabbing a blurred or fog-wrapped foe rolled both the 20% miss chance and her
         # sneak dice, and one who had found a hiding foe was still refused them.
-        concealed = bool(self._concealment_of(actor, defender)[0] > 0
+        chance = self._concealment_of(actor, defender)[0]
+        # Shadow Strike (APG): "precision damage ... against targets with concealment (but
+        # not total concealment)" — its document's tag, asked of the vocabulary.
+        if 0 < chance < 50 and actor.has_state(precision_mod.THROUGH_CONCEALMENT):
+            chance = 0
+        concealed = bool(chance > 0
                          or position_mod.cover_of(self.scene, actor, defender) == "total")
         return precision_mod.applies(
             self.scene, actor, defender, weapon,
