@@ -1,0 +1,198 @@
+{
+  "class": "feat",
+  "_source": "Feat loop b3, lane b3-divine (2026-11-26): the channel, lay on hands, smite and performance feats a character USES. Each is had by a holder of the feat its `feat` names (rules/class_abilities.py `_docs_for`), run by the one executor. Benefit text from content/feats/feats.json (the OGL sheet), checked against aonprd.com FeatDisplay for each feat. A use 'of your channel energy' is `cost.uses_of`: one of a cleric's channel energy pool, two of a paladin's lay on hands (CRB p.62), read off whichever document answers to the name.",
+  "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
+  "abilities": [
+    {
+      "key": "channel smite",
+      "name": "Channel Smite",
+      "feat": "channel-smite",
+      "level": 1,
+      "source": "Channel Smite (CRB): 'Before you make a melee attack roll, you can choose to spend one use of your channel energy ability as a swift action. If you channel positive energy and you hit an undead creature, that creature takes an amount of additional damage equal to the damage dealt by your channel positive energy ability. If you channel negative energy and you hit a living creature ... Your target can make a Will save, as normal, to halve this additional damage. If your attack misses, the channel energy ability is still expended with no effect.'",
+      "text": "Swift: your next melee blow carries your channel's dice into an undead (or, channelling negative energy, a living) foe; Will for half. A miss wastes it.",
+      "action": "swift",
+      "cost": {"uses_of": "channel energy", "amount": 1},
+      "aim": "foe",
+      "charge": {
+        "category": "melee",
+        "spent_on": "swing",
+        "dice": {"count": "floor((level + 1) / 2)", "die": 6, "type": "positive"},
+        "bonus_from": "channel.harm-undead",
+        "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod", "success": "half"},
+        "target_requires": ["type.undead"],
+        "target_said": "an undead creature"
+      },
+      "choice": {
+        "kind": "mode",
+        "default": "positive",
+        "options": {
+          "positive": {"aliases": ["positive energy", "harm undead", "against the undead"]},
+          "negative": {
+            "requires": ["class.channel-energy"],
+            "aliases": ["negative energy", "harm the living", "against the living"],
+            "charge": {
+              "category": "melee",
+              "spent_on": "swing",
+              "dice": {"count": "floor((level + 1) / 2)", "die": 6, "type": "negative"},
+              "bonus_from": "channel.harm-living",
+              "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod", "success": "half"},
+              "target_requires_not": ["type.undead", "type.construct"],
+              "target_said": "a living creature"
+            }
+          }
+        }
+      },
+      "_negative_note": "The negative mode is open to a cleric (`class.channel-energy`); the owner's ruling 2026-10-05 lets any cleric channel either energy until alignment is tracked. A paladin channels positive energy only (CRB p.62).",
+      "tell": "{name} gathers divine energy into the weapon."
+    },
+    {
+      "key": "greater channel smite",
+      "name": "Greater Channel Smite",
+      "feat": "greater-channel-smite",
+      "level": 1,
+      "source": "Greater Channel Smite (UC): 'Before making any melee attacks on your turn, you can use a swift action to expend one daily use of your channel energy class feature. The dice from your channel energy feature form a pool of damage dice ... Prior to making each melee attack, allocate dice from the pool ... Your target can make a Will save, as normal, to halve this extra damage. This extra damage is not multiplied when you score a critical hit. If you miss, the extra damage dice remain in your pool, but any dice left unexpended at the end of your turn are wasted.'",
+      "text": "Swift, before your blows: your channel's dice wait in the weapon until a melee blow lands on an undead (or living) foe this turn; Will for half. A miss keeps them.",
+      "action": "swift",
+      "cost": {"uses_of": "channel energy", "amount": 1},
+      "aim": "foe",
+      "charge": {
+        "category": "melee",
+        "spent_on": "hit",
+        "dice": {"count": "floor((level + 1) / 2)", "die": 6, "type": "positive"},
+        "bonus_from": "channel.harm-undead",
+        "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod", "success": "half"},
+        "target_requires": ["type.undead"],
+        "target_said": "an undead creature"
+      },
+      "choice": {
+        "kind": "mode",
+        "default": "positive",
+        "options": {
+          "positive": {"aliases": ["positive energy", "harm undead", "against the undead"]},
+          "negative": {
+            "requires": ["class.channel-energy"],
+            "aliases": ["negative energy", "harm the living", "against the living"],
+            "charge": {
+              "category": "melee",
+              "spent_on": "hit",
+              "dice": {"count": "floor((level + 1) / 2)", "die": 6, "type": "negative"},
+              "bonus_from": "channel.harm-living",
+              "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod", "success": "half"},
+              "target_requires_not": ["type.undead", "type.construct"],
+              "target_said": "a living creature"
+            }
+          }
+        }
+      },
+      "_allocation_note": "The book lets the player split the pool across the turn's blows. The engine puts the whole pool on each blow until one lands — a miss keeps the dice, so that is the split a table makes when it wants the dice to land; owner call in the lane report.",
+      "tell": "{name} gathers a pool of divine energy into the weapon."
+    },
+    {
+      "key": "turn undead",
+      "name": "Turn Undead",
+      "feat": "turn-undead",
+      "level": 1,
+      "aliases": ["turn the undead"],
+      "source": "Turn Undead (CRB): 'You can, as a standard action, use one of your uses of channel positive energy to cause all undead within 30 feet of you to flee, as if panicked. Undead receive a Will save to negate the effect. The DC for this Will save is equal to 10 + 1/2 your cleric level + your Charisma modifier. Undead that fail their save flee for 1 minute. Intelligent undead receive a new saving throw each round to end the effect. If you use channel energy in this way, it has no other effect.'",
+      "text": "Standard: every undead within 30 ft saves (Will) or flees, panicked, for a minute; the thinking dead may shake it off each round.",
+      "action": "standard",
+      "cost": {"uses_of": "channel energy", "amount": 1},
+      "affects": "all",
+      "radius_ft": 30,
+      "aim": "self",
+      "undead_only": true,
+      "harmful": true,
+      "bonus_from": "channel.harm-undead",
+      "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod", "success": "negates"},
+      "effect": {"condition": "panicked", "rounds": 10, "resave": "intelligent"},
+      "tell": "{name} raises a holy symbol and turns the undead."
+    },
+    {
+      "key": "life lure",
+      "name": "Life Lure",
+      "feat": "life-lure",
+      "level": 1,
+      "source": "Life Lure (UM): 'As a standard action, you can channel positive energy to fascinate all undead within 30 feet for a number of rounds equal to your Charisma modifier (minimum of 1). Undead that succeed at a Will save (DC 10 + 1/2 your cleric level + your Charisma modifier) are unaffected. Channeling energy for this purpose does not heal or harm creatures.'",
+      "text": "Standard: every undead within 30 ft saves (Will) or stands fascinated for Cha rounds.",
+      "action": "standard",
+      "cost": {"uses_of": "channel energy", "amount": 1},
+      "affects": "all",
+      "radius_ft": 30,
+      "aim": "self",
+      "undead_only": true,
+      "harmful": true,
+      "bonus_from": "channel.harm-undead",
+      "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod", "success": "negates"},
+      "effect": {"condition": "fascinated", "rounds": "max(1, cha_mod)"},
+      "tell": "{name} lets a warm glow of life spill out, and the dead turn towards it."
+    },
+    {
+      "key": "command undead",
+      "name": "Command Undead",
+      "feat": "command-undead",
+      "level": 1,
+      "requires": ["class.channel-energy"],
+      "requires_said": "with a cleric's channel energy (a paladin channels positive energy only)",
+      "source": "Command Undead (CRB): 'As a standard action, you can use one of your uses of channel negative energy to enslave undead within 30 feet. Undead receive a Will save to negate the effect. The DC for this Will save is equal to 10 + 1/2 your cleric level + your Charisma modifier. Undead that fail their saves fall under your control ... Intelligent undead receive a new saving throw each day to resist your command. You can control any number of undead, so long as their total Hit Dice do not exceed your cleric level.'",
+      "text": "Standard: undead within 30 ft save (Will) or fall under your command, up to your level in Hit Dice all told.",
+      "action": "standard",
+      "cost": {"uses_of": "channel energy", "amount": 1},
+      "affects": "all",
+      "radius_ft": 30,
+      "aim": "self",
+      "undead_only": true,
+      "harmful": true,
+      "bonus_from": "channel.harm-living",
+      "hit_dice": {"total": "level"},
+      "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod", "success": "negates"},
+      "effect": {"commanded": true},
+      "tell": "{name} channels negative energy and calls the dead to heel.",
+      "not_yet": [
+        "An intelligent undead's new saving throw each day: the command holds until it is ended.",
+        "Commands out of a fight: a commanded undead fights on its master's side in an encounter; it does not follow or take orders between fights.",
+        "The opposed Charisma check when another creature's orders conflict."
+      ]
+    },
+    {
+      "key": "elemental channel",
+      "name": "Elemental Channel",
+      "feat": "elemental-channel",
+      "level": 1,
+      "source": "Elemental Channel (CRB): 'Instead of its normal effect, you can choose to have your ability to channel energy heal or harm outsiders of your chosen elemental subtype. You must make this choice each time you channel energy. If you choose to heal or harm creatures of your elemental subtype, your channel energy has no affect on other creatures. The amount of damage healed or dealt and the DC to halve the damage is otherwise unchanged.' Each taking names a new subtype: Elemental Channel (fire) holds `channel.elemental.fire`, which opens that subtype's two modes.",
+      "text": "Standard: channel to heal or harm only the outsiders of your elemental subtype, in a 30-ft burst.",
+      "action": "standard",
+      "cost": {"uses_of": "channel energy", "amount": 1},
+      "affects": "all",
+      "radius_ft": 30,
+      "aim": "self",
+      "roll": {"count": "floor((level + 1) / 2)", "die": 6},
+      "selective": {"requires": "channel.selective", "count": "cha_mod"},
+      "choice": {
+        "kind": "mode",
+        "options": {
+          "harm air": {"requires": ["channel.elemental.air"], "only": {"subtype": ["air"]}, "roll_as": "damage", "harmful": true, "damage_type": "positive", "bonus_from": "channel.harm-living", "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod", "success": "half"}, "aliases": ["harm air elementals", "harm the air outsiders"]},
+          "heal air": {"requires": ["channel.elemental.air"], "only": {"subtype": ["air"]}, "roll_as": "heal", "aliases": ["heal air elementals", "heal the air outsiders"]},
+          "harm earth": {"requires": ["channel.elemental.earth"], "only": {"subtype": ["earth"]}, "roll_as": "damage", "harmful": true, "damage_type": "positive", "bonus_from": "channel.harm-living", "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod", "success": "half"}, "aliases": ["harm earth elementals", "harm the earth outsiders"]},
+          "heal earth": {"requires": ["channel.elemental.earth"], "only": {"subtype": ["earth"]}, "roll_as": "heal", "aliases": ["heal earth elementals", "heal the earth outsiders"]},
+          "harm fire": {"requires": ["channel.elemental.fire"], "only": {"subtype": ["fire"]}, "roll_as": "damage", "harmful": true, "damage_type": "positive", "bonus_from": "channel.harm-living", "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod", "success": "half"}, "aliases": ["harm fire elementals", "harm the fire outsiders"]},
+          "heal fire": {"requires": ["channel.elemental.fire"], "only": {"subtype": ["fire"]}, "roll_as": "heal", "aliases": ["heal fire elementals", "heal the fire outsiders"]},
+          "harm water": {"requires": ["channel.elemental.water"], "only": {"subtype": ["water"]}, "roll_as": "damage", "harmful": true, "damage_type": "positive", "bonus_from": "channel.harm-living", "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod", "success": "half"}, "aliases": ["harm water elementals", "harm the water outsiders"]},
+          "heal water": {"requires": ["channel.elemental.water"], "only": {"subtype": ["water"]}, "roll_as": "heal", "aliases": ["heal water elementals", "heal the water outsiders"]}
+        }
+      },
+      "tell": "{name} channels energy shaped to the elements."
+    },
+    {
+      "key": "quick channel",
+      "name": "Quick Channel",
+      "feat": "quick-channel",
+      "level": 1,
+      "source": "Quick Channel (UM): 'You may channel energy as a move action by spending 2 daily uses of that ability.'",
+      "text": "Channel energy as a move action, for two of its uses (name the mode in brackets as for Channel Energy).",
+      "action": "move",
+      "runs": "channel energy",
+      "cost": {"uses_of": "channel energy", "amount": 2},
+      "tell": "{name} channels energy in a quick burst."
+    }
+  ]
+}

@@ -92,7 +92,7 @@
         "kind": "mode",
         "default": "heal",
         "options": {
-          "heal": {"living": true, "roll_as": "heal",
+          "heal": {"living": true, "roll_as": "heal", "eases": {"requires": "channel.bestow-hope"},
                    "aliases": ["heal", "healing", "heal the living", "heal the wounded",
                                "positive energy to heal", "mend", "restore"]},
           "harm": {"undead_only": true, "roll_as": "damage", "harmful": true,

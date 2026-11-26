@@ -1,0 +1,29 @@
+{
+  "_about": [
+    "Feat loop batch 3, lane b3-divine (2026-11-26): channel energy, lay on hands, mercy,",
+    "smite, aura, ki and bardic performance feats, each built as its Benefit says",
+    "(content/feats/feats.json, checked against aonprd.com FeatDisplay). The feats a",
+    "character USES are documents in content/class-abilities/feats-b3-divine.json, run by",
+    "the class-ability executor; their entry here is empty, or carries a `not_yet`. The",
+    "rest are tags a class document asks for (an option's `requires`, an `eases`), or",
+    "terms on the funnel targets the class documents read."
+  ],
+  "channel-smite": {},
+  "greater-channel-smite": {},
+  "turn-undead": {},
+  "life-lure": {},
+  "quick-channel": {},
+  "command-undead": {
+    "not_yet": [
+      "An intelligent undead's new saving throw each day to resist the command.",
+      "Commands out of a fight: a commanded undead fights on its master's side; it does not follow or take orders between fights.",
+      "The opposed Charisma check when another creature's orders conflict."
+    ]
+  },
+  "elemental-channel": {
+    "tags": ["channel.elemental.$target"]
+  },
+  "bestow-hope": {
+    "tags": ["channel.bestow-hope"]
+  }
+}

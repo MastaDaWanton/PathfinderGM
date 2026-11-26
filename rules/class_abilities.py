@@ -334,11 +334,11 @@ DOC_KEYS = frozenset({
     "selective", "self", "self_action", "source", "target_requires",
     "target_requires_said", "tell", "tell_off", "text", "toggle", "undead",
     "undead_only", "charge_condition", "charge_rounds", "charge_rounds_dice", "feat",
-    "charge_push_ft", "gaze", "light"})
+    "charge_push_ft", "gaze", "light", "runs", "eases"})
 SELF_KEYS = frozenset({"ends_when", "forbids", "modifiers", "natural_weapons", "rounds",
                        "strikes_as", "tags", "vs_target"})
 EFFECT_KEYS = frozenset({"condition", "modifiers", "on", "rounds", "skill_modifiers",
-                         "tags", "temp_hp", "vulnerable"})
+                         "tags", "temp_hp", "vulnerable", "resave", "commanded"})
 
 AREA_SHAPES = ("cone", "line", "burst")
 _AREA_WORDS = re.compile(r"^\s*(\d+)\s*-?\s*(?:foot|feet|ft\.?)\s*-?\s*(?:radius\s+)?"
@@ -646,6 +646,7 @@ def uses_left(actor, doc: dict) -> tuple[int | None, int | None, str]:
     """
     from . import resources
 
+    doc = with_cost(actor, doc)
     cost = doc.get("cost") or {}
     pid = _norm(cost.get("pool"))
     if not pid:
@@ -685,12 +686,12 @@ def choices_of(actor, doc: dict) -> list[str]:
     spec = doc.get("choice") or {}
     kind = spec.get("kind")
     level = level_of(actor)
-    if kind == "mode":
+    if doc.get("runs"):
+        base = _runs_base(actor, doc)
+        return choices_of(actor, base) if base is not None else []
+    if kind in ("mode", "condition"):
         return [k for k, v in (spec.get("options") or {}).items()
-                if int((v or {}).get("level", 1) or 1) <= level]
-    if kind == "condition":
-        return [k for k, v in (spec.get("options") or {}).items()
-                if int((v or {}).get("level", 1) or 1) <= level]
+                if int((v or {}).get("level", 1) or 1) <= level and option_open(actor, v)]
     if kind == "skill":
         from .tables import SKILLS
 
@@ -739,19 +740,90 @@ def usable(actor) -> list[dict]:
                                                 in ("self", "allies") else "foe")),
                  "origin": origin_of(doc)}
         if pid:
-            cost = int((doc.get("cost") or {}).get("amount", 1) or 1)
+            cost = int((with_cost(actor, doc).get("cost") or {}).get("amount", 1) or 1)
             entry.update({"uses": left, "max": most, "pool": pid, "cost": cost})
         if toggle_key(doc):
             entry["toggle"] = True
             entry["active"] = bool(held is not None and held.origin == origin_of(doc))
         picks = choices_of(actor, doc)
-        kind = (doc.get("choice") or {}).get("kind")
+        kind = (((_runs_base(actor, doc) or {}) if doc.get("runs") else doc)
+                .get("choice") or {}).get("kind")
         if kind:
             entry["choice_kind"] = str(kind)
         if picks and kind != "skill":
             entry["choices"] = picks
         out.append(entry)
     return out
+
+
+# --- what a feat opens on a class ability (feat loop b3-divine, 2026-11-26) ---------------
+#
+# Channel Smite, Turn Undead, Command Undead and Life Lure each "use one of your uses of
+# channel energy"; a cleric's use is one of her channel energy pool and a paladin's is two
+# of her lay on hands (CRB p.62). A feat's document says so once — `cost.uses_of` names the
+# ability whose use it spends, read off whichever document of the user's answers to the
+# name — rather than one copy per class that could drift. `runs` (Quick Channel: "channel
+# energy as a move action by spending 2 daily uses") is that ability itself, its choice
+# and all, with this document's action and price. An option's `requires` is the feat that
+# opens it (Elemental Channel's subtype, Word of Healing's range), asked with has_state.
+
+
+def option_open(actor, option) -> bool:
+    """Whether a mode the document prints is open to this character: every `requires`
+    tag query held (a feat document's tag, a class grant's)."""
+    return all(actor.has_state(str(q)) for q in (option or {}).get("requires") or ())
+
+
+def _runs_base(actor, doc: dict) -> dict | None:
+    want = doc.get("runs") or (doc.get("cost") or {}).get("uses_of")
+    if not want:
+        return None
+    base, _ = find(actor, str(want))
+    return base
+
+
+def with_cost(actor, doc: dict) -> dict:
+    """The document with `cost.uses_of` worked out to the pool and amount the named
+    ability spends, times this cost's `amount` — unchanged when it has none. The named
+    ability's own pool is defined on the way (channel energy's 3 + Cha)."""
+    cost = doc.get("cost") or {}
+    if not cost.get("uses_of"):
+        return doc
+    base = _runs_base(actor, {"runs": cost["uses_of"]})
+    if base is None:
+        return {**doc, "cost": {}, "uses_of_missing": str(cost["uses_of"])}
+    ensure_pool(actor, base)
+    bc = base.get("cost") or {}
+    times = int(cost.get("amount", 1) or 1)
+    return {**doc, "cost": {"pool": bc.get("pool"),
+                            "amount": int(bc.get("amount", 1) or 1) * times}}
+
+
+def resolved(actor, doc: dict, choice: str) -> tuple[dict, str]:
+    """`with_choice` and `with_cost` together, the way the executor reads a use. A
+    document that `runs` another is that other's document with the choice laid on it,
+    under this one's name, origin, action, price and tell."""
+    if doc.get("runs"):
+        base = _runs_base(actor, doc)
+        if base is None:
+            return doc, (f"{doc.get('name')} runs {doc['runs']}, which "
+                         f"{getattr(actor, 'name', 'they')} does not have.")
+        laid, wrong = with_choice(actor, base, choice)
+        if wrong:
+            return doc, wrong.replace(str(base.get("name")), str(doc.get("name")))
+        own = {k: doc[k] for k in ("key", "name", "class", "feat", "action", "cost",
+                                   "tell", "source", "text", "not_yet") if k in doc}
+        out = {**laid, **own, "picked": laid.get("picked")}
+        out.pop("self_action", None)
+        return with_cost(actor, out), ""
+    laid, wrong = with_choice(actor, doc, choice)
+    if wrong:
+        return laid, wrong
+    out = with_cost(actor, laid)
+    if out.get("uses_of_missing"):
+        return out, (f"{doc.get('name')} spends a use of {out['uses_of_missing']}, which "
+                     f"{getattr(actor, 'name', 'they')} does not have.")
+    return out, ""
 
 
 # --- the document, with the choice laid over it -----------------------------------------
@@ -810,7 +882,8 @@ def with_choice(actor, doc: dict, choice: str) -> tuple[dict, str]:
                      + ", ".join(f"{name} ({o})" for o in options) + ".")
     # `aliases` are the words that NAME the option, not part of what it does: laid over
     # the document they would replace the ability's own aliases.
-    overlay = {k: v for k, v in (table[pick] or {}).items() if k not in ("level", "aliases")}
+    overlay = {k: v for k, v in (table[pick] or {}).items()
+               if k not in ("level", "aliases", "requires")}
     out = {**doc, **overlay}
     # The energy a cleric channels is a choice of hers (the app has no alignment to read
     # it off): negative swaps who the burst heals and who it harms, as the book's
@@ -1005,11 +1078,15 @@ def _shape_problems(at: str, doc: dict) -> list[str]:
     tag_list("lifts", doc.get("lifts"))
     hd = doc.get("hit_dice")
     if hd is not None:
-        if not isinstance(hd, dict) or hd.get("max") in (None, ""):
+        if not isinstance(hd, dict) or (hd.get("max") in (None, "")
+                                        and hd.get("total") in (None, "")):
             out.append(f"{at}: hit_dice is {{\"max\": \"level\"}}, with `over` the overlay "
-                       f"for a creature above it (none: it is unaffected).")
+                       f"for a creature above it (none: it is unaffected), or "
+                       f"{{\"total\": \"level\"}} for a cap on all held at once.")
         else:
-            formula_ok("hit_dice.max", hd["max"])
+            for k in ("max", "total"):
+                if hd.get(k) not in (None, ""):
+                    formula_ok(f"hit_dice.{k}", hd[k])
             if hd.get("over") is not None and not isinstance(hd["over"], dict):
                 out.append(f"{at}: hit_dice.over is an object laid over the document.")
     roll = doc.get("roll") or {}
@@ -1036,9 +1113,22 @@ def _shape_problems(at: str, doc: dict) -> list[str]:
         out.append(f"{at}: charge.spent_on is \"swing\" (a miss ruins it) or \"hit\".")
     if charge.get("category") not in (None, "melee", "ranged"):
         out.append(f"{at}: charge.category is \"melee\" or \"ranged\".")
-    if charge and not charge.get("save") and not charge.get("modifiers"):
-        out.append(f"{at}: a charge carries a `save` (and its condition) or `modifiers`; "
-                   f"with neither it arms nothing.")
+    if charge and not charge.get("save") and not charge.get("modifiers") \
+            and not charge.get("dice"):
+        out.append(f"{at}: a charge carries a `save` (and its condition), `modifiers` or "
+                   f"`dice`; with none it arms nothing.")
+    if charge.get("dice") is not None:
+        d = charge["dice"]
+        if not isinstance(d, dict) or not str(d.get("type") or "").strip():
+            out.append(f"{at}: charge.dice is {{\"count\": <formula>, \"die\": 6, "
+                       f"\"type\": \"positive\"}}.")
+        else:
+            formula_ok("charge.dice.count", d.get("count", 1))
+    pays = charge.get("pays")
+    if pays is not None and (not isinstance(pays, dict) or not pays.get("pool")
+                             or not (pays.get("amount", 1) == "all"
+                                     or isinstance(pays.get("amount", 1), int))):
+        out.append(f"{at}: charge.pays is {{\"pool\": <id>, \"amount\": 1 | \"all\"}}.")
     for m in charge.get("modifiers") or ():
         if str(m.get("type") or "combat_mod") not in _KINDS:
             out.append(f"{at}: charge modifier type {m.get('type')!r} is not one of "
