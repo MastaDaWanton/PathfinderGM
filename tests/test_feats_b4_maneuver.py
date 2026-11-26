@@ -617,3 +617,69 @@ def test_mounted_shield_lends_the_riders_shield_to_the_horses_ac_and_the_ride_ch
     from rules import maneuver_feats
 
     assert sum(m.value for m in maneuver_feats.shield_on_ride(pc)) == 3
+
+
+# --- Trample, Unseat --------------------------------------------------------------------------
+
+def _mounted_rider(faces, feats):
+    from rules import bodyskills
+    from tests.test_body_skills import _check as bcheck, _run as brun, _stable
+
+    scene, engine, pc, horse = _stable(faces=faces, fight=True)
+    pc.feats = list(pc.feats) + list(feats)
+    brun(engine, bcheck(skill="ride", use="mount"))
+    assert bodyskills.mount_of(scene, pc) is horse
+    foe = scene.get("c2")
+    scene.positions["c2"] = (7, 5)
+    scene.resync_zones()
+    scene.turn = [r for r, _ in scene.initiative].index("pc")
+    return scene, engine, pc, horse, foe
+
+
+def test_trample_lets_the_horse_stamp_on_the_one_its_rider_overran():
+    """Trample (CRB): "Your mount may make one hoof attack against any target you knock
+    down, gaining the standard +4 bonus on attack rolls against prone targets." Measured
+    before: the thug lay prone under the horse and nothing struck him."""
+    scene, engine, pc, horse, foe = _mounted_rider({"Ride": 20, "Overrun (CMB)": 20,
+                                                    "Attack with": 15},
+                                                   ["Mounted Combat", "Trample"])
+    res = _settle(engine, engine.run(engine.validate([{
+        "op": "attack", "actor": "pc", "target": "c2", "visibility": "hidden",
+        "params": {"manoeuvre": "overrun"}}])))
+    assert foe.has_state("state.position.prone"), _tells(res)
+    hooves = [o for o in res.outcomes if o.op == "attack" and o.actor == horse.ref]
+    assert hooves, _tells(res)
+
+
+def test_unseat_knocks_a_charged_rider_out_of_the_saddle():
+    """Unseat (CRB): a mounted lance charge that hits makes "a free bull rush attempt ...
+    If successful, the target is knocked off his horse and lands prone in a space adjacent
+    to his mount that is directly away from you." Measured before: the foe stayed seated."""
+    from rules import bodyskills, maneuver_feats
+    from rules.engine import Intent
+
+    scene, engine, pc, horse, foe = _mounted_rider({"Ride": 20, "Bull Rush (CMB)": 20},
+                                                   ["Mounted Combat", "Unseat"])
+    steed = scene.add(instantiate("heavy-horse", scene=scene, name="the grey"))
+    scene.positions[steed.ref] = (8, 5)
+    scene.positions["c2"] = (8, 5)
+    from rules.activeeffect import ActiveEffect
+
+    foe.apply_effect(ActiveEffect(name="mounted", kind="situation", key="mounted",
+                                  source="t", tags=(bodyskills.MOUNTED,),
+                                  payload={"mount": steed.ref}))
+    steed.apply_effect(ActiveEffect(name="ridden", kind="situation", key="ridden",
+                                    source="t", tags=(bodyskills.RIDDEN,),
+                                    payload={"by": "c2"}))
+    assert bodyskills.mount_of(scene, foe) is steed
+    pc.weapons = list(pc.weapons) + ["lance"]
+    intent = Intent(op="attack", actor="pc", target="c2", params={"charge": True})
+    from rules.sheet import situated
+
+    with situated(scene):
+        got = maneuver_feats.unseat(engine, intent, pc, foe, "lance", ("charge",))
+    assert bodyskills.mount_of(scene, foe) is None, [g["tell"] for g in got]
+    assert foe.has_state("state.position.prone")
+    assert tuple(scene.positions["c2"])[:2] != (8, 5)
+    # Not a charge, no unseat.
+    assert maneuver_feats.unseat(engine, intent, pc, foe, "lance", ()) == []

@@ -380,6 +380,7 @@ def after_hit(engine, intent, actor, defender, weapon_key, weapon, state, choice
     from . import maneuver_feats
 
     out += maneuver_feats.gory_finish(engine, actor, defender, choices, state)
+    out += maneuver_feats.unseat(engine, intent, actor, defender, weapon_key, choices)
     return out
 
 

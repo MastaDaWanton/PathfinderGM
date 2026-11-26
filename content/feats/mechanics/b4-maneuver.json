@@ -168,5 +168,15 @@
     "tags": [
       "mount.shield-shared"
     ]
+  },
+  "trample": {
+    "tags": [
+      "mount.trample"
+    ]
+  },
+  "unseat": {
+    "tags": [
+      "mount.unseat"
+    ]
   }
 }

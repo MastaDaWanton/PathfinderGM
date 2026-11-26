@@ -313,6 +313,10 @@ def after(engine, intent, actor, defender, key: str, verdict: str, weapon_key: s
                                "params": {"weapon": off, "full_attack": False,
                                           "reaction": "swift", OFF_HAND_SWING: True}}})
                 out["tells"].append(f"{name}: the {off} follows through the opening.")
+    for e in trample(engine, actor, defender, key, won):
+        out["effects"].append(e)
+        out["tells"].append(f"{engine.scene.actors[e['ref']].name} tramples "
+                            f"{defender.name} where they fell (Trample).")
     if key == "trip" and intent.params.get("tripping_twirl"):
         out_twirl = _twirl(engine, intent, actor, defender)
         for k in out:
@@ -813,3 +817,79 @@ def shield_on_ride(rider) -> list:
 
     n = shield_lent(rider)
     return [Modifier(n, "shield (Mounted Shield)")] if n else []
+
+
+# --- Trample, Unseat ------------------------------------------------------------------------
+
+TRAMPLE = "mount.trample"
+UNSEAT = "mount.unseat"
+
+
+def trample(engine, actor, defender, key: str, won: bool) -> list[dict]:
+    """Trample (CRB): "When you attempt to overrun an opponent while mounted, your target
+    may not choose to avoid you [no target here ever chooses to: an avoid is not offered,
+    so the clause holds as the engine stands]. Your mount may make one hoof attack against
+    any target you knock down, gaining the standard +4 bonus on attack rolls against prone
+    targets." The hoof is the steed's own printed attack, owed next in the queue; the +4 is
+    the prone row's, which every melee blow at a prone body already takes."""
+    from . import bodyskills
+
+    if key != "overrun" or not won or not actor.has_state(TRAMPLE) \
+            or not defender.has_state("state.position.prone") or defender.is_down:
+        return []
+    steed = bodyskills.mount_of(engine.scene, actor)
+    if steed is None or steed.stat_block_weapon("hoof") is None:
+        return []
+    return [{"ref": steed.ref, "kind": "owed_swing", "target": defender.ref,
+             "origin": "rule:feat-trample",
+             "attack": {"op": "attack", "actor": steed.ref, "target": defender.ref,
+                        "because": f"{actor.name}'s Trample",
+                        "visibility": "hidden",
+                        "params": {"weapon": "hoof", "full_attack": False,
+                                   "reaction": "trample"}}}]
+
+
+def unseat(engine, intent, actor, defender, weapon_key: str, choices) -> list[dict]:
+    """Unseat (CRB): "When charging an opponent while mounted and wielding a lance,
+    resolve the attack as normal. If it hits, you may immediately make a free bull rush
+    attempt in addition to the normal damage. If successful, the target is knocked off his
+    horse and lands prone in a space adjacent to his mount that is directly away from you."
+    Asked once the charge's lance hit has landed (`feat_events.after_hit`)."""
+    from . import bodyskills
+
+    if "charge" not in (choices or ()) or not actor.has_state(UNSEAT) or defender.is_down \
+            or "lance" not in str(weapon_key or "").lower() \
+            or bodyskills.mount_of(engine.scene, actor) is None:
+        return []
+    steed = bodyskills.mount_of(engine.scene, defender)
+    got = _sub(engine, intent, actor, defender, "bull rush", UNSEAT, "Unseat")
+    out = [{"effect": e, "tell": ""} for e in got.effects]
+    out.append({"effect": {"ref": defender.ref, "kind": "rider", "rider": "Unseat",
+                           "verdict": got.verdict, "origin": "rule:feat-unseat"},
+                "tell": got.tell})
+    if got.verdict != "success" or steed is None:
+        return out
+    bodyskills._unseat(defender, steed)
+    scene = engine.scene
+    here, mount_at = scene.positions.get(actor.ref), scene.positions.get(steed.ref)
+    if scene.has_grid and here is not None and mount_at is not None:
+        step = ((mount_at[0] > here[0]) - (mount_at[0] < here[0]),
+                (mount_at[1] > here[1]) - (mount_at[1] < here[1]))
+        if step != (0, 0):
+            # The first square straight on past the steed's own footprint (a horse is
+            # Large); open, they land there, through the board's one door (`_put`), else
+            # where the bull rush's push left them.
+            from . import grid as gridmod
+
+            body = set(gridmod.footprint(tuple(mount_at)[:2], steed.size or "medium"))
+            landing = tuple(mount_at)[:2]
+            while landing in body:
+                landing = (landing[0] + step[0], landing[1] + step[1])
+            if engine._open_for(defender.ref, landing):
+                engine._put(defender.ref, landing)
+    bodyskills._prone(defender, f"{actor.name}'s Unseat", "rule:feat-unseat")
+    out.append({"effect": {"ref": defender.ref, "kind": "condition", "condition": "prone",
+                           "origin": "rule:feat-unseat"},
+                "tell": f"{defender.name} is knocked out of the saddle and lands prone beside "
+                        f"{steed.name}."})
+    return out
