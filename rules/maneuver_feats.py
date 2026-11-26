@@ -643,3 +643,57 @@ def siphon_poison(engine, intent, actor, patient, aff, mods, partial):
                               basis=f"Siphon Poison: the {aff.name}'s DC {value}",
                               verdict="success" if margin >= 0 else "failure",
                               margin=margin, effects=effects, tell=tell)
+
+
+# --- Greater Wild Empathy -----------------------------------------------------------------
+#
+# "You gain a +2 insight bonus on wild empathy checks [the `wild_empathy` funnel target,
+# `animals.empathy_mods`], and you may use wild empathy to duplicate an Intimidate check
+# rather than a Diplomacy check. In addition, choose one of the following kinds of
+# creatures: elementals, fey, lycanthropes, plants, or vermin. You may influence creatures
+# of that type with wild empathy, if their Intelligence score is 1 or 2, or they do not
+# possess an Intelligence score." The kind is the sheet's parenthetical, bound into the tag
+# `class.wild-empathy.reaches.<kind>`; a lycanthrope is the shapechanger subtype.
+
+EMPATHY_REACHES = "class.wild-empathy.reaches"
+EMPATHY_INTIMIDATE = "class.wild-empathy.intimidate"
+_EMPATHY_KINDS = {"elemental": "type.elemental", "fey": "type.fey", "plant": "type.plant",
+                  "vermin": "type.vermin", "lycanthrope": "subtype.shapechanger"}
+
+
+def empathy_reaches_more(target, by) -> bool:
+    from . import animals
+
+    score = animals._int(target)
+    if score not in (None, 1, 2):
+        return False
+    for kind, tag in _EMPATHY_KINDS.items():
+        if target.has_state(tag) and (by.has_state(f"{EMPATHY_REACHES}.{kind}")
+                                      or by.has_state(f"{EMPATHY_REACHES}.{kind}s")):
+            return True
+    return False
+
+
+def empathy_intimidates(engine, intent, actor, skill: str, partial):
+    """An Intimidate to influence a creature this bearer's wild empathy reaches, out of a
+    fight, rolled as wild empathy when that is the better roll (owner call: the feat says
+    "may", and the better of two is the player's obvious choice). None otherwise."""
+    from . import animals
+    from .dice import stack
+    from .skilluses import _target
+
+    if skill != "intimidate" or intent.params.get("opposed_by") \
+            or not actor.has_state(EMPATHY_INTIMIDATE) \
+            or not actor.has_state("class.wild-empathy") or engine.scene.in_encounter:
+        return None
+    target = _target(engine, intent)
+    if target is None or animals.empathy_reaches(target, actor) is None:
+        return None
+    empathy = sum(m.value for m in animals.empathy_mods(actor))
+    try:
+        plain = sum(m.value for m in stack(actor.skill_modifiers("intimidate")))
+    except Exception:  # noqa: BLE001 — an untrained or missing skill reads as nothing
+        plain = -99
+    if empathy < plain and not animals.diplomacy_bar(target, actor):
+        return None
+    return animals.wild_empathy(engine, intent, actor, target, partial, how="intimidate")

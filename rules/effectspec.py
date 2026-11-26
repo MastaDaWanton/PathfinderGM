@@ -645,7 +645,11 @@ VOCAB: dict[str, list[dict]] = {
         # Feat loop b4-maneuver: skill ranks over the class's and race's (Human Spirit's
         # "+1 bonus skill rank ... an additional skill rank" a Hit Die, four at most),
         # read by `leveling.skill_ranks` into the total a character may place.
-        ("skill_ranks", "Skill ranks to place"))],
+        ("skill_ranks", "Skill ranks to place"),
+        # Feat loop b4-maneuver: a druid's or ranger's wild empathy roll (Greater Wild
+        # Empathy's "+2 insight bonus on wild empathy checks"), read by
+        # `animals.empathy_mods`.
+        ("wild_empathy", "Wild empathy checks"))],
     "sense": [{"id": k, "name": n} for k, n in (
         ("low_light", "Low-light vision"), ("darkvision", "Darkvision"),
         ("scent", "Scent"), ("tremorsense", "Tremorsense"),

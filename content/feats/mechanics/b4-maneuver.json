@@ -129,5 +129,20 @@
     "tags": [
       "skill.heal.siphon-poison"
     ]
+  },
+  "greater-wild-empathy": {
+    "tags": [
+      "class.wild-empathy.intimidate",
+      "class.wild-empathy.reaches.$target"
+    ],
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "wild_empathy",
+        "amount": 2,
+        "bonus_type": "insight",
+        "note": "+2 insight on wild empathy checks"
+      }
+    ]
   }
 }

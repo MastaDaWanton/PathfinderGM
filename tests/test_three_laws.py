@@ -468,7 +468,14 @@ _REACHES = {
     # Feat loop b4-maneuver: skill ranks a feat adds (Human Spirit), read by
     # `leveling.skill_ranks` into the total a character may place.
     ("combat_mod", "skill_ranks"): lambda a: _skill_ranks(a),
+    ("combat_mod", "wild_empathy"): lambda a: _wild_empathy(a),
 }
+
+
+def _wild_empathy(a) -> int:
+    from rules import animals
+
+    return sum(m.value for m in animals.empathy_mods(a))
 
 
 def _skill_ranks(a) -> int:

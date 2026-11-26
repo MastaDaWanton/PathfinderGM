@@ -518,3 +518,28 @@ def test_siphon_poison_draws_a_fresh_injury_poison_out_in_a_full_round():
         scene.round += later
         out = _run(engine, _check(skill="heal", dc={"band": "average"}))[0]
         assert "Siphon Poison" not in out.tell and pc.has_state("care.treated.poison")
+
+
+# --- Greater Wild Empathy ------------------------------------------------------------------
+
+def test_greater_wild_empathy_reaches_the_chosen_kind_adds_two_and_intimidates():
+    """Greater Wild Empathy (UM): "+2 insight bonus on wild empathy checks, and you may use
+    wild empathy to duplicate an Intimidate check ... choose one of the following kinds of
+    creatures: elementals, fey, lycanthropes, plants, or vermin. You may influence
+    creatures of that type with wild empathy, if their Intelligence score is 1 or 2, or
+    they do not possess an Intelligence score." Measured before: a giant spider was out of
+    reach and an Intimidate at a wolf was Kesst's untrained Intimidate."""
+    from rules import animals, attitude
+    from tests.test_handle_animal import _check as hcheck, _run as hrun, _scene as hscene
+
+    scene, engine, pc, (wolf, spider) = hscene(("wolf", "the wolf"),
+                                               ("giant-spider", "the spider"),
+                                               faces={"Wild empathy": 18}, druid=True)
+    assert animals.empathy_reaches(spider, pc) is None
+    plain = sum(m.value for m in animals.empathy_mods(pc))
+    pc.feats = list(pc.feats) + ["Greater Wild Empathy (vermin)"]
+    assert animals.empathy_reaches(spider, pc) == 0
+    assert sum(m.value for m in animals.empathy_mods(pc)) == plain + 2
+    out = hrun(engine, hcheck(skill="intimidate", target=wolf.ref))[0]
+    assert out.rolls and out.rolls[0].label == "Wild empathy check", out.tell
+    assert out.dc["value"] == attitude.intimidate_dc(wolf)

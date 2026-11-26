@@ -666,12 +666,20 @@ def empathy_reaches(target, by=None) -> int | None:
         return 0
     if target.has_state("type.magical-beast") and _int(target) in (1, 2):
         return int(_row("wild-empathy")["magical_beast"])
+    # Feat loop b4-maneuver: Greater Wild Empathy's chosen kind of creature.
+    from . import maneuver_feats
+
+    if by is not None and maneuver_feats.empathy_reaches_more(target, by):
+        return 0
     return None
 
 
-def wild_empathy(engine, intent, actor, target, partial):
+def wild_empathy(engine, intent, actor, target, partial, how: str = "diplomacy"):
     """Wild empathy: Diplomacy's Influence Attitude for animals, by the same machinery —
-    the attitude's DC, the once-a-day limit, `Engine._sway` (the one applicator)."""
+    the attitude's DC, the once-a-day limit, `Engine._sway` (the one applicator). `how`
+    "intimidate" is Greater Wild Empathy's "use wild empathy to duplicate an Intimidate
+    check rather than a Diplomacy check" (feat loop b4-maneuver): Intimidate's DC and
+    Intimidate's consequence, the wild empathy roll."""
     from . import attitude as attitude_mod
     from . import dc as dc_mod
     from .dice import Modifier
@@ -691,29 +699,40 @@ def wild_empathy(engine, intent, actor, target, partial):
         return _refused(engine, intent, f"{target.name} is {int(gap)} feet away: wild "
                                         f"empathy works within {r['range_ft']} feet. "
                                         f"Nothing is rolled.")
-    refused = engine._sway_refusal(intent, actor, target, "diplomacy")
+    refused = engine._sway_refusal(intent, actor, target, how)
     if refused is not None:
         return refused
-    mods = [Modifier(int(actor.level), f"{actor.char_class} level"),
-            Modifier(int(actor.ability_mod("cha")), "Charisma")]
+    mods = empathy_mods(actor)
     if penalty:
         mods.append(Modifier(penalty, "a magical beast"))
     if _link(target, actor):
         mods.append(Modifier(int(r["link_bonus"]), "the link with an animal companion",
                              "circumstance"))
-    value = attitude_mod.influence_dc(target)
+    value = (attitude_mod.intimidate_dc(target) if how == "intimidate"
+             else attitude_mod.influence_dc(target))
     roll = engine._roll_or_suspend(intent, actor, mods, label="Wild empathy check",
                                    dc=value, partial=partial)
     margin = roll.total - value
-    moved, effects = engine._sway(actor, target, "diplomacy", margin,
+    moved, effects = engine._sway(actor, target, how, margin,
                                   intent.because or "wild empathy")
     tell = (f"{actor.name} works on {target.name} with wild empathy"
             + (f"{dc_mod.by(margin)}." if margin >= 0 else f", and misses by {-margin}.")
             + f" {moved}")
     return _outcome(intent, rolls=[roll], dc_value=value,
-                    basis="wild empathy: " + attitude_mod.dc_basis(target, "diplomacy"),
+                    basis="wild empathy: " + attitude_mod.dc_basis(target, how),
                     verdict="success" if margin >= 0 else "failure", margin=margin,
                     effects=effects, tell=tell.strip())
+
+
+def empathy_mods(actor) -> list:
+    """The wild empathy roll's terms: "1d20 and adds his druid level and his Charisma
+    modifier" (CRB), and what the funnel aims at it (`wild_empathy`: Greater Wild
+    Empathy's +2 insight, feat loop b4-maneuver)."""
+    from .dice import Modifier, stack
+
+    return [Modifier(int(actor.level), f"{actor.char_class} level"),
+            Modifier(int(actor.ability_mod("cha")), "Charisma"),
+            *stack(actor._buff_mods("combat_mod", "wild_empathy"))]
 
 
 def social_door(engine, intent, actor, skill: str, partial):
@@ -723,6 +742,12 @@ def social_door(engine, intent, actor, skill: str, partial):
     skill = str(skill or "").lower()
     if skill == "handle animal":
         return check(engine, intent, actor, partial)
+    # Feat loop b4-maneuver: Greater Wild Empathy's Intimidate by wild empathy.
+    from . import maneuver_feats
+
+    cowed = maneuver_feats.empathy_intimidates(engine, intent, actor, skill, partial)
+    if cowed is not None:
+        return cowed
     if skill != "diplomacy" or intent.params.get("opposed_by"):
         return None
     from .skilluses import _target
