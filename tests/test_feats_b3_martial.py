@@ -731,3 +731,24 @@ def test_falconer_s_art_gives_the_bird_its_chosen_bonus_and_the_handler_two():
         mods, _label, _why = animals._mods(pc, animal, untrained_ok=False)
         return sum(m.value for m in mods if m.source.startswith("Falconer"))
     assert bonus(bird) == 2 and bonus(wolf) == 0
+
+
+def test_invoke_primal_instinct_spends_a_wild_shape_and_frightens_on_a_bluff_dc():
+    """Invoke Primal Instinct (Gnomes of Golarion): a standard action and a use of wild
+    shape; the Bluff check is the Will DC of everyone within 30 feet, frightened a round a
+    druid level on a failure."""
+    scene, engine, pc, thug = _fight(feats=["Invoke Primal Instinct"], cls="druid", level=6,
+                                     faces={"Invoke Primal Instinct: Bluff": 20,
+                                            "Will save": 1})
+    from rules import classes, resources
+
+    for p in classes.get("druid").get("pools") or ():
+        resources.define(pc, p)
+    pc.ranks["bluff"] = 1
+    pc.armour, pc.shield = "none", ""     # a druid in metal loses her powers (CRB)
+    left = pc.pool("wild shape").current
+    out = _use(engine, "Invoke Primal Instinct")
+    assert out.status != "refused", out.tell
+    assert pc.pool("wild shape").current == left - 1
+    assert thug.has_state("state.fear.frightened")
+    assert "sets the DC" in out.tell

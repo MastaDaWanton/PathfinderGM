@@ -393,5 +393,26 @@
     "tags": [
       "handle.birds-of-prey"
     ]
+  },
+  "invoke-primal-instinct": {
+    "not_yet": [
+      "'If you choose contempt, the targets consider you harmless for 1 minute, ignoring you unless you attack them': nothing makes a creature pass over one it holds harmless, so only fear is offered"
+    ]
+  },
+  "hamatula-grasp": {
+    "not_yet": [
+      "the whole feat: the impaled foe's grapple check with the impaling weapon is not offered yet (Hamatula Strike's own not_yet), so neither its lighter -2 nor its +1d6 has a roll to ride"
+    ]
+  },
+  "dragonbane-aura": {
+    "not_yet": [
+      "'your aura of courage expands to a 20-foot-radius emanation' against dragons: the aura's ally half (+4 morale against fear within 10 feet) is not built (content/class-features/paladin.json not_yet)",
+      "'allies in the aura gain a morale bonus on saving throws against dragon breath': no dragon's breath weapon is used by the engine (bestiary special attacks have no locator)"
+    ]
+  },
+  "protector-s-strike": {
+    "not_yet": [
+      "'you also choose one creature other than you within line of sight ... gains a deflection bonus to AC equal to your Charisma modifier against attacks made by the target of the smite', and the paladin's own deflection given up: smite names one creature, and nothing yet lets the player name a second"
+    ]
   }
 }

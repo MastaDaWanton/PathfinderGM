@@ -60,7 +60,9 @@ The grammar, one ability:
 - `spends_pool`: n of the user's Blood Pools here, drawn back in; refused without them.
 - `roll`: `{"count": <formula>, "die": 6, "bonus": <formula>, "as": "heal"|"damage",
   "type": ..., "lethality": ...}` — rolled ONCE, as a fireball is, and shared.
-- `save`: `{"save": "will", "dc": <formula>, "success": "half"|"negates"}`.
+- `save`: `{"save": "will", "dc": <formula>, "success": "half"|"negates"}`; or `check`
+  (a skill) in place of `dc`: the user's check, rolled once, is the DC (Invoke Primal
+  Instinct's Bluff, feat loop b3).
 - `charge`: arms the user's next hit with a weapon in `weapons`: `{"weapons": [...],
   "save": {...}, "condition": ..., "rounds": ...}` (stunning fist).
 - `removes`: `{"choice": "mercy", "catalogue": {"<pick>": [<condition keys>]}}` — what the

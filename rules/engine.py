@@ -37927,6 +37927,17 @@ class Engine:
                                               records, tells)
             saving = doc.get("save") or {}
             dc = ca.amount(saving.get("dc"), actor) if saving else 0
+            if saving.get("check"):
+                # A DC set by the user's own check (`save.check`, feat loop b3): Invoke
+                # Primal Instinct's "make a Bluff check. All creatures within 30 feet that
+                # fail a Will save against your Bluff check DC" — rolled once, shared.
+                skill = str(saving["check"])
+                chk = self.dice.d20(actor.skill_modifiers(skill),
+                                    label=f"{shown}: {skill.title()} check",
+                                    visibility=intent.visibility or "player")
+                rolls.append(chk)
+                dc = chk.total
+                tells.append(f"{actor.name}'s {skill.title()} sets the DC at {dc}.")
             if saving and extra_dc:
                 dc += sum(m.value for m in extra_dc)
                 tells.append(", ".join(f"{m.source} {m.value:+d}" for m in extra_dc)
