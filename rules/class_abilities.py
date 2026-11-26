@@ -358,7 +358,10 @@ DOC_KEYS = frozenset({
     # Feat loop b3: an ally who must stand close holding a state (Sympathetic Rage).
     "requires_ally",
     # Feat loop b3: another document used another way (Quick Wild Shape).
-    "as", "level_down", "self_tags"})
+    "as", "level_down", "self_tags",
+    # Feat loop b4-maneuver: the score a choice names for a charge's ability damage
+    # (Bonebreaker, Neckbreaker; `maneuver_feats.charge_ability_damage`).
+    "charge_ability"})
 
 
 def _ally_want_problems(at: str, want) -> list[str]:

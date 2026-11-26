@@ -385,3 +385,66 @@ def choice_refusal(actor, weapon: dict, declared, params: dict) -> str:
         if params.get("full_attack") or params.get("iteration") is not None:
             return "Tripping Twirl is its own full-round action; make it on its own."
     return ""
+
+
+# --- the Stunning Fist variants: Bonebreaker, Neckbreaker --------------------------------
+#
+# Activated feats in content/class-abilities/feats-b4-maneuver.json, armed through the
+# class abilities' one executor like Jawbreaker (feat loop b2). What they add to the charge
+# grammar: `on_fail.ability_damage` (`{"dice": "1d6", "overflow": "con"}`, the score the
+# choice names in `charge_ability`), `holding_target` (the user must be grappling the foe:
+# Neckbreaker's "after you initiate or maintain a grapple") and `no_larger` ("an opponent
+# your size or smaller").
+
+ABILITY_WORDS = {"str": "Strength", "dex": "Dexterity", "con": "Constitution"}
+
+
+def charge_ability_damage(doc: dict, on_fail: dict) -> dict:
+    """The armed charge's ability damage, worked out when armed, or {}."""
+    spec = on_fail.get("ability_damage")
+    if not isinstance(spec, dict):
+        return {}
+    ab = str(doc.get("charge_ability") or spec.get("ability") or "str")[:3].lower()
+    return {"ability_damage": {"dice": str(spec.get("dice") or "1d6"), "ability": ab,
+                               "overflow": str(spec.get("overflow") or "")}}
+
+
+def charge_unfit(engine, actor, c: dict, defender) -> str:
+    """Why this armed blow does nothing to the creature it hit (this lane's clauses)."""
+    if c.get("holding_target") and not engine._holds(actor, defender):
+        return f"{actor.name} is not grappling {defender.name}"
+    if c.get("no_larger") and _size_steps(actor, defender) > 0:
+        return f"{defender.name} is larger than {actor.name}"
+    return ""
+
+
+def charge_ability_hit(engine, defender, e, spec: dict, line: str) -> list[dict]:
+    """The failed save's ability damage, through `Actor.damage_ability` (the one door a
+    score is lowered by). Neckbreaker: "If the targeted ability score is reduced to 0, any
+    remaining damage is dealt to that opponent's Constitution score.\""""
+    ab = spec["ability"]
+    roll = engine.dice.roll(spec["dice"], label=f"{e.name}: {ABILITY_WORDS.get(ab, ab)} "
+                                                f"damage", visibility="hidden")
+    amount = max(0, roll.total)
+    here = defender.ability_score(ab)
+    first = min(amount, here) if spec.get("overflow") else amount
+    hits = [(ab, first)] + ([(spec["overflow"], amount - first)]
+                            if spec.get("overflow") and amount > first else [])
+    out, said = [], []
+    for score, n in hits:
+        if n <= 0:
+            continue
+        res = defender.damage_ability(score, n)
+        out.append({"effect": {"ref": defender.ref, "kind": "ability_damage", **res,
+                               "origin": e.origin, "roll": roll.as_dict()}, "tell": ""})
+        said.append(f"{n} {ABILITY_WORDS.get(score, score)} (now {res['score']})")
+        for cond in defender.ability_zero_effects():
+            out.append({"effect": {"ref": defender.ref, "kind": "condition",
+                                   "condition": cond, "origin": e.origin}, "tell": ""})
+    crossed = engine._hp_state_effects(defender)
+    out.extend({"effect": x, "tell": ""} for x in crossed)
+    out.append({"effect": {"ref": defender.ref, "kind": "charge_spent", "what": e.name,
+                           "origin": e.origin},
+                "tell": f"{line}; {e.name} deals " + " and ".join(said or ["nothing"]) + "."
+                        + engine._hp_state_tell(crossed)})
+    return out

@@ -1,0 +1,79 @@
+{
+  "class": "feat",
+  "_source": "Feat loop b4, lane b4-maneuver (2026-11-26): the feats a character USES in place of a Stunning Fist effect. Each is had by a holder of the feat its `feat` names (rules/class_abilities.py), whatever their class, and run by the one executor the class abilities use (`Engine._use_class_ability`), as Jawbreaker is. Benefit text from content/feats/feats.json, checked against aonprd.com FeatDisplay 2026-11-26.",
+  "_grammar": "rules/class_abilities.py, module docstring; this lane's charge fields in rules/maneuver_feats.py. The engine reads these fields and never these names.",
+  "abilities": [
+    {
+      "key": "bonebreaker",
+      "name": "Bonebreaker",
+      "feat": "bonebreaker",
+      "aliases": ["bonebreaker", "break a bone", "break bones"],
+      "level": 1,
+      "source": "Bonebreaker (UC): 'When you make a successful Stunning Fist attempt against an opponent that is grappled, helpless, or stunned, you can forgo any other Stunning Fist effect to deal 1d6 Strength or Dexterity damage to that opponent.' The attempt is a Stunning Fist use (Fortitude, DC 10 + 1/2 level + Wis; the creatures stunning fist cannot stun are spared).",
+      "text": "Your next unarmed hit on a held, helpless or stunned foe spends a Stunning Fist: Fortitude save or 1d6 Strength or Dexterity damage.",
+      "action": "free",
+      "pool": {"id": "stunning fist", "max": "max(level // 4, level_monk)", "refresh": "rest.night"},
+      "cost": {"pool": "stunning fist", "amount": 1},
+      "aim": "foe",
+      "charge": {
+        "weapons": ["unarmed", "unarmed strike"],
+        "spent_on": "swing",
+        "target_requires": ["state.held.grappled", "state.held.pinned", "state.helpless", "state.unable.stunned"],
+        "target_said": "a grappled, helpless or stunned foe",
+        "save": {"save": "fort", "dc": "10 + level // 2 + wis_mod"},
+        "immune_types": ["construct", "ooze", "plant", "undead"],
+        "immune_subtypes": ["incorporeal"],
+        "immune_crit": true,
+        "on_fail": {"ability_damage": {"dice": "1d6"}}
+      },
+      "choice": {
+        "kind": "condition",
+        "default": "strength",
+        "options": {
+          "strength": {"charge_ability": "str", "aliases": ["str", "strength", "arm", "arms"]},
+          "dexterity": {"charge_ability": "dex", "aliases": ["dex", "dexterity", "leg", "legs", "hand", "hands"]}
+        }
+      },
+      "tell": "{name} sets up a bone-breaking blow."
+    },
+    {
+      "key": "neckbreaker",
+      "name": "Neckbreaker",
+      "feat": "neckbreaker",
+      "aliases": ["neckbreaker", "break the neck", "wrench the neck", "wring the neck"],
+      "level": 1,
+      "source": "Neckbreaker (UC): 'If you have an opponent your size or smaller helpless or pinned, after you initiate or maintain a grapple, you can make a Stunning Fist attempt at a -5 penalty on the attack roll. If you succeed, you wrench that opponent's neck, dealing 2d6 Strength or Dexterity damage. If the targeted ability score is reduced to 0, any remaining damage is dealt to that opponent's Constitution score. A creature that is immune to critical hits or that has no discernible head and neck is immune to the effects of this feat.' The attempt is a Stunning Fist use (its Fortitude save).",
+      "text": "Your next unarmed hit on a pinned or helpless foe you are grappling, no larger than you, spends a Stunning Fist at -5: Fortitude save or 2d6 Strength or Dexterity damage, the rest to Constitution.",
+      "action": "free",
+      "pool": {"id": "stunning fist", "max": "max(level // 4, level_monk)", "refresh": "rest.night"},
+      "cost": {"pool": "stunning fist", "amount": 1},
+      "aim": "foe",
+      "charge": {
+        "weapons": ["unarmed", "unarmed strike"],
+        "spent_on": "swing",
+        "target_requires": ["state.held.pinned", "state.helpless"],
+        "target_said": "a pinned or helpless foe",
+        "holding_target": true,
+        "no_larger": true,
+        "save": {"save": "fort", "dc": "10 + level // 2 + wis_mod"},
+        "immune_types": ["construct", "ooze", "plant", "undead"],
+        "immune_subtypes": ["incorporeal"],
+        "immune_crit": true,
+        "modifiers": [
+          {"type": "combat_mod", "target": "attack", "amount": -5, "bonus_type": "untyped",
+           "when": {"weapon": {"key": "unarmed"}}, "note": "Neckbreaker's -5 on the attack roll"}
+        ],
+        "on_fail": {"ability_damage": {"dice": "2d6", "overflow": "con"}}
+      },
+      "choice": {
+        "kind": "condition",
+        "default": "strength",
+        "options": {
+          "strength": {"charge_ability": "str", "aliases": ["str", "strength"]},
+          "dexterity": {"charge_ability": "dex", "aliases": ["dex", "dexterity"]}
+        }
+      },
+      "tell": "{name} gets a grip on the neck."
+    }
+  ]
+}

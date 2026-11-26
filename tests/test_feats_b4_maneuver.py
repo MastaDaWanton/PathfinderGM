@@ -263,3 +263,63 @@ def test_break_guard_follows_a_disarm_with_the_off_hand_weapon():
     res = _maneuver(engine, "disarm", iteration=0, off_hand="dagger")
     assert _rolls(res, "Attack with dagger"), _tells(res)
     assert scene.swift_spent.get("pc") == scene.round
+
+
+# --- the Stunning Fist variants: Bonebreaker, Neckbreaker --------------------------------
+
+def _monk(feats):
+    from tests.test_feats_b2_attack_a import _pc
+
+    monk = _pc("monk", 8, feats=feats)
+    monk.abilities["wis"] = 40
+    monk.equipped = "unarmed"
+    return monk
+
+
+def _bout(monk):
+    from tests.test_feats_b2_attack_a import _adjacent, _fight as fight2
+
+    scene, e = fight2(monk)
+    _adjacent(scene)
+    return scene, e, scene.actors["c1"]
+
+
+def test_bonebreaker_deals_the_chosen_score_to_a_held_foe_only():
+    """Bonebreaker (UC): against an opponent "grappled, helpless, or stunned ... forgo any
+    other Stunning Fist effect to deal 1d6 Strength or Dexterity damage." Measured before:
+    the feat had no use at all; "use Bonebreaker" was refused by name."""
+    from tests.test_feats_b2_attack_a import _swing, _use
+
+    scene, e, thug = _bout(_monk(["Bonebreaker"]))
+    _use(e, "Bonebreaker")
+    res = _swing(e, face=19)
+    assert not thug.ability_damage and "no hold" in _tells(res)
+    thug.add_condition("grappled", 10, source="test")
+    _use(e, "Bonebreaker (dexterity)")
+    res = _swing(e, face=19)
+    assert thug.ability_damage.get("dex", 0) >= 1 and not thug.ability_damage.get("str"), \
+        _tells(res)
+    assert not thug.has_state("state.unable.stunned")
+
+
+def test_neckbreaker_needs_a_pin_it_holds_and_pours_the_rest_into_constitution():
+    """Neckbreaker (UC): against a pinned or helpless foe no larger, "after you initiate or
+    maintain a grapple ... a Stunning Fist attempt at a -5 penalty on the attack roll ...
+    2d6 Strength or Dexterity damage. If the targeted ability score is reduced to 0, any
+    remaining damage is dealt to that opponent's Constitution score.\""""
+    from rules.engine import _held_by
+    from tests.test_feats_b2_attack_a import _swing, _use
+
+    scene, e, thug = _bout(_monk(["Neckbreaker"]))
+    thug.add_condition("pinned", 10, source="test")
+    _use(e, "Neckbreaker")
+    res = _swing(e, face=19)
+    assert not thug.ability_damage and "not grappling" in _tells(res)
+    _held_by(thug, "pinned", "pc", grappler="pc")
+    thug.abilities["str"] = 3
+    _use(e, "Neckbreaker")
+    res = _swing(e, face=19)
+    hit = [r for o in res.outcomes for r in o.rolls if r.label.startswith("Attack with")]
+    assert any(m.value == -5 for m in hit[0].modifiers), "the -5 rides the blow"
+    assert thug.ability_score("str") == 0 and thug.ability_damage.get("con", 0) >= 1, \
+        _tells(res)

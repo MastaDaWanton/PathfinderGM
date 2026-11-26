@@ -39595,7 +39595,9 @@ class Engine:
                 # now with the user's Wisdom; Jawbreaker's bleed), and Gorgon's Fist's
                 # "single unarmed melee attack" that no full attack carries.
                 **{k: charge[k] for k in ("target_requires", "target_requires_not",
-                                          "target_said", "no_damage", "single_attack")
+                                          "target_said", "no_damage", "single_attack",
+                                          # Feat loop b4-maneuver: Neckbreaker's.
+                                          "holding_target", "no_larger")
                    if charge.get(k)},
                 **({"push_ft": int(doc["charge_push_ft"])} if doc.get("charge_push_ft")
                    else {}),
@@ -39603,7 +39605,10 @@ class Engine:
                 **({"on_fail": {"modifiers": ca.modifiers(
                     (charge["on_fail"] or {}).get("modifiers"), actor),
                     "rounds": (charge["on_fail"] or {}).get("rounds"),
-                    "bleed": (charge["on_fail"] or {}).get("bleed")}}
+                    "bleed": (charge["on_fail"] or {}).get("bleed"),
+                    # Feat loop b4-maneuver: Bonebreaker's and Neckbreaker's ability
+                    # damage, the score the player's choice names (`charge_ability`).
+                    **maneuver_feats.charge_ability_damage(doc, charge["on_fail"] or {})}}
                    if charge.get("on_fail") else {})}
 
     @staticmethod
@@ -39698,7 +39703,8 @@ class Engine:
             c = e.payload["charge"]
             if c.get("on_charge") and not charging:
                 continue                  # Radiant Charge waits for a charge's blow
-            unfit = self._charge_unfit(c, defender, full)
+            unfit = self._charge_unfit(c, defender, full) or maneuver_feats.charge_unfit(
+                self, actor, c, defender)                # feat loop b4-maneuver
             if unfit and c.get("pays"):
                 continue                  # paid on the hit: nothing chosen, nothing spent
             actor.remove_effects(match=lambda x, e=e: x is e)
@@ -39904,6 +39910,9 @@ class Engine:
         due to Crushing Blow" — one effect by the blow's origin, laid again rather than
         added to; Jawbreaker's "1d4 points of bleed damage". Through the one applicator."""
         out: list[dict] = []
+        if spec.get("ability_damage"):
+            out.extend(maneuver_feats.charge_ability_hit(self, defender, e,
+                                                         spec["ability_damage"], line))
         if spec.get("modifiers"):
             defender.remove_effects(match=lambda x: x.origin == e.origin
                                     and x.key == e.name.lower())
