@@ -1,0 +1,387 @@
+"""The combat-manoeuvre feats of feat loop batch 4 (lane b4-maneuver, 2026-11-26).
+
+Each feat is a document in content/feats/mechanics/b4-maneuver.json; the engine reads the
+document's TAGS here and never a feat's name (tests/test_feat_documents.py). One reader per
+shape, asked from three small hooks in `Engine._resolve_maneuver`:
+
+* `twice` — "roll twice and take the better result" on a manoeuvre's check. Tandem Trip
+  (UC): "Whenever you attempt a trip combat maneuver against an enemy threatened by an ally
+  with this feat, you roll twice and take the better result" — the tag
+  `maneuver.twice.<manoeuvre>.with-ally`, held by both. The roll itself is made at the d20
+  door (`Engine._roll_or_suspend_stage`'s `twice`): the player rolls a second die, anybody
+  else's is rolled by the engine.
+* `formula_names` — `allies_flanking` and `streak`, the two names Topple Foe's formula asks
+  (`sheet.FEAT_FORMULA_NAMES`): allies with the feat flanking the foe with you, and how many
+  rounds in a row this manoeuvre has been tried at the same foe. The streak is a one-round
+  situation effect on the maker (`streak-<feat id>`), laid by `after` and gone on the ticker
+  when a round passes without a try, so it is the one effect store and no counter.
+* `backfire_spared` — a trip that fails by 10 and would knock its maker prone. The trip
+  weapon special feature (CRB, Weapon Qualities): "If you are tripped during your own trip
+  attempt, you can drop the weapon to avoid being tripped"; Tripping Staff (UM): "You treat
+  quarterstaves as if they had the trip special feature" (`weapon.trip-feature.<key>`).
+  Until this the trip feature was a word in weapons.json nothing read.
+* `after` — what a held feat makes of a manoeuvre just made: the follow-up manoeuvres
+  (Binding Throw's swift grapple after a Ki Throw, Spinning Throw's swift bull rush after an
+  unarmed trip), Break Guard's swift blow with the other weapon after a disarm, Tripping
+  Twirl's trip at every other adjacent enemy, and the streak.
+
+Prior art (searched 2026-11-26): Foundry PF1 leaves every one of these to the table — a
+chat card and the GM's hand; Owlcat's Pathfinder CRPGs make the follow-ups automatic rule
+hooks on the manoeuvre's success event (`RuleCombatManeuver` then a free manoeuvre), which
+is this module's shape. A follow-up is made the way the engine already makes a feat's free
+manoeuvre on a hit (`Engine._rider_feat_maneuver`, Shield Slam): an engine-built intent,
+stamped `rule:feat-<id>`, rolled at once, its action spent through the one swift door
+(`Engine._spend_swift`). Owner call (taking the rules as written): the swift follow-up is
+taken whenever the swift action is free — the book says "can", and the best the roll allows
+is the choice made for the player, as the crit-strike feats' already is.
+"""
+from __future__ import annotations
+
+TWICE = "maneuver.twice"
+TRIP_FEATURE = "weapon.trip-feature"
+# After a trip that Ki Throw made (an unarmed trip by its holder), a swift grapple:
+# Binding Throw. After an unarmed trip, a swift bull rush that ends prone: Spinning Throw.
+AFTER_TRIP_GRAPPLE = "maneuver.after-trip.grapple"
+AFTER_TRIP_BULL_RUSH = "maneuver.after-trip.bull-rush"
+# After a disarm made with one of two weapons, a swift blow with the other: Break Guard.
+AFTER_DISARM_STRIKE = "maneuver.after-disarm.strike"
+STREAK = "streak-"
+# An engine-written blow with the weapon a two-weapon swing declared in the off hand
+# (Break Guard's "using your other weapon"): it is in hand by that declaration, so the
+# attack does not ask for it to be drawn. Never a param the model may write (parse refuses
+# an unknown one).
+OFF_HAND_SWING = "off_hand_swing"
+
+
+def _slug(text: str) -> str:
+    return "-".join(str(text or "").strip().lower().split())
+
+
+def _docs(actor):
+    """(document) for every feat this creature holds that has one, once each."""
+    from . import feats as feats_mod
+
+    seen: set = set()
+    for raw in getattr(actor, "feats", None) or ():
+        doc = feats_mod.document(raw)
+        if doc and doc["id"] not in seen:
+            seen.add(doc["id"])
+            yield doc
+
+
+def _named_by_tag(actor, tag: str) -> str:
+    """The display name of the held feat whose document carries `tag`."""
+    for doc in _docs(actor):
+        if tag in (doc.get("tags") or ()):
+            return str(doc["name"])
+    return ""
+
+
+def _scene():
+    from .sheet import current_moment
+
+    return getattr(current_moment(), "scene", None)
+
+
+# --- roll twice ------------------------------------------------------------------------
+
+def twice(engine, actor, defender, key: str) -> str:
+    """The feat that has this manoeuvre's check rolled twice, the better kept — or "".
+
+    Tandem Trip: an ally on the same side who also holds the tag threatens the foe
+    (`reactions.threatens`, the attack of opportunity's own rule). No board, no threat."""
+    from . import position, reactions
+
+    tag = f"{TWICE}.{_slug(key)}.with-ally"
+    if defender is None or not actor.has_state(tag):
+        return ""
+    scene = engine.scene
+    square = scene.positions.get(defender.ref) if scene.has_grid else None
+    if square is None:
+        return ""
+    for ref, other in scene.actors.items():
+        if ref in (actor.ref, defender.ref) or other.is_down or not other.has_state(tag):
+            continue
+        if position._same_side(scene, actor.ref, ref) and reactions.threatens(
+                scene, ref, square, getattr(defender, "size", "medium")):
+            return _named_by_tag(actor, tag) or key
+    return ""
+
+
+# --- Topple Foe's two names --------------------------------------------------------------
+
+def formula_names(actor, fid: str, foe) -> dict:
+    """`allies_flanking` and `streak` for a formula of feat `fid` against `foe`.
+
+    `allies_flanking`: allies holding the feat who flank `foe` with this creature on the
+    board (`position.flanking_allies`, the +2's own geometry). `streak`: the rounds before
+    this one, in an unbroken run, in which this creature tried the formula's manoeuvre at
+    `foe` — 0 on the first round, 3 on the fourth (Topple Foe's "Each time you attempt to
+    trip the same foe in consecutive rounds, the bonus ... increases by +1 per ally")."""
+    from . import feats as feats_mod
+    from . import position
+
+    out = {"allies_flanking": 0, "streak": 0}
+    scene = _scene()
+    if foe is None or scene is None:
+        return out
+    if getattr(scene, "has_grid", False):
+        out["allies_flanking"] = sum(
+            1 for a in position.flanking_allies(scene, actor, foe)
+            if fid in feats_mod._held(a))
+    out["streak"] = streak(actor, fid, foe, getattr(scene, "round", 0))
+    return out
+
+
+def _streak_effect(actor, fid: str):
+    return next((e for e in actor.effects if e.key == STREAK + fid), None)
+
+
+def streak(actor, fid: str, foe, rnd: int) -> int:
+    e = _streak_effect(actor, fid)
+    p = (e.payload or {}) if e is not None else {}
+    if e is None or p.get("vs") != getattr(foe, "ref", None):
+        return 0
+    if int(p.get("round", -9)) == rnd:
+        return int(p.get("count", 0))
+    if int(p.get("round", -9)) == rnd - 1:
+        return int(p.get("count", 0)) + 1
+    return 0
+
+
+def _keep_streak(engine, actor, defender, key: str) -> None:
+    """Record this try at `defender` for every held document whose formula counts a
+    streak of this manoeuvre — one situation effect each, two rounds on the ticker (it
+    has to outlast the round boundary to be read on the next turn)."""
+    from .activeeffect import ActiveEffect
+
+    if not engine.scene.in_encounter:
+        return
+    rnd = engine.scene.round
+    for doc in _docs(actor):
+        if not any("streak" in str(m.get("formula") or "")
+                   and (m.get("scope") or {}).get("maneuver") == key
+                   for m in doc.get("modifiers") or ()):
+            continue
+        n = streak(actor, doc["id"], defender, rnd)
+        actor.remove_effects(match=lambda e, k=STREAK + doc["id"]: e.key == k)
+        actor.apply_effect(ActiveEffect(
+            name=f"{doc['name']}: {key} at {defender.name}", kind="situation",
+            key=STREAK + doc["id"], source=doc["name"], origin=f"rule:feat-{doc['id']}",
+            duration="rounds", rounds_left=2,
+            payload={"vs": defender.ref, "round": rnd, "count": n}))
+
+
+# --- the trip weapon feature ------------------------------------------------------------
+
+def trip_feature(actor, weapon_key: str) -> bool:
+    """Whether the weapon in hand has the trip special feature, by the weapon table or by
+    a held tag lending it (Tripping Staff: `weapon.trip-feature.quarterstaff`)."""
+    from . import weapons as weapons_mod
+
+    key = str(weapon_key or "").strip().lower()
+    if not key or key in ("unarmed", "improvised"):
+        return False
+    base = str((actor.weapon(key) or {}).get("crafted_base") or key)
+    return weapons_mod.has_trait(base, "trip") or actor.has_state(
+        f"{TRIP_FEATURE}.{_slug(base)}")
+
+
+def backfire_spared(engine, intent, actor, defender, key: str, weapon_key: str,
+                    bits: list, effects: list) -> bool:
+    """A failed trip that would knock its maker prone: with a trip weapon in hand the
+    weapon is let go instead (it lies here, still theirs — `Engine._let_go`). Owner call:
+    the drop is always taken, because standing from prone costs a move action and provokes
+    while picking a weapon up costs only the move. True when it handled the backfire."""
+    if key != "trip" or not trip_feature(actor, weapon_key) \
+            or not engine._drops_in_hand(actor, weapon_key):
+        return False
+    rec = engine._let_go(actor, weapon_key)
+    name = str((actor.weapon(weapon_key) or {}).get("name") or weapon_key)
+    bits.append(f"{actor.name} lets go of the {weapon_key} rather than be pulled down "
+                f"(a trip weapon): it lies on the ground.")
+    effects.append({"ref": actor.ref, "kind": "dropped", "item": weapon_key,
+                    "prop": rec["name"], "from": f"failed trip with a trip weapon ({name})",
+                    "origin": "rule:trip-weapon"})
+    return True
+
+
+# --- follow-ups --------------------------------------------------------------------------
+
+def _sub(engine, intent, actor, defender, key: str, tag: str, word: str, params=None):
+    """An engine-built manoeuvre at `defender` (the free-manoeuvre door's shape), resolved
+    at once and rolled by the engine. Never through `validate`: the feat's own action is
+    what it costs, and no attack of opportunity is owed by a manoeuvre the feat makes
+    (each of these feats requires the Improved <manoeuvre> feat that removes the swing)."""
+    from .engine import Intent
+
+    doc_id = next((d["id"] for d in _docs(actor) if tag in (d.get("tags") or ())), _slug(word))
+    sub = Intent(op="attack", actor=actor.ref, target=defender.ref,
+                 because=f"{actor.name}'s {word}", visibility="hidden",
+                 id=f"{intent.id}.{_slug(word)}",
+                 params={"manoeuvre": key, "rider": word, **(params or {})},
+                 origin=f"rule:feat-{doc_id}", origin_name=word)
+    return engine._resolve_maneuver(sub, actor, defender, actor.wielded_key()
+                                    if key != "grapple" else "unarmed", {})
+
+
+def _swift(engine, actor, what: str) -> str:
+    """Spend the swift action, or say why it cannot be."""
+    return engine._spend_swift(actor, False, what) or ""
+
+
+def after(engine, intent, actor, defender, key: str, verdict: str, weapon_key: str,
+          rolled: bool) -> dict:
+    """Effects, tells and rolls a held feat adds to the manoeuvre just made."""
+    out = {"effects": [], "tells": [], "rolls": []}
+    if intent.params.get("rider") or actor is None or defender is None:
+        return out                          # a follow-up begets no follow-up
+    if rolled:
+        _keep_streak(engine, actor, defender, key)
+    won = verdict == "success"
+
+    def take(got, tag):
+        out["rolls"].extend(got.rolls)
+        out["effects"].extend(dict(e, origin=e.get("origin") or got_origin(tag))
+                              for e in got.effects)
+        out["tells"].append(got.tell)
+
+    def got_origin(tag):
+        doc = next((d for d in _docs(actor) if tag in (d.get("tags") or ())), None)
+        return f"rule:feat-{doc['id']}" if doc else "rule:maneuver-feat"
+
+    unarmed = str(weapon_key or "").strip().lower() in ("unarmed", "unarmed strike")
+    if key == "trip" and won and unarmed and not defender.is_down:
+        # Binding Throw (UC): "After you successfully use the Ki Throw feat on an opponent,
+        # you can use a swift action to attempt a grapple combat maneuver against that
+        # opponent." Ki Throw is an unarmed trip (APG); its holder's trip is its use.
+        from . import feats as feats_mod
+
+        if actor.has_state(AFTER_TRIP_GRAPPLE) and "ki-throw" in feats_mod._held(actor) \
+                and not engine._holds(actor, defender):
+            name = _named_by_tag(actor, AFTER_TRIP_GRAPPLE)
+            why = _swift(engine, actor, name)
+            if why:
+                out["tells"].append(f"{name}: {why}")
+            else:
+                take(_sub(engine, intent, actor, defender, "grapple", AFTER_TRIP_GRAPPLE,
+                          name), AFTER_TRIP_GRAPPLE)
+        # Spinning Throw (UC): "On a successful unarmed trip combat maneuver against an
+        # opponent your size or smaller, you can spend a swift action to attempt a bull
+        # rush ... If your bull rush succeeds, you can move that opponent to any
+        # unoccupied square you threaten, then push that opponent the number of 5-foot
+        # increments your successful bull rush allows. The target is then knocked prone."
+        # Owner call: the move to another threatened square is the player's to offer and
+        # is not taken (the book's "can"); the push is the bull rush's own line.
+        elif actor.has_state(AFTER_TRIP_BULL_RUSH) and _size_steps(actor, defender) <= 0:
+            name = _named_by_tag(actor, AFTER_TRIP_BULL_RUSH)
+            why = _swift(engine, actor, name)
+            if why:
+                out["tells"].append(f"{name}: {why}")
+            else:
+                got = _sub(engine, intent, actor, defender, "bull rush",
+                           AFTER_TRIP_BULL_RUSH, name)
+                take(got, AFTER_TRIP_BULL_RUSH)
+                if got.verdict == "success" and not defender.is_down \
+                        and not defender.has_state("state.position.prone"):
+                    from . import bodyskills
+
+                    bodyskills._prone(defender, f"{actor.name}'s {name}",
+                                      got_origin(AFTER_TRIP_BULL_RUSH))
+                    out["effects"].append({"ref": defender.ref, "kind": "condition",
+                                           "condition": "prone",
+                                           "origin": got_origin(AFTER_TRIP_BULL_RUSH)})
+                    out["tells"].append(f"{defender.name} is thrown down again.")
+    if key == "disarm" and won:
+        # Break Guard (UC): "While wielding two weapons, whenever you successfully use one
+        # weapon to disarm an opponent, you can spend a swift action to attack the
+        # opponent you attempted to disarm using your other weapon." The other weapon is
+        # the off hand the swing declared (`off_hand`, a two-weapon full attack's).
+        off = str(intent.params.get("off_hand") or "").strip().lower()
+        if actor.has_state(AFTER_DISARM_STRIKE) and off and off != weapon_key:
+            name = _named_by_tag(actor, AFTER_DISARM_STRIKE)
+            why = _swift(engine, actor, name)
+            if why:
+                out["tells"].append(f"{name}: {why}")
+            else:
+                out["effects"].append({
+                    "ref": actor.ref, "kind": "owed_swing", "target": defender.ref,
+                    "origin": got_origin(AFTER_DISARM_STRIKE),
+                    "attack": {"op": "attack", "actor": actor.ref, "target": defender.ref,
+                               "because": f"{actor.name}'s {name}",
+                               "visibility": "player" if actor.is_pc else "hidden",
+                               "params": {"weapon": off, "full_attack": False,
+                                          "reaction": "swift", OFF_HAND_SWING: True}}})
+                out["tells"].append(f"{name}: the {off} follows through the opening.")
+    if key == "trip" and intent.params.get("tripping_twirl"):
+        out_twirl = _twirl(engine, intent, actor, defender)
+        for k in out:
+            out[k].extend(out_twirl[k])
+    return out
+
+
+def _size_steps(actor, other) -> int:
+    from . import classfeatures
+
+    return classfeatures.size_steps(actor, other)
+
+
+# Tripping Twirl's declared option (sheet.ATTACK_CHOICES, the feat document's `choice`).
+TWIRL = "tripping_twirl"
+
+
+def _twirl(engine, intent, actor, first) -> dict:
+    """Tripping Twirl (UM): "As a full-round action, while wielding a quarterstaff
+    two-handed, you can attempt a trip combat maneuver against each enemy adjacent to
+    you." The declared trip is the first; one more at each other foe adjacent on the board,
+    each its own roll. No board, nobody can be shown to stand adjacent."""
+    from . import grid as gridmod
+    from . import skilluses
+
+    out = {"effects": [], "tells": [], "rolls": []}
+    scene = engine.scene
+    skilluses._spend_action(engine, actor, "full-round")
+    here = scene.positions.get(actor.ref) if scene.has_grid else None
+    if here is None:
+        out["tells"].append("With no map to say who stands adjacent, the twirl takes only "
+                            "the one foe.")
+        return out
+    doc = next((d for d in _docs(actor) if d.get("choice") == TWIRL), None)
+    name = doc["name"] if doc else "Tripping Twirl"
+    for ref, foe in list(scene.actors.items()):
+        if ref in (actor.ref, first.ref) or foe.is_down or ref not in scene.positions \
+                or not engine._against(actor, foe):
+            continue
+        if not gridmod.is_adjacent(tuple(here), actor.size or "medium",
+                                   tuple(scene.positions[ref]), foe.size or "medium"):
+            continue
+        if foe.has_state("state.position.prone") or engine._untrippable(foe):
+            continue
+        from .engine import Intent
+
+        sub = Intent(op="attack", actor=actor.ref, target=ref,
+                     because=f"{actor.name}'s {name}", visibility="hidden",
+                     id=f"{intent.id}.twirl-{ref}",
+                     params={"manoeuvre": "trip", "rider": name},
+                     origin=f"rule:feat-{doc['id'] if doc else 'tripping-twirl'}",
+                     origin_name=name)
+        got = engine._resolve_maneuver(sub, actor, foe, actor.wielded_key(), {})
+        out["rolls"].extend(got.rolls)
+        out["effects"].extend(got.effects)
+        out["tells"].append(got.tell)
+    return out
+
+
+def choice_refusal(actor, weapon: dict, declared, params: dict) -> str:
+    """Why a declared option of this lane cannot ride this swing, or "" (asked beside
+    `feat_events.choice_refusal`)."""
+    if TWIRL in declared:
+        if params.get("manoeuvre") not in (None, "", "trip"):
+            return "Tripping Twirl is a trip at each foe beside you; declare it with a trip."
+        key = str(params.get("weapon") or actor.wielded_key() or "").strip().lower()
+        if "quarterstaff" not in (key, str(weapon.get("crafted_base") or "")) \
+                or int(weapon.get("hands", 1) or 1) < 2:
+            return "Tripping Twirl is made with a quarterstaff in both hands."
+        if params.get("full_attack") or params.get("iteration") is not None:
+            return "Tripping Twirl is its own full-round action; make it on its own."
+    return ""

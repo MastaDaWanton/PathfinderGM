@@ -1,0 +1,43 @@
+{
+  "_about": [
+    "Feat loop, batch 4, lane b4-maneuver (2026-11-26): the combat-manoeuvre feats and the",
+    "skill-use feats beside them. Each benefit is the book's (content/feats/feats.json, checked",
+    "against aonprd.com FeatDisplay 2026-11-26). The manoeuvre feats are read by",
+    "rules/maneuver_feats.py off their tags (roll twice, a trip weapon, a follow-up after the",
+    "manoeuvre, a streak at one foe); what still does not run is each document's `not_yet`."
+  ],
+  "tandem-trip": {
+    "tags": ["maneuver.twice.trip.with-ally"]
+  },
+  "topple-foe": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "formula": "min(4, 1 + streak) + max(0, allies_flanking - 1) * min(4, 2 + streak)",
+        "bonus_type": "untyped",
+        "scope": {"maneuver": "trip"},
+        "when": {"target": {"larger": true}, "flanking_with": {"feat": "topple-foe"}},
+        "note": "+1 with one flanking ally who has Topple Foe, +2 more for each other; +1 per ally each consecutive round tripping the same foe, +4 per ally at most"
+      }
+    ]
+  },
+  "tripping-staff": {
+    "tags": ["weapon.trip-feature.quarterstaff"]
+  },
+  "tripping-twirl": {
+    "choice": "tripping_twirl"
+  },
+  "binding-throw": {
+    "tags": ["maneuver.after-trip.grapple"]
+  },
+  "spinning-throw": {
+    "tags": ["maneuver.after-trip.bull-rush"],
+    "not_yet": [
+      "'If the bull rush fails, you can use the Ki Throw feat as normal' and the Improved Ki Throw throw into a secondary target's space: Ki Throw's own throw into a threatened square does not run yet (its document's not_yet)"
+    ]
+  },
+  "break-guard": {
+    "tags": ["maneuver.after-disarm.strike"]
+  }
+}

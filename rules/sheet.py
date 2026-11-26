@@ -278,6 +278,10 @@ def feat_rank_name(skill: str) -> str:
 # extra`): the ranks in the skill the term lands on, in any named skill, and the adjacent
 # allies holding the same feat. The validator probes formulas with these.
 FEAT_FORMULA_NAMES = ("ranks", "allies", "allies_threatening", "weapon_dice",
+                      # Feat loop b4-maneuver: allies holding the feat who flank the roll's
+                      # foe with you, and the consecutive rounds of this manoeuvre at it
+                      # (Topple Foe; rules/maneuver_feats.py keeps the streak).
+                      "allies_flanking", "streak",
                       *(feat_rank_name(s) for s in SKILLS))
 # A feat's class-skill grant, `skill.class.$target` bound to each pick (`class_skills`).
 FEAT_CLASS_SKILL = "skill.class."
@@ -388,7 +392,9 @@ ATTACK_CHOICES = ("power_attack", "deadly_aim", "piranha_strike", "combat_expert
                   # Feat loop b3 (2026-11-26): Furious Finish's maximised Vital Strike,
                   # Pushing Assault's push for Power Attack's damage, and the two crit
                   # trades (Dragonslayer, Wingclipper) — `rules/feat_events.py`.
-                  "furious_finish", "pushing_assault", "dragonslayer", "wingclipper")
+                  "furious_finish", "pushing_assault", "dragonslayer", "wingclipper",
+                  # Feat loop b4-maneuver: Tripping Twirl's trip at every adjacent foe.
+                  "tripping_twirl")
 # The options nobody needs a feat for (combat bar round 2, 2026-11-22). CRB, Combat
 # ("Fighting Defensively as a Standard Action"): "You can choose to fight defensively when
 # attacking" — anyone, with any attack. Its numbers are `defensive_dodge` and the stance
@@ -420,7 +426,9 @@ ATTACK_CHOICE_FEATS = {"power_attack": "power-attack", "deadly_aim": "deadly-aim
                        "pinpoint_targeting": "pinpoint-targeting",
                        "footslasher": "footslasher", "sliding_axe_throw": "sliding-axe-throw",
                        "furious_finish": "furious-finish", "pushing_assault": "pushing-assault",
-                       "dragonslayer": "dragonslayer", "wingclipper": "wingclipper"}
+                       "dragonslayer": "dragonslayer", "wingclipper": "wingclipper",
+                       # Feat loop b4-maneuver.
+                       "tripping_twirl": "tripping-twirl"}
 
 _IMPLIED_GENDER = {"she": "woman", "he": "man"}
 
@@ -6736,6 +6744,11 @@ class Actor:
         if "allies_threatening" in text:
             out["allies_threatening"] = len(self.allies_threatening_with(
                 fid, (ctx or {}).get("target_actor")))
+        if "allies_flanking" in text or "streak" in text:
+            # Feat loop b4-maneuver (Topple Foe): rules/maneuver_feats.py answers both.
+            from . import maneuver_feats
+
+            out.update(maneuver_feats.formula_names(self, fid, (ctx or {}).get("target_actor")))
         if "allies" in text:
             out["allies"] = len(self.adjacent_allies_with(fid))
         if "weapon_dice" in text:

@@ -885,6 +885,10 @@ _OPTION_SHAPES = {
     "wingclipper": ("swing", "Wingclipper",
                     "A critical on a winged flier trades its extra damage for grounding "
                     "it."),
+    # Feat loop b4-maneuver.
+    "tripping_twirl": ("strike", "Tripping Twirl",
+                       "The whole round, quarterstaff in both hands: a trip at every foe "
+                       "beside you."),
     "total_defense": ("act", "Total defense",
                       "Your standard action spent guarding: no attacks, and no attacks of "
                       "opportunity."),
@@ -1064,7 +1068,8 @@ def _attack_options(pc) -> dict:
             # What these do is the walk or the count of blows, not a number on the sheet.
             extra = {"spring_attack": "no attack of opportunity from the one struck",
                      "whirlwind_attack": "one blow at each foe in reach",
-                     "lunge": "+5 ft reach this turn"}.get(c)
+                     "lunge": "+5 ft reach this turn",
+                     "tripping_twirl": "a trip at each foe beside you"}.get(c)
             if extra:
                 opt["says"] = ", ".join(x for x in (opt["says"], extra) if x)
             if not opt["says"] and c in _SAID_IN_WORDS:

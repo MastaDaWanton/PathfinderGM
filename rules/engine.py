@@ -54,6 +54,7 @@ from .activeeffect import ActiveEffect
 from .guards import Guard, Packet
 from .dice import Dice, Modifier, Roll, d20_succeeds, natural_said
 from . import luck as luck_mod
+from . import maneuver_feats                 # feat loop b4-maneuver
 from .grid import Grid
 from . import hazards
 from . import deeds
@@ -10788,7 +10789,7 @@ class Engine:
         # held by the goo — and the refusal is printed right before this. Until 2026-10-16
         # a named weapon was swung straight off the belt, the one in hand never put away.
         if partial.get("attack_state") is None and not dancing and intent.params.get(
-                "weapon"):
+                "weapon") and not intent.params.get(maneuver_feats.OFF_HAND_SWING):
             off_belt = self._needs_drawing(actor, weapon_key)
             if off_belt:
                 name = actor.weapon(weapon_key).get("name", off_belt)
@@ -11127,7 +11128,9 @@ class Engine:
             # One blow is the whole full-round action: no iteratives, and no manoeuvre
             # riding it — a trip is not a way to finish somebody.
             full = False
-        elif intent.params.get("manoeuvre"):
+        elif intent.params.get("manoeuvre") or intent.params.get(maneuver_feats.TWIRL):
+            # Tripping Twirl, declared from the bar as its own strike, is a trip (b4).
+            intent.params.setdefault("manoeuvre", "trip")
             if partial.get("attack_state") is None:
                 why = self._maneuver_slot_refusal(intent, actor)
                 if why:
@@ -13987,6 +13990,8 @@ class Engine:
                 roll = self._roll_or_suspend_stage(
                     intent, actor, mods, f"{m['name'].title()} (CMB)", cmd, partial,
                     state, "1d20",
+                    # Feat loop b4-maneuver: Tandem Trip's two dice, the better kept.
+                    twice=maneuver_feats.twice(self, actor, defender, key),
                 )
                 state["cmb"] = roll.as_dict()
             # A natural 20 always succeeds and a natural 1 always fails, whatever the
@@ -14142,6 +14147,11 @@ class Engine:
                     effects.append({"ref": actor.ref, "kind": "dropped",
                                     "item": weapon_key, "prop": rec["name"],
                                     "from": f"failed {m['name']}"})
+            # A trip weapon let go instead of falling (feat loop b4-maneuver).
+            elif m.get("backfire") and margin <= -10 and not rider \
+                    and maneuver_feats.backfire_spared(self, intent, actor, defender, key,
+                                                       weapon_key, bits, effects):
+                pass
             # Trip UMR: "If the attempt fails, the creature is not tripped in return."
             elif m.get("backfire") and margin <= -10 and not rider:
                 bits.append(maneuver_text(m["backfire"], actor.name, defender.name) + ".")
@@ -14151,6 +14161,13 @@ class Engine:
                     effects.append({"ref": actor.ref, "kind": "condition",
                                     "condition": back, "from": f"failed {m['name']}"})
 
+        # Feat loop b4-maneuver: what a held feat makes of this manoeuvre — a follow-up,
+        # a second trip, a streak kept (rules/maneuver_feats.py).
+        more = maneuver_feats.after(self, intent, actor, defender, key, verdict, weapon_key,
+                                    roll is not None)
+        effects.extend(more["effects"])
+        bits.extend(t for t in more["tells"] if t)
+        extra_rolls.extend(more["rolls"])
         crossed = self._hp_state_effects(defender)
         effects.extend(crossed)
         return Outcome(
@@ -27962,6 +27979,9 @@ class Engine:
         ranged = w.get("category") == "ranged" or bool(params.get("thrown"))
         said = {c: c.replace("_", " ").title() for c in declared}
         why = feat_events.choice_refusal(actor, w, declared, params)    # feat loop b3
+        if why:
+            return why
+        why = maneuver_feats.choice_refusal(actor, w, declared, params)  # feat loop b4
         if why:
             return why
         for c in ("vital_strike", "cleave", "scorpion_style"):
@@ -42117,9 +42137,13 @@ class Engine:
     def _roll_or_suspend_stage(
         self, intent: Intent, actor: Actor, mods: list[Modifier], label: str,
         dc: int | None, partial: dict, state: dict, notation: str,
-        state_key: str = "attack_state", kind: str = "",
+        state_key: str = "attack_state", kind: str = "", twice: str = "",
     ) -> Roll:
         """One stage of a multi-stage intent: roll it, or hand it to the player and stop.
+
+        `twice` names a feat that has this d20 rolled twice and the better kept (feat loop
+        b4-maneuver, Tandem Trip): the player is asked for a second die, anybody else's is
+        rolled again (`_twice`).
 
         `kind` names a d20 roll for the luck feats (`rules/luck.py`): "attack" for the
         swing's to-hit. Left out, a roll no luck reaches (damage, the confirmation).
@@ -42147,6 +42171,9 @@ class Engine:
                         intent, actor, mods, label, dc, partial, kind, {state_key: state},
                         True))
                 face = partial.pop("player_face")
+                if twice and notation.strip() == "1d20":
+                    face = self._twice_face(intent, actor, mods, label, dc, state,
+                                            state_key, twice, face)
                 return self._took(self.dice.given_total(face, notation, mods, label=label))
             count, faces, _ = self.dice.parse(notation)
             raise _NeedsPlayerRoll(
@@ -42166,7 +42193,34 @@ class Engine:
                 {state_key: state},
             )
         rolled = self.dice.roll(notation, mods, label=label, visibility=intent.visibility)
+        if twice and notation.strip() == "1d20":
+            other = self.dice.roll(notation, mods, label=f"{label}, second die ({twice})",
+                                   visibility=intent.visibility)
+            self._luck_note(actor, {"id": twice.lower().replace(" ", "-")},
+                            f"{actor.name} rolls twice ({twice}): {rolled.raw} and "
+                            f"{other.raw}, the better kept.")
+            rolled = other if other.total > rolled.total else rolled
         return self._luck_npc(actor, mods, label, dc, kind, rolled) if lucky else rolled
+
+    def _twice_face(self, intent: Intent, actor: Actor, mods, label: str, dc, state: dict,
+                    state_key: str, twice: str, face: int) -> int:
+        """The player's two faces for a roll-twice d20 (feat loop b4-maneuver): the first
+        is kept in the stage's state and a second die asked for; the better of the two is
+        the face rolled with. Told behind the op, as luck is."""
+        first = state.pop("twice_first", None)
+        if first is None:
+            state["twice_first"] = int(face)
+            raise _NeedsPlayerRoll(
+                {"label": f"{label} — second die ({twice})", "die": "1d20",
+                 "actor": actor.name, "min": 1, "max": 20,
+                 "modifier": sum(m.value for m in mods),
+                 "breakdown": [m.as_dict() for m in mods], "dc": dc,
+                 "because": self._roll_why(intent, actor), "intent_id": intent.id},
+                {state_key: state})
+        self._luck_note(actor, {"id": twice.lower().replace(" ", "-")},
+                        f"{actor.name} rolls twice ({twice}): {first} and {face}, the "
+                        f"better kept.")
+        return max(int(first), int(face))
 
     def _roll_why(self, intent: Intent, actor: Actor) -> str:
         """The dice popup's subtitle for a roll the player makes: the plan's `because`,
