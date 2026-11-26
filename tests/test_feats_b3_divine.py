@@ -749,3 +749,10 @@ def test_blood_vengeance_on_a_raging_barbarian_lifts_the_rage_by_two():
     out = _use(e, "Blood Vengeance (raging)")
     assert out.status != "refused", out.tell
     assert sum(m.value for m in stack(pc._buff_mods("ability_mod", "str"))) == raging + 2
+
+
+def test_fabulist_gives_plus_one_perform_and_makes_it_a_class_skill():
+    pc = _pc("fighter", feats=["Fabulist"], ranks={"perform": 1})
+    plain = _pc("fighter", ranks={"perform": 1})
+    assert sum(m.value for m in pc.skill_modifiers("perform")) == \
+        sum(m.value for m in plain.skill_modifiers("perform")) + 1 + 3

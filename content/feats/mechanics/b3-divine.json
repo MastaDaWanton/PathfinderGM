@@ -192,5 +192,37 @@
     "not_yet": [
       "Delivering the chosen domain power through a successful unarmed strike as a swift action: no use of a domain power rides a blow yet, so the feat does nothing."
     ]
+  },
+  "fabulist": {
+    "tags": [
+      "skill.class.perform"
+    ],
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "perform",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "note": "Fabulist: '+1 bonus on Perform (act, comedy, oratory, and sing)'"
+      }
+    ],
+    "not_yet": [
+      "Regaining a grit point on a far-fetched lie: grit belongs to the gunslinger (or Amateur Gunslinger), and no grit pool exists yet. Perform is one skill here, so the +1 counts on every kind of performance."
+    ]
+  },
+  "disruptive-recall": {
+    "not_yet": [
+      "Spell recall: no magus is playable."
+    ]
+  },
+  "righteous-healing": {
+    "not_yet": [
+      "Judgment: no inquisitor is playable."
+    ]
+  },
+  "contingent-channeling": {
+    "not_yet": [
+      "True healer: the merciful healer cleric archetype is not playable (no archetypes yet)."
+    ]
   }
 }
