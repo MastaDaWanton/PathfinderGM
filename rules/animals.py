@@ -641,12 +641,22 @@ _register()
 
 # --- wild empathy ---------------------------------------------------------------------------
 
-def empathy_reaches(target) -> int | None:
+# Vermin Heart (APG p.173, aonprd 2026-11-26): "You may use wild empathy to influence vermin
+# as easily as you influence animals", and target vermin "with spells and special abilities
+# that only affect animals" — held as this tag by the feat's document (b3-arcane.json).
+VERMIN_AS_ANIMALS = "reach.vermin-as-animals"
+
+
+def empathy_reaches(target, by=None) -> int | None:
     """The check's term for this creature, or None when wild empathy cannot reach it: an
-    animal at +0, a magical beast of Int 1 or 2 at -4 (CRB)."""
+    animal at +0, a magical beast of Int 1 or 2 at -4 (CRB); vermin at +0 for one who
+    holds Vermin Heart."""
     if target is None:
         return None
     if target.has_state("type.animal"):
+        return 0
+    if target.has_state("type.vermin") and by is not None \
+            and by.has_state(VERMIN_AS_ANIMALS):
         return 0
     if target.has_state("type.magical-beast") and _int(target) in (1, 2):
         return int(_row("wild-empathy")["magical_beast"])
@@ -662,7 +672,7 @@ def wild_empathy(engine, intent, actor, target, partial):
     from .skilluses import _outcome
 
     r = _row("wild-empathy")
-    penalty = empathy_reaches(target)
+    penalty = empathy_reaches(target, actor)
     if penalty is None:
         return _refused(engine, intent, f"Wild empathy reaches animals, and magical beasts "
                                         f"of an animal's mind: not {target.name}. Nothing "
@@ -715,7 +725,7 @@ def social_door(engine, intent, actor, skill: str, partial):
     bar = diplomacy_bar(target, actor)
     if not bar:
         return None
-    if actor.has_state("class.wild-empathy") and empathy_reaches(target) is not None \
+    if actor.has_state("class.wild-empathy") and empathy_reaches(target, actor) is not None \
             and not intent.params.get("request"):
         return wild_empathy(engine, intent, actor, target, partial)
     return _refused(engine, intent,

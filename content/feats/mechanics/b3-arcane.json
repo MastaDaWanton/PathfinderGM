@@ -177,5 +177,24 @@
     "not_yet": [
       "taking the adjacent ally's Reflex die (and falling prone for it) when both save against the same effect: a save is rolled one creature at a time"
     ]
+  },
+  "vermin-heart": {
+    "tags": [
+      "reach.vermin-as-animals"
+    ]
+  },
+  "exile-s-path": {
+    "luck": [
+      {
+        "reroll": "any",
+        "rolls": [
+          "save.will"
+        ],
+        "against": [
+          "enchantment"
+        ],
+        "per_day": 1
+      }
+    ]
   }
 }

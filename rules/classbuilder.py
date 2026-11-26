@@ -1148,7 +1148,7 @@ _FEAT_DOC_KEYS = frozenset({"modifiers", "tags", "budget", "choice", "attack_abi
 
 # The keys a feat's `luck` entry may carry (rules/luck.py, which reads them).
 _LUCK_KEYS = frozenset({"reroll", "bonus", "ally_save", "on_reroll", "surge", "rolls",
-                        "per_day", "bonus_type"})
+                        "per_day", "bonus_type", "against"})
 
 
 def _luck_problems(at: str, entries) -> list[str]:
@@ -1179,6 +1179,13 @@ def _luck_problems(at: str, entries) -> list[str]:
         if not isinstance(rolls, list) or not all(isinstance(r, str) and r for r in rolls):
             out.append(f"{where}.rolls: a list of roll kinds — attack, save, save.fort, "
                        f"skill, skill.disable device, ability, d20.")
+        if "against" in e:
+            from .effectspec import AGAINST
+
+            if not isinstance(e["against"], list) or not e["against"] \
+                    or set(e["against"]) - set(AGAINST):
+                out.append(f"{where}.against: a list of what the roll is made against, "
+                           f"each one of {', '.join(AGAINST)}.")
         if not isinstance(e.get("per_day", 0), int) or int(e.get("per_day", 0)) < 0:
             out.append(f"{where}.per_day: a count of uses a day, or left out for no limit.")
     return out

@@ -10278,11 +10278,17 @@ class Engine:
         level = actor.level if actor.is_pc else 1
         resolved_dc = dc_mod.resolve(intent.params["dc"], level)
 
-        roll = self._roll_or_suspend(
-            intent, actor, mods, label=f"{SAVES[save]} save",
-            dc=resolved_dc.final, partial=partial, extra_partial={"save_gutter": gut},
-            kind=f"save.{save}",
-        )
+        self._luck_against = tuple((ctx or {}).get("against") or ())
+        if isinstance((ctx or {}).get("against"), str):
+            self._luck_against = (ctx["against"],)
+        try:
+            roll = self._roll_or_suspend(
+                intent, actor, mods, label=f"{SAVES[save]} save",
+                dc=resolved_dc.final, partial=partial, extra_partial={"save_gutter": gut},
+                kind=f"save.{save}",
+            )
+        finally:
+            self._luck_against = ()
 
         # The face decides before the total (CRB p.180; `dice.d20_succeeds`). Until
         # 2026-09-28 this read `margin >= 0` alone, so a natural 20 short of the DC failed
@@ -31021,10 +31027,17 @@ class Engine:
                 save, {"against": effectspec.spell_against(spell)
                        + self._spell_source_words(caster, spell),
                        "attacker_actor": caster}) + list(extra)
-        roll = self._roll_or_suspend_stage(
-            intent, target, save_mods, f"{SAVES[save]} save against {spell.name}"
-            + (" again (persistent)" if again else ""), dc,
-            partial, state, "1d20", state_key="cast_state")
+        # The save a spell calls for carries luck too (feat loop b3: Exile's Path's
+        # reroll of "a Will save against an enchantment spell"); until then a cast's
+        # saves were the one save door no reroll reached.
+        self._luck_against = tuple(effectspec.spell_against(spell))
+        try:
+            roll = self._roll_or_suspend_stage(
+                intent, target, save_mods, f"{SAVES[save]} save against {spell.name}"
+                + (" again (persistent)" if again else ""), dc,
+                partial, state, "1d20", state_key="cast_state", kind=f"save.{save}")
+        finally:
+            self._luck_against = ()
         state["rolls"].append(roll.as_dict())
         saved = d20_succeeds(roll, dc)
         self._judge(roll, saved)
@@ -31714,7 +31727,7 @@ class Engine:
             spared: dict[str, str] = {}
             for ref in others:
                 who = self.scene.actors[ref]
-                why = spells_mod.spared_by(spell, who, ca.hit_dice_of(who))
+                why = spells_mod.spared_by(spell, who, ca.hit_dice_of(who), actor)
                 if why:
                     spared[ref] = why
             pool = spells_mod.HD_POOL.get(spell.id)
@@ -32594,7 +32607,6 @@ class Engine:
             roll = self.dice.d20(stack([Modifier(int(ctx.get("caster_level", 1)),
                                                  "caster level")] + extra),
                                  label=f"caster level check ({op})", visibility="hidden")
-
             effects.append({"kind": "caster_level_check", "op": op, "dc": dc,
                             "total": roll.total, "beat": roll.total >= dc})
             if roll.total < dc:
@@ -41305,6 +41317,12 @@ class Engine:
             return not d20_succeeds(roll, int(dc))
         return roll.total < int(dc)
 
+    # What the save being rolled is made against (`effectspec.AGAINST` words), set by the
+    # two save doors around their roll and read by the luck offers (Exile's Path asks
+    # "against an enchantment"). A class default, so an engine that never set it answers
+    # nothing; it is the roll's own context, never a store (feat loop b3).
+    _luck_against: tuple = ()
+
     def _luck_note(self, who: Actor, doc: dict, said: str) -> None:
         self.__dict__.setdefault("_luck_said", []).append(
             {"ref": who.ref, "tell": said, "origin": f"rule:feat-{doc['id']}"})
@@ -41350,7 +41368,7 @@ class Engine:
         start = int(first) if first is not None else face
         roll = self.dice.given(start, list(mods) + extra, label=label)
         offers = luck_mod.after_offers(actor, kind, roll, self._short(roll, dc, kind),
-                                       skip=before)
+                                       skip=before, against=self._luck_against)
         if first is None:
             if offers:
                 prompt = {
@@ -41392,7 +41410,7 @@ class Engine:
         +4 when four more would make it (the GM knows the DC). The "before the roll" +8
         is never pre-committed by the engine (owner call, b2-styles)."""
         short = self._short(roll, dc, kind)
-        for o in luck_mod.after_offers(actor, kind, roll, short):
+        for o in luck_mod.after_offers(actor, kind, roll, short, against=self._luck_against):
             if o["kind"] == "reroll" and roll.natural != 1 and short is not True:
                 continue
             if o["kind"] == "bonus" and not (short and dc is not None

@@ -2002,7 +2002,7 @@ def _to_an_animal(row: Row, a: dict, scene, pc, approached: str = "") -> bool:
         return False
     calm = attitude_mod.step_of(attitude_mod.of(who)) >= attitude_mod.step_of("indifferent")
     empathic = (pc.has_state("class.wild-empathy") and not calm
-                and animals.empathy_reaches(who) is not None)
+                and animals.empathy_reaches(who, pc) is not None)
     row.ops = ["check"]
     row.skill = "diplomacy" if empathic else "handle animal"
     row.note = (f"{who.name} cannot understand words: "

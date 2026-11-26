@@ -193,3 +193,95 @@ def test_duck_and_cover_takes_cover_behind_an_allys_shield_from_arrows_only():
                                                             attacker=foe) + 2
         b.shield = "none"
         assert a.ac(against="ranged", attacker=foe) == a.ac(against="melee", attacker=foe)
+
+
+# --- Vermin Heart, Exile's Path -----------------------------------------------------------
+
+from rules import animals  # noqa: E402
+from rules.bestiary import instantiate  # noqa: E402
+from tests.test_feats_batch1_modifiers import Loaded  # noqa: E402
+
+
+def _cast_at(caster, foe, spell, dice):
+    s = Scene(location_id="5bbd0c40345f")
+    s.add(caster)
+    s.add(foe)
+    s.initiative = [(caster.ref, 20), (foe.ref, 10)]
+    s.sides = {"us": [caster.ref], "them": [foe.ref]}
+    s.round, s.turn = 1, 0
+    e = Engine(s, dice)
+
+    raw = {"op": "cast", "actor": caster.ref, "target": foe.ref, "because": "test",
+           "visibility": "hidden", "params": {"spell": spell}}
+    res = e.run(e.validate([raw]))
+    res.outcomes[0].said = " ".join(o.tell for o in res.outcomes)
+    return res.outcomes[0]
+
+
+def _druid(feats):
+    d = _wren(feats, **{"class": "druid", "spellbook": ["hold-animal"],
+                        "prepared": {"hold-animal": 2}})
+    d.abilities["wis"] = 18
+    return d
+
+
+def test_vermin_heart_lets_wild_empathy_and_animal_spells_reach_vermin():
+    """APG: "You may target vermin with spells and special abilities that only affect
+    animals ... You may use wild empathy to influence vermin as easily as you influence
+    animals." Measured before: a giant spider was "no animal" to hold animal and wild
+    empathy refused it, feat or not."""
+    spider = instantiate("giant-spider", name="the spider")
+    assert animals.empathy_reaches(spider, _druid([])) is None
+    assert animals.empathy_reaches(spider, _druid(["Vermin Heart"])) == 0
+    held = spells.spared_by(spells.get("hold-animal"), spider, 4, _druid(["Vermin Heart"]))
+    assert held == ""
+    assert spells.spared_by(spells.get("hold-animal"), spider, 4, _druid([])) == "is no animal"
+
+
+def test_vermin_heart_hold_animal_takes_hold_of_a_spider_through_the_cast():
+    """The cast's own spare (`_rider_saves`) asks with the caster: without the feat the
+    spider is told spared and makes no save; with it, it saves against the spell."""
+    plain = _cast_at(_druid([]), instantiate("giant-spider", name="the spider"),
+                     "hold-animal", Dice(seed=2))
+    assert "no hold on" in plain.tell
+    heart = _cast_at(_druid(["Vermin Heart"]), instantiate("giant-spider", name="the spider"),
+                     "hold-animal", Dice(seed=2))
+    assert "no hold on" not in heart.tell and "Will save" in heart.tell
+
+
+def _charmer():
+    pc = _wren([], level=5, **{"class": "sorcerer", "spellbook": ["charm-person"]})
+    pc.abilities["cha"] = 18
+    return pc
+
+
+
+def _half_elf(feats):
+    return from_dict({"name": "Ilse", "kind": "npc", "class": "fighter", "level": 3,
+                      "abilities": {"str": 12, "dex": 12, "con": 12, "int": 10, "wis": 10,
+                                    "cha": 10}, "hp": 25, "feats": list(feats)})
+
+
+def test_exiles_path_rerolls_a_failed_will_save_against_an_enchantment():
+    """ARG: "Once per day, when you fail a Will save against an enchantment spell or
+    effect, you may reroll that saving throw, but must take the reroll result". Charm
+    person (enchantment): the 2 fails, the reroll 19 stands. Before b3 a cast's saves
+    carried no luck at all, so no reroll feat reached a spell's save."""
+    out = _cast_at(_charmer(), _half_elf(["Exile's Path"]), "charm-person", Loaded(2, 19))
+    assert "rolls again (Exile's Path): 2, then 19" in out.said
+    assert "Ilse makes the Will save" in out.tell
+    plain = _cast_at(_charmer(), _half_elf([]), "charm-person", Loaded(2, 19))
+    assert "Ilse fails the Will save" in plain.tell
+
+
+
+def test_exiles_path_is_not_offered_against_a_will_save_that_is_no_enchantment():
+    """The same failed die against a will save from no enchantment: no reroll."""
+    from rules import luck
+
+    doc = {"id": "exile-s-path", "name": "Exile's Path"}
+    entry = {"reroll": "any", "rolls": ["save.will"], "against": ["enchantment"]}
+    assert luck.covers(entry, "save.will", ("spell", "enchantment", "charm"))
+    assert not luck.covers(entry, "save.will", ("spell", "evocation"))
+    assert not luck.covers(entry, "save.fort", ("spell", "enchantment"))
+    assert doc

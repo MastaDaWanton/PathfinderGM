@@ -4708,7 +4708,6 @@ class Actor:
             ctx["situation"] = sit
         if opportunity:
             ctx["opportunity"] = True
-
         if attacker is not None:
             ctx["attacker_actor"] = attacker
             scene = getattr(current_moment(), "scene", None)
@@ -9073,7 +9072,6 @@ def _when_holds(when, ctx: dict | None) -> bool:
                 if field_name not in ("type", "subtype"):
                     return False
                 if who is not None:
-
                     if not _is_of_kind(who, field_name, value):
                         return False
                     continue
