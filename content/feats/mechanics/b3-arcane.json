@@ -429,5 +429,23 @@
     "not_yet": [
       "an outsider that casts spells as a cleric without a casting class: only a creature with a casting class is a caster to the engine (casting.is_caster)"
     ]
+  },
+  "spell-bluff": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "spellcraft",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "skill_use": "identify-casting",
+          "spell_known": true
+        },
+        "note": "UM: +2 on Spellcraft to identify an opponent's spell you know or have in your spellbook"
+      }
+    ],
+    "not_yet": [
+      "the +2 to counter that spell and the +4 on a counterspeller's Spellcraft DC against yours: counterspelling is not built (there is no readied action to counter with)"
+    ]
   }
 }

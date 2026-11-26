@@ -2507,6 +2507,9 @@ WHEN_KEYS: dict[str, str] = {
     # Intimidating Confidence's "when you confirm a critical hit".
     "flanking_with": "flanking the roll's target with an ally who holds a feat: "
                      "{\"feat\": \"outflank\"} (classfeatures.holds)",
+    # Feat loop b3: whether the one identifying a casting knows the spell (Spell Bluff).
+    "spell_known": "whether the spell being identified is one the bearer knows or has in "
+                   "their spellbook (skilluses.identify_casting)",
     "critical": "whether the hit was a confirmed critical (Engine._feat_riders)",
     "nonlethal": "whether the hit dealt nonlethal damage (Engine._feat_riders)",
 }
@@ -2520,7 +2523,8 @@ _WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment"
 _WHEN_COMPARE = ("lte", "gte", "lt", "gt", "eq")
 _WHEN_BOOLS = ("daylight", "underground", "wielder_casts", "resting", "full_attack",
                "flanked", "sole_threat", "opportunity", "first_attack", "adjacent",
-               "own_turn", "critical", "nonlethal")
+               "own_turn", "critical", "nonlethal", "spell_known")
+
 
 # What a roll may be made AGAINST — the `against` of a roll context, one word per danger,
 # each with the reader that passes it. A closed list, because the clause is answered by

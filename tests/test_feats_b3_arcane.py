@@ -560,3 +560,17 @@ def test_divine_denouncer_is_two_better_at_a_divine_caster_through_the_check():
         return [m.source for o in res.outcomes for r in o.rolls for m in r.modifiers]
     assert "Divine Denouncer" in terms(cleric)
     assert "Divine Denouncer" not in terms(wizard)
+
+
+# --- Spell Bluff -----------------------------------------------------------------------------
+
+def test_spell_bluff_identifies_a_known_spell_two_better():
+    """UM: "+2 bonus on your Spellcraft checks to identify ... an opponent's spell if it is
+    a spell you know or have in your spellbook". The identify door now says which use it is
+    and whether the watcher knows the spell."""
+    pc = _wren(["Spell Bluff"], spellbook=["magic-missile"])
+    known = {"skill_use": "identify-casting", "spell_known": True}
+    unknown = {"skill_use": "identify-casting", "spell_known": False}
+    assert _sum(pc.skill_modifiers("spellcraft", ctx=known), "Spell Bluff") == 2
+    assert _sum(pc.skill_modifiers("spellcraft", ctx=unknown), "Spell Bluff") == 0
+    assert _sum(pc.skill_modifiers("spellcraft"), "Spell Bluff") == 0

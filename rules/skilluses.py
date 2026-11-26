@@ -1285,7 +1285,13 @@ def identify_casting(engine, out, caster, spell, level) -> dict | None:
     for pc in watchers:
         if not int((pc.ranks or {}).get("spellcraft", 0) or 0):
             continue                     # trained only
-        roll = engine.dice.d20(list(pc.skill_modifiers("spellcraft")),
+        # The use, and whether the watcher knows the spell (feat loop b3: Spell Bluff's
+        # "+2 bonus on your Spellcraft checks to identify ... a spell you know").
+        from . import casting
+
+        ctx = {"skill_use": "identify-casting", "spell_known": casting.knows(pc, spell)}
+        roll = engine.dice.d20(list(pc.skill_modifiers("spellcraft", ctx=ctx)),
+
                                label=f"{pc.name}'s Spellcraft (identify the casting)",
                                visibility="hidden")
         out.rolls.append(roll)
