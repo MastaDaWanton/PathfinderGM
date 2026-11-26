@@ -38766,10 +38766,11 @@ class Engine:
                             "modifiers": [dict(m) for m in mods], "rounds": rounds,
                             "origin": origin,
                             **({"vs": target.ref} if spec.get("vs_target") and target else {})})
-        bits = [f"{m['amount']:+d} {m['target']}"
-                + (f" against {target.name}" if m.get("vs") and target else "")
-                + (f" ({m['when']})" if m.get("when") else "")
-                for m in mods]
+        bits = list(dict.fromkeys(
+            f"{m['amount']:+d} {m['target'].replace('_', ' ')}"
+            + (f" against {target.name}" if m.get("vs") and target else "")
+            + (f" ({_when_said(m['when'])})" if m.get("when") else "")
+            for m in mods))
         line = ""
         if bits:
             line = f"{actor.name}: " + ", ".join(bits)
@@ -42986,3 +42987,21 @@ def _to_rounds(amount: int, unit: str) -> int:
 
 def _to_minutes(amount: int, unit: str) -> int:
     return {"round": 0, "minute": 1, "hour": 60, "day": 1440}[unit] * int(amount)
+
+
+def _when_said(when) -> str:
+    """A `when` clause in words for a tell (feat loop b3): its words, not its dict — the
+    stance's tell printed "({'choice': 'power_attack', 'own_turn': True, ...})" to the
+    narrator. True flags by name, words as written, numbers left out."""
+    out: list[str] = []
+
+    def walk(v, k=""):
+        if isinstance(v, dict):
+            for kk, vv in v.items():
+                walk(vv, kk)
+        elif v is True:
+            out.append(k.replace("_", " "))
+        elif isinstance(v, str):
+            out.append(v.replace("_", " "))
+    walk(when if isinstance(when, dict) else {})
+    return ", ".join(dict.fromkeys(out)) or "in some cases"
