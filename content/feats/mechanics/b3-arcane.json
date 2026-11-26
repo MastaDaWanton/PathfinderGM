@@ -196,5 +196,29 @@
         "per_day": 1
       }
     ]
+  },
+  "arcane-vendetta": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "target": {
+            "state": "mark.arcane-vendetta"
+          }
+        },
+        "note": "ISWG: +2 damage with weapon attacks against a target seen casting an arcane spell in the last 5 rounds and identified by Spellcraft (rules/skilluses.py _arcane_vendetta lays the mark)"
+      }
+    ],
+    "tags": [
+      "witness.arcane-vendetta"
+    ]
+  },
+  "sorcerous-bloodstrike": {
+    "tags": [
+      "power.bloodline.regain-on-kill"
+    ]
   }
 }

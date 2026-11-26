@@ -105,7 +105,8 @@ def _wren(feats=(), level=6, **extra):
     data = {"name": "Wren", "kind": "pc", "class": "wizard", "level": level,
             "abilities": {"str": 10, "dex": 14, "con": 12, "int": 16, "wis": 12, "cha": 12},
             "hp": 40, "weapons": ["dagger"], "equipped": "dagger",
-            "feats": list(feats), "ranks": {"spellcraft": 4, "knowledge (arcana)": 4}}
+            "feats": list(feats), "ranks": {"spellcraft": 2, "knowledge (arcana)": 2}}
+
     data.update(extra)
     return from_dict(data)
 
@@ -285,3 +286,86 @@ def test_exiles_path_is_not_offered_against_a_will_save_that_is_no_enchantment()
     assert not luck.covers(entry, "save.will", ("spell", "evocation"))
     assert not luck.covers(entry, "save.fort", ("spell", "enchantment"))
     assert doc
+
+
+# --- Arcane Vendetta ----------------------------------------------------------------------
+
+def test_arcane_vendetta_marks_an_arcane_caster_the_pc_identified():
+    """ISWG: "+2 damage with weapon attacks made against any target you have witnessed
+    casting an arcane spell ... in the last 5 rounds. You must have successfully identified
+    the spell with a Spellcraft check". The hedge wizard's magic missile, identified on a
+    20: he is marked for 5 rounds, told, and the PC's blows at him deal 2 more; missed on a
+    1, nothing."""
+    from tests.test_skill_uses_mind import _here, _wizard
+
+    def cast(face):
+        scene, engine, pc = _here(faces={"Spellcraft": face}, rest=10)
+        pc.ranks["spellcraft"] = 1
+        pc.feats = list(pc.feats) + ["Arcane Vendetta"]
+        pc.hp = pc.hp_max = 500
+        wiz = _wizard(scene)
+        res = engine.run(engine.validate([{"op": "cast", "actor": "c2", "target": "pc",
+                                           "params": {"spell": "magic-missile"},
+                                           "visibility": "hidden"}]))
+        return pc, wiz, next(o for o in res.outcomes if o.op == "cast")
+
+    pc, wiz, out = cast(20)
+    assert "marks the hedge wizard for Arcane Vendetta" in out.tell
+    mark = next(e for e in wiz.effects if "mark.arcane-vendetta" in e.tags)
+    assert mark.rounds_left == 5 and mark.origin == "feat:arcane-vendetta"
+    assert _sum(pc._buff_mods("combat_mod", "damage", {"target_actor": wiz}),
+                "Arcane Vendetta") == 2
+    pc, wiz, out = cast(1)
+    assert not wiz.has_state("mark.arcane-vendetta")
+    assert _sum(pc._buff_mods("combat_mod", "damage", {"target_actor": wiz}),
+                "Arcane Vendetta") == 0
+
+
+# --- Sorcerous Bloodstrike ------------------------------------------------------------------
+
+def _red_sorcerer(feats, level=2):
+    pc = _wren(feats, level=level, **{"class": "sorcerer", "spellbook": ["magic-missile"],
+                                  "class_choices": {"bloodline": {"picks": [
+                                      {"pick": "draconic", "variant": "red"}]}}})
+    pc.abilities["cha"] = 18
+    return pc
+
+
+def test_sorcerous_bloodstrike_gives_a_spent_claw_back_for_a_kill_by_spell():
+    """UM: "upon reducing a creature to 0 or fewer hit points with one of your sorcerer
+    spells, you can regain one usage of a sorcerer bloodline power that has a limited
+    number of uses per day", once a day, for a creature of at least half the sorcerer's
+    level in Hit Dice. A 2nd-level red-dragon sorcerer who has spent one round of claws
+    kills a 1-HD thug with magic missile: the round comes back, and only once; at 4th
+    level the thug has too few Hit Dice."""
+    pc = _red_sorcerer(["Sorcerous Bloodstrike"])
+    claws = pc.pool("claws")
+    claws.current = claws.maximum - 1
+    thug = instantiate("thug", name="the thug")
+    thug.hp = 1
+
+    out = _cast_at(pc, thug, "magic-missile", Dice(seed=3))
+    assert "Sorcerous Bloodstrike" in out.tell
+    assert claws.current == claws.maximum
+    assert pc.pool("sorcerous-bloodstrike").current == 0
+
+
+def test_no_bloodstrike_without_the_feat_or_with_nothing_spent():
+    pc = _red_sorcerer([])
+    claws = pc.pool("claws")
+    claws.current = claws.maximum - 1
+    thug = instantiate("thug", name="the thug")
+    thug.hp = 1
+    _cast_at(pc, thug, "magic-missile", Dice(seed=3))
+    assert claws.current == claws.maximum - 1
+    full = _red_sorcerer(["Sorcerous Bloodstrike"])
+    thug = instantiate("thug", name="the thug")
+    thug.hp = 1
+    out = _cast_at(full, thug, "magic-missile", Dice(seed=3))
+    assert "Bloodstrike" not in out.tell
+    high = _red_sorcerer(["Sorcerous Bloodstrike"], level=4)
+    high.pool("claws").current -= 1
+    thug = instantiate("thug", name="the thug")
+    thug.hp = 1
+    out = _cast_at(high, thug, "magic-missile", Dice(seed=3))
+    assert "Bloodstrike" not in out.tell

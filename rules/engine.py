@@ -8262,6 +8262,7 @@ class Engine:
                 out.about = _about_refs(intent, self.scene)
             if intent.op == "cast" and isinstance(out, Outcome) and out.status == "resolved":
                 self._identify_casting(intent, out)
+                self._bloodstrike(intent, out)
             return out
         finally:
             if m is not None:
@@ -8287,7 +8288,61 @@ class Engine:
         if record:
             out.effects += [record]      # the outcome's record, as `done.effects +=` above
 
+    def _bloodstrike(self, intent: Intent, out) -> None:
+        """Sorcerous Bloodstrike (UM p.156, aonprd 2026-11-26): "Once per day, as an
+        immediate action upon reducing a creature to 0 or fewer hit points with one of
+        your sorcerer spells, you can regain one usage of a sorcerer bloodline power that
+        has a limited number of uses per day. The slain creature must have at least half as
+        many Hit Dice as your sorcerer level. You cannot use this feat to gain another
+        usage of a bloodline power that you have not yet used today."
+
+        Taken whenever it can be (owner call, b3-arcane: nobody declines a free use back):
+        the power regained is the most spent of the bloodline's daily pools, the immediate
+        action spent through the one swift door, the feat's own once-a-day pool spent, and
+        both told. A heritage power (Eldritch Heritage) is not a sorcerer's bloodline power.
+        """
+        from . import class_abilities as ca, grantedpowers, resources
+
+        caster = self.scene.actors.get(intent.actor or "")
+        if caster is None or ca.class_of(caster) != "sorcerer" \
+                or not caster.has_state("power.bloodline.regain-on-kill"):
+            return
+
+        felled = [f for f in out.effects or () if isinstance(f, dict)
+                  and f.get("kind") == "damage" and f.get("ref") != caster.ref
+                  and f.get("hp_after") is not None and int(f["hp_after"]) <= 0
+                  and f.get("ref") in self.scene.actors
+                  and 2 * ca.hit_dice_of(self.scene.actors[f["ref"]]) >= int(caster.level)]
+        if not felled:
+            return
+        spent = []
+        for row in grantedpowers.had(caster):
+            if row["kind"] != "bloodline" or "Eldritch Heritage" in row["label"]:
+                continue
+            pid = str(row["power"].get("key") or "").strip().lower()
+            pool = caster.pool(pid) if isinstance(row["power"].get("pool"), dict) else None
+            if pool is not None and pool.current < pool.maximum:
+                spent.append((pool.maximum - pool.current, pid, row["power"]))
+        if not spent:
+            return
+        daily = resources.define(caster, {"id": "sorcerous-bloodstrike", "max": "1",
+                                          "refresh": "rest.night",
+                                          "source": "Sorcerous Bloodstrike"})
+        if daily.current < 1 or self._spend_swift(caster, immediate=True,
+                                                   what="Sorcerous Bloodstrike"):
+            return
+        _gap, pid, power = max(spent, key=lambda t: t[0])
+        caster.spend_pool("sorcerous-bloodstrike")
+        caster.gain_pool(pid, 1, source="Sorcerous Bloodstrike")
+        name = str(power.get("name") or pid)
+        out.tell = (f"{out.tell} {caster.name} draws on the kill (Sorcerous Bloodstrike): "
+                    f"one use of {name} comes back.").strip()
+        out.effects = list(out.effects or ()) + [
+            {"kind": "resource", "ref": caster.ref, "pool": pid, "regained": 1,
+             "origin": "feat:sorcerous-bloodstrike"}]
+
     def _articled(self, outcome):
+
         """A tell names every person by a label with its article (`names.with_articles`).
 
         Measured live 2026-09-29: "You leave man mid-sentence" — a person the prose had

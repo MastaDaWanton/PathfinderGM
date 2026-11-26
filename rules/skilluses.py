@@ -1294,13 +1294,44 @@ def identify_casting(engine, out, caster, spell, level) -> dict | None:
     if knew:
         out.tell = (f"{out.tell} {' and '.join(knew)} knows the casting at once: "
                     f"{spell.name}.").strip()
+        _arcane_vendetta(engine, out, caster, spell, [p for p in watchers if p.name in knew])
     else:
         out.tell = out.tell.replace(spell.name, "a spell", 1).replace(spell.name, "the spell")
     return {"kind": "identified", "spell": spell.id, "by": list(knew), "dc": need,
             "origin": "rule:spellcraft-identify"}
 
 
+# Arcane Vendetta (Inner Sea World Guide p.284, aonprd 2026-11-26): "+2 damage with weapon
+# attacks made against any target you have witnessed casting an arcane spell (not using a
+# spell-like ability) in the last 5 rounds. You must have successfully identified the spell
+# with a Spellcraft check". The witnessing is this door; the mark it leaves is a tagged
+# effect on the caster for 5 rounds, and the +2 is the feat document's damage term asking
+# the target for it (b3-arcane.json). Arcane is the caster's casting tradition
+# (`Engine._spell_source_words`): a creature with no casting class casts spell-likes.
+VENDETTA = "mark.arcane-vendetta"
+
+
+def _arcane_vendetta(engine, out, caster, spell, knowers) -> None:
+    from .activeeffect import ActiveEffect
+
+    if "arcane_spell" not in engine._spell_source_words(caster, spell):
+        return
+    sworn = [p for p in knowers if p.has_state("witness.arcane-vendetta")]
+
+    if not sworn:
+        return
+    caster.apply_effect(ActiveEffect(name="Arcane Vendetta", kind="effect",
+                                     source="Arcane Vendetta", origin="feat:arcane-vendetta",
+                                     duration="rounds", rounds_left=5, tags=(VENDETTA,)))
+    out.tell = (f"{out.tell} {' and '.join(p.name for p in sworn)} marks {caster.name} "
+                f"for Arcane Vendetta: weapon blows at them deal 2 more for 5 rounds.")
+    out.effects = list(out.effects or ()) + [{"kind": "mark", "ref": caster.ref,
+                                              "tag": VENDETTA, "rounds": 5,
+                                              "origin": "feat:arcane-vendetta"}]
+
+
 # --- Perform ----------------------------------------------------------------------------------
+
 
 def perform_for_coin(engine, intent, actor, mods, partial):
     """Perform to earn money (CRB, Perform): the book's table, DC 10 a routine performance
