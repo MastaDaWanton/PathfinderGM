@@ -441,5 +441,81 @@
     "tags": [
       "teamwork.target-of-opportunity"
     ]
+  },
+  "shot-on-the-run": {
+    "not_yet": [
+      "'As a full-round action, you can move up to your speed and make a single ranged attack at any point during your movement': a turn moves once, before or after its blow; no walk is split around a shot (Spring Attack's split walk is melee's, closing on its foe)"
+    ]
+  },
+  "critical-versatility": {
+    "not_yet": [
+      "'Once per day, you can spend 1 hour practicing maneuvers to gain one single critical feat that you meet the prerequisites for ... until you choose to practice a different critical feat': no door grants a feat for a time, and no ability takes an hour"
+    ]
+  },
+  "enhanced-ki-throw": {
+    "not_yet": [
+      "'When using the Ki Throw feat, you can expend 1 ki point ... it takes damage as if you had hit it with an unarmed strike': Ki Throw's own throw is not built yet (its document's not_yet; Improved Ki Throw is lane b4-maneuver's), so there is no throw to amplify"
+    ]
+  },
+  "quivering-palm-adept": {
+    "not_yet": [
+      "'Add +2 to the saving throw DC against your quivering palm attacks': the monk's 15th-level quivering palm is a name on the class table with no ability document, so there is no DC to raise"
+    ]
+  },
+  "amplified-rage": {
+    "not_yet": [
+      "'Whenever you are raging and adjacent to a raging ally who also has this feat or flanking the same opponent as a raging ally with this feat, your morale bonuses to Strength and Constitution increase by +4': a rage's morale terms are laid when it begins and ability scores are read with no board in their context, so nothing re-reads where a raging ally stands"
+    ]
+  },
+  "improved-charging-hurler": {
+    "not_yet": [
+      "'When you use Charging Hurler, your target can be at any range ... If your target is within 30 feet, you gain a +2 bonus on damage rolls': Charging Hurler itself is lane b4-moves' (feat loop batch 4), and this lane has nothing of it to widen"
+    ]
+  },
+  "sling-flail": {
+    "not_yet": [
+      "'You can make melee attacks using your loaded sling ... treating it as a flail', the flail feats with it, and 'magical or masterwork ammunition loses its special properties after a single hit': a sling is a ranged weapon in every reader, and no option swings it"
+    ]
+  },
+  "quarterstaff-master": {
+    "not_yet": [
+      "'you can wield a quarterstaff as a one-handed weapon ... your other hand is free, and you cannot use the staff as a double weapon': the staff's two hands are the weapon row's, and no turn-start choice changes them",
+      "'You can take the feat Weapon Specialization in the quarterstaff even if you have no levels in fighter': a prerequisite is asked of the feat, never of the weapon it is taken in"
+    ]
+  },
+  "strike-back": {
+    "not_yet": [
+      "'You can ready an action to make a melee attack against any foe that attacks you in melee, even if the foe is outside of your reach': the engine has no readied actions"
+    ]
+  },
+  "net-adept": {
+    "not_yet": [
+      "a net treated as a one-handed melee reach weapon, no penalty unfolded, folded in a full-round action: the net row is unwieldable ('the rules have no net attack yet')"
+    ]
+  },
+  "net-and-trident": {
+    "not_yet": [
+      "the net as a one-handed ranged weapon beside a melee weapon, and +2 damage and +2 to confirm against an entangled foe: there is no net attack to throw"
+    ]
+  },
+  "performance-weapon-mastery": {
+    "not_yet": [
+      "every proficient weapon a performance weapon: Ultimate Combat's performance combat is not in the game"
+    ]
+  },
+  "siege-gunner": {
+    "not_yet": [
+      "no size penalty aiming a direct-fire siege weapon, a missed indirect shot misdirected 1 square per increment: siege weapons are not fired by the engine"
+    ]
+  },
+  "blighted-critical-mastery": {
+    "not_yet": [
+      "choosing the spellblight Blighted Critical applies: spellblights and Blighted Critical are not in the game"
+    ]
+  },
+  "painful-anchor": {
+    "not_yet": [
+      "4d8 + Charisma holy damage to an evil outsider teleporting or summoning in the anchoring aura: anchoring aura is the Oath against Fiends paladin's (an archetype; the content has no archetypes)"
+    ]
   }
 }

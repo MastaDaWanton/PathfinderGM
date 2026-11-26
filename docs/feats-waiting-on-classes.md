@@ -307,3 +307,17 @@ feature no playable class grants.
 - Ascendant Spell: mythic rules
 - Create Sanguine Elixir: Brew Potion, removed by the owner's 2026-11-22 ruling (item
   creation lives at the benches), so no one can meet the prerequisite
+
+## Class features no playable class has (feat loop batch 4)
+
+- Painful Anchor: anchoring aura (the Oath against Fiends paladin, an archetype; the content
+  has no archetypes)
+
+## Systems not in the game (feat loop batch 4)
+
+- Strike Back: readied actions (the engine has no ready action)
+- Net Adept, Net and Trident: net attacks (the net is unwieldable: "the rules have no net
+  attack yet")
+- Performance Weapon Mastery: performance combat (Ultimate Combat), as Savage Display
+- Siege Gunner: siege weapons (none is fired by the engine)
+- Blighted Critical Mastery: spellblights and Blighted Critical
