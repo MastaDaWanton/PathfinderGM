@@ -157,7 +157,8 @@
         }
       },
       "_allocation_note": "The book lets the player split the pool across the turn's blows. The engine puts the whole pool on each blow until one lands — a miss keeps the dice, so that is the split a table makes when it wants the dice to land; owner call in the lane report.",
-      "tell": "{name} gathers a pool of divine energy into the weapon."
+      "tell": "{name} gathers a pool of divine energy into the weapon.",
+      "before": "attacks"
     },
     {
       "key": "turn undead",
@@ -522,6 +523,33 @@
         }
       },
       "tell": "{name} lowers into a charge, holy light gathering."
+    },
+    {
+      "key": "adept champion",
+      "name": "Adept Champion",
+      "feat": "adept-champion",
+      "level": 1,
+      "source": "Adept Champion (UC): 'While using your smite evil class feature, as a swift action at the start of your turn, you can forgo the bonus on damage rolls and instead gain half that bonus as a bonus on combat maneuver checks against the target of your smite. The effects of your smite evil feature return to normal at the start of your next turn.'",
+      "text": "Swift, while smiting: trade the smite's damage bonus against its target for half of it on combat manoeuvres, until your next turn.",
+      "action": "swift",
+      "affects": "target",
+      "aim": "foe",
+      "requires": [
+        "buff.smite"
+      ],
+      "requires_said": "only while a smite holds",
+      "marked_by": "buff.smite",
+      "self": {
+        "vs_target": true,
+        "rounds": 1,
+        "forgoes": {
+          "from": "buff.smite",
+          "target": "damage",
+          "gain": "cmb"
+        }
+      },
+      "tell": "{name} turns the smite from wounding {target} to overpowering them.",
+      "before": "actions"
     }
   ]
 }

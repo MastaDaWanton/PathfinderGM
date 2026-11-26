@@ -335,9 +335,9 @@ DOC_KEYS = frozenset({
     "target_requires_said", "tell", "tell_off", "text", "toggle", "undead",
     "undead_only", "charge_condition", "charge_rounds", "charge_rounds_dice", "feat",
     "charge_push_ft", "gaze", "light", "runs", "eases", "hands_free",
-    "target_requires_not"})
+    "target_requires_not", "marked_by", "before"})
 SELF_KEYS = frozenset({"ends_when", "forbids", "modifiers", "natural_weapons", "rounds",
-                       "strikes_as", "tags", "vs_target"})
+                       "strikes_as", "tags", "vs_target", "forgoes"})
 EFFECT_KEYS = frozenset({"condition", "modifiers", "on", "rounds", "skill_modifiers",
                          "tags", "temp_hp", "vulnerable", "resave", "commanded"})
 

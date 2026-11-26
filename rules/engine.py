@@ -37415,6 +37415,21 @@ class Engine:
             if not pool.ready:
                 return (f"The {cost['pool']} pool recharges in {pool.cooldown_left} "
                         f"round{'' if pool.cooldown_left == 1 else 's'}.")
+        # `before`: when in the turn it may be used — "attacks", before the user's first
+        # blow this round (Greater Channel Smite: "Before making any melee attacks on your
+        # turn"), or "actions", before anything else (Adept Champion: "at the start of
+        # your turn"). Read off the round's own ledgers (`Scene.swung`, `move_spent`,
+        # `standard_spent`); out of a fight there is no turn to be late in.
+        when = str(doc.get("before") or "")
+        if when and self.scene.in_encounter:
+            rnd = self.scene.round
+            late = self.scene.swung.get(actor.ref) == rnd or (
+                when == "actions" and rnd in (self.scene.move_spent.get(actor.ref),
+                                              self.scene.standard_spent.get(actor.ref)))
+            if late:
+                return (f"{found.title()} is used "
+                        + ("before any attack" if when == "attacks" else "at the start")
+                        + f" of {actor.name}'s turn, and this turn is under way.")
         # "You must be able to speak and have a free hand" (Word of Healing): the hands
         # by `classfeatures.free_hands`; the voice is the document's `requires_not`.
         if doc.get("hands_free"):
@@ -38213,6 +38228,12 @@ class Engine:
             wrong = self._class_ability_wrong_target(doc, name, other)
             if wrong:
                 return [], wrong
+            # `marked_by`: only the creature the user's own effect with that tag is aimed
+            # at — Adept Champion's "against the target of your smite".
+            if doc.get("marked_by") and not self._marked(actor, str(doc["marked_by"]), other):
+                return [], (f"{name} works against the creature {actor.name}'s "
+                            f"{doc['marked_by'].split('.')[-1]} is aimed at, and "
+                            f"{other.name} is not it.")
             # A gaze (Blinding Flash, Dragon Empires Primer: "This feat functions as a gaze
             # attack ... does not work on creatures that are already blinded"): only on a
             # creature that can see the user (`awareness.sees`) and is not blind.
@@ -38323,6 +38344,41 @@ class Engine:
         if bars:
             return (f"{name} does not work on {other.name} ({bars[0]}). Nothing is spent.")
         return ""
+
+    @staticmethod
+    def _marked(actor: Actor, tag: str, other: Actor) -> bool:
+        """Whether an effect of the user's carrying `tag` is aimed at `other` (its
+        modifiers' `vs`): the smite's mark."""
+        return any(other.ref == m.get("vs") for e in actor.effects
+                   if any(states.matches(t, tag) for t in e.tags) for m in e.modifiers)
+
+    @staticmethod
+    def _forgone(actor: Actor, spec: dict, target: Actor) -> list[dict]:
+        """Terms that give up one channel of a marked effect for half of it on another
+        (`self.forgoes`): Adept Champion (UC), "forgo the bonus on damage rolls and
+        instead gain half that bonus as a bonus on combat maneuver checks against the
+        target of your smite". Each forgone term is mirrored, negated, with its own
+        `when` and `first_hit` — so a smite's doubled first blow is forgone only while it
+        is still owed — and half the standing part lands on the gain."""
+        tag, channel = str(spec.get("from") or ""), str(spec.get("target") or "damage")
+        gain = str(spec.get("gain") or "cmb")
+        out: list[dict] = []
+        standing = 0
+        for e in actor.effects:
+            if not any(states.matches(t, tag) for t in e.tags):
+                continue
+            for m in e.modifiers:
+                if m.get("vs") != target.ref or m.get("target") != channel \
+                        or m.get("kind") != "combat_mod":
+                    continue
+                out.append({**m, "amount": -int(m.get("amount", 0)),
+                            "note": "forgone (Adept Champion)"})
+                if not m.get("first_hit") and not m.get("when"):
+                    standing += int(m.get("amount", 0))
+        if standing // 2:
+            out.append({"kind": "combat_mod", "target": gain, "amount": standing // 2,
+                        "bonus_type": "untyped", "vs": target.ref})
+        return out
 
     def _feat_addons(self, actor: Actor, doc: dict) -> list[dict]:
         """The addons a held feat opens on this document (`addons[].requires`, a tag a feat
@@ -38705,6 +38761,8 @@ class Engine:
         if not spec and not key and not charge:
             return None
         mods = ca.modifiers(spec.get("modifiers"), actor)
+        if spec.get("forgoes") and target is not None:
+            mods += self._forgone(actor, spec["forgoes"], target)
         weapons: list[dict] = []
         said: list[str] = []
         add_tags: list[str] = []

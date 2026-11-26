@@ -412,3 +412,63 @@ def test_radiant_charge_waits_through_a_blow_that_is_no_charge():
     _swing(e, face=19)
     assert _left(pc, "lay on hands") == uses
     assert any(x.name == "Radiant Charge" for x in pc.effects)
+
+
+# --- Adept Champion, Fearless Aura --------------------------------------------------------
+
+def test_adept_champion_trades_the_smite_s_damage_for_half_on_manoeuvres():
+    """Adept Champion (UC): the smite's +level damage against its target is forgone, and
+    half of it (+4 at 8th) is laid on combat manoeuvre checks against that target only."""
+    pc = _pc("paladin", feats=["Adept Champion"])
+    scene, e = _fight(pc, "thug", "thug")
+    a, b = scene.actors["c1"], scene.actors["c2"]
+    assert _use(e, "Smite Evil", to="c1").status != "refused"
+    ctx = pc._roll_context(None, defender=a)
+    dmg = sum(m.value for m in pc._buff_mods("combat_mod", "damage", ctx))
+    cmb = sum(m.value for m in pc.cmb_modifiers(defender=a))
+    assert _use(e, "Adept Champion", to="c2").status == "refused"
+    out = _use(e, "Adept Champion", to="c1")
+    assert out.status != "refused", out.tell
+    assert sum(m.value for m in pc._buff_mods("combat_mod", "damage", ctx)) == dmg - 8
+    assert sum(m.value for m in pc.cmb_modifiers(defender=a)) == cmb + 4
+    assert sum(m.value for m in pc.cmb_modifiers(defender=b)) == \
+        sum(m.value for m in pc.cmb_modifiers(defender=b))
+    pc.tick_effects(1)
+    assert sum(m.value for m in pc._buff_mods("combat_mod", "damage", ctx)) == dmg
+
+
+def test_adept_champion_needs_a_smite():
+    pc = _pc("paladin", feats=["Adept Champion"])
+    _s, e = _fight(pc, "thug")
+    assert _use(e, "Adept Champion", to="c1").status == "refused"
+
+
+def test_fearless_aura_makes_allies_within_twenty_feet_immune_to_fear():
+    """Fearless Aura (UM): 'Allies within the aura are immune to fear effects.' Measured
+    through the condition op's immunity gate, inside the engine's moment."""
+    from rules.sheet import situated
+    pc = _pc("paladin", feats=["Fearless Aura"])
+    ally = _ally_hurt(0)
+    scene, e = _fight(pc, "thug", allies=[ally])
+    with situated(scene):
+        assert "fear" in ally.immunities
+        assert "fear" not in scene.actors["c1"].immunities
+    out = e.run(e.validate([{"op": "condition", "because": "test", "params": {
+        "condition": "shaken", "to": "ally"}}], origin="author:test")).outcomes[-1]
+    assert "immune to fear" in out.tell and not ally.has_condition("shaken")
+    plain = _pc("paladin")
+    ally2 = _ally_hurt(0)
+    scene, e = _fight(plain, "thug", allies=[ally2])
+    with situated(scene):
+        assert "fear" not in ally2.immunities
+
+
+def test_greater_channel_smite_comes_before_the_turn_s_first_blow():
+    """'Before making any melee attacks on your turn': refused once a blow is struck."""
+    pc = _pc("cleric", feats=["Channel Smite", "Greater Channel Smite"])
+    scene, e = _fight(pc, "ogre")
+    from tests._board import face_to_face
+    face_to_face(scene, "pc", "c1")
+    _swing(e, face=1)
+    out = _use(e, "Greater Channel Smite", to="c1")
+    assert out.status == "refused" and "before any attack" in out.tell

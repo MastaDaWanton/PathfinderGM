@@ -56,5 +56,11 @@
     ]
   },
   "crusader-s-fist": {},
-  "radiant-charge": {}
+  "radiant-charge": {},
+  "adept-champion": {},
+  "fearless-aura": {
+    "tags": [
+      "aura.fearless"
+    ]
+  }
 }
