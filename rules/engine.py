@@ -6902,7 +6902,34 @@ class Engine:
         after = {id(o) for o in so_far[joined_at + 1:]} if joined_at >= 0 else None
         return any(not any(e.get("kind") == "battle_joined" for e in o.effects or ())
                    and (after is None or id(o) in after)
+                   and not (o.op == "use_ability" and self._free_use(actor, o.effects))
                    for o in self._acted_in_batch(actor, self._ONE_ACTION_OPS))
+
+    _NOT_THE_ACTION = ("free", "swift", "immediate")
+
+    def _free_use(self, actor, effects=None, ability: str = "") -> bool:
+        """Whether an ability use is not the surprise round's one action: "You can also
+        take free actions" (CRB, The Surprise Round), and a swift action may be taken
+        whenever a free one may. Live 2026-11-26 (owner ask A2): laying keen on the blood
+        armament, a free action, spent Shadow's surprise round, and the strike behind it
+        was refused "it is spent". Read off the outcome's records (a toggle, a property
+        laid, the executor's `action`), or, before the act, off its document."""
+        from . import class_abilities, leveling
+
+        for e in effects or ():
+            if e.get("kind") in ("toggle", "weapon_property"):
+                return True
+            if e.get("kind") == "use_ability" and e.get("action"):
+                return str(e["action"]) in self._NOT_THE_ACTION
+        if not ability:
+            return False
+        _p, found, _fx = leveling.find_ability(actor, ability)
+        if found and leveling.toggle_key(actor, found):
+            return True
+        doc = leveling.ability_doc(actor, found)[1] if found else {}
+        if not doc:
+            doc = class_abilities.find(actor, ability)[0] or {}
+        return bool(doc) and class_abilities.action_of(doc, actor) in self._NOT_THE_ACTION
 
     def _one_action_refusal(self, raw: dict) -> "Outcome | None":
         """This act refused for the surprise round's limit, or None. A creature's full
@@ -6921,6 +6948,9 @@ class Engine:
             return None
         actor = self.scene.actors.get(str(raw.get("actor") or ""))
         if actor is None or not actor.has_state(states.ONE_ACTION_TURN):
+            return None
+        if op == "use_ability" and self._free_use(
+                actor, ability=str(params.get("ability") or "")):
             return None
         why = ""
         if op == "attack" and (params.get("spring_attack") or params.get("whirlwind_attack")) \
@@ -6950,7 +6980,10 @@ class Engine:
         if intent.op not in self._ONE_ACTION_OPS or intent.op == "move"                 or outcome.status != "resolved" or intent.params.get("reaction")                 or any(e.get("kind") == "battle_joined" for e in outcome.effects or ()):
             return
         actor = self.scene.actors.get(intent.actor or "")
-        if actor is not None and self.scene.in_encounter                 and actor.has_state(states.ONE_ACTION_TURN):
+        if actor is not None and self.scene.in_encounter \
+                and actor.has_state(states.ONE_ACTION_TURN) \
+                and not (intent.op == "use_ability"
+                         and self._free_use(actor, outcome.effects)):
             self.scene.standard_spent[actor.ref] = self.scene.round
 
     def _standard_spent_refusal(self, intent: Intent, actor) -> "Outcome | None":
