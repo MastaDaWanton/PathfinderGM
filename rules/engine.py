@@ -39751,7 +39751,8 @@ class Engine:
                                        "what": e.name, "origin": e.origin},
                             "tell": f"{immune}, and {e.name} finds nothing to stun."})
                 continue
-            roll = self.dice.d20(defender.save_modifiers(c["save"]),
+            roll = self.dice.d20(defender.save_modifiers(
+                c["save"], ctx=maneuver_feats.charge_save_ctx(c)),   # feat loop b4
                                  label=f"{SAVES.get(c['save'], c['save'])} save against "
                                        f"{e.name}", visibility=visibility)
             made = d20_succeeds(roll, int(c["dc"]))

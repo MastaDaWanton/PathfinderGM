@@ -641,7 +641,11 @@ VOCAB: dict[str, list[dict]] = {
         # Feat loop b3: levels added to the druid level an animal companion is figured
         # at, never past the character's own (Boon Companion; `animal_companion.
         # effective_level`).
-        ("companion_level", "Animal companion's effective druid level"))],
+        ("companion_level", "Animal companion's effective druid level"),
+        # Feat loop b4-maneuver: skill ranks over the class's and race's (Human Spirit's
+        # "+1 bonus skill rank ... an additional skill rank" a Hit Die, four at most),
+        # read by `leveling.skill_ranks` into the total a character may place.
+        ("skill_ranks", "Skill ranks to place"))],
     "sense": [{"id": k, "name": n} for k, n in (
         ("low_light", "Low-light vision"), ("darkvision", "Darkvision"),
         ("scent", "Scent"), ("tremorsense", "Tremorsense"),
@@ -2607,6 +2611,11 @@ AGAINST: dict[str, str] = {
     # supernatural abilities of witches and hags": a save whose source is a hag or a
     # witch (Engine._cast_save, Engine._op_save off the source creature).
     "hag_or_witch": "a save against a hag's or a witch's spell or ability",
+    # Feat loop b4-maneuver: Hard-Headed's "+2 bonus on saves against spells and special
+    # abilities that cause you to become staggered or stunned" — a spell whose effects
+    # land either condition (`spell_against`), and an armed blow that does (stunning
+    # fist's save, `Engine._deliver_charges`).
+    "stun_or_stagger": "a save against a spell or ability that staggers or stuns",
 }
 
 
@@ -2631,9 +2640,27 @@ def spell_against(spell) -> tuple[str, ...]:
         words.append("area")
     if _lands_sleep(getattr(spell, "effects", None) or ()):
         words.append("sleep")
+    if _lands_condition(getattr(spell, "effects", None) or (), ("stunned", "staggered")):
+        words.append("stun_or_stagger")                 # feat loop b4-maneuver
     if "divination" in words and "mind-affecting" in words:
         words.append("mind-reading")
     return tuple(words)
+
+
+def _lands_condition(specs, keys) -> bool:
+    """Whether these effect documents land one of these conditions, on a failed save or
+    outright (feat loop b4-maneuver: Hard-Headed's staggered or stunned)."""
+    for spec in specs:
+        if not isinstance(spec, dict):
+            continue
+        if str(spec.get("type") or "") == "apply_condition" \
+                and str(spec.get("target") or spec.get("condition") or "").strip().lower() \
+                in keys:
+            return True
+        if _lands_condition(list(spec.get("on_failure") or ())
+                            + list(spec.get("on_success") or ()), keys):
+            return True
+    return False
 
 
 def _lands_sleep(specs) -> bool:

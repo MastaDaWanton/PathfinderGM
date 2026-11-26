@@ -7,7 +7,9 @@
     "manoeuvre, a streak at one foe); what still does not run is each document's `not_yet`."
   ],
   "tandem-trip": {
-    "tags": ["maneuver.twice.trip.with-ally"]
+    "tags": [
+      "maneuver.twice.trip.with-ally"
+    ]
   },
   "topple-foe": {
     "modifiers": [
@@ -16,40 +18,111 @@
         "target": "cmb",
         "formula": "min(4, 1 + streak) + max(0, allies_flanking - 1) * min(4, 2 + streak)",
         "bonus_type": "untyped",
-        "scope": {"maneuver": "trip"},
-        "when": {"target": {"larger": true}, "flanking_with": {"feat": "topple-foe"}},
+        "scope": {
+          "maneuver": "trip"
+        },
+        "when": {
+          "target": {
+            "larger": true
+          },
+          "flanking_with": {
+            "feat": "topple-foe"
+          }
+        },
         "note": "+1 with one flanking ally who has Topple Foe, +2 more for each other; +1 per ally each consecutive round tripping the same foe, +4 per ally at most"
       }
     ]
   },
   "tripping-staff": {
-    "tags": ["weapon.trip-feature.quarterstaff"]
+    "tags": [
+      "weapon.trip-feature.quarterstaff"
+    ]
   },
   "tripping-twirl": {
     "choice": "tripping_twirl"
   },
   "binding-throw": {
-    "tags": ["maneuver.after-trip.grapple"]
+    "tags": [
+      "maneuver.after-trip.grapple"
+    ]
   },
   "spinning-throw": {
-    "tags": ["maneuver.after-trip.bull-rush"],
+    "tags": [
+      "maneuver.after-trip.bull-rush"
+    ],
     "not_yet": [
       "'If the bull rush fails, you can use the Ki Throw feat as normal' and the Improved Ki Throw throw into a secondary target's space: Ki Throw's own throw into a threatened square does not run yet (its document's not_yet)"
     ]
   },
   "break-guard": {
-    "tags": ["maneuver.after-disarm.strike"]
+    "tags": [
+      "maneuver.after-disarm.strike"
+    ]
   },
   "feinting-flurry": {
     "choice": "feinting_flurry"
   },
   "improved-feinting-flurry": {
-    "tags": ["skill.bluff.feint.flurry-turn"]
+    "tags": [
+      "skill.bluff.feint.flurry-turn"
+    ]
   },
   "wave-strike": {
-    "tags": ["skill.bluff.feint.wave-strike"]
+    "tags": [
+      "skill.bluff.feint.wave-strike"
+    ]
   },
   "disengaging-shot": {
-    "tags": ["skill.bluff.feint.disengaging-shot"]
+    "tags": [
+      "skill.bluff.feint.disengaging-shot"
+    ]
+  },
+  "hard-headed": {
+    "modifiers": [
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "stun_or_stagger"
+        },
+        "note": "saves against spells and special abilities that stagger or stun"
+      },
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "stun_or_stagger"
+        },
+        "note": "saves against spells and special abilities that stagger or stun"
+      },
+      {
+        "type": "save_mod",
+        "target": "will",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "stun_or_stagger"
+        },
+        "note": "saves against spells and special abilities that stagger or stun"
+      }
+    ],
+    "not_yet": [
+      "'+1 bonus on attack rolls and combat maneuver checks made using a helmet': no helmet in the game's gear is a weapon to attack or manoeuvre with"
+    ]
+  },
+  "human-spirit": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "skill_ranks",
+        "formula": "min(4, level)",
+        "bonus_type": "untyped",
+        "note": "1 bonus skill rank, and another each Hit Die after, four at most"
+      }
+    ]
   }
 }

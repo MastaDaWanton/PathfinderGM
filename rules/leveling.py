@@ -1026,6 +1026,9 @@ def skill_ranks(actor) -> dict:
     # And a rank for every level whose favoured class bonus was taken as one (CRB p.31).
     favoured = sum(1 for b in getattr(actor, "favoured", None) or () if b == "skill")
     total = per_level * level + favoured
+    # Feat loop b4-maneuver: ranks a feat grants (Human Spirit), through the funnel.
+    if hasattr(actor, "_buff_mods"):
+        total += sum(m.value for m in actor._buff_mods("combat_mod", "skill_ranks"))
     class_skills = [str(s).lower() for s in actor.class_skills]
     return {
         "owed": max(0, total - spent), "per_level": per_level, "total": total,

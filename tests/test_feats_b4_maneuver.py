@@ -435,3 +435,49 @@ class _MP:
 
     def undo(self):
         self._mp.undo()
+
+
+# --- Hard-Headed, Human Spirit -----------------------------------------------------------
+
+def test_hard_headed_adds_two_against_what_staggers_or_stuns_and_nothing_else():
+    """Hard-Headed (ARG): "+2 bonus on saves against spells and special abilities that
+    cause you to become staggered or stunned." Measured before: no save knew what it was
+    against beyond "spell", and stunning fist's save knew nothing at all."""
+    from rules import effectspec, spells
+
+    dwarf = load_pc("fixtures/pc-borin.json")
+    dwarf.feats = list(dwarf.feats) + ["Hard-Headed"]
+
+    def term(spell_id):
+        ctx = {"against": effectspec.spell_against(spells.get(spell_id))}
+        return sum(m.value for m in dwarf.save_modifiers("will", ctx=ctx)
+                   if str(m.source).startswith("Hard-Headed"))
+
+    assert term("color-spray") == 2 and term("slow") == 2
+    assert term("daze") == 0 and term("charm-person") == 0
+
+
+def test_hard_headed_reaches_the_save_against_a_stunning_fist():
+    from tests.test_feats_b2_attack_a import _swing, _use
+
+    scene, e, thug = _bout(_monk([]))
+    thug.feats = list(thug.feats or ()) + ["Hard-Headed"]
+    _use(e, "Stunning Fist")
+    res = _swing(e, face=19)
+    saves = [e["roll"] for o in res.outcomes for e in o.effects
+             if str((e.get("roll") or {}).get("label") or "").startswith("Fortitude save")]
+    assert saves and _named(saves[0], "Hard-Headed") == 2, _tells(res)
+
+
+def test_human_spirit_adds_a_rank_a_hit_die_up_to_four():
+    """Human Spirit (ARG): "You receive 1 bonus skill rank. Whenever you gain another Hit
+    Die, you gain an additional skill rank. You cannot gain more than four skill ranks in
+    this way." Measured before: the ranks a character could place did not move."""
+    from rules import leveling
+
+    for level, more in ((1, 1), (3, 3), (6, 4)):
+        pc = load_pc("fixtures/pc-kesst.json")
+        pc.level = level
+        before = leveling.skill_ranks(pc)["total"]
+        pc.feats = list(pc.feats) + ["Human Spirit"]
+        assert leveling.skill_ranks(pc)["total"] - before == more

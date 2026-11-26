@@ -560,3 +560,12 @@ def disengaging_shot(engine, actor, target) -> list[dict]:
                         "because": f"{actor.name}'s Disengaging Shot",
                         "visibility": "player" if actor.is_pc else "hidden",
                         "params": {"full_attack": False, "reaction": "disengaging-shot"}}}]
+
+
+def charge_save_ctx(c: dict) -> dict:
+    """The save against an armed blow, said for what it would leave: a stunning fist that
+    stuns or staggers is a save "against ... special abilities that cause you to become
+    staggered or stunned" (Hard-Headed, `effectspec.AGAINST`)."""
+    if str(c.get("condition") or "") in ("stunned", "staggered"):
+        return {"against": ("stun_or_stagger",)}
+    return {}
