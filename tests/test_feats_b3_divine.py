@@ -628,3 +628,64 @@ def test_ensemble_brings_an_ally_s_aid_to_a_perform_check():
     bard = _pc("bard", feats=["Ensemble"])
     scene, e = _fight(bard, "thug", allies=[_ally_hurt(0)], seed=2)
     assert sum(len(e._ensemble_aid(bard, "perform")) for _ in range(20)) > 0
+
+
+# --- Stance of the Xorn, Destroyer's Blessing, Bewildering Koan ---------------------------
+
+def test_stance_of_the_xorn_takes_the_flanking_bonus_away_but_not_when_dex_is_lost():
+    """Stance of the Xorn: flankers gain no +2 against you; 'a condition that makes you
+    lose your Dex bonus to AC also makes you lose the benefits of this feat'."""
+    from rules import position
+    from rules.grid import Grid
+    s = Scene(location_id="t")
+    a = instantiate("guildhand", scene=s, name="A")
+    s.add(a, at=(4, 5))
+    b = instantiate("guildhand", scene=s, name="B")
+    s.add(b, at=(6, 5))
+    foe = _pc("fighter", feats=["Stance of the Xorn"])
+    s.add(foe, at=(5, 5))
+    s.grid = Grid()
+    assert position.attack_mods(s, a, foe) == []
+    assert position.flanking_with(s, a, foe, None)          # still flanked (sneak attack)
+    foe.add_condition("stunned", 1)
+    assert [m.value for m in position.attack_mods(s, a, foe)] == [2]
+
+
+def test_destroyer_s_blessing_regains_a_round_of_rage_and_heals_on_a_break():
+    pc = _pc("barbarian", feats=["Destroyer's Blessing"])
+    _s, e = _fight(pc, "thug")
+    assert _use(e, "Rage").status != "refused"
+    pool = "rage"
+    pc.spend_pool(pool, 3)
+    left = _left(pc, pool)
+    pc.hp -= 5
+    hp = pc.hp
+    effects: list = []
+    said = e._sunder_regains(pc, True, effects)
+    assert _left(pc, pool) == left + 1 and pc.hp == hp + 1, said
+    assert e._sunder_regains(pc, True, []) == []          # once a round
+    calm = _pc("barbarian", feats=["Destroyer's Blessing"])
+    _s, e = _fight(calm, "thug")
+    assert e._sunder_regains(calm, True, []) == []        # not raging
+
+
+def test_bewildering_koan_dazes_a_foe_that_loses_the_contest_for_a_ki():
+    pc = _pc("monk", feats=["Bewildering Koan"], ranks={"bluff": 8})
+    pc.abilities["cha"] = 30
+    scene, e = _fight(pc, "thug")
+    before = _left(pc, "ki")
+    out = _use(e, "Bewildering Koan", to="c1")
+    assert out.status != "refused", out.tell
+    assert _left(pc, "ki") == before - 1
+    won = _kinds(out, "contest")[0]["won"]
+    assert scene.actors["c1"].has_condition("dazed") == won
+
+
+def test_bewildering_koan_damage_mode_is_two_against_that_foe_for_a_round():
+    pc = _pc("monk", feats=["Bewildering Koan"], ranks={"bluff": 8})
+    pc.abilities["cha"] = 30
+    scene, e = _fight(pc, "thug")
+    out = _use(e, "Bewildering Koan (damage)", to="c1")
+    ctx = pc._roll_context(None, defender=scene.actors["c1"])
+    got = sum(m.value for m in pc._buff_mods("combat_mod", "damage", ctx))
+    assert got == (2 if _kinds(out, "contest")[0]["won"] else 0)

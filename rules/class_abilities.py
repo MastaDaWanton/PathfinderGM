@@ -335,7 +335,8 @@ DOC_KEYS = frozenset({
     "target_requires_said", "tell", "tell_off", "text", "toggle", "undead",
     "undead_only", "charge_condition", "charge_rounds", "charge_rounds_dice", "feat",
     "charge_push_ft", "gaze", "light", "runs", "eases", "hands_free",
-    "target_requires_not", "marked_by", "before", "overlay"})
+    "target_requires_not", "marked_by", "before", "overlay",
+    "contest"})
 SELF_KEYS = frozenset({"ends_when", "forbids", "modifiers", "natural_weapons", "rounds",
                        "strikes_as", "tags", "vs_target", "forgoes"})
 EFFECT_KEYS = frozenset({"condition", "modifiers", "on", "rounds", "skill_modifiers",
@@ -930,6 +931,9 @@ def validate_documents(docs: dict | None = None) -> list[str]:
                 if str(d.get("feat") or "") not in feats_mod.all_feats():
                     problems.append(f"feat: {d.get('name')!r} names no feat — `feat` is "
                                     f"the feats.json id that grants it ({d.get('feat')!r}).")
+            # A feat spends a class's own pool (Bewildering Koan's ki): any class's.
+            class_pools = {_norm(p.get("id")) for c in classes_mod.all_classes().values()
+                           for p in c.get("pools") or ()}
         else:
             cls = classes_mod.all_classes().get(cid)
             if not cls:

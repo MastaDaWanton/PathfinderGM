@@ -579,6 +579,67 @@
         }
       },
       "tell": "{name} speaks a word of healing."
+    },
+    {
+      "key": "bewildering koan",
+      "name": "Bewildering Koan",
+      "feat": "bewildering-koan",
+      "level": 1,
+      "aliases": [
+        "koan"
+      ],
+      "source": "Bewildering Koan (Gnomes of Golarion): 'As a swift action, spend 1 point from your ki pool and make a Bluff check by asking a creature one of the impossible questions you ponder when meditating. If the creature fails its check, you choose whether it loses its next action or you gain a +2 bonus on all damage rolls you make against that creature for 1 round.' The creature's check is its Sense Motive against the Bluff; 'loses its next action' is dazed for a round (owner call).",
+      "text": "Swift, 1 ki: Bluff against a foe's Sense Motive; beaten, it loses its next action, or you gain +2 damage against it for a round.",
+      "action": "swift",
+      "cost": {
+        "pool": "ki",
+        "amount": 1
+      },
+      "affects": "target",
+      "aim": "foe",
+      "harmful": true,
+      "contest": {
+        "skill": "bluff",
+        "against": "sense motive"
+      },
+      "choice": {
+        "kind": "mode",
+        "default": "lose action",
+        "options": {
+          "lose action": {
+            "aliases": [
+              "lose its action",
+              "lose their action",
+              "stun",
+              "bewilder"
+            ],
+            "effect": {
+              "condition": "dazed",
+              "rounds": 1
+            }
+          },
+          "damage": {
+            "aliases": [
+              "damage",
+              "hurt",
+              "wound"
+            ],
+            "self": {
+              "vs_target": true,
+              "rounds": 1,
+              "modifiers": [
+                {
+                  "type": "combat_mod",
+                  "target": "damage",
+                  "amount": 2,
+                  "bonus_type": "untyped"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "tell": "{name} asks {target} a question with no answer."
     }
   ]
 }

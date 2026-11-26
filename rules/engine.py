@@ -13879,6 +13879,9 @@ class Engine:
                     effects.append({"kind": "item_damage", "ref": defender.ref,
                                     "owner": defender.ref, "weapon": weapon["name"],
                                     **res})
+                    bits.extend(self._sunder_regains(
+                        actor, bool(res.get("broken") or res.get("destroyed"))
+                        and not was_broken, effects))
             cond = m.get("condition")
             if cond:
                 defender.add_condition(cond, source=f"{m['name']} by {actor.name}")
@@ -37959,6 +37962,28 @@ class Engine:
                                  f"and {shown} takes a lesser hold.")
                     each = {**doc, **over}
                 failed = False
+                # `contest`: a skill check against the creature's own (Bewildering Koan's
+                # Bluff against Sense Motive: "If the creature fails its check"). Lost by
+                # the user, the use reaches nobody.
+                contest = doc.get("contest") or {}
+                if contest and other is not actor:
+                    mine = self.dice.d20(actor.skill_modifiers(str(contest["skill"])),
+                                         label=f"{str(contest['skill']).title()}: {shown}",
+                                         visibility=intent.visibility or "player")
+                    theirs = self.dice.d20(
+                        other.skill_modifiers(str(contest["against"]), opposed=True),
+                        label=f"{other.name}'s {contest['against']}", visibility="hidden")
+                    rolls += [mine, theirs]
+                    won = mine.total > theirs.total
+                    records.append({"kind": "contest", "ref": other.ref,
+                                    "skill": contest["skill"], "against": contest["against"],
+                                    "won": won, "mine": mine.total, "theirs": theirs.total,
+                                    "origin": origin})
+                    tells.append(f"{actor.name}'s {contest['skill']} ({mine.total}) "
+                                 f"{'beats' if won else 'does not beat'} {other.name}'s "
+                                 f"{contest['against']} ({theirs.total}).")
+                    if not won:
+                        continue
                 dc_here = dc
                 if saving and other is not actor and doc.get("bonus_from"):
                     # A DC term scoped to the creature saving (`_bonus_from`'s ctx).
@@ -38113,8 +38138,10 @@ class Engine:
                                               shown, tells))
         # A missed touch leaves the use spent and nothing else: the price was paid above.
 
-        # 7. What it lays on the user: a stance, a timed bonus, a mark, a charge.
-        if hit_ok or not doc.get("attack"):
+        # 7. What it lays on the user: a stance, a timed bonus, a mark, a charge. A
+        # contest lost (`contest`) lays nothing.
+        if (hit_ok or not doc.get("attack")) and not (
+                doc.get("contest") and not any(a is not actor for a in landed)):
             mine = self._class_self_effect(actor, doc, origin, shown, key, target,
                                            pool_start, [a.ref for a in landed
                                                         if a is not actor])
@@ -38397,6 +38424,42 @@ class Engine:
         if bars:
             return (f"{name} does not work on {other.name} ({bars[0]}). Nothing is spent.")
         return ""
+
+    SUNDER_REGAINS: ClassVar[str] = "maneuver.sunder.regains"
+
+    def _sunder_regains(self, actor: Actor, broke: bool, effects: list) -> list[str]:
+        """Destroyer's Blessing (ARG): "When you are raging and you succeed at a sunder
+        combat maneuver, you regain 1 round of rage. If the sunder attempt causes the
+        object to gain the broken condition, you heal 1 hit point. You can only gain these
+        benefits once per round." The stance is the user's held one that drains a pool and
+        leaves an aftermath (its payload's `after` and `pool`), read off the effect; once a
+        round by a one-round marker on the one ticker."""
+        if not actor.has_state(self.SUNDER_REGAINS) \
+                or actor.has_state("spent.sunder-regains"):
+            return []
+        held = next((e for e in actor.effects if isinstance(e.payload, dict)
+                     and e.payload.get("after") and e.payload.get("pool")), None)
+        if held is None:
+            return []
+        pool = str(held.payload["pool"])
+        p = actor.pool(pool)
+        said = []
+        if p is not None and p.current < p.maximum:
+            now = actor.gain_pool(pool, 1)
+            effects.append({"kind": "resource", "ref": actor.ref, "pool": pool,
+                            "gained": 1, "left": now, "origin": "rule:feat/destroyers-blessing"})
+            said.append(f"{actor.name} draws a round of {pool} back from the wreckage.")
+        if broke:
+            got = max(0, actor.heal(1))
+            effects.append({"kind": "heal", "ref": actor.ref, "amount": got, "rolled": 1,
+                            "hp_after": actor.hp, "hp_max": actor.hp_max,
+                            "origin": "rule:feat/destroyers-blessing"})
+            said.append(f"{actor.name} recovers {got} hit point ({actor.hp}/{actor.hp_max}).")
+        actor.apply_effect(ActiveEffect(
+            name="Destroyer's Blessing", kind="buff", key="destroyers-blessing",
+            source="Destroyer's Blessing", origin="rule:feat/destroyers-blessing",
+            duration="rounds", rounds_left=1, tags=("spent.sunder-regains",)))
+        return said
 
     HARMONIC_DC: ClassVar[int] = 15
 

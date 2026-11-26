@@ -166,5 +166,16 @@
     "tags": [
       "teamwork.ensemble"
     ]
-  }
+  },
+  "stance-of-the-xorn": {
+    "tags": [
+      "defence.no-flank-bonus"
+    ]
+  },
+  "destroyer-s-blessing": {
+    "tags": [
+      "maneuver.sunder.regains"
+    ]
+  },
+  "bewildering-koan": {}
 }
