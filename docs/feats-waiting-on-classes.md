@@ -279,8 +279,31 @@ feature no playable class grants.
 
 - Practiced Tactician: the tactician class feature (cavalier, inquisitor)
 - Branded for Retribution: the bane class feature (inquisitor)
+- Righteous Healing: judgment (inquisitor)
+- Disruptive Recall: the arcane pool and spell recall (magus)
+- Extra Arcane Pool: the arcane pool (magus)
+- Contingent Channeling: true healer (the merciful healer cleric archetype; the content has
+  no archetypes)
+- Inquisitor bane and judgment: Double Bane, Extra Bane, Extended Bane, Intimidating Bane,
+  Menacing Bane, Merciful Bane, Spell Bane, Instant Judgment, Shared Judgment, Favored
+  Judgment, Judgment Surge
+- Witch hexes: Extra Hex, Seeds of Doubt, Hex Strike, Accursed Hex, Spell Hex, Split Major
+  Hex
+- Gunslinger grit, deeds and firearms: Amateur Gunslinger (a general feat, but grit, deeds
+  and firearm rules aren't built), Extra Grit, Gun Twirling, Named Bullet, Blowout Shot
+  Deed, Deft Shootist Deed, Leaping Shot Deed, No Name, Ricochet Shot Deed, Secret Stash
+  Deed
+- Summoner's eidolon: Summoner's Call, Extra Evolution, Focused Eidolon, Resilient
+  Eidolon, Sense Link, Vigilant Eidolon
+- Oracle mystery and revelations: Abundant Revelations, Prophetic Visionary
+- Alchemist bombs: Extra Bombs
 
 ## Systems not in the game (feat loop batch 3)
 
 - Savage Display: performance combat checks (Ultimate Combat's performance combat), which
   no part of the engine runs
+- Shaping Focus: multiclassing (a single-classed druid's druid level is already her
+  character level, so the feat changes nothing until a second class can be taken)
+- Ascendant Spell: mythic rules
+- Create Sanguine Elixir: Brew Potion, removed by the owner's 2026-11-22 ruling (item
+  creation lives at the benches), so no one can meet the prerequisite
