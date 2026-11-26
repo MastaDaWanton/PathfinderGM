@@ -231,13 +231,135 @@ def had(actor) -> list[dict]:
     not reached is not had."""
     level = level_of(actor)
     out = []
-    for src in sources(actor):
+    for src in sources(actor) + heritage_sources(actor):
+        # A heritage source (Eldritch Heritage) names the powers it gives by key and
+        # reads them at its own level; a class choice gives every power its level reached.
+        lvl, keys = int(src.get("level") or level), src.get("keys")
         for power in (src["entry"].get("powers") or ()):
-            if not isinstance(power, dict) or int(power.get("level", 1) or 1) > level:
+            if not isinstance(power, dict):
+                continue
+            if keys is not None:
+                if _norm(power.get("key")) not in keys:
+                    continue
+            elif int(power.get("level", 1) or 1) > lvl:
                 continue
             out.append({"label": src["label"], "kind": src["kind"], "id": src["id"],
-                        "power": resolve(power, level, src["vars"]), "vars": src["vars"]})
+                        "power": shift_level(resolve(power, lvl, src["vars"]), lvl - level),
+                        "vars": src["vars"], "level": lvl})
     return out
+
+
+# --- Eldritch Heritage (feat loop b3-arcane, 2026-11-26) -------------------------------------
+#
+# UM p.149/152, read on aonprd.com FeatDisplay 2026-11-26. Eldritch Heritage: "select one
+# sorcerer bloodline" you do not have, needing Skill Focus in its class skill; you gain
+# its 1st-level power "using your character level - 2 as your effective sorcerer level";
+# "you do not gain any of the other bloodline abilities". Improved: the 3rd- or 9th-level
+# power (taken again for the other), at character level - 2. Greater: one more power of
+# 15th level or lower, and "treat your character level as your sorcerer level for all
+# your sorcerer bloodline powers granted by this feat, Eldritch Heritage, and Improved".
+# The feat documents carry `heritage` (b3-arcane.json); the bloodline is Eldritch
+# Heritage's own parenthetical, "Eldritch Heritage (draconic red)", and each later feat's
+# parenthetical names the power, "Improved Eldritch Heritage (breath weapon)". Kept out
+# of `sources()` on purpose: that list also hands out bonus spells and class skills
+# (rules/casting.py), and the heritage gives neither.
+BLOODLINE_CATALOGUE = "sorcerer-bloodlines"
+
+
+def _heritage_skill_held(actor, skill: str) -> bool:
+    """Whether the sheet holds Skill Focus in this class skill ("knowledge (any one)", the
+    arcane bloodline's, is any Knowledge)."""
+    from . import feats as feats_mod
+
+    want = _norm(skill)
+    for raw in getattr(actor, "feats", None) or ():
+        feat, target = feats_mod.resolve(raw)
+        if feat is None or feat.id != "skill-focus" or not target:
+            continue
+        got = _norm(target)
+        if got == want or (want.startswith("knowledge (any") and got.startswith("knowledge")):
+            return True
+    return False
+
+
+def heritage_skill_any(actor) -> bool:
+    """Eldritch Heritage's prerequisite asked without its pick (`feats.meets` has no
+    target): Skill Focus in some bloodline's class skill. The pick itself is checked when
+    the power is read (`heritage_sources`), so a heritage in a bloodline whose skill the
+    sheet lacks gives nothing."""
+    from . import classes as classes_mod
+
+    cat = classes_mod.catalogue(BLOODLINE_CATALOGUE) or {}
+    return any(_heritage_skill_held(actor, o.get("class_skill") or "")
+               for o in cat.get("options") or () if isinstance(o, dict))
+
+
+def heritage_sources(actor) -> list[dict]:
+    """The bloodline an Eldritch Heritage feat names, as a source of the powers the
+    heritage feats give, each read at the heritage's level; [] when none is held, the
+    bloodline is unknown or already the character's own, or its Skill Focus is missing."""
+    from . import classes as classes_mod, feats as feats_mod
+
+    docs = [d for d in (feats_mod.document(r) for r in getattr(actor, "feats", None) or ())
+            if d and isinstance(d.get("heritage"), dict)]
+    base = next((d for d in docs if not d["heritage"].get("pick")), None)
+    if base is None or not base.get("target"):
+        return []
+    words = _norm(base["target"]).replace(":", " ").replace(",", " ").split()
+    bid, variant = words[0], " ".join(words[1:])
+    if bid in {_norm(p.get("id")) for p in classes_mod.chosen(actor, "bloodline")}:
+        return []                                   # "a bloodline you do not already have"
+    entry = next((e for doc in files().values() if label_of(doc) == "bloodline"
+                  for k, e in (doc.get("entries") or {}).items() if _norm(k) == bid), None)
+    cat = next((o for o in (classes_mod.catalogue(BLOODLINE_CATALOGUE) or {}).get("options")
+                or () if isinstance(o, dict) and _norm(o.get("id")) == bid), None)
+    if not isinstance(entry, dict) or cat is None \
+            or not _heritage_skill_held(actor, cat.get("class_skill") or ""):
+        return []
+    by_level = {}
+    for p in entry.get("powers") or ():
+        if isinstance(p, dict):
+            by_level.setdefault(int(p.get("level", 1) or 1), []).append(_norm(p.get("key")))
+    keys = set()
+    for d in docs:
+        rule = d["heritage"]
+        at = [int(n) for n in rule.get("powers") or ()]
+        if not rule.get("pick"):
+            keys |= {k for n in at for k in by_level.get(n, ())}
+        elif d.get("target") and _norm(d["target"]) in {k for n in at
+                                                       for k in by_level.get(n, ())}:
+            keys.add(_norm(d["target"]))
+    offset = min(int(d["heritage"].get("level_offset", 0) or 0) for d in docs)
+    if any(d["heritage"].get("lifts") for d in docs):
+        offset = 0
+    level = max(1, int(getattr(actor, "level", 1) or 1) + offset)
+    pick = {"id": bid, "variant": variant, "entry": cat}
+    return [{"label": f"{cat.get('name') or bid} bloodline (Eldritch Heritage)",
+             "kind": "bloodline", "id": bid, "entry": entry, "pick": pick,
+             "vars": _variant_fields(pick), "level": level, "keys": keys}]
+
+
+_LEVEL_WORD = re.compile(r"\blevel\b")
+
+
+def shift_level(doc, delta: int):
+    """A document whose formulas read `level` as `level + delta` — the heritage's
+    "character level - 2 as your effective sorcerer level" for every number the power's
+    own formulas scale (Acidic Ray's `floor(level / 2)`), without a second variable.
+    Only formula-bearing strings change; a `line` or `tell` is left alone."""
+    if not delta:
+        return doc
+    if isinstance(doc, dict):
+        return {k: (v if k in ("line", "name", "text", "source", "tell", "key", "power",
+                               "entry", "kind", "not_yet", "label")
+                    else shift_level(v, delta)) for k, v in doc.items()}
+    if isinstance(doc, list):
+        return [shift_level(v, delta) for v in doc]
+    if isinstance(doc, str) and _LEVEL_WORD.search(doc) and (
+            doc.strip() == "level" or any(c in doc for c in "+-*/(")):
+        return _LEVEL_WORD.sub(f"(level - {-delta})" if delta < 0 else f"(level + {delta})",
+                               doc)
+    return doc
 
 
 # --- the readers -----------------------------------------------------------------------------

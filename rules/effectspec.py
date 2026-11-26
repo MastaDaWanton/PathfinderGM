@@ -2515,6 +2515,9 @@ WHEN_KEYS: dict[str, str] = {
     # Intimidating Confidence's "when you confirm a critical hit".
     "flanking_with": "flanking the roll's target with an ally who holds a feat: "
                      "{\"feat\": \"outflank\"} (classfeatures.holds)",
+    # Feat loop b3: whether the one identifying a casting knows the spell (Spell Bluff).
+    "spell_known": "whether the spell being identified is one the bearer knows or has in "
+                   "their spellbook (skilluses.identify_casting)",
     "critical": "whether the hit was a confirmed critical (Engine._feat_riders)",
     "nonlethal": "whether the hit dealt nonlethal damage (Engine._feat_riders)",
     # Feat loop b3-divine: War Singer's "a battlefield (any area where a combat involving
@@ -2526,12 +2529,15 @@ WHEN_KEYS: dict[str, str] = {
 # `larger` / `smaller` (feat loop b2): size categories against the bearer's own, answered
 # by `classfeatures.holds` where the bearer is known (Risky Striker, Underfoot).
 _WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment", "choice",
-                                  "state", "aloft", "larger", "smaller"),
-                       "attacker": ("type", "subtype", "larger", "smaller", "unprovoked")}
+                                  "state", "aloft", "larger", "smaller", "casts"),
+
+                       "attacker": ("type", "subtype", "larger", "smaller", "unprovoked",
+                                    "alignment")}
 _WHEN_COMPARE = ("lte", "gte", "lt", "gt", "eq")
 _WHEN_BOOLS = ("daylight", "underground", "wielder_casts", "resting", "full_attack",
                "flanked", "sole_threat", "opportunity", "first_attack", "adjacent",
-               "own_turn", "critical", "nonlethal")
+               "own_turn", "critical", "nonlethal", "spell_known")
+
 
 # What a roll may be made AGAINST — the `against` of a roll context, one word per danger,
 # each with the reader that passes it. A closed list, because the clause is answered by
@@ -2651,7 +2657,10 @@ CASTING_SITUATIONS: dict[str, str] = {
     "damaged": "struck while casting: DC 10 + the damage taken + the spell's level",
     "disrupted": "under a disruptive spell: DC its save DC + the spell's level "
                  "(Disruptive Spell)",
+    "bright_light": "a tenebrous spell cast in bright light: DC 15 + twice its slot's "
+                    "level (Tenebrous Spell)",
 }
+
 
 
 def when_problems(when, where: str = "when") -> list[str]:
@@ -2725,10 +2734,11 @@ def when_problems(when, where: str = "when") -> list[str]:
         elif key == "ally_beside":
             from . import feats as feats_mod
 
-            if (not isinstance(want, dict) or set(want) - {"feat", "foe_larger"}
+            if (not isinstance(want, dict) or set(want) - {"feat", "foe_larger", "shield"}
                     or str(want.get("feat") or "") not in feats_mod.all_feats()):
                 out.append(f"{where}.ally_beside is {{\"feat\": \"<a feat id>\"}}, with "
-                           f"an optional \"foe_larger\": true.")
+                           f"an optional \"foe_larger\": true and \"shield\": true (the "
+                           f"ally wields one).")
         elif key in ("weapon", "armour", "bearer", "near"):
             if not isinstance(want, dict) or not want:
                 out.append(f"{where}.{key} is an object of the fields it asks.")

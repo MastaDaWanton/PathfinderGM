@@ -1,0 +1,457 @@
+{
+  "_about": [
+    "Feat loop batch 3, lane b3-arcane (2026-11-26): the arcane class-feature hooks a",
+    "playable class can use (the sorcerer's bloodline by feat, the druid's wild empathy) and",
+    "the spell-hook and metamagic leftovers of batches 1-2. Text read on aonprd.com",
+    "FeatDisplay pages 2026-11-26; the feats whose class no player can take yet are listed",
+    "in docs/feats-waiting-on-classes.md, not here."
+  ],
+  "eldritch-heritage": {
+    "heritage": {
+      "powers": [
+        1
+      ],
+      "level_offset": -2
+    }
+  },
+  "improved-eldritch-heritage": {
+    "heritage": {
+      "powers": [
+        3,
+        9
+      ],
+      "level_offset": -2,
+      "pick": true
+    }
+  },
+  "greater-eldritch-heritage": {
+    "heritage": {
+      "powers": [
+        3,
+        9,
+        15
+      ],
+      "level_offset": 0,
+      "pick": true,
+      "lifts": true
+    }
+  },
+  "tapestry-traveler": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "spell_cl",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "subschool": "teleportation"
+        },
+        "note": "PSP: 'You cast spells of the teleportation subschool as though your caster level were 2 higher'"
+      }
+    ],
+    "not_yet": [
+      "one step more familiar when teleporting to an established lodge of the book's own setting: a World Bible world has no such lodges, and teleport's familiarity is not modelled",
+      "a supernatural teleport's distance at class level + 2: no player class teleports as a supernatural ability"
+    ]
+  },
+  "mage-of-the-wild": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "caster_level",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "terrain": "$pick"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "concentration",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "terrain": "$pick"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (arcana)",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "terrain": "$pick"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "spellcraft",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "terrain": "$pick"
+          }
+        }
+      }
+    ],
+    "not_yet": [
+      "the terrain is Mage of the Wild's own parenthetical, \"Mage of the Wild (forest)\", one of the Attuned to the Wild terrains the sheet should also hold: nothing checks that the two match"
+    ]
+  },
+  "shieldwall-phalanx": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "formula": "allies",
+        "bonus_type": "sacred",
+        "when": {
+          "attacker": {
+            "alignment": "evil"
+          }
+        },
+        "note": "Champions of Purity: a sacred bonus to AC against evil creatures' attacks, one per adjacent ally with the feat; alignment is not tracked (owner ruling 2026-10-05), so any attacker"
+      },
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "formula": "allies",
+        "bonus_type": "sacred",
+        "when": {
+          "attacker": {
+            "alignment": "evil"
+          }
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "formula": "allies",
+        "bonus_type": "sacred",
+        "when": {
+          "attacker": {
+            "alignment": "evil"
+          }
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "will",
+        "formula": "allies",
+        "bonus_type": "sacred",
+        "when": {
+          "attacker": {
+            "alignment": "evil"
+          }
+        }
+      }
+    ],
+    "not_yet": [
+      "saves against an evil creature's ability that is not a spell: only a spell's save says who made it (Engine._cast_save)"
+    ]
+  },
+  "duck-and-cover": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "attack": "ranged",
+          "ally_beside": {
+            "feat": "duck-and-cover",
+            "shield": true
+          }
+        },
+        "note": "APG: '+2 cover bonus to your AC against ranged attacks as long as your ally is wielding a shield'; cover is untyped here"
+      }
+    ],
+    "not_yet": [
+      "taking the adjacent ally's Reflex die (and falling prone for it) when both save against the same effect: a save is rolled one creature at a time"
+    ]
+  },
+  "vermin-heart": {
+    "tags": [
+      "reach.vermin-as-animals"
+    ]
+  },
+  "exile-s-path": {
+    "luck": [
+      {
+        "reroll": "any",
+        "rolls": [
+          "save.will"
+        ],
+        "against": [
+          "enchantment"
+        ],
+        "per_day": 1
+      }
+    ]
+  },
+  "arcane-vendetta": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "target": {
+            "state": "mark.arcane-vendetta"
+          }
+        },
+        "note": "ISWG: +2 damage with weapon attacks against a target seen casting an arcane spell in the last 5 rounds and identified by Spellcraft (rules/skilluses.py _arcane_vendetta lays the mark)"
+      }
+    ],
+    "tags": [
+      "witness.arcane-vendetta"
+    ]
+  },
+  "sorcerous-bloodstrike": {
+    "tags": [
+      "power.bloodline.regain-on-kill"
+    ]
+  },
+  "echoing-spell": {
+    "metamagic": {
+      "does": "echo",
+      "levels": 3
+    }
+  },
+  "tenebrous-spell": {
+    "metamagic": {
+      "does": "tenebrous",
+      "levels": 1
+    },
+    "not_yet": [
+      "the -2 on dispelling a tenebrous spell in darkness and the +4 in bright light: a dispel's DC does not know who cast the effect it ends"
+    ]
+  },
+  "blood-ties": {
+    "tags": [
+      "skill.bluff.blood-ties"
+    ]
+  },
+  "unsanctioned-knowledge": {
+    "spell_list_add": {
+      "from": [
+        "bard",
+        "cleric",
+        "inquisitor",
+        "oracle"
+      ],
+      "levels": [
+        1,
+        2,
+        3,
+        4
+      ]
+    }
+  },
+  "divine-denouncer": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "bluff",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "diplomacy",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "intimidate",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "perform",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        },
+        "note": "the one Perform skill: oratory is not a separate skill here"
+      },
+      {
+        "type": "skill_mod",
+        "target": "sense motive",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (arcana)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (dungeoneering)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (engineering)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (geography)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (history)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (local)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (nature)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (nobility)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (planes)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (religion)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      }
+    ],
+    "not_yet": [
+      "an outsider that casts spells as a cleric without a casting class: only a creature with a casting class is a caster to the engine (casting.is_caster)"
+    ]
+  },
+  "spell-bluff": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "spellcraft",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "skill_use": "identify-casting",
+          "spell_known": true
+        },
+        "note": "UM: +2 on Spellcraft to identify an opponent's spell you know or have in your spellbook"
+      }
+    ],
+    "not_yet": [
+      "the +2 to counter that spell and the +4 on a counterspeller's Spellcraft DC against yours: counterspelling is not built (there is no readied action to counter with)"
+    ]
+  },
+  "racial-heritage": {
+    "tags": [
+      "race.$target",
+      "subtype.$target"
+    ]
+  }
+}

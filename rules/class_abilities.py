@@ -364,7 +364,8 @@ DOC_KEYS = frozenset({
 def _ally_want_problems(at: str, want) -> list[str]:
     """`requires_ally` / `self.ends_when.ally`: {"state", "within_ft", "far_feat",
     "far_ft"} (`feat_events.ally_holds`)."""
-    if not isinstance(want, dict) or not str(want.get("state") or "").strip()             or set(want) - {"state", "within_ft", "far_feat", "far_ft"}:
+    if not isinstance(want, dict) or not str(want.get("state") or "").strip() \
+            or set(want) - {"state", "within_ft", "far_feat", "far_ft"}:
         return [f"{at} is {{\"state\": \"buff.stance.rage\", \"within_ft\": 5}}, with an "
                 f"optional far_feat and far_ft."]
     return []
@@ -531,8 +532,12 @@ def _docs_for(actor) -> list[dict]:
                 # was offered "Claws" twice, the second with the demon's fire rider).
                 if row is not None and (not doc.get("entry")
                                         or _norm(doc["entry"]) == _norm(row["id"])):
-                    out.append({**grantedpowers.resolve(doc, level_of(actor), row["vars"]),
-                                "class": kind})
+                    # A heritage power reads its own level (Eldritch Heritage's
+                    # character level - 2), its rungs and formulas both.
+                    lvl = int(row.get("level") or level_of(actor))
+                    out.append({**grantedpowers.shift_level(
+                        grantedpowers.resolve(doc, lvl, row["vars"]), lvl - level_of(actor)),
+                        "class": kind})
     return out
 
 

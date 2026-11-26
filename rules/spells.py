@@ -1122,7 +1122,7 @@ _TYPE_WORDS = ("monstrous humanoid", "magical beast", "aberration", "animal", "c
                "dragon", "fey", "humanoid", "ooze", "outsider", "plant", "undead", "vermin")
 
 
-def spared_by(spell, target, hit_dice: int) -> str:
+def spared_by(spell, target, hit_dice: int, caster=None) -> str:
     """Why this spell's target line keeps `target` out of it, as the end of a sentence
     ("is no humanoid"), or "". Read off the spell's own `targets` line: "creature, humanoid
     with 4 HD or less (1)" (daze), "creature, living with 5 HD or less" (cause fear).
@@ -1153,8 +1153,15 @@ def spared_by(spell, target, hit_dice: int) -> str:
     rest = line
     for word in _TYPE_WORDS:
         if re.search(rf"\b{word}\b", rest):
-            if typed and not _is_of_kind(target, "type", word):
+            # Vermin Heart: vermin answer to "animal" for a caster who holds it.
+            from .animals import VERMIN_AS_ANIMALS
+
+            vermin_ok = (word == "animal" and caster is not None
+                         and caster.has_state(VERMIN_AS_ANIMALS)
+                         and target.has_state("type.vermin"))
+            if typed and not _is_of_kind(target, "type", word) and not vermin_ok:
                 return f"is no {word}"
+
             # "monstrous humanoid" must not also be read as "humanoid".
             rest = re.sub(rf"\b{word}\b", "", rest)
             break

@@ -29,7 +29,7 @@ from pathfindergm import files
 # rather than ignored — see the module docstring.
 CHECKABLE = {
     "ability", "bab", "caster_level", "character_level", "class_level", "skill_ranks",
-    "feat", "race", "race_any", "size", "alignment", "class_feature",
+    "feat", "race", "race_any", "size", "alignment", "class_feature", "heritage_skill",
 }
 
 # Kinds the extractor types but the sheet cannot answer yet. Listed separately from the
@@ -111,7 +111,26 @@ def from_dict(d: dict) -> Feat:
     known = Feat.__dataclass_fields__
     feat = Feat(**{k: v for k, v in d.items() if k in known})
     _monk_alternative(feat)
+    _heritage_skill(feat)
     return feat
+
+
+# Eldritch Heritage (UM p.149): "Skill Focus with the class skill of bloodline selected for
+# this feat". The extractor could not type it, so the feat was untakeable and the two
+# heritage feats after it with it (feat loop b3-arcane, 2026-11-26). Typed here as a
+# condition `meets` can answer without the pick — Skill Focus in some bloodline's class
+# skill — and the pick's own skill is asked when its power is read
+# (`grantedpowers.heritage_sources`).
+_HERITAGE_SKILL = "skill focus with the class skill of bloodline"
+
+
+def _heritage_skill(feat: Feat) -> None:
+    for text in list(feat.unparsed_prerequisites):
+        if str(text).strip().lower().startswith(_HERITAGE_SKILL):
+            feat.unparsed_prerequisites = [t for t in feat.unparsed_prerequisites
+                                           if t != text]
+            feat.prerequisites = list(feat.prerequisites) + [
+                {"kind": "heritage_skill", "text": "Skill Focus in the bloodline's class skill"}]
 
 
 # "base attack bonus +2 or monk level 1st" (the style feats, Ultimate Combat): the
@@ -406,6 +425,10 @@ def _check(actor, cond: dict) -> bool | None:
         return actor.bab >= int(cond["value"])
     if kind == "character_level":
         return actor.level >= int(cond["value"])
+    if kind == "heritage_skill":
+        from . import grantedpowers
+
+        return grantedpowers.heritage_skill_any(actor)
     if kind == "caster_level":
         from . import casting
 

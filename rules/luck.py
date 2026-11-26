@@ -54,9 +54,14 @@ def _entries(actor):
             yield doc, entry
 
 
-def covers(entry: dict, kind: str) -> bool:
-    """Whether an entry's `rolls` take in this roll (prefixes at a dot or space)."""
+def covers(entry: dict, kind: str, against=()) -> bool:
+    """Whether an entry's `rolls` take in this roll (prefixes at a dot or space), and —
+    when the entry names `against` — the roll is made against one of those (feat loop
+    b3: Exile's Path's "a Will save against an enchantment spell or effect"; the words of
+    `effectspec.AGAINST`, handed in by the save that rolls)."""
     if not kind:
+        return False
+    if entry.get("against") and not set(entry["against"]) & set(against or ()):
         return False
     for want in entry.get("rolls") or ("d20",):
         want = str(want).lower()
@@ -111,14 +116,16 @@ def before_offers(actor, kind: str) -> list[dict]:
 
 
 def after_offers(actor, kind: str, roll, short: bool | None,
-                 skip: str = "") -> list[dict]:
+                 skip: str = "", against=()) -> list[dict]:
     """What may be done once the die is down: a reroll or a bonus. `short` is whether the
     total misses what it needed (None when that is not known — an opposed check); the
     offers that only matter on a miss are made only then, so the popup does not ask about
     every roll of the day."""
     out = []
     for doc, entry in _entries(actor):
-        if doc["id"] == skip or not covers(entry, kind) or not uses_left(actor, doc, entry):
+        if doc["id"] == skip or not covers(entry, kind, against) \
+                or not uses_left(actor, doc, entry):
+
             continue
         how = entry.get("reroll")
         if how == "natural_1" and roll.natural == 1:

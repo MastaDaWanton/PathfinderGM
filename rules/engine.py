@@ -7952,6 +7952,13 @@ class Engine:
             situations.append(("disrupted",
                                int((disrupted.payload or {}).get("dc", 10)) + level,
                                f"under {disrupted.source or 'a disruptive spell'}"))
+        # Tenebrous Spell: "Casting a tenebrous spell in bright light is difficult, and
+        # requires a concentration check (DC 15 + twice the tenebrous spell's effective
+        # spell level)" — the slot it fills.
+        if metamagic.flag(spell, "tenebrous") and self._caster_light(actor) == "bright":
+            slot = level + metamagic.levels(actor, metamagic.chosen(intent.params), spell)
+            situations.append(("bright_light", 15 + 2 * slot,
+                               "casting a tenebrous spell in bright light"))
         situations = self._distracted(actor, situations)
         ctx_of = casting.spell_context(spell, adjacent_allies=self._adjacent_allies(actor))
         for kind, dc, why in situations:
@@ -8299,6 +8306,8 @@ class Engine:
                 out.about = _about_refs(intent, self.scene)
             if intent.op == "cast" and isinstance(out, Outcome) and out.status == "resolved":
                 self._identify_casting(intent, out)
+                self._bloodstrike(intent, out)
+                self._echo_left(intent, out)
             return out
         finally:
             if m is not None:
@@ -8324,7 +8333,105 @@ class Engine:
         if record:
             out.effects += [record]      # the outcome's record, as `done.effects +=` above
 
+    def _caster_light(self, actor: Actor) -> str:
+        """The light where this creature stands — "dark", "dim", "normal" or "bright" —
+        as the place is lit, whoever looks (`Scene.light_at` with no viewer)."""
+        pos = (self.scene.positions or {}).get(actor.ref)
+        return self.scene.light_at(tuple(pos[:2]) if pos else None)
+
+    def _spend_echo(self, actor: Actor, spell) -> dict:
+
+        """The echo an Echoing Spell left (`casting.echo_tag`) spent for this casting,
+        through the applicator: remove the effect and the second casting is gone."""
+        gone = actor.remove_effects(
+            match=lambda e: casting.echo_tag(spell.id) in (e.tags or ()))
+        return {"ok": bool(gone)}
+
+    def _echo_left(self, intent: Intent, out) -> None:
+        """An echoing cast resolved: the spell stays in memory for one more casting today
+        (UM, Echoing Spell), an effect on the caster a night's sleep ends."""
+        from .activeeffect import ActiveEffect
+
+        cast = next((e for e in out.effects or () if isinstance(e, dict)
+                     and e.get("kind") == "cast" and e.get("spell")), None)
+        caster = self.scene.actors.get(intent.actor or "")
+        if cast is None or caster is None or "echoing-spell" not in [
+                metamagic.base_id(m) for m in metamagic.chosen(intent.params)]:
+            return
+        try:
+            spell = spells_mod.get(str(cast["spell"]))
+        except KeyError:
+            return
+        # A condition only so the night's sweep reaches it (`Actor.clear_states` asks
+        # conditions): "during that day".
+        caster.apply_effect(ActiveEffect(
+            name=f"Echo of {spell.name}", kind="condition", key="echoing",
+            source="Echoing Spell",
+
+            origin="feat:echoing-spell", duration="until-dismissed",
+            tags=(casting.echo_tag(spell.id), "recovery.rest")))
+        out.tell = (f"{out.tell} {spell.name} echoes in {caster.name}'s memory: it can be "
+                    f"cast once more today without a slot.").strip()
+        out.effects += [
+            {"kind": "echo", "ref": caster.ref, "spell": spell.id,
+             "origin": "feat:echoing-spell"}]
+
+    def _bloodstrike(self, intent: Intent, out) -> None:
+
+        """Sorcerous Bloodstrike (UM p.156, aonprd 2026-11-26): "Once per day, as an
+        immediate action upon reducing a creature to 0 or fewer hit points with one of
+        your sorcerer spells, you can regain one usage of a sorcerer bloodline power that
+        has a limited number of uses per day. The slain creature must have at least half as
+        many Hit Dice as your sorcerer level. You cannot use this feat to gain another
+        usage of a bloodline power that you have not yet used today."
+
+        Taken whenever it can be (owner call, b3-arcane: nobody declines a free use back):
+        the power regained is the most spent of the bloodline's daily pools, the immediate
+        action spent through the one swift door, the feat's own once-a-day pool spent, and
+        both told. A heritage power (Eldritch Heritage) is not a sorcerer's bloodline power.
+        """
+        from . import class_abilities as ca, grantedpowers, resources
+
+        caster = self.scene.actors.get(intent.actor or "")
+        if caster is None or ca.class_of(caster) != "sorcerer" \
+                or not caster.has_state("power.bloodline.regain-on-kill"):
+            return
+
+        felled = [f for f in out.effects or () if isinstance(f, dict)
+                  and f.get("kind") == "damage" and f.get("ref") != caster.ref
+                  and f.get("hp_after") is not None and int(f["hp_after"]) <= 0
+                  and f.get("ref") in self.scene.actors
+                  and 2 * ca.hit_dice_of(self.scene.actors[f["ref"]]) >= int(caster.level)]
+        if not felled:
+            return
+        spent = []
+        for row in grantedpowers.had(caster):
+            if row["kind"] != "bloodline" or "Eldritch Heritage" in row["label"]:
+                continue
+            pid = str(row["power"].get("key") or "").strip().lower()
+            pool = caster.pool(pid) if isinstance(row["power"].get("pool"), dict) else None
+            if pool is not None and pool.current < pool.maximum:
+                spent.append((pool.maximum - pool.current, pid, row["power"]))
+        if not spent:
+            return
+        daily = resources.define(caster, {"id": "sorcerous-bloodstrike", "max": "1",
+                                          "refresh": "rest.night",
+                                          "source": "Sorcerous Bloodstrike"})
+        if daily.current < 1 or self._spend_swift(caster, immediate=True,
+                                                   what="Sorcerous Bloodstrike"):
+            return
+        _gap, pid, power = max(spent, key=lambda t: t[0])
+        caster.spend_pool("sorcerous-bloodstrike")
+        caster.gain_pool(pid, 1, source="Sorcerous Bloodstrike")
+        name = str(power.get("name") or pid)
+        out.tell = (f"{out.tell} {caster.name} draws on the kill (Sorcerous Bloodstrike): "
+                    f"one use of {name} comes back.").strip()
+        out.effects += [
+            {"kind": "resource", "ref": caster.ref, "pool": pid, "regained": 1,
+             "origin": "feat:sorcerous-bloodstrike"}]
+
     def _articled(self, outcome):
+
         """A tell names every person by a label with its article (`names.with_articles`).
 
         Measured live 2026-09-29: "You leave man mid-sentence" — a person the prose had
@@ -9318,9 +9425,16 @@ class Engine:
         if ability:
             mods = actor.ability_check_modifiers(ability)
         else:
+            # Who the check is made at rides the context (feat loop b3: Divine
+            # Denouncer's checks "involving any divine spellcaster"), as a blow's does.
+            ctx = self._skill_use_ctx(intent, skill)
+            aimed = self.scene.actors.get(str(intent.target or ""))
+            if aimed is not None and aimed is not actor:
+                ctx = {**(ctx or {}), "target_actor": aimed}
             mods, refused = self._skill_mods_or_refusal(
                 intent, actor, skill, opposed=bool(intent.params.get("opposed_by")),
-                ctx=self._skill_use_ctx(intent, skill))
+                ctx=ctx)
+
             if refused is not None:
                 return refused
         for (named_skill, flag), resolve in skilluses.OWN_DOORS.items():
@@ -9521,6 +9635,8 @@ class Engine:
         swayed = None if heard is not None else self._sway_subject(intent, skill)
         if swayed is not None and (refusal := self._sway_refusal(intent, actor, swayed, skill)):
             return refusal
+        if swayed is not None and skill == "diplomacy":
+            mods = self._blood_ties(actor, swayed, mods)
         # Intimidate in a fight at one on a side is Demoralize (`_sway`): its own roll.
         if swayed is not None and skill == "intimidate" and self.scene.in_encounter and any(
                 swayed.ref in refs for refs in (self.scene.sides or {}).values()):
@@ -10092,7 +10208,41 @@ class Engine:
                   f"hear it again. Come back tomorrow, or find another way."),
             because=intent.because)
 
+    # Blood Ties (Gnomes of Golarion p.30, aonprd 2026-11-26): "When attempting a Diplomacy
+    # check to influence a creature with a plausible connection to your sorcerous
+    # bloodline, you may instead make a Bluff check. For example, a gnome sorcerer with the
+    # draconic bloodline may use this feat against dragons and their kin, but no other
+    # creatures." The book names only the draconic case; the rest is this app's reading of
+    # "plausible" (owner call, b3-arcane), by the creature's own type or subtype tags. The
+    # arcane and destined bloodlines name no kind of creature and reach nobody.
+    BLOOD_KIN: dict[str, tuple[str, ...]] = {
+        "draconic": ("type.dragon",), "abyssal": ("subtype.demon",),
+        "infernal": ("subtype.devil",), "fey": ("type.fey",), "undead": ("type.undead",),
+        "aberrant": ("type.aberration",),
+        "celestial": ("subtype.angel", "subtype.archon", "subtype.azata",
+                      "subtype.agathion"),
+        "elemental": ("subtype.$element",),
+    }
+
+    def _blood_ties(self, actor, target, mods: list) -> list:
+        """Diplomacy's terms, or the bearer's Bluff in their place when Blood Ties reaches
+        this creature and the Bluff is the better (the feat's "may": taken when it helps)."""
+        from . import classes as classes_mod
+
+        if not actor.has_state("skill.bluff.blood-ties"):
+            return mods
+        for pick in classes_mod.chosen(actor, "bloodline"):
+            kin = [t.replace("$element", str(pick.get("variant") or "").lower())
+                   for t in self.BLOOD_KIN.get(str(pick.get("id") or "").lower(), ())]
+            if any(t and not t.endswith(".") and target.has_state(t) for t in kin):
+                bluff = list(actor.skill_modifiers("bluff"))
+                if sum(m.value for m in bluff) > sum(m.value for m in mods):
+                    return [Modifier(m.value, f"{m.source} (Bluff, Blood Ties)", m.type)
+                            for m in bluff]
+        return mods
+
     def _sway(self, actor, target, skill: str, margin: int, because: str,
+
               demand: str = ""):
         """Move the target along the track, and say how they now feel.
 
@@ -10327,11 +10477,17 @@ class Engine:
         level = actor.level if actor.is_pc else 1
         resolved_dc = dc_mod.resolve(intent.params["dc"], level)
 
-        roll = self._roll_or_suspend(
-            intent, actor, mods, label=f"{SAVES[save]} save",
-            dc=resolved_dc.final, partial=partial, extra_partial={"save_gutter": gut},
-            kind=f"save.{save}",
-        )
+        self._luck_against = tuple((ctx or {}).get("against") or ())
+        if isinstance((ctx or {}).get("against"), str):
+            self._luck_against = (ctx["against"],)
+        try:
+            roll = self._roll_or_suspend(
+                intent, actor, mods, label=f"{SAVES[save]} save",
+                dc=resolved_dc.final, partial=partial, extra_partial={"save_gutter": gut},
+                kind=f"save.{save}",
+            )
+        finally:
+            self._luck_against = ()
 
         # The face decides before the total (CRB p.180; `dice.d20_succeeds`). Until
         # 2026-09-28 this read `margin >= 0` alone, so a natural 20 short of the DC failed
@@ -30394,6 +30550,12 @@ class Engine:
         dc = int(item["dc"]) if item else casting.save_dc(actor, level, spell)
         cl = int(item["cl"]) if item else casting.spell_caster_level(
             actor, spell, adjacent_allies=self._adjacent_allies(actor))
+        # Tenebrous Spell (Inner Sea Magic, aonprd 2026-11-26): "When you cast a tenebrous
+        # spell in darkness or dim light, the spell's effective caster level and any
+        # associated save DCs are increased by 1" — the light where the caster stands.
+        if not item and metamagic.flag(spell, "tenebrous") \
+                and self._caster_light(actor) in ("dark", "dim"):
+            cl, dc = cl + 1, dc + 1
         plan = spells_mod.casting_plan(spell, cl)
         dice = plan["dice"]
         # A spell of missiles (`spells.missiles_at`): its dice are one missile's, rolled
@@ -30504,6 +30666,7 @@ class Engine:
             # 2026-09-29: this spent "spell slot 0" per cast, and a level 5 wizard's Light
             # went 4, 3, 2, 1, 0 and was then refused. Nothing is spent, nothing unprepared.
             spent = {"ok": True} if casting.at_will(level) or item \
+                else self._spend_echo(actor, spell) if source.get("echo") \
                 else actor.spend_pool(pool, max(1, int(source.get("cost", 1) or 1)))
             if not spent["ok"]:
                 # The mid-list case, measured: six casts in one list PASS validation
@@ -30524,6 +30687,8 @@ class Engine:
                 if source.get("key") and casting.prepared_count(actor, source["key"]) > 0:
                     # The copy in the slot that paid: ordinary, domain or school.
                     casting.unprepare(actor, source["key"], 1)
+                elif source.get("echo"):
+                    pass                 # Echoing Spell: no slot, no copy (`_spend_echo`)
                 else:
                     # Spontaneous conversion: the cure is cast and the prepared spell that
                     # paid for it is gone. Said out loud, because a player whose shield of
@@ -31133,10 +31298,17 @@ class Engine:
                 save, {"against": effectspec.spell_against(spell)
                        + self._spell_source_words(caster, spell),
                        "attacker_actor": caster}) + list(extra)
-        roll = self._roll_or_suspend_stage(
-            intent, target, save_mods, f"{SAVES[save]} save against {spell.name}"
-            + (" again (persistent)" if again else ""), dc,
-            partial, state, "1d20", state_key="cast_state")
+        # The save a spell calls for carries luck too (feat loop b3: Exile's Path's
+        # reroll of "a Will save against an enchantment spell"); until then a cast's
+        # saves were the one save door no reroll reached.
+        self._luck_against = tuple(effectspec.spell_against(spell))
+        try:
+            roll = self._roll_or_suspend_stage(
+                intent, target, save_mods, f"{SAVES[save]} save against {spell.name}"
+                + (" again (persistent)" if again else ""), dc,
+                partial, state, "1d20", state_key="cast_state", kind=f"save.{save}")
+        finally:
+            self._luck_against = ()
         state["rolls"].append(roll.as_dict())
         saved = d20_succeeds(roll, dc)
         self._judge(roll, saved)
@@ -31826,7 +31998,7 @@ class Engine:
             spared: dict[str, str] = {}
             for ref in others:
                 who = self.scene.actors[ref]
-                why = spells_mod.spared_by(spell, who, ca.hit_dice_of(who))
+                why = spells_mod.spared_by(spell, who, ca.hit_dice_of(who), actor)
                 if why:
                     spared[ref] = why
             pool = spells_mod.HD_POOL.get(spell.id)
@@ -32694,8 +32866,17 @@ class Engine:
 
         if spec.get("check_dc"):
             dc = effectspec.evaluate(spec["check_dc"], ctx.get("vars") or {})
-            roll = self.dice.d20([Modifier(int(ctx.get("caster_level", 1)),
-                                           "caster level")],
+            # The caster's own terms on a caster level check (feat loop b3: Mage of the
+            # Wild's "+2 on caster level checks" in its terrain), through the funnel the
+            # check against spell resistance already reads.
+            from .dice import stack
+
+            caster = self.scene.actors.get(str(ctx.get("caster") or ""))
+            extra = caster._buff_mods(
+"combat_mod", "caster_level",
+                                      {"against": (op,)}) if caster is not None else []
+            roll = self.dice.d20(stack([Modifier(int(ctx.get("caster_level", 1)),
+                                                 "caster level")] + extra),
                                  label=f"caster level check ({op})", visibility="hidden")
             effects.append({"kind": "caster_level_check", "op": op, "dc": dc,
                             "total": roll.total, "beat": roll.total >= dc})
@@ -33027,7 +33208,8 @@ class Engine:
             source = casting.conversion_source(actor, spell, meta)
         paying = (source or {}).get("pool") or casting.slot_pool(level)
         cost = max(1, int((source or {}).get("cost", 1) or 1))
-        if not casting.at_will(level) and casting.pool_left(actor, paying) < cost:
+        if not casting.at_will(level) and not (source or {}).get("echo") \
+                and casting.pool_left(actor, paying) < cost:
             raise IntentError(
                 f"cast: {actor.name} has no level {level} slots left"
                 + (f" (an opposition-school spell takes {cost})." if cost > 1 else "."),
@@ -33094,8 +33276,9 @@ class Engine:
             # every reader of `at_will` spends nothing for level 0 — refused until those
             # readers learn the slot; RAW allows it (CRB Metamagic Feats).
             why = "a cantrip cast with metamagic is not supported yet."
-        at = level + metamagic.levels(actor, meta)
+        at = level + metamagic.levels(actor, meta, spell)
         if not why and at > casting.highest_spell_level(actor):
+
             why = (f"it would take a level {at} slot, and {actor.name} casts up to level "
                    f"{casting.highest_spell_level(actor)}.")
         if not why and kind == "prepared" and casting.prepared_count(
@@ -42070,6 +42253,12 @@ class Engine:
             return not d20_succeeds(roll, int(dc))
         return roll.total < int(dc)
 
+    # What the save being rolled is made against (`effectspec.AGAINST` words), set by the
+    # two save doors around their roll and read by the luck offers (Exile's Path asks
+    # "against an enchantment"). A class default, so an engine that never set it answers
+    # nothing; it is the roll's own context, never a store (feat loop b3).
+    _luck_against: tuple = ()
+
     def _luck_note(self, who: Actor, doc: dict, said: str) -> None:
         self.__dict__.setdefault("_luck_said", []).append(
             {"ref": who.ref, "tell": said, "origin": f"rule:feat-{doc['id']}"})
@@ -42115,7 +42304,7 @@ class Engine:
         start = int(first) if first is not None else face
         roll = self.dice.given(start, list(mods) + extra, label=label)
         offers = luck_mod.after_offers(actor, kind, roll, self._short(roll, dc, kind),
-                                       skip=before)
+                                       skip=before, against=self._luck_against)
         if first is None:
             if offers:
                 prompt = {
@@ -42157,7 +42346,7 @@ class Engine:
         +4 when four more would make it (the GM knows the DC). The "before the roll" +8
         is never pre-committed by the engine (owner call, b2-styles)."""
         short = self._short(roll, dc, kind)
-        for o in luck_mod.after_offers(actor, kind, roll, short):
+        for o in luck_mod.after_offers(actor, kind, roll, short, against=self._luck_against):
             if o["kind"] == "reroll" and roll.natural != 1 and short is not True:
                 continue
             if o["kind"] == "bonus" and not (short and dc is not None

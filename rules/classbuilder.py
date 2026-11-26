@@ -1146,11 +1146,17 @@ _FEAT_DOC_KEYS = frozenset({"modifiers", "tags", "budget", "choice", "attack_abi
                             # (rules/feat_events.py), the class choices it adds a pick to
                             # (Extra Rage Power: `classes.feat_slots`), and the precision
                             # dice a blow carries (Precise Strike: `Engine._b3_precision`).
-                            "triggers", "choice_slots", "precision"})
+                            "triggers", "choice_slots", "precision",
+                            # Feat loop b3-arcane: a bloodline's powers by feat
+                            # (Eldritch Heritage; rules/grantedpowers.heritage_sources).
+                            "heritage",
+                            # Spells added to the class list (Unsanctioned Knowledge;
+                            # rules/casting.feat_list_spells).
+                            "spell_list_add"})
 
 # The keys a feat's `luck` entry may carry (rules/luck.py, which reads them).
 _LUCK_KEYS = frozenset({"reroll", "bonus", "ally_save", "on_reroll", "surge", "rolls",
-                        "per_day", "bonus_type"})
+                        "per_day", "bonus_type", "against"})
 
 
 def _luck_problems(at: str, entries) -> list[str]:
@@ -1181,6 +1187,13 @@ def _luck_problems(at: str, entries) -> list[str]:
         if not isinstance(rolls, list) or not all(isinstance(r, str) and r for r in rolls):
             out.append(f"{where}.rolls: a list of roll kinds — attack, save, save.fort, "
                        f"skill, skill.disable device, ability, d20.")
+        if "against" in e:
+            from .effectspec import AGAINST
+
+            if not isinstance(e["against"], list) or not e["against"] \
+                    or set(e["against"]) - set(AGAINST):
+                out.append(f"{where}.against: a list of what the roll is made against, "
+                           f"each one of {', '.join(AGAINST)}.")
         if not isinstance(e.get("per_day", 0), int) or int(e.get("per_day", 0)) < 0:
             out.append(f"{where}.per_day: a count of uses a day, or left out for no limit.")
     return out
@@ -1489,6 +1502,27 @@ def validate_feat_document(feat_id: str, doc) -> list[str]:
             rest = {k: v for k, v in when.items() if k != "bearer"}
             if rest:
                 problems.extend(effectspec.when_problems(rest, f"{at}.precision[{i}].when"))
+    add = doc.get("spell_list_add")
+    if add is not None and (
+            not isinstance(add, dict) or set(add) - {"from", "levels"}
+            or not add.get("from") or not all(isinstance(x, str) for x in add["from"])
+            or not add.get("levels")
+            or not all(isinstance(n, int) and 0 <= n <= 9 for n in add["levels"])):
+        problems.append(
+            f"{at}.spell_list_add: {{\"from\": [\"cleric\", \"bard\"], \"levels\": [1, 2]}} "
+            f"— the class lists the picks come from and the one level each pick adds.")
+    heritage = doc.get("heritage")
+
+    if heritage is not None and (
+            not isinstance(heritage, dict)
+            or set(heritage) - {"powers", "level_offset", "pick", "lifts"}
+            or not heritage.get("powers")
+            or not all(isinstance(n, int) and 1 <= n <= 20 for n in heritage["powers"])
+            or not isinstance(heritage.get("level_offset", 0), int)):
+        problems.append(
+            f"{at}.heritage: {{\"powers\": [1], \"level_offset\": -2}} — the bloodline "
+            f"power levels it gives, `pick` when the parenthetical names one of them, "
+            f"`lifts` when the character level becomes the sorcerer level for them all.")
     sub = doc.get("cmb_ability")
     if sub is not None:
         from .tables import ABILITIES
