@@ -485,3 +485,129 @@ def test_hold_the_blade_disarms_back_at_a_flanker_and_drops_the_guard(monkeypatc
     assert pc.ac() == ac - 4
     again = _attack(engine, by="c2", target="pc")
     assert not any(e.get("maneuver") == "disarm" for e in _effects(again, "rider"))
+
+
+# --- rage's own feats: Raging Vitality, Extra Rage Power, Sympathetic Rage, Warleader's
+# Rage, Raging Brutality, Raging Throw --------------------------------------------------
+
+def _use(engine, name, actor="pc", to=None):
+    raw = {"op": "use_ability", "actor": actor, "because": "test", "params": {"ability": name}}
+    if to:
+        raw["params"]["to"] = to
+    return engine.run(engine.validate([raw])).outcomes[-1]
+
+
+def _barbarian(feats=(), level=4, **kw):
+    scene, engine, pc, thug = _fight(feats=feats, cls="barbarian", level=level, **kw)
+    from rules import classes, resources
+
+    for p in classes.get("barbarian").get("pools") or ():
+        resources.define(pc, p)
+    return scene, engine, pc, thug
+
+
+def test_raging_vitality_raises_rage_s_constitution_and_outlasts_unconsciousness():
+    """Raging Vitality (APG): the rage's morale Constitution +4 becomes +6, and the rage
+    does not end when she falls unconscious (only death ends it)."""
+    for feats, con, stays in (([], 4, False), (["Raging Vitality"], 6, True)):
+        scene, engine, pc, thug = _barbarian(feats)
+        base = pc.ability_score("con") if hasattr(pc, "ability_score") else None
+        before = pc.ability_mod("con")
+        out = _use(engine, "Rage")
+        assert out.status != "refused", out.tell
+        assert pc.ability_mod("con") - before == con // 2, feats
+        pc.add_condition("unconscious", None, source="test")
+        engine._ability_ends_settle()
+        assert pc.has_state("buff.stance.rage") is stays, feats
+        del base
+
+
+def test_extra_rage_power_owes_one_more_pick_each_time_it_is_taken():
+    """Extra Rage Power (APG): "You gain one additional rage power", taken more than once.
+    A 4th-level barbarian is owed two by her levels; one copy makes three, two make four."""
+    from rules import classes
+
+    for copies, want in ((0, 2), (1, 3), (2, 4)):
+        scene, engine, pc, thug = _barbarian(["Extra Rage Power"] * copies)
+        rows = [r for r in classes.owed_rows("barbarian", 4, {}, (),
+                                             classes.feat_slots(pc))
+                if r["choice"] == "rage power"]
+        assert len(rows) == want, copies
+
+
+def _rager(scene, at):
+    friend = load_pc("fixtures/pc-kesst.json")
+    friend.ref, friend.kind = "ally", "npc"
+    scene.add(friend)
+    scene.positions["ally"] = at
+    scene.sides = {"pc": ["pc", "ally"], "them": ["c1"]}
+    from rules.activeeffect import ActiveEffect
+
+    friend.apply_effect(ActiveEffect(name="rage", kind="buff", key="rage", source="test",
+                                     tags=("buff.stance.rage",)))
+    return friend
+
+
+def test_sympathetic_rage_needs_a_raging_ally_beside_you_and_ends_when_they_go():
+    """Sympathetic Rage (ARG): a free action beside a raging ally: +2 morale Str and Con,
+    rage's Will and AC; it lasts while they stay adjacent and leaves you fatigued."""
+    scene, engine, pc, thug = _fight(feats=["Sympathetic Rage"], level=3)
+    pc.race = "half-orc"
+    assert _use(engine, "Sympathetic Rage").status == "refused"
+    friend = _rager(scene, (6, 11))
+    strength = pc.ability_mod("str")
+    out = _use(engine, "Sympathetic Rage")
+    assert out.status != "refused", out.tell
+    assert pc.ability_mod("str") == strength + 1 and pc.has_state("buff.stance.rage")
+    scene.positions["ally"] = (12, 10)                     # thirty feet off
+    engine._ability_ends_settle()
+    assert not pc.has_state("buff.stance.rage")
+    assert pc.has_state("state.impaired.fatigued")
+    del friend
+
+
+def test_warleader_s_rage_holds_a_sympathetic_rage_at_thirty_feet_in_sight():
+    """Warleader's Rage (Orcs of Golarion): a rage begun beside the warleader persists
+    while she is within 30 feet and seen."""
+    scene, engine, pc, thug = _fight(feats=["Sympathetic Rage"], level=3)
+    friend = _rager(scene, (6, 11))
+    friend.feats = list(friend.feats) + ["Warleader's Rage"]
+    assert _use(engine, "Sympathetic Rage").status != "refused"
+    scene.positions["ally"] = (11, 10)                     # twenty-five feet
+    engine._ability_ends_settle()
+    assert pc.has_state("buff.stance.rage")
+    scene.positions["ally"] = (14, 10)                     # forty feet
+    engine._ability_ends_settle()
+    assert not pc.has_state("buff.stance.rage")
+
+
+def test_raging_brutality_adds_unmultiplied_constitution_to_power_attack_damage():
+    """Raging Brutality (UC): swift, three rounds of rage: + Con on Power Attack damage
+    this turn (1-1/2 two-handed), never multiplied on a critical."""
+    scene, engine, pc, thug = _barbarian(["Raging Brutality"], level=12,
+                                         faces={"Attack with": 20, "Confirm": 20,
+                                                "Damage": 1})
+    thug.hp = thug.hp_max = 400
+    scene.current_ref = "pc"
+    assert _use(engine, "Raging Brutality").status == "refused"     # not raging
+    assert _use(engine, "Rage").status != "refused"
+    left = pc.pool("rage").current
+    assert _use(engine, "Raging Brutality").status != "refused"
+    assert pc.pool("rage").current == left - 3
+    con = pc.ability_mod("con")
+    dmg = _rolls(_attack(engine, power_attack=True), "Damage")[0]
+    assert "CRITICAL" in dmg["label"]
+    assert _named(dmg, "Raging Brutality") == con
+    plain = _rolls(_attack(engine), "Damage")[0]
+    assert not _named(plain, "Raging Brutality")
+
+
+def test_raging_throw_adds_constitution_to_the_bull_rush_only():
+    scene, engine, pc, thug = _barbarian(["Raging Throw"], level=6)
+    assert _use(engine, "Rage").status != "refused"
+    rush = sum(m.value for m in pc.cmb_modifiers("bull rush", defender=thug))
+    trip = sum(m.value for m in pc.cmb_modifiers("trip", defender=thug))
+    assert _use(engine, "Raging Throw").status != "refused"
+    con = pc.ability_mod("con")
+    assert sum(m.value for m in pc.cmb_modifiers("bull rush", defender=thug)) == rush + con
+    assert sum(m.value for m in pc.cmb_modifiers("trip", defender=thug)) == trip

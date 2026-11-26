@@ -528,9 +528,17 @@ def damage_terms(engine, intent, actor, defender, weapon, state, mult, lethality
     sneak attack damage to an opponent denied his Dexterity bonus to AC, you gain a +1
     bonus on the damage roll per each sneak attack damage die you roll" — a bonus on the
     damage roll, so multiplied as the roll's own bonuses are."""
-    from .dice import Modifier
+    from .dice import Modifier, stack
+    from .sheet import ATTACK_CHOICES
 
     out = []
+    # What the funnel holds that a critical never multiplies (`damage_unmultiplied`):
+    # Raging Brutality's Constitution, asked with the blow's options and whose turn it is.
+    ctx = blow_ctx(actor, intent.params.get("weapon") or actor.wielded_key(), weapon,
+                   defender)
+    ctx.update({c: True for c in ATTACK_CHOICES if intent.params.get(c)})
+    ctx["own_turn"] = getattr(engine.scene, "current_ref", None) == actor.ref
+    out.extend(stack(actor._buff_mods("combat_mod", "damage_unmultiplied", ctx)))
     if actor.has_state(HAMMER_THE_GAP) and intent.params.get("full_attack"):
         run = 0
         for b in reversed(state.get("blows") or ()):
@@ -761,3 +769,32 @@ def push_after_hit(engine, actor, defender, choices, state, power) -> list[dict]
              "tell": (f"The blow drives {defender.name} back {moved * 5} feet (Pushing "
                       f"Assault)." if moved else
                       f"{defender.name} has nowhere to be pushed to (Pushing Assault).")}]
+
+
+def ally_holds(engine, actor, want: dict) -> bool:
+    """Whether an ally of `actor` holds `want["state"]` within `within_ft` — or, failing
+    that, an ally holding both the state and the feat `far_feat` within `far_ft` who can
+    see `actor`. A class ability's `requires_ally` and `self.ends_when.ally` (feat loop b3):
+    Sympathetic Rage's "adjacent to an ally who is raging", and Warleader's Rage's "persist
+    as long as your ally is within 30 feet of you and can see you". With no board nobody is
+    adjacent, and the answer is no — a rage nobody can be shown to stand beside fails
+    closed, as flanking does."""
+    from . import awareness, feats as feats_mod
+
+    state = str(want.get("state") or "")
+    near = int(want.get("within_ft", 5) or 5)
+    far_feat = str(want.get("far_feat") or "")
+    far = int(want.get("far_ft", 0) or 0)
+    for other in engine.scene.actors.values():
+        if other is actor or other.is_down or engine._against(actor, other) \
+                or not other.has_state(state):
+            continue
+        gap = engine._gap_ft(actor, other)
+        if gap is None:
+            continue
+        if gap <= near:
+            return True
+        if far_feat and gap <= far and far_feat in feats_mod._held(other) \
+                and awareness.sees(engine.scene, actor, other):
+            return True
+    return False

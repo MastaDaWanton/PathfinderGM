@@ -633,7 +633,11 @@ VOCAB: dict[str, list[dict]] = {
         ("reach", "Melee reach, in feet"),
         # Feat loop b2: Cut Your Losses' "treat your Strength score as 2 higher for the
         # purpose of determining your carrying capacity", read by `gear.encumbrance`.
-        ("carry_str", "Strength for carrying capacity"))],
+        ("carry_str", "Strength for carrying capacity"),
+        # Feat loop b3: damage a blow adds that is "not multiplied on a critical hit"
+        # (Raging Brutality's Constitution), read past the crit scaling by
+        # `feat_events.damage_terms` with the blow's context.
+        ("damage_unmultiplied", "Damage never multiplied on a critical"))],
     "sense": [{"id": k, "name": n} for k, n in (
         ("low_light", "Low-light vision"), ("darkvision", "Darkvision"),
         ("scent", "Scent"), ("tremorsense", "Tremorsense"),

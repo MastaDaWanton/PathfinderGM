@@ -980,7 +980,8 @@ def owed(actor, rules: dict | None = None) -> dict:
     out["skills"] = skill_ranks(actor)
     rows = classes_mod.owed_rows(cid, level, dict(getattr(actor, "class_choices", None)
                                                   or {}),
-                                 list(getattr(actor, "domains", None) or []))
+                                 list(getattr(actor, "domains", None) or []),
+                                 classes_mod.feat_slots(actor))
     out["choices"] = {"owed": len(rows), "picks": rows, "made": choices_made(actor)}
     out["paths"] = path_b_offer(actor)
     out["outstanding"] = out["total"] + out["skills"]["owed"] + out["choices"]["owed"]

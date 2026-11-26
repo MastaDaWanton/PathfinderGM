@@ -458,6 +458,10 @@ _REACHES = {
         "combat_mod", "charge_ac", a._roll_context(None, charge=True))),
     # Feat loop b2: the Strength carrying capacity is figured from (Cut Your Losses).
     ("combat_mod", "carry_str"): lambda a: _carry_str(a),
+    # Feat loop b3: damage a critical never multiplies (Raging Brutality), read by the
+    # attack's damage stage off this funnel call (`feat_events.damage_terms`).
+    ("combat_mod", "damage_unmultiplied"):
+        lambda a: sum(m.value for m in a._buff_mods("combat_mod", "damage_unmultiplied")),
 }
 
 

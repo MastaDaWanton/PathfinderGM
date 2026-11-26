@@ -316,5 +316,21 @@
     "not_yet": [
       "'an opponent that uses wings to fly': any creature with a fly speed is grounded, winged or not — no stat block says how a creature flies"
     ]
+  },
+  "extra-rage-power": {
+    "stacks": true,
+    "choice_slots": {
+      "rage power": 1
+    }
+  },
+  "raging-vitality": {},
+  "sympathetic-rage": {},
+  "sympathetic-rage-orcs": {},
+  "warleader-s-rage": {},
+  "raging-brutality": {},
+  "raging-throw": {
+    "not_yet": [
+      "'if you bull rush an opponent into a square another creature occupies or into a solid object, the opponent and the creature or object take bludgeoning damage equal to your Strength modifier + your Constitution modifier': the push stops at what blocks it and nobody is hurt"
+    ]
   }
 }

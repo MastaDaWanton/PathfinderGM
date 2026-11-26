@@ -1393,7 +1393,13 @@ class Scene:
             start = payload.get("pool_start")
             spent = max(1, int(start) - (pool.current if pool else 0)) \
                 if start is not None else 1
-            rounds = int(after.get("rounds_per_spent", 1) or 1) * spent
+            # A stance with no pool counts the rounds it was held (Sympathetic Rage's
+            # rage "as with a barbarian's rage", feat loop b3: `rounds_per_held`).
+            if after.get("rounds_per_held"):
+                spent = max(1, int(getattr(self, "round", 0) or 0)
+                            - int(payload.get("began_round") or 0))
+            rounds = int(after.get("rounds_per_spent", after.get("rounds_per_held", 1))
+                         or 1) * spent
             cond = str(after["condition"])
             actor.add_condition(cond, rounds, source=f"the end of {e.name}", origin=e.origin)
             records.append({"kind": "condition", "ref": actor.ref, "condition": cond,
@@ -5034,6 +5040,10 @@ class Engine:
                 why = ""
                 if any(actor.has_state(q) for q in ends.get("holder") or ()):
                     why = f"{actor.name} has fallen"
+                # Ends when no ally holds what it needs close by (`ends_when.ally`, b3).
+                if not why and ends.get("ally") \
+                        and not feat_events.ally_holds(self, actor, ends["ally"]):
+                    why = f"{actor.name} has no one left beside them to share it"
                 mark = self.scene.actors.get(str(p.get("ends_when_ref") or ""))
                 if not why and ends.get("target") and p.get("ends_when_ref"):
                     if mark is None or any(mark.has_state(q) for q in ends["target"]):
@@ -37476,6 +37486,11 @@ class Engine:
         for q in doc.get("requires_not") or ():
             if actor.has_state(str(q)):
                 return f"{found.title()} cannot be used while {q} holds on {actor.name}."
+        # An ally who must stand close holding a state (`requires_ally`, feat loop b3).
+        want = doc.get("requires_ally")
+        if want and not feat_events.ally_holds(self, actor, want):
+            return (f"{found.title()} needs an ally within {want.get('within_ft', 5)} feet "
+                    f"of {actor.name} holding {want.get('state')}, and there is none.")
         cost = doc.get("cost") or {}
         if cost.get("pool"):
             pool = actor.pool(str(cost["pool"]))
@@ -38610,9 +38625,21 @@ class Engine:
         weapons: list[dict] = []
         said: list[str] = []
         add_tags: list[str] = []
+        ends_over = None
         for add in doc.get("addons") or ():
-            if ca._norm(add.get("pick")) in ca.chosen(actor, add.get("choice", "")):
+            if ca.addon_held(actor, add):
                 mods += ca.modifiers(add.get("modifiers"), actor)
+                # A feat's addon (feat loop b3): Raging Vitality's "the morale bonus to
+                # your Constitution increases by +2" raises the stance's own term rather
+                # than laying a second morale bonus the stacking rule would drop, and
+                # "your rage does not end if you become unconscious" narrows its end.
+                for up in add.get("raises") or ():
+                    for m in mods:
+                        if all(m.get(k) == up.get(k) for k in ("kind", "target",
+                                                               "bonus_type")):
+                            m["amount"] = int(m.get("amount") or 0) + int(up["amount"])
+                if add.get("ends_when") is not None:
+                    ends_over = add["ends_when"]
                 weapons += [_sized_weapon(w, actor.size) for w in add.get("natural_weapons") or ()]
                 # A rage power's sense while raging (low-light vision, night vision,
                 # scent): tags on the one stance effect, gone when it goes.
@@ -38655,6 +38682,7 @@ class Engine:
             payload["natural_weapons"] = weapons
         if doc.get("after"):
             payload["after"] = dict(doc["after"])
+            payload["began_round"] = int(getattr(self.scene, "round", 0) or 0)
             payload["pool"] = str((doc.get("cost") or {}).get("pool") or "")
             payload["pool_start"] = pool_start
         if linked and key:
@@ -38677,9 +38705,10 @@ class Engine:
         # the effect: the end a tag brings (`ends_when`, swept by
         # `_ability_ends_settle`), the checks it refuses (`forbids`, read by `_op_check`),
         # and the traits its holder's blows carry (`strikes_as`, read by the attack op).
-        if spec.get("ends_when"):
-            payload["ends_when"] = {k: [str(q) for q in v]
-                                    for k, v in dict(spec["ends_when"]).items()}
+        if spec.get("ends_when") or ends_over:
+            payload["ends_when"] = {k: ([str(q) for q in v] if isinstance(v, list)
+                                        else dict(v)) for k, v in dict(
+                ends_over if ends_over is not None else spec["ends_when"]).items()}
             if target is not None:
                 payload["ends_when_ref"] = target.ref
         if spec.get("forbids"):

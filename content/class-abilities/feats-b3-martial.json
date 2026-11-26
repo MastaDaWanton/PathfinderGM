@@ -1,0 +1,118 @@
+{
+  "class": "feat",
+  "_source": "Feat loop b3, lane b3-martial (2026-11-26): the rage feats a character USES — a weaker rage beside a raging ally, a swift action's spend of rage rounds. Each is had by a holder of the feat its `feat` names (rules/class_abilities.py), whatever their class, and run by the one executor the class abilities use (`Engine._use_class_ability`). Benefit text from content/feats/feats.json, checked against aonprd.com FeatDisplay 2026-11-26.",
+  "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
+  "abilities": [
+    {
+      "key": "sympathetic rage",
+      "name": "Sympathetic Rage",
+      "feat": "sympathetic-rage",
+      "aliases": ["sympathetic rage", "rage beside them", "share the rage"],
+      "level": 1,
+      "source": "Sympathetic Rage (ARG): 'Whenever you are adjacent to an ally who is raging, you may choose to enter a similar but less powerful rage as a free action on your turn. This weaker rage gives you all the benefits and penalties of a barbarian's rage, except your morale bonus to Strength and Constitution is only +2. There is no limit to how long you can rage, as long as you remain adjacent to a raging ally ... As with a barbarian's rage, when this weaker rage ends, you are fatigued. You cannot use this feat if you are fatigued.' Warleader's Rage (Orcs of Golarion): such a rage 'persist[s] as long as your ally is within 30 feet of you and can see you' when that ally holds Warleader's Rage.",
+      "text": "+2 Str and Con, +2 Will, -2 AC while beside a raging ally; fatigued after.",
+      "action": "free",
+      "toggle": {"key": "sympathetic rage"},
+      "requires_not": ["state.impaired.fatigued", "state.impaired.exhausted", "buff.stance.rage"],
+      "requires_ally": {"state": "buff.stance.rage", "within_ft": 5},
+      "self": {
+        "tags": ["buff.stance.rage", "buff.stance.sympathetic-rage"],
+        "modifiers": [
+          {"type": "ability_mod", "target": "str", "bonus_type": "morale", "amount": 2},
+          {"type": "ability_mod", "target": "con", "bonus_type": "morale", "amount": 2},
+          {"type": "save_mod", "target": "will", "bonus_type": "morale", "amount": 2},
+          {"type": "combat_mod", "target": "ac", "bonus_type": "untyped", "amount": -2}
+        ],
+        "ends_when": {"holder": ["state.down"],
+                      "ally": {"state": "buff.stance.rage", "within_ft": 5,
+                               "far_feat": "warleader-s-rage", "far_ft": 30}},
+        "forbids": {"skills": {"abilities": ["cha", "dex", "int"],
+                               "except": ["acrobatics", "fly", "intimidate", "ride"]}}
+      },
+      "after": {"condition": "fatigued", "rounds_per_held": 2},
+      "tell": "{name} catches the fury of the one beside them.",
+      "tell_off": "{name}'s borrowed rage gutters out."
+    },
+    {
+      "key": "sympathetic rage",
+      "name": "Sympathetic Rage",
+      "feat": "sympathetic-rage-orcs",
+      "aliases": ["sympathetic rage", "rage beside them", "share the rage"],
+      "level": 1,
+      "source": "Sympathetic Rage (Orcs of Golarion): the same text as the Advanced Race Guide's, without its last sentence ('You cannot use this feat if you are fatigued'); a fatigued creature still cannot rage (CRB, Rage), so the refusal stands.",
+      "text": "+2 Str and Con, +2 Will, -2 AC while beside a raging ally; fatigued after.",
+      "action": "free",
+      "toggle": {"key": "sympathetic rage"},
+      "requires_not": ["state.impaired.fatigued", "state.impaired.exhausted", "buff.stance.rage"],
+      "requires_ally": {"state": "buff.stance.rage", "within_ft": 5},
+      "self": {
+        "tags": ["buff.stance.rage", "buff.stance.sympathetic-rage"],
+        "modifiers": [
+          {"type": "ability_mod", "target": "str", "bonus_type": "morale", "amount": 2},
+          {"type": "ability_mod", "target": "con", "bonus_type": "morale", "amount": 2},
+          {"type": "save_mod", "target": "will", "bonus_type": "morale", "amount": 2},
+          {"type": "combat_mod", "target": "ac", "bonus_type": "untyped", "amount": -2}
+        ],
+        "ends_when": {"holder": ["state.down"],
+                      "ally": {"state": "buff.stance.rage", "within_ft": 5,
+                               "far_feat": "warleader-s-rage", "far_ft": 30}},
+        "forbids": {"skills": {"abilities": ["cha", "dex", "int"],
+                               "except": ["acrobatics", "fly", "intimidate", "ride"]}}
+      },
+      "after": {"condition": "fatigued", "rounds_per_held": 2},
+      "tell": "{name} catches the fury of the one beside them.",
+      "tell_off": "{name}'s borrowed rage gutters out."
+    },
+    {
+      "key": "raging brutality",
+      "name": "Raging Brutality",
+      "feat": "raging-brutality",
+      "level": 1,
+      "source": "Raging Brutality (UC): 'While raging and using Power Attack, you can spend 3 additional rounds of your rage as a swift action to add your Constitution bonus on damage rolls for melee attacks or thrown weapon attacks you make on your turn. If you are using the weapon two-handed, instead add 1-1/2 times your Constitution bonus. This bonus damage is not multiplied on a critical hit.' A thrown melee weapon keeps its melee category, so the melee clause carries it.",
+      "text": "Swift, 3 rounds of rage: + Con to Power Attack damage this turn (1-1/2 two-handed).",
+      "action": "swift",
+      "cost": {"pool": "rage", "amount": 3},
+      "requires": ["buff.stance.rage"],
+      "requires_said": "only while raging",
+      "self": {
+        "rounds": "1",
+        "modifiers": [
+          {"type": "combat_mod", "target": "damage_unmultiplied", "bonus_type": "untyped",
+           "formula": "max(0, con_mod)",
+           "when": {"choice": "power_attack", "own_turn": true,
+                    "weapon": {"category": "melee", "strength_share": 1.0}}},
+          {"type": "combat_mod", "target": "damage_unmultiplied", "bonus_type": "untyped",
+           "formula": "max(0, con_mod)",
+           "when": {"choice": "power_attack", "own_turn": true,
+                    "weapon": {"category": "melee", "strength_share": 0.5}}},
+          {"type": "combat_mod", "target": "damage_unmultiplied", "bonus_type": "untyped",
+           "formula": "max(0, con_mod) * 3 // 2",
+           "when": {"choice": "power_attack", "own_turn": true,
+                    "weapon": {"category": "melee", "strength_share": 1.5}}}
+        ]
+      },
+      "tell": "{name} burns the rage hotter behind each blow."
+    },
+    {
+      "key": "raging throw",
+      "name": "Raging Throw",
+      "feat": "raging-throw",
+      "level": 1,
+      "source": "Raging Throw (UC): 'While raging, when you attempt a bull rush combat maneuver, you can spend 1 additional round of your rage as a swift action to add your Constitution bonus on your combat maneuver check to the bull rush.'",
+      "text": "Swift, 1 round of rage: + Con on bull rush checks this turn.",
+      "action": "swift",
+      "cost": {"pool": "rage", "amount": 1},
+      "requires": ["buff.stance.rage"],
+      "requires_said": "only while raging",
+      "self": {
+        "rounds": "1",
+        "tags": ["bull-rush.collision.str-con"],
+        "modifiers": [
+          {"type": "combat_mod", "target": "cmb", "bonus_type": "untyped",
+           "formula": "max(0, con_mod)", "when": {"maneuver": "bull rush"}}
+        ]
+      },
+      "tell": "{name} gathers the rage to drive someone off their feet."
+    }
+  ]
+}
