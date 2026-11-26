@@ -2537,7 +2537,10 @@ WHEN_KEYS: dict[str, str] = {
 # `larger` / `smaller` (feat loop b2): size categories against the bearer's own, answered
 # by `classfeatures.holds` where the bearer is known (Risky Striker, Underfoot).
 _WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment", "choice",
-                                  "state", "aloft", "larger", "smaller", "casts"),
+                                  "state", "aloft", "larger", "smaller", "casts",
+                                  # Feat loop b4-maneuver: on rocky, difficult ground
+                                  # (Undermining Exploit; maneuver_feats.on_rocky_ground).
+                                  "rocky_ground"),
 
                        "attacker": ("type", "subtype", "larger", "smaller", "unprovoked",
                                     "alignment")}

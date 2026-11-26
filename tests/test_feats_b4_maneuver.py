@@ -543,3 +543,22 @@ def test_greater_wild_empathy_reaches_the_chosen_kind_adds_two_and_intimidates()
     out = hrun(engine, hcheck(skill="intimidate", target=wolf.ref))[0]
     assert out.rolls and out.rolls[0].label == "Wild empathy check", out.tell
     assert out.dc["value"] == attitude.intimidate_dc(wolf)
+
+
+# --- Undermining Exploit --------------------------------------------------------------------
+
+def test_undermining_exploit_adds_four_against_a_foe_on_rocky_difficult_ground():
+    """Undermining Exploit (Faiths of Purity): "+4 insight bonus on combat maneuvers
+    against opponents that are located in rocky, difficult terrain." Measured before: +0
+    with the thug in a rubble square in the hills."""
+    from tests._places import stand_on
+
+    for ground, rough, want in (("mountain", True, 4), ("mountain", False, 0),
+                                ("forest", True, 0)):
+        scene, engine, pc, thug = _fight(feats=["Undermining Exploit"],
+                                         faces={"Trip (CMB)": 2})
+        stand_on(scene, ground)
+        if rough:
+            scene.grid.difficult.add((7, 10))
+        res = _maneuver(engine, "trip")
+        assert _named(_rolls(res, "Trip (CMB)")[0], "Undermining Exploit") == want, ground

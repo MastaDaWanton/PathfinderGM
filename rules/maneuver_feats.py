@@ -697,3 +697,30 @@ def empathy_intimidates(engine, intent, actor, skill: str, partial):
     if empathy < plain and not animals.diplomacy_bar(target, actor):
         return None
     return animals.wild_empathy(engine, intent, actor, target, partial, how="intimidate")
+
+
+# --- Undermining Exploit --------------------------------------------------------------------
+
+# The ground words (`places.terrain_of`) that are stone underfoot: the mountain and hill
+# terrains and anything underground (a cave, a dungeon). Owner call: "rocky" is the
+# place's own terrain, since the board marks a square difficult without saying of what.
+ROCKY_TERRAINS = ("mountain", "mountains", "hills", "underground", "cave", "caves")
+
+
+def on_rocky_ground(creature) -> bool:
+    """Whether this creature stands on a difficult square of the board in a rocky place:
+    Undermining Exploit's "opponents that are located in rocky, difficult terrain". No
+    moment or no board, no answer (False, the clause failing closed)."""
+    from . import places
+
+    scene = _scene()
+    grid = getattr(scene, "grid", None)
+    if scene is None or grid is None or creature is None:
+        return False
+    at = scene.positions.get(creature.ref)
+    if at is None:
+        return False
+    word = places.terrain_of(str(getattr(creature, "at", "") or getattr(scene, "at", "")))
+    if word not in ROCKY_TERRAINS:
+        return False
+    return tuple(at)[:2] in grid.difficult

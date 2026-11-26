@@ -144,5 +144,21 @@
         "note": "+2 insight on wild empathy checks"
       }
     ]
+  },
+  "undermining-exploit": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 4,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "rocky_ground": true
+          }
+        },
+        "note": "+4 insight on combat maneuvers against foes on rocky, difficult ground"
+      }
+    ]
   }
 }

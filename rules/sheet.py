@@ -9138,6 +9138,14 @@ def _when_holds(when, ctx: dict | None) -> bool:
                             "arcane" if armour_mod.is_arcane(defender) else "divine") != value:
                         return False
                     continue
+                if field_name == "rocky_ground":
+                    # Undermining Exploit's "opponents that are located in rocky, difficult
+                    # terrain" (feat loop b4-maneuver): a difficult square on stony ground.
+                    from . import maneuver_feats
+
+                    if maneuver_feats.on_rocky_ground(defender) is not bool(value):
+                        return False
+                    continue
                 if field_name == "aloft":
 
                     # Death from Below's "flying opponents" (feat loop b2): up in the air
