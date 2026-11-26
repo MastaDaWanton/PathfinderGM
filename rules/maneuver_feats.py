@@ -375,6 +375,9 @@ def _twirl(engine, intent, actor, first) -> dict:
 def choice_refusal(actor, weapon: dict, declared, params: dict) -> str:
     """Why a declared option of this lane cannot ride this swing, or "" (asked beside
     `feat_events.choice_refusal`)."""
+    if "feinting_flurry" in declared and ("flurry" not in declared
+                                          or not params.get("full_attack")):
+        return "Feinting Flurry is made with a flurry of blows, as a full attack."
     if TWIRL in declared:
         if params.get("manoeuvre") not in (None, "", "trip"):
             return "Tripping Twirl is a trip at each foe beside you; declare it with a trip."
@@ -448,3 +451,112 @@ def charge_ability_hit(engine, defender, e, spec: dict, line: str) -> list[dict]
                 "tell": f"{line}; {e.name} deals " + " and ".join(said or ["nothing"]) + "."
                         + engine._hp_state_tell(crossed)})
     return out
+
+
+# --- the feint feats: Feinting Flurry, Improved Feinting Flurry, Wave Strike,
+# --- Disengaging Shot ------------------------------------------------------------------
+#
+# The feint is lane E's (`skilluses.feint`); these feats change WHEN it is made and what
+# it buys. An engine-written feint check is put in front of the blow it belongs to (the
+# whirlwind's shape in `Engine._drive`), carrying the code-only param that says which
+# action pays for it: `in_flurry` (none: the flurry's first swing is forgone instead) or
+# `swift_feint` (Wave Strike's swift action).
+
+FEINTING_FLURRY = "feinting_flurry"
+FLURRY_TURN = "skill.bluff.feint.flurry-turn"           # Improved Feinting Flurry
+WAVE_STRIKE = "skill.bluff.feint.wave-strike"
+DISENGAGING_SHOT = "skill.bluff.feint.disengaging-shot"
+IN_FLURRY = "in_flurry"
+SWIFT_FEINT = "swift_feint"
+
+
+def _feint_raw(raw: dict, flag: str, because: str) -> dict:
+    return {"op": "check", "actor": raw.get("actor"), "target": raw.get("target"),
+            "id": f"{raw.get('id') or 'attack'}-feint", "because": because,
+            "visibility": raw.get("visibility", "hidden"),
+            "params": {"skill": "bluff", "feint": True, flag: True}}
+
+
+def feint_before(engine, raw: dict) -> list[dict]:
+    """The feint Feinting Flurry (Dragon Empires Primer) puts in front of a declared
+    flurry: "While using flurry of blows to make melee attacks, you can forgo your first
+    attack to make a Bluff check to feint." [] when the blow declares none."""
+    params = raw.get("params") or {}
+    if raw.get("op") != "attack" or not params.get(FEINTING_FLURRY) \
+            or not params.get("full_attack") or not raw.get("target"):
+        return []
+    return [_feint_raw(raw, IN_FLURRY, "Feinting Flurry")]
+
+
+def wave_strike(engine, raw: dict, draw: dict) -> list[dict]:
+    """Wave Strike (UC): "If on your first turn of combat you draw a melee weapon to
+    attack an opponent within your reach, you can spend a swift action to make a Bluff
+    check to feint against that opponent." Put behind the draw and in front of the blow.
+    The first turn is one the bearer has not yet acted in (`Scene.acted`, the flat-footed
+    record), and the reach is measured from where they stand (`position.out_of_reach`)."""
+    from . import position
+
+    scene = engine.scene
+    actor = scene.actors.get(str(raw.get("actor") or ""))
+    foe = scene.actors.get(str(raw.get("target") or ""))
+    params = raw.get("params") or {}
+    if actor is None or foe is None or not scene.in_encounter \
+            or not actor.has_state(WAVE_STRIKE) or actor.ref in scene.acted \
+            or params.get("manoeuvre"):
+        return []
+    key = str(params.get("weapon") or "").strip().lower()
+    w = actor.weapon(key) if key else {}
+    if w.get("category") == "ranged" or params.get("thrown") or (
+            scene.has_grid and position.out_of_reach(scene, actor, foe, key) is not None):
+        return []
+    if engine._swift_refusal(actor, False, "Wave Strike"):
+        return []
+    return [_feint_raw(raw, SWIFT_FEINT, "Wave Strike")]
+
+
+def feint_action(intent, action: str) -> str:
+    """The action an engine-written feint is paid with."""
+    if intent.params.get(IN_FLURRY):
+        return "none"
+    if intent.params.get(SWIFT_FEINT):
+        return "swift"
+    return action
+
+
+def whole_turn(intent, actor) -> bool:
+    """Improved Feinting Flurry (Dragon Empires Primer): "While using Feinting Flurry, if
+    you successfully feint, your opponent is denied its Dexterity bonus to AC until the
+    end of your turn" — the feint's effect is not spent by the first blow."""
+    return bool(intent.params.get(IN_FLURRY)) and actor.has_state(FLURRY_TURN)
+
+
+def drop_first_swing(intent, sequence: list, hands: list) -> tuple[list, list]:
+    """The flurry's first attack, forgone for the feint (Feinting Flurry)."""
+    if intent.params.get(FEINTING_FLURRY) and intent.params.get("full_attack") \
+            and len(sequence) > 1:
+        return sequence[1:], hands[1:]
+    return sequence, hands
+
+
+def disengaging_shot(engine, actor, target) -> list[dict]:
+    """Disengaging Shot (UC): "Whenever you use Disengaging Feint or Disengaging
+    Flourish, you can make a single melee attack against one opponent you succeeded at
+    feinting against. That opponent is denied his Dexterity bonus to AC against this
+    attack." The blow is owed next in the queue (`owed_swing`, a feat's swing's door), the
+    target laid open to it by the feint's own tag (`state.feinted.<ref>`, spent by it)."""
+    from . import skilluses
+    from .activeeffect import ActiveEffect
+
+    if not actor.has_state(DISENGAGING_SHOT):
+        return []
+    target.apply_effect(ActiveEffect(
+        name=f"feinted by {actor.name}", kind="situation", key=f"feinted-by-{actor.ref}",
+        source=skilluses.FEINT_SOURCE, origin="rule:feat-disengaging-shot",
+        duration="rounds", rounds_left=1, tags=(f"{skilluses.FEINTED}.{actor.ref}",),
+        payload={"by": actor.ref}))
+    return [{"ref": actor.ref, "kind": "owed_swing", "target": target.ref,
+             "origin": "rule:feat-disengaging-shot",
+             "attack": {"op": "attack", "actor": actor.ref, "target": target.ref,
+                        "because": f"{actor.name}'s Disengaging Shot",
+                        "visibility": "player" if actor.is_pc else "hidden",
+                        "params": {"full_attack": False, "reaction": "disengaging-shot"}}}]

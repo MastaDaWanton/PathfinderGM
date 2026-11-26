@@ -273,6 +273,7 @@ def _monk(feats):
     monk = _pc("monk", 8, feats=feats)
     monk.abilities["wis"] = 40
     monk.equipped = "unarmed"
+    monk.armour = "none"                    # a monk in leather loses the flurry
     return monk
 
 
@@ -323,3 +324,114 @@ def test_neckbreaker_needs_a_pin_it_holds_and_pours_the_rest_into_constitution()
     assert any(m.value == -5 for m in hit[0].modifiers), "the -5 rides the blow"
     assert thug.ability_score("str") == 0 and thug.ability_damage.get("con", 0) >= 1, \
         _tells(res)
+
+
+# --- the feint feats ---------------------------------------------------------------------
+
+def _no_prereqs(monkeypatch):
+    from rules import feats as feats_mod
+
+    monkeypatch.setattr(feats_mod, "meets", lambda actor, feat: {"ok": True, "unmet": [],
+                                                                  "unknown": []})
+
+
+def _flurry(feats, monkeypatch, **params):
+    from tests.test_feats_b2_attack_a import _swing
+
+    _no_prereqs(monkeypatch)
+    monk = _monk(feats)
+    monk.abilities["cha"] = 40                    # the feint lands
+    scene, e, thug = _bout(monk)
+    thug.hp = thug.hp_max = 500                   # standing through every blow
+    res = _swing(e, face=15, full_attack=True, flurry=True, **params)
+    return scene, e, thug, res
+
+
+def test_feinting_flurry_trades_the_first_blow_for_a_feint_that_opens_the_next():
+    """Feinting Flurry (Dragon Empires Primer): "While using flurry of blows to make melee
+    attacks, you can forgo your first attack to make a Bluff check to feint." Measured
+    before: no flurry could feint; a feint was its own standard action."""
+    _s, _e, _t, plain = _flurry(["Feinting Flurry"], monkeypatch=_MP())
+    scene, e, thug, res = _flurry(["Feinting Flurry"], _MP(), feinting_flurry=True)
+    swings = lambda r: len(_rolls(r, "Attack with"))            # noqa: E731
+    assert _rolls(res, "Bluff check (feint)"), _tells(res)
+    assert swings(res) == swings(plain) - 1
+    assert "feint has drawn" in _tells(res)
+    assert not thug.has_state("state.feinted.pc")       # the next blow spent it
+
+
+def test_improved_feinting_flurry_keeps_the_foe_open_for_the_whole_turn():
+    """Improved Feinting Flurry: "if you successfully feint, your opponent is denied its
+    Dexterity bonus to AC until the end of your turn" — not only against the next blow."""
+    scene, e, thug, res = _flurry(["Feinting Flurry", "Improved Feinting Flurry"], _MP(),
+                                  feinting_flurry=True)
+    assert thug.has_state("state.feinted.pc"), _tells(res)
+    assert _tells(res).count("feint has drawn") >= 1
+
+
+def test_feinting_flurry_is_refused_without_a_flurry():
+    _no = _MP()
+    _no_prereqs(_no)
+    monk = _monk(["Feinting Flurry"])
+    scene, e, thug = _bout(monk)
+    assert "flurry" in e._attack_choice_refusal(monk, "unarmed", {"feinting_flurry": True,
+                                                                  "full_attack": True})
+    _no.undo()
+
+
+def test_wave_strike_feints_with_the_swift_action_behind_a_first_turn_draw():
+    """Wave Strike (UC): "If on your first turn of combat you draw a melee weapon to
+    attack an opponent within your reach, you can spend a swift action to make a Bluff
+    check to feint against that opponent." Measured before: the draw and the blow only."""
+    scene, engine, pc, thug = _fight(feats=["Wave Strike"],
+                                     faces={"Bluff check (feint)": 20, "Attack with": 12})
+    pc.abilities["cha"] = 40
+    pc.equipped = "unarmed"
+    scene.acted.discard("pc")
+    scene.turn = [r for r, _ in scene.initiative].index("pc")
+    res = _settle(engine, engine.run(engine.validate([{
+        "op": "attack", "actor": "pc", "target": "c1", "visibility": "hidden",
+        "params": {"weapon": "longsword"}}])))
+    assert _rolls(res, "Bluff check (feint)"), _tells(res)
+    assert scene.swift_spent.get("pc") == scene.round
+    assert "feint has drawn" in _tells(res)
+    # Not the first turn: no feint.
+    scene2, engine2, pc2, thug2 = _fight(feats=["Wave Strike"],
+                                         faces={"Bluff check (feint)": 20})
+    pc2.equipped = "unarmed"
+    res2 = _settle(engine2, engine2.run(engine2.validate([{
+        "op": "attack", "actor": "pc", "target": "c1", "visibility": "hidden",
+        "params": {"weapon": "longsword"}}])))
+    assert not _rolls(res2, "Bluff check (feint)")
+
+
+def test_disengaging_shot_strikes_the_feinted_foe_open_before_stepping_away():
+    """Disengaging Shot (UC): "Whenever you use Disengaging Feint ... you can make a single
+    melee attack against one opponent you succeeded at feinting against. That opponent is
+    denied his Dexterity bonus to AC against this attack." Measured before: the feint let
+    the rogue slip away and struck nothing."""
+    scene, engine, pc, thug = _fight("fixtures/pc-kesst.json",
+                                     feats=["Disengaging Feint", "Disengaging Shot"],
+                                     faces={"Bluff check (feint)": 20, "Attack with": 12})
+    scene.turn = [r for r, _ in scene.initiative].index("pc")
+    res = _settle(engine, engine.run(engine.validate([{
+        "op": "check", "actor": "pc", "target": "c1", "visibility": "hidden",
+        "params": {"skill": "bluff", "feint": True, "disengage": True}}])))
+    attacks = [o for o in res.outcomes if o.op == "attack"]
+    assert attacks and "feint has drawn" in attacks[0].tell, _tells(res)
+    assert not thug.has_state("state.feinted.pc")
+
+
+class _MP:
+    """A monkeypatch usable outside the fixture (two set-ups in one test)."""
+
+    def __init__(self):
+        import pytest
+
+        self._mp = pytest.MonkeyPatch()
+
+    def setattr(self, *a, **k):
+        self._mp.setattr(*a, **k)
+
+    def undo(self):
+        self._mp.undo()

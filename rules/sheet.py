@@ -393,8 +393,9 @@ ATTACK_CHOICES = ("power_attack", "deadly_aim", "piranha_strike", "combat_expert
                   # Pushing Assault's push for Power Attack's damage, and the two crit
                   # trades (Dragonslayer, Wingclipper) — `rules/feat_events.py`.
                   "furious_finish", "pushing_assault", "dragonslayer", "wingclipper",
-                  # Feat loop b4-maneuver: Tripping Twirl's trip at every adjacent foe.
-                  "tripping_twirl")
+                  # Feat loop b4-maneuver: Tripping Twirl's trip at every adjacent foe,
+                  # Feinting Flurry's feint for a flurry's first swing.
+                  "tripping_twirl", "feinting_flurry")
 # The options nobody needs a feat for (combat bar round 2, 2026-11-22). CRB, Combat
 # ("Fighting Defensively as a Standard Action"): "You can choose to fight defensively when
 # attacking" — anyone, with any attack. Its numbers are `defensive_dodge` and the stance
@@ -428,7 +429,8 @@ ATTACK_CHOICE_FEATS = {"power_attack": "power-attack", "deadly_aim": "deadly-aim
                        "furious_finish": "furious-finish", "pushing_assault": "pushing-assault",
                        "dragonslayer": "dragonslayer", "wingclipper": "wingclipper",
                        # Feat loop b4-maneuver.
-                       "tripping_twirl": "tripping-twirl"}
+                       "tripping_twirl": "tripping-twirl",
+                       "feinting_flurry": "feinting-flurry"}
 
 _IMPLIED_GENDER = {"she": "woman", "he": "man"}
 

@@ -39,5 +39,17 @@
   },
   "break-guard": {
     "tags": ["maneuver.after-disarm.strike"]
+  },
+  "feinting-flurry": {
+    "choice": "feinting_flurry"
+  },
+  "improved-feinting-flurry": {
+    "tags": ["skill.bluff.feint.flurry-turn"]
+  },
+  "wave-strike": {
+    "tags": ["skill.bluff.feint.wave-strike"]
+  },
+  "disengaging-shot": {
+    "tags": ["skill.bluff.feint.disengaging-shot"]
   }
 }

@@ -6129,7 +6129,8 @@ class Engine:
             if not partial and not drawn:
                 draw = self._draw_before(raw)
                 if draw is not None:
-                    queue[0:0] = [draw]
+                    # Wave Strike's swift feint behind the draw (feat loop b4-maneuver).
+                    queue[0:0] = [draw] + maneuver_feats.wave_strike(self, raw, draw)
                     raw["_drawn"] = True
                     continue
             # A blow one move short: the move goes in front of it as a real intent, so it
@@ -6139,6 +6140,14 @@ class Engine:
             # on a resume, which is the same blow part-way through its dice.
             # Whirlwind Attack: one blow at each foe in reach, each its own intent
             # (`_whirlwind_before`), or the refusal in place of the one declared.
+            # Feinting Flurry's feint, in front of the flurry it forgoes a swing of
+            # (feat loop b4-maneuver, rules/maneuver_feats.py).
+            if not partial and not raw.get("_ffeint"):
+                ahead = maneuver_feats.feint_before(self, raw)
+                if ahead:
+                    raw["_ffeint"] = True
+                    queue[0:0] = ahead
+                    continue
             if not partial and raw.get("op") == "attack" \
                     and (raw.get("params") or {}).get("whirlwind_attack"):
                 whirl = self._whirlwind_before(raw)
@@ -11348,6 +11357,8 @@ class Engine:
         off_from = len(actor.attack_plan(weapon_key, True, choices)) if off_key else None
         hands = ([("primary" if n < off_from else "off") for n in range(len(sequence))]
                  if off_from is not None and full else [""] * len(sequence))
+        # Feinting Flurry forgoes the flurry's first swing for its feint (feat loop b4).
+        sequence, hands = maneuver_feats.drop_first_swing(intent, sequence, hands)
         # One swing at a stated iterative. The combat panel lets a Blood Bender replace
         # any attack in a full attack with an ability, so the remaining weapon swings
         # arrive one op each, still carrying their own -5/-10 — a mixed full attack

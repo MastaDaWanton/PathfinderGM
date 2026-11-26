@@ -886,6 +886,8 @@ _OPTION_SHAPES = {
                     "A critical on a winged flier trades its extra damage for grounding "
                     "it."),
     # Feat loop b4-maneuver.
+    "feinting_flurry": ("full", "Feinting Flurry",
+                        "With a flurry: a feint in place of the first blow."),
     "tripping_twirl": ("strike", "Tripping Twirl",
                        "The whole round, quarterstaff in both hands: a trip at every foe "
                        "beside you."),
