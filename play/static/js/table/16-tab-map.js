@@ -476,7 +476,7 @@ function siteAbout(st) {
   return "Rooms entered are built; rooms only seen are chalk outlines. A ringed pit is a trap you found. Zoom out past the site to go back up.";
 }
 function siteKeys(st, pf) {
-  return st.rooms.filter(r => r.id !== pf.here).map(r => [r.id, r.name]);
+  return (st.out ? [[st.out.id, "Way out: " + st.out.name]] : []).concat(st.rooms.filter(r => r.id !== pf.here).map(r => [r.id, r.name]));
 }
 // On the town and the Region round it: every site known beneath a place found, to go down to.
 function waysDown(s, pf) {

@@ -483,13 +483,13 @@ export async function draw(v) {
   if (level !== "town" && level !== "site") { mine.WL = PW().worldLayout(v.W); mine.K = PW().worldKnown(v.W, v.KP); }
   // Every state is a new view, and a press only moves the route: the site's centre is worked
   // out here, not in siteMap, or the route of a press found every room at NaN.
-  if (level === "site") { const cols = v.site.rooms.map(r => r.at[0]), rows = v.site.rooms.map(r => r.at[1]);
+  if (level === "site") { const all = v.site.rooms.concat(v.site.out ? [v.site.out] : []), cols = all.map(r => r.at[0]), rows = all.map(r => r.at[1]);
     mine.siteMid = [(Math.min(...cols) + Math.max(...cols)) / 2, (Math.min(...rows) + Math.max(...rows)) / 2]; }
   V = mine;
   const subject = level === "nation" ? v.nation : level === "continent" ? v.continent : level === "town" ? pf.where : level === "site" ? v.site.id : "";
   const sig = level + "|" + subject + "|" + pf.where + "|" + pf.here + "|" + pf.nodes.map(n => n.id + (n.visited ? "+" : "")).join(",")
     + "|" + (mine.K ? Object.keys(mine.K.how).sort().join() : "")
-    + "|" + mine.sites.map(st => st.id + ":" + st.rooms.map(r => r.id + (r.visited ? "+" : "")).join()).join(";")
+    + "|" + mine.sites.map(st => st.id + ":" + (st.out ? st.out.id + ">" : "") + st.rooms.map(r => r.id + (r.visited ? "+" : "")).join()).join(";")
     + "|" + (v.hexgrid ? "hx" : "") + JSON.stringify((v.KP && v.KP.hexes) || {});
   const freshView = level + "|" + subject !== lastTown;
   if (sig !== lastSig) {
@@ -962,9 +962,18 @@ function siteMap(v) {
     place(g, r.id, x, z);
     Object.assign(g.userData, { pickable: !here, name: bare(r.name) + (r.trap ? " (trap found)" : ""), seen: !r.visited });
   });
+  // The way out (owner ask 2026-11-26 A3): the ground the site lies under (its hex, or the town
+  // place over the sewers) as a slab of open ground joined to the way in, no walls: pressed, it
+  // is a place like any other, and its slip's Walk there sends the engine the real way up.
+  const root = by[st.id], out = st.out;
+  if (root && out) { const p = siteXZ(v, out.at), q = siteXZ(v, root.at), L = q[0] - p[0];
+    const f = mesh(new THREE.BoxGeometry(L, .3, 2.2), mat(0x4a3f32)); f.position.set((p[0] + q[0]) / 2, .15, p[1]); world.add(f);
+    const g = new THREE.Group(); g.add(mesh(new THREE.BoxGeometry(W, .4, D), mat(0x5f6b3e)));
+    const stair = mesh(new THREE.BoxGeometry(2.2, .9, 2.2), mat(0x6a5a46)); stair.position.set(W / 2 - 1.4, .45, 0); g.add(stair);
+    place(g, out.id, p[0], p[1]);
+    Object.assign(g.userData, { pickable: true, name: "Way out: " + bare(out.name), seen: false }); }
   // The way up, before the way in: an arrow pointing up, to the map the site lies under.
-  const root = by[st.id];
-  if (root && v.up) { const [x, z] = siteXZ(v, root.at), a = new THREE.Group(), cone = mesh(new THREE.ConeGeometry(1.4, 3, 12), mat(0x5a3a22));
+  if (root && v.up) { const [x, z] = siteXZ(v, out ? out.at : root.at), a = new THREE.Group(), cone = mesh(new THREE.ConeGeometry(1.4, 3, 12), mat(0x5a3a22));
     cone.position.y = 1.6; a.add(cone); place(a, "up:" + st.id, x - SITE_COL * .75, z, 1);
     Object.assign(a.userData, { name: "Back up", open: [v.up] }); }
 }
@@ -1083,7 +1092,7 @@ function paintWorldHighlight() {
 // --- The party's miniature, the route, the walk -----------------------------------------------
 function posOf(id) {
   if (!V) return null;
-  if (V.level === "site") { const r = V.site.rooms.find(x => x.id === id); if (!r) return null; const [x, z] = siteXZ(V, r.at); return new THREE.Vector3(x, .4, z); }
+  if (V.level === "site") { const r = V.site.rooms.find(x => x.id === id) || (V.site.out && V.site.out.id === id ? V.site.out : null); if (!r) return null; const [x, z] = siteXZ(V, r.at); return new THREE.Vector3(x, .4, z); }
   // Underground, on the town or the Region: the party stands at the place the site lies under.
   const st = V.sites.find(x => x.rooms.some(r => r.id === id));
   if (st && st.host !== id) return posOf(st.host);

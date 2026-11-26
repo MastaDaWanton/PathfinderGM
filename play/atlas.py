@@ -139,7 +139,8 @@ def known_places(engine, world) -> dict:
          "sites": [{"id", "name", "host", "here": room id | "",
                     "rooms": [{"id", "name", "parent", "exits": [...], "visited": bool,
                                "about": str, "role": str, "door": str, "trap": str,
-                               "at": [column, row]}]}]}
+                               "at": [column, row]}],
+                    "out": {"id", "name", "at"} | None}]}   # the place it lies under
 
     A room's `about`, `role` and `door` are sent only once it has been stood in: a room
     only seen is its name and its passages, as a place only seen is on the town chart.
@@ -288,7 +289,18 @@ def _sites(engine, been: set) -> list[dict]:
                 "trap": dungeons.found_trap(engine.scene, pid),
                 "at": seat[pid],
             })
-        out.append({"id": root.id, "name": root.name, "host": host, "here": here, "rooms": sent})
+        # The way out (owner ask 2026-11-26 A3: "add a representative room for the original
+        # map of the hex ... so that I can actually move back out"): the place the site lies
+        # under, drawn as one more room joined to the way in, a column before it, so a press
+        # on it gives the town slip's Walk there and the engine walks the real way up.
+        # CRPGs put the exit on the local map itself (Kingmaker's compass rose, Baldur's
+        # Gate's map edge), roguelikes the up stair (docs/research/2026-11-26-leave-the-dungeon.md).
+        # Kept apart from `rooms`, which every reader takes for the site's own.
+        way_out = ({"id": host, "name": known[host].name,
+                    "at": [seat[root.id][0] - 1, seat[root.id][1]]}
+                   if host in known and host in been else None)
+        out.append({"id": root.id, "name": root.name, "host": host, "here": here, "rooms": sent,
+                    "out": way_out})
     return out
 
 
