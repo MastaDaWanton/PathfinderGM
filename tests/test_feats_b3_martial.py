@@ -695,3 +695,39 @@ def test_quick_wild_shape_changes_as_a_move_or_swift_action_with_lower_forms():
     assert pc.has_state("form.animal")
     assert _use(engine, "Wild Shape").status != "refused"          # the one stance ends
     assert not pc.has_state("form.animal")
+
+
+# --- companions: Boon Companion, Falconer's Art ---------------------------------------------
+
+def test_boon_companion_raises_a_ranger_s_companion_four_levels_to_his_own():
+    """Boon Companion (Animal Archive): the companion figured as though the class were 4
+    levels higher, never past the character level. A 6th-level ranger's companion is at
+    3rd (level - 3); with the feat, 6th — not 7th."""
+    from rules import animal_companion
+
+    scene, engine, pc, thug = _fight(cls="ranger", level=6)
+    assert animal_companion.effective_level(pc, -3) == 3
+    pc.feats = list(pc.feats) + ["Boon Companion"]
+    assert animal_companion.effective_level(pc, -3) == 6
+    assert animal_companion.effective_level(pc, 0) == 6
+
+
+def test_falconer_s_art_gives_the_bird_its_chosen_bonus_and_the_handler_two():
+    """Falconer's Art (ISWG): a bird of prey companion gains the bonus chosen with it (+1
+    dodge AC here); the handler +2 on Handle Animal with birds of prey, not with a wolf."""
+    from rules import animal_companion, animals
+
+    scene, engine, pc, thug = _fight(cls="druid", level=4,
+                                     feats=["Animal Affinity", "Falconer's Art (dodge)"])
+    pc.ranks["handle animal"] = 4
+    bird = animal_companion.make(scene, pc, "eagle")
+    wolf = animal_companion.make(scene, pc, "wolf")
+    assert any(m.get("target") == "ac" and m.get("bonus_type") == "dodge"
+               for e in bird.effects for m in e.modifiers)
+    assert not any(m.get("note") == "Falconer's Art" for e in wolf.effects
+                   for m in e.modifiers)
+
+    def bonus(animal):
+        mods, _label, _why = animals._mods(pc, animal, untrained_ok=False)
+        return sum(m.value for m in mods if m.source.startswith("Falconer"))
+    assert bonus(bird) == 2 and bonus(wolf) == 0

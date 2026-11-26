@@ -126,8 +126,22 @@ def row(edl: int) -> dict | None:
 def effective_level(master, offset: int = 0) -> int:
     """The druid level the table is read at. Nature bond: her druid level. The Animal
     domain's companion: level - 3 (Core Rulebook, Animal domain), which can be 0 — no
-    companion yet."""
-    return max(0, int(getattr(master, "level", 1) or 1) + int(offset or 0))
+    companion yet.
+
+    Boon Companion (feat loop b3): "The abilities of your animal companion ... are
+    calculated as though your class were 4 levels higher, to a maximum effective druid
+    level equal to your character level" — the `companion_level` term through the funnel,
+    capped at the character's level."""
+    level = int(getattr(master, "level", 1) or 1)
+    edl = level + int(offset or 0)
+    reader = getattr(master, "_buff_mods", None)
+    if callable(reader):
+        from .dice import stack
+
+        boost = sum(m.value for m in stack(reader("combat_mod", "companion_level")))
+        if boost > 0:
+            edl = max(edl, min(level, edl + boost))
+    return max(0, edl)
 
 
 def body(animal_key: str, edl: int) -> dict:
@@ -257,6 +271,10 @@ def _apply(companion, master, animal_key: str, edl: int, tricks=None,
     companion.abilities = dict(b["abilities"])
     mods = [{"kind": "ability_mod", "target": ab, "amount": n}
             for ab, n in sorted(b["deltas"].items()) if n]
+    # What the master's feats lay on this companion (Falconer's Art, feat loop b3).
+    from . import feat_events
+
+    mods += feat_events.companion_mods(master, b["animal"])
     companion.apply_effect(ActiveEffect(
         name=f"{getattr(master, 'name', 'their druid')}'s animal companion",
         kind="bond", key=BOND_KEY, source=f"companion:{getattr(master, 'ref', '')}",

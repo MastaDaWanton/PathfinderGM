@@ -35,6 +35,8 @@ was loadable, so this paragraph says so.)
 """
 from __future__ import annotations
 
+import re
+
 from .activeeffect import ActiveEffect
 
 UNTIL_REST = "duration.until-rest"          # sheet.UNTIL_REST: a rest takes it back
@@ -834,3 +836,53 @@ def shaped_casting_refusal(actor, spell) -> str:
         return (f"The components of {spell.name} are melded into {actor.name}'s animal "
                 f"shape (Natural Spell would let them use them). Nothing is spent.")
     return ""
+
+
+# --- companions (feat loop b3) ---------------------------------------------------------------
+
+HANDLES_BIRDS = "handle.birds-of-prey"            # Falconer's Art's Handle Animal half
+# Birds of prey (ISWG, Falconer's Art: "such as eagles, falcons, hawks, and owls"): the
+# companion catalogue's one bird (eagle, hawk or owl) and the bestiary's raptors by name.
+_RAPTORS = ("eagle", "falcon", "hawk", "owl", "kestrel", "osprey")
+# Falconer's Art's three bonuses, "chosen at the time this animal companion is gained" —
+# the feat's parenthetical on the sheet: Falconer's Art (dodge).
+FALCONER_PICKS = {
+    "dodge": {"kind": "combat_mod", "target": "ac", "amount": 1, "bonus_type": "dodge"},
+    "attack": {"kind": "combat_mod", "target": "attack", "amount": 1, "bonus_type": "morale"},
+    "will": {"kind": "save_mod", "target": "will", "amount": 2, "bonus_type": "morale"},
+}
+
+
+def bird_of_prey(animal) -> bool:
+    from . import animal_companion
+
+    bond = animal_companion.bond_of(animal)
+    if bond is not None and str((bond.payload or {}).get("animal") or "") == "bird":
+        return True
+    getter = getattr(animal, "_creature_doc", None)
+    doc = (getter() if callable(getter) else None) or {}
+    words = f"{doc.get('id') or ''} {getattr(animal, 'name', '')}".lower()
+    return any(re.search(rf"(?<![a-z]){w}s?(?![a-z])", words) for w in _RAPTORS)
+
+
+def companion_mods(master, animal_key: str) -> list[dict]:
+    """What the master's feats lay on their companion's bond: Falconer's Art (ISWG): "if
+    you have a bird of prey as an animal companion, your animal companion gains one of
+    the following bonuses chosen at the time this animal companion is gained: a +1 dodge
+    bonus to AC, a +1 morale bonus on all attack rolls, or a +2 morale bonus on all Will
+    saves" — the sheet's parenthetical names it; none named, none laid."""
+    from . import feats as feats_mod
+
+    if str(animal_key or "") != "bird":
+        return []
+    out = []
+    for raw in getattr(master, "feats", None) or ():
+        doc = feats_mod.document(raw)
+        if not doc or doc["id"] != "falconer-s-art":
+            continue
+        pick = str(doc.get("target") or "").strip().lower()
+        for word, mod in FALCONER_PICKS.items():
+            if word in pick:
+                out.append(dict(mod, note="Falconer's Art"))
+                break
+    return out

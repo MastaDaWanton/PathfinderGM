@@ -283,6 +283,12 @@ def _mods(actor, animal, *, untrained_ok: bool):
     if link:
         mods.append(Modifier(int(_row("wild-empathy")["link_bonus"]),
                              "the link with an animal companion", "circumstance"))
+    # Falconer's Art (ISWG): "+2 bonus on Animal Handling checks made to train or control
+    # birds of prey" — its document's tag, and the animal answered by what it is.
+    from . import feat_events
+
+    if actor.has_state(feat_events.HANDLES_BIRDS) and feat_events.bird_of_prey(animal):
+        mods.append(Modifier(2, "Falconer's Art (a bird of prey)"))
     return mods, label, ""
 
 

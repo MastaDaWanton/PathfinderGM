@@ -374,5 +374,24 @@
     "not_yet": [
       "'carrying capacity, and any size-based special attacks you use or that are used against you (such as grab, swallow whole, and trample)': carrying capacity and the size limits of grab and swallow whole still read the form's own size"
     ]
+  },
+  "boon-companion": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "companion_level",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "note": "the companion figured 4 levels higher, never past your character level"
+      }
+    ],
+    "not_yet": [
+      "'or familiar': no class here has a familiar, so only an animal companion is raised"
+    ]
+  },
+  "falconer-s-art": {
+    "tags": [
+      "handle.birds-of-prey"
+    ]
   }
 }

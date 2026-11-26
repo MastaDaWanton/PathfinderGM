@@ -637,7 +637,11 @@ VOCAB: dict[str, list[dict]] = {
         # Feat loop b3: damage a blow adds that is "not multiplied on a critical hit"
         # (Raging Brutality's Constitution), read past the crit scaling by
         # `feat_events.damage_terms` with the blow's context.
-        ("damage_unmultiplied", "Damage never multiplied on a critical"))],
+        ("damage_unmultiplied", "Damage never multiplied on a critical"),
+        # Feat loop b3: levels added to the druid level an animal companion is figured
+        # at, never past the character's own (Boon Companion; `animal_companion.
+        # effective_level`).
+        ("companion_level", "Animal companion's effective druid level"))],
     "sense": [{"id": k, "name": n} for k, n in (
         ("low_light", "Low-light vision"), ("darkvision", "Darkvision"),
         ("scent", "Scent"), ("tremorsense", "Tremorsense"),
