@@ -288,3 +288,127 @@ def test_greater_channel_smite_keeps_its_dice_through_a_miss():
     said = _tells(_swing(e, face=19))
     assert "4d6" in said and "positive energy" in said
     assert not pc.has_state("buff.charged")
+
+
+# --- lay on hands: Reward of Grace, Reward of Life, Greater Mercy, Extra Mercy ------------
+
+def _ally_hurt(hp_down=10):
+    a = load_pc("fixtures/pc-borin.json")
+    a.ref, a.kind = "ally", "npc"
+    a.hp = max(1, a.hp_max - hp_down)
+    return a
+
+
+def test_reward_of_grace_gives_a_sacred_plus_one_to_hit_for_a_round():
+    pc = _pc("paladin", feats=["Reward of Grace"])
+    _s, e = _fight(pc, "thug")
+    before = sum(m.value for m in pc.attack_modifiers())
+    _use(e, "Lay on Hands")
+    assert sum(m.value for m in pc.attack_modifiers()) == before + 1
+    pc.tick_effects(1)
+    assert sum(m.value for m in pc.attack_modifiers()) == before
+
+
+def test_reward_of_life_heals_the_paladin_cha_for_healing_another():
+    """Reward of Life (UM): healing another returns her Charisma bonus (+3); healing
+    herself does not."""
+    pc = _pc("paladin", feats=["Reward of Life"])
+    pc.hp = pc.hp_max - 10
+    ally = _ally_hurt()
+    _s, e = _fight(pc, "thug", allies=[ally])
+    hp = pc.hp
+    out = _use(e, "Lay on Hands", to="ally")
+    assert out.status != "refused", out.tell
+    assert pc.hp == hp + 3
+    hp = pc.hp
+    _use(e, "Lay on Hands")
+    healed = pc.hp - hp
+    assert healed >= 4 and "Reward of Life" not in _use(e, "Lay on Hands").tell
+
+
+def test_greater_mercy_adds_a_d6_when_there_is_nothing_to_lift():
+    pc = _pc("paladin", feats=["Greater Mercy"], class_choices={"mercy": ["sickened"]})
+    ally = _ally_hurt(30)
+    _s, e = _fight(pc, "thug", allies=[ally])
+    out = _use(e, "Lay on Hands", to="ally")
+    assert "nothing the mercies lift: 1d6" in out.tell
+    ally.add_condition("sickened", 5)
+    out = _use(e, "Lay on Hands", to="ally")
+    assert "nothing the mercies lift" not in out.tell
+    assert not ally.has_condition("sickened")
+
+
+def test_extra_mercy_lifts_its_condition():
+    """Extra Mercy (UM): one additional mercy — the parenthetical's — lifted on a heal."""
+    pc = _pc("paladin", feats=["Extra Mercy (shaken)"], class_choices={"mercy": ["sickened"]})
+    ally = _ally_hurt()
+    _s, e = _fight(pc, "thug", allies=[ally])
+    ally.add_condition("shaken", 5)
+    ally.add_condition("sickened", 5)
+    _use(e, "Lay on Hands", to="ally")
+    assert not ally.has_condition("shaken") and not ally.has_condition("sickened")
+
+
+def test_word_of_healing_heals_half_at_thirty_feet_and_needs_the_feat():
+    """Word of Healing (UM): 30 feet, half the healing, mercies as normal. Without the feat
+    the `at range` mode does not exist."""
+    pc = _pc("paladin", feats=["Word of Healing"])
+    ally = _ally_hurt(30)
+    scene, e = _fight(pc, "thug", allies=[ally])
+    out = _use(e, "Lay on Hands (word of healing)", to="ally")
+    assert out.status != "refused", out.tell
+    assert "Half of it carries" in out.tell
+    plain = _pc("paladin")
+    assert "at range" not in ca.choices_of(plain, ca.find(plain, "lay on hands")[0])
+    zombie_pc = _pc("paladin", feats=["Word of Healing"])
+    scene, e = _fight(zombie_pc, "zombie")
+    assert _use(e, "Lay on Hands (at range)", to="c1").status == "refused"
+
+
+def test_word_of_healing_needs_a_voice():
+    pc = _pc("paladin", feats=["Word of Healing"])
+    ally = _ally_hurt()
+    _s, e = _fight(pc, "thug", allies=[ally])
+    pc.add_condition("choked", 2)
+    assert _use(e, "Lay on Hands (at range)", to="ally").status == "refused"
+
+
+# --- Crusader's Fist, Radiant Charge --------------------------------------------------------
+
+def test_crusader_s_fist_spends_lay_on_hands_only_when_the_fist_lands_on_undead():
+    pc = _pc("paladin", feats=["Crusader's Fist", "Improved Unarmed Strike"])
+    scene, e = _fight(pc, "zombie")
+    from tests._board import face_to_face
+    face_to_face(scene, "pc", "c1")
+    before = _left(pc, "lay on hands")
+    out = _use(e, "Crusader's Fist", to="c1")
+    assert out.status != "refused", out.tell
+    assert _left(pc, "lay on hands") == before
+    said = _tells(_swing(e, face=19, weapon="unarmed"))
+    assert "4d6" in said and "positive energy" in said, said
+    assert _left(pc, "lay on hands") == before - 1
+
+
+def test_radiant_charge_spends_every_use_on_the_charge_s_hit_past_dr():
+    """Radiant Charge (UM): all remaining lay on hands, 1d6 each + Cha, 'not subject to
+    damage reduction'. A blow that is not a charge leaves it waiting."""
+    pc = _pc("paladin", feats=["Radiant Charge"])
+    scene, e = _fight(pc, "ogre")
+    uses = _left(pc, "lay on hands")
+    _use(e, "Radiant Charge", to="c1")
+    said = _tells(_swing(e, face=19, charge=True))
+    assert f"spends {uses} lay on hands" in said and f"{uses}d6+3" in said, said
+    assert "holy" in said
+    assert _left(pc, "lay on hands") == 0
+
+
+def test_radiant_charge_waits_through_a_blow_that_is_no_charge():
+    pc = _pc("paladin", feats=["Radiant Charge"])
+    scene, e = _fight(pc, "ogre")
+    from tests._board import face_to_face
+    face_to_face(scene, "pc", "c1")
+    uses = _left(pc, "lay on hands")
+    _use(e, "Radiant Charge", to="c1")
+    _swing(e, face=19)
+    assert _left(pc, "lay on hands") == uses
+    assert any(x.name == "Radiant Charge" for x in pc.effects)

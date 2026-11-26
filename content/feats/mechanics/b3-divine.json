@@ -21,9 +21,40 @@
     ]
   },
   "elemental-channel": {
-    "tags": ["channel.elemental.$target"]
+    "tags": [
+      "channel.elemental.$target"
+    ]
   },
   "bestow-hope": {
-    "tags": ["channel.bestow-hope"]
-  }
+    "tags": [
+      "channel.bestow-hope"
+    ]
+  },
+  "extra-mercy": {
+    "tags": [
+      "mercy.extra.$target"
+    ]
+  },
+  "greater-mercy": {
+    "tags": [
+      "mercy.greater"
+    ]
+  },
+  "reward-of-grace": {
+    "tags": [
+      "lay-on-hands.reward-of-grace"
+    ]
+  },
+  "reward-of-life": {
+    "tags": [
+      "lay-on-hands.reward-of-life"
+    ]
+  },
+  "word-of-healing": {
+    "tags": [
+      "lay-on-hands.word-of-healing"
+    ]
+  },
+  "crusader-s-fist": {},
+  "radiant-charge": {}
 }

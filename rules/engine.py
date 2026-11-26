@@ -37415,6 +37415,13 @@ class Engine:
             if not pool.ready:
                 return (f"The {cost['pool']} pool recharges in {pool.cooldown_left} "
                         f"round{'' if pool.cooldown_left == 1 else 's'}.")
+        # "You must be able to speak and have a free hand" (Word of Healing): the hands
+        # by `classfeatures.free_hands`; the voice is the document's `requires_not`.
+        if doc.get("hands_free"):
+            from . import classfeatures
+
+            if classfeatures.free_hands(actor) < int(doc["hands_free"]):
+                return f"{found.title()} needs a free hand, and {actor.name} has none."
         # A price paid when the blow lands (`charge.pays`): nothing to arm with an empty
         # pool (Crusader's Fist, Radiant Charge).
         pays = (doc.get("charge") or {}).get("pays") or {}
@@ -37837,6 +37844,15 @@ class Engine:
                 for m in extra_dmg:
                     total += m.value
                     tells.append(f"{m.source} adds {m.value:+d} ({total}).")
+                if spec.get("halve"):
+                    # Word of Healing: "The target heals half the amount they would have
+                    # healed if you had touched them".
+                    total //= 2
+                    tells.append(f"Half of it carries across the distance ({total}).")
+            riders = self._feat_addons(actor, doc)
+            unlifted = next((a["unlifted_dice"] for a in riders if a.get("unlifted_dice")), "")
+            mercy_lifts = _mercy_lifts(actor, doc.get("removes") or {}, ca) \
+                if unlifted and doc.get("removes") else []
             if hp_cost.get("roll") and total:
                 # Blood Transfer: "deal Blood DMG to self and heal a receiver for equal
                 # HP" — the one roll is both the price and the gift.
@@ -37951,6 +37967,16 @@ class Engine:
                         if held:
                             tells.append(held)
                     elif as_ == "heal":
+                        # Greater Mercy (UM): "When you use your lay on hands ability and
+                        # the target of that ability does not have any conditions your
+                        # mercies can remove, it instead heals an additional +1d6".
+                        if unlifted and not any(other.has_condition(c) for c in mercy_lifts):
+                            more = self.dice.roll(str(unlifted), label=f"{shown}: nothing to "
+                                                  f"lift", visibility="player")
+                            rolls.append(more)
+                            share += more.total
+                            tells.append(f"{other.name} carries nothing the mercies lift: "
+                                         f"{unlifted} more ({share}).")
                         # Never below 0: a body standing over its maximum (a scratch
                         # sheet did, live 2026-10-05) "recovered -1 hit points".
                         healed = max(0, other.heal(share))
@@ -38019,6 +38045,8 @@ class Engine:
                                             "condition": cond, "origin": origin})
                             tells.append(f"{other.name} is no longer {cond}.")
             records.extend(self._eased(actor, doc, landed, origin, tells))
+            records.extend(self._addons_after(actor, doc, riders, landed, records, origin,
+                                              shown, tells))
         # A missed touch leaves the use spent and nothing else: the price was paid above.
 
         # 7. What it lays on the user: a stance, a timed bonus, a mark, a charge.
@@ -38290,7 +38318,60 @@ class Engine:
             said = doc.get("target_requires_said") or "a creature answering " + " or ".join(
                 str(q) for q in need)
             return f"{name} works only on {said}, and {other.name} is not. Nothing is spent."
+        bars = [str(q) for q in doc.get("target_requires_not") or ()
+                if other.has_state(str(q))]
+        if bars:
+            return (f"{name} does not work on {other.name} ({bars[0]}). Nothing is spent.")
         return ""
+
+    def _feat_addons(self, actor: Actor, doc: dict) -> list[dict]:
+        """The addons a held feat opens on this document (`addons[].requires`, a tag a feat
+        document grants): Reward of Grace, Reward of Life and Greater Mercy on lay on hands
+        (feat loop b3-divine). A rage power's addon (`choice`/`pick`) is read by
+        `_class_self_effect`, as before."""
+        return [a for a in doc.get("addons") or ()
+                if a.get("requires") and actor.has_state(str(a["requires"]))]
+
+    def _addons_after(self, actor: Actor, doc: dict, riders: list[dict], landed: list,
+                      records: list[dict], origin: str, shown: str,
+                      tells: list[str]) -> list[dict]:
+        """What a feat's addon does once the use has landed: a timed bonus on the user
+        (`self`: Reward of Grace's "+1 sacred bonus on all attack rolls for 1 round"),
+        and hit points back to the user for healing another (`heals_user`: Reward of
+        Life's "you heal a number of hit points equal to your Charisma bonus. This ability
+        has no effect if you use lay on hands to harm undead")."""
+        from . import class_abilities as ca
+
+        out: list[dict] = []
+        healed_other = any(r.get("kind") == "heal" and r.get("ref") != actor.ref
+                           for r in records)
+        for a in riders:
+            mine = a.get("self") or {}
+            if mine.get("modifiers"):
+                mods = ca.modifiers(mine["modifiers"], actor)
+                rounds = ca.amount(mine.get("rounds"), actor, 1) or 1
+                name = str(a.get("name") or shown)
+                actor.remove_effects(match=lambda x, n=name: x.origin == origin
+                                     and x.name == n)
+                actor.apply_effect(ActiveEffect(
+                    name=name, kind="buff", source=name, origin=origin,
+                    duration="rounds", rounds_left=rounds, modifiers=mods))
+                out.append({"ref": actor.ref, "kind": "buff", "ability": name,
+                            "modifiers": mods, "rounds": rounds, "origin": origin})
+                tells.append(f"{actor.name}: " + ", ".join(
+                    f"{m['amount']:+d} {m['target']}" for m in mods)
+                    + f" for {rounds} round{'s' if rounds != 1 else ''} ({name}).")
+            if a.get("heals_user") and healed_other \
+                    and (doc.get("roll_as") or (doc.get("roll") or {}).get("as")) == "heal":
+                n = max(0, ca.amount(a["heals_user"], actor))
+                got = max(0, actor.heal(n)) if n else 0
+                if n:
+                    out.append({"ref": actor.ref, "kind": "heal", "amount": got,
+                                "rolled": n, "hp_after": actor.hp, "hp_max": actor.hp_max,
+                                "origin": origin})
+                    tells.append(f"{actor.name} recovers {got} hit points "
+                                 f"({actor.hp}/{actor.hp_max}) ({a.get('name') or shown}).")
+        return out
 
     def _class_ability_area(self, intent: Intent, actor: Actor, doc: dict, name: str):
         """Who a shaped area catches — a breath weapon's cone, a line, a burst laid away
@@ -38628,6 +38709,8 @@ class Engine:
         said: list[str] = []
         add_tags: list[str] = []
         for add in doc.get("addons") or ():
+            if add.get("requires"):
+                continue                       # a feat's addon: `_feat_addons`
             if ca._norm(add.get("pick")) in ca.chosen(actor, add.get("choice", "")):
                 mods += ca.modifiers(add.get("modifiers"), actor)
                 weapons += [_sized_weapon(w, actor.size) for w in add.get("natural_weapons") or ()]
@@ -38766,8 +38849,9 @@ class Engine:
                 d = c["dice"]
                 line += (f" The next {swing} this round, if it hits"
                          + (f" {c['target_said']}" if c.get("target_said") else "")
-                         + f": {'a die' if d.get('per_spent') else str(d['count']) + 'd' + str(d['die'])}"
+                         + f": {d['count']}d{d['die']}"
                          + (" per use spent" if d.get("per_spent") else "")
+                         + (f"{int(d['bonus']):+d}" if d.get("bonus") else "")
                          + f" {d['type']}"
                          + (f", {SAVES.get(c['save'], c['save'])} DC "
                             f"{int(c['dc']) + int(c.get('dc_more') or 0)} for half"
@@ -38918,8 +39002,10 @@ class Engine:
             c = e.payload["charge"]
             if c.get("on_charge") and not charging:
                 continue                  # Radiant Charge waits for a charge's blow
-            actor.remove_effects(match=lambda x, e=e: x is e)
             unfit = self._charge_unfit(c, defender, full)
+            if unfit and c.get("pays"):
+                continue                  # paid on the hit: nothing chosen, nothing spent
+            actor.remove_effects(match=lambda x, e=e: x is e)
             if unfit:
                 out.append({"effect": {"ref": defender.ref, "kind": "charge_spent",
                                        "what": e.name, "origin": e.origin},
@@ -42266,7 +42352,12 @@ def _mercy_lifts(actor, removes: dict, ca) -> list[str]:
     """The condition keys this character's chosen mercies lift, at their level."""
     catalogue = {_norm_word(k): v for k, v in (removes.get("catalogue") or {}).items()}
     out: list[str] = []
-    for pick in ca.chosen(actor, str(removes.get("choice") or "")):
+    # Extra Mercy (UM): "Select one additional mercy for which you qualify" — the feat's
+    # parenthetical held as `mercy.extra.<pick>`, asked per catalogue row.
+    picks = list(ca.chosen(actor, str(removes.get("choice") or "")))
+    picks += [k for k in catalogue if k not in picks
+              and actor.has_state(f"mercy.extra.{k.replace(' ', '-')}")]
+    for pick in picks:
         row = catalogue.get(pick) or {}
         if int(row.get("level", 1) or 1) <= ca.level_of(actor):
             out.extend(str(c) for c in row.get("lifts") or ())

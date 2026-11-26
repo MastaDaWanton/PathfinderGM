@@ -51,6 +51,37 @@
       "reach_ft": 5,
       "roll": {"count": "floor(level / 2)", "die": 6, "as": "heal"},
       "undead": {"attack": "melee touch", "as": "damage", "type": "positive"},
+      "choice": {
+        "kind": "mode",
+        "default": "touch",
+        "options": {
+          "touch": {"aliases": ["by touch", "with a touch"]},
+          "at range": {
+            "requires": ["lay-on-hands.word-of-healing"],
+            "aliases": ["word of healing", "from afar", "at a distance", "from a distance"],
+            "aim": "ally",
+            "range_ft": 30,
+            "self_action": "standard",
+            "undead": null,
+            "target_requires_not": ["type.undead"],
+            "requires_not": ["state.silenced"],
+            "hands_free": 1,
+            "roll": {"count": "floor(level / 2)", "die": 6, "as": "heal", "halve": true}
+          }
+        }
+      },
+      "_word_of_healing_note": "Word of Healing (UM) opens the `at range` mode: 'heal another creature at a range of 30 feet as a standard action that does not provoke ... You must be able to speak and have a free hand ... The target heals half the amount ... but gains the benefits of your mercies as normal.'",
+      "addons": [
+        {"requires": "lay-on-hands.reward-of-grace", "name": "Reward of Grace",
+         "_source": "Reward of Grace (UM): 'Each time you use your lay on hands ability, you gain a +1 sacred bonus on all attack rolls for 1 round.'",
+         "self": {"modifiers": [{"type": "combat_mod", "target": "attack", "amount": 1, "bonus_type": "sacred"}], "rounds": 1}},
+        {"requires": "lay-on-hands.reward-of-life", "name": "Reward of Life",
+         "_source": "Reward of Life (UM): 'Each time you use your lay on hands ability to heal a creature other than yourself, you heal a number of hit points equal to your Charisma bonus. This ability has no effect if you use lay on hands to harm undead.'",
+         "heals_user": "max(0, cha_mod)"},
+        {"requires": "mercy.greater", "name": "Greater Mercy",
+         "_source": "Greater Mercy (UM): 'When you use your lay on hands ability and the target of that ability does not have any conditions your mercies can remove, it instead heals an additional +1d6 points of damage.'",
+         "unlifted_dice": "1d6"}
+      ],
       "removes": {
         "choice": "mercy",
         "catalogue": {
