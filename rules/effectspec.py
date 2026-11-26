@@ -2629,7 +2629,10 @@ CASTING_SITUATIONS: dict[str, str] = {
     "damaged": "struck while casting: DC 10 + the damage taken + the spell's level",
     "disrupted": "under a disruptive spell: DC its save DC + the spell's level "
                  "(Disruptive Spell)",
+    "bright_light": "a tenebrous spell cast in bright light: DC 15 + twice its slot's "
+                    "level (Tenebrous Spell)",
 }
+
 
 
 def when_problems(when, where: str = "when") -> list[str]:

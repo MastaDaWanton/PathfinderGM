@@ -7915,6 +7915,13 @@ class Engine:
             situations.append(("disrupted",
                                int((disrupted.payload or {}).get("dc", 10)) + level,
                                f"under {disrupted.source or 'a disruptive spell'}"))
+        # Tenebrous Spell: "Casting a tenebrous spell in bright light is difficult, and
+        # requires a concentration check (DC 15 + twice the tenebrous spell's effective
+        # spell level)" — the slot it fills.
+        if metamagic.flag(spell, "tenebrous") and self._caster_light(actor) == "bright":
+            slot = level + metamagic.levels(actor, metamagic.chosen(intent.params), spell)
+            situations.append(("bright_light", 15 + 2 * slot,
+                               "casting a tenebrous spell in bright light"))
         situations = self._distracted(actor, situations)
         ctx_of = casting.spell_context(spell, adjacent_allies=self._adjacent_allies(actor))
         for kind, dc, why in situations:
@@ -8289,7 +8296,14 @@ class Engine:
         if record:
             out.effects += [record]      # the outcome's record, as `done.effects +=` above
 
+    def _caster_light(self, actor: Actor) -> str:
+        """The light where this creature stands — "dark", "dim", "normal" or "bright" —
+        as the place is lit, whoever looks (`Scene.light_at` with no viewer)."""
+        pos = (self.scene.positions or {}).get(actor.ref)
+        return self.scene.light_at(tuple(pos[:2]) if pos else None)
+
     def _spend_echo(self, actor: Actor, spell) -> dict:
+
         """The echo an Echoing Spell left (`casting.echo_tag`) spent for this casting,
         through the applicator: remove the effect and the second casting is gone."""
         gone = actor.remove_effects(
@@ -30381,6 +30395,12 @@ class Engine:
         dc = int(item["dc"]) if item else casting.save_dc(actor, level, spell)
         cl = int(item["cl"]) if item else casting.spell_caster_level(
             actor, spell, adjacent_allies=self._adjacent_allies(actor))
+        # Tenebrous Spell (Inner Sea Magic, aonprd 2026-11-26): "When you cast a tenebrous
+        # spell in darkness or dim light, the spell's effective caster level and any
+        # associated save DCs are increased by 1" — the light where the caster stands.
+        if not item and metamagic.flag(spell, "tenebrous") \
+                and self._caster_light(actor) in ("dark", "dim"):
+            cl, dc = cl + 1, dc + 1
         plan = spells_mod.casting_plan(spell, cl)
         dice = plan["dice"]
         # A spell of missiles (`spells.missiles_at`): its dice are one missile's, rolled
@@ -33101,8 +33121,9 @@ class Engine:
             # every reader of `at_will` spends nothing for level 0 — refused until those
             # readers learn the slot; RAW allows it (CRB Metamagic Feats).
             why = "a cantrip cast with metamagic is not supported yet."
-        at = level + metamagic.levels(actor, meta)
+        at = level + metamagic.levels(actor, meta, spell)
         if not why and at > casting.highest_spell_level(actor):
+
             why = (f"it would take a level {at} slot, and {actor.name} casts up to level "
                    f"{casting.highest_spell_level(actor)}.")
         if not why and kind == "prepared" and casting.prepared_count(

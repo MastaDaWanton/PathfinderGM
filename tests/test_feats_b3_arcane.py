@@ -419,3 +419,60 @@ type("I", (), {"actor": pc.ref, "params": {"metamagic": ["echoing-spell"]}})(),
     pc.clear_states("recovery.rest")
     assert not pc.has_state(casting.echo_tag("magic-missile"))
 
+
+
+# --- Tenebrous Spell --------------------------------------------------------------------------
+
+def _night_cast(minute, meta=(), seed=5):
+    pc = _wren(["Tenebrous Spell"], level=7, spellbook=["burning-hands"],
+               prepared={"burning-hands": 1, "burning-hands+tenebrous-spell": 1})
+    thug = instantiate("thug", name="the thug")
+    thug.hp_max = thug.hp = 500
+    s = Scene()
+    s.at = "oldwood~forest"
+    s.clock_minutes = minute
+    s.add(pc)
+    s.add(thug)
+    s.initiative = [(pc.ref, 20), (thug.ref, 10)]
+    s.sides = {"us": [pc.ref], "them": [thug.ref]}
+    s.round, s.turn = 1, 0
+    e = Engine(s, Dice(seed=seed))
+    raw = {"op": "cast", "actor": pc.ref, "target": thug.ref, "because": "test",
+           "visibility": "hidden",
+           "params": {"spell": "burning-hands", "metamagic": list(meta)}}
+    return e, e.run(e.validate([raw])).outcomes[0]
+
+
+def test_tenebrous_spell_is_a_level_stronger_in_the_dark_only():
+    """ISM: "When you cast a tenebrous spell in darkness or dim light, the spell's
+    effective caster level and any associated save DCs are increased by 1". A forest at
+    night is dim: burning hands at DC 14 (Int 16) and caster level 7 becomes DC 15 at
+    caster level 8; the same spell plain stays DC 14."""
+    e, plain = _night_cast(23 * 60)
+    assert e._caster_light(e.scene.actors["wren"]) == "dim"
+    assert "DC 14" in plain.tell and "caster level 7" in plain.tell
+    _, dark = _night_cast(23 * 60, ["tenebrous-spell"])
+    assert "DC 15" in dark.tell and "caster level 8" in dark.tell
+
+
+def test_tenebrous_spell_in_bright_light_needs_concentration():
+    """ISM: "Casting a tenebrous spell in bright light is difficult, and requires a
+    concentration check (DC 15 + twice the tenebrous spell's effective spell level)":
+    burning hands in a 2nd-level slot at noon is DC 19, rolled, and no light bonus."""
+    e, noon = _night_cast(12 * 60, ["tenebrous-spell"])
+    assert e._caster_light(e.scene.actors["wren"]) == "bright"
+    assert "DC 19" in noon.tell and "bright light" in noon.tell
+    assert "DC 15;" not in noon.tell
+
+
+
+def test_tenebrous_cannot_take_a_light_spell_and_costs_nothing_on_darkness():
+    """"You cannot use this feat on spells with the light descriptor"; a darkness spell
+    pays no extra slot level."""
+    from rules import metamagic
+
+    pc = _wren(["Tenebrous Spell"], level=7)
+    assert "light descriptor" in metamagic.refusal(pc, spells.get("light"),
+                                                   ["tenebrous-spell"], spontaneous=False)
+    assert metamagic.levels(pc, ["tenebrous-spell"], spells.get("darkness")) == 0
+    assert metamagic.levels(pc, ["tenebrous-spell"], spells.get("burning-hands")) == 1

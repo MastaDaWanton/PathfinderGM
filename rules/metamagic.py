@@ -72,9 +72,12 @@ import re
 # - Echoing (+3, UM): "you can cast it one additional time during that day"; the copy is
 #   the plain spell, and the echo is laid after the cast (`Engine._echo_left`) and spent
 #   in place of a slot (`casting.cast_source`).
+# - Tenebrous (+1, ISM; +0 for a darkness or shadow spell, `_cost`): +1 caster level and
+#   DC in darkness or dim light, a concentration check in bright light (`Engine._op_cast`,
+#   `Engine._concentrate`); "You cannot use this feat on spells with the light descriptor."
 DOES = ("extend", "empower", "maximize", "enlarge", "silent", "still", "quicken",
         "heighten", "widen", "reach", "merciful", "intensify", "elemental", "pierce",
-        "persist", "focus", "select", "disrupt", "ectoplasm", "rider", "echo")
+        "persist", "focus", "select", "disrupt", "ectoplasm", "rider", "echo", "tenebrous")
 
 
 # What a `rider` may lay, and the fields it carries (see `_rider_problems`).
@@ -177,23 +180,37 @@ def held(actor) -> dict[str, dict]:
     return out
 
 
-def document_levels(ids) -> int:
+def document_levels(ids, spell=None) -> int:
     """The slot levels these feats add, by their documents alone (a prepared copy's slot
     is the copy's, whoever holds it now)."""
     from . import feats as feats_mod
 
     docs = feats_mod.documents()
-    return sum(_cost((docs.get(base_id(i)) or {}).get("metamagic") or {}, i) for i in ids)
+    return sum(_cost((docs.get(base_id(i)) or {}).get("metamagic") or {}, i, spell)
+               for i in ids)
 
 
-def levels(actor, ids) -> int:
-    """The slot levels these feats add for this actor."""
+def levels(actor, ids, spell=None) -> int:
+    """The slot levels these feats add for this actor (to this spell, when named)."""
     mine = held(actor)
-    return sum(_cost(mine[base_id(i)]["metamagic"], i) for i in ids if base_id(i) in mine)
+    return sum(_cost(mine[base_id(i)]["metamagic"], i, spell) for i in ids
+               if base_id(i) in mine)
 
 
-def _cost(doc: dict, fid: str) -> int:
+def _cost(doc: dict, fid: str, spell=None) -> int:
+    # Tenebrous Spell: "A tenebrous spell uses up a spell slot one level higher than the
+    # spell's actual level, except in the case of spells with the darkness or shadow
+    # descriptors and spells of the illusion (shadow) subschool" — those cost nothing.
+    if doc.get("does") == "tenebrous" and spell is not None and _shadowy(spell):
+        return 0
     return int(doc.get("levels", 0)) * (steps(fid) if doc.get("steps") else 1)
+
+
+def _shadowy(spell) -> bool:
+    words = {str(d).strip().lower() for d in getattr(spell, "descriptors", None) or ()}
+    return bool(words & {"darkness", "shadow"}) \
+        or str(getattr(spell, "subschool", "") or "").strip().lower() == "shadow"
+
 
 
 def refusal(actor, spell, ids, *, spontaneous: bool) -> str:
@@ -247,7 +264,11 @@ def _not_for(does: str, spell, actor, spontaneous: bool, doc: dict | None = None
             return "it has no verbal component."
         if str(casting.caster_data(actor).get("list") or "").lower() == "bard":
             return "bard spells cannot be enhanced by Silent Spell."
+    if does == "tenebrous" and "light" in {str(d).strip().lower()
+                                          for d in getattr(spell, "descriptors", None) or ()}:
+        return "it has the light descriptor."
     if does == "still" and "S" not in comps:
+
         return "it has no somatic component."
     if does == "quicken":
         timing = str(spell.casting_time or "").lower()
@@ -433,7 +454,8 @@ ADJECTIVE = {"extend": "extended", "empower": "empowered", "maximize": "maximize
              "reach": "reaching", "merciful": "merciful", "intensify": "intensified",
              "elemental": "elemental", "pierce": "piercing", "persist": "persistent",
              "focus": "focused", "select": "selective", "disrupt": "disruptive",
-             "ectoplasm": "ectoplasmic", "rider": "riding", "echo": "echoing"}
+             "ectoplasm": "ectoplasmic", "rider": "riding", "echo": "echoing",
+             "tenebrous": "tenebrous"}
 
 
 

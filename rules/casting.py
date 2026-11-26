@@ -1295,7 +1295,7 @@ def conversion_source(actor, spell, meta=()) -> dict | None:
     if meta and preferred(actor, spell):
         from . import metamagic
 
-        lift = metamagic.levels(actor, meta)
+        lift = metamagic.levels(actor, meta, spell)
     given = sacrifice_for(actor, lvl + lift)
     if not given:
         return None
@@ -1357,7 +1357,7 @@ def _level(actor, spell_id: str) -> int | None:
         return lvl
     from . import metamagic
 
-    return lvl + metamagic.document_levels(meta)
+    return lvl + metamagic.document_levels(meta, spells_mod.get(str(sid)))
 
 
 # A spell prepared with metamagic is its own prepared copy, in the slot of the raised
@@ -1726,7 +1726,8 @@ def cast_source(actor, spell, meta=()) -> dict | None:
     if meta:
         from . import metamagic
 
-        at = lvl + metamagic.levels(actor, meta)
+        at = lvl + metamagic.levels(actor, meta, spell)
+
         key = metamagic_key(spell.id, meta) if data.get("kind") == "prepared" else ""
         if at > highest_spell_level(actor) or (key and prepared_count(actor, key) <= 0):
             return None
