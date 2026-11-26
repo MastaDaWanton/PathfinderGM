@@ -9388,9 +9388,16 @@ class Engine:
         if ability:
             mods = actor.ability_check_modifiers(ability)
         else:
+            # Who the check is made at rides the context (feat loop b3: Divine
+            # Denouncer's checks "involving any divine spellcaster"), as a blow's does.
+            ctx = self._skill_use_ctx(intent, skill)
+            aimed = self.scene.actors.get(str(intent.target or ""))
+            if aimed is not None and aimed is not actor:
+                ctx = {**(ctx or {}), "target_actor": aimed}
             mods, refused = self._skill_mods_or_refusal(
                 intent, actor, skill, opposed=bool(intent.params.get("opposed_by")),
-                ctx=self._skill_use_ctx(intent, skill))
+                ctx=ctx)
+
             if refused is not None:
                 return refused
         for (named_skill, flag), resolve in skilluses.OWN_DOORS.items():

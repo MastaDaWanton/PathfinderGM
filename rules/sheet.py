@@ -9010,7 +9010,18 @@ def _when_holds(when, ctx: dict | None) -> bool:
                     if not any(defender.has_state(str(v or "")) for v in held):
                         return False
                     continue
+                if field_name == "casts":
+                    # Divine Denouncer's "any divine spellcaster" (feat loop b3): the
+                    # creature casts spells of that tradition (`armour.is_arcane` is the
+                    # one reader of which a caster's are).
+                    from . import armour as armour_mod, casting
+
+                    if not casting.is_caster(defender) or (
+                            "arcane" if armour_mod.is_arcane(defender) else "divine") != value:
+                        return False
+                    continue
                 if field_name == "aloft":
+
                     # Death from Below's "flying opponents" (feat loop b2): up in the air
                     # on the board of the moment (`aloft`); no board, no answer.
                     if aloft(defender) is not bool(value):

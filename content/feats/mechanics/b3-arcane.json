@@ -256,5 +256,178 @@
         4
       ]
     }
+  },
+  "divine-denouncer": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "bluff",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "diplomacy",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "intimidate",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "perform",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        },
+        "note": "the one Perform skill: oratory is not a separate skill here"
+      },
+      {
+        "type": "skill_mod",
+        "target": "sense motive",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (arcana)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (dungeoneering)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (engineering)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (geography)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (history)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (local)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (nature)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (nobility)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (planes)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (religion)",
+        "amount": 2,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "casts": "divine"
+          }
+        }
+      }
+    ],
+    "not_yet": [
+      "an outsider that casts spells as a cleric without a casting class: only a creature with a casting class is a caster to the engine (casting.is_caster)"
+    ]
   }
 }

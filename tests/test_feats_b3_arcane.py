@@ -534,3 +534,29 @@ def test_unsanctioned_knowledge_puts_four_spells_on_the_paladin_list():
         assert casting.on_class_list(pal, sp) and casting.knows(pal, sp)
         assert not casting.on_class_list(plain, sp)
     assert casting.spell_level_for(pal, spells.get("fireball")) is None
+
+
+# --- Divine Denouncer -------------------------------------------------------------------------
+
+def test_divine_denouncer_is_two_better_at_a_divine_caster_through_the_check():
+    """F&P: "+2 insight bonus on Bluff, Diplomacy, Intimidate, Knowledge, Perform
+    (oratory), and Sense Motive checks involving any divine spellcaster". Measured before:
+    a skill check's context carried nobody, so no `when.target` term on a skill could ever
+    hold. A Sense Motive at a cleric gets +2; at a wizard, nothing."""
+    pc = _wren(["Divine Denouncer"], level=5)
+    cleric = _wren([], name="Mother Oda", **{"class": "cleric", "kind": "npc"})
+    wizard = _wren([], name="Old Bram", **{"class": "wizard", "kind": "npc"})
+
+    def terms(who):
+        s = Scene(location_id="5bbd0c40345f")
+        s.add(pc)
+        s.add(who)
+        e = Engine(s, Dice(seed=2))
+        res = e.run(e.validate([{"op": "check", "actor": pc.ref, "target": who.ref,
+                                 "visibility": "hidden", "because": "test",
+                                 "params": {"skill": "sense motive",
+                                            "dc": {"band": "average"}}}],
+                               origin="author:test"))
+        return [m.source for o in res.outcomes for r in o.rolls for m in r.modifiers]
+    assert "Divine Denouncer" in terms(cleric)
+    assert "Divine Denouncer" not in terms(wizard)

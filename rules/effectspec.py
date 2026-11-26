@@ -2513,7 +2513,8 @@ WHEN_KEYS: dict[str, str] = {
 # `larger` / `smaller` (feat loop b2): size categories against the bearer's own, answered
 # by `classfeatures.holds` where the bearer is known (Risky Striker, Underfoot).
 _WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment", "choice",
-                                  "state", "aloft", "larger", "smaller"),
+                                  "state", "aloft", "larger", "smaller", "casts"),
+
                        "attacker": ("type", "subtype", "larger", "smaller", "unprovoked",
                                     "alignment")}
 _WHEN_COMPARE = ("lte", "gte", "lt", "gt", "eq")
