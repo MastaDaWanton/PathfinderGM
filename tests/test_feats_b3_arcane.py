@@ -369,3 +369,53 @@ def test_no_bloodstrike_without_the_feat_or_with_nothing_spent():
     thug.hp = 1
     out = _cast_at(high, thug, "magic-missile", Dice(seed=3))
     assert "Bloodstrike" not in out.tell
+
+
+# --- Echoing Spell ----------------------------------------------------------------------------
+
+def test_echoing_spell_casts_once_more_today_without_a_slot():
+    """UM: "you can cast it one additional time during that day ... this second casting
+    does not require you to prepare it in another spell slot", in a slot three levels
+    higher. A 9th-level wizard prepares one echoing magic missile (a 4th-level slot): it
+    is cast, the echo stays, the second missile is cast with no slot and no copy, and the
+    third is refused. A night's sleep clears an unused echo."""
+    pc = _wren(["Echoing Spell"], level=9, spellbook=["magic-missile"],
+               prepared={"magic-missile+echoing-spell": 1})
+    assert casting.prepared_count(pc, casting.metamagic_key("magic-missile",
+                                                            ["echoing-spell"])) == 1
+    thug = instantiate("thug", name="the thug")
+    thug.hp_max = thug.hp = 500
+    s = Scene(location_id="5bbd0c40345f")
+    s.add(pc)
+    s.add(thug)
+    s.initiative = [(pc.ref, 20), (thug.ref, 10)]
+    s.sides = {"us": [pc.ref], "them": [thug.ref]}
+    s.round, s.turn = 1, 0
+    e = Engine(s, Dice(seed=1))
+
+    def cast(**params):
+        raw = {"op": "cast", "actor": pc.ref, "target": thug.ref, "because": "test",
+               "visibility": "hidden", "params": {"spell": "magic-missile", **params}}
+        return e.run(e.validate([raw])).outcomes[0]
+
+    slots = pc.pool(casting.slot_pool(4)).current
+    first = cast(metamagic=["echoing-spell"])
+    assert "echoes in Wren's memory" in first.tell
+    assert pc.has_state(casting.echo_tag("magic-missile"))
+    assert pc.pool(casting.slot_pool(4)).current == slots - 1
+    left1 = pc.pool(casting.slot_pool(1)).current
+    second = cast()
+    assert second.status == "resolved"
+    assert not pc.has_state(casting.echo_tag("magic-missile"))
+    assert pc.pool(casting.slot_pool(1)).current == left1
+    with pytest.raises(Exception):
+        cast()
+    # An unused echo is gone in the morning.
+    e._echo_left(
+type("I", (), {"actor": pc.ref, "params": {"metamagic": ["echoing-spell"]}})(),
+                 type("O", (), {"effects": [{"kind": "cast", "spell": "magic-missile"}],
+                                "tell": ""})())
+    assert pc.has_state(casting.echo_tag("magic-missile"))
+    pc.clear_states("recovery.rest")
+    assert not pc.has_state(casting.echo_tag("magic-missile"))
+

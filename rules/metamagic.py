@@ -67,9 +67,15 @@ import re
 #   (+2, sonic: -2 on attacks, saves, skills and ability checks), Burning (+2, acid or
 #   fire: 2 x the spell's level at the start of the creature's next turn), Toppling (+1,
 #   force: a trip check at caster level + the casting ability bonus).
+#
+# Feat loop b3-arcane (2026-11-26), aonprd FeatDisplay pages read that day:
+# - Echoing (+3, UM): "you can cast it one additional time during that day"; the copy is
+#   the plain spell, and the echo is laid after the cast (`Engine._echo_left`) and spent
+#   in place of a slot (`casting.cast_source`).
 DOES = ("extend", "empower", "maximize", "enlarge", "silent", "still", "quicken",
         "heighten", "widen", "reach", "merciful", "intensify", "elemental", "pierce",
-        "persist", "focus", "select", "disrupt", "ectoplasm", "rider")
+        "persist", "focus", "select", "disrupt", "ectoplasm", "rider", "echo")
+
 
 # What a `rider` may lay, and the fields it carries (see `_rider_problems`).
 RIDER_KEYS = ("condition", "burn", "trip", "save", "needs", "damage_types")
@@ -427,7 +433,8 @@ ADJECTIVE = {"extend": "extended", "empower": "empowered", "maximize": "maximize
              "reach": "reaching", "merciful": "merciful", "intensify": "intensified",
              "elemental": "elemental", "pierce": "piercing", "persist": "persistent",
              "focus": "focused", "select": "selective", "disrupt": "disruptive",
-             "ectoplasm": "ectoplasmic", "rider": "riding"}
+             "ectoplasm": "ectoplasmic", "rider": "riding", "echo": "echoing"}
+
 
 
 def named(name: str, ids) -> str:

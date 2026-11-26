@@ -1691,7 +1691,13 @@ def pool_left(actor, pool_id: str) -> int:
     return int(pool.current) if pool else 0
 
 
+def echo_tag(spell_id: str) -> str:
+    """The tag an echoing spell leaves on its caster: `echo.<spell id>`."""
+    return f"echo.{spell_id}"
+
+
 def cast_source(actor, spell, meta=()) -> dict | None:
+
     """Where a cast of this spell comes from: `{"pool", "key", "cost", "level"}` — the
     slot pool to spend, the prepared copy to use up ("" for none), how many slots, the
     level cast at. None for a prepared caster with no copy of it prepared anywhere.
@@ -1709,6 +1715,14 @@ def cast_source(actor, spell, meta=()) -> dict | None:
     if spell is None or lvl is None:
         return None
     data = caster_data(actor)
+    # Echoing Spell's second casting (UM, aonprd 2026-11-26): "it does not disappear
+    # entirely from memory, and you can cast it one additional time during that day ...
+    # this second casting does not require you to prepare it in another spell slot ...
+    # does not expend another available spell slot". The echo is an effect on the caster
+    # (`echo_tag`, laid by the echoing cast, swept by a night's sleep); this source spends
+    # it instead of a slot. A plain cast only: the echo is of the spell, not of its feats.
+    if not meta and getattr(actor, "has_state", None) and actor.has_state(echo_tag(spell.id)):
+        return {"pool": "", "key": "", "cost": 0, "level": lvl, "echo": True}
     if meta:
         from . import metamagic
 

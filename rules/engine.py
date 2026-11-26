@@ -8263,6 +8263,7 @@ class Engine:
             if intent.op == "cast" and isinstance(out, Outcome) and out.status == "resolved":
                 self._identify_casting(intent, out)
                 self._bloodstrike(intent, out)
+                self._echo_left(intent, out)
             return out
         finally:
             if m is not None:
@@ -8288,7 +8289,44 @@ class Engine:
         if record:
             out.effects += [record]      # the outcome's record, as `done.effects +=` above
 
+    def _spend_echo(self, actor: Actor, spell) -> dict:
+        """The echo an Echoing Spell left (`casting.echo_tag`) spent for this casting,
+        through the applicator: remove the effect and the second casting is gone."""
+        gone = actor.remove_effects(
+            match=lambda e: casting.echo_tag(spell.id) in (e.tags or ()))
+        return {"ok": bool(gone)}
+
+    def _echo_left(self, intent: Intent, out) -> None:
+        """An echoing cast resolved: the spell stays in memory for one more casting today
+        (UM, Echoing Spell), an effect on the caster a night's sleep ends."""
+        from .activeeffect import ActiveEffect
+
+        cast = next((e for e in out.effects or () if isinstance(e, dict)
+                     and e.get("kind") == "cast" and e.get("spell")), None)
+        caster = self.scene.actors.get(intent.actor or "")
+        if cast is None or caster is None or "echoing-spell" not in [
+                metamagic.base_id(m) for m in metamagic.chosen(intent.params)]:
+            return
+        try:
+            spell = spells_mod.get(str(cast["spell"]))
+        except KeyError:
+            return
+        # A condition only so the night's sweep reaches it (`Actor.clear_states` asks
+        # conditions): "during that day".
+        caster.apply_effect(ActiveEffect(
+            name=f"Echo of {spell.name}", kind="condition", key="echoing",
+            source="Echoing Spell",
+
+            origin="feat:echoing-spell", duration="until-dismissed",
+            tags=(casting.echo_tag(spell.id), "recovery.rest")))
+        out.tell = (f"{out.tell} {spell.name} echoes in {caster.name}'s memory: it can be "
+                    f"cast once more today without a slot.").strip()
+        out.effects = list(out.effects or ()) + [
+            {"kind": "echo", "ref": caster.ref, "spell": spell.id,
+             "origin": "feat:echoing-spell"}]
+
     def _bloodstrike(self, intent: Intent, out) -> None:
+
         """Sorcerous Bloodstrike (UM p.156, aonprd 2026-11-26): "Once per day, as an
         immediate action upon reducing a creature to 0 or fewer hit points with one of
         your sorcerer spells, you can regain one usage of a sorcerer bloodline power that
@@ -30453,6 +30491,7 @@ class Engine:
             # 2026-09-29: this spent "spell slot 0" per cast, and a level 5 wizard's Light
             # went 4, 3, 2, 1, 0 and was then refused. Nothing is spent, nothing unprepared.
             spent = {"ok": True} if casting.at_will(level) or item \
+                else self._spend_echo(actor, spell) if source.get("echo") \
                 else actor.spend_pool(pool, max(1, int(source.get("cost", 1) or 1)))
             if not spent["ok"]:
                 # The mid-list case, measured: six casts in one list PASS validation
@@ -30473,6 +30512,8 @@ class Engine:
                 if source.get("key") and casting.prepared_count(actor, source["key"]) > 0:
                     # The copy in the slot that paid: ordinary, domain or school.
                     casting.unprepare(actor, source["key"], 1)
+                elif source.get("echo"):
+                    pass                 # Echoing Spell: no slot, no copy (`_spend_echo`)
                 else:
                     # Spontaneous conversion: the cure is cast and the prepared spell that
                     # paid for it is gone. Said out loud, because a player whose shield of
@@ -32992,7 +33033,8 @@ class Engine:
             source = casting.conversion_source(actor, spell, meta)
         paying = (source or {}).get("pool") or casting.slot_pool(level)
         cost = max(1, int((source or {}).get("cost", 1) or 1))
-        if not casting.at_will(level) and casting.pool_left(actor, paying) < cost:
+        if not casting.at_will(level) and not (source or {}).get("echo") \
+                and casting.pool_left(actor, paying) < cost:
             raise IntentError(
                 f"cast: {actor.name} has no level {level} slots left"
                 + (f" (an opposition-school spell takes {cost})." if cost > 1 else "."),
