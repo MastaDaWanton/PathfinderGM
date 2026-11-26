@@ -352,7 +352,9 @@ DOC_KEYS = frozenset({
     "undead_only", "charge_condition", "charge_rounds", "charge_rounds_dice", "feat",
     "charge_push_ft", "gaze", "light",
     # Feat loop b3: an ally who must stand close holding a state (Sympathetic Rage).
-    "requires_ally"})
+    "requires_ally",
+    # Feat loop b3: another document used another way (Quick Wild Shape).
+    "as", "level_down"})
 
 
 def _ally_want_problems(at: str, want) -> list[str]:
@@ -489,8 +491,20 @@ def _docs_for(actor) -> list[dict]:
     # rungs are laid over the document (claws grow at 7th).
     held = feat_ids(actor)
     for doc in (documents().get(FEAT_KIND) or {}).get("abilities") or ():
-        if str(doc.get("feat") or "") in held:
-            out.append({**doc, "class": FEAT_KIND})
+        if str(doc.get("feat") or "") not in held:
+            continue
+        if doc.get("as"):
+            # Another document of the character's, used another way (feat loop b3):
+            # Quick Wild Shape is wild shape at a move or swift action with a lower
+            # level's forms — the class's own document, so its stance, its pool and its
+            # toggle are the one wild shape, and nothing of it is written twice.
+            base = next((d for d in out if _norm(d.get("key")) == _norm(doc["as"])), None)
+            if base is not None:
+                out.append({**base, **{k: doc[k] for k in (
+                    "name", "aliases", "action", "level_down", "text", "source", "feat")
+                    if k in doc}})
+            continue
+        out.append({**doc, "class": FEAT_KIND})
     from . import grantedpowers
 
     kinds = grantedpowers.kinds()
@@ -738,7 +752,10 @@ def forms_for(actor, doc: dict) -> dict[str, dict]:
     from . import animal_companion
 
     spec = doc.get("choice") or {}
-    sizes = rung_at(spec.get("sizes") or {}, level_of(actor)) or []
+    # `level_down` (feat loop b3): Quick Wild Shape's "limited to forms available to a
+    # druid two levels lower when changing form as a move action, or four levels lower".
+    sizes = rung_at(spec.get("sizes") or {},
+                    level_of(actor) - int(doc.get("level_down", 0) or 0)) or []
     allowed = {_norm(s) for s in sizes}
     return {k: v for k, v in animal_companion.animals().items()
             if _norm(v.get("size")) in allowed}

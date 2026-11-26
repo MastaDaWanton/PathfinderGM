@@ -611,3 +611,87 @@ def test_raging_throw_adds_constitution_to_the_bull_rush_only():
     con = pc.ability_mod("con")
     assert sum(m.value for m in pc.cmb_modifiers("bull rush", defender=thug)) == rush + con
     assert sum(m.value for m in pc.cmb_modifiers("trip", defender=thug)) == trip
+
+
+# --- the druid in a shape: Natural Spell, Wild Speech, Powerful Shape, Quick Wild Shape ----
+
+def _druid(feats=(), level=8):
+    from rules.sheet import from_dict, to_dict
+
+    d = to_dict(load_pc("fixtures/pc-kesst.json"))
+    d.update({"class": "druid", "level": level, "ranks": {}, "armour": "none"})
+    d["abilities"]["wis"] = 18
+    d["spellbook"] = ["cure-light-wounds"]
+    d["prepared"] = {"cure-light-wounds": 3}
+    d["feats"] = list(d.get("feats") or ()) + list(feats)
+    pc = from_dict(d, ref="pc")
+    scene = Scene(location_id="5bbd0c40345f")
+    scene.add(pc)
+    scene.add(instantiate("thug", scene=scene, name=FOE))
+    scene.initiative = [("pc", 20), ("c1", 10)]
+    scene.sides = {"pc": ["pc"], "them": ["c1"]}
+    scene.round, scene.turn = 1, 0
+    return scene, Engine(scene, Dice(seed=5)), pc
+
+
+def _cast(engine, spell="cure-light-wounds", at="pc"):
+    return engine.run(engine.validate([{"op": "cast", "actor": "pc", "because": "test",
+                                        "params": {"spell": spell, "at": at}}])).outcomes[-1]
+
+
+def test_a_druid_in_a_wolf_s_shape_casts_only_with_natural_spell():
+    """CRB, wild shape: no speech in an animal's form; Natural Spell (CRB) completes the
+    verbal and somatic components; Wild Speech (UM) the verbal alone. Measured before: a
+    druid shaped as a wolf cast cure light wounds (V, S) with nothing asked."""
+    for feats, refused, why in (([], True, "throat"), (["Wild Speech"], True, "paws"),
+                                (["Natural Spell"], False, "")):
+        scene, engine, pc = _druid(feats)
+        assert _use(engine, "Wild Shape (wolf)").status != "refused"
+        out = _cast(engine)
+        assert (out.status == "refused") is refused, (feats, out.tell)
+        assert why in out.tell, (feats, out.tell)
+        assert _use(engine, "Wild Shape").status != "refused"       # back to herself
+        assert _cast(engine).status != "refused"
+
+
+def test_wild_speech_speaks_with_animals_a_minute_a_use_in_a_shape_only():
+    """Wild Speech (UM): speak with animals as a spell-like ability, druid level minutes a
+    day, in an animal's shape."""
+    from rules import animals
+
+    scene, engine, pc = _druid(["Wild Speech"], level=6)
+    assert _use(engine, "Wild Speech").status == "refused"
+    assert _use(engine, "Wild Shape (wolf)").status != "refused"
+    assert _use(engine, "Wild Speech").status != "refused"
+    assert animals.speaks_with_animals(pc) if hasattr(animals, "speaks_with_animals") \
+        else pc.has_state("permission.speak_with_animals")
+    assert pc.pool("wild speech").current == 5
+
+
+def test_powerful_shape_fights_one_size_larger_in_cmb_and_cmd_only_while_shaped():
+    scene, engine, pc = _druid(["Powerful Shape"])
+    cmb = sum(m.value for m in pc.cmb_modifiers("trip"))
+    assert _use(engine, "Wild Shape (wolf)").status != "refused"
+    shaped = sum(m.value for m in pc.cmb_modifiers("trip"))
+    pc.feats = [f for f in pc.feats if f != "Powerful Shape"]
+    plain_shaped = sum(m.value for m in pc.cmb_modifiers("trip"))
+    assert shaped == plain_shaped + 1
+    del cmb
+
+
+def test_quick_wild_shape_changes_as_a_move_or_swift_action_with_lower_forms():
+    """Quick Wild Shape (UM): a move action (forms of two druid levels lower) or a swift
+    action (four lower). At 8th: Large as a move action (6th's forms), not as a swift
+    action (4th's: Small and Medium)."""
+    from rules import class_abilities as ca
+
+    scene, engine, pc = _druid(["Quick Wild Shape"], level=8)
+    quick, _ = ca.find(pc, "quick wild shape (wolf)")
+    swift, _ = ca.find(pc, "swift wild shape (wolf)")
+    assert ca.action_of(quick, pc) == "move" and ca.action_of(swift, pc) == "swift"
+    assert "large" in {v["size"] for v in ca.forms_for(pc, quick).values()}
+    assert "large" not in {v["size"] for v in ca.forms_for(pc, swift).values()}
+    assert _use(engine, "Swift Wild Shape (wolf)").status != "refused"
+    assert pc.has_state("form.animal")
+    assert _use(engine, "Wild Shape").status != "refused"          # the one stance ends
+    assert not pc.has_state("form.animal")

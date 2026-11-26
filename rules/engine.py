@@ -30323,6 +30323,10 @@ class Engine:
                 return self._refuse(intent, f"{actor.name} cannot speak the words of "
                                             f"{spell.name}. Nothing is spent.",
                                     code="silenced")
+            # In an animal's shape (feat loop b3): Natural Spell's and Wild Speech's gate.
+            why = feat_events.shaped_casting_refusal(actor, spell)
+            if why:
+                return self._refuse(intent, why, code="shaped")
             barred = actor.barred_from_casting(arcane=armour_mod.is_arcane(actor))
             if barred is not None:
                 found = self._curse_said(actor, barred, found=True)

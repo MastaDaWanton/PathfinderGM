@@ -332,5 +332,47 @@
     "not_yet": [
       "'if you bull rush an opponent into a square another creature occupies or into a solid object, the opponent and the creature or object take bludgeoning damage equal to your Strength modifier + your Constitution modifier': the push stops at what blocks it and nobody is hurt"
     ]
+  },
+  "natural-spell": {
+    "tags": [
+      "casting.form.natural"
+    ]
+  },
+  "wild-speech": {
+    "tags": [
+      "casting.form.verbal"
+    ]
+  },
+  "quick-wild-shape": {},
+  "powerful-shape": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "form.animal"
+          }
+        },
+        "note": "in wild shape, the CMB of one size larger"
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmd",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "form.animal"
+          }
+        },
+        "note": "in wild shape, the CMD of one size larger"
+      }
+    ],
+    "not_yet": [
+      "'carrying capacity, and any size-based special attacks you use or that are used against you (such as grab, swallow whole, and trample)': carrying capacity and the size limits of grab and swallow whole still read the form's own size"
+    ]
   }
 }

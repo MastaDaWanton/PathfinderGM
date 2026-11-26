@@ -798,3 +798,39 @@ def ally_holds(engine, actor, want: dict) -> bool:
                 and awareness.sees(engine.scene, actor, other):
             return True
     return False
+
+
+# --- casting in an animal's shape (feat loop b3) -------------------------------------------
+
+ANIMAL_FORM = "form.animal"                       # the wild shape document's own tag
+SPEAKS_IN_FORM = "casting.form.verbal"            # Wild Speech
+CASTS_IN_FORM = "casting.form.natural"            # Natural Spell
+
+
+def shaped_casting_refusal(actor, spell) -> str:
+    """Why a spell cannot be cast in an animal's shape, or "".
+
+    CRB, Druid (wild shape, as beast shape): the druid "loses her ability to speak while
+    in animal form"; Natural Spell (CRB): "You can complete the verbal and somatic
+    components of spells while using wild shape ... You can also use any material
+    components or focuses you possess, even if such items are melded within your current
+    form"; Wild Speech (UM): verbal components and speech, "However, it does not give you
+    the ability to cast spells requiring somatic components unless you also have the
+    Natural Spell feat, or cast spells with material components merged into your form."
+    Measured before: a druid shaped as a wolf cast cure light wounds with nothing asked."""
+    if not actor.has_state(ANIMAL_FORM):
+        return ""
+    if actor.has_state(CASTS_IN_FORM):
+        return ""
+    comps = {str(c).strip().upper() for c in getattr(spell, "components", None) or ()}
+    if "V" in comps and not actor.has_state(SPEAKS_IN_FORM):
+        return (f"{actor.name} has an animal's throat and cannot speak the words of "
+                f"{spell.name} (Natural Spell or Wild Speech would let them). Nothing is "
+                f"spent.")
+    if "S" in comps:
+        return (f"{actor.name} has paws, not hands, for the gestures of {spell.name} "
+                f"(Natural Spell would let them). Nothing is spent.")
+    if comps & {"M", "F", "DF", "M/DF", "F/DF"}:
+        return (f"The components of {spell.name} are melded into {actor.name}'s animal "
+                f"shape (Natural Spell would let them use them). Nothing is spent.")
+    return ""
