@@ -648,8 +648,8 @@ def _reckless_miss(engine, actor, defender, weapon_key, weapon, state) -> None:
                     for sq in squares)]
     if not near:
         return
-    pick = near[engine.dice.roll(f"1d{len(near)}", label="Reckless Aim (who is hit)",
-                                 visibility="hidden").total - 1]
+    pick = near[0] if len(near) == 1 else near[engine.dice.roll(
+        f"1d{len(near)}", label="Reckless Aim (who is hit)", visibility="hidden").total - 1]
     dmg = engine.dice.roll(weapon["damage"], actor.damage_modifiers(weapon_key,
                                                                      defender=pick),
                            label=f"Damage ({weapon['name']}, Reckless Aim)",
@@ -726,7 +726,7 @@ def death_or_glory_answer(engine, actor, defender, choices) -> list[dict]:
     from . import position
 
     if "death_or_glory" not in choices or defender.is_down or defender.is_dead \
-            or not defender.can_act("attack"):
+            or defender.blocking_key("attack"):
         return []
     if position.out_of_reach(engine.scene, defender, actor, defender.wielded_key()) \
             is not None:

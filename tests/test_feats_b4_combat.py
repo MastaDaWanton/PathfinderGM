@@ -497,3 +497,190 @@ def test_opening_volley_gives_plus_four_on_the_next_melee_attack_and_is_spent():
     assert _named(first, "Opening Volley") == 4
     second = _rolls(_attack(engine, weapon="longsword"), "Attack with")[0]
     assert _named(second, "Opening Volley") == 0
+
+
+# --- the declared one-blow options --------------------------------------------------------
+
+def _owed(res, by):
+    return [e for o in res.outcomes for e in o.effects
+            if e.get("kind") == "owed_swing" and e.get("ref") == by]
+
+
+def test_death_or_glory_is_plus_four_and_the_large_foe_answers_with_the_same():
+    """Death or Glory (UC): against a Large or larger creature one melee attack as a
+    full-round action at +4 attack, damage and confirmation (+1 at BAB 11); then the foe
+    may spend an immediate action on one melee attack back with the same bonuses."""
+    scene, engine, pc, ogre = _fight(feats=["Death or Glory"], foe="ogre", level=11,
+                                     at=((6, 10), (7, 10)),
+                                     faces={"Attack with": 15, "Damage": 1})
+    ogre.hp = ogre.hp_max = 900
+    res = _attack(engine, death_or_glory=True)
+    roll = _rolls(res, "Attack with Death") or _rolls(res, "Attack with")
+    assert _named(roll[0], "Death or Glory") == 5
+    assert _named(_rolls(res, "Damage")[0], "Death or Glory") == 5
+    swings = [o for o in res.outcomes if o.op == "attack"]
+    assert any(o.actor == "c1" for o in swings), _tells(res)
+    back = next(o for o in swings if o.actor == "c1")
+    assert _named(back.rolls[0].as_dict(), "Death or Glory") == 5
+    assert "Death or Glory" in _tells(res)
+
+
+def test_death_or_glory_is_refused_against_a_medium_foe_and_in_a_full_attack():
+    from rules.intents import IntentError
+
+    scene, engine, pc, thug = _fight(feats=["Death or Glory"], level=6)
+    with pytest.raises(IntentError, match="Large or larger"):
+        engine.validate([{"op": "attack", "actor": "pc", "target": "c1",
+                          "params": {"death_or_glory": True}}])
+    scene, engine, pc, ogre = _fight(feats=["Death or Glory"], foe="ogre", level=6)
+    with pytest.raises(IntentError, match="full-round"):
+        engine.validate([{"op": "attack", "actor": "pc", "target": "c1",
+                          "params": {"death_or_glory": True, "full_attack": True}}])
+
+
+def test_deadly_finish_kills_a_foe_left_below_zero_who_fails_fortitude():
+    """Deadly Finish (UC): a melee hit leaving the foe at -1 or fewer: Fortitude DC 15 +
+    the damage or die. Before this feat the thug lay dying; now it is dead."""
+    scene, engine, pc, thug = _fight(feats=["Deadly Finish"], level=11,
+                                     faces={"Attack with": 18, "Damage": 20,
+                                            "Fortitude save": 2})
+    thug.hp = 5
+    res = _attack(engine, deadly_finish=True)
+    assert thug.is_dead and "Deadly Finish" in _tells(res)
+    scene, engine, pc, thug = _fight(feats=["Deadly Finish"], level=11,
+                                     faces={"Attack with": 18, "Damage": 20})
+    thug.hp = 5
+    _attack(engine)                                     # not declared: it lies dying
+    assert not thug.is_dead
+
+
+def test_punch_through_opens_the_foe_s_typed_dr_to_the_bearer_s_allies():
+    """Punch Through (Demon Hunter's Handbook): the bearer's damaging hit lets allies who
+    hold the feat pass 5 of the foe's typed DR for a round; not the bearer himself."""
+    from rules import strike_feats
+
+    scene, engine, pc, thug = _fight(feats=["Punch Through"], level=6,
+                                     ally=[((7, 9), ["Punch Through"])],
+                                     faces={"Attack with": 18, "Damage": 3})
+    thug.hp = thug.hp_max = 400
+    from rules.sheet import situated
+
+    kesst = scene.get("ally0")
+    with situated(scene):
+        assert "ignores_typed_dr:5" not in strike_feats.dr_traits(kesst, thug, "rapier")
+    res = _attack(engine, punch_through=True)
+    assert "Punch Through" in _tells(res)
+    with situated(scene):
+        assert "ignores_typed_dr:5" in strike_feats.dr_traits(kesst, thug, "rapier")
+        assert "ignores_typed_dr:5" not in strike_feats.dr_traits(pc, thug, "longsword")
+
+
+def test_reckless_aim_trades_one_ac_for_plus_two_and_a_natural_one_hits_a_neighbour():
+    """Reckless Aim (Blood of Fiends): at a foe engaged in melee, +2 competence on the
+    shot and -1 AC; a natural 1 automatically hits a random adjacent creature that
+    threatens the target - here Kesst, fighting it."""
+    scene, engine, pc, thug = _fight(feats=["Point-Blank Shot", "Precise Shot", "Reckless Aim"], at=((2, 10), (8, 10)),
+                                     ally=[((8, 11), ())],
+                                     faces={"Attack with": 15, "Damage": 3})
+    thug.hp = thug.hp_max = 400
+    pc.shield = "none"
+    ac = pc.ac()
+    res = _attack(engine, weapon="shortbow", reckless_aim=True)
+    assert _named(_rolls(res, "Attack with")[0], "Reckless Aim") == 2
+    assert pc.ac() == ac - 1
+    scene, engine, pc, thug = _fight(feats=["Point-Blank Shot", "Precise Shot", "Reckless Aim"], at=((2, 10), (8, 10)),
+                                     ally=[((8, 11), ())],
+                                     faces={"Attack with": 1, "Damage": 3})
+    kesst = scene.get("ally0")
+    before = kesst.hp
+    res = _attack(engine, weapon="shortbow", reckless_aim=True)
+    assert kesst.hp == before - 3 and "Reckless Aim, natural 1" in _tells(res)
+
+
+def test_reckless_aim_needs_a_foe_engaged_in_melee():
+    from rules.intents import IntentError
+
+    scene, engine, pc, thug = _fight(feats=["Point-Blank Shot", "Precise Shot", "Reckless Aim"], at=((2, 10), (8, 10)))
+    with pytest.raises(IntentError, match="engaged in melee"):
+        engine.validate([{"op": "attack", "actor": "pc", "target": "c1",
+                          "params": {"weapon": "shortbow", "reckless_aim": True}}])
+
+
+def test_butterfly_s_sting_gives_the_critical_to_the_next_ally_s_melee_hit():
+    """Butterfly's Sting (Faiths of Purity): the bearer forgoes a confirmed critical (the
+    blow deals normal damage) and the next ally's melee hit on the creature is a critical
+    without a confirmation roll."""
+    scene, engine, pc, thug = _fight(feats=["Combat Expertise", "Butterfly's Sting"],
+                                     ally=[((7, 9), ())],
+                                     faces={"Attack with": 20, "Confirm": 20, "Damage": 4})
+    pc.abilities["int"] = 13
+    thug.hp = thug.hp_max = 400
+    res = _attack(engine, butterfly_sting=True)
+    assert "Butterfly's Sting" in _tells(res)
+    assert not any("critical" in str(b.get("critical")) and b.get("critical")
+                   for o in res.outcomes for b in (o.blows or []))
+    engine.dice.faces = {"Attack with": 15, "Damage": 4}
+    res = _attack(engine, by="ally0", target="c1")
+    assert "a critical (Butterfly's Sting)" in _tells(res)
+    assert not _rolls(res, "Confirm")
+
+
+def test_two_handed_thrower_adds_half_again_strength_to_a_two_handed_throw():
+    """Two-Handed Thrower (UC): a one-handed weapon thrown with both hands deals 1-1/2
+    times the Strength bonus: Borin's +3 becomes +4 on a thrown dagger."""
+    scene, engine, pc, thug = _fight(feats=["Two-Handed Thrower"], at=((6, 10), (8, 10)),
+                                     faces={"Attack with": 18, "Damage": 2})
+    thug.hp = thug.hp_max = 400
+    res = _attack(engine, weapon="dagger", thrown=True, two_handed_throw=True)
+    assert _named(_rolls(res, "Damage")[0], "Two-Handed Thrower") == 1, _tells(res)
+
+
+def test_two_handed_throw_needs_the_hands_free():
+    from rules.intents import IntentError
+
+    scene, engine, pc, thug = _fight(feats=["Two-Handed Thrower"], at=((6, 10), (8, 10)))
+    with pytest.raises(IntentError, match="both hands"):
+        engine.validate([{"op": "attack", "actor": "pc", "target": "c1",
+                          "params": {"weapon": "dagger", "thrown": True,
+                                     "two_handed_throw": True}}])     # heavy shield on
+
+
+def test_hamatulatsu_pierces_and_a_piercing_critical_sickens_then_staggers():
+    """Hamatulatsu (ISWG): the unarmed strike may pierce; a piercing critical leaves the
+    foe sickened for a round, or staggered for a round if it is already sickened."""
+    feats = ["Improved Unarmed Strike", "Weapon Focus (unarmed strike)", "Hamatulatsu"]
+    scene, engine, pc, thug = _fight(feats=feats, faces=CRIT)
+    thug.hp = thug.hp_max = 400
+    res = _attack(engine, weapon="unarmed", hamatulatsu=True)
+    assert any(e.get("type") == "piercing" for o in res.outcomes for e in o.effects
+               if e.get("kind") == "damage")
+    assert _cond(thug, "sickened").rounds_left == 1
+    _attack(engine, weapon="unarmed", hamatulatsu=True)
+    assert _cond(thug, "staggered") is not None
+
+
+def test_cockatrice_strike_petrifies_a_stunned_foe_on_a_failed_fortitude():
+    """Cockatrice Strike (APG): one unarmed strike as a full-round action against a dazed,
+    flat-footed, paralyzed, staggered, stunned or unconscious foe; a critical petrifies
+    it unless it makes Fortitude DC 10 + half level + Wis."""
+    feats = ["Improved Unarmed Strike", "Gorgon's Fist", "Medusa's Wrath",
+             "Cockatrice Strike"]
+    scene, engine, pc, thug = _fight(feats=feats, level=14,
+                                     faces=dict(CRIT, **{"Fortitude save": 2}))
+    thug.hp = thug.hp_max = 400
+    thug.add_condition("stunned", rounds=2)
+    res = _attack(engine, weapon="unarmed", cockatrice_strike=True)
+    assert _cond(thug, "petrified") is not None, _tells(res)
+
+
+def test_cockatrice_strike_is_refused_against_a_foe_on_guard():
+    from rules.intents import IntentError
+
+    feats = ["Improved Unarmed Strike", "Gorgon's Fist", "Medusa's Wrath",
+             "Cockatrice Strike"]
+    scene, engine, pc, thug = _fight(feats=feats, level=14)
+    scene.acted.add("c1") if isinstance(scene.acted, set) else None
+    engine._flat_footed = lambda d: False
+    with pytest.raises(IntentError, match="stunned or unconscious"):
+        engine.validate([{"op": "attack", "actor": "pc", "target": "c1",
+                          "params": {"weapon": "unarmed", "cockatrice_strike": True}}])
