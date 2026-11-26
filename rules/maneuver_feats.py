@@ -893,3 +893,23 @@ def unseat(engine, intent, actor, defender, weapon_key: str, choices) -> list[di
                 "tell": f"{defender.name} is knocked out of the saddle and lands prone beside "
                         f"{steed.name}."})
     return out
+
+
+# --- Cypher Script ---------------------------------------------------------------------------
+
+CYPHER_SCRIPT = "spellbook.cypher-script"
+
+
+def cypher_script(actor, plan: dict, level: int) -> None:
+    """Cypher Script (ISWG): "Any spell you scribe in your spellbook costs half as much as
+    normal and takes up only half the room it normally would (round all fractions up). It
+    only takes you 10 minutes per spell level to scribe a spell into your spellbook (5
+    minutes for cantrips)." The copy plan's price and minutes (`spellitems.copy_plan`): the
+    hour of study stays, the writing is the feat's. The room is not counted anywhere — a
+    spellbook here has no page limit — so that clause has nothing to halve."""
+    from . import formulae
+
+    if not actor.has_state(CYPHER_SCRIPT):
+        return
+    plan["cost_gp"] = -(-int(plan.get("cost_gp") or 0) // 2)
+    plan["minutes"] = formulae.STUDY_MINUTES + (5 if level <= 0 else 10 * level)

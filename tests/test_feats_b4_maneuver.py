@@ -683,3 +683,22 @@ def test_unseat_knocks_a_charged_rider_out_of_the_saddle():
     assert tuple(scene.positions["c2"])[:2] != (8, 5)
     # Not a charge, no unseat.
     assert maneuver_feats.unseat(engine, intent, pc, foe, "lance", ()) == []
+
+
+# --- Cypher Script ----------------------------------------------------------------------------
+
+def test_cypher_script_halves_the_ink_and_writes_in_ten_minutes_a_level():
+    """Cypher Script (ISWG): "Any spell you scribe in your spellbook costs half as much as
+    normal ... It only takes you 10 minutes per spell level to scribe." Measured before: a
+    1st-level copy cost 10 gp and 120 minutes, feat or not."""
+    from rules import spellitems
+    from tests.test_spell_items import _wizard
+
+    for feats, cost, minutes in (([], 10, 120), (["Cypher Script"], 5, 70)):
+        pc = _wizard()
+        pc.spellbook = [s for s in pc.spellbook if s != "magic-missile"]
+        pc.feats = list(pc.feats) + feats
+        pc.add_stock(spellitems.make("scroll", "magic-missile", how="bought"), 1)
+        sid = next(k for k, v in pc.stock.items() if spellitems.kind_of(v))
+        plan = spellitems.copy_plan(pc, pc.stock[sid], clock=0)
+        assert (plan["cost_gp"], plan["minutes"]) == (cost, minutes), plan

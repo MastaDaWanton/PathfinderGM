@@ -178,5 +178,10 @@
     "tags": [
       "mount.unseat"
     ]
+  },
+  "cypher-script": {
+    "tags": [
+      "spellbook.cypher-script"
+    ]
   }
 }

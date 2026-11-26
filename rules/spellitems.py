@@ -381,6 +381,10 @@ def copy_plan(actor, stock, *, clock: int | None = None) -> dict:
         out["bonus_terms"].append({"label": "specialty school", "value": 2})
     out["cost_gp"] = formulae.copy_cost_gp(int(level))
     out["minutes"] = formulae.copy_minutes(int(level))
+    # Feat loop b4-maneuver: Cypher Script's half price and quicker hand.
+    from . import maneuver_feats
+
+    maneuver_feats.cypher_script(actor, out, int(level))
     return out
 
 
