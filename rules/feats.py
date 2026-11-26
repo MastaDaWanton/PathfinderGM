@@ -30,6 +30,7 @@ from pathfindergm import files
 CHECKABLE = {
     "ability", "bab", "caster_level", "character_level", "class_level", "skill_ranks",
     "feat", "race", "race_any", "size", "alignment", "class_feature", "heritage_skill",
+    "casts_spell",
 }
 
 # Kinds the extractor types but the sheet cannot answer yet. Listed separately from the
@@ -112,7 +113,45 @@ def from_dict(d: dict) -> Feat:
     feat = Feat(**{k: v for k, v in d.items() if k in known})
     _monk_alternative(feat)
     _heritage_skill(feat)
+    _retired_prerequisites(feat)
+    _ability_to_cast(feat)
     return feat
+
+
+# Feat loop b4-crafting, the owner 2026-11-26: "any feat that requires a crafting feat that
+# we removed, strip that requirement and allow it to be taken and reworked to fit our
+# systems." A prerequisite naming a RETIRED feat, or "any item creation feat", is dropped:
+# the world-class benches make what those feats made, and anyone begins a world class by
+# working its bench, so no stand-in gate is put back. Measured before: Cypher Magic,
+# Create Sanguine Elixir, Create Reliquary Arms and Shields and Cooperative Crafting could
+# never be taken, since no character can hold a retired feat.
+_ITEM_CREATION_ANY = "any item creation feat"
+
+
+def _retired_prerequisites(feat: Feat) -> None:
+    feat.prerequisites = [c for c in feat.prerequisites
+                          if not (c.get("kind") == "feat" and c.get("feat") in RETIRED)]
+    feat.unparsed_prerequisites = [t for t in feat.unparsed_prerequisites
+                                   if str(t).strip().lower() != _ITEM_CREATION_ANY]
+
+
+# "ability to cast consecrate or desecrate" (Create Reliquary Arms and Shields), typed so
+# `meets` can ask `casting.castable_now`. Only the plain shape: a clause with other words
+# ("as a spell or spell-like ability") stays unparsed. The names resolve at the check
+# (`casting.spell_named`), and one that names no spell answers "cannot tell".
+_CAST_ANY = re.compile(r"^(?:the )?ability to cast ([a-z' ]+?(?: or [a-z' ]+)*)$")
+_NOT_A_SPELL = re.compile(r"\b(spells?|cantrips|orisons|spell-like)\b")
+
+
+def _ability_to_cast(feat: Feat) -> None:
+    for text in list(feat.unparsed_prerequisites):
+        m = _CAST_ANY.match(str(text).strip().lower())
+        if not m or _NOT_A_SPELL.search(m.group(1)):
+            continue
+        feat.unparsed_prerequisites = [t for t in feat.unparsed_prerequisites if t != text]
+        feat.prerequisites = list(feat.prerequisites) + [
+            {"kind": "casts_spell", "spells": [n.strip() for n in m.group(1).split(" or ")],
+             "text": str(text)}]
 
 
 # Eldritch Heritage (UM p.149): "Skill Focus with the class skill of bloodline selected for
@@ -446,7 +485,22 @@ def _check(actor, cond: dict) -> bool | None:
         # Alchemist, Sea Legs, Dervish Dance among them.
         from .tables import base_skill
 
-        return actor.ranks.get(base_skill(cond["skill"]), 0) >= int(cond["ranks"])
+        # "1 rank in any Craft skill", "any Craft or Profession skill" (feat loop
+        # b4-crafting): the best of the skills named. Read as one skill called "any craft
+        # skill", Cooperative Crafting and Master Craftsman could never be met.
+        said = str(cond["skill"]).strip().lower()
+        if said.startswith("any ") and said.endswith(" skill"):
+            names = said[len("any "):-len(" skill")].split(" or ")
+        else:
+            names = [said]
+        return max(actor.ranks.get(base_skill(n), 0) for n in names) >= int(cond["ranks"])
+    if kind == "casts_spell":
+        from . import casting
+
+        found = [casting.spell_named(n) for n in cond.get("spells") or ()]
+        if not found or any(s is None for s in found):
+            return None
+        return any(casting.castable_now(actor, s) for s in found)
     if kind == "feat":
         return cond["feat"] in _held(actor) or cond["name"].strip().lower() in _held(actor)
     # A tag question, not a string match: the race document grants `race.<id>`
@@ -510,6 +564,8 @@ def describe(cond: dict) -> str:
         return ("non-" if cond.get("negated") else "") + cond["component"]
     if kind == "mythic_tier":
         return f"mythic tier {cond['value']}"
+    if kind == "casts_spell":
+        return "able to cast " + " or ".join(str(n).title() for n in cond.get("spells") or ())
     return cond.get("text", kind or "?")
 
 

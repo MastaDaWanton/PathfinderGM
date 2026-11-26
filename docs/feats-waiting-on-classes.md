@@ -305,5 +305,5 @@ feature no playable class grants.
 - Shaping Focus: multiclassing (a single-classed druid's druid level is already her
   character level, so the feat changes nothing until a second class can be taken)
 - Ascendant Spell: mythic rules
-- Create Sanguine Elixir: Brew Potion, removed by the owner's 2026-11-22 ruling (item
-  creation lives at the benches), so no one can meet the prerequisite
+- Mythic Crafter: mythic rules (its "any item creation feat" was stripped by the owner's
+  2026-11-26 ruling, feat loop b4-crafting; the mythic tier is still missing)
