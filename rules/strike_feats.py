@@ -546,6 +546,11 @@ def target_refusal(engine, actor, defender, params) -> str:
     """Why this foe is the wrong one for a declared option, or "" (asked at validation,
     where the foe is known)."""
     params = params or {}
+    if not params.get("manoeuvre") and not params.get("aid"):
+        key = str(params.get("weapon") or actor.wielded_key())
+        why = prone_refusal(actor, actor.weapon(key), key, bool(params.get("thrown")))
+        if why:
+            return why
     if defender is None:
         return ""
     from .tables import SIZE_ORDER
@@ -796,6 +801,8 @@ def after_hit(engine, intent, actor, defender, weapon_key, weapon, state, choice
                     "tell": f"The shot opens {defender.name} up: +4 on {actor.name}'s next "
                             f"melee attack against them, before the end of their next turn "
                             f"(Opening Volley)."})
+    if not melee and dealt >= 0:
+        out += target_of_opportunity(engine, actor, defender, weapon)
     if crit and "hamatulatsu" in choices:
         out += _hamatulatsu(actor, defender)
     if crit and "cockatrice_strike" in choices:
@@ -961,3 +968,89 @@ def stunning_pin(engine, actor, defender) -> list[dict]:
                     f"(Stunning Pin)."}]
     return out + engine._deliver_charges(actor, defender, "unarmed",
                                          weapon=actor.weapon("unarmed"))
+
+
+# --- the shield as a weapon: Shield Master -----------------------------------------------
+SHIELD_MASTER = "shield.bash.master"
+
+
+def shield_enhancement(actor, rec) -> int:
+    """The worn shield's enhancement bonus, for a Shield Master's bash (0 without the
+    feat, or for a shield with no awake layer)."""
+    if rec is None or not actor.has_state(SHIELD_MASTER) or not actor.layer_awake(rec):
+        return 0
+    from .sheet import layer_of
+
+    return int((layer_of(rec) or {}).get("enhancement") or 0)
+
+
+def shield_unpenalised(actor, w: dict) -> bool:
+    """Whether this two-weapon swing is a Shield Master's shield, which takes no penalty."""
+    return bool(w.get("shield_bash")) and actor.has_state(SHIELD_MASTER)
+
+
+# --- prone shooting: the rule, Prone Slinger ---------------------------------------------
+# CRB, Prone (Conditions): "A prone attacker has a -4 penalty on melee attack rolls and
+# cannot use a ranged weapon (except for a crossbow)." Ultimate Combat's firearms keep the
+# crossbow's exception ("Crossbows and firearms are the only ranged weapons that can be
+# used while prone", Prone Slinger's Normal). Prone Slinger: "While prone, you can use a
+# sling to make ranged attacks." Nothing refused a prone archer before feat loop b4.
+PRONE_SLINGER = "prone.sling"
+PRONE_SHOOTER = "prone.shooter"
+_PRONE_LAUNCHERS = frozenset({"crossbows", "firearms"})
+
+
+def prone_refusal(actor, weapon: dict, key, thrown: bool) -> str:
+    from . import states, weapons as weapons_mod
+
+    if not actor.has_state(states.tags_for("prone")[0]):
+        return ""
+    if not (thrown or weapon.get("category") == "ranged"):
+        return ""
+    base = base_key(weapon, key)
+    if not thrown and weapons_mod.groups_of(base) & _PRONE_LAUNCHERS:
+        return ""
+    if not thrown and base == "sling" and actor.has_state(PRONE_SLINGER):
+        return ""
+    return (f"{actor.name} is prone, and a prone creature cannot shoot or throw except "
+            f"with a crossbow or a firearm. Stand first, or crawl.")
+
+
+# --- Target of Opportunity ---------------------------------------------------------------
+# Target of Opportunity (UC): "When an ally who also has this feat makes a ranged attack and
+# hits an opponent within 30 feet of you, you can spend an immediate action to make a single
+# ranged attack against that opponent. Your ranged weapon must be in hand, loaded, and
+# ready to be fired or thrown." Taken whenever the immediate action is free.
+TARGET_OF_OPPORTUNITY = "teamwork.target-of-opportunity"
+
+
+def target_of_opportunity(engine, actor, defender, weapon: dict) -> list[dict]:
+    if weapon.get("category") != "ranged" or not actor.has_state(TARGET_OF_OPPORTUNITY) \
+            or defender.is_down:
+        return []
+    from . import position
+
+    out: list[dict] = []
+    for ref, ally in sorted(engine.scene.actors.items()):
+        if ref == actor.ref or ally.is_down or not ally.has_state(TARGET_OF_OPPORTUNITY) \
+                or not position._same_side(engine.scene, actor.ref, ref) \
+                or ally.blocking_key("attack"):
+            continue
+        held = ally.wielded_key()
+        w = ally.weapon(held)
+        gap = engine._gap_ft(ally, defender)
+        if w.get("category") != "ranged" or gap is None or gap > 30:
+            continue
+        if engine._spend_swift(ally, True, "Target of Opportunity") is not None:
+            continue
+        raw = {"op": "attack", "actor": ref, "target": defender.ref,
+               "because": "Target of Opportunity",
+               "visibility": "player" if ally.is_pc else "hidden",
+               "params": {"full_attack": False, "weapon": held,
+                          "reaction": "target_of_opportunity"}}
+        out.append({"effect": {"ref": ref, "kind": "owed_swing", "attack": raw,
+                               "target": defender.ref,
+                               "origin": "rule:feat-target-of-opportunity"},
+                    "tell": f"{ally.name} looses at the same mark as {actor.name}'s shot "
+                            f"lands (Target of Opportunity)."})
+    return out

@@ -3488,6 +3488,15 @@ class Actor:
             row["bash_plus"] = 1
             # "Acts as a +1 weapon": magic for damage reduction, as any +1 is.
             row["strikes_as"] = sorted(set(row.get("strikes_as") or ()) | {"magic"})
+        # Shield Master (CRB): "Add your shield's enhancement bonus to attacks and damage
+        # rolls made with the shield as if it was a weapon enhancement bonus" - one
+        # enhancement with bashing's +1, the better taken (feat loop b4).
+        from . import strike_feats
+
+        enh = strike_feats.shield_enhancement(self, rec)
+        if enh > int(row.get("bash_plus") or 0):
+            row["bash_plus"] = enh
+            row["strikes_as"] = sorted(set(row.get("strikes_as") or ()) | {"magic"})
         return row
 
     def _weapon_row(self, key: str | None = None) -> dict:
@@ -4293,7 +4302,11 @@ class Actor:
         swap = self.lethality_swap(key, lethality) if lethality else ""
         if swap:
             mods.append(Modifier(LETHALITY_SWAP_PENALTY, swap))
-        if hand:
+        # Shield Master (CRB): "You do not suffer any penalties on attack rolls made with
+        # a shield while you are wielding another weapon" (feat loop b4).
+        from . import strike_feats
+
+        if hand and not strike_feats.shield_unpenalised(self, w):
             mods.append(self.two_weapon_penalty(hand, off_light))
         # CRB, Combat, Charge: "you get a +2 bonus on the attack roll". On the charge's own
         # blow only; the -2 AC is the stance the engine lays (`Engine._stance_terms`).

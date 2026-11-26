@@ -825,3 +825,82 @@ def test_stunning_pin_spends_a_swift_stunning_fist_on_the_foe_just_pinned():
     assert _cond(thug, "stunned") is not None, _tells(res)
     assert pc.pool("stunning fist").current == before - 1
     assert "Stunning Pin" in _tells(res)
+
+
+# --- shields, prone shooting, the teamwork shot ------------------------------------------
+
+def test_shield_master_takes_no_two_weapon_penalty_with_the_shield_and_adds_its_plus():
+    """Shield Master (CRB): no attack penalty with the shield while wielding another
+    weapon, and the shield's enhancement bonus on the bash's attack and damage."""
+    scene, engine, pc, thug = _fight(feats=["Improved Shield Bash", "Two-Weapon Fighting"])
+    plain = sum(m.value for m in pc.attack_modifiers("shield", 0, hand="off",
+                                                     off_light=False, defender=thug)
+                if m.source.startswith("two-weapon"))
+    assert plain < 0
+    pc.feats.append("Shield Master")
+    assert sum(m.value for m in pc.attack_modifiers("shield", 0, hand="off",
+                                                    off_light=False, defender=thug)
+               if m.source.startswith("two-weapon")) == 0
+    main = pc.attack_modifiers("longsword", 0, hand="primary", off_light=False,
+                               defender=thug)
+    assert sum(m.value for m in main if m.source.startswith("two-weapon")) < 0
+
+
+def test_shield_master_lays_a_magic_shield_s_plus_on_the_bash(monkeypatch):
+    from rules import strike_feats
+
+    scene, engine, pc, thug = _fight(feats=["Shield Master"])
+    monkeypatch.setattr(strike_feats, "shield_enhancement",
+                        lambda actor, rec: 3 if actor.has_state("shield.bash.master") else 0)
+    row = pc.weapon("shield")
+    assert row["bash_plus"] == 3 and "magic" in row["strikes_as"]
+
+
+def test_a_prone_archer_is_refused_and_a_prone_slinger_may_sling():
+    """CRB, Prone: "cannot use a ranged weapon (except for a crossbow)". Nothing refused a
+    prone bow before this; Prone Slinger lets the sling through."""
+    from rules.intents import IntentError
+
+    scene, engine, pc, thug = _fight(at=((2, 10), (8, 10)))
+    pc.shield = "none"
+    pc.add_condition("prone")
+    for weapon in ("shortbow", "sling"):
+        with pytest.raises(IntentError, match="prone"):
+            engine.validate([{"op": "attack", "actor": "pc", "target": "c1",
+                              "params": {"weapon": weapon}}])
+    pc.feats.append("Prone Slinger")
+    engine.validate([{"op": "attack", "actor": "pc", "target": "c1",
+                      "params": {"weapon": "sling"}}])
+    pc.weapons = list(pc.weapons) + ["light crossbow"]
+    pc.feats.remove("Prone Slinger")
+    engine.validate([{"op": "attack", "actor": "pc", "target": "c1",
+                      "params": {"weapon": "light crossbow"}}])
+
+
+def test_prone_shooter_softens_prone_s_ac_both_ways():
+    """Prone Shooter (UC): prone's -4 AC against melee becomes -2, its +4 against ranged
+    becomes +6."""
+    scene, engine, pc, thug = _fight(feats=["Prone Shooter"])
+    standing_melee, standing_ranged = pc.ac("melee"), pc.ac("ranged")
+    pc.add_condition("prone")
+    assert pc.ac("melee") == standing_melee - 2
+    assert pc.ac("ranged") == standing_ranged + 6
+
+
+def test_target_of_opportunity_answers_an_ally_s_ranged_hit_with_a_shot():
+    """Target of Opportunity (UC): an ally with the feat hits with a ranged attack a foe
+    within 30 feet of you; your immediate action buys one ranged attack at it."""
+    scene, engine, pc, thug = _fight(feats=["Point-Blank Shot", "Target of Opportunity"],
+                                     at=((2, 10), (6, 10)), level=6,
+                                     ally=[((3, 12), ["Point-Blank Shot",
+                                                      "Target of Opportunity"])],
+                                     faces={"Attack with": 18, "Damage": 1})
+    thug.hp = thug.hp_max = 400
+    kesst = scene.get("ally0")
+    kesst.weapons = list(kesst.weapons) + ["shortbow"]
+    kesst.equipped = "shortbow"
+    kesst.goods["arrows"] = 20
+    res = _attack(engine, weapon="shortbow")
+    swings = [o for o in res.outcomes if o.op == "attack"]
+    assert any(o.actor == "ally0" for o in swings), _tells(res)
+    assert "Target of Opportunity" in _tells(res)
