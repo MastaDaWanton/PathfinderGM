@@ -1723,9 +1723,29 @@ class Actor:
                 # a disease's "1/day" is a day of the clock, and a poison's "1/minute for
                 # 6 minutes" six minutes of it. Its own count bounds the saves, so a
                 # night's 4,800 rounds are a handful of saves, not 4,800 (`_afflicted`).
+                source = e.name or e.source or "an effect"
+                if "upkeep_nonlethal" in p:
+                    # A price paid "per turn" (the blood armament's special abilities,
+                    # owner ask 2026-11-26 A2): a played round pays it, non-lethal, past
+                    # damage reduction as every price is (`Engine._pay_hp_cost`). A
+                    # stretch of time has no turns to pay in, and a body that is down
+                    # cannot hold it, so either lets it go — told, not silent.
+                    if elapsed or self.is_down or (
+                            p.get("while") and not self.has_condition(str(p["while"]))):
+                        if self.remove_effects(match=lambda x, e=e: x is e):
+                            out.append({"kind": "effect_ended", "ref": self.ref,
+                                        "what": source, "origin": e.origin})
+                        break
+                    paid = sum(_amount_of(p["upkeep_nonlethal"], dice)
+                               for _ in range(times))
+                    if paid > 0:
+                        self.take_nonlethal(paid)
+                        out.append({"kind": "upkeep_paid", "ref": self.ref,
+                                    "amount": paid, "source": source, "origin": e.origin,
+                                    "nonlethal": self.nonlethal})
+                    continue
                 if elapsed and "heal" not in p and "affliction" not in p:
                     continue
-                source = e.name or e.source or "an effect"
                 if isinstance(p.get("affliction"), dict):
                     if e in self.effects:
                         out.extend(self._afflicted(e, p["affliction"], times, dice))
@@ -3481,7 +3501,7 @@ class Actor:
             # forms it — so a refusal can name the fix.
             base["granted_by"] = g["key"]
             base["formed_with"] = g["ability"]
-            return base
+            return self._granted_layer(base, g["key"])
         # A crafted weapon — the sword just made at the forge, by its record's id or name
         # (contract §5). Before the forge revamp this method knew the Core table, the
         # weapons file, granted weapons and natural attacks, and not the thing in your
@@ -3503,6 +3523,34 @@ class Actor:
             row = dict(row, damage=weapons_mod.first_end_damage(row["damage"]),
                        damage_text=str(row["damage"]))
         return row
+
+    def granted_properties(self, key: str) -> list:
+        """The weapon special abilities laid on the weapon this toggle forms, as the
+        `ActiveEffect`s that hold them (owner ask 2026-11-26 A2: the blood armament's
+        corrosive, keen and vicious). One effect per property — remove it and the
+        property is gone; there is no second store."""
+        return [e for e in self.effects
+                if (e.payload or {}).get("weapon_property")
+                and (e.payload or {}).get("granted_by") == key]
+
+    def _granted_layer(self, row: dict, key: str) -> dict:
+        """The granted weapon's row with its held properties as a magic layer, built by
+        the enchanter's own reader (`magic_layer.layer`) from the same property documents
+        a forged blade carries — so the armament's keen is the scimitar's keen, read by
+        `_with_layer` (threat range) and the attack's riders (`Engine._magic_dice`)."""
+        held = self.granted_properties(key) if key else []
+        if not held:
+            return row
+        from . import magic_layer
+
+        rec = {"id": key, "name": row.get("name"), "weapon": "unarmed", "magic": {
+            "properties": [{"id": str(e.payload["weapon_property"])} for e in held]}}
+        lay = magic_layer.layer(rec)
+        origin = held[0].origin
+        for bucket in ("specs", "riders"):
+            for d in lay.get(bucket) or ():
+                d["origin"] = origin
+        return _with_layer(row, lay)
 
     def wielded_key(self) -> str:
         """What this body swings when nobody names a weapon.

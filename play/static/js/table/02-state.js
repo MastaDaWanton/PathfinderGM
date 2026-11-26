@@ -445,7 +445,16 @@ function renderAbilities(s) {
         a.choices ? " · name one: " + esc(a.choices.join(", ")) : ""}${
         a.text ? " — " + esc(a.text) : ""}">${esc(a.name)}${
         a.uses != null ? ` (${esc(a.uses)}/${esc(a.max)})` : ""}${
-        a.toggle ? (a.active ? " ●" : " ○") : ""}</button>`).join("");
+        a.toggle ? (a.active ? " ●" : " ○") : ""}</button>${
+      // The weapon's special abilities beside its toggle (owner ask 2026-11-26 A2): each
+      // a free action that lays it, or lifts it when held, at the price in the tooltip.
+      a.choice_kind === "property" ? a.choices.map(c => {
+        const held = (a.held || []).includes(c);
+        return `<button class="abilitybtn${held ? " on" : ""}"
+          data-ability="${esc(`${a.name} (${c})`)}" data-toggle="0" data-free="1"
+          title="${esc(held ? `${c} holds on the armament — click to let it go`
+                            : `give the armament ${c}, paid in non-lethal damage each turn`)}"
+          >${esc(c)}${held ? " ●" : " ○"}</button>`; }).join("") : ""}`).join("");
 }
 
 document.addEventListener("click", async e => {

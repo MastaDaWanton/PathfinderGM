@@ -1061,6 +1061,25 @@ def _validate_grants(d: dict, path: dict, at: str, resolved_names: set,
                         f"nonlethal or either. Leave it out for lethal; \"either\" lets "
                         f"the wielder choose with no -4, the way Improved Unarmed "
                         f"Strike does.")
+                props = weapon.get("properties")
+                if props is not None:
+                    from . import effectspec
+
+                    picks = (props.get("choose_from") or []) if isinstance(props, dict) else []
+                    for pid in picks:
+                        prop = effectspec.property(str(pid))
+                        if prop is None or "weapon" not in (prop.get("gear") or ()):
+                            problems.append(
+                                f"{gat}.weapon.properties: {pid!r} is no weapon special "
+                                f"ability in content/rules/magic-properties.json, so it "
+                                f"could never be laid. Name one that is, or list it under "
+                                f"not_yet with the reason.")
+                    if not isinstance(props, dict) or not picks or not str(
+                            (props.get("cost") or {}).get("dice_per_plus") or "").strip():
+                        problems.append(
+                            f"{gat}.weapon.properties: needs choose_from (property ids) "
+                            f"and cost.dice_per_plus — the non-lethal price per +1 of a "
+                            f"property's book price, paid each turn it holds.")
         # A use with modes (Battle Blood Ki Pool's attack, speed or dodge): the core
         # classes' `choice` grammar, run by the same executor (`Engine._use_class_ability`,
         # rules/class_abilities.py). Each mode's `self` is a timed effect on the user; its

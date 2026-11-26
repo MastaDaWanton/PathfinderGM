@@ -876,6 +876,32 @@ def _states_of(actor) -> str:
     return f" Conditions: {', '.join(names)}."
 
 
+def _path_ability_said(pc, name: str) -> str:
+    """What the brief says beside a path ability's name: a passive is always active (the
+    brief listed Iron Clot and Swift Strikes as things to use), a toggle whether it
+    holds, and the special abilities its weapon may take in brackets (owner ask
+    2026-11-26 A2: "Extracorporeal Blood Armament (keen)"), with any already held."""
+    from rules import leveling
+
+    if leveling.is_passive(pc, name):
+        return ("passive, and the engine does not run it yet — it does nothing"
+                if leveling.needs_of(pc, name)
+                else "always active — never used, it simply happens")
+    bits = []
+    key = leveling.toggle_key(pc, name)
+    if key:
+        bits.append("ACTIVE — using it again ends it" if pc.has_condition(key)
+                    else "a stance")
+    _path, doc = leveling.ability_doc(pc, name)
+    props = ((doc.get("weapon") or {}).get("properties") or {}).get("choose_from") or ()
+    if props:
+        held = [str(e.payload.get("weapon_property")) for e in pc.granted_properties(key)]
+        bits.append("its weapon takes a special ability named in brackets, paid in "
+                    "non-lethal each turn: " + ", ".join(props)
+                    + (f" (holding {', '.join(held)})" if held else ""))
+    return "; ".join(bits)
+
+
 def held_arms(actor) -> list[str]:
     """The weapons a body with no printed attacks carries, by the name its own sheet
     resolves (`Actor.weapon`), the one in hand first: a built guardsman's longspear, a
@@ -1411,8 +1437,8 @@ def scene_brief(world, scene, location, recent_events=None, *, here=None,
         # what is left to spend. Measured (docs/class-audit.md): this line was guarded
         # by `paths`, so the narrator of a barbarian was never told rage existed, and
         # "I rage" could only be narrated, never resolved.
-        usable = [(n, "") for n in (leveling.usable_names(pc)
-                                     if getattr(pc, "paths", None) else [])]
+        usable = [(n, _path_ability_said(pc, n)) for n in (
+            leveling.usable_names(pc) if getattr(pc, "paths", None) else [])]
         for entry in class_abilities.usable(pc):
             bits = [entry.get("action") or ""]
             if entry.get("uses") is not None:

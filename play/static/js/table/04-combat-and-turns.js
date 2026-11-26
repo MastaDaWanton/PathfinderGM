@@ -1079,7 +1079,13 @@ document.addEventListener("click", async e => {
     const button = (a, name, label) => `<button data-pick="${slot}:${esc(name)}"
       ${a.uses === 0 ? "disabled" : ""}
       title="${esc((a.text || "").slice(0, 200))}">${esc(label)}</button>`;
-    combatMenu(list.map(a => (a.choices && a.choices.length && !(a.toggle && a.active))
+    // A weapon's special abilities (the blood armament's keen, corrosive, vicious) sit
+    // beside its toggle, each marked held or not: naming one lays it or lifts it, and
+    // never dismisses the weapon (owner ask 2026-11-26 A2).
+    combatMenu(list.map(a => a.choice_kind === "property"
+      ? button(a, a.name, abilityLabel(a)) + a.choices.map(c => button(a, `${a.name} (${c})`,
+          `${a.name} (${c})${(a.held || []).includes(c) ? " ●" : " ○"}`)).join("")
+      : (a.choices && a.choices.length && !(a.toggle && a.active))
       ? a.choices.map(c => button(a, `${a.name} (${c})`,
           `${a.name} (${c})${a.uses != null ? ` (${a.uses}/${a.max})` : ""}`)).join("")
       : button(a, a.name, abilityLabel(a))).join(""));

@@ -16,6 +16,85 @@
       "roll": {"count": 1, "die": 10, "bonus": "con_mod", "as": "heal"},
       "ability_type": "ex",
       "tell": "{name}'s wounds clot over at once."
+    },
+    {
+      "key": "unbalancing strike",
+      "name": "Unbalancing Strike",
+      "aliases": [
+        "unbalance",
+        "unbalancing blow"
+      ],
+      "level": 3,
+      "source": "content/classes/blood-bending.json features and the author's .docx: 'Declared before making an attack roll. A foe damaged by your unarmed attack must make a Fortitude save (DC ) or become Flat-Footed until just before your next turn. Usable 1/day for every 4 levels + CON modifier.' The DC was lost from the .docx; 10 + 1/2 level + Con is the class's own formula for its other saves (Blood Burst), inferred. Written the Stunning Fist way (a charge the next unarmed swing spends; a miss wastes it). Before 2026-11-26 it had no document, so its pool was never made and the name was refused.",
+      "text": "Your next unarmed hit: Fortitude save or flat-footed until your next turn.",
+      "action": "free",
+      "cost": {
+        "pool": "unbalancing strike",
+        "amount": 1
+      },
+      "aim": "foe",
+      "charge": {
+        "weapons": [
+          "unarmed",
+          "unarmed strike",
+          "armed punch",
+          "armed punches",
+          "blood gauntlets"
+        ],
+        "spent_on": "swing",
+        "save": {
+          "save": "fort",
+          "dc": "10 + floor(level / 2) + con_mod"
+        }
+      },
+      "charge_condition": "flat-footed",
+      "charge_rounds": 1,
+      "ability_type": "ex",
+      "tell": "{name} sets the next blow to knock the foe off balance."
+    },
+    {
+      "key": "stunning strike",
+      "name": "Stunning Strike",
+      "aliases": [
+        "stun strike"
+      ],
+      "level": 13,
+      "source": "content/classes/blood-bending.json features and the author's .docx: 'Declared before making an attack roll. A foe damaged by your unarmed attack must make a Fortitude save (DC ) or be Stunned for 1 round. Usable 1/day for every 4 levels + CON modifier.' DC inferred as Unbalancing Strike's; the immunities are Stunning Fist's (CRB), which this is written against.",
+      "text": "Your next unarmed hit: Fortitude save or stunned for a round.",
+      "action": "free",
+      "cost": {
+        "pool": "stunning strike",
+        "amount": 1
+      },
+      "aim": "foe",
+      "charge": {
+        "weapons": [
+          "unarmed",
+          "unarmed strike",
+          "armed punch",
+          "armed punches",
+          "blood gauntlets"
+        ],
+        "spent_on": "swing",
+        "save": {
+          "save": "fort",
+          "dc": "10 + floor(level / 2) + con_mod"
+        },
+        "immune_types": [
+          "construct",
+          "ooze",
+          "plant",
+          "undead"
+        ],
+        "immune_subtypes": [
+          "incorporeal"
+        ],
+        "immune_crit": true
+      },
+      "charge_condition": "stunned",
+      "charge_rounds": 1,
+      "ability_type": "ex",
+      "tell": "{name} gathers the blood into the next blow."
     }
   ]
 }
