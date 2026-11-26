@@ -333,10 +333,14 @@ def has_weapon_focus(actor, weapon_key) -> bool:
 
     want = {str(weapon_key or "").lower(), str(weapons_mod.key_for(str(weapon_key or ""))
                                                 or "").lower()}
+    from . import strike_feats
+
     for raw in getattr(actor, "feats", None) or ():
-        doc = feats_mod.document(raw)
-        if doc and doc["id"] == "weapon-focus" \
-                and str(doc.get("target") or "").strip().lower().replace(" ", "-") in want:
+        doc = strike_feats.widen(actor, feats_mod.document(raw))
+        if doc and doc["id"] == "weapon-focus" and (
+                str(doc.get("target") or "").strip().lower().replace(" ", "-") in want
+                or (doc.get("target_groups") and set(doc["target_groups"])
+                    & weapons_mod.groups_of(str(weapon_key or "")))):
             return True
     return False
 
@@ -386,8 +390,12 @@ def _cleaving_finish(engine, intent, actor, defender, weapon_key, melee) -> list
     only one extra attack per round with this feat." Taken always (it only hurts a foe)."""
     from . import position as position_mod, reactions as reactions_mod, states
 
+    from .strike_feats import CLEAVING_FINISH_UNLIMITED     # Improved Cleaving Finish (b4)
+
     if not melee or defender.hp > 0 or not actor.has_state(CLEAVING_FINISH) \
-            or _spent(actor, "cleaving-finish") or not engine.scene.has_grid:
+            or (_spent(actor, "cleaving-finish")
+                and not actor.has_state(CLEAVING_FINISH_UNLIMITED)) \
+            or not engine.scene.has_grid:
         return []
     pick = None
     for ref, foe in engine.scene.actors.items():

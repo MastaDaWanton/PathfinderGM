@@ -288,6 +288,25 @@ FEAT_CLASS_SKILL = "skill.class."
 IGNORES_DR = "ignores_dr"
 
 
+IGNORES_TYPED_DR = "ignores_typed_dr"          # feat loop b4: only a DR with a bypass
+
+
+def typed_dr_ignored(traits) -> int:
+    """How many points of a DR with a bypass (not DR x/—) a blow passes."""
+    most = 0
+    for t in traits or ():
+        if str(t).startswith(IGNORES_TYPED_DR + ":"):
+            try:
+                most = max(most, int(str(t).split(":", 1)[1]))
+            except ValueError:
+                continue
+    return most
+
+
+def _typed_dr(r) -> bool:
+    return str(getattr(r, "bypass", "") or "").strip() not in ("", "-", "—", "–")
+
+
 def dr_ignored(traits) -> int:
     """How many points of DR a blow with these traits passes: 0, N, or all of it."""
     most = 0
@@ -388,7 +407,11 @@ ATTACK_CHOICES = ("power_attack", "deadly_aim", "piranha_strike", "combat_expert
                   # Feat loop b3 (2026-11-26): Furious Finish's maximised Vital Strike,
                   # Pushing Assault's push for Power Attack's damage, and the two crit
                   # trades (Dragonslayer, Wingclipper) — `rules/feat_events.py`.
-                  "furious_finish", "pushing_assault", "dragonslayer", "wingclipper")
+                  "furious_finish", "pushing_assault", "dragonslayer", "wingclipper",
+                  # Feat loop b4-combat: the one-blow options of rules/strike_feats.py.
+                  "death_or_glory", "punch_through", "deadly_finish", "reckless_aim",
+                  "butterfly_sting", "two_handed_throw", "hamatulatsu",
+                  "cockatrice_strike")
 # The options nobody needs a feat for (combat bar round 2, 2026-11-22). CRB, Combat
 # ("Fighting Defensively as a Standard Action"): "You can choose to fight defensively when
 # attacking" — anyone, with any attack. Its numbers are `defensive_dodge` and the stance
@@ -420,7 +443,14 @@ ATTACK_CHOICE_FEATS = {"power_attack": "power-attack", "deadly_aim": "deadly-aim
                        "pinpoint_targeting": "pinpoint-targeting",
                        "footslasher": "footslasher", "sliding_axe_throw": "sliding-axe-throw",
                        "furious_finish": "furious-finish", "pushing_assault": "pushing-assault",
-                       "dragonslayer": "dragonslayer", "wingclipper": "wingclipper"}
+                       "dragonslayer": "dragonslayer", "wingclipper": "wingclipper",
+                       # Feat loop b4-combat:
+                       **{"death_or_glory": "death-or-glory", "punch_through": "punch-through",
+                          "deadly_finish": "deadly-finish", "reckless_aim": "reckless-aim",
+                          "butterfly_sting": "butterfly-s-sting",
+                          "two_handed_throw": "two-handed-thrower",
+                          "hamatulatsu": "hamatulatsu",
+                          "cockatrice_strike": "cockatrice-strike"}}
 
 _IMPLIED_GENDER = {"she": "woman", "he": "man"}
 
@@ -3337,8 +3367,10 @@ class Actor:
         base = str(row.get("crafted_base") or key or self.wielded_key()).strip().lower()
         ctx = {"weapon": {"key": base}}
         best = 1
+        from . import strike_feats
+
         for raw in self.feats:
-            doc = feats_mod.document(raw)
+            doc = strike_feats.widen(self, feats_mod.document(raw))
             spec = (doc or {}).get("crit_range")
             if isinstance(spec, dict) and _scope_holds(spec.get("scope"), doc, ctx):
                 best = max(best, int(spec.get("multiply", 2) or 2))
@@ -5317,9 +5349,12 @@ class Actor:
         # "bypasses an amount of damage reduction ... equal to your cleric level" (CRB
         # Artifice domain). Neither is a material, so neither can be a bypass word.
         cut = dr_ignored(traits)
-        if cut:
-            usable = [Reduction(r.amount - cut, r.bypass, r.source)
-                      for r in usable if r.amount > cut]
+        # Feat loop b4: `ignores_typed_dr:N` passes N of a DR with a bypass and none of
+        # DR x/— (Greater Penetrating Strike's 10, Punch Through's 5).
+        typed = typed_dr_ignored(traits)
+        if cut or typed:
+            usable = [Reduction(r.amount - c, r.bypass, r.source) for r in usable
+                      for c in [max(cut, typed if _typed_dr(r) else 0)] if r.amount > c]
         return max(usable, key=lambda r: r.amount) if usable else None
 
     # --- non-lethal damage ---------------------------------------------------------------
@@ -6650,8 +6685,10 @@ class Actor:
         # keyed by id and target (Weapon Focus (longsword) and (dagger) are two).
         seen: set[tuple[str, str]] = set()
         try:
+            from . import strike_feats
+
             for raw in self.feats:
-                doc = feats_mod.document(raw)
+                doc = strike_feats.widen(self, feats_mod.document(raw))
                 if not doc:
                     continue
                 key = (doc["id"], str(doc.get("target") or ""))
@@ -8626,8 +8663,18 @@ def _scope_holds(scope, doc: dict, ctx: dict | None) -> bool:
                                                                    frozenset)) else [have])}
         wants = {_scope_word(w) for w in (raw if isinstance(raw, (list, tuple)) else [want])}
         if not haves & wants:
-            return False
+            # Martial Versatility / Mastery (feat loop b4): "with any weapon within the
+            # same weapon group" — `strike_feats.widen` lays the target's groups on.
+            if not (key == "weapon" and raw == "$target" and doc.get("target_groups")
+                    and _weapon_in_groups(have, doc["target_groups"])):
+                return False
     return True
+
+
+def _weapon_in_groups(key, groups) -> bool:
+    from . import weapons as weapons_mod
+
+    return bool(weapons_mod.groups_of(str(key or "")) & set(groups))
 
 
 def _scope_word(word) -> str:
@@ -9141,6 +9188,14 @@ def _when_holds(when, ctx: dict | None) -> bool:
             # ally's one-round charging stance. No moment, no answer.
             sit = ctx.get("situation")
             if sit is None or not sit.ally_state(want):
+                return False
+        elif key == "alone_within":
+            # Feat loop b4: Desperate Battler's "no ally is within 10 feet of you and you
+            # are not receiving benefits from the aid another action".
+            from . import strike_feats
+
+            sit = ctx.get("situation")
+            if sit is None or not strike_feats.alone(sit.actor, sit.scene, int(want or 0)):
                 return False
         elif key in ("ally_beside", "sole_threat"):
             # Board questions about the bearer and the foe of this roll (feat loop b1):

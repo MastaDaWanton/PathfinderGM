@@ -42,7 +42,7 @@ class _Faces(Dice):
 
 
 def _fight(pc_file="fixtures/pc-borin.json", foe="thug", faces=None, at=((6, 10), (7, 10)),
-           feats=(), ally=None, cls=None, level=None, bab=None):
+           feats=(), ally=None, cls=None, level=None, bab=None, second=None):
     scene = Scene(location_id="5bbd0c40345f")
     pc = load_pc(pc_file)
     if cls:
@@ -60,6 +60,11 @@ def _fight(pc_file="fixtures/pc-borin.json", foe="thug", faces=None, at=((6, 10)
     engine._ensure_encounter("pc")
     scene.positions["pc"], scene.positions["c1"] = at
     sides = {"pc": ["pc"], "them": ["c1"]}
+    for template, square in second or ():
+        other = instantiate(template, scene=scene, name=f"the {template} {len(sides['them'])}")
+        scene.add(other)
+        scene.positions[other.ref] = square
+        sides["them"].append(other.ref)
     for i, (square, extra) in enumerate(ally or ()):
         friend = load_pc("fixtures/pc-kesst.json")
         friend.ref, friend.kind = f"ally{i}", "npc"
@@ -319,3 +324,176 @@ def test_throw_anything_is_plus_one_circumstance_on_a_thrown_splash_weapon():
     assert sum(m.value for m in pc.splash_attack_modifiers(thug)
                if m.source.startswith("Throw Anything")) == 1
     assert _named(_rolls(_attack(engine), "Attack with")[0], "Throw Anything") == 0
+
+
+# --- flanking by feat, the lone fighter, the chain's guard ------------------------------
+
+def _flanking(res) -> int:
+    return _named(_rolls(res, "Attack with")[0], "flanking")
+
+
+def test_gang_up_flanks_when_two_allies_threaten_the_foe_wherever_the_bearer_stands():
+    """Gang Up (APG): two allies threatening the foe flank it for the bearer, "regardless
+    of your actual positioning". Borin at the thug's west side, the allies north and
+    south: no flank by the map, a flank by the feat; one ally is not enough."""
+    allies = [((7, 9), ()), ((7, 11), ())]
+    for feats, want in (((), 0), (["Gang Up"], 2)):
+        scene, engine, pc, thug = _fight(feats=feats, ally=allies, faces={"Attack with": 10})
+        assert _flanking(_attack(engine)) == want
+    scene, engine, pc, thug = _fight(feats=["Gang Up"], ally=allies[:1],
+                                     faces={"Attack with": 10})
+    assert _flanking(_attack(engine)) == 0
+
+
+def test_overwhelm_flanks_a_foe_two_sizes_larger_with_an_ally_who_holds_it():
+    """Overwhelm (Dragonslayer's Handbook): an ally with the feat threatening, the foe two
+    or more sizes larger than either of you."""
+    for size, ally_feats, want in (("huge", ["Overwhelm"], 2), ("large", ["Overwhelm"], 0),
+                                   ("huge", [], 0)):
+        scene, engine, pc, thug = _fight(feats=["Overwhelm"], ally=[((7, 9), ally_feats)],
+                                         faces={"Attack with": 10})
+        thug.size = size
+        assert _flanking(_attack(engine)) == want, size
+
+
+def test_desperate_battler_is_plus_one_morale_with_no_ally_within_ten_feet():
+    """Desperate Battler (ISWG): +1 morale on melee attack and damage with no ally within
+    10 feet and no aid another; Kesst 5 feet away takes it off."""
+    scene, engine, pc, thug = _fight(feats=["Desperate Battler"],
+                                     faces={"Attack with": 15, "Damage": 1})
+    thug.hp = thug.hp_max = 400
+    res = _attack(engine)
+    assert _named(_rolls(res, "Attack with")[0], "Desperate Battler") == 1
+    assert _named(_rolls(res, "Damage")[0], "Desperate Battler") == 1
+    scene, engine, pc, thug = _fight(feats=["Desperate Battler"], ally=[((6, 11), ())],
+                                     faces={"Attack with": 15})
+    assert _named(_rolls(_attack(engine), "Attack with")[0], "Desperate Battler") == 0
+    scene, engine, pc, thug = _fight(feats=["Desperate Battler"], ally=[((6, 14), ())],
+                                     faces={"Attack with": 15})
+    assert _named(_rolls(_attack(engine), "Attack with")[0], "Desperate Battler") == 1
+
+
+def test_cornugon_shield_is_a_shield_bonus_with_a_spiked_chain():
+    """Cornugon Shield: +1 shield bonus to AC wielding a spiked chain, +2 fighting
+    defensively or in total defense; nothing with a longsword."""
+    from rules.activeeffect import ActiveEffect
+    from rules import states
+
+    scene, engine, pc, thug = _fight(feats=["Cornugon Shield"])
+    pc.shield = "none"
+    pc.weapons = list(pc.weapons) + ["spiked chain"]
+    base = pc.ac()
+    pc.equipped = "spiked chain"
+    assert pc.ac() == base + 1
+    pc.apply_effect(ActiveEffect(name="fighting defensively", kind="buff",
+                                 key="fighting defensively",
+                                 tags=states.tags_for("fighting defensively")))
+    with_stance = pc.ac()
+    pc.equipped = "longsword"
+    assert with_stance - pc.ac() == 2
+
+
+def test_improved_cleaving_finish_carries_on_more_than_once_a_round():
+    """Improved Cleaving Finish (UC): "any number of times per round". Cleaving Finish
+    alone swings once a round: two dropped foes, one carry-on."""
+    for feats, carries in ((["Cleave", "Cleaving Finish"], 1),
+                           (["Cleave", "Cleaving Finish", "Improved Cleaving Finish"], 2)):
+        scene, engine, pc, thug = _fight(feats=feats, second=[("thug", (7, 11)),
+                                                              ("thug", (6, 11))],
+                                         faces={"Attack with": 18, "Damage": 30})
+        thug.hp = 1
+        refs = [r for r in scene.sides["them"] if r != "c1"]
+        scene.get(refs[0]).hp = 1
+        scene.get(refs[1]).hp = scene.get(refs[1]).hp_max = 400
+        res = _attack(engine)
+        assert _tells(res).count("(Cleaving Finish)") == carries, _tells(res)
+
+
+# --- damage reduction, threat range, the guard against a group ---------------------------
+
+def test_greater_penetrating_strike_passes_ten_of_a_typed_dr_and_five_of_dr_dash():
+    """Greater Penetrating Strike (CRB): with a Weapon Focus weapon, 10 points of DR pass,
+    5 of a DR without a type: DR 12/silver leaves 2, DR 12/- leaves 7."""
+    from rules.activeeffect import ActiveEffect
+    from rules import strike_feats
+
+    scene, engine, pc, thug = _fight(feats=["Greater Penetrating Strike"])
+    traits = strike_feats.dr_traits(pc, thug, "longsword")
+    for bypass, left in (("silver", 2), ("", 7)):
+        thug.effects = [e for e in thug.effects if e.kind != "damage_reduction"]
+        thug.apply_effect(ActiveEffect(name="DR", kind="damage_reduction",
+                                       payload={"amount": 12, "bypass": bypass}))
+        assert thug.damage_reduction("slashing", traits=traits).amount == left
+    assert strike_feats.dr_traits(pc, thug, "dagger") == ()       # no Weapon Focus in it
+
+
+def test_slayers_knack_doubles_the_threat_against_the_picked_enemy_only():
+    """Slayer's Knack (UC): against the picked favoured enemy type the threat range is
+    doubled; a weapon already widened (Improved Critical) is not widened again."""
+    from rules import strike_feats
+
+    scene, engine, pc, skel = _fight(feats=["Slayer's Knack (undead)"], foe="human-skeleton")
+    sword = pc.weapon("longsword")
+    assert strike_feats.threat_from(pc, skel, sword) == 17
+    ogre = instantiate("ogre", scene=scene)
+    assert strike_feats.threat_from(pc, ogre, sword) == 19
+    pc.feats.append("Improved Critical (longsword)")
+    assert strike_feats.threat_from(pc, skel, pc.weapon("longsword")) == 17
+
+
+def test_defensive_weapon_training_is_dodge_against_the_picked_group():
+    """Defensive Weapon Training (UC): +2 dodge AC against a weapon of the group, +3 with
+    weapon training in it; nothing flat-footed, nothing against another group."""
+    from rules import strike_feats
+
+    scene, engine, pc, thug = _fight(feats=["Defensive Weapon Training (heavy blades)"])
+    sword = pc.weapon("longsword")
+    got = strike_feats.guard_against(pc, thug, sword, "longsword", False)
+    assert [m.value for m in got] == [2] and got[0].type == "dodge"
+    assert strike_feats.guard_against(pc, thug, sword, "longsword", True) == []
+    assert strike_feats.guard_against(pc, thug, pc.weapon("dagger"), "dagger", False) == []
+    pc.level = 5
+    pc.class_choices = {"weapon training": ["heavy blades"]}
+    assert [m.value for m in strike_feats.guard_against(pc, thug, sword, "longsword",
+                                                        False)] == [3]
+
+
+def test_martial_versatility_carries_weapon_focus_across_the_group():
+    """Martial Versatility (ARG): the picked feat works with every weapon of the group -
+    Borin's Weapon Focus (longsword) on a scimitar, not on a dagger. Martial Mastery does
+    it for every such feat."""
+    for feats, want in (((), 0), (["Martial Versatility (Weapon Focus)"], 1),
+                        (["Martial Mastery"], 1)):
+        scene, engine, pc, thug = _fight(feats=feats)
+        pc.weapons = list(pc.weapons) + ["scimitar"]
+        mods = pc.attack_modifiers("scimitar", 0, defender=thug)
+        assert sum(m.value for m in mods if m.source.startswith("Weapon Focus")) == want
+        mods = pc.attack_modifiers("dagger", 0, defender=thug)
+        assert sum(m.value for m in mods if m.source.startswith("Weapon Focus")) == 0
+
+
+def test_spear_dancer_dazzles_on_a_hit_with_a_focused_two_handed_reach_weapon():
+    scene, engine, pc, thug = _fight(feats=["Spear Dancer", "Weapon Focus (longspear)"],
+                                     at=((6, 10), (8, 10)),
+                                     faces={"Attack with": 18, "Damage": 1})
+    thug.hp = thug.hp_max = 400
+    pc.weapons = list(pc.weapons) + ["longspear"]
+    res = _attack(engine, weapon="longspear")
+    assert _cond(thug, "dazzled") is not None and "Spear Dancer" in _tells(res)
+    scene, engine, pc, thug = _fight(feats=["Spear Dancer"], faces={"Attack with": 18})
+    thug.hp = thug.hp_max = 400
+    _attack(engine)
+    assert _cond(thug, "dazzled") is None
+
+
+def test_opening_volley_gives_plus_four_on_the_next_melee_attack_and_is_spent():
+    """Opening Volley (UC): a ranged hit that deals damage gives +4 circumstance on the
+    next melee attack roll against that foe; the swing spends it."""
+    scene, engine, pc, thug = _fight(feats=["Opening Volley"], at=((6, 10), (7, 10)),
+                                     faces={"Attack with": 18, "Damage": 2})
+    thug.hp = thug.hp_max = 400
+    _attack(engine, weapon="shortbow")
+    first = _rolls(_attack(engine, weapon="longsword"), "Attack with")[0]
+    assert _named(first, "Opening Volley") == 4
+    second = _rolls(_attack(engine, weapon="longsword"), "Attack with")[0]
+    assert _named(second, "Opening Volley") == 0

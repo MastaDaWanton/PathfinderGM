@@ -2525,6 +2525,9 @@ WHEN_KEYS: dict[str, str] = {
     # (Engine._where_ctx).
     "combatants": "how many stand in the fight the roll is made in, compared: "
                   "{\"gte\": 12} (Engine._where_ctx)",
+    # Feat loop b4-combat: Desperate Battler's "no ally is within 10 feet of you and you
+    # are not receiving benefits from the aid another action" (strike_feats.alone).
+    "alone_within": "no ally within this many feet and no aid another on the bearer: 10",
 }
 # `larger` / `smaller` (feat loop b2): size categories against the bearer's own, answered
 # by `classfeatures.holds` where the bearer is known (Risky Striker, Underfoot).

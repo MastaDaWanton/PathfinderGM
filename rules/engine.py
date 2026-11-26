@@ -4527,7 +4527,9 @@ class Engine:
                 why = actor.can_power_attack()
                 if why:
                     raise IntentError(f"attack: {why}", "legality", index, code="cannot_power_attack")
-            why = self._attack_choice_refusal(actor, key, intent.params)
+            why = self._attack_choice_refusal(actor, key, intent.params) \
+                or strike_feats.target_refusal(self, actor, self.scene.actors.get(
+                    (intent.targets() or [""])[0]), intent.params)      # feat loop b4
             if why:
                 raise IntentError(f"attack: {why}", "legality", index,
                                   code="cannot_choose")
@@ -7230,7 +7232,8 @@ class Engine:
         behind it is marked (`after_coup`) and refused in words — the `after_close` shape."""
         whole = intent.params.get("coup_de_grace") or (
             intent.params.get("charged") is not None
-            and (intent.params.get("charge") or intent.params.get("spring_attack")))
+            and (intent.params.get("charge") or intent.params.get("spring_attack"))) \
+            or strike_feats.whole_round(intent.params)          # feat loop b4
         if not self.scene.in_encounter or outcome.status != "resolved" \
                 or not whole or intent.params.get("reaction"):
             return
@@ -10906,6 +10909,14 @@ class Engine:
             if spent:
                 return self._refuse(intent, spent)
             self._coup_provokes(intent, actor, defender, weapon_key)
+        # Feat loop b4: Death or Glory, Punch Through, Cockatrice Strike are one attack
+        # as a full-round action, the round asked as the coup de grace asks it.
+        whole = strike_feats.whole_round(intent.params)
+        if whole and partial.get("attack_state") is None and self.scene.in_encounter \
+                and not intent.params.get("reaction"):
+            spent = self._coup_round_spent(actor, whole)
+            if spent:
+                return self._refuse(intent, spent)
         # Whether the one struck can tell who struck them (owner, Q34, for swords and
         # spells alike): a hidden attacker sniping from ten feet or more who keeps hidden
         # opens no fight and costs no attitude — `attitude.perceived` carries the rule and
@@ -11097,6 +11108,10 @@ class Engine:
             # key, so Strength stays on it (`damage_modifiers`). Before 2026-10-06 the
             # throw was a melee blow in every one of these but the range increment.
             weapon = dict(weapon, category="ranged", thrown=True)
+        # Hamatulatsu (ISWG): "Your unarmed attacks can deal either bludgeoning or piercing
+        # damage" - piercing when declared (feat loop b4).
+        if intent.params.get("hamatulatsu"):
+            weapon = dict(weapon, type="piercing")
         # Which kind of damage this swing deals: the weapon's own, unless the swing was
         # declared the other way (`lethality`), which costs the -4 `attack_modifiers`
         # charges. Measured 2026-09-27 before this was read: a punch took a thug from 13
@@ -11289,7 +11304,9 @@ class Engine:
                 f"{defender.name} is behind total cover: there is no line to them from "
                 f"where {actor.name} is standing.")
         cover_mods = strike_feats.cover_kept(actor, weapon, position_mod.ac_mods(
-            self.scene, actor, defender)) + self._dark_ac_mods(defender, actor)
+            self.scene, actor, defender)) + self._dark_ac_mods(defender, actor) \
+            + strike_feats.guard_against(defender, actor, weapon, weapon_key,
+                                         flat_footed or bool(flounders))
         if cover_mods:
             target_ac += sum(m.value for m in cover_mods)
             ac_parts.extend((m.source, m.value) for m in cover_mods)
@@ -11639,6 +11656,9 @@ class Engine:
                 # Kept for the swing: vorpal asks "upon a roll of natural 20 (followed by
                 # a successful roll to confirm)" at the damage stage, a popup later.
                 state["natural"] = natural
+                if not dancing:                                   # feat loop b4
+                    strike_feats.after_roll(self, intent, actor, defender, weapon_key,
+                                            weapon, atk, state, swing_choices)
                 riposte = self._crane_after(actor, defender, wing, atk, swing_ac, state)
                 if riposte == "deflected":
                     state.setdefault("blows", []).append(
@@ -11810,9 +11830,16 @@ class Engine:
                         swift_at += 1
                 # A threat is not a crit until it is confirmed — exactly the sort of step
                 # a person forgets mid-fight and code does not.
-                threat = natural is not None and natural >= weapon["crit_range"]
+                threat = natural is not None and natural >= strike_feats.threat_from(
+                    actor, defender, weapon)            # Slayer's Knack (feat loop b4)
                 state["stage"] = "confirm" if threat else "damage"
                 state["crit"] = False
+                # Butterfly's Sting (feat loop b4): an ally's mark lands this melee hit as
+                # a critical, confirmed without a roll.
+                if not dancing and strike_feats.stung_critical(self, actor, defender, weapon):
+                    state["stage"], state["crit"] = "damage", True
+                    state["tells"].append(f"{actor.name} strikes through the opening an "
+                                          f"ally left: a critical (Butterfly's Sting).")
 
             if state["stage"] == "confirm":
                 # Critical Focus's +4 (`Actor.confirm_modifiers`), on this roll alone.
@@ -11829,6 +11856,7 @@ class Engine:
                 state["crit"] = confirm.total >= swing_ac
                 state["confirm_total"] = confirm.total     # Impact Critical Shot's CMD test
                 self._judge(confirm, state["crit"])
+                strike_feats.on_confirm(actor, defender, swing_choices, state)  # b4
                 if state["crit"]:
                     self._surge(actor, "a confirmed critical hit")
                     feat_events.crit_events(self, actor, defender, weapon_key, weapon,
@@ -12161,7 +12189,9 @@ class Engine:
                 amount, spared = feat_events.half_nonlethal(defender, amount, state,
                                                             lethality)
                 hit = self._apply_damage(defender, amount, weapon["type"],
-                                         traits=struck_as + attacker_traits(actor),
+                                         traits=struck_as + attacker_traits(actor)
+                                         + strike_feats.dr_traits(actor, defender,
+                                                                  weapon_key),
                                          lethality=lethality)
                 if spared:
                     bruise = self._apply_damage(defender, spared, weapon["type"],
@@ -12301,6 +12331,14 @@ class Engine:
                 # (`_b3_after_hit`).
                 for extra in ([] if dancing else feat_events.after_hit(
                         self, intent, actor, defender, weapon_key, weapon, state, choices)):
+                    state["effects"].append(extra["effect"])
+                    if extra.get("tell"):
+                        state["tells"].append(extra["tell"])
+                # Feat loop b4-combat (rules/strike_feats.py): Deadly Finish, Punch
+                # Through, Spear Dancer, Opening Volley, Hamatulatsu, Cockatrice Strike.
+                for extra in ([] if dancing else strike_feats.after_hit(
+                        self, intent, actor, defender, weapon_key, weapon, state,
+                        swing_choices)):
                     state["effects"].append(extra["effect"])
                     if extra.get("tell"):
                         state["tells"].append(extra["tell"])
@@ -27983,6 +28021,9 @@ class Engine:
         ranged = w.get("category") == "ranged" or bool(params.get("thrown"))
         said = {c: c.replace("_", " ").title() for c in declared}
         why = feat_events.choice_refusal(actor, w, declared, params)    # feat loop b3
+        if why:
+            return why
+        why = strike_feats.choice_refusal(actor, w, declared, params)   # feat loop b4
         if why:
             return why
         for c in ("vital_strike", "cleave", "scorpion_style"):

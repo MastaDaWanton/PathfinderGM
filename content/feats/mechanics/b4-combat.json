@@ -108,5 +108,212 @@
         "note": "Throw Anything: a thrown splash weapon"
       }
     ]
+  },
+  "gang-up": {
+    "tags": [
+      "flank.gang-up"
+    ]
+  },
+  "overwhelm": {
+    "tags": [
+      "flank.overwhelm"
+    ]
+  },
+  "desperate-battler": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 1,
+        "bonus_type": "morale",
+        "when": {
+          "alone_within": 10,
+          "weapon": {
+            "ranged": false
+          }
+        },
+        "note": "Desperate Battler: no ally within 10 feet, no aid another"
+      },
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "amount": 1,
+        "bonus_type": "morale",
+        "when": {
+          "alone_within": 10,
+          "weapon": {
+            "ranged": false
+          }
+        },
+        "note": "Desperate Battler: no ally within 10 feet, no aid another"
+      }
+    ]
+  },
+  "cornugon-shield": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 1,
+        "bonus_type": "shield",
+        "when": {
+          "bearer": {
+            "wielding": "spiked-chain"
+          }
+        },
+        "note": "Cornugon Shield: wielding a spiked chain"
+      },
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 2,
+        "bonus_type": "shield",
+        "when": {
+          "bearer": {
+            "wielding": "spiked-chain",
+            "state": "buff.stance.fighting-defensively"
+          }
+        },
+        "note": "Cornugon Shield: fighting defensively"
+      },
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 2,
+        "bonus_type": "shield",
+        "when": {
+          "bearer": {
+            "wielding": "spiked-chain",
+            "state": "buff.stance.total-defense"
+          }
+        },
+        "note": "Cornugon Shield: in total defense"
+      }
+    ]
+  },
+  "improved-cleaving-finish": {
+    "tags": [
+      "attack.cleaving-finish.unlimited"
+    ]
+  },
+  "greater-penetrating-strike": {
+    "tags": [
+      "dr.penetrating.greater"
+    ]
+  },
+  "slayer-s-knack": {
+    "tags": [
+      "crit.favored-enemy.doubled"
+    ]
+  },
+  "defensive-weapon-training": {
+    "tags": [
+      "ac.dodge.weapon-group"
+    ]
+  },
+  "martial-versatility": {},
+  "martial-mastery": {
+    "tags": [
+      "feat.weapon.whole-group"
+    ]
+  },
+  "spear-dancer": {
+    "tags": [
+      "hit.dazzle.two-handed-reach"
+    ]
+  },
+  "opening-volley": {
+    "tags": [
+      "hit.ranged.opens-melee"
+    ]
+  },
+  "death-or-glory": {
+    "choice": "death_or_glory",
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "formula": "4 + min(1, bab // 11) + min(1, bab // 16) + min(1, bab // 20)",
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "death_or_glory"
+        },
+        "note": "Death or Glory"
+      },
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "formula": "4 + min(1, bab // 11) + min(1, bab // 16) + min(1, bab // 20)",
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "death_or_glory"
+        },
+        "note": "Death or Glory"
+      },
+      {
+        "type": "combat_mod",
+        "target": "crit_confirm",
+        "formula": "4 + min(1, bab // 11) + min(1, bab // 16) + min(1, bab // 20)",
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "death_or_glory"
+        },
+        "note": "Death or Glory"
+      }
+    ]
+  },
+  "punch-through": {
+    "choice": "punch_through",
+    "tags": [
+      "dr.punch-through"
+    ]
+  },
+  "deadly-finish": {
+    "choice": "deadly_finish"
+  },
+  "reckless-aim": {
+    "choice": "reckless_aim",
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 2,
+        "bonus_type": "competence",
+        "when": {
+          "choice": "reckless_aim"
+        },
+        "note": "Reckless Aim"
+      }
+    ]
+  },
+  "butterfly-s-sting": {
+    "choice": "butterfly_sting"
+  },
+  "two-handed-thrower": {
+    "choice": "two_handed_throw",
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "formula": "max(0, str_mod) // 2",
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "two_handed_throw",
+          "weapon": {
+            "hands": 1
+          }
+        },
+        "note": "Two-Handed Thrower: 1-1/2 times Strength, thrown with both hands"
+      }
+    ],
+    "not_yet": [
+      "'If you also have the Quick Draw feat, you can throw two-handed weapons at your full normal rate of attacks': a throw is one attack an op (the weapon leaves the hand), so no full attack of throws is offered"
+    ]
+  },
+  "hamatulatsu": {
+    "choice": "hamatulatsu"
+  },
+  "cockatrice-strike": {
+    "choice": "cockatrice_strike"
   }
 }
