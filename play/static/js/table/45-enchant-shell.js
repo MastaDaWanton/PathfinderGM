@@ -90,7 +90,7 @@
   function blank(method) {
     return { method: method || null, vessel: "", circle: [], focus: "", seats: {}, choices: {},
              catalyst: "", hurry: false, phials: {}, essence: "", item: "", recipe: "",
-             construct: "", spell: "", blank: "", ink: "" };
+             construct: "", spell: "", blank: "", ink: "", reliquary: "" };
   }
   E.order = blank(null);
   var subs = {};
@@ -536,6 +536,7 @@
     } else if (m === "bind") {
       body.vessel = o.vessel; body.hurry = !!o.hurry;
       if (o.catalyst) body.catalyst = o.catalyst;
+      if (o.reliquary) body.reliquary = o.reliquary;
     } else if (m === "refine") {
       body.phials = Object.assign({}, o.phials);
     } else if (m === "unbind" || m === "cleanse") {
@@ -698,6 +699,13 @@
   E.setConstruct = function (id) {
     if (E.busy || E.live) return;
     E.order.construct = String(id || "");
+    E.emit("order");
+    E.runCheck();
+  };
+  // Create Reliquary Arms and Shields (feat loop b4-crafting): the spell cast into the binding.
+  E.setReliquary = function (spell) {
+    if (E.busy || E.live) return;
+    E.order.reliquary = String(spell || "");
     E.emit("order");
     E.runCheck();
   };

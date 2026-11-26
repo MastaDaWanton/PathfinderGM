@@ -535,9 +535,27 @@ def _docs_for(actor) -> list[dict]:
                     # A heritage power reads its own level (Eldritch Heritage's
                     # character level - 2), its rungs and formulas both.
                     lvl = int(row.get("level") or level_of(actor))
-                    out.append({**grantedpowers.shift_level(
+                    used = {**grantedpowers.shift_level(
                         grantedpowers.resolve(doc, lvl, row["vars"]), lvl - level_of(actor)),
-                        "class": kind})
+                        "class": kind}
+                    if row.get("borrowed"):
+                        used = _borrowed_use(used, row["borrowed"])
+                    out.append(used)
+    return out
+
+
+def _borrowed_use(doc: dict, borrow: dict) -> dict:
+    """A power a sanguine elixir lends is used once (feat loop b4-crafting, UM Create
+    Sanguine Elixir: "activate the bloodline power ... as if it had access"): its uses and
+    upkeep are paid from a pool of one that is the elixir's own, not the sorcerer's."""
+    from . import sanguine
+
+    pid = sanguine.pool_id(borrow)
+    out = dict(doc, pool={"id": pid, "max": 1, "starts": "max", "refresh": "never"})
+    for field_ in ("cost", "drain"):
+        if isinstance(out.get(field_), dict):
+            out[field_] = {**out[field_], "pool": pid, "amount": 1}
+    out["cost"] = out.get("cost") or {"pool": pid, "amount": 1}
     return out
 
 

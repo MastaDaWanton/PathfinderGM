@@ -1458,6 +1458,8 @@
                  ? '<button type="button" class="bf-btn" data-alchemy-manuals data-tut="alchemy-manuals" aria-haspopup="dialog">Manuals</button>' : "") +
                '<button type="button" class="bf-btn" data-alchemy-formulary data-tut="alchemy-formulary" aria-haspopup="dialog">Formulary</button>' +
                '<button type="button" class="bf-btn" data-alchemy-codex data-tut="alchemy-codex" aria-haspopup="dialog">Codex</button>' +
+               // Create Sanguine Elixir (feat loop b4-crafting): the server's `state.sanguine`.
+               ((s && s.sanguine) ? '<button type="button" class="bf-btn" data-alchemy-sanguine aria-haspopup="dialog">Sanguine elixir</button>' : "") +
                // The bench's tips again (js/tutorials.js), as the herb bench's footer has them.
                '<button type="button" class="tut-help" data-tut="help-alchemy" data-tut-help="bench.alchemy" aria-label="Show the tips for this bench">?</button>',
     };
@@ -1471,9 +1473,63 @@
       if (b) { A.book(b.hasAttribute("data-alchemy-formulary") ? "formulary" : "codex", b); return; }
       var mb = e.target.closest("[data-alchemy-manuals]");
       if (mb) { A.openManuals(mb); return; }
+      var sb = e.target.closest("[data-alchemy-sanguine]");
+      if (sb) { A.openSanguine(sb); return; }
       if (e.target.closest("[data-bench-perks]")) A.openPerks();
     });
   }
+
+  // Create Sanguine Elixir (feat loop b4-crafting): one of the sorcerer's own bloodline
+  // powers bottled through POST api/alchemy/sanguine — 100 gp and an hour, the power lent
+  // until the next rest. The manuals dialog's frame and classes, so the bench keeps its look.
+  A.openSanguine = function (from) {
+    var o = (A.state && A.state.sanguine) || { powers: [] };
+    var pops = $id("alchemy-pops");
+    if (!pops) return;
+    var wrap = document.createElement("div");
+    wrap.className = "bench-modal bench-manuals";
+    wrap.setAttribute("role", "dialog");
+    wrap.setAttribute("aria-modal", "true");
+    wrap.setAttribute("aria-labelledby", "al-sanguine-t");
+    var rows = (o.powers || []).map(function (p) {
+      return '<li><b>' + esc(p.name) + '</b>' + (p.line ? '<i>' + esc(p.line) + '</i>' : "") +
+        '<button type="button" class="v2-btn is-small" data-bottle="' + esc(p.key) + '"' +
+        (o.refusal ? " disabled" : "") + '>Bottle</button></li>';
+    });
+    wrap.innerHTML = '<div class="bench-scrim"></div><div class="bench-dialog bench-books-d v2-framed v2-card-leather">' +
+      '<i class="v2-rim" aria-hidden="true"></i><h3 id="al-sanguine-t">Sanguine elixir</h3>' +
+      '<div class="bench-books-body"><p>Bottle one of your bloodline powers for ' + esc(String(o.cost_gp || 100)) +
+      ' gp and an hour. You lose the power until your next rest; whoever drinks the elixir within a day can use it once, before the end of their next turn.</p>' +
+      '<ul class="bench-books">' + (rows.join("") || '<li><span>You have no bloodline power to bottle.</span></li>') + '</ul>' +
+      '<div class="bench-books-said" role="status" aria-live="polite">' + esc(o.refusal || "") + '</div></div>' +
+      '<div class="bench-dialog-acts"><button type="button" class="v2-btn is-quiet" data-books-close>Close</button></div></div>';
+    pops.appendChild(wrap);
+    var said = wrap.querySelector(".bench-books-said");
+    var close = function () {
+      core.dropEsc(close);
+      wrap.remove();
+      if (from && document.contains(from) && from.focus) from.focus();
+    };
+    core.pushEsc(close);
+    wrap.querySelector("[data-books-close]").addEventListener("click", close);
+    wrap.querySelector(".bench-scrim").addEventListener("click", close);
+    wrap.querySelector(".bench-books").addEventListener("click", function (e) {
+      var b = e.target.closest("[data-bottle]");
+      if (!b || b.disabled) return;
+      Array.prototype.forEach.call(wrap.querySelectorAll("[data-bottle]"), function (x) { x.disabled = true; });
+      said.textContent = "Bottling…";
+      C.api("/api/alchemy/sanguine", { power: b.dataset.bottle }).then(function (got) {
+        said.textContent = got.tell || "Bottled.";
+        if (got.clock) tickClock(got.clock);
+        A.refresh();
+      }).catch(function (err) {
+        said.textContent = err.message || String(err);
+        Array.prototype.forEach.call(wrap.querySelectorAll("[data-bottle]"), function (x) { x.disabled = false; });
+      });
+    });
+    var first = wrap.querySelector("[data-bottle]:not([disabled])") || wrap.querySelector("[data-books-close]");
+    if (first) first.focus();
+  };
 
   // The alchemy manuals carried, read through POST api/alchemy/manual (the core's dialog):
   // the reagents a book teaches. A formulary's formulae are copied from the Formulary, as

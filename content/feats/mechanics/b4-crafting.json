@@ -1,0 +1,20 @@
+{
+  "_about": [
+    "Feat loop b4-crafting (2026-11-26). The owner: 'any feat that requires a crafting feat that",
+    "we removed, strip that requirement and allow it to be taken and reworked to fit our systems.'",
+    "The prerequisite is dropped in rules/feats.py (_retired_prerequisites); the rework runs in code",
+    "the documents name. Cypher Magic's document stays in batch1-spells.json: its +1 caster level",
+    "reads every scroll, the ones scribed at the enchanting circle included.",
+    "create-sanguine-elixir: rules/sanguine.py, made at the alchemy bench (api/alchemy/sanguine).",
+    "cooperative-crafting: rules/cooperative.py, at all five world-class benches.",
+    "create-reliquary-arms-and-shields: rules/reliquary.py, at the enchanting circle's Bind."
+  ],
+  "create-sanguine-elixir": {},
+  "cooperative-crafting": {},
+  "create-reliquary-arms-and-shields": {
+    "not_yet": [
+      "the holy symbol: no cast asks a caster for a divine focus (spell components other than V are not checked), so the reliquary serving as one changes no roll",
+      "the permanent fixture: consecrate and desecrate are narrated spells, so the doubled figures a fixture gives have no number to double"
+    ]
+  }
+}

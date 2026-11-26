@@ -212,6 +212,15 @@
                 : empty("Catalyst", "Optional: a catalyst eases the binding", { pick: "catalyst", optional: true });
     html += '<label class="ew-check"><input type="checkbox" id="enchant-hurry"' + (o.hurry ? " checked" : "") + '>' +
       '<span>Hurry it<small>Half the time, and harder</small></span></label>';
+    // Create Reliquary Arms and Shields (feat loop b4-crafting): the server's `state.reliquary`.
+    var rel = (E.state || {}).reliquary;
+    if (rel && rel.length) {
+      html += '<label class="ew-check"><span>Reliquary<small>Cast into arms or a shield: 250 gp more in price</small></span>' +
+        '<select id="enchant-reliquary"><option value="">None</option>' +
+        rel.map(function (r) {
+          return '<option value="' + esc(r.id) + '"' + (o.reliquary === r.id ? " selected" : "") + '>' + esc(r.name) + '</option>';
+        }).join("") + '</select></label>';
+    }
     return html;
   }
 
@@ -505,6 +514,7 @@
       return;
     }
     if (e.target.id === "enchant-hurry") E.setHurry(e.target.checked);
+    if (e.target.id === "enchant-reliquary") E.setReliquary(e.target.value);
     if (e.target.id === "enchant-spell") {
       var name = String(e.target.value || "").trim().toLowerCase();
       var opts = ((E.state || {}).spell_items || {})[E.order.method] || [];

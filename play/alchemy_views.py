@@ -35,7 +35,8 @@ from django.views.decorators.http import require_GET, require_POST
 
 from rules import alchemist as al
 from rules import alchemy_items as items
-from rules import crafting, effectspec, formulae, knowledge, pricing, survival, worldclass
+from rules import (cooperative, crafting, effectspec, formulae, knowledge, pricing, sanguine,
+                   survival, worldclass)
 
 from . import bench_clock
 from . import campaign as campaign_mod
@@ -452,6 +453,8 @@ def _state_body(c, pc) -> dict:
         # `formulae` are still written into the formula book through the Formulae
         # dialog's own route (`alchemy_learn`, source "formulary"), with its check.
         "manuals": manual_reader.carried(pc, knowledge.ALCHEMIST),
+        # Create Sanguine Elixir (feat loop b4-crafting): None for anyone without the feat.
+        "sanguine": sanguine.offer(pc, where=where, fight=bool(where.get("fight"))),
     }
 
 
@@ -484,6 +487,8 @@ def _ready(request):
     if pc is None:
         return None, None, _err("There is no character to work the bench.", 409)
     _ensure_starting(c, pc)
+    # Cooperative Crafting (feat loop b4-crafting): the companion helping here, if any.
+    cooperative.settle(c.scene, pc)
     return c, pc, None
 
 
@@ -1703,3 +1708,32 @@ def _formulary_note(pc, manual: dict) -> str:
         return "Every formula it writes down is already in your formula book."
     return (f"It writes down {len(new)} formula{'e' if len(new) != 1 else ''} not yet in "
             f"your formula book: copy {'them' if len(new) != 1 else 'it'} from the Formulary.")
+
+
+@require_POST
+def alchemy_sanguine(request):
+    """Create Sanguine Elixir at the bench (feat loop b4-crafting, `rules/sanguine.py`):
+    {"power": key} bottles that bloodline power — 100 gp, an hour, the power lent until the
+    next rest — and answers {name, power, tell, clock, state}. No check: the book has none."""
+    from . import history as history_mod
+
+    c, pc, refused = _ready(request)
+    if refused:
+        return refused
+    body = read_body(request)
+    power = str(body.get("power") or "")
+    where = _where(c, pc)
+    why = sanguine.refusal(pc, power, where=where,
+                           fight=bool(where.get("fight") or c.scene.in_encounter))
+    if why:
+        return _err(why, 409)
+    got = sanguine.make(pc, power, now=_now(c))
+    c.scene.advance(sanguine.MINUTES)
+    c.transcript.append({"who": "gm", "kind": "consequence", "text": got["tell"]})
+    c.turn_log.append(history_mod.stamp(c, {
+        "kind": "resolution", "door": "alchemist",
+        "outcomes": [{"intent_id": "sanguine", "op": "sanguine", "tell": got["tell"],
+                      "effects": [{"ref": pc.ref, "kind": "sanguine_elixir",
+                                   "power": got["power"]}]}]}))
+    c.save()
+    return JsonResponse({**got, "clock": _clock(c), "state": _state_body(c, pc)})

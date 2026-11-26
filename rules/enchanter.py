@@ -793,6 +793,13 @@ def item_card(record: dict) -> dict:
     asks = pending_of(record)
     if asks:
         card["questions"] = asks
+    # A reliquary (feat loop b4-crafting, rules/reliquary.py) says what was cast into it.
+    from . import reliquary
+
+    held = reliquary.of(record)
+    if held:
+        card["lines"] = list(card.get("lines") or []) + [
+            f"Reliquary: a casting of {held} is in it; it serves as a holy symbol."]
     return card
 
 
@@ -893,6 +900,9 @@ class StepPlan:
     spell_level: int = 0
     item_cl: int = 0
     coin_cp: int = 0
+    # Create Reliquary Arms and Shields at Bind (feat loop b4-crafting, rules/reliquary.py):
+    # "consecrate" or "desecrate", cast into the item, or "".
+    reliquary: str = ""
 
     @property
     def can_roll(self) -> bool:
@@ -1068,7 +1078,10 @@ def _spells_known(actor, ids) -> set[str]:
                 out.add(sid)
         except Exception:  # noqa: BLE001 - an unknown id or a non-caster knows nothing
             continue
-    return out
+    # Cooperative Crafting: "either one of you can fulfill any other prerequisites" (b4).
+    from . import cooperative
+
+    return out | (set(ids) & cooperative.helper_spells(actor))
 
 
 def _spell_groups_of(adds: dict) -> list[list[str]]:
@@ -1495,6 +1508,17 @@ def _build_bind(plan: StepPlan, actor, body, where, now) -> None:
         plan.traits = sorted({t for p in seats.values() for t in p.traits})
     if cat is not None:
         plan.consumes.append((cat.key, 1, cat.name))
+    if body.get("reliquary"):
+        from . import reliquary
+
+        plan.reliquary = str(body["reliquary"]).strip().lower()
+        why = reliquary.refusal(actor, plan.reliquary, _vessel_gear(v.record))
+        if why:
+            plan.problems.append(why)
+        else:
+            plan.info.append(f"A casting of {plan.reliquary} goes into the binding: a "
+                             f"reliquary, {reliquary.PRICE_GP} gp more in price, "
+                             f"{reliquary.COST_CP // 100} gp paid at the binding.")
     plan.flawed_ok = True
     lift = int(_n("circle_lift", 1))
     caps = [int(plan.ceiling)]
@@ -2327,6 +2351,11 @@ def _land_binding(actor, progress, plan: StepPlan, tier: int, *, engine, now: in
             focus = None
     if focus:
         binding["focus"] = focus
+    if plan.reliquary:
+        from . import reliquary
+
+        reliquary.spend(actor, plan.reliquary)
+        binding["reliquary"] = plan.reliquary
     _store_magic(st, m or None)
     day = int(now) // 1440 + 1
     name = plan.name_after or v.name

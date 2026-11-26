@@ -229,9 +229,14 @@ def had(actor) -> list[dict]:
     """Every power this character has right now, resolved:
     `{"label", "kind", "id", "power", "vars"}`. A power whose `level` the class level has
     not reached is not had."""
+    from . import sanguine
+
     level = level_of(actor)
     out = []
-    for src in sources(actor) + heritage_sources(actor):
+    # Create Sanguine Elixir (feat loop b4-crafting): a power bottled is gone from its
+    # sorcerer until her next rest, and the drinker's borrowed one is a source here.
+    lent = sanguine.lent(actor)
+    for src in sources(actor) + heritage_sources(actor) + borrowed_sources(actor):
         # A heritage source (Eldritch Heritage) names the powers it gives by key and
         # reads them at its own level; a class choice gives every power its level reached.
         lvl, keys = int(src.get("level") or level), src.get("keys")
@@ -243,9 +248,41 @@ def had(actor) -> list[dict]:
                     continue
             elif int(power.get("level", 1) or 1) > lvl:
                 continue
+            if not src.get("borrowed") and sanguine.slug(power.get("key")) in lent:
+                continue
+            resolved = shift_level(resolve(power, lvl, src["vars"]), lvl - level)
+            if src.get("borrowed"):
+                resolved.pop("pool", None)      # one use, the elixir's (`sanguine.pool_id`)
             out.append({"label": src["label"], "kind": src["kind"], "id": src["id"],
-                        "power": shift_level(resolve(power, lvl, src["vars"]), lvl - level),
-                        "vars": src["vars"], "level": lvl})
+                        "power": resolved, "vars": src["vars"], "level": lvl,
+                        "borrowed": src.get("borrowed"),
+                        "heritage": keys is not None and not src.get("borrowed")})
+    return out
+
+
+def borrowed_sources(actor) -> list[dict]:
+    """The bloodline power a sanguine elixir drunk lends (`sanguine.borrowed`), read at
+    the lower of the drinker's character level and the maker's sorcerer level, and not at
+    all below the power's own minimum level (UM, Create Sanguine Elixir)."""
+    from . import classes as classes_mod, sanguine
+
+    out = []
+    mine = max(1, int(getattr(actor, "level", 1) or 1))
+    for b in sanguine.borrowed(actor):
+        if mine < int(b.get("min_level") or 1):
+            continue
+        bid = _norm(b.get("bloodline"))
+        entry = next((e for doc in files().values() if label_of(doc) == "bloodline"
+                      for k, e in (doc.get("entries") or {}).items() if _norm(k) == bid), None)
+        if not isinstance(entry, dict):
+            continue
+        cat = next((o for o in (classes_mod.catalogue(BLOODLINE_CATALOGUE) or {}).get(
+            "options") or () if isinstance(o, dict) and _norm(o.get("id")) == bid), None) or {}
+        pick = {"id": bid, "variant": b.get("variant") or "", "entry": cat}
+        out.append({"label": f"{b.get('name') or 'A bloodline power'} (sanguine elixir)",
+                    "kind": "bloodline", "id": bid, "entry": entry, "pick": pick,
+                    "vars": _variant_fields(pick), "keys": {_norm(b.get("power"))},
+                    "level": min(mine, int(b.get("level") or mine)), "borrowed": b})
     return out
 
 

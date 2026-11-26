@@ -29514,6 +29514,11 @@ class Engine:
             off = alchemy_items.gone_off(rec, now)
             if off:
                 return self._refuse(intent, f"The {held.base} {off}. Nothing comes of it.")
+        # A sanguine elixir "lose[s] its potency 1 day after" it is made (feat loop
+        # b4-crafting, `rules/sanguine.py`): read off the jar and the clock, never stored.
+        if getattr(held, "craft", "") == "sanguine" and held.spoils_minute is not None                 and now >= int(held.spoils_minute):
+            return self._refuse(intent, f"The {held.base} has lost its potency: a sanguine "
+                                        f"elixir keeps a day. Nothing comes of it.")
 
         route = str(intent.params.get("route") or "").strip().lower()
         if how == "light":
@@ -35519,7 +35524,11 @@ class Engine:
         tag = str(intent.params.get("tag") or "").strip().lower()
         known = {row["tag"] for row in effectspec.PERMISSIONS.values()} | {
             "buff.fast-healing", "state.wound.bleeding"}
-        if not (tag.startswith(self._GRANT_PREFIXES) or tag in known):
+        # Feat loop b4-crafting: a sanguine elixir's borrowed bloodline power
+        # (rules/sanguine.py), only from a stamped item — a model cannot lend itself one.
+        borrow = intent.params.get("borrowed") if tag.startswith("borrowed.bloodline.")             and str(intent.origin or "").startswith("item:") else None
+        if not (tag.startswith(self._GRANT_PREFIXES) or tag in known
+                or isinstance(borrow, dict)):
             return self._refuse(intent, f"{tag!r} is not a sense, a light or a permission "
                                         f"the engine grants.")
         per = intent.params.get("per_round") if isinstance(
@@ -35538,7 +35547,7 @@ class Engine:
             rounds_left=rounds, tags=(tag,),
             payload={"light": {"radius_ft": int(light.get("radius_ft") or 0),
                                "raised_ft": int(light.get("raised_ft") or 0)}}
-            if light else {}))
+            if light else {"borrowed": dict(borrow)} if isinstance(borrow, dict) else {}))
         span = ("" if not rounds else f" for {rounds // 600} hour(s)" if rounds >= 600
                 else f" for {rounds // 10} minute(s)" if rounds >= 10
                 else f" for {rounds} round(s)")

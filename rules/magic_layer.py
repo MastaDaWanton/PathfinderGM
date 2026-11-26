@@ -300,6 +300,11 @@ def market_price(magic: dict, gear: str, slot: str = "") -> int:
     if gear in ARMS:
         per = WEAPON_GP_PER_SQUARE if gear == "weapon" else ARMOUR_GP_PER_SQUARE
         flat = sum(_entry_gp(e) for e in magic["flat"])
+        # Create Reliquary Arms and Shields: "increases the item's Price by 250 gp" (b4).
+        if (magic.get("binding") or {}).get("reliquary"):
+            from .reliquary import PRICE_GP
+
+            flat += PRICE_GP
         return total_bonus(magic) ** 2 * per + flat
     prices = sorted((gp for gp in _wondrous_powers_gp(magic) if gp > 0), reverse=True)
     if not prices:

@@ -175,6 +175,7 @@ urlpatterns = [
     path("api/alchemy/formulary", alchemy_views.alchemy_formulary, name="alchemy_formulary"),
     path("api/alchemy/codex", alchemy_views.alchemy_codex, name="alchemy_codex"),
     path("api/alchemy/manual", alchemy_views.alchemy_manual, name="alchemy_manual"),
+    path("api/alchemy/sanguine", alchemy_views.alchemy_sanguine, name="alchemy_sanguine"),
     path("api/alchemy/material/<str:material_id>", alchemy_views.alchemy_material,
          name="alchemy_material"),
     # The leather bench (docs/leatherworking-contracts.md §7). Lane E's block: every fixed
