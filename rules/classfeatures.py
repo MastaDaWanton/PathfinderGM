@@ -380,7 +380,10 @@ MOD_KEYS = frozenset({"type", "target", "amount", "formula", "bonus_type", "when
 MOD_TYPES = ("ability_mod", "skill_mod", "save_mod", "combat_mod", "speed")
 BEARER_KEYS = frozenset({"armour", "shield", "armoured", "load", "helpless", "pool",
                          "terrain", "state", "wielding", "shield_kind", "hands_free",
-                         "loses_dex"})
+                         "loses_dex",
+                         # Feat loop b4-combat: a state NOT held (Stunning Fist Adept's
+                         # "does not stack with ... Mantis Style").
+                         "not_state"})
 WEAPON_KEYS = frozenset({"applies_to", "damage_column", "strikes_as", "strikes_as_by_rank",
                          "when"})
 ARMOUR_KEYS = frozenset({"max_dex", "check_penalty", "unhindered"})
@@ -714,6 +717,11 @@ def _bearer_holds(clause: dict, actor, pick: str = "") -> bool:
             # defensively").
             wants = want if isinstance(want, list) else [want]
             if not all(actor.has_state(str(w or "")) for w in wants):
+                return False
+        elif key == "not_state":
+            # Feat loop b4: none of these held (Stunning Fist Adept beside Mantis Style).
+            wants = want if isinstance(want, list) else [want]
+            if any(actor.has_state(str(w or "")) for w in wants):
                 return False
         elif key == "loses_dex":
             # "While denied your Dexterity bonus to AC you are also denied this

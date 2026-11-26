@@ -7574,6 +7574,9 @@ class Engine:
             out["effects"].append({"ref": defender.ref, "kind": "condition",
                                    "condition": "pinned", "from": "grapple", "by": actor.ref})
             out["tells"].append(f"{actor.name} pins {defender.name}.")
+            for piece in strike_feats.stunning_pin(self, actor, defender):   # feat loop b4
+                out["effects"].append(piece["effect"])
+                out["tells"].append(piece["tell"])
         if not actor.has_state("state.exposed.pinning"):
             actor.apply_effect(ActiveEffect(
                 name="pinning", kind="situation", key="pinning",
@@ -11651,6 +11654,9 @@ class Engine:
                     intent, actor, atk_mods, f"Attack with {weapon['name']}",
                     swing_ac, partial, state, "1d20", kind="attack",
                 )
+                if not dancing:                                   # Perfect Strike (b4)
+                    atk = strike_feats.perfect_strike(self, actor, weapon_key, weapon, atk,
+                                                      atk_mods, state)
                 state["rolls"].append(atk.as_dict())
                 natural = atk.natural
                 # Kept for the swing: vorpal asks "upon a roll of natural 20 (followed by
@@ -11848,10 +11854,11 @@ class Engine:
                 # And the defender's (Snapping Turtle Shell's -4 against you, b2-styles).
                 confirm_mods = list(confirm_mods) + defender._buff_mods(
                     "combat_mod", "crit_confirm_against")
-                confirm = self._roll_or_suspend_stage(
-                    intent, actor, confirm_mods, f"Confirm critical ({weapon['name']})",
-                    swing_ac, partial, state, "1d20",
-                )
+                confirm = strike_feats.kept_confirm(self, confirm_mods, weapon, state) \
+                    or self._roll_or_suspend_stage(
+                        intent, actor, confirm_mods, f"Confirm critical ({weapon['name']})",
+                        swing_ac, partial, state, "1d20",
+                    )
                 state["rolls"].append(confirm.as_dict())
                 state["crit"] = confirm.total >= swing_ac
                 state["confirm_total"] = confirm.total     # Impact Critical Shot's CMD test
@@ -39639,7 +39646,9 @@ class Engine:
                 # now with the user's Wisdom; Jawbreaker's bleed), and Gorgon's Fist's
                 # "single unarmed melee attack" that no full attack carries.
                 **{k: charge[k] for k in ("target_requires", "target_requires_not",
-                                          "target_said", "no_damage", "single_attack")
+                                          "target_said", "no_damage", "single_attack",
+                                          # feat loop b4: Disorienting Blow, Perfect Strike
+                                          "adds_duration", "roll_twice")
                    if charge.get(k)},
                 **({"push_ft": int(doc["charge_push_ft"])} if doc.get("charge_push_ft")
                    else {}),
@@ -39668,7 +39677,8 @@ class Engine:
             if not c:
                 continue
             if c.get("weapons") and key not in c["weapons"] \
-                    and not (ki_focus and "unarmed" in c["weapons"]):
+                    and not (ki_focus and "unarmed" in c["weapons"]) \
+                    and not strike_feats.monk_weapon_carries(actor, key, e):   # b4
                 continue
             if c.get("category") and category and c["category"] != category:
                 continue
@@ -39800,8 +39810,17 @@ class Engine:
                 out.extend(self._charge_on_fail(defender, e, c["on_fail"], line))
                 if not c.get("condition"):
                     continue
-            defender.add_condition(str(c["condition"]), int(rounds) if rounds else None,
-                                   source=e.name, origin=e.origin)
+            # `adds_duration` (feat loop b4, Disorienting Blow): a running copy from the
+            # same document is lengthened, never replaced.
+            running = next((x for x in defender.effects if c.get("adds_duration")
+                            and x.origin == e.origin and x.key == c["condition"]
+                            and x.rounds_left is not None and rounds), None)
+            if running is not None:
+                running.rounds_left += int(rounds)
+                rounds = running.rounds_left
+            else:
+                defender.add_condition(str(c["condition"]), int(rounds) if rounds else None,
+                                       source=e.name, origin=e.origin)
             out.append({"effect": {"ref": defender.ref, "kind": "condition",
                                    "condition": c["condition"], "rounds": rounds,
                                    "from": e.name, "origin": e.origin,

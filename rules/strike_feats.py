@@ -576,12 +576,15 @@ def target_refusal(engine, actor, defender, params) -> str:
 # (Bullseye Shot, Faiths of Purity). Its terms are its own modifiers, scoped by `vs` the
 # way aid another's are; the roll they ride removes it.
 NEXT_ATTACK = "next_attack"
+NEXT_RANGED = "next-attack.ranged"           # a class-ability `self` effect's own tag
 
 
 def _spend_next(actor, weapon: dict, defender) -> None:
     cat = "ranged" if weapon.get("category") == "ranged" else "melee"
 
     def spent(e) -> bool:
+        if cat == "ranged" and NEXT_RANGED in (e.tags or ()):      # Bullseye Shot's use
+            return True
         want = (e.payload or {}).get(NEXT_ATTACK)
         if not isinstance(want, dict):
             return False
@@ -867,3 +870,94 @@ def _cockatrice(engine, actor, defender, state) -> list[dict]:
                         "save": roll.total, "dc": dc, "origin": origin},
              "tell": f"{defender.name} turns to stone where the blow struck (Fortitude "
                      f"{roll.total} against {dc}, Cockatrice Strike)."}]
+
+
+# --- the monk's strike feats -------------------------------------------------------------
+# Cornugon Stun (Cheliax): "You may use Stunning Fist when making melee attacks with special
+# monk weapons as well as when making unarmed attacks." The Stunning Fist charge armed for
+# the fist is spent through a weapon with the `monk` trait too.
+MONK_WEAPON_STUN = "charge.stunning-fist.monk-weapons"
+STUNNING_PIN = "grapple.pin.stunning-fist"
+
+
+def monk_weapon_carries(actor, key: str, e) -> bool:
+    if not actor.has_state(MONK_WEAPON_STUN) or not str(e.origin or "").endswith(
+            "/stunning fist"):
+        return False
+    from . import weapons as weapons_mod
+
+    k = str(weapons_mod.key_for(key) or key)
+    return weapons_mod.has(k) and weapons_mod.has_trait(k, "monk") \
+        and weapons_mod.get(k).get("category") != "ranged"
+
+
+def perfect_strike(engine, actor, weapon_key, weapon, atk, mods, state):
+    """Perfect Strike (APG): "You can roll your attack roll twice and take the higher
+    result. If one of these rolls is a critical threat, the other roll is used as your
+    confirmation roll (your choice if they are both critical threats)." The charge armed
+    by the feat's use (`charge.roll_twice`) on a kama, nunchaku, quarterstaff, sai or
+    siangham; the second die is the engine's, shown in the tell. Both threats: the higher
+    attacks and the other confirms - the choice that keeps the better hit."""
+    if "perfect" in state or not any(
+            (e.payload or {}).get("charge", {}).get("roll_twice")
+            for e in engine._charges_for(actor, weapon_key, weapon)):
+        return atk
+    other = engine.dice.roll("1d20", mods, label=f"Attack with {weapon['name']} "
+                             f"(Perfect Strike, second die)", visibility="player")
+    state["rolls"].append(other.as_dict())
+    low = int(weapon.get("crit_range") or 20)
+    a_threat, b_threat = (atk.natural or 0) >= low, (other.natural or 0) >= low
+    if a_threat or b_threat:
+        keep, spare = (atk, other) if (a_threat and (not b_threat or atk.total >= other.total)) \
+            else (other, atk)
+        state["perfect"] = {"confirm_face": int(spare.natural or 1)}
+    else:
+        keep = atk if atk.total >= other.total else other
+        state["perfect"] = {}
+    state["tells"].append(f"{actor.name} strikes with perfect intent: two dice, "
+                          f"{atk.total} and {other.total}, and the {keep.total} stands "
+                          f"(Perfect Strike).")
+    return keep
+
+
+def kept_confirm(engine, mods, weapon, state):
+    """The confirmation Perfect Strike's other die already is, or None to roll one."""
+    face = (state.get("perfect") or {}).get("confirm_face")
+    if not face:
+        return None
+    state["perfect"]["confirm_face"] = None
+    return engine.dice.given(int(face), mods, f"Confirm critical ({weapon['name']}, "
+                                               f"Perfect Strike's other die)")
+
+
+def stunning_pin(engine, actor, defender) -> list[dict]:
+    """Stunning Pin (UC): "Whenever you pin an opponent, you can spend a swift action to
+    make a Stunning Fist attempt against that opponent." Taken when a use and the swift
+    action are left: the bearer's own Stunning Fist document, armed and delivered on the
+    pinned foe by the charge's one door (`Engine._deliver_charges`)."""
+    if not actor.has_state(STUNNING_PIN):
+        return []
+    from . import class_abilities as ca
+
+    doc, _ = ca.find(actor, "stunning fist")
+    if not doc or not doc.get("charge"):
+        return []
+    ca.ensure_pool(actor, doc)
+    pool = actor.pool("stunning fist")
+    if pool is None or pool.current < 1:
+        return []
+    if engine._spend_swift(actor, False, "Stunning Pin") is not None:
+        return []
+    rdoc, _ = ca.resolved(actor, doc, "")
+    actor.spend_pool("stunning fist", 1)
+    actor.apply_effect(ActiveEffect(
+        name=str(doc.get("name") or "Stunning Fist"), kind="buff", key="stunning pin",
+        source="Stunning Pin", origin=ca.origin_of(doc), duration="rounds", rounds_left=1,
+        tags=("buff.charged",),
+        payload={"charge": engine._resolve_charge(actor, rdoc, rdoc["charge"])}))
+    out = [{"effect": {"ref": actor.ref, "kind": "resource", "pool": "stunning fist",
+                       "spent": 1, "left": pool.current, "origin": "rule:feat-stunning-pin"},
+            "tell": f"{actor.name} drives a stunning blow into the pinned {defender.name} "
+                    f"(Stunning Pin)."}]
+    return out + engine._deliver_charges(actor, defender, "unarmed",
+                                         weapon=actor.weapon("unarmed"))

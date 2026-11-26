@@ -684,3 +684,144 @@ def test_cockatrice_strike_is_refused_against_a_foe_on_guard():
     with pytest.raises(IntentError, match="stunned or unconscious"):
         engine.validate([{"op": "attack", "actor": "pc", "target": "c1",
                           "params": {"weapon": "unarmed", "cockatrice_strike": True}}])
+
+
+# --- the monk's strike feats ------------------------------------------------------------
+
+def _use(engine, name, to=None, actor="pc"):
+    raw = {"op": "use_ability", "actor": actor, "because": "test",
+           "params": {"ability": name}}
+    if to:
+        raw["params"]["to"] = to
+    return _settle(engine, engine.run(engine.validate([raw]))).outcomes[-1]
+
+
+def _monk(feats, level=8, **kw):
+    scene, engine, pc, thug = _fight(feats=feats, cls="monk", level=level, **kw)
+    pc.shield = "none"
+    pc.equipped = ""
+    thug.hp = thug.hp_max = 400
+    return scene, engine, pc, thug
+
+
+def test_elemental_fist_adds_a_d6_of_the_chosen_energy_once_a_round():
+    """Elemental Fist (APG): declared before the roll, the unarmed hit adds 1d6 of acid,
+    cold, electricity or fire; a monk has his level in uses a day, no more than once a
+    round."""
+    scene, engine, pc, thug = _monk(["Improved Unarmed Strike", "Elemental Fist"],
+                                    faces={"Attack with": 18, "Damage": 2,
+                                           "Elemental Fist": 4})
+    used = _use(engine, "elemental fist (cold)")
+    assert used.status == "resolved", used.tell
+    assert pc.pool("elemental fist").current == 7
+    again = _use(engine, "elemental fist (cold)")
+    assert again.status != "resolved"                        # once a round
+    res = _attack(engine, weapon="unarmed")
+    cold = [e for o in res.outcomes for e in o.effects
+            if e.get("kind") == "damage" and e.get("type") == "cold"]
+    assert cold and cold[0]["amount"] == 4, _tells(res)
+
+
+def test_perfect_strike_keeps_the_better_of_two_dice_and_the_twin_confirms_a_threat():
+    """Perfect Strike (APG): two attack dice, the higher kept; a threat on one has the
+    other for its confirmation - no third die. With a quarterstaff, not the fist."""
+    scene, engine, pc, thug = _monk(["Improved Unarmed Strike", "Perfect Strike"],
+                                    faces={"Attack with quarterstaff (Perfect": 20,
+                                           "Attack with": 3, "Damage": 1})
+    pc.weapons = list(pc.weapons) + ["quarterstaff"]
+    pc.equipped = "quarterstaff"
+    assert _use(engine, "perfect strike").status == "resolved"
+    res = _attack(engine, weapon="quarterstaff")
+    attack = _rolls(res, "Attack with")
+    assert len(attack) == 2 and "Perfect Strike" in _tells(res)
+    confirm = _rolls(res, "Confirm")
+    assert len(confirm) == 1 and confirm[0]["natural"] == 3
+    assert "hits" in _tells(res)
+
+
+def test_disorienting_blow_confuses_and_each_blow_adds_a_round():
+    """Disorienting Blow (Dragon Empires Primer): a Stunning Fist use that confuses for a
+    round on a failed Fortitude save; another adds to the confusion's duration."""
+    scene, engine, pc, thug = _monk(["Improved Unarmed Strike", "Stunning Fist",
+                                     "Disorienting Blow"],
+                                    level=12, faces={"Attack with": 18, "Damage": 1,
+                                                     "Fortitude": 2})
+    left = None
+    for want in (1, 2):
+        assert _use(engine, "disorienting blow", to="c1").status == "resolved"
+        scene.swung = {}
+        _attack(engine, weapon="unarmed")
+        got = _cond(thug, "confused")
+        assert got is not None and got.rounds_left == want
+        left = pc.pool("stunning fist").current
+    assert left == 12 - 2
+
+
+def test_stunning_fist_adept_adds_one_to_the_dc_but_not_beside_mantis_style():
+    """Stunning Fist Adept (Dragon Empires Primer): +1 to the Stunning Fist DC; "does not
+    stack with feats that grant you bonuses to the DC ... such as Mantis Style"."""
+    from rules.activeeffect import ActiveEffect
+
+    scene, engine, pc, thug = _monk(["Improved Unarmed Strike", "Stunning Fist",
+                                     "Stunning Fist Adept"])
+    plain = sum(m.value for m in pc._buff_mods("combat_mod", "stunning-fist.dc"))
+    assert plain == 1
+    pc.feats.append("Mantis Style")
+    pc.apply_effect(ActiveEffect(name="Mantis Style", kind="buff", key="mantis style",
+                                 tags=("style.mantis-style",)))
+    assert sum(m.value for m in pc._buff_mods("combat_mod", "stunning-fist.dc")) == 2
+
+
+def test_cornugon_stun_carries_stunning_fist_through_a_monk_weapon():
+    """Cornugon Stun (Cheliax): Stunning Fist with special monk weapons as well as the
+    fist. A kama hit stuns; without the feat the charge waits for the fist."""
+    for feats, stunned in ((["Improved Unarmed Strike", "Stunning Fist"], False),
+                           (["Improved Unarmed Strike", "Stunning Fist", "Cornugon Stun"],
+                            True)):
+        scene, engine, pc, thug = _monk(feats, faces={"Attack with": 18, "Damage": 1,
+                                                      "Fortitude": 2})
+        pc.weapons = list(pc.weapons) + ["kama"]
+        pc.equipped = "kama"
+        assert _use(engine, "stunning fist", to="c1").status == "resolved"
+        _attack(engine, weapon="kama")
+        assert (_cond(thug, "stunned") is not None) is stunned
+
+
+def test_bullseye_shot_is_plus_four_on_the_next_ranged_attack_and_spent_by_it():
+    scene, engine, pc, thug = _fight(feats=["Point-Blank Shot", "Precise Shot",
+                                            "Bullseye Shot"], level=5,
+                                     at=((2, 10), (8, 10)), faces={"Attack with": 10})
+    thug.hp = thug.hp_max = 400
+    pc.shield = "none"
+    pc.equipped = "shortbow"
+    assert _use(engine, "bullseye shot").status == "resolved"
+    first = _rolls(_attack(engine, weapon="shortbow"), "Attack with")[0]
+    assert _named(first, "Bullseye Shot") == 4
+    scene.swung = {}
+    second = _rolls(_attack(engine, weapon="shortbow"), "Attack with")[0]
+    assert _named(second, "Bullseye Shot") == 0
+
+
+def test_stunning_pin_spends_a_swift_stunning_fist_on_the_foe_just_pinned():
+    """Stunning Pin (UC): "Whenever you pin an opponent, you can spend a swift action to
+    make a Stunning Fist attempt against that opponent." The pin, then Fortitude or
+    stunned, a use of Stunning Fist gone."""
+    from rules.engine import _held_by
+
+    scene, engine, pc, thug = _monk(["Improved Unarmed Strike", "Improved Grapple",
+                                     "Stunning Fist", "Stunning Pin"],
+                                    faces={"Combat manoeuvre": 19, "grapple": 19,
+                                           "Fortitude": 2}, at=((6, 10), (7, 10)))
+    pc.add_condition("grappled", source="test")
+    thug.add_condition("grappled", source="test")
+    _held_by(thug, "grappled", "pc", grappler="pc")
+    _held_by(pc, "grappled", "c1", grappler="pc")
+    from rules import class_abilities as ca
+
+    ca.ensure_pool(pc, ca.find(pc, "stunning fist")[0])
+    before = pc.pool("stunning fist").current
+    res = _attack(engine, manoeuvre="grapple", pin=True)
+    assert thug.has_state("state.held.pinned"), _tells(res)
+    assert _cond(thug, "stunned") is not None, _tells(res)
+    assert pc.pool("stunning fist").current == before - 1
+    assert "Stunning Pin" in _tells(res)

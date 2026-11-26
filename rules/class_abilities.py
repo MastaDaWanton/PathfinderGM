@@ -1184,7 +1184,7 @@ def _shape_problems(at: str, doc: dict) -> list[str]:
     if charge.get("category") not in (None, "melee", "ranged"):
         out.append(f"{at}: charge.category is \"melee\" or \"ranged\".")
     if charge and not charge.get("save") and not charge.get("modifiers") \
-            and not charge.get("dice"):
+            and not charge.get("dice") and not charge.get("roll_twice"):
         out.append(f"{at}: a charge carries a `save` (and its condition), `modifiers` or "
                    f"`dice`; with none it arms nothing.")
     if charge.get("dice") is not None:

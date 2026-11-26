@@ -315,5 +315,83 @@
   },
   "cockatrice-strike": {
     "choice": "cockatrice_strike"
-  }
+  },
+  "stunning-fist-adept": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "stunning-fist.dc",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "not_state": "style.mantis-style"
+          }
+        },
+        "note": "Stunning Fist Adept: not with Mantis Style's bonus"
+      },
+      {
+        "type": "combat_mod",
+        "target": "disorienting-blow.dc",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "not_state": "style.mantis-style"
+          }
+        },
+        "note": "Stunning Fist Adept: not with Mantis Style's bonus"
+      },
+      {
+        "type": "combat_mod",
+        "target": "gorgon's-fist.dc",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "not_state": "style.mantis-style"
+          }
+        },
+        "note": "Stunning Fist Adept: not with Mantis Style's bonus"
+      },
+      {
+        "type": "combat_mod",
+        "target": "crushing-blow.dc",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "not_state": "style.mantis-style"
+          }
+        },
+        "note": "Stunning Fist Adept: not with Mantis Style's bonus"
+      },
+      {
+        "type": "combat_mod",
+        "target": "jawbreaker.dc",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "not_state": "style.mantis-style"
+          }
+        },
+        "note": "Stunning Fist Adept: not with Mantis Style's bonus"
+      }
+    ]
+  },
+  "cornugon-stun": {
+    "tags": [
+      "charge.stunning-fist.monk-weapons"
+    ]
+  },
+  "stunning-pin": {
+    "tags": [
+      "grapple.pin.stunning-fist"
+    ]
+  },
+  "elemental-fist": {},
+  "perfect-strike": {},
+  "disorienting-blow": {},
+  "bullseye-shot": {}
 }
