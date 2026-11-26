@@ -4723,6 +4723,10 @@ class Actor:
             mods = [m for m in mods if m.source != "Dex"] + [Modifier(-5, "Dex 0 (helpless)")]
             if against == "melee":
                 mods.append(Modifier(-4, "helpless, against melee"))
+        # Feat loop b4-maneuver: a rider's shield lent to the steed (Mounted Shield).
+        from . import maneuver_feats
+
+        mods.extend(maneuver_feats.lent_shield(self))
         return stack(mods)
 
     def _ac_context(self, against: str, attacker=None, opportunity: bool = False) -> dict:

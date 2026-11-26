@@ -590,3 +590,30 @@ def test_gory_finish_shakes_every_foe_who_saw_the_kill():
     assert thug.hp < 0
     assert scene.get("c2").has_state("state.fear.shaken"), _tells(res)
     assert scene.swift_spent.get("pc") == scene.round
+
+
+# --- Mounted Shield -------------------------------------------------------------------------
+
+def test_mounted_shield_lends_the_riders_shield_to_the_horses_ac_and_the_ride_check():
+    """Mounted Shield (APG): "add your base shield bonus (including the bonus from Shield
+    Focus but not including enhancement bonuses) to your mount's AC. In addition, you may
+    add this bonus when making a Ride check to negate a hit against your mount using the
+    Mounted Combat feat." Measured before: the horse's AC was its own with Borin's heavy
+    shield on his arm."""
+    from rules import bodyskills
+    from rules.sheet import situated
+    from tests.test_body_skills import _check as bcheck, _run as brun, _stable
+
+    scene, engine, pc, horse = _stable(faces={"Ride": 20}, fight=False)
+    pc.shield = "heavy wooden shield" if "heavy wooden shield" in __import__(
+        "rules.tables", fromlist=["SHIELDS"]).SHIELDS else "heavy steel shield"
+    brun(engine, bcheck(skill="ride", use="mount"))
+    assert bodyskills.mount_of(scene, pc) is horse
+    with situated(scene):
+        before = horse.ac()
+        pc.feats = list(pc.feats) + ["Mounted Combat", "Shield Focus", "Mounted Shield"]
+        lent = horse.ac() - before
+    assert lent == 2 + 1                                 # heavy shield +2, Shield Focus +1
+    from rules import maneuver_feats
+
+    assert sum(m.value for m in maneuver_feats.shield_on_ride(pc)) == 3

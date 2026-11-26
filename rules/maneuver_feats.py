@@ -766,3 +766,50 @@ def gory_finish(engine, actor, defender, choices, state) -> list[dict]:
              "tell": f"{defender.name} falls in a spray of blood, and {actor.name} rounds on "
                      f"the rest (Gory Finish)."}] + engine._free_demoralize(actor, foes,
                                                                           "Gory Finish")
+
+
+# --- Mounted Shield -------------------------------------------------------------------------
+
+MOUNTED_SHIELD = "mount.shield-shared"
+
+
+def shield_lent(rider) -> int:
+    """Mounted Shield (APG): "your base shield bonus (including the bonus from Shield
+    Focus but not including enhancement bonuses)". The shield's own row (`shield_stats`,
+    whose AC is the base and any material, never the magic layer's enhancement) and the
+    rider's feat terms that are a bonus for carrying a shield (`when.bearer.shield`, the
+    Shield Focus shape) — read off the documents, never by a feat's name."""
+    if not rider.has_state(MOUNTED_SHIELD) or str(rider.shield or "none").lower() == "none":
+        return 0
+    base = int(rider.shield_stats().get("ac") or 0)
+    focus = 0
+    for doc in _docs(rider):
+        for m in doc.get("modifiers") or ():
+            if m.get("type") == "combat_mod" and m.get("target") == "ac" \
+                    and ((m.get("when") or {}).get("bearer") or {}).get("shield") is True:
+                focus += int(m.get("amount") or 0)
+    return max(0, base + focus)
+
+
+def lent_shield(steed) -> list:
+    """The shield term a ridden steed's AC takes from its rider (Mounted Shield)."""
+    from . import bodyskills
+    from .dice import Modifier
+
+    scene = _scene()
+    if scene is None or not steed.has_state(bodyskills.RIDDEN):
+        return []
+    rider = bodyskills.rider_of(scene, steed)
+    if rider is None or bodyskills.mount_of(scene, rider) is not steed:
+        return []
+    n = shield_lent(rider)
+    return [Modifier(n, f"{rider.name}'s shield (Mounted Shield)", "shield")] if n else []
+
+
+def shield_on_ride(rider) -> list:
+    """"In addition, you may add this bonus when making a Ride check to negate a hit
+    against your mount using the Mounted Combat feat.\""""
+    from .dice import Modifier
+
+    n = shield_lent(rider)
+    return [Modifier(n, "shield (Mounted Shield)")] if n else []

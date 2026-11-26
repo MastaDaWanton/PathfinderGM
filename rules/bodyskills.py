@@ -1018,7 +1018,11 @@ def mounted_combat(engine, attacker, defender, atk, state) -> str:
                                             for e in rider.effects) else ""),
         source="feat:mounted-combat", origin="feat:mounted-combat", duration="rounds",
         rounds_left=1))
-    roll = _roll(engine, rider, _skill_mods(rider, "ride"), "Ride check (Mounted Combat)")
+    # Feat loop b4-maneuver: Mounted Shield's shield bonus on this Ride check too.
+    from . import maneuver_feats
+
+    roll = _roll(engine, rider, _skill_mods(rider, "ride") + maneuver_feats.shield_on_ride(rider),
+                 "Ride check (Mounted Combat)")
     state["rolls"].append(roll.as_dict())
     if roll.total > atk.total:
         return (f"{rider.name} turns {defender.name} from the blow (Mounted Combat: Ride "

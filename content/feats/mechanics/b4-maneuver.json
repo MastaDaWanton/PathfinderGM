@@ -163,5 +163,10 @@
   },
   "gory-finish": {
     "choice": "gory_finish"
+  },
+  "mounted-shield": {
+    "tags": [
+      "mount.shield-shared"
+    ]
   }
 }
