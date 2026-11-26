@@ -550,6 +550,35 @@
       },
       "tell": "{name} turns the smite from wounding {target} to overpowering them.",
       "before": "actions"
+    },
+    {
+      "key": "word of healing",
+      "name": "Word of Healing",
+      "feat": "word-of-healing",
+      "level": 1,
+      "source": "Word of Healing (UM): 'You may use your lay on hands to heal another creature at a range of 30 feet as a standard action that does not provoke an attack of opportunity. You must be able to speak and have a free hand to use this ability. The target heals half the amount they would have healed if you had touched them, but gains the benefits of your mercies as normal.' A use of lay on hands, so its mercies and the feats that ride it come along.",
+      "text": "Standard: lay on hands on another creature up to 30 ft away, for half the healing, mercies as normal.",
+      "action": "standard",
+      "runs": "lay on hands",
+      "overlay": {
+        "aim": "ally",
+        "range_ft": 30,
+        "undead": null,
+        "target_requires_not": [
+          "type.undead"
+        ],
+        "requires_not": [
+          "state.silenced"
+        ],
+        "hands_free": 1,
+        "roll": {
+          "count": "floor(level / 2)",
+          "die": 6,
+          "as": "heal",
+          "halve": true
+        }
+      },
+      "tell": "{name} speaks a word of healing."
     }
   ]
 }

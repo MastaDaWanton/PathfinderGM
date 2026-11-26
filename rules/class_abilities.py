@@ -335,7 +335,7 @@ DOC_KEYS = frozenset({
     "target_requires_said", "tell", "tell_off", "text", "toggle", "undead",
     "undead_only", "charge_condition", "charge_rounds", "charge_rounds_dice", "feat",
     "charge_push_ft", "gaze", "light", "runs", "eases", "hands_free",
-    "target_requires_not", "marked_by", "before"})
+    "target_requires_not", "marked_by", "before", "overlay"})
 SELF_KEYS = frozenset({"ends_when", "forbids", "modifiers", "natural_weapons", "rounds",
                        "strikes_as", "tags", "vs_target", "forgoes"})
 EFFECT_KEYS = frozenset({"condition", "modifiers", "on", "rounds", "skill_modifiers",
@@ -814,7 +814,9 @@ def resolved(actor, doc: dict, choice: str) -> tuple[dict, str]:
             return doc, wrong.replace(str(base.get("name")), str(doc.get("name")))
         own = {k: doc[k] for k in ("key", "name", "class", "feat", "action", "cost",
                                    "tell", "source", "text", "not_yet") if k in doc}
-        out = {**laid, **own, "picked": laid.get("picked")}
+        # `overlay`: what this way of using it changes (Word of Healing's range, half
+        # the healing, the voice and the free hand it needs).
+        out = {**laid, **(doc.get("overlay") or {}), **own, "picked": laid.get("picked")}
         out.pop("self_action", None)
         return with_cost(actor, out), ""
     laid, wrong = with_choice(actor, doc, choice)

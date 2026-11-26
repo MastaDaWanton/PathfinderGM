@@ -28,8 +28,10 @@ def _pc(cls: str = "cleric", level: int = 8, feats=(), **extra):
     return pc
 
 
-def _fight(pc, *foes, allies=(), seed=11):
+def _fight(pc, *foes, allies=(), seed=11, at=None):
     scene = Scene()
+    if at:
+        scene.at = at
     scene.add(pc)
     for a in allies:
         scene.add(a)
@@ -355,14 +357,15 @@ def test_word_of_healing_heals_half_at_thirty_feet_and_needs_the_feat():
     pc = _pc("paladin", feats=["Word of Healing"])
     ally = _ally_hurt(30)
     scene, e = _fight(pc, "thug", allies=[ally])
-    out = _use(e, "Lay on Hands (word of healing)", to="ally")
+    before = _left(pc, "lay on hands")
+    out = _use(e, "Word of Healing", to="ally")
     assert out.status != "refused", out.tell
     assert "Half of it carries" in out.tell
-    plain = _pc("paladin")
-    assert "at range" not in ca.choices_of(plain, ca.find(plain, "lay on hands")[0])
+    assert _left(pc, "lay on hands") == before - 1
+    assert ca.find(_pc("paladin"), "word of healing")[0] is None
     zombie_pc = _pc("paladin", feats=["Word of Healing"])
     scene, e = _fight(zombie_pc, "zombie")
-    assert _use(e, "Lay on Hands (at range)", to="c1").status == "refused"
+    assert _use(e, "Word of Healing", to="c1").status == "refused"
 
 
 def test_word_of_healing_needs_a_voice():
@@ -370,7 +373,7 @@ def test_word_of_healing_needs_a_voice():
     ally = _ally_hurt()
     _s, e = _fight(pc, "thug", allies=[ally])
     pc.add_condition("choked", 2)
-    assert _use(e, "Lay on Hands (at range)", to="ally").status == "refused"
+    assert _use(e, "Word of Healing", to="ally").status == "refused"
 
 
 # --- Crusader's Fist, Radiant Charge --------------------------------------------------------
@@ -472,3 +475,156 @@ def test_greater_channel_smite_comes_before_the_turn_s_first_blow():
     _swing(e, face=1)
     out = _use(e, "Greater Channel Smite", to="c1")
     assert out.status == "refused" and "before any attack" in out.tell
+
+
+# --- bardic performance: Lingering Performance, the Singers, Harmonic Sage, Discordant
+# --- Voice, Ensemble -----------------------------------------------------------------------
+
+def _attack_bonus(who):
+    return sum(m.value for m in who.attack_modifiers())
+
+
+def test_lingering_performance_keeps_inspire_courage_two_rounds_after_it_ends():
+    """Lingering Performance (APG): 'continue for 2 rounds after you cease performing';
+    without the feat the bonus leaves with the song."""
+    for feats, rounds in ((["Lingering Performance"], 2), ([], 0)):
+        pc = _pc("bard", feats=feats)
+        ally = _ally_hurt(0)
+        _s, e = _fight(pc, "thug", allies=[ally])
+        base = _attack_bonus(ally)
+        _use(e, "Inspire Courage")
+        assert _attack_bonus(ally) == base + 2
+        _use(e, "Inspire Courage")                       # the song ends
+        assert _attack_bonus(ally) == base + (2 if rounds else 0)
+        ally.tick_effects(rounds)
+        assert _attack_bonus(ally) == base
+
+
+def test_a_new_performance_ends_the_lingering_one_at_once():
+    pc = _pc("bard", feats=["Lingering Performance"])
+    ally = _ally_hurt(0)
+    _s, e = _fight(pc, "thug", allies=[ally])
+    base = _attack_bonus(ally)
+    _use(e, "Inspire Courage")
+    _use(e, "Inspire Courage")
+    assert _attack_bonus(ally) == base + 2
+    _use(e, "Dirge of Doom")
+    assert _attack_bonus(ally) == base
+
+
+def test_leaf_singer_adds_two_to_fascinate_against_fey_and_doubles_range_in_a_forest():
+    pc = _pc("bard", feats=["Leaf Singer"])
+    pc.abilities["cha"] = 10
+    scene, e = _fight(pc, "nixie")
+    out = _use(e, "Fascinate", to="c1")
+    assert _kinds(out, "save")[0]["dc"] == 10 + 4 + 0 + 2
+    plain = _pc("bard")
+    plain.abilities["cha"] = 10
+    scene, e = _fight(plain, "nixie")
+    assert _kinds(_use(e, "Fascinate", to="c1"), "save")[0]["dc"] == 14
+    doc = ca.find(pc, "fascinate")[0]
+    pc.at = "5bbd0c40345f~forest:the-old-wood"
+    assert e._reach_times(pc, doc) == 2.0
+    pc.at = "5bbd0c40345f~urban:the-square"
+    assert e._reach_times(pc, doc) == 1.0
+
+
+def test_stone_singer_doubles_underground_and_adds_two_against_earth():
+    from rules.sheet import situated
+    pc = _pc("bard", feats=["Stone Singer"])
+    pc.abilities["cha"] = 10
+    scene, e = _fight(pc, "small-earth-elemental")
+    out = _use(e, "Fascinate", to="c1")
+    assert _kinds(out, "save")[0]["dc"] == 16
+    doc = ca.find(pc, "fascinate")[0]
+    deep = _pc("bard", feats=["Stone Singer"])
+    scene, e = _fight(deep, "thug", at="5bbd0c40345f~underground:the-old-mine")
+    with situated(scene):
+        assert e._reach_times(deep, doc) == 2.0
+
+
+def test_war_singer_doubles_on_a_battlefield_of_a_dozen():
+    pc = _pc("bard", feats=["War Singer"])
+    small, e = _fight(pc, "thug")
+    doc = ca.find(pc, "fascinate")[0]
+    assert e._reach_times(pc, doc) == 1.0
+    pc2 = _pc("bard", feats=["War Singer"])
+    big, e2 = _fight(pc2, *(["thug"] * 11))
+    assert e2._reach_times(pc2, doc) == 2.0
+    out = _use(e2, "Fascinate", to="c1")
+    assert out.status != "refused"
+
+
+def test_war_singer_adds_two_against_orcs():
+    pc = _pc("bard", feats=["War Singer"])
+    pc.abilities["cha"] = 10
+    _s, e = _fight(pc, "orc-sergeant")
+    assert _kinds(_use(e, "Fascinate", to="c1"), "save")[0]["dc"] == 16
+
+
+def test_harmonic_sage_harmonizes_a_performance_indoors():
+    """Harmonic Sage (UC): inside a building, a DC 15 Knowledge (engineering) check as
+    the performance begins; on a success Self-Harmonize lifts its DC by 1."""
+    pc = _pc("bard", level=12, feats=["Harmonic Sage"],
+             ranks={"knowledge (engineering)": 12})
+    pc.abilities["cha"] = 10
+    scene, e = _fight(pc, "thug", seed=5, at="town~urban:the-tavern")
+    out = _use(e, "Fascinate", to="c1")
+    assert "Self-Harmonize" in out.tell, out.tell
+    assert _kinds(out, "save")[0]["dc"] == 10 + 6 + 0 + 1
+    outside = _pc("bard", level=12, feats=["Harmonic Sage"],
+                  ranks={"knowledge (engineering)": 12})
+    scene, e = _fight(outside, "thug", seed=5, at="5bbd0c40345f~urban:the-square")
+    assert "Harmonic Sage" not in _use(e, "Fascinate", to="c1").tell
+
+
+def test_harmonic_sage_reverberates_a_performance_without_a_save():
+    pc = _pc("bard", level=12, feats=["Harmonic Sage"],
+             ranks={"knowledge (engineering)": 12})
+    ally = _ally_hurt(0)
+    scene, e = _fight(pc, "thug", allies=[ally], at="town~urban:the-tavern")
+    base = _attack_bonus(ally)
+    out = _use(e, "Inspire Courage")
+    assert "Reverberation" in out.tell, out.tell
+    sung = _attack_bonus(ally)
+    assert sung > base
+    _use(e, "Inspire Courage")
+    assert _attack_bonus(ally) == sung
+    ally.tick_effects(1)
+    assert _attack_bonus(ally) == base
+
+
+def test_discordant_voice_lends_allies_a_d6_of_sonic_while_the_bard_performs():
+    """Discordant Voice (UC): allies within 30 ft of a performing bard deal +1d6 sonic on
+    weapon hits — rolled apart, so a critical does not multiply it. Silent bard, none."""
+    from tests._board import face_to_face
+    bard = _pc("bard", feats=["Discordant Voice"])
+    bard.ref, bard.kind = "bard", "npc"
+    pc = _pc("fighter")
+    scene, e = _fight(pc, "ogre", allies=[bard])
+    face_to_face(scene, "pc", "c1")
+    assert "discordant voice" not in _tells(_swing(e, face=19))
+    _use(e, "Inspire Courage", actor="bard")
+    assert "discordant voice adds" in _tells(_swing(e, face=19))
+
+
+def test_ensemble_brings_an_ally_s_aid_to_a_perform_check():
+    """Ensemble (UM): an ally within 20 feet with the feat aids the Perform check (+2 on
+    their 10); a bard may count one ally as having it."""
+    pc = _pc("fighter", feats=["Ensemble"])
+    ally = load_pc("fixtures/pc-borin.json")
+    ally.ref, ally.kind = "ally", "npc"
+    ally.feats = list(ally.feats) + ["Ensemble"]
+    scene, e = _fight(pc, "thug", allies=[ally], seed=2)
+    from rules.engine import Intent
+    got = e._ensemble_aid(pc, "perform")
+    assert len(got) <= 1
+    assert all("Ensemble" in m.source for m in got)
+    total = sum(len(e._ensemble_aid(pc, "perform")) for _ in range(20))
+    assert total > 0
+    alone = _pc("fighter", feats=["Ensemble"])
+    scene, e = _fight(alone, "thug", allies=[_ally_hurt(0)])
+    assert e._ensemble_aid(alone, "perform") == []
+    bard = _pc("bard", feats=["Ensemble"])
+    scene, e = _fight(bard, "thug", allies=[_ally_hurt(0)], seed=2)
+    assert sum(len(e._ensemble_aid(bard, "perform")) for _ in range(20)) > 0

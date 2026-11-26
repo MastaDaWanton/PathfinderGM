@@ -50,17 +50,121 @@
       "lay-on-hands.reward-of-life"
     ]
   },
-  "word-of-healing": {
-    "tags": [
-      "lay-on-hands.word-of-healing"
-    ]
-  },
+  "word-of-healing": {},
   "crusader-s-fist": {},
   "radiant-charge": {},
   "adept-champion": {},
   "fearless-aura": {
     "tags": [
       "aura.fearless"
+    ]
+  },
+  "lingering-performance": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "bardic-performance.linger",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "note": "APG: 'continue for 2 rounds after you cease performing'"
+      }
+    ]
+  },
+  "leaf-singer": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "bardic-performance.range",
+        "amount": 100,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "terrain": "forest"
+          }
+        },
+        "note": "APG: 'in a forest, the range or area of your chosen performance is doubled'"
+      },
+      {
+        "type": "combat_mod",
+        "target": "bardic-performance.dc",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "target": {
+            "type": "fey"
+          }
+        },
+        "note": "APG: '+2 for creatures of the fey type'"
+      }
+    ]
+  },
+  "stone-singer": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "bardic-performance.range",
+        "amount": 100,
+        "bonus_type": "untyped",
+        "when": {
+          "underground": true
+        },
+        "note": "APG: 'underground, the range or area of your chosen performance is doubled'"
+      },
+      {
+        "type": "combat_mod",
+        "target": "bardic-performance.dc",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "target": {
+            "subtype": "earth"
+          }
+        },
+        "note": "APG: '+2 for creatures of the earth subtype'"
+      }
+    ]
+  },
+  "war-singer": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "bardic-performance.range",
+        "amount": 100,
+        "bonus_type": "untyped",
+        "when": {
+          "combatants": {
+            "gte": 12
+          }
+        },
+        "note": "APG: 'on a battlefield (any area where a combat involving a dozen or more combatants is taking place)'"
+      },
+      {
+        "type": "combat_mod",
+        "target": "bardic-performance.dc",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "target": {
+            "subtype": "orc"
+          }
+        },
+        "note": "APG: '+2 for creatures of the orc subtype'"
+      }
+    ]
+  },
+  "harmonic-sage": {
+    "tags": [
+      "performance.harmonic-sage"
+    ]
+  },
+  "discordant-voice": {
+    "tags": [
+      "performance.discordant-voice"
+    ]
+  },
+  "ensemble": {
+    "tags": [
+      "teamwork.ensemble"
     ]
   }
 }
