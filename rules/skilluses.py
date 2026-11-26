@@ -1331,9 +1331,9 @@ def _arcane_vendetta(engine, out, caster, spell, knowers) -> None:
                                      duration="rounds", rounds_left=5, tags=(VENDETTA,)))
     out.tell = (f"{out.tell} {' and '.join(p.name for p in sworn)} marks {caster.name} "
                 f"for Arcane Vendetta: weapon blows at them deal 2 more for 5 rounds.")
-    out.effects = list(out.effects or ()) + [{"kind": "mark", "ref": caster.ref,
-                                              "tag": VENDETTA, "rounds": 5,
-                                              "origin": "feat:arcane-vendetta"}]
+    out.effects += [{"kind": "mark", "ref": caster.ref, "tag": VENDETTA, "rounds": 5,
+                     "origin": "feat:arcane-vendetta"}]
+
 
 
 # --- Perform ----------------------------------------------------------------------------------

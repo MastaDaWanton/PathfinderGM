@@ -50,7 +50,7 @@
       }
     ],
     "not_yet": [
-      "one step more familiar when teleporting to an established Pathfinder lodge: a World Bible world has no Pathfinder lodges, and teleport's familiarity is not modelled",
+      "one step more familiar when teleporting to an established lodge of the book's own setting: a World Bible world has no such lodges, and teleport's familiarity is not modelled",
       "a supernatural teleport's distance at class level + 2: no player class teleports as a supernatural ability"
     ]
   },
@@ -446,6 +446,12 @@
     ],
     "not_yet": [
       "the +2 to counter that spell and the +4 on a counterspeller's Spellcraft DC against yours: counterspelling is not built (there is no readied action to counter with)"
+    ]
+  },
+  "racial-heritage": {
+    "tags": [
+      "race.$target",
+      "subtype.$target"
     ]
   }
 }

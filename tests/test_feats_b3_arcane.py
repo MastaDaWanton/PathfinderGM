@@ -574,3 +574,21 @@ def test_spell_bluff_identifies_a_known_spell_two_better():
     assert _sum(pc.skill_modifiers("spellcraft", ctx=known), "Spell Bluff") == 2
     assert _sum(pc.skill_modifiers("spellcraft", ctx=unknown), "Spell Bluff") == 0
     assert _sum(pc.skill_modifiers("spellcraft"), "Spell Bluff") == 0
+
+
+# --- Racial Heritage --------------------------------------------------------------------------
+
+def test_racial_heritage_counts_a_human_as_the_chosen_race_too():
+    """APG: "You count as both human and that race for any effects related to race. For
+    example, if you choose dwarf, you are considered both a human and a dwarf for the
+    purpose of taking traits, feats, how spells and magic items affect you". A human with
+    Racial Heritage (dwarf) holds `race.dwarf` (so a dwarf-only feat's prerequisite is met)
+    and `subtype.dwarf` (so "+2 against dwarves" finds her), and stays human."""
+    from rules.sheet import _is_of_kind
+
+    pc = _wren(["Racial Heritage (dwarf)"], race="human")
+    assert pc.has_state("race.dwarf") and pc.has_state("race.human")
+    assert _is_of_kind(pc, "subtype", "dwarf")
+    assert feats.meets(pc, "shatterspell")["unmet"] != [] and "Dwarf" not in \
+        feats.meets(pc, "shatterspell")["unmet"]
+    assert not _wren([], race="human").has_state("race.dwarf")

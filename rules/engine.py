@@ -8335,7 +8335,7 @@ class Engine:
             tags=(casting.echo_tag(spell.id), "recovery.rest")))
         out.tell = (f"{out.tell} {spell.name} echoes in {caster.name}'s memory: it can be "
                     f"cast once more today without a slot.").strip()
-        out.effects = list(out.effects or ()) + [
+        out.effects += [
             {"kind": "echo", "ref": caster.ref, "spell": spell.id,
              "origin": "feat:echoing-spell"}]
 
@@ -8389,7 +8389,7 @@ class Engine:
         name = str(power.get("name") or pid)
         out.tell = (f"{out.tell} {caster.name} draws on the kill (Sorcerous Bloodstrike): "
                     f"one use of {name} comes back.").strip()
-        out.effects = list(out.effects or ()) + [
+        out.effects += [
             {"kind": "resource", "ref": caster.ref, "pool": pid, "regained": 1,
              "origin": "feat:sorcerous-bloodstrike"}]
 
