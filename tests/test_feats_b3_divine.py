@@ -689,3 +689,63 @@ def test_bewildering_koan_damage_mode_is_two_against_that_foe_for_a_round():
     ctx = pc._roll_context(None, defender=scene.actors["c1"])
     got = sum(m.value for m in pc._buff_mods("combat_mod", "damage", ctx))
     assert got == (2 if _kinds(out, "contest")[0]["won"] else 0)
+
+
+# --- Blood Vengeance (both) ------------------------------------------------------------------
+
+def _drop(e, who):
+    e._apply_damage(who, who.hp + 3, "untyped")
+
+
+def test_blood_vengeance_waits_for_a_fallen_ally_then_rages_lesser_for_four_rounds():
+    """Blood Vengeance (ARG): an ally of at least your Hit Dice falls; next turn, a free
+    lesser rage: +2 morale Str and Con, the rage's -2 AC; 4 rounds; fatigued after."""
+    pc = _pc("fighter", level=1, feats=["Blood Vengeance"])
+    ally = _ally_hurt(0)
+    scene, e = _fight(pc, "thug", allies=[ally])
+    assert _use(e, "Blood Vengeance").status == "refused"
+    _drop(e, ally)
+    assert pc.has_state("buff.vengeance-owed")
+    from rules.dice import stack
+    out = _use(e, "Blood Vengeance")
+    assert out.status != "refused", out.tell
+    assert pc.has_state("buff.stance.vengeance")
+    assert sum(m.value for m in stack(pc._buff_mods("ability_mod", "str"))) == 2
+    for _ in range(5):
+        e.scene._drain_periodic(pc)
+    assert not pc.has_state("buff.stance.vengeance")
+    assert pc.has_condition("fatigued")
+
+
+def test_a_second_fall_adds_four_rounds_to_the_vengeance():
+    pc = _pc("fighter", level=1, feats=["Blood Vengeance"])
+    a1, a2 = _ally_hurt(0), _ally_hurt(0)
+    a2.ref = "ally2"
+    scene, e = _fight(pc, "thug", allies=[a1, a2])
+    _drop(e, a1)
+    _use(e, "Blood Vengeance")
+    left = _left(pc, "blood vengeance")
+    _drop(e, a2)
+    assert _left(pc, "blood vengeance") == left + 4
+
+
+def test_a_lesser_ally_s_fall_does_not_wake_it():
+    pc = _pc("fighter", level=8, feats=["Blood Vengeance"])
+    ally = _ally_hurt(0)                               # level 1: fewer Hit Dice
+    scene, e = _fight(pc, "thug", allies=[ally])
+    _drop(e, ally)
+    assert not pc.has_state("buff.vengeance-owed")
+
+
+def test_blood_vengeance_on_a_raging_barbarian_lifts_the_rage_by_two():
+    pc = _pc("barbarian", level=1, feats=["Blood Vengeance"])
+    ally = _ally_hurt(0)
+    scene, e = _fight(pc, "thug", allies=[ally])
+    _use(e, "Rage")
+    from rules.dice import stack
+    raging = sum(m.value for m in stack(pc._buff_mods("ability_mod", "str")))
+    _drop(e, ally)
+    assert _use(e, "Blood Vengeance").status == "refused"        # the lesser one
+    out = _use(e, "Blood Vengeance (raging)")
+    assert out.status != "refused", out.tell
+    assert sum(m.value for m in stack(pc._buff_mods("ability_mod", "str"))) == raging + 2

@@ -177,5 +177,20 @@
       "maneuver.sunder.regains"
     ]
   },
-  "bewildering-koan": {}
+  "bewildering-koan": {},
+  "blood-vengeance": {
+    "tags": [
+      "vengeance.ally-falls"
+    ]
+  },
+  "blood-vengeance-orcs": {
+    "tags": [
+      "vengeance.ally-falls"
+    ]
+  },
+  "domain-strike": {
+    "not_yet": [
+      "Delivering the chosen domain power through a successful unarmed strike as a swift action: no use of a domain power rides a blow yet, so the feat does nothing."
+    ]
+  }
 }

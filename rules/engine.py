@@ -38425,6 +38425,45 @@ class Engine:
             return (f"{name} does not work on {other.name} ({bars[0]}). Nothing is spent.")
         return ""
 
+    # Blood Vengeance (ARG; Orcs of Golarion): "Whenever one of your allies is reduced to
+    # negative hit points or killed, you may enter a state similar to but less powerful
+    # than a barbarian's rage as a free action on your next turn ... if another ally falls
+    # before this duration ends, the weaker rage lasts for an additional 4 rounds ... You
+    # may only use this feat if the fallen ally had at least as many Hit Dice as you
+    # (excluding conjured or summoned allies)." The fall is read at the one damage door
+    # (`_apply_damage`); what it leaves is an effect through the applicator, never a flag.
+    AVENGES: ClassVar[str] = "vengeance.ally-falls"
+    OWED: ClassVar[str] = "buff.vengeance-owed"
+    AVENGING: ClassVar[str] = "buff.stance.vengeance"
+
+    def _ally_fell(self, fallen: Actor) -> None:
+        from . import class_abilities as ca
+
+        if any(getattr(h, "creature", "") == fallen.ref
+               for h in list(self.scene.manifests)):
+            return                                  # a summoned ally does not count
+        for other in list(self.scene.actors.values()):
+            if other is fallen or other.is_down or self._against(other, fallen) \
+                    or not other.has_state(self.AVENGES) \
+                    or ca.hit_dice_of(fallen) < ca.hit_dice_of(other):
+                continue
+            held = [e for e in other.effects if any(
+                states.matches(t, self.AVENGING) for t in e.tags)]
+            if held:
+                for e in held:
+                    if e.rounds_left is not None:
+                        e.rounds_left += 4
+                    for p in e.periodic or ():
+                        if p.get("spend_pool"):
+                            other.gain_pool(str(p["spend_pool"]), 4)
+                continue
+            other.remove_effects(match=lambda x: any(
+                states.matches(t, self.OWED) for t in x.tags))
+            other.apply_effect(ActiveEffect(
+                name="Vengeance owed", kind="buff", key="vengeance-owed",
+                source=f"{fallen.name} falling", origin="rule:feat/blood-vengeance",
+                duration="rounds", rounds_left=2, tags=(self.OWED,)))
+
     SUNDER_REGAINS: ClassVar[str] = "maneuver.sunder.regains"
 
     def _sunder_regains(self, actor: Actor, broke: bool, effects: list) -> list[str]:
@@ -42081,6 +42120,7 @@ class Engine:
         rest off it. Every caller of this has always read one effect back, and a blow that
         split in two must not silently become invisible to the ones that did not change.
         """
+        was_standing = target.hp >= 0
         landed = self._intercept(target, amount, dtype, traits, lethality)
         if not landed:
             return {"ref": target.ref, "kind": "damage", "amount": 0, "rolled": amount,
@@ -42090,6 +42130,8 @@ class Engine:
                     "nonlethal": target.nonlethal, "note": "stopped before it landed"}
 
         effects = [self._land(pk) for pk in landed]
+        if was_standing and target.hp < 0:
+            self._ally_fell(target)
         effects.sort(key=lambda e: e["amount"], reverse=True)
         head, rest = effects[0], effects[1:]
         if rest:

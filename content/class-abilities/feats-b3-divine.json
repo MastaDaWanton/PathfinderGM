@@ -640,6 +640,308 @@
         }
       },
       "tell": "{name} asks {target} a question with no answer."
+    },
+    {
+      "key": "blood vengeance",
+      "name": "Blood Vengeance",
+      "feat": "blood-vengeance",
+      "level": 1,
+      "source": "Blood Vengeance (ARG): 'Whenever one of your allies is reduced to negative hit points or killed, you may enter a state similar to but less powerful than a barbarian's rage as a free action on your next turn. If you have the rage class feature and are already raging, your morale bonuses to Strength and Constitution increase by +2 for the duration of your rage. If you do not have the rage class feature, or you have no more rage rounds left, this weaker rage gives you all the benefits and penalties of a barbarian's rage, except your morale bonus to Strength and Constitution is only +2. In either case, this state lasts for 4 rounds. As with a barbarian's rage, when this weaker rage ends, you are fatigued; if another ally falls before this duration ends, the weaker rage lasts for an additional 4 rounds. This feat does not allow you to enter a rage if you are fatigued. You may only use this feat if the fallen ally had at least as many Hit Dice as you (excluding conjured or summoned allies).'",
+      "text": "Free, the turn after an ally with at least your Hit Dice falls: a lesser rage for 4 rounds (+2 Str, Con and Will, -2 AC), or +2 more on a rage already burning.",
+      "action": "free",
+      "requires": [
+        "buff.vengeance-owed"
+      ],
+      "requires_said": "on your turn after an ally with at least your Hit Dice is brought below 0 hit points or killed",
+      "requires_not": [
+        "state.impaired.fatigued",
+        "state.impaired.exhausted",
+        "buff.stance.rage"
+      ],
+      "pool": {
+        "id": "blood vengeance",
+        "max": "4",
+        "refresh": "stance.end.blood vengeance",
+        "cap": "none"
+      },
+      "cost": {
+        "pool": "blood vengeance",
+        "amount": 1
+      },
+      "drain": {
+        "pool": "blood vengeance",
+        "amount": 1
+      },
+      "toggle": {
+        "key": "blood vengeance"
+      },
+      "self": {
+        "tags": [
+          "buff.stance.vengeance"
+        ],
+        "modifiers": [
+          {
+            "type": "ability_mod",
+            "target": "str",
+            "bonus_type": "morale",
+            "amount": 2
+          },
+          {
+            "type": "ability_mod",
+            "target": "con",
+            "bonus_type": "morale",
+            "amount": 2
+          },
+          {
+            "type": "save_mod",
+            "target": "will",
+            "bonus_type": "morale",
+            "amount": 2
+          },
+          {
+            "type": "combat_mod",
+            "target": "ac",
+            "bonus_type": "untyped",
+            "amount": -2
+          }
+        ],
+        "ends_when": {
+          "holder": [
+            "state.down"
+          ]
+        },
+        "forbids": {
+          "skills": {
+            "abilities": [
+              "cha",
+              "dex",
+              "int"
+            ],
+            "except": [
+              "acrobatics",
+              "fly",
+              "intimidate",
+              "ride"
+            ]
+          }
+        }
+      },
+      "after": {
+        "condition": "fatigued",
+        "rounds_per_spent": 2
+      },
+      "choice": {
+        "kind": "mode",
+        "default": "lesser rage",
+        "options": {
+          "lesser rage": {
+            "aliases": [
+              "weaker rage",
+              "fury"
+            ]
+          },
+          "raging": {
+            "requires": [
+              "buff.stance.rage"
+            ],
+            "aliases": [
+              "in my rage",
+              "feed my rage",
+              "stoke my rage"
+            ],
+            "requires_not": [
+              "state.impaired.fatigued",
+              "state.impaired.exhausted"
+            ],
+            "toggle": null,
+            "drain": null,
+            "cost": null,
+            "after": null,
+            "self": {
+              "rounds": 4,
+              "tags": [
+                "buff.stance.vengeance"
+              ],
+              "modifiers": [
+                {
+                  "type": "ability_mod",
+                  "target": "str",
+                  "bonus_type": "morale",
+                  "by_level": {
+                    "1": 6,
+                    "11": 8,
+                    "20": 10
+                  }
+                },
+                {
+                  "type": "ability_mod",
+                  "target": "con",
+                  "bonus_type": "morale",
+                  "by_level": {
+                    "1": 6,
+                    "11": 8,
+                    "20": 10
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_raging_note": "Already raging: 'your morale bonuses to Strength and Constitution increase by +2' — the rage's own ladder (+4, +6 at 11th, +8 at 20th) plus 2, as one morale term that outranks the rage's, for 4 rounds. Not raging (or out of rage rounds): the lesser rage, a stance of 4 rounds on its own pool, fatigued after as a rage leaves you (2 rounds a round). Another ally's fall adds 4 rounds to either (`Engine._ally_fell`).",
+      "tell": "{name}'s grief turns to fury.",
+      "tell_off": "{name}'s vengeance burns out."
+    },
+    {
+      "key": "blood vengeance",
+      "name": "Blood Vengeance",
+      "feat": "blood-vengeance-orcs",
+      "level": 1,
+      "source": "Blood Vengeance (Orcs of Golarion): the ARG text, with 'worthy allies' (at least as many Hit Dice as you) and 'as a free action on your turn'.",
+      "text": "Free, the turn after an ally with at least your Hit Dice falls: a lesser rage for 4 rounds (+2 Str, Con and Will, -2 AC), or +2 more on a rage already burning.",
+      "action": "free",
+      "requires": [
+        "buff.vengeance-owed"
+      ],
+      "requires_said": "on your turn after an ally with at least your Hit Dice is brought below 0 hit points or killed",
+      "requires_not": [
+        "state.impaired.fatigued",
+        "state.impaired.exhausted",
+        "buff.stance.rage"
+      ],
+      "pool": {
+        "id": "blood vengeance",
+        "max": "4",
+        "refresh": "stance.end.blood vengeance",
+        "cap": "none"
+      },
+      "cost": {
+        "pool": "blood vengeance",
+        "amount": 1
+      },
+      "drain": {
+        "pool": "blood vengeance",
+        "amount": 1
+      },
+      "toggle": {
+        "key": "blood vengeance"
+      },
+      "self": {
+        "tags": [
+          "buff.stance.vengeance"
+        ],
+        "modifiers": [
+          {
+            "type": "ability_mod",
+            "target": "str",
+            "bonus_type": "morale",
+            "amount": 2
+          },
+          {
+            "type": "ability_mod",
+            "target": "con",
+            "bonus_type": "morale",
+            "amount": 2
+          },
+          {
+            "type": "save_mod",
+            "target": "will",
+            "bonus_type": "morale",
+            "amount": 2
+          },
+          {
+            "type": "combat_mod",
+            "target": "ac",
+            "bonus_type": "untyped",
+            "amount": -2
+          }
+        ],
+        "ends_when": {
+          "holder": [
+            "state.down"
+          ]
+        },
+        "forbids": {
+          "skills": {
+            "abilities": [
+              "cha",
+              "dex",
+              "int"
+            ],
+            "except": [
+              "acrobatics",
+              "fly",
+              "intimidate",
+              "ride"
+            ]
+          }
+        }
+      },
+      "after": {
+        "condition": "fatigued",
+        "rounds_per_spent": 2
+      },
+      "choice": {
+        "kind": "mode",
+        "default": "lesser rage",
+        "options": {
+          "lesser rage": {
+            "aliases": [
+              "weaker rage",
+              "fury"
+            ]
+          },
+          "raging": {
+            "requires": [
+              "buff.stance.rage"
+            ],
+            "aliases": [
+              "in my rage",
+              "feed my rage",
+              "stoke my rage"
+            ],
+            "requires_not": [
+              "state.impaired.fatigued",
+              "state.impaired.exhausted"
+            ],
+            "toggle": null,
+            "drain": null,
+            "cost": null,
+            "after": null,
+            "self": {
+              "rounds": 4,
+              "tags": [
+                "buff.stance.vengeance"
+              ],
+              "modifiers": [
+                {
+                  "type": "ability_mod",
+                  "target": "str",
+                  "bonus_type": "morale",
+                  "by_level": {
+                    "1": 6,
+                    "11": 8,
+                    "20": 10
+                  }
+                },
+                {
+                  "type": "ability_mod",
+                  "target": "con",
+                  "bonus_type": "morale",
+                  "by_level": {
+                    "1": 6,
+                    "11": 8,
+                    "20": 10
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "_raging_note": "Already raging: 'your morale bonuses to Strength and Constitution increase by +2' — the rage's own ladder (+4, +6 at 11th, +8 at 20th) plus 2, as one morale term that outranks the rage's, for 4 rounds. Not raging (or out of rage rounds): the lesser rage, a stance of 4 rounds on its own pool, fatigued after as a rage leaves you (2 rounds a round). Another ally's fall adds 4 rounds to either (`Engine._ally_fell`).",
+      "tell": "{name}'s grief turns to fury.",
+      "tell_off": "{name}'s vengeance burns out."
     }
   ]
 }
