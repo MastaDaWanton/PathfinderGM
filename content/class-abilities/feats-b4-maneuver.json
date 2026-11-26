@@ -7,31 +7,82 @@
       "key": "bonebreaker",
       "name": "Bonebreaker",
       "feat": "bonebreaker",
-      "aliases": ["bonebreaker", "break a bone", "break bones"],
+      "aliases": [
+        "bonebreaker",
+        "break a bone",
+        "break bones"
+      ],
       "level": 1,
       "source": "Bonebreaker (UC): 'When you make a successful Stunning Fist attempt against an opponent that is grappled, helpless, or stunned, you can forgo any other Stunning Fist effect to deal 1d6 Strength or Dexterity damage to that opponent.' The attempt is a Stunning Fist use (Fortitude, DC 10 + 1/2 level + Wis; the creatures stunning fist cannot stun are spared).",
       "text": "Your next unarmed hit on a held, helpless or stunned foe spends a Stunning Fist: Fortitude save or 1d6 Strength or Dexterity damage.",
       "action": "free",
-      "pool": {"id": "stunning fist", "max": "max(level // 4, level_monk)", "refresh": "rest.night"},
-      "cost": {"pool": "stunning fist", "amount": 1},
+      "pool": {
+        "id": "stunning fist",
+        "max": "max(level // 4, level_monk)",
+        "refresh": "rest.night"
+      },
+      "cost": {
+        "pool": "stunning fist",
+        "amount": 1
+      },
       "aim": "foe",
       "charge": {
-        "weapons": ["unarmed", "unarmed strike"],
+        "weapons": [
+          "unarmed",
+          "unarmed strike"
+        ],
         "spent_on": "swing",
-        "target_requires": ["state.held.grappled", "state.held.pinned", "state.helpless", "state.unable.stunned"],
+        "target_requires": [
+          "state.held.grappled",
+          "state.held.pinned",
+          "state.helpless",
+          "state.unable.stunned"
+        ],
         "target_said": "a grappled, helpless or stunned foe",
-        "save": {"save": "fort", "dc": "10 + level // 2 + wis_mod"},
-        "immune_types": ["construct", "ooze", "plant", "undead"],
-        "immune_subtypes": ["incorporeal"],
+        "save": {
+          "save": "fort",
+          "dc": "10 + level // 2 + wis_mod"
+        },
+        "immune_types": [
+          "construct",
+          "ooze",
+          "plant",
+          "undead"
+        ],
+        "immune_subtypes": [
+          "incorporeal"
+        ],
         "immune_crit": true,
-        "on_fail": {"ability_damage": {"dice": "1d6"}}
+        "on_fail": {
+          "ability_damage": {
+            "dice": "1d6"
+          }
+        }
       },
       "choice": {
         "kind": "condition",
         "default": "strength",
         "options": {
-          "strength": {"charge_ability": "str", "aliases": ["str", "strength", "arm", "arms"]},
-          "dexterity": {"charge_ability": "dex", "aliases": ["dex", "dexterity", "leg", "legs", "hand", "hands"]}
+          "strength": {
+            "charge_ability": "str",
+            "aliases": [
+              "str",
+              "strength",
+              "arm",
+              "arms"
+            ]
+          },
+          "dexterity": {
+            "charge_ability": "dex",
+            "aliases": [
+              "dex",
+              "dexterity",
+              "leg",
+              "legs",
+              "hand",
+              "hands"
+            ]
+          }
         }
       },
       "tell": "{name} sets up a bone-breaking blow."
@@ -40,40 +91,128 @@
       "key": "neckbreaker",
       "name": "Neckbreaker",
       "feat": "neckbreaker",
-      "aliases": ["neckbreaker", "break the neck", "wrench the neck", "wring the neck"],
+      "aliases": [
+        "neckbreaker",
+        "break the neck",
+        "wrench the neck",
+        "wring the neck"
+      ],
       "level": 1,
       "source": "Neckbreaker (UC): 'If you have an opponent your size or smaller helpless or pinned, after you initiate or maintain a grapple, you can make a Stunning Fist attempt at a -5 penalty on the attack roll. If you succeed, you wrench that opponent's neck, dealing 2d6 Strength or Dexterity damage. If the targeted ability score is reduced to 0, any remaining damage is dealt to that opponent's Constitution score. A creature that is immune to critical hits or that has no discernible head and neck is immune to the effects of this feat.' The attempt is a Stunning Fist use (its Fortitude save).",
       "text": "Your next unarmed hit on a pinned or helpless foe you are grappling, no larger than you, spends a Stunning Fist at -5: Fortitude save or 2d6 Strength or Dexterity damage, the rest to Constitution.",
       "action": "free",
-      "pool": {"id": "stunning fist", "max": "max(level // 4, level_monk)", "refresh": "rest.night"},
-      "cost": {"pool": "stunning fist", "amount": 1},
+      "pool": {
+        "id": "stunning fist",
+        "max": "max(level // 4, level_monk)",
+        "refresh": "rest.night"
+      },
+      "cost": {
+        "pool": "stunning fist",
+        "amount": 1
+      },
       "aim": "foe",
       "charge": {
-        "weapons": ["unarmed", "unarmed strike"],
+        "weapons": [
+          "unarmed",
+          "unarmed strike"
+        ],
         "spent_on": "swing",
-        "target_requires": ["state.held.pinned", "state.helpless"],
+        "target_requires": [
+          "state.held.pinned",
+          "state.helpless"
+        ],
         "target_said": "a pinned or helpless foe",
         "holding_target": true,
         "no_larger": true,
-        "save": {"save": "fort", "dc": "10 + level // 2 + wis_mod"},
-        "immune_types": ["construct", "ooze", "plant", "undead"],
-        "immune_subtypes": ["incorporeal"],
+        "save": {
+          "save": "fort",
+          "dc": "10 + level // 2 + wis_mod"
+        },
+        "immune_types": [
+          "construct",
+          "ooze",
+          "plant",
+          "undead"
+        ],
+        "immune_subtypes": [
+          "incorporeal"
+        ],
         "immune_crit": true,
         "modifiers": [
-          {"type": "combat_mod", "target": "attack", "amount": -5, "bonus_type": "untyped",
-           "when": {"weapon": {"key": "unarmed"}}, "note": "Neckbreaker's -5 on the attack roll"}
+          {
+            "type": "combat_mod",
+            "target": "attack",
+            "amount": -5,
+            "bonus_type": "untyped",
+            "when": {
+              "weapon": {
+                "key": "unarmed"
+              }
+            },
+            "note": "Neckbreaker's -5 on the attack roll"
+          }
         ],
-        "on_fail": {"ability_damage": {"dice": "2d6", "overflow": "con"}}
+        "on_fail": {
+          "ability_damage": {
+            "dice": "2d6",
+            "overflow": "con"
+          }
+        }
       },
       "choice": {
         "kind": "condition",
         "default": "strength",
         "options": {
-          "strength": {"charge_ability": "str", "aliases": ["str", "strength"]},
-          "dexterity": {"charge_ability": "dex", "aliases": ["dex", "dexterity"]}
+          "strength": {
+            "charge_ability": "str",
+            "aliases": [
+              "str",
+              "strength"
+            ]
+          },
+          "dexterity": {
+            "charge_ability": "dex",
+            "aliases": [
+              "dex",
+              "dexterity"
+            ]
+          }
         }
       },
       "tell": "{name} gets a grip on the neck."
+    },
+    {
+      "key": "combat meditation",
+      "name": "Combat Meditation",
+      "feat": "combat-meditation",
+      "aliases": [
+        "combat meditation",
+        "meditate in combat",
+        "meditate in the fight"
+      ],
+      "level": 1,
+      "source": "Combat Meditation (Faiths & Philosophies): 'You can meditate as a full-round action. If you do, you gain all the benefits of your meditation feats, but they last for only 1 round per character level ... You can perform combat meditation a number of times per day equal to your Wisdom modifier.' The meditation feats ask `meditation.held`, the tag Meditation Master's hour lays for 24 hours (lane b4-other); this lays it for the rounds.",
+      "text": "Full-round: the benefits of your meditation feats for 1 round per level; Wisdom-modifier times a day.",
+      "action": "full-round",
+      "pool": {
+        "id": "combat meditation",
+        "max": "max(0, wis_mod)",
+        "refresh": "rest.night"
+      },
+      "cost": {
+        "pool": "combat meditation",
+        "amount": 1
+      },
+      "self": {
+        "tags": [
+          "meditation.held"
+        ],
+        "rounds": "level"
+      },
+      "tell": "{name} drops into a moment of stillness in the middle of the fight.",
+      "not_yet": [
+        "'expend the +1 insight bonus granted from the Meditation Master feat to instead roll twice ... taking the better of the two results': the roll-twice luck offer and Meditation Master's +1 pool are lane b4-other's (`luck` `twice`, `while: meditation.held`) and meet only when both lanes are merged"
+      ]
     }
   ]
 }

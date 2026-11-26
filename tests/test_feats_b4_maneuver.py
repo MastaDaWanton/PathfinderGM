@@ -702,3 +702,23 @@ def test_cypher_script_halves_the_ink_and_writes_in_ten_minutes_a_level():
         sid = next(k for k, v in pc.stock.items() if spellitems.kind_of(v))
         plan = spellitems.copy_plan(pc, pc.stock[sid], clock=0)
         assert (plan["cost_gp"], plan["minutes"]) == (cost, minutes), plan
+
+
+# --- Combat Meditation ------------------------------------------------------------------------
+
+def test_combat_meditation_lays_the_meditation_for_a_round_a_level_wisdom_times_a_day():
+    """Combat Meditation (F&P): "You can meditate as a full-round action ... the benefits
+    of your meditation feats, but they last for only 1 round per character level ... a
+    number of times per day equal to your Wisdom modifier." The meditation feats ask
+    `meditation.held` (lane b4-other's Meditation Master). Measured before: the feat had no
+    use; "use Combat Meditation" was refused by name."""
+    from tests.test_feats_b2_attack_a import _use
+
+    monk = _monk(["Combat Meditation"])
+    monk.abilities["wis"] = 14                          # +2: twice a day
+    scene, e, thug = _bout(monk)
+    out = _use(e, "Combat Meditation")
+    held = [x for x in monk.effects if "meditation.held" in (x.tags or ())]
+    assert held and held[0].rounds_left == monk.level, out.tell
+    assert any(e.get("action") == "full-round" for e in out.effects)
+    assert monk.pools["combat meditation"].current == 1
