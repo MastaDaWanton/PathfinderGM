@@ -408,6 +408,8 @@ build rather than trusting it.
    pointer. `unreachable` (2026-10-30) names a turn's buttons or the pen squeezed into a
    box too short to show them whole: at 794x608 in a fight, End turn sat in a 17px strip
    of the desk's choices, and the story's paragraph lay over the part that showed.
+   With a door's popover open (Ways on, More, Declare), controls under it are counted in
+   `underPopover`, not `covered` (2026-11-26); run it with each door shut and open.
    Run it twice more (0.5.0, the tutorials): once with tips off, exactly as above, and
    once per table card with one open (`window.HIT_TEST_TUTORIAL = "table"`, run, run
    again; then `"map.places"` and `"map.region"` on the Map), at every release size.

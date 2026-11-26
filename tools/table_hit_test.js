@@ -27,6 +27,12 @@
 // never one in MUST_SHOW or the focused element (WCAG 2.4.11); the card may take at most a
 // quarter of the window; and `card.missing` lists the steps' anchors the page did not draw.
 // `card.problems` empty, with `covered` and `unreachable` empty, is the pass.
+//
+// A DOOR OPEN (2026-11-26). An open popover the player opened (Ways on, More, Declare) is a
+// layer they asked for and can see, and it covers what lies under it by design: a control
+// under it is counted in `underPopover`, not `covered`, on the card's rules (never one in
+// MUST_SHOW, never the focused element; those go to `covered`). Before this, Ways on open at
+// 1024x700 listed Strike, Full attack and Ability as "covered" under its own way buttons.
 (() => {
   const T = globalThis.Tutorials;
   if (globalThis.HIT_TEST_TUTORIAL && T && T.isOpen() !== globalThis.HIT_TEST_TUTORIAL) {
@@ -52,6 +58,10 @@
       const c = p.getBoundingClientRect();
       left = Math.max(left, c.left); right = Math.min(right, c.right);
       upper = Math.max(upper, c.top); lower = Math.min(lower, c.bottom);
+      // An open popover is in the top layer: the boxes it sits in do not clip it. The combat
+      // bar's Declare popover (2026-11-26) lives in the desk's scroll box; cut to that box,
+      // its options would count as off screen and go unchecked.
+      if (p.matches && p.matches(":popover-open")) break;
     }
     return right - left >= 2 && lower - upper >= 2 ? {x: (left + right) / 2, y: (upper + lower) / 2} : null;
   };
@@ -66,15 +76,19 @@
     : el.tagName.toLowerCase() + (el.className && typeof el.className === "string"
       ? "." + el.className.trim().split(/\s+/).join(".") : "");
   const covered = [], problems = [];
+  let underPopover = 0;
   const must = new Set(MUST_SHOW.flatMap((s) => [...document.querySelectorAll(s)]));
   for (const el of seen) {
     const {x, y} = shown(el);
     const top = document.elementFromPoint(x, y);
     if (top && top !== el && !el.contains(top) && !top.contains(el)) {
       const entry = {control: name(el), label: (el.innerText || el.value || el.getAttribute("aria-label") || "").trim().slice(0, 40), under: name(top)};
+      const door = top.closest && top.closest(":popover-open");
       if (cardEl && cardEl.contains(top)) {
         // Under the card: allowed, unless it is a control a turn cannot do without.
         if (must.has(el) || el === document.activeElement) problems.push({...entry, why: "the card covers it"});
+      } else if (door && door !== cardEl && !must.has(el) && el !== document.activeElement) {
+        underPopover++;
       } else covered.push(entry);
     }
   }
@@ -105,5 +119,5 @@
     const box = room(el), of = el.getBoundingClientRect().height;
     if (box < of) unreachable.push({control: name(el), box: Math.round(box), of: Math.round(of)});
   }
-  return {checked: seen.length, covered, unreachable, card};
+  return {checked: seen.length, covered, underPopover, unreachable, card};
 })();
