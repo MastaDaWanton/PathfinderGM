@@ -479,8 +479,12 @@ def _docs_for(actor) -> list[dict]:
                 # was offered "Claws" twice, the second with the demon's fire rider).
                 if row is not None and (not doc.get("entry")
                                         or _norm(doc["entry"]) == _norm(row["id"])):
-                    out.append({**grantedpowers.resolve(doc, level_of(actor), row["vars"]),
-                                "class": kind})
+                    # A heritage power reads its own level (Eldritch Heritage's
+                    # character level - 2), its rungs and formulas both.
+                    lvl = int(row.get("level") or level_of(actor))
+                    out.append({**grantedpowers.shift_level(
+                        grantedpowers.resolve(doc, lvl, row["vars"]), lvl - level_of(actor)),
+                        "class": kind})
     return out
 
 

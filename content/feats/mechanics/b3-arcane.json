@@ -1,0 +1,30 @@
+{
+  "_about": [
+    "Feat loop batch 3, lane b3-arcane (2026-11-26): the arcane class-feature hooks a",
+    "playable class can use (the sorcerer's bloodline by feat, the druid's wild empathy) and",
+    "the spell-hook and metamagic leftovers of batches 1-2. Text read on aonprd.com",
+    "FeatDisplay pages 2026-11-26; the feats whose class no player can take yet are listed",
+    "in docs/feats-waiting-on-classes.md, not here."
+  ],
+  "eldritch-heritage": {
+    "heritage": {
+      "powers": [1],
+      "level_offset": -2
+    }
+  },
+  "improved-eldritch-heritage": {
+    "heritage": {
+      "powers": [3, 9],
+      "level_offset": -2,
+      "pick": true
+    }
+  },
+  "greater-eldritch-heritage": {
+    "heritage": {
+      "powers": [3, 9, 15],
+      "level_offset": 0,
+      "pick": true,
+      "lifts": true
+    }
+  }
+}

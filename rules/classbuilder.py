@@ -1141,7 +1141,10 @@ _FEAT_DOC_KEYS = frozenset({"modifiers", "tags", "budget", "choice", "attack_abi
                             "stacks", "summoned", "summon_extra", "metamagic", "crit_range",
                             "on_hit",
                             # Feat loop b2-styles: rerolls and after-the-die bonuses.
-                            "luck"})
+                            "luck",
+                            # Feat loop b3-arcane: a bloodline's powers by feat
+                            # (Eldritch Heritage; rules/grantedpowers.heritage_sources).
+                            "heritage"})
 
 # The keys a feat's `luck` entry may carry (rules/luck.py, which reads them).
 _LUCK_KEYS = frozenset({"reroll", "bonus", "ally_save", "on_reroll", "surge", "rolls",
@@ -1464,6 +1467,17 @@ def validate_feat_document(feat_id: str, doc) -> list[str]:
         problems.extend(_on_hit_problems(at, doc["on_hit"], doc))
     if doc.get("luck") is not None:
         problems.extend(_luck_problems(at, doc["luck"]))
+    heritage = doc.get("heritage")
+    if heritage is not None and (
+            not isinstance(heritage, dict)
+            or set(heritage) - {"powers", "level_offset", "pick", "lifts"}
+            or not heritage.get("powers")
+            or not all(isinstance(n, int) and 1 <= n <= 20 for n in heritage["powers"])
+            or not isinstance(heritage.get("level_offset", 0), int)):
+        problems.append(
+            f"{at}.heritage: {{\"powers\": [1], \"level_offset\": -2}} — the bloodline "
+            f"power levels it gives, `pick` when the parenthetical names one of them, "
+            f"`lifts` when the character level becomes the sorcerer level for them all.")
     sub = doc.get("cmb_ability")
     if sub is not None:
         from .tables import ABILITIES
