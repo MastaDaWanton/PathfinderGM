@@ -39225,8 +39225,8 @@ class Engine:
                 line += (f" The next {swing} this round, if it hits"
                          + (f" {c['target_said']}" if c.get("target_said") else "")
                          + f": {d['count']}d{d['die']}"
-                         + (" per use spent" if d.get("per_spent") else "")
-                         + (f"{int(d['bonus']):+d}" if d.get("bonus") else "")
+                         + (" per use spent," if d.get("per_spent") else "")
+                         + (f" {int(d['bonus']):+d}" if d.get("bonus") else "")
                          + f" {d['type']}"
                          + (f", {SAVES.get(c['save'], c['save'])} DC "
                             f"{int(c['dc']) + int(c.get('dc_more') or 0)} for half"
