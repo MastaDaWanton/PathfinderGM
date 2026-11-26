@@ -588,7 +588,7 @@ def test_raging_brutality_adds_unmultiplied_constitution_to_power_attack_damage(
                                          faces={"Attack with": 20, "Confirm": 20,
                                                 "Damage": 1})
     thug.hp = thug.hp_max = 400
-    scene.current_ref = "pc"
+    scene.turn = [r for r, _ in scene.initiative].index("pc")       # the bearer's turn
     assert _use(engine, "Raging Brutality").status == "refused"     # not raging
     assert _use(engine, "Rage").status != "refused"
     left = pc.pool("rage").current
@@ -600,6 +600,12 @@ def test_raging_brutality_adds_unmultiplied_constitution_to_power_attack_damage(
     assert _named(dmg, "Raging Brutality") == con
     plain = _rolls(_attack(engine), "Damage")[0]
     assert not _named(plain, "Raging Brutality")
+    # Off the bearer's turn (an attack of opportunity, say) it adds nothing: "attacks you
+    # make on your turn". Measured before the fix: `own_turn` compared the Scene's method
+    # to a ref and was never true, so the term held for nobody in a real fight.
+    scene.turn = [r for r, _ in scene.initiative].index("c1")
+    off = _rolls(_attack(engine, power_attack=True), "Damage")[0]
+    assert not _named(off, "Raging Brutality")
 
 
 def test_raging_throw_adds_constitution_to_the_bull_rush_only():

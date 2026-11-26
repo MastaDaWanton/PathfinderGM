@@ -539,7 +539,7 @@ def damage_terms(engine, intent, actor, defender, weapon, state, mult, lethality
     ctx = blow_ctx(actor, intent.params.get("weapon") or actor.wielded_key(), weapon,
                    defender)
     ctx.update({c: True for c in ATTACK_CHOICES if intent.params.get(c)})
-    ctx["own_turn"] = getattr(engine.scene, "current_ref", None) == actor.ref
+    ctx["own_turn"] = engine.scene.current_ref() == actor.ref
     out.extend(stack(actor._buff_mods("combat_mod", "damage_unmultiplied", ctx)))
     if actor.has_state(HAMMER_THE_GAP) and intent.params.get("full_attack"):
         run = 0
