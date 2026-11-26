@@ -4701,8 +4701,14 @@ class Actor:
         """The roll context an AC is asked in: the attack's kind, who makes it, and
         whether they flank this creature on the board of the moment."""
         ctx: dict = {"attack": against, "flanked": False}
+        # The moment, for the board questions an AC term may ask (feat loop b3: Duck and
+        # Cover's ally beside wielding a shield), as the CMD line passes it.
+        sit = situation_of(self)
+        if sit is not None:
+            ctx["situation"] = sit
         if opportunity:
             ctx["opportunity"] = True
+
         if attacker is not None:
             ctx["attacker_actor"] = attacker
             scene = getattr(current_moment(), "scene", None)
@@ -6654,8 +6660,11 @@ class Actor:
                     # `bearer` (light armour, a shield, a light load) is answered off the
                     # character by the class documents' reader, which hands the rest of
                     # the clause to `_when_holds` — one grammar, never a second copy.
+                    # The feat's parenthetical is the clause's `$pick` (feat loop b3:
+                    # Mage of the Wild (forest)'s "in a terrain type you have selected").
                     if not _scope_holds(spec.get("scope"), doc, ctx) \
-                            or not classfeatures.holds(spec.get("when"), self, ctx):
+                            or not classfeatures.holds(spec.get("when"), self, ctx,
+                                                       str(doc.get("target") or "")):
                         continue
                     if spec.get("formula"):
                         # A skill term may ask `ranks`: the ranks in the skill it lands
@@ -8846,6 +8855,9 @@ class Situation:
             if not any((feats_mod.document(raw) or {}).get("id") == want["feat"]
                        for raw in other.feats or ()):
                 continue
+            # Duck and Cover's "as long as your ally is wielding a shield" (feat loop b3).
+            if want.get("shield") and not (other.shield_stats() or {}).get("ac"):
+                continue
             if want.get("foe_larger"):
                 if foe is None:
                     continue
@@ -9053,9 +9065,15 @@ def _when_holds(when, ctx: dict | None) -> bool:
             if who is None and tags is None:
                 return False
             for field_name, value in want.items():
+                if field_name == "alignment":
+                    # Shieldwall Phalanx's "attacks of evil creatures" (feat loop b3): the
+                    # owner's ruling on the target's alignment above holds here too — no
+                    # alignment is tracked, so the clause holds against any attacker.
+                    continue
                 if field_name not in ("type", "subtype"):
                     return False
                 if who is not None:
+
                     if not _is_of_kind(who, field_name, value):
                         return False
                     continue

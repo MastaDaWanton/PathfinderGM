@@ -90,3 +90,106 @@ def test_a_sorcerer_cannot_take_her_own_bloodline_again():
              class_choices={"bloodline": {"picks": [{"pick": "draconic", "variant": "red"}]}})
     assert [r["label"] for r in grantedpowers.had(pc)
             if "Eldritch" in r["label"]] == []
+
+
+# --- documents on the existing grammar ----------------------------------------------------
+
+from rules import casting, spells  # noqa: E402
+from rules.dice import Dice  # noqa: E402
+from rules.engine import Engine, Scene  # noqa: E402
+from rules.grid import Grid  # noqa: E402
+from rules.sheet import from_dict, situated  # noqa: E402
+
+
+def _wren(feats=(), level=6, **extra):
+    data = {"name": "Wren", "kind": "pc", "class": "wizard", "level": level,
+            "abilities": {"str": 10, "dex": 14, "con": 12, "int": 16, "wis": 12, "cha": 12},
+            "hp": 40, "weapons": ["dagger"], "equipped": "dagger",
+            "feats": list(feats), "ranks": {"spellcraft": 4, "knowledge (arcana)": 4}}
+    data.update(extra)
+    return from_dict(data)
+
+
+def _sum(mods, name=None) -> int:
+    return sum(m.value for m in mods if name is None or m.source == name)
+
+
+def test_tapestry_traveler_casts_teleportation_two_levels_higher():
+    """PSP: "You cast spells of the teleportation subschool as though your caster level
+    were 2 higher". Dimension door at a 9th-level wizard's CL 11; fireball stays at 9."""
+    pc = _wren(["Tapestry Traveler"], level=9)
+    assert casting.spell_caster_level(pc, spells.get("dimension-door")) == 11
+    assert casting.spell_caster_level(pc, spells.get("fireball")) == 9
+
+
+def test_mage_of_the_wild_is_two_better_in_its_own_terrain_only():
+    """ARG: "+2 bonus on caster level checks, concentration checks, and Knowledge (arcana)
+    and Spellcraft checks" in the terrain picked. Measured before: no document, +0 in the
+    forest; and a feat's `bearer.terrain` could not name its own parenthetical."""
+    pc = _wren(["Attuned to the Wild (forest)", "Mage of the Wild (forest)"])
+    pc.at = "oldwood~forest"
+    assert _sum(pc.concentration_modifiers({}), "Mage of the Wild") == 2
+    assert _sum(pc.caster_level_check_modifiers({}), "Mage of the Wild") == 2
+    assert _sum(pc.skill_modifiers("spellcraft"), "Mage of the Wild") == 2
+    assert _sum(pc.skill_modifiers("knowledge (arcana)"), "Mage of the Wild") == 2
+    pc.at = "town~urban"
+    assert _sum(pc.concentration_modifiers({}), "Mage of the Wild") == 0
+    assert _sum(pc.skill_modifiers("spellcraft"), "Mage of the Wild") == 0
+
+
+def test_a_dispels_caster_level_check_now_reads_the_casters_terms():
+    """Measured 0.5.2: the dispel's caster level check was a bare `Modifier(caster_level)`
+    outside the funnel, so no feat on caster level checks reached it. Same seed, same die:
+    the elf in her forest totals 2 more."""
+    def total(feats):
+        pc = _wren(feats)
+        s = Scene()
+        s.at = "oldwood~forest"
+        s.add(pc)
+
+
+        e = Engine(s, Dice(seed=4))
+        fx, _ = e._spell_operation({"operation": "dispel", "check_dc": "30", "target": "x"},
+                                   {"caster": pc.ref, "caster_level": 6})
+        return next(f["total"] for f in fx if f["kind"] == "caster_level_check")
+    assert total(["Mage of the Wild (forest)"]) == total([]) + 2
+
+
+def _line(a, b, foe):
+    s = Scene(location_id="5bbd0c40345f", grid=Grid(20, 20))
+    for x in (a, b, foe):
+        s.add(x)
+    s.sides = {"us": [a.ref, b.ref], "them": [foe.ref]}
+    s.positions.update({a.ref: (5, 5), b.ref: (5, 6), foe.ref: (9, 5)})
+    return s
+
+
+def test_shieldwall_phalanx_counts_the_adjacent_allies_who_hold_it():
+    """Champions of Purity: a sacred bonus to AC against evil creatures' attacks and to
+    saves against their spells "equal to the number of adjacent allies who also have this
+    feat". One such ally: +1; the ally steps away: +0."""
+    a = _wren(["Shieldwall Phalanx"])
+    b = _wren(["Shieldwall Phalanx"], name="Bryn")
+    foe = _wren([], name="Foe")
+    s = _line(a, b, foe)
+    with situated(s):
+        assert _sum(a.ac_modifiers(attacker=foe), "Shieldwall Phalanx") == 1
+        assert _sum(a.save_modifiers("will", {"attacker_actor": foe}),
+                    "Shieldwall Phalanx") == 1
+        s.positions[b.ref] = (15, 15)
+        assert _sum(a.ac_modifiers(attacker=foe), "Shieldwall Phalanx") == 0
+
+
+def test_duck_and_cover_takes_cover_behind_an_allys_shield_from_arrows_only():
+    """APG: "+2 cover bonus to your AC against ranged attacks as long as your ally is
+    wielding a shield" — the ally adjacent and holding the feat. No shield, no cover; a
+    sword swing gets none."""
+    a = _wren(["Duck and Cover"])
+    b = _wren(["Duck and Cover"], name="Bryn", shield="heavy wooden shield")
+    foe = _wren([], name="Foe")
+    s = _line(a, b, foe)
+    with situated(s):
+        assert a.ac(against="ranged", attacker=foe) == a.ac(against="melee",
+                                                            attacker=foe) + 2
+        b.shield = "none"
+        assert a.ac(against="ranged", attacker=foe) == a.ac(against="melee", attacker=foe)

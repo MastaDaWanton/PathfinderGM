@@ -2514,7 +2514,9 @@ WHEN_KEYS: dict[str, str] = {
 # by `classfeatures.holds` where the bearer is known (Risky Striker, Underfoot).
 _WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment", "choice",
                                   "state", "aloft", "larger", "smaller"),
-                       "attacker": ("type", "subtype", "larger", "smaller", "unprovoked")}
+                       "attacker": ("type", "subtype", "larger", "smaller", "unprovoked",
+                                    "alignment")}
+
 _WHEN_COMPARE = ("lte", "gte", "lt", "gt", "eq")
 _WHEN_BOOLS = ("daylight", "underground", "wielder_casts", "resting", "full_attack",
                "flanked", "sole_threat", "opportunity", "first_attack", "adjacent",
@@ -2702,10 +2704,13 @@ def when_problems(when, where: str = "when") -> list[str]:
         elif key == "ally_beside":
             from . import feats as feats_mod
 
-            if (not isinstance(want, dict) or set(want) - {"feat", "foe_larger"}
+            if (not isinstance(want, dict) or set(want) - {"feat", "foe_larger", "shield"}
+
                     or str(want.get("feat") or "") not in feats_mod.all_feats()):
                 out.append(f"{where}.ally_beside is {{\"feat\": \"<a feat id>\"}}, with "
-                           f"an optional \"foe_larger\": true.")
+                           f"an optional \"foe_larger\": true and \"shield\": true (the "
+                           f"ally wields one).")
+
         elif key in ("weapon", "armour", "bearer", "near"):
             if not isinstance(want, dict) or not want:
                 out.append(f"{where}.{key} is an object of the fields it asks.")

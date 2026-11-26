@@ -8,23 +8,174 @@
   ],
   "eldritch-heritage": {
     "heritage": {
-      "powers": [1],
+      "powers": [
+        1
+      ],
       "level_offset": -2
     }
   },
   "improved-eldritch-heritage": {
     "heritage": {
-      "powers": [3, 9],
+      "powers": [
+        3,
+        9
+      ],
       "level_offset": -2,
       "pick": true
     }
   },
   "greater-eldritch-heritage": {
     "heritage": {
-      "powers": [3, 9, 15],
+      "powers": [
+        3,
+        9,
+        15
+      ],
       "level_offset": 0,
       "pick": true,
       "lifts": true
     }
+  },
+  "tapestry-traveler": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "spell_cl",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "scope": {
+          "subschool": "teleportation"
+        },
+        "note": "PSP: 'You cast spells of the teleportation subschool as though your caster level were 2 higher'"
+      }
+    ],
+    "not_yet": [
+      "one step more familiar when teleporting to an established Pathfinder lodge: a World Bible world has no Pathfinder lodges, and teleport's familiarity is not modelled",
+      "a supernatural teleport's distance at class level + 2: no player class teleports as a supernatural ability"
+    ]
+  },
+  "mage-of-the-wild": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "caster_level",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "terrain": "$pick"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "concentration",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "terrain": "$pick"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "knowledge (arcana)",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "terrain": "$pick"
+          }
+        }
+      },
+      {
+        "type": "skill_mod",
+        "target": "spellcraft",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "terrain": "$pick"
+          }
+        }
+      }
+    ],
+    "not_yet": [
+      "the terrain is Mage of the Wild's own parenthetical, \"Mage of the Wild (forest)\", one of the Attuned to the Wild terrains the sheet should also hold: nothing checks that the two match"
+    ]
+  },
+  "shieldwall-phalanx": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "formula": "allies",
+        "bonus_type": "sacred",
+        "when": {
+          "attacker": {
+            "alignment": "evil"
+          }
+        },
+        "note": "Champions of Purity: a sacred bonus to AC against evil creatures' attacks, one per adjacent ally with the feat; alignment is not tracked (owner ruling 2026-10-05), so any attacker"
+      },
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "formula": "allies",
+        "bonus_type": "sacred",
+        "when": {
+          "attacker": {
+            "alignment": "evil"
+          }
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "formula": "allies",
+        "bonus_type": "sacred",
+        "when": {
+          "attacker": {
+            "alignment": "evil"
+          }
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "will",
+        "formula": "allies",
+        "bonus_type": "sacred",
+        "when": {
+          "attacker": {
+            "alignment": "evil"
+          }
+        }
+      }
+    ],
+    "not_yet": [
+      "saves against an evil creature's ability that is not a spell: only a spell's save says who made it (Engine._cast_save)"
+    ]
+  },
+  "duck-and-cover": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "attack": "ranged",
+          "ally_beside": {
+            "feat": "duck-and-cover",
+            "shield": true
+          }
+        },
+        "note": "APG: '+2 cover bonus to your AC against ranged attacks as long as your ally is wielding a shield'; cover is untyped here"
+      }
+    ],
+    "not_yet": [
+      "taking the adjacent ally's Reflex die (and falling prone for it) when both save against the same effect: a save is rolled one creature at a time"
+    ]
   }
 }

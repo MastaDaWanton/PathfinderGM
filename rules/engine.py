@@ -32582,9 +32582,19 @@ class Engine:
 
         if spec.get("check_dc"):
             dc = effectspec.evaluate(spec["check_dc"], ctx.get("vars") or {})
-            roll = self.dice.d20([Modifier(int(ctx.get("caster_level", 1)),
-                                           "caster level")],
+            # The caster's own terms on a caster level check (feat loop b3: Mage of the
+            # Wild's "+2 on caster level checks" in its terrain), through the funnel the
+            # check against spell resistance already reads.
+            from .dice import stack
+
+            caster = self.scene.actors.get(str(ctx.get("caster") or ""))
+            extra = caster._buff_mods(
+"combat_mod", "caster_level",
+                                      {"against": (op,)}) if caster is not None else []
+            roll = self.dice.d20(stack([Modifier(int(ctx.get("caster_level", 1)),
+                                                 "caster level")] + extra),
                                  label=f"caster level check ({op})", visibility="hidden")
+
             effects.append({"kind": "caster_level_check", "op": op, "dc": dc,
                             "total": roll.total, "beat": roll.total >= dc})
             if roll.total < dc:
