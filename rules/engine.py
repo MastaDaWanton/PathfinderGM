@@ -1353,6 +1353,17 @@ class Scene:
         out.extend(actor.run_periodic("round", 1, self._dice))
         return out
 
+    def lingering_end(self, actor: "Actor", key: str) -> list[dict]:
+        """End what a lingering stance of `actor`'s under `key` still leaves on others."""
+        out = []
+        for other in list(self.actors.values()):
+            gone = other.remove_effects(match=lambda x: isinstance(x.payload, dict)
+                                        and x.payload.get("lingers_for") == actor.ref
+                                        and x.payload.get("lingers_key") == key)
+            out.extend({"kind": "effect_ended", "ref": other.ref, "what": g.name or g.key,
+                        "origin": g.origin} for g in gone)
+        return out
+
     def stance_ended(self, actor: "Actor", e: "ActiveEffect") -> tuple[list[dict], list[str]]:
         """What a document's stance leaves when it ends, however it ended — dismissed,
         or run dry by its upkeep. Two things, both declared in its payload:
@@ -1370,9 +1381,24 @@ class Scene:
         records: list[dict] = []
         said: list[str] = []
         source = str(payload.get("linked_source") or "")
+        linger = int(payload.get("linger") or 0)
         for ref in payload.get("linked") or ():
             other = self.people.get(ref) or self.actors.get(ref)
             if other is None:
+                continue
+            if linger:
+                # Lingering Performance: the pieces run on for `linger` rounds on the one
+                # ticker, marked whose they are so a new performance can end them.
+                kept = [x for x in other.effects if x.origin == e.origin
+                        and (not source or x.source == source)]
+                for x in kept:
+                    x.duration, x.rounds_left = "rounds", linger
+                    x.payload = {**(x.payload or {}), "lingers_for": actor.ref,
+                                 "lingers_key": e.key}
+                if kept:
+                    records.append({"kind": "lingers", "ref": other.ref, "rounds": linger,
+                                    "origin": e.origin})
+                    said.append(f"{e.name} lingers on {other.name} for {linger} rounds.")
                 continue
             before = other.hp_max
             gone = other.remove_effects(
@@ -9732,7 +9758,10 @@ class Engine:
         # is right (1e knowledge checks are trained-only); the crash is not. Nothing is
         # rolled, the player is told why, and the turn survives.
         try:
-            return actor.skill_modifiers(skill, opposed=opposed, ctx=ctx), None
+            mods = actor.skill_modifiers(skill, opposed=opposed, ctx=ctx)
+            if not opposed and intent.actor == actor.ref:
+                mods = mods + self._ensemble_aid(actor, str(skill))
+            return mods, None
         except IllegalSheet as exc:
             return [], Outcome(intent_id=intent.id, op="check", effects=[],
                                tell=f"{exc}. Nothing is rolled.", because=intent.because)
@@ -11775,7 +11804,8 @@ class Engine:
                 # term past the crit scaling — 1e's extra dice never multiply — so damage
                 # reduction meets it with the blade, as the book adds it to the blow.
                 magic_dice = self._magic_dice(actor, defender, weapon, weapon_key,
-                                              state, lethality)
+                                              state, lethality) \
+                    + self._discordant_dice(actor, defender, weapon)
                 for n, rider in enumerate(magic_dice):
                     if f"magic_{n}" not in state:
                         roll = self._roll_or_suspend_stage(
@@ -12016,7 +12046,8 @@ class Engine:
                 for extra in ([] if dancing else self._deliver_charges(
                         actor, defender, weapon_key, intent.visibility or "player", weapon,
                         full=bool(intent.params.get("full_attack"))
-                        or intent.params.get("iteration") is not None)):
+                        or intent.params.get("iteration") is not None,
+                        charging=bool(intent.params.get("charge")))):
                     state["effects"].append(extra["effect"])
                     state["tells"].append(extra["tell"])
                 # A raging feint (Tantrum) lasts until the first blow that lands.
@@ -13848,6 +13879,9 @@ class Engine:
                     effects.append({"kind": "item_damage", "ref": defender.ref,
                                     "owner": defender.ref, "weapon": weapon["name"],
                                     **res})
+                    bits.extend(self._sunder_regains(
+                        actor, bool(res.get("broken") or res.get("destroyed"))
+                        and not was_broken, effects))
             cond = m.get("condition")
             if cond:
                 defender.add_condition(cond, source=f"{m['name']} by {actor.name}")
@@ -37414,6 +37448,35 @@ class Engine:
             if not pool.ready:
                 return (f"The {cost['pool']} pool recharges in {pool.cooldown_left} "
                         f"round{'' if pool.cooldown_left == 1 else 's'}.")
+        # `before`: when in the turn it may be used — "attacks", before the user's first
+        # blow this round (Greater Channel Smite: "Before making any melee attacks on your
+        # turn"), or "actions", before anything else (Adept Champion: "at the start of
+        # your turn"). Read off the round's own ledgers (`Scene.swung`, `move_spent`,
+        # `standard_spent`); out of a fight there is no turn to be late in.
+        when = str(doc.get("before") or "")
+        if when and self.scene.in_encounter:
+            rnd = self.scene.round
+            late = self.scene.swung.get(actor.ref) == rnd or (
+                when == "actions" and rnd in (self.scene.move_spent.get(actor.ref),
+                                              self.scene.standard_spent.get(actor.ref)))
+            if late:
+                return (f"{found.title()} is used "
+                        + ("before any attack" if when == "attacks" else "at the start")
+                        + f" of {actor.name}'s turn, and this turn is under way.")
+        # "You must be able to speak and have a free hand" (Word of Healing): the hands
+        # by `classfeatures.free_hands`; the voice is the document's `requires_not`.
+        if doc.get("hands_free"):
+            from . import classfeatures
+
+            if classfeatures.free_hands(actor) < int(doc["hands_free"]):
+                return f"{found.title()} needs a free hand, and {actor.name} has none."
+        # A price paid when the blow lands (`charge.pays`): nothing to arm with an empty
+        # pool (Crusader's Fist, Radiant Charge).
+        pays = (doc.get("charge") or {}).get("pays") or {}
+        if pays.get("pool"):
+            pool = actor.pool(str(pays["pool"]))
+            if pool is None or pool.current < 1:
+                return f"{found.title()} spends {pays['pool']}, and {actor.name} has none left."
         return ""
 
     def _apply_ability_document(self, actor: Actor, found: str, key: str,
@@ -37653,7 +37716,8 @@ class Engine:
                           "condition": key, "ability": name, "origin": origin}] + ended,
                 tell=" ".join([tell] + said), because=intent.because)
 
-        doc, wrong = ca.with_choice(actor, doc, choice)
+        # `resolved`: the choice laid on, a `cost.uses_of` worked out, a `runs` followed.
+        doc, wrong = ca.resolved(actor, doc, choice)
         if wrong:
             return self._refuse(intent, wrong, code="ability_choice")
         shown = name
@@ -37773,9 +37837,13 @@ class Engine:
                             "spent": paid.get("spent", 0), "left": paid.get("current", 0),
                             "origin": origin})
         if swap is not None:
-            ended, said = self._end_class_stance(actor, swap)
+            ended, said = self._end_class_stance(actor, swap, linger=False)
             records.extend(ended)
             tells.extend(said)
+        if key:
+            # "If you begin a new bardic performance during this time, the effects of the
+            # previous performance immediately cease" (Lingering Performance).
+            records.extend(self.scene.lingering_end(actor, key))
         for pool in banked[:drawn]:
             self.scene.pools.remove(pool)
             records.append({"ref": actor.ref, "kind": "blood_pool", "spent": 1,
@@ -37791,6 +37859,10 @@ class Engine:
         if hp_cost and not hp_cost.get("roll"):
             self_paid = self._pay_hp_cost(actor, doc, None, shown, origin, rolls,
                                           records, tells)
+
+        # Harmonic Sage's check, made as the performance begins and before its save.
+        if key and doc.get("bonus_from"):
+            doc = {**doc, "_harmonic": self._harmonic(actor, doc)}
 
         # 6. What it does to whoever it reached: a touch attack, one roll shared, a save
         # each, the heal or the harm, and the standing effect it lays on them.
@@ -37828,6 +37900,15 @@ class Engine:
                 for m in extra_dmg:
                     total += m.value
                     tells.append(f"{m.source} adds {m.value:+d} ({total}).")
+                if spec.get("halve"):
+                    # Word of Healing: "The target heals half the amount they would have
+                    # healed if you had touched them".
+                    total //= 2
+                    tells.append(f"Half of it carries across the distance ({total}).")
+            riders = self._feat_addons(actor, doc)
+            unlifted = next((a["unlifted_dice"] for a in riders if a.get("unlifted_dice")), "")
+            mercy_lifts = _mercy_lifts(actor, doc.get("removes") or {}, ca) \
+                if unlifted and doc.get("removes") else []
             if hp_cost.get("roll") and total:
                 # Blood Transfer: "deal Blood DMG to self and heal a receiver for equal
                 # HP" — the one roll is both the price and the gift.
@@ -37835,6 +37916,8 @@ class Engine:
                                               records, tells)
             saving = doc.get("save") or {}
             dc = ca.amount(saving.get("dc"), actor) if saving else 0
+            dc += sum(int(m.get("amount", 0)) for m in (doc.get("_harmonic") or [[]])[0]
+                      if str(m.get("target", "")).endswith(".dc")) if saving else 0
             if saving and extra_dc:
                 dc += sum(m.value for m in extra_dc)
                 tells.append(", ".join(f"{m.source} {m.value:+d}" for m in extra_dc)
@@ -37845,14 +37928,28 @@ class Engine:
             if (doc.get("radius_ft") or area is not None) and len(who) > 1:
                 traits += ("area",)
             hd_rule = doc.get("hit_dice") or {}
-            hd_cap = ca.amount(hd_rule.get("max"), actor) if hd_rule else 0
+            hd_cap = ca.amount(hd_rule.get("max"), actor) if hd_rule.get("max") else 0
             for other in who:
                 share = total
                 each = doc
+                # "So long as their total Hit Dice do not exceed your cleric level" (Command
+                # Undead): those already held count, and one who would overrun the total is
+                # passed by, nearest first, before any save (`hit_dice.total`).
+                if hd_rule.get("total") and other is not actor:
+                    cap = ca.amount(hd_rule["total"], actor)
+                    held = sum(ca.hit_dice_of(a) for a in self.scene.actors.values()
+                               if a.has_state(f"controlled.by.{actor.ref}"))
+                    if held + ca.hit_dice_of(other) > cap:
+                        records.append({"kind": "unaffected", "ref": other.ref,
+                                        "hit_dice": ca.hit_dice_of(other), "max": cap,
+                                        "held": held, "origin": origin})
+                        tells.append(f"{other.name} would take {actor.name} past {cap} Hit "
+                                     f"Dice under command; {shown} passes them by.")
+                        continue
                 # "Creatures with more Hit Dice than your level are unaffected" — read off
                 # the printed stat block (`class_abilities.hit_dice_of`), since every
                 # imported monster's sheet level is 1.
-                if hd_rule and other is not actor and ca.hit_dice_of(other) > hd_cap:
+                if hd_cap and other is not actor and ca.hit_dice_of(other) > hd_cap:
                     hd = ca.hit_dice_of(other)
                     over = hd_rule.get("over")
                     records.append({"kind": "unaffected", "ref": other.ref,
@@ -37865,19 +37962,50 @@ class Engine:
                                  f"and {shown} takes a lesser hold.")
                     each = {**doc, **over}
                 failed = False
+                # `contest`: a skill check against the creature's own (Bewildering Koan's
+                # Bluff against Sense Motive: "If the creature fails its check"). Lost by
+                # the user, the use reaches nobody.
+                contest = doc.get("contest") or {}
+                if contest and other is not actor:
+                    mine = self.dice.d20(actor.skill_modifiers(str(contest["skill"])),
+                                         label=f"{str(contest['skill']).title()}: {shown}",
+                                         visibility=intent.visibility or "player")
+                    theirs = self.dice.d20(
+                        other.skill_modifiers(str(contest["against"]), opposed=True),
+                        label=f"{other.name}'s {contest['against']}", visibility="hidden")
+                    rolls += [mine, theirs]
+                    won = mine.total > theirs.total
+                    records.append({"kind": "contest", "ref": other.ref,
+                                    "skill": contest["skill"], "against": contest["against"],
+                                    "won": won, "mine": mine.total, "theirs": theirs.total,
+                                    "origin": origin})
+                    tells.append(f"{actor.name}'s {contest['skill']} ({mine.total}) "
+                                 f"{'beats' if won else 'does not beat'} {other.name}'s "
+                                 f"{contest['against']} ({theirs.total}).")
+                    if not won:
+                        continue
+                dc_here = dc
+                if saving and other is not actor and doc.get("bonus_from"):
+                    # A DC term scoped to the creature saving (`_bonus_from`'s ctx).
+                    scoped = sum(m.value for m in self._bonus_from(
+                        actor, doc, {"target_actor": other})[1]) - sum(
+                        m.value for m in extra_dc)
+                    if scoped:
+                        dc_here = dc + scoped
+                        tells.append(f"Against {other.name} the DC is {dc_here}.")
                 if saving and other is not actor:
                     sv = str(saving.get("save", "will"))
                     sroll = self.dice.d20(other.save_modifiers(sv),
                                           label=f"{SAVES.get(sv, sv)} save against {shown}",
                                           visibility=intent.visibility or "player")
                     rolls.append(sroll)
-                    made = d20_succeeds(sroll, dc)
-                    nat = natural_said(sroll, dc)
+                    made = d20_succeeds(sroll, dc_here)
+                    nat = natural_said(sroll, dc_here)
                     tells.append(f"{other.name} {'makes' if made else 'fails'} the "
                                  f"{SAVES.get(sv, sv)} save ({nat + ', ' if nat else ''}"
-                                 f"{sroll.total} against DC {dc}).")
+                                 f"{sroll.total} against DC {dc_here}).")
                     records.append({"kind": "save", "ref": other.ref, "save": sv,
-                                    "saved": bool(made), "dc": dc, "origin": origin})
+                                    "saved": bool(made), "dc": dc_here, "origin": origin})
                     failed = not made
                     if made and saving.get("success", "negates") == "negates":
                         continue
@@ -37928,6 +38056,16 @@ class Engine:
                         if held:
                             tells.append(held)
                     elif as_ == "heal":
+                        # Greater Mercy (UM): "When you use your lay on hands ability and
+                        # the target of that ability does not have any conditions your
+                        # mercies can remove, it instead heals an additional +1d6".
+                        if unlifted and not any(other.has_condition(c) for c in mercy_lifts):
+                            more = self.dice.roll(str(unlifted), label=f"{shown}: nothing to "
+                                                  f"lift", visibility="player")
+                            rolls.append(more)
+                            share += more.total
+                            tells.append(f"{other.name} carries nothing the mercies lift: "
+                                         f"{unlifted} more ({share}).")
                         # Never below 0: a body standing over its maximum (a scratch
                         # sheet did, live 2026-10-05) "recovered -1 hit points".
                         healed = max(0, other.heal(share))
@@ -37995,10 +38133,15 @@ class Engine:
                             records.append({"ref": other.ref, "kind": "condition_removed",
                                             "condition": cond, "origin": origin})
                             tells.append(f"{other.name} is no longer {cond}.")
+            records.extend(self._eased(actor, doc, landed, origin, tells))
+            records.extend(self._addons_after(actor, doc, riders, landed, records, origin,
+                                              shown, tells))
         # A missed touch leaves the use spent and nothing else: the price was paid above.
 
-        # 7. What it lays on the user: a stance, a timed bonus, a mark, a charge.
-        if hit_ok or not doc.get("attack"):
+        # 7. What it lays on the user: a stance, a timed bonus, a mark, a charge. A
+        # contest lost (`contest`) lays nothing.
+        if (hit_ok or not doc.get("attack")) and not (
+                doc.get("contest") and not any(a is not actor for a in landed)):
             mine = self._class_self_effect(actor, doc, origin, shown, key, target,
                                            pool_start, [a.ref for a in landed
                                                         if a is not actor])
@@ -38161,6 +38304,12 @@ class Engine:
             wrong = self._class_ability_wrong_target(doc, name, other)
             if wrong:
                 return [], wrong
+            # `marked_by`: only the creature the user's own effect with that tag is aimed
+            # at — Adept Champion's "against the target of your smite".
+            if doc.get("marked_by") and not self._marked(actor, str(doc["marked_by"]), other):
+                return [], (f"{name} works against the creature {actor.name}'s "
+                            f"{doc['marked_by'].split('.')[-1]} is aimed at, and "
+                            f"{other.name} is not it.")
             # A gaze (Blinding Flash, Dragon Empires Primer: "This feat functions as a gaze
             # attack ... does not work on creatures that are already blinded"): only on a
             # creature that can see the user (`awareness.sees`) and is not blind.
@@ -38171,12 +38320,16 @@ class Engine:
                 return [], (f"{name} works on a creature that can see {actor.name}, and "
                             f"{other.name} cannot. Nothing is spent.")
             feet = doc.get("range_ft") or doc.get("reach_ft") or doc.get("radius_ft")
+            if feet and doc.get("bonus_from"):
+                feet = int(int(feet) * self._reach_times(actor, doc))
             if not near(other, feet):
                 gap = self.scene.distance_between(actor.ref, other.ref)
                 return [], (f"{other.name} is {gap} ft away, and {name} reaches "
                             f"{feet} ft.")
             return [other], ""
         radius = doc.get("radius_ft")
+        if radius and doc.get("bonus_from"):
+            radius = int(int(radius) * self._reach_times(actor, doc))
         if affects in ("allies", "others"):
             pool = [a for a in here if not self._against(actor, a) and not a.is_down
                     and not (affects == "others" and a is actor)]
@@ -38266,7 +38419,286 @@ class Engine:
             said = doc.get("target_requires_said") or "a creature answering " + " or ".join(
                 str(q) for q in need)
             return f"{name} works only on {said}, and {other.name} is not. Nothing is spent."
+        bars = [str(q) for q in doc.get("target_requires_not") or ()
+                if other.has_state(str(q))]
+        if bars:
+            return (f"{name} does not work on {other.name} ({bars[0]}). Nothing is spent.")
         return ""
+
+    # Blood Vengeance (ARG; Orcs of Golarion): "Whenever one of your allies is reduced to
+    # negative hit points or killed, you may enter a state similar to but less powerful
+    # than a barbarian's rage as a free action on your next turn ... if another ally falls
+    # before this duration ends, the weaker rage lasts for an additional 4 rounds ... You
+    # may only use this feat if the fallen ally had at least as many Hit Dice as you
+    # (excluding conjured or summoned allies)." The fall is read at the one damage door
+    # (`_apply_damage`); what it leaves is an effect through the applicator, never a flag.
+    AVENGES: ClassVar[str] = "vengeance.ally-falls"
+    OWED: ClassVar[str] = "buff.vengeance-owed"
+    AVENGING: ClassVar[str] = "buff.stance.vengeance"
+
+    def _ally_fell(self, fallen: Actor) -> None:
+        from . import class_abilities as ca
+
+        if any(getattr(h, "creature", "") == fallen.ref
+               for h in list(self.scene.manifests)):
+            return                                  # a summoned ally does not count
+        for other in list(self.scene.actors.values()):
+            if other is fallen or other.is_down or self._against(other, fallen) \
+                    or not other.has_state(self.AVENGES) \
+                    or ca.hit_dice_of(fallen) < ca.hit_dice_of(other):
+                continue
+            held = [e for e in other.effects if any(
+                states.matches(t, self.AVENGING) for t in e.tags)]
+            if held:
+                for e in held:
+                    if e.rounds_left is not None:
+                        e.rounds_left += 4
+                    for p in e.periodic or ():
+                        if p.get("spend_pool"):
+                            other.gain_pool(str(p["spend_pool"]), 4)
+                continue
+            other.remove_effects(match=lambda x: any(
+                states.matches(t, self.OWED) for t in x.tags))
+            other.apply_effect(ActiveEffect(
+                name="Vengeance owed", kind="buff", key="vengeance-owed",
+                source=f"{fallen.name} falling", origin="rule:feat/blood-vengeance",
+                duration="rounds", rounds_left=2, tags=(self.OWED,)))
+
+    SUNDER_REGAINS: ClassVar[str] = "maneuver.sunder.regains"
+
+    def _sunder_regains(self, actor: Actor, broke: bool, effects: list) -> list[str]:
+        """Destroyer's Blessing (ARG): "When you are raging and you succeed at a sunder
+        combat maneuver, you regain 1 round of rage. If the sunder attempt causes the
+        object to gain the broken condition, you heal 1 hit point. You can only gain these
+        benefits once per round." The stance is the user's held one that drains a pool and
+        leaves an aftermath (its payload's `after` and `pool`), read off the effect; once a
+        round by a one-round marker on the one ticker."""
+        if not actor.has_state(self.SUNDER_REGAINS) \
+                or actor.has_state("spent.sunder-regains"):
+            return []
+        held = next((e for e in actor.effects if isinstance(e.payload, dict)
+                     and e.payload.get("after") and e.payload.get("pool")), None)
+        if held is None:
+            return []
+        pool = str(held.payload["pool"])
+        p = actor.pool(pool)
+        said = []
+        if p is not None and p.current < p.maximum:
+            now = actor.gain_pool(pool, 1)
+            effects.append({"kind": "resource", "ref": actor.ref, "pool": pool,
+                            "gained": 1, "left": now, "origin": "rule:feat/destroyers-blessing"})
+            said.append(f"{actor.name} draws a round of {pool} back from the wreckage.")
+        if broke:
+            got = max(0, actor.heal(1))
+            effects.append({"kind": "heal", "ref": actor.ref, "amount": got, "rolled": 1,
+                            "hp_after": actor.hp, "hp_max": actor.hp_max,
+                            "origin": "rule:feat/destroyers-blessing"})
+            said.append(f"{actor.name} recovers {got} hit point ({actor.hp}/{actor.hp_max}).")
+        actor.apply_effect(ActiveEffect(
+            name="Destroyer's Blessing", kind="buff", key="destroyers-blessing",
+            source="Destroyer's Blessing", origin="rule:feat/destroyers-blessing",
+            duration="rounds", rounds_left=1, tags=("spent.sunder-regains",)))
+        return said
+
+    HARMONIC_DC: ClassVar[int] = 15
+
+    def _harmonic(self, actor: Actor, doc: dict) -> tuple[list[dict], int, str]:
+        """Harmonic Sage (UC): "While inside an artificial structure, you can spend a free
+        action to make a DC 15 Knowledge (engineering) check when you begin your bardic
+        performance. Success ... Self-Harmonize: ... increase the DC of your bardic
+        performance effects +1. Reverberation: ... continue for 1 round after you cease
+        maintaining it." A free action nothing is lost by, so it is always tried; the
+        engine takes Self-Harmonize for a performance with a save and Reverberation for
+        one without (owner call). Indoors is `places.is_indoors`, a roof over the place.
+        Returns (modifiers for the stance, linger rounds, the sentence)."""
+        from . import places as places_mod
+
+        if not actor.has_state("performance.harmonic-sage"):
+            return [], 0, ""
+        at = str(getattr(actor, "at", "") or self.scene.at or "")
+        try:
+            inside = bool(at) and places_mod.is_indoors(at, places_mod.terrain_of(at))
+        except Exception:  # noqa: BLE001 - an unknown place is not a building
+            inside = False
+        if not inside:
+            return [], 0, ""
+        try:
+            mods = actor.skill_modifiers("knowledge (engineering)")
+        except Exception:  # noqa: BLE001 - untrained: no check to make
+            return [], 0, ""
+        roll = self.dice.d20(mods, label="Knowledge (engineering): Harmonic Sage",
+                             visibility="player")
+        if roll.total < self.HARMONIC_DC:
+            return [], 0, (f"the walls do not carry it (Knowledge (engineering) "
+                           f"{roll.total} against {self.HARMONIC_DC})")
+        prefix = str(doc.get("bonus_from") or "").strip()
+        if doc.get("save"):
+            return ([{"kind": "combat_mod", "target": f"{prefix}.dc", "amount": 1,
+                      "bonus_type": "untyped", "note": "Self-Harmonize"}], 0,
+                    f"Self-Harmonize, +1 DC (Knowledge (engineering) {roll.total})")
+        return [], 1, f"Reverberation (Knowledge (engineering) {roll.total})"
+
+    def _discordant_dice(self, actor: Actor, defender: Actor, weapon: dict) -> list[dict]:
+        """Discordant Voice (UC): "Whenever you are using bardic performance to create a
+        spell-like or supernatural effect, allies within 30 feet of you deal an extra 1d6
+        points of sonic damage with successful weapon attacks ... the extra damage is dealt
+        only if the projectile hits a target within 30 feet of you." Asked of the swing:
+        a performing ally of the attacker's holding the feat, within 30 ft (no board: all
+        here, the class abilities' rule). The bard's own blows are not an ally's."""
+        out = []
+        for bard in self.scene.actors.values():
+            if bard is actor or bard.is_down or self._against(actor, bard) \
+                    or not bard.has_state("performance.discordant-voice") \
+                    or not bard.has_state("buff.performance"):
+                continue
+            gap = self.scene.distance_between(bard.ref, actor.ref)
+            if gap is not None and gap > 30:
+                continue
+            if weapon.get("category") == "ranged" or weapon.get("ranged"):
+                far = self.scene.distance_between(bard.ref, defender.ref)
+                if far is not None and far > 30:
+                    continue
+            out.append({"dice": "1d6", "type": "sonic", "joins": False,
+                        "what": "discordant voice",
+                        "origin": "rule:feat/discordant-voice", "source": bard.name,
+                        "lethality": "lethal",
+                        "label": "Discordant voice (1d6 sonic)",
+                        "term": "discordant voice (1d6)"})
+            break
+        return out
+
+    def _ensemble_aid(self, actor: Actor, skill: str) -> list[Modifier]:
+        """Ensemble (UM): "allies within 20 feet who also have this feat can aid you with
+        your Perform checks ... as if they were aiding another as an immediate action ...
+        No more than four allies"; "If you possess one or more levels of the bard class,
+        you can choose any one ally within 20 feet to be part of the ensemble." Each
+        aider's own check against 10 (CRB p.86), hidden, in the category they are best at
+        ("Allies aiding you do not need to use the same category"); +2 each, untyped.
+        The bard's chosen ally is the nearest one without the feat (owner call)."""
+        if not str(skill).startswith("perform") or not actor.has_state("teamwork.ensemble"):
+            return []
+        from .tables import SKILLS
+
+        near = []
+        for other in self.scene.actors.values():
+            if other is actor or other.is_down or self._against(actor, other):
+                continue
+            if not self.scene.in_encounter and not (
+                    other.is_pc or other.has_state(states.TRAVELS_WITH_YOU)):
+                continue
+            gap = self.scene.distance_between(actor.ref, other.ref)
+            if gap is not None and gap > 20:
+                continue
+            near.append((gap or 0, other))
+        near.sort(key=lambda g: g[0])
+        aiders = [o for _g, o in near if o.has_state("teamwork.ensemble")]
+        if str(getattr(actor, "char_class", "") or "").lower() == "bard":
+            extra = next((o for _g, o in near if o not in aiders), None)
+            if extra is not None:
+                aiders.append(extra)
+        out: list[Modifier] = []
+        for other in aiders[:4]:
+            best = None
+            for k in SKILLS:
+                if not k.startswith("perform"):
+                    continue
+                try:
+                    total = sum(m.value for m in other.skill_modifiers(k))
+                except Exception:  # noqa: BLE001 - a category they cannot use
+                    continue
+                best = total if best is None else max(best, total)
+            if best is None:
+                continue
+            roll = self.dice.d20([Modifier(best, "Perform")],
+                                 label=f"{other.name} aids the performance",
+                                 visibility="hidden")
+            if roll.total >= AID_ANOTHER_DC:
+                out.append(Modifier(AID_ANOTHER_BONUS, f"aid from {other.name} (Ensemble)"))
+        return out
+
+    @staticmethod
+    def _marked(actor: Actor, tag: str, other: Actor) -> bool:
+        """Whether an effect of the user's carrying `tag` is aimed at `other` (its
+        modifiers' `vs`): the smite's mark."""
+        return any(other.ref == m.get("vs") for e in actor.effects
+                   if any(states.matches(t, tag) for t in e.tags) for m in e.modifiers)
+
+    @staticmethod
+    def _forgone(actor: Actor, spec: dict, target: Actor) -> list[dict]:
+        """Terms that give up one channel of a marked effect for half of it on another
+        (`self.forgoes`): Adept Champion (UC), "forgo the bonus on damage rolls and
+        instead gain half that bonus as a bonus on combat maneuver checks against the
+        target of your smite". Each forgone term is mirrored, negated, with its own
+        `when` and `first_hit` — so a smite's doubled first blow is forgone only while it
+        is still owed — and half the standing part lands on the gain."""
+        tag, given_up = str(spec.get("from") or ""), str(spec.get("target") or "damage")
+        gain = str(spec.get("gain") or "cmb")
+        out: list[dict] = []
+        standing = 0
+        for e in actor.effects:
+            if not any(states.matches(t, tag) for t in e.tags):
+                continue
+            for m in e.modifiers:
+                if m.get("vs") != target.ref or m.get("target") != given_up \
+                        or m.get("kind") != "combat_mod":
+                    continue
+                out.append({**m, "amount": -int(m.get("amount", 0)),
+                            "note": "forgone"})
+                if not m.get("first_hit") and not m.get("when"):
+                    standing += int(m.get("amount", 0))
+        if standing // 2:
+            out.append({"kind": "combat_mod", "target": gain, "amount": standing // 2,
+                        "bonus_type": "untyped", "vs": target.ref})
+        return out
+
+    def _feat_addons(self, actor: Actor, doc: dict) -> list[dict]:
+        """The addons a held feat opens on this document (`addons[].requires`, a tag a feat
+        document grants): Reward of Grace, Reward of Life and Greater Mercy on lay on hands
+        (feat loop b3-divine). A rage power's addon (`choice`/`pick`) is read by
+        `_class_self_effect`, as before."""
+        return [a for a in doc.get("addons") or ()
+                if a.get("requires") and actor.has_state(str(a["requires"]))]
+
+    def _addons_after(self, actor: Actor, doc: dict, riders: list[dict], landed: list,
+                      records: list[dict], origin: str, shown: str,
+                      tells: list[str]) -> list[dict]:
+        """What a feat's addon does once the use has landed: a timed bonus on the user
+        (`self`: Reward of Grace's "+1 sacred bonus on all attack rolls for 1 round"),
+        and hit points back to the user for healing another (`heals_user`: Reward of
+        Life's "you heal a number of hit points equal to your Charisma bonus. This ability
+        has no effect if you use lay on hands to harm undead")."""
+        from . import class_abilities as ca
+
+        out: list[dict] = []
+        healed_other = any(r.get("kind") == "heal" and r.get("ref") != actor.ref
+                           for r in records)
+        for a in riders:
+            mine = a.get("self") or {}
+            if mine.get("modifiers"):
+                mods = ca.modifiers(mine["modifiers"], actor)
+                rounds = ca.amount(mine.get("rounds"), actor, 1) or 1
+                name = str(a.get("name") or shown)
+                actor.remove_effects(match=lambda x, n=name: x.origin == origin
+                                     and x.name == n)
+                actor.apply_effect(ActiveEffect(
+                    name=name, kind="buff", source=name, origin=origin,
+                    duration="rounds", rounds_left=rounds, modifiers=mods))
+                out.append({"ref": actor.ref, "kind": "buff", "ability": name,
+                            "modifiers": mods, "rounds": rounds, "origin": origin})
+                tells.append(f"{actor.name}: " + ", ".join(
+                    f"{m['amount']:+d} {m['target']}" for m in mods)
+                    + f" for {rounds} round{'s' if rounds != 1 else ''} ({name}).")
+            if a.get("heals_user") and healed_other \
+                    and (doc.get("roll_as") or (doc.get("roll") or {}).get("as")) == "heal":
+                n = max(0, ca.amount(a["heals_user"], actor))
+                got = max(0, actor.heal(n)) if n else 0
+                if n:
+                    out.append({"ref": actor.ref, "kind": "heal", "amount": got,
+                                "rolled": n, "hp_after": actor.hp, "hp_max": actor.hp_max,
+                                "origin": origin})
+                    tells.append(f"{actor.name} recovers {got} hit points "
+                                 f"({actor.hp}/{actor.hp_max}) ({a.get('name') or shown}).")
+        return out
 
     def _class_ability_area(self, intent: Intent, actor: Actor, doc: dict, name: str):
         """Who a shaped area catches — a breath weapon's cone, a line, a burst laid away
@@ -38352,18 +38784,47 @@ class Engine:
             said += f" {_and_list(missed)} {'is' if len(missed) == 1 else 'are'} outside it."
         return said
 
-    def _bonus_from(self, actor: Actor, doc: dict) -> tuple[list[Modifier], list[Modifier]]:
+    def _bonus_from(self, actor: Actor, doc: dict, ctx: dict | None = None
+                    ) -> tuple[list[Modifier], list[Modifier]]:
         """(damage terms, DC terms) the user's own powers lend this use, read through the
-        funnel at `<bonus_from>.damage` and `<bonus_from>.dc` and stacked by type."""
+        funnel at `<bonus_from>.damage` and `<bonus_from>.dc` and stacked by type.
+
+        `ctx`: the creature the use reaches (`target_actor`), so a term scoped to it
+        holds — Leaf Singer's "+2 for creatures of the fey type" (feat loop b3-divine). With
+        none, scoped terms are dropped, as every unanswerable clause is."""
         from .dice import stack
 
         prefix = str(doc.get("bonus_from") or "").strip()
         if not prefix:
             return [], []
-        dmg = [m for m in stack(actor._buff_mods("combat_mod", f"{prefix}.damage"))
+        dmg = [m for m in stack(actor._buff_mods("combat_mod", f"{prefix}.damage", ctx))
                if m.value]
-        dc = [m for m in stack(actor._buff_mods("combat_mod", f"{prefix}.dc")) if m.value]
+        dc = [m for m in stack(actor._buff_mods("combat_mod", f"{prefix}.dc", ctx))
+              if m.value]
         return dmg, dc
+
+    def _where_ctx(self, actor: Actor) -> dict:
+        """A roll context for where the user stands: the moment's `Situation`
+        (underground, daylight) and the fight's size (`combatants`, War Singer's "any area
+        where a combat involving a dozen or more combatants is taking place")."""
+        from .sheet import Situation
+
+        n = sum(1 for refs in (self.scene.sides or {}).values() for r in refs
+                if r in self.scene.actors and not self.scene.actors[r].is_down) \
+            if self.scene.in_encounter else 0
+        return {"situation": Situation(actor, self.scene), "combatants": n}
+
+    def _reach_times(self, actor: Actor, doc: dict) -> float:
+        """How far a use's range or area is stretched (`<bonus_from>.range`, percent):
+        Leaf Singer's forest, Stone Singer's underground, War Singer's battlefield — "the
+        range or area of your chosen performance is doubled". The best term counts: two
+        doublings are not a quadrupling."""
+        prefix = str(doc.get("bonus_from") or "").strip()
+        if not prefix:
+            return 1.0
+        got = [m.value for m in actor._buff_mods("combat_mod", f"{prefix}.range",
+                                                 self._where_ctx(actor)) if m.value > 0]
+        return 1.0 + (max(got) / 100.0 if got else 0.0)
 
     def _ability_gate(self, intent: Intent, actor: Actor, shown: str,
                       foes: list[Actor]) -> Outcome | None:
@@ -38491,9 +38952,21 @@ class Engine:
             tells.append(f"{other.name} gains {said or shown}"
                          + (f" for {rounds} round{'s' if rounds != 1 else ''}." if rounds
                             else "."))
+        if spec.get("commanded"):
+            out.extend(self._commanded(actor, other, shown, origin, tells))
         if spec.get("condition"):
             cond = str(spec["condition"])
-            other.add_condition(cond, rounds, source=source, origin=origin)
+            # "Intelligent undead receive a new saving throw each round to end the effect"
+            # (Turn Undead): the hold person shape (`ends_when.save_each_turn`, rolled by
+            # `Scene._held_saves`), at the use's own DC, for a creature with an Int score.
+            payload = None
+            if spec.get("resave") == "intelligent" and other.abilities.get("int") is not None \
+                    and doc.get("save"):
+                dc = ca.amount((doc.get("save") or {}).get("dc"), actor) + sum(
+                    m.value for m in self._bonus_from(actor, doc)[1])
+                payload = {"ends_when": {"save_each_turn": {
+                    "save": str(doc["save"].get("save", "will")), "dc": dc}}}
+            other.add_condition(cond, rounds, source=source, origin=origin, payload=payload)
             out.append({"ref": other.ref, "kind": "condition", "condition": cond,
                         "rounds": rounds, "from": shown, "origin": origin})
             tells.append(_ward_tell(self.scene, {"kind": "condition", "ref": other.ref,
@@ -38520,6 +38993,60 @@ class Engine:
             tells.append(f"{other.name} gains {amount} temporary hit points.")
         return out
 
+    _FEAR_LADDER: ClassVar[tuple] = (("shaken", ""), ("frightened", "shaken"),
+                                      ("panicked", "frightened"))
+
+    def _eased(self, actor: Actor, doc: dict, landed: list, origin: str,
+               tells: list[str]) -> list[dict]:
+        """A heal that steps fear down (`eases`, held by a feat's tag): Bestow Hope (Faiths
+        of Purity), "If a creature you heal is shaken, that condition ends. If the creature
+        is frightened, it becomes shaken instead. If the creature is panicked, it becomes
+        frightened instead." One step each, from what they held when the energy reached
+        them, keeping the old condition's clock and source."""
+        eases = doc.get("eases") or {}
+        need = str(eases.get("requires") or "")
+        if not eases or (need and not actor.has_state(need)) \
+                or (doc.get("roll_as") or (doc.get("roll") or {}).get("as")) != "heal":
+            return []
+        out: list[dict] = []
+        for other in landed:
+            held = {e.key: e for e in other.effects if e.kind == "condition"}
+            for was, now in self._FEAR_LADDER:
+                e = held.get(was)
+                if e is None:
+                    continue
+                other.remove_effects(match=lambda x, e=e: x is e)
+                if now:
+                    other.add_condition(now, e.rounds_left, source=e.source, origin=e.origin)
+                out.append({"ref": other.ref, "kind": "condition_eased", "from": was,
+                            "to": now, "origin": origin})
+                tells.append(f"{other.name} is no longer {was}"
+                             + (f", only {now}." if now else "."))
+        return out
+
+    def _commanded(self, actor: Actor, other: Actor, shown: str, origin: str,
+                   tells: list[str]) -> list[dict]:
+        """An undead put under command (Command Undead, CRB): an effect tagged
+        `controlled.by.<master>` through the one applicator — read for the Hit Dice already
+        held — and, in a fight, the creature moved to its master's side of `Scene.sides`,
+        so it fights for them."""
+        other.apply_effect(ActiveEffect(
+            name="Commanded", kind="buff", key="commanded", source=f"{shown} ({actor.name})",
+            origin=origin, duration="until-dismissed",
+            tags=(f"controlled.by.{actor.ref}",)))
+        out = [{"ref": other.ref, "kind": "commanded", "by": actor.ref, "origin": origin}]
+        sides = self.scene.sides or {}
+        mine = next((k for k, refs in sides.items() if actor.ref in refs), None)
+        if mine is not None:
+            for k, refs in sides.items():
+                if other.ref in refs and k != mine:
+                    refs.remove(other.ref)
+            if other.ref not in sides[mine]:
+                sides[mine].append(other.ref)
+            out.append({"ref": other.ref, "kind": "side", "side": mine, "origin": origin})
+        tells.append(f"{other.name} falls under {actor.name}'s command.")
+        return out
+
     def _class_self_effect(self, actor: Actor, doc: dict, origin: str, shown: str,
                            key: str, target: Actor | None, pool_start, linked: list[str]
                            ) -> dict | None:
@@ -38534,10 +39061,14 @@ class Engine:
         if not spec and not key and not charge:
             return None
         mods = ca.modifiers(spec.get("modifiers"), actor)
+        if spec.get("forgoes") and target is not None:
+            mods += self._forgone(actor, spec["forgoes"], target)
         weapons: list[dict] = []
         said: list[str] = []
         add_tags: list[str] = []
         for add in doc.get("addons") or ():
+            if add.get("requires"):
+                continue                       # a feat's addon: `_feat_addons`
             if ca._norm(add.get("pick")) in ca.chosen(actor, add.get("choice", "")):
                 mods += ca.modifiers(add.get("modifiers"), actor)
                 weapons += [_sized_weapon(w, actor.size) for w in add.get("natural_weapons") or ()]
@@ -38584,6 +39115,21 @@ class Engine:
             payload["after"] = dict(doc["after"])
             payload["pool"] = str((doc.get("cost") or {}).get("pool") or "")
             payload["pool_start"] = pool_start
+        if key and doc.get("bonus_from"):
+            # Lingering Performance (APG): "The bonuses and penalties from your bardic
+            # performance continue for 2 rounds after you cease performing"; Harmonic
+            # Sage's Reverberation, 1 round. The longest, not the sum: both say the same
+            # performance goes on, not that two go on in turn. Harmonic Sage's
+            # Self-Harmonize +1 DC rides the stance itself, so it ends with it.
+            more, linger_more, sage = doc.get("_harmonic") or ([], 0, "")
+            mods += more
+            if sage:
+                payload["harmonic"] = sage
+            prefix = str(doc["bonus_from"]).strip()
+            linger = [m.value for m in actor._buff_mods("combat_mod", f"{prefix}.linger")
+                      if m.value > 0] + ([linger_more] if linger_more else [])
+            if linger:
+                payload["linger"] = max(linger)
         if linked and key:
             payload["linked"] = list(linked)
             payload["linked_source"] = f"{shown} ({actor.name})"
@@ -38665,6 +39211,8 @@ class Engine:
             line += " Natural attacks: " + ", ".join(str(w["name"]) for w in weapons) + "."
         if said:
             line += " With " + ", ".join(said) + "."
+        if payload.get("harmonic"):
+            line += f" Harmonic Sage: {payload['harmonic']}."
         if charge:
             c = payload["charge"]
             what = (" or ".join(c["weapons"][:1]) if c.get("weapons")
@@ -38672,6 +39220,17 @@ class Engine:
             swing = f"{what} blow" if what else "blow"
             if c.get("push_ft"):
                 line += f" The next {swing} this round, if it hits, drives the foe back."
+            elif c.get("dice"):
+                d = c["dice"]
+                line += (f" The next {swing} this round, if it hits"
+                         + (f" {c['target_said']}" if c.get("target_said") else "")
+                         + f": {d['count']}d{d['die']}"
+                         + (" per use spent," if d.get("per_spent") else "")
+                         + (f" {int(d['bonus']):+d}" if d.get("bonus") else "")
+                         + f" {d['type']}"
+                         + (f", {SAVES.get(c['save'], c['save'])} DC "
+                            f"{int(c['dc']) + int(c.get('dc_more') or 0)} for half"
+                            if c.get("save") else "") + ".")
             elif c.get("save"):
                 # Crushing Blow's failed save leaves a penalty, not a condition (b2).
                 worse = c["condition"] or ", ".join(
@@ -38719,6 +39278,7 @@ class Engine:
                    if charge.get(k)},
                 **({"push_ft": int(doc["charge_push_ft"])} if doc.get("charge_push_ft")
                    else {}),
+                **self._charge_dice_spec(actor, charge),
                 **({"on_fail": {"modifiers": ca.modifiers(
                     (charge["on_fail"] or {}).get("modifiers"), actor),
                     "rounds": (charge["on_fail"] or {}).get("rounds"),
@@ -38804,7 +39364,7 @@ class Engine:
 
     def _deliver_charges(self, actor: Actor, defender: Actor, weapon_key: str,
                          visibility: str = "player", weapon: dict | None = None,
-                         full: bool = False) -> list[dict]:
+                         full: bool = False, charging: bool = False) -> list[dict]:
         """Spend a charged blow on the hit that just landed — stunning fist's save.
 
         Read off the effect's payload, not a name: any document that arms the next hit
@@ -38815,8 +39375,12 @@ class Engine:
         out: list[dict] = self._first_hits_spent(actor, defender)
         for e in self._charges_for(actor, weapon_key, weapon):
             c = e.payload["charge"]
-            actor.remove_effects(match=lambda x, e=e: x is e)
+            if c.get("on_charge") and not charging:
+                continue                  # Radiant Charge waits for a charge's blow
             unfit = self._charge_unfit(c, defender, full)
+            if unfit and c.get("pays"):
+                continue                  # paid on the hit: nothing chosen, nothing spent
+            actor.remove_effects(match=lambda x, e=e: x is e)
             if unfit:
                 out.append({"effect": {"ref": defender.ref, "kind": "charge_spent",
                                        "what": e.name, "origin": e.origin},
@@ -38824,6 +39388,9 @@ class Engine:
                 continue
             if c.get("push_ft"):
                 out.extend(self._charge_push(actor, defender, e, int(c["push_ft"])))
+                continue
+            if c.get("dice"):
+                out.extend(self._charge_dice(actor, defender, e, c, visibility))
                 continue
             if not c.get("save"):
                 # A damage-only charge has done its work in the roll's funnel already.
@@ -38879,6 +39446,92 @@ class Engine:
                             "condition": c["condition"], "from": e.name})
                         + (f" It lasts {rounds} round{'s' if rounds != 1 else ''}."
                            if rounds else "")})
+        return out
+
+    def _charge_dice_spec(self, actor: Actor, charge: dict) -> dict:
+        """A charge that carries energy dice (`charge.dice`, feat loop b3-divine): Channel
+        Smite's "additional damage equal to the damage dealt by your channel energy",
+        Crusader's Fist's lay on hands dice, Radiant Charge's 1d6 per use. Worked out
+        when armed: the count, the die, a flat bonus, and what the user's own powers add
+        at `<bonus_from>.damage` and `.dc` (Improved Channel's +2 DC rides the smite as it
+        rides the burst). `pays`: the price is spent when the blow lands, not when it is
+        armed ("when you hit ... you can expend": Crusader's Fist, Radiant Charge), and
+        `amount: "all"` spends what is left, the dice `per_spent`."""
+        from . import class_abilities as ca
+
+        d = charge.get("dice") or {}
+        if not d:
+            return {}
+        dmg, dc = self._bonus_from(actor, {"bonus_from": charge.get("bonus_from")})
+        save = charge.get("save") or {}
+        out = {"dice": {"count": ca.amount(d.get("count", 1), actor, 1),
+                        "die": int(d.get("die", 6) or 6),
+                        "bonus": ca.amount(d.get("bonus"), actor, 0)
+                        + sum(m.value for m in dmg),
+                        "per_spent": bool(d.get("per_spent")),
+                        "type": str(d.get("type") or "untyped"),
+                        "ignores_dr": bool(d.get("ignores_dr"))},
+               "save_half": str(save.get("success") or "") == "half",
+               "dc_more": sum(m.value for m in dc)}
+        if isinstance(charge.get("pays"), dict):
+            out["pays"] = {"pool": str(charge["pays"].get("pool") or ""),
+                           "amount": charge["pays"].get("amount", 1)}
+        if charge.get("on_charge"):
+            out["on_charge"] = True
+        return out
+
+    def _charge_dice(self, actor: Actor, defender: Actor, e: ActiveEffect, c: dict,
+                     visibility: str) -> list[dict]:
+        """Land a charge's energy dice on the creature just hit: rolled apart from the
+        weapon, so a critical never multiplies them (1e: extra dice are not; Greater
+        Channel Smite and Crusader's Fist say so), half on a made save when the charge
+        says, through the one damage door."""
+        d = c["dice"]
+        out: list[dict] = []
+        spent = 1
+        pays = c.get("pays") or {}
+        if pays.get("pool"):
+            pool = actor.pool(pays["pool"])
+            have = pool.current if pool is not None else 0
+            want = have if pays.get("amount") == "all" else int(pays.get("amount") or 1)
+            if have < max(1, want):
+                return [{"effect": {"ref": actor.ref, "kind": "charge_spent", "what": e.name,
+                                    "origin": e.origin},
+                         "tell": f"{actor.name} has no {pays['pool']} left to spend; "
+                                 f"{e.name} does nothing."}]
+            paid = actor.spend_pool(pays["pool"], want)
+            spent = int(paid.get("spent", want) or want)
+            out.append({"effect": {"ref": actor.ref, "kind": "resource", "pool": pays["pool"],
+                                   "spent": spent, "left": paid.get("current", 0),
+                                   "origin": e.origin},
+                        "tell": f"{actor.name} spends {spent} {pays['pool']}."})
+        count = max(0, int(d["count"]) * (spent if d.get("per_spent") else 1))
+        notation = f"{count}d{d['die']}" + (f"{int(d['bonus']):+d}" if d.get("bonus") else "")
+        roll = self.dice.roll(notation, label=e.name, visibility=visibility)
+        total = max(0, roll.total)
+        line = f"{e.name}: {notation} — {total}."
+        if c.get("save"):
+            dc = int(c.get("dc") or 0) + int(c.get("dc_more") or 0)
+            sv = self.dice.d20(defender.save_modifiers(c["save"]),
+                               label=f"{SAVES.get(c['save'], c['save'])} save against "
+                                     f"{e.name}", visibility=visibility)
+            made = d20_succeeds(sv, dc)
+            nat = natural_said(sv, dc)
+            line += (f" {defender.name} {'makes' if made else 'fails'} the "
+                     f"{SAVES.get(c['save'], c['save'])} save ({nat + ', ' if nat else ''}"
+                     f"{sv.total} against DC {dc}).")
+            out.append({"effect": {"ref": defender.ref, "kind": "save", "save": c["save"],
+                                   "saved": bool(made), "dc": dc, "origin": e.origin,
+                                   "roll": sv.as_dict()}, "tell": ""})
+            if made and c.get("save_half"):
+                total //= 2
+        hit = self._apply_damage(defender, total, d["type"],
+                                 traits=("ignores_dr",) if d.get("ignores_dr") else ())
+        hit["origin"] = e.origin
+        kind = hit["type"] + (" energy" if hit["type"] in ("positive", "negative") else "")
+        line += f" {defender.name} takes {hit['amount']} {kind}" + (
+            f" ({hit['note']})." if hit.get("note") else ".")
+        out.append({"effect": hit, "tell": line})
         return out
 
     @staticmethod
@@ -38964,14 +39617,18 @@ class Engine:
                                     f"{spec['bleed']} a round."})
         return out
 
-    def _end_class_stance(self, actor: Actor, eff: ActiveEffect) -> tuple[list[dict], list[str]]:
+    def _end_class_stance(self, actor: Actor, eff: ActiveEffect,
+                          linger: bool = True) -> tuple[list[dict], list[str]]:
         """End a stance a document put on: the effect, then what it left on others and
-        what it leaves behind (`Scene.stance_ended`)."""
+        what it leaves behind (`Scene.stance_ended`). `linger=False`: ended by a new
+        stance of the same key, which ends a lingering performance outright."""
         before = actor.hp_max
         actor.remove_effects(match=lambda e: e is eff)
         if eff.source:
             actor.clear_temp_hp(source=eff.source)
         actor._follow_con(before)
+        if not linger and isinstance(eff.payload, dict):
+            eff.payload.pop("linger", None)
         return self.scene.stance_ended(actor, eff)
 
     def _op_blood_pool(self, intent: Intent, partial: dict) -> Outcome:
@@ -41463,6 +42120,7 @@ class Engine:
         rest off it. Every caller of this has always read one effect back, and a blow that
         split in two must not silently become invisible to the ones that did not change.
         """
+        was_standing = target.hp >= 0
         landed = self._intercept(target, amount, dtype, traits, lethality)
         if not landed:
             return {"ref": target.ref, "kind": "damage", "amount": 0, "rolled": amount,
@@ -41472,6 +42130,8 @@ class Engine:
                     "nonlethal": target.nonlethal, "note": "stopped before it landed"}
 
         effects = [self._land(pk) for pk in landed]
+        if was_standing and target.hp < 0:
+            self._ally_fell(target)
         effects.sort(key=lambda e: e["amount"], reverse=True)
         head, rest = effects[0], effects[1:]
         if rest:
@@ -42074,7 +42734,12 @@ def _mercy_lifts(actor, removes: dict, ca) -> list[str]:
     """The condition keys this character's chosen mercies lift, at their level."""
     catalogue = {_norm_word(k): v for k, v in (removes.get("catalogue") or {}).items()}
     out: list[str] = []
-    for pick in ca.chosen(actor, str(removes.get("choice") or "")):
+    # Extra Mercy (UM): "Select one additional mercy for which you qualify" — the feat's
+    # parenthetical held as `mercy.extra.<pick>`, asked per catalogue row.
+    picks = list(ca.chosen(actor, str(removes.get("choice") or "")))
+    picks += [k for k in catalogue if k not in picks
+              and actor.has_state(f"mercy.extra.{k.replace(' ', '-')}")]
+    for pick in picks:
         row = catalogue.get(pick) or {}
         if int(row.get("level", 1) or 1) <= ca.level_of(actor):
             out.extend(str(c) for c in row.get("lifts") or ())

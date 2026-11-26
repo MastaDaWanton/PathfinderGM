@@ -2509,6 +2509,11 @@ WHEN_KEYS: dict[str, str] = {
                      "{\"feat\": \"outflank\"} (classfeatures.holds)",
     "critical": "whether the hit was a confirmed critical (Engine._feat_riders)",
     "nonlethal": "whether the hit dealt nonlethal damage (Engine._feat_riders)",
+    # Feat loop b3-divine: War Singer's "a battlefield (any area where a combat involving
+    # a dozen or more combatants is taking place)", compared: {"gte": 12}
+    # (Engine._where_ctx).
+    "combatants": "how many stand in the fight the roll is made in, compared: "
+                  "{\"gte\": 12} (Engine._where_ctx)",
 }
 # `larger` / `smaller` (feat loop b2): size categories against the bearer's own, answered
 # by `classfeatures.holds` where the bearer is known (Risky Striker, Underfoot).

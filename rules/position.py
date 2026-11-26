@@ -122,7 +122,12 @@ def attack_mods(scene, actor, defender, weapon: dict | None = None) -> list[Modi
     mods: list[Modifier] = []
 
     with_whom = flanking_with(scene, actor, defender, weapon)
-    if with_whom:
+    # Stance of the Xorn (Dwarves of Golarion): "Flanking creatures do not gain a +2 bonus
+    # to attack you (this does not prevent you from being sneak attacked ...). A condition
+    # that makes you lose your Dex bonus to AC also makes you lose the benefits of this
+    # feat." Only the bonus goes; the flank itself still stands for sneak attack.
+    if with_whom and not (defender.has_state(NO_FLANK_BONUS)
+                          and not defender.loses_dex_to_ac):
         mods.append(Modifier(FLANKING_BONUS, f"flanking with {with_whom}", "flanking"))
 
     if _level(here) - _level(there) >= HIGHER_GROUND_SQUARES:
@@ -131,6 +136,8 @@ def attack_mods(scene, actor, defender, weapon: dict | None = None) -> list[Modi
 
 
 INTO_MELEE_PENALTY = -4
+# Stance of the Xorn's tag (content/feats/mechanics/b3-divine.json).
+NO_FLANK_BONUS = "defence.no-flank-bonus"
 # Precise Shot's tag (content/feats/mechanics/core.json): "You can shoot or throw ranged
 # weapons at an opponent engaged in melee without taking the standard -4 penalty".
 SHOOTS_INTO_MELEE = "shot.into-melee.unpenalised"

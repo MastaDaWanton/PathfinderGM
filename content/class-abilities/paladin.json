@@ -51,6 +51,17 @@
       "reach_ft": 5,
       "roll": {"count": "floor(level / 2)", "die": 6, "as": "heal"},
       "undead": {"attack": "melee touch", "as": "damage", "type": "positive"},
+      "addons": [
+        {"requires": "lay-on-hands.reward-of-grace", "name": "Reward of Grace",
+         "_source": "Reward of Grace (UM): 'Each time you use your lay on hands ability, you gain a +1 sacred bonus on all attack rolls for 1 round.'",
+         "self": {"modifiers": [{"type": "combat_mod", "target": "attack", "amount": 1, "bonus_type": "sacred"}], "rounds": 1}},
+        {"requires": "lay-on-hands.reward-of-life", "name": "Reward of Life",
+         "_source": "Reward of Life (UM): 'Each time you use your lay on hands ability to heal a creature other than yourself, you heal a number of hit points equal to your Charisma bonus. This ability has no effect if you use lay on hands to harm undead.'",
+         "heals_user": "max(0, cha_mod)"},
+        {"requires": "mercy.greater", "name": "Greater Mercy",
+         "_source": "Greater Mercy (UM): 'When you use your lay on hands ability and the target of that ability does not have any conditions your mercies can remove, it instead heals an additional +1d6 points of damage.'",
+         "unlifted_dice": "1d6"}
+      ],
       "removes": {
         "choice": "mercy",
         "catalogue": {
@@ -92,7 +103,7 @@
         "kind": "mode",
         "default": "heal",
         "options": {
-          "heal": {"living": true, "roll_as": "heal",
+          "heal": {"living": true, "roll_as": "heal", "eases": {"requires": "channel.bestow-hope"},
                    "aliases": ["heal", "healing", "heal the living", "heal the wounded",
                                "positive energy to heal", "mend", "restore"]},
           "harm": {"undead_only": true, "roll_as": "damage", "harmful": true,

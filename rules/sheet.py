@@ -2306,6 +2306,7 @@ class Actor:
         worn = [str(s.get("target") or "")
                 for s, _, _ in self.worn_specs_of("immunity", walk=walk)]
         own = own + [w for w in worn if w and w not in own]
+        own = own + [w for w in _aura_immunities(self) if w not in own]
         if not self.char_class:
             return own
         from . import classfeatures
@@ -8594,6 +8595,55 @@ def _is_of_kind(actor, field_name: str, value) -> bool:
     bronze's "magical beast" or "monstrous humanoid") — by tag prefix (law 1)."""
     wanted = value if isinstance(value, (list, tuple)) else [value]
     return any(actor.has_state(f"{field_name}.{_kind_leaf(v)}") for v in wanted)
+
+
+# What an ally's aura makes a creature immune to, by the aura's tag and radius (feat loop
+# b3-divine). Fearless Aura (UM): "Your aura of courage expands to a 20-foot-radius
+# emanation. Allies within the aura are immune to fear effects." Asked of the moment's
+# scene (`current_moment`): the sides of the fight say who is an ally, or out of one the
+# party; the board says how far, and with no board everyone here is within it (the class
+# abilities' rule, `Engine._class_ability_reach`). No moment, no aura.
+AURA_IMMUNITIES: tuple = (("aura.fearless", "class.aura-of-courage", 20, "fear"),)
+
+
+_AURA_ASKING: list = []
+
+
+def _aura_immunities(actor) -> list[str]:
+    scene = getattr(current_moment(), "scene", None)
+    if scene is None or _AURA_ASKING             or getattr(actor, "ref", None) not in getattr(scene, "actors", {}):
+        return []
+    # Re-entrancy: asking another creature's tags can ask immunities again (a worn walk,
+    # is_dead); an aura is never held by virtue of another aura.
+    _AURA_ASKING.append(1)
+    try:
+        return _aura_immunities_of(actor, scene)
+    finally:
+        _AURA_ASKING.pop()
+
+
+def _aura_immunities_of(actor, scene) -> list[str]:
+    from . import states
+
+    sides = getattr(scene, "sides", None) or {}
+    mine = next((set(refs) for refs in sides.values() if actor.ref in refs), None)
+    out: list[str] = []
+    for tag, needs, feet, against in AURA_IMMUNITIES:
+        for other in scene.actors.values():
+            if other is actor or other.is_dead or not other.has_state(tag) \
+                    or not other.has_state(needs):
+                continue
+            if mine is not None:
+                if other.ref not in mine:
+                    continue
+            elif not ((actor.is_pc or actor.has_state(states.TRAVELS_WITH_YOU))
+                      and (other.is_pc or other.has_state(states.TRAVELS_WITH_YOU))):
+                continue
+            gap = scene.distance_between(actor.ref, other.ref)
+            if gap is None or gap <= feet:
+                out.append(against)
+                break
+    return out
 
 
 def _effect_scope_holds(m: dict, ctx: dict | None) -> bool:

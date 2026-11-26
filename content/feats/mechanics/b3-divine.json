@@ -1,0 +1,228 @@
+{
+  "_about": [
+    "Feat loop batch 3, lane b3-divine (2026-11-26): channel energy, lay on hands, mercy,",
+    "smite, aura, ki and bardic performance feats, each built as its Benefit says",
+    "(content/feats/feats.json, checked against aonprd.com FeatDisplay). The feats a",
+    "character USES are documents in content/class-abilities/feats-b3-divine.json, run by",
+    "the class-ability executor; their entry here is empty, or carries a `not_yet`. The",
+    "rest are tags a class document asks for (an option's `requires`, an `eases`), or",
+    "terms on the funnel targets the class documents read."
+  ],
+  "channel-smite": {},
+  "greater-channel-smite": {},
+  "turn-undead": {},
+  "life-lure": {},
+  "quick-channel": {},
+  "command-undead": {
+    "not_yet": [
+      "An intelligent undead's new saving throw each day to resist the command.",
+      "Commands out of a fight: a commanded undead fights on its master's side; it does not follow or take orders between fights.",
+      "The opposed Charisma check when another creature's orders conflict."
+    ]
+  },
+  "elemental-channel": {
+    "tags": [
+      "channel.elemental.$target"
+    ]
+  },
+  "bestow-hope": {
+    "tags": [
+      "channel.bestow-hope"
+    ]
+  },
+  "extra-mercy": {
+    "tags": [
+      "mercy.extra.$target"
+    ]
+  },
+  "greater-mercy": {
+    "tags": [
+      "mercy.greater"
+    ]
+  },
+  "reward-of-grace": {
+    "tags": [
+      "lay-on-hands.reward-of-grace"
+    ]
+  },
+  "reward-of-life": {
+    "tags": [
+      "lay-on-hands.reward-of-life"
+    ]
+  },
+  "word-of-healing": {},
+  "crusader-s-fist": {},
+  "radiant-charge": {},
+  "adept-champion": {},
+  "fearless-aura": {
+    "tags": [
+      "aura.fearless"
+    ]
+  },
+  "lingering-performance": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "bardic-performance.linger",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "note": "APG: 'continue for 2 rounds after you cease performing'"
+      }
+    ]
+  },
+  "leaf-singer": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "bardic-performance.range",
+        "amount": 100,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "terrain": "forest"
+          }
+        },
+        "note": "APG: 'in a forest, the range or area of your chosen performance is doubled'"
+      },
+      {
+        "type": "combat_mod",
+        "target": "bardic-performance.dc",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "target": {
+            "type": "fey"
+          }
+        },
+        "note": "APG: '+2 for creatures of the fey type'"
+      }
+    ]
+  },
+  "stone-singer": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "bardic-performance.range",
+        "amount": 100,
+        "bonus_type": "untyped",
+        "when": {
+          "underground": true
+        },
+        "note": "APG: 'underground, the range or area of your chosen performance is doubled'"
+      },
+      {
+        "type": "combat_mod",
+        "target": "bardic-performance.dc",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "target": {
+            "subtype": "earth"
+          }
+        },
+        "note": "APG: '+2 for creatures of the earth subtype'"
+      }
+    ]
+  },
+  "war-singer": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "bardic-performance.range",
+        "amount": 100,
+        "bonus_type": "untyped",
+        "when": {
+          "combatants": {
+            "gte": 12
+          }
+        },
+        "note": "APG: 'on a battlefield (any area where a combat involving a dozen or more combatants is taking place)'"
+      },
+      {
+        "type": "combat_mod",
+        "target": "bardic-performance.dc",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "target": {
+            "subtype": "orc"
+          }
+        },
+        "note": "APG: '+2 for creatures of the orc subtype'"
+      }
+    ]
+  },
+  "harmonic-sage": {
+    "tags": [
+      "performance.harmonic-sage"
+    ]
+  },
+  "discordant-voice": {
+    "tags": [
+      "performance.discordant-voice"
+    ]
+  },
+  "ensemble": {
+    "tags": [
+      "teamwork.ensemble"
+    ]
+  },
+  "stance-of-the-xorn": {
+    "tags": [
+      "defence.no-flank-bonus"
+    ]
+  },
+  "destroyer-s-blessing": {
+    "tags": [
+      "maneuver.sunder.regains"
+    ]
+  },
+  "bewildering-koan": {},
+  "blood-vengeance": {
+    "tags": [
+      "vengeance.ally-falls"
+    ]
+  },
+  "blood-vengeance-orcs": {
+    "tags": [
+      "vengeance.ally-falls"
+    ]
+  },
+  "domain-strike": {
+    "not_yet": [
+      "Delivering the chosen domain power through a successful unarmed strike as a swift action: no use of a domain power rides a blow yet, so the feat does nothing."
+    ]
+  },
+  "fabulist": {
+    "tags": [
+      "skill.class.perform"
+    ],
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "perform",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "note": "Fabulist: '+1 bonus on Perform (act, comedy, oratory, and sing)'"
+      }
+    ],
+    "not_yet": [
+      "Regaining a grit point on a far-fetched lie: grit belongs to the gunslinger (or Amateur Gunslinger), and no grit pool exists yet. Perform is one skill here, so the +1 counts on every kind of performance."
+    ]
+  },
+  "disruptive-recall": {
+    "not_yet": [
+      "Spell recall: no magus is playable."
+    ]
+  },
+  "righteous-healing": {
+    "not_yet": [
+      "Judgment: no inquisitor is playable."
+    ]
+  },
+  "contingent-channeling": {
+    "not_yet": [
+      "True healer: the merciful healer cleric archetype is not playable (no archetypes yet)."
+    ]
+  }
+}

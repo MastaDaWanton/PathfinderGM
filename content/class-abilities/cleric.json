@@ -25,7 +25,7 @@
         "kind": "mode",
         "default": "heal",
         "options": {
-          "heal": {"living": true, "roll_as": "heal",
+          "heal": {"living": true, "roll_as": "heal", "eases": {"requires": "channel.bestow-hope"},
                    "aliases": ["heal", "healing", "heal the living", "heal the wounded",
                                "positive energy to heal", "mend", "restore"]},
           "harm": {"undead_only": true, "roll_as": "damage", "harmful": true,
@@ -55,7 +55,7 @@
       },
       "_bonus_from_note": "The harm mode reads `channel.harm-undead.damage` and `.dc` through the funnel: Sun's Blessing puts the cleric's level on the first and the Glory domain +2 on the second (content/domains/powers.json, each a passive modifier of its power). Negative energy reads `channel.negative.heals` off whoever it reaches: Death's Embrace grants that tag, and the energy heals them instead.",
       "negative": {
-        "heal": {"living": false, "undead_only": true, "roll_as": "heal",
+        "heal": {"living": false, "undead_only": true, "roll_as": "heal", "eases": null,
                  "healed_instead": "channel.negative.heals"},
         "harm": {"undead_only": false, "living": true, "damage_type": "negative",
                  "bonus_from": "channel.harm-living",

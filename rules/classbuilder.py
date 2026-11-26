@@ -1282,7 +1282,8 @@ def _feat_funnel_targets() -> set[str]:
                 out.add(f"pool.{str(node['pool']['id']).strip().lower()}")
             prefix = node.get("bonus_from")
             if isinstance(prefix, str) and prefix.strip():
-                out.update({f"{prefix.strip()}.dc", f"{prefix.strip()}.damage"})
+                out.update({f"{prefix.strip()}.{k}"
+                            for k in ("dc", "damage", "range", "linger")})
             for v in node.values():
                 walk(v)
         elif isinstance(node, list):
