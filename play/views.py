@@ -1337,10 +1337,13 @@ def _usable_abilities(pc) -> list[dict]:
             for name in names:
                 # A passive is not "usable": Swift Strikes sat on this bar as a button,
                 # and clicking it stood in for the attack it exists to modify.
-                if name.lower() in passives:
+                # Asked of the resolved name too: the tier lists "Iron Clot (DR 2/-)" and
+                # the passive list "Iron Clot", and the DR sat on the bar as a standard
+                # action that could only answer "always active" (audit 2026-11-26).
+                key = (det.get("resolves") or {}).get(name, "")
+                if name.lower() in passives or str(key).lower() in passives:
                     continue
                 if int(tier) <= reached:
-                    key = (det.get("resolves") or {}).get(name, "")
                     entry = {"name": name, "path": path, "tier": int(tier),
                              "text": (det.get("abilities") or {}).get(key, "")}
                     # A toggle's button must say whether it holds — that confusion is
@@ -1349,6 +1352,17 @@ def _usable_abilities(pc) -> list[dict]:
                     if cond:
                         entry["toggle"] = True
                         entry["active"] = pc.has_condition(str(cond))
+                        # The special abilities its weapon may take (owner ask 2026-11-26
+                        # A2): "Extracorporeal Blood Armament (keen)" lays keen, formed or
+                        # not, and the button stays whichever way the toggle stands.
+                        props = ((((det.get("grants") or {}).get(key) or {})
+                                  .get("weapon") or {}).get("properties") or {})
+                        if props.get("choose_from"):
+                            entry["choices"] = [str(p) for p in props["choose_from"]]
+                            entry["choice_kind"] = "property"
+                            held = {str(e.payload.get("weapon_property"))
+                                    for e in pc.granted_properties(str(cond))}
+                            entry["held"] = [p for p in entry["choices"] if p in held]
                     # A use with a document (Battle Blood Ki Pool): its action, its modes
                     # and what is left in its pool, read off the document as the core
                     # classes' entries are (`class_abilities.usable`), so the Swift menu
@@ -1364,8 +1378,12 @@ def _usable_abilities(pc) -> list[dict]:
                         # Aimed the way the core classes' entries are: a harm or a
                         # target takes the panel's target chip (Blood Spike Projectile),
                         # a use on oneself (Battle Blood Ki Pool) does not.
+                        # An ally's ability (Blood Transfer) is not aimed at the foe chip:
+                        # it was, and every press in a fight was refused "the thug is not
+                        # an ally" (audit 2026-11-26). The ally is named in words.
                         reaches = doc.get("affects") or "self"
                         entry["aim"] = str(doc.get("aim") or (
+                            "ally" if reaches == "ally" and not doc.get("harmful") else
                             "foe" if doc.get("harmful") or reaches not in ("self", "allies")
                             else "self"))
                         pid = str((doc.get("cost") or {}).get("pool") or "")

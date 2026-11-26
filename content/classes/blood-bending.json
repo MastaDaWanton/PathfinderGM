@@ -113,9 +113,10 @@
       "id": "stunning strike",
       "from_level": 13,
       "ability": "Stunning Strike",
-      "max": "floor(level/4)",
+      "max": "floor(level/4) + con_mod",
       "starts": "max",
-      "refresh": "rest.night"
+      "refresh": "rest.night",
+      "_note": "'Usable 1/day for every 4 levels + CON modifier', as Unbalancing Strike's; the Con term was dropped here until 2026-11-26."
     },
     {
       "id": "rapid coagulation",
@@ -1178,7 +1179,7 @@
         ]
       },
       "abilities": {
-        "Extracorporeal Blood Armament": "Toggle (free action): form or dismiss blood gauntlets over your hands. While formed, the armed punch is available as an attack, dealing Blood DMG + Fist DMG + STR mod as piercing/bludgeoning (or non-lethal). The armament never applies through a held weapon — it arms your fists, not your sword. Applies 1 blood stack per hit. Special abilities (Corrosive, Keen, Vicious, Advancing) can be paid for in Non-Lethal costs per turn.",
+        "Extracorporeal Blood Armament": "Toggle (free action): form or dismiss blood gauntlets over your hands. While formed, the armed punch is available as an attack, dealing Blood DMG + Fist DMG + STR mod as piercing/bludgeoning (or non-lethal). The armament never applies through a held weapon — it arms your fists, not your sword. Applies 1 blood stack per hit. Special abilities (Corrosive, Keen, Vicious, Advancing) can be paid for in Non-Lethal costs per turn: name one in brackets — Extracorporeal Blood Armament (keen) — and it costs 2d6 non-lethal when chosen and again each turn it holds; name it again to let it go. Advancing is not built yet.",
         "Coagulant Stacks": "Target loses -10 ft movement per stack.",
         "Vampiric Recovery": "Rip stacks back from enemies to deal 2d10 damage and heal 50% of damage dealt (1d3 turn cooldown).",
         "Vortex Pull": "Swift action. Pull enemies 10 ft per stack towards you (1d3 turn cooldown).",
@@ -1249,6 +1250,9 @@
       },
       "needs": {
         "Blood Burst": [],
+        "Vampiric Recovery": [
+          "blood stacks ripped back from the foes who carry them, a 2d10 harm, a heal of half the harm dealt, and a 1d3-turn cooldown (the converter read '50%' as a flat 50 hit points healed; audit 2026-11-26)"
+        ],
         "Rupture Self": [
           "targeting a particular Blood Pool on the map"
         ],
@@ -1321,7 +1325,15 @@
             "rider_column": "fist",
             "type": "bludgeoning and piercing",
             "proficiency_as": "unarmed",
-            "lethality": "either"
+            "lethality": "either",
+            "properties": {
+              "_note": "'Apply special abilities (Corrosive, Keen, Vicious, Advancing) by paying Non-Lethal costs per turn.' The author names the four and the currency, not the amount: the price is the class's own for a +1 (Blood Booster, '+1 to the modifier--2d6 non-lethal dmg'), per +1 of the property's book price, per turn — paid when chosen and at the top of each round of a fight while it holds; a stretch of time with no turns lets it go. The same ability once (UE). Each one is the enchanter's own property document (content/rules/magic-properties.json), laid on the armed punch as an ActiveEffect. docs/research/2026-11-26-blood-bender.md.",
+              "choose_from": ["corrosive", "keen", "vicious"],
+              "not_yet": {
+                "advancing": "Advancing (Ultimate Equipment, +2): a 5-foot step as a swift action after a melee hit. The engine has no swift step after a blow yet, so it is not laid and nothing is paid."
+              },
+              "cost": {"dice_per_plus": "2d6"}
+            }
           },
           "tell": "{name} forms the blood armament. The armed punch is ready as an attack."
         },

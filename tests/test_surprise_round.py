@@ -194,3 +194,38 @@ def test_a_declared_fight_asks_the_same_question():
     assert thug.has_state(states.SURPRISED)
     assert scene.current_ref() == "pc"
     assert any("Surprise round" in o.tell for o in res.outcomes)
+
+
+def test_a_free_ability_does_not_spend_the_surprise_round():
+    """Live 2026-11-26 (owner ask A2) on Shadow's save: "free: Extracorporeal Blood Armament
+    (keen); strike the lost scholar" in the surprise round paid the keen and then refused
+    the strike, "Surprise round: Shadow has one standard or move action, and it is spent."
+    CRB, The Surprise Round: "You can also take free actions during the surprise round."
+    A free use goes first and the one action still follows it; the other way round, the
+    free use after the strike is not refused either."""
+    from rules.sheet import from_dict, to_dict
+
+    scene = Scene(location_id="5bbd0c40345f")
+    d = to_dict(load_pc("fixtures/pc-kesst.json"))
+    d.update({"class": "blood bending", "level": 1, "ranks": {}, "paths": ["battle blood"],
+              "hp": 40, "hp_max": 40})
+    scene.add(from_dict(d, ref="pc"))
+    scene.add(instantiate("thug", scene=scene, name="the thug"))
+    engine = Engine(scene, _Faces({}, 10))
+    pc, thug = scene.get("pc"), scene.get("c1")
+    engine._ensure_encounter("pc", "c1")
+    thug.add_condition(surprise.SURPRISED_KEY, rounds=1, source=surprise.ORIGIN)
+    pc.add_condition(surprise.ROUND_KEY, rounds=1, source=surprise.ORIGIN)
+    from tests._board import face_to_face
+
+    face_to_face(scene)
+    res = _run(engine,
+               {"op": "use_ability", "actor": "pc", "because": "keen",
+                "params": {"ability": "Extracorporeal Blood Armament (keen)"}},
+               {"op": "attack", "actor": "pc", "target": "c1", "because": "strike"})
+    assert not [o for o in res.outcomes if o.status == "refused"], \
+        [o.tell for o in res.outcomes]
+    assert any(o.op == "attack" and o.status == "resolved" for o in res.outcomes)
+    later = _run(engine, {"op": "use_ability", "actor": "pc", "because": "vicious",
+                          "params": {"ability": "Extracorporeal Blood Armament (vicious)"}})
+    assert not [o for o in later.outcomes if o.status == "refused"]

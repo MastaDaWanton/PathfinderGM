@@ -377,9 +377,10 @@ def test_a_bender_arrives_with_their_pools_filled():
     b = bender(level=6, con=16)
     assert b.pool("rage").maximum == 17                 # 4 + 3 + 2*5
     assert b.pool("ki").maximum == 6                    # floor(6/2) + 3
-    # Unbalancing strike's pool waits for a document saying what it does: the class
-    # file prints only its uses (owner's call, playtest 2026-11-15).
-    assert b.pool("unbalancing strike") is None
+    # Unbalancing strike's pool waited for a document saying what it does (owner's call,
+    # playtest 2026-11-15); it has one since 2026-11-26 (content/class-abilities/
+    # blood-bending.json): "1/day for every 4 levels + CON modifier".
+    assert b.pool("unbalancing strike").maximum == 4    # floor(6/4) + 3
 
 
 def test_a_pool_not_yet_earned_is_not_there():

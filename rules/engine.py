@@ -6902,7 +6902,34 @@ class Engine:
         after = {id(o) for o in so_far[joined_at + 1:]} if joined_at >= 0 else None
         return any(not any(e.get("kind") == "battle_joined" for e in o.effects or ())
                    and (after is None or id(o) in after)
+                   and not (o.op == "use_ability" and self._free_use(actor, o.effects))
                    for o in self._acted_in_batch(actor, self._ONE_ACTION_OPS))
+
+    _NOT_THE_ACTION = ("free", "swift", "immediate")
+
+    def _free_use(self, actor, effects=None, ability: str = "") -> bool:
+        """Whether an ability use is not the surprise round's one action: "You can also
+        take free actions" (CRB, The Surprise Round), and a swift action may be taken
+        whenever a free one may. Live 2026-11-26 (owner ask A2): laying keen on the blood
+        armament, a free action, spent Shadow's surprise round, and the strike behind it
+        was refused "it is spent". Read off the outcome's records (a toggle, a property
+        laid, the executor's `action`), or, before the act, off its document."""
+        from . import class_abilities, leveling
+
+        for e in effects or ():
+            if e.get("kind") in ("toggle", "weapon_property"):
+                return True
+            if e.get("kind") == "use_ability" and e.get("action"):
+                return str(e["action"]) in self._NOT_THE_ACTION
+        if not ability:
+            return False
+        _p, found, _fx = leveling.find_ability(actor, ability)
+        if found and leveling.toggle_key(actor, found):
+            return True
+        doc = leveling.ability_doc(actor, found)[1] if found else {}
+        if not doc:
+            doc = class_abilities.find(actor, ability)[0] or {}
+        return bool(doc) and class_abilities.action_of(doc, actor) in self._NOT_THE_ACTION
 
     def _one_action_refusal(self, raw: dict) -> "Outcome | None":
         """This act refused for the surprise round's limit, or None. A creature's full
@@ -6921,6 +6948,9 @@ class Engine:
             return None
         actor = self.scene.actors.get(str(raw.get("actor") or ""))
         if actor is None or not actor.has_state(states.ONE_ACTION_TURN):
+            return None
+        if op == "use_ability" and self._free_use(
+                actor, ability=str(params.get("ability") or "")):
             return None
         why = ""
         if op == "attack" and (params.get("spring_attack") or params.get("whirlwind_attack")) \
@@ -6950,7 +6980,10 @@ class Engine:
         if intent.op not in self._ONE_ACTION_OPS or intent.op == "move"                 or outcome.status != "resolved" or intent.params.get("reaction")                 or any(e.get("kind") == "battle_joined" for e in outcome.effects or ()):
             return
         actor = self.scene.actors.get(intent.actor or "")
-        if actor is not None and self.scene.in_encounter                 and actor.has_state(states.ONE_ACTION_TURN):
+        if actor is not None and self.scene.in_encounter \
+                and actor.has_state(states.ONE_ACTION_TURN) \
+                and not (intent.op == "use_ability"
+                         and self._free_use(actor, outcome.effects)):
             self.scene.standard_spent[actor.ref] = self.scene.round
 
     def _standard_spent_refusal(self, intent: Intent, actor) -> "Outcome | None":
@@ -37103,6 +37136,15 @@ class Engine:
         key = leveling.toggle_key(actor, found)
         doc_path, doc = leveling.ability_doc(actor, found)
         if key:
+            # A toggle named with a special ability for the weapon it forms — "<toggle>
+            # (keen)" — lays (or lifts) that ability; it never dismisses the weapon
+            # (owner ask 2026-11-26 A2).
+            from . import class_abilities as _ca
+
+            picked = (_ca._match(wanted, {"name": found}) or (0, ""))[1]
+            if picked and ((doc.get("weapon") or {}).get("properties")):
+                return self._granted_property(intent, actor, found, key, doc_path, doc,
+                                              picked)
             if actor.has_condition(key):
                 self._drop_stance(actor, key, doc)
                 return Outcome(
@@ -37112,34 +37154,13 @@ class Engine:
                     tell=_doc_tell(doc.get("tell_off"), actor)
                          or f"{actor.name} lets the {key} fall away.",
                     because=intent.because)
-            # Requirements and cost are checked before anything lands, and a failure
-            # is a refusal Outcome with the reason printed — never an IntentError.
-            # The schema may REQUIRE the op the player declared, and a hard refusal
-            # against a required op is the 502 death-spiral this repo has buried four
-            # times (see _op_forage's own post-mortem).
-            refused = self._ability_refusal(actor, found, doc)
-            if refused:
+            formed = self._form_toggle(actor, found, key, doc_path, doc)
+            if isinstance(formed, str):
                 return Outcome(intent_id=intent.id, op="use_ability", effects=[],
-                               tell=f"Nothing takes hold. {refused}",
+                               tell=f"Nothing takes hold. {formed}",
                                because=intent.because)
-            spent = []
-            cost = doc.get("cost") or {}
-            if cost.get("pool"):
-                paid = actor.spend_pool(str(cost["pool"]),
-                                        int(cost.get("amount", 1) or 1))
-                spent.append({"ref": actor.ref, "kind": "resource",
-                              "pool": str(cost["pool"]),
-                              "spent": paid.get("spent", 0),
-                              "left": paid.get("current", 0)})
-            applied = self._apply_ability_document(actor, found, key, doc_path, doc)
-            return Outcome(
-                intent_id=intent.id, op="use_ability",
-                effects=[{"ref": actor.ref, "kind": "toggle", "state": "on",
-                          "condition": key}] + spent + applied["effects"],
-                tell=_doc_tell(doc.get("tell"), actor)
-                     or f"{actor.name} forms the {key}."
-                        + (" " + applied["said"] if applied["said"] else ""),
-                because=intent.because)
+            return Outcome(intent_id=intent.id, op="use_ability", effects=formed[0],
+                           tell=formed[1], because=intent.because)
         # Not reached yet: a refusal, with the tier named. This and the two branches below
         # were ONE outcome, status resolved and no effects, whatever the reason — measured
         # on the owner's report of 2026-11-01: "Battle Blood Ki Pool is a Control Blood 2
@@ -37475,6 +37496,125 @@ class Engine:
         actor.remove_condition(key)
         if (doc.get("temp_hp") or {}) and source:
             actor.clear_temp_hp(source=source)
+        # The special abilities laid on the weapon it formed go with it.
+        for held in actor.granted_properties(key):
+            actor.remove_effects(match=lambda x, held=held: x is held)
+
+    def _form_toggle(self, actor: Actor, found: str, key: str, path: str, doc: dict):
+        """Turn a path toggle on: requirements, its pool cost, then its document through
+        the one applicator. Returns the refusal sentence, or (effect records, tell).
+
+        Requirements and cost are checked before anything lands, and a failure is a
+        refusal Outcome with the reason printed — never an IntentError. The schema may
+        REQUIRE the op the player declared, and a hard refusal against a required op is
+        the 502 death-spiral this repo has buried four times (see _op_forage's own
+        post-mortem)."""
+        refused = self._ability_refusal(actor, found, doc)
+        if refused:
+            return refused
+        spent = []
+        cost = doc.get("cost") or {}
+        if cost.get("pool"):
+            paid = actor.spend_pool(str(cost["pool"]), int(cost.get("amount", 1) or 1))
+            spent.append({"ref": actor.ref, "kind": "resource", "pool": str(cost["pool"]),
+                          "spent": paid.get("spent", 0), "left": paid.get("current", 0)})
+        applied = self._apply_ability_document(actor, found, key, path, doc)
+        tell = (_doc_tell(doc.get("tell"), actor) or f"{actor.name} forms the {key}."
+                + (" " + applied["said"] if applied["said"] else ""))
+        return ([{"ref": actor.ref, "kind": "toggle", "state": "on", "condition": key}]
+                + spent + applied["effects"], tell)
+
+    def _granted_property(self, intent: Intent, actor: Actor, found: str, key: str,
+                          path: str, doc: dict, picked: str) -> Outcome:
+        """Lay a weapon special ability on the weapon a toggle forms, or lift it.
+
+        Owner ask 2026-11-26 A2: a level-1 homebrew weapon toggle "Apply special
+        abilities (Corrosive, Keen, Vicious, Advancing) by paying Non-Lethal costs per
+        turn", and nothing laid them. The document's
+        `weapon.properties` says which, and the price per +1 of each property's book
+        price; the property itself is the enchanter's document
+        (content/rules/magic-properties.json), so its keen is a forged blade's keen.
+
+        One ActiveEffect per property (law 2): its payload names the property and the
+        toggle whose weapon carries it (`Actor._granted_layer` reads it), its periodic
+        entry the per-turn price (`Actor.run_periodic`, `upkeep_nonlethal`). Not formed
+        yet, the weapon is formed first, with the toggle's own checks. Named again, the
+        property is lifted. docs/research/2026-11-26-blood-bender.md.
+        """
+        from . import effectspec
+
+        spec = (doc.get("weapon") or {}).get("properties") or {}
+        name = found.title()
+        choose = [_norm_word(p) for p in spec.get("choose_from") or ()]
+        later = {_norm_word(k): str(v) for k, v in (spec.get("not_yet") or {}).items()}
+        pid = _norm_word(picked)
+        offered = ", ".join(f"{name} ({p})" for p in choose)
+        if pid in later:
+            return self._refuse(intent, f"{later[pid]} {name} can take: {offered}.",
+                                code="ability_unsupported")
+        prop = effectspec.property(pid) if pid in choose else None
+        if prop is None:
+            return self._refuse(intent, f"{name} has no special ability called "
+                                        f"{picked!r}. It can take: {offered}.",
+                                code="ability_choice")
+        pname = str(prop.get("name") or pid)
+        origin = f"ability:{path}/{found}"
+        held = next((e for e in actor.granted_properties(key)
+                     if e.payload.get("weapon_property") == prop["id"]), None)
+        if held is not None:
+            actor.remove_effects(match=lambda x: x is held)
+            return Outcome(
+                intent_id=intent.id, op="use_ability",
+                effects=[{"ref": actor.ref, "kind": "effect_ended", "what": held.name,
+                          "origin": origin}],
+                tell=f"{actor.name} lets the {pname.lower()} go from the {name}. "
+                     f"It costs nothing more.",
+                because=intent.because)
+        # The property's own restriction, against the weapon the document grants
+        # (a keen club is not a thing), by the damage types the document gives it.
+        w = doc.get("weapon") or {}
+        req = prop.get("requires") or {}
+        types = set(re.split(r"\s*(?:and|or|/|,)\s*", str(w.get("type") or "").lower()))
+        if req.get("ranged") or (req.get("damage_types_any")
+                                 and not types & set(req["damage_types_any"])):
+            return self._refuse(intent, f"{pname} needs a "
+                                        f"{' or '.join(req.get('damage_types_any') or ['ranged'])}"
+                                        f" weapon, and the {name} is not one.",
+                                code="ability_refused")
+        records: list[dict] = []
+        tells: list[str] = []
+        rolls: list[Roll] = []
+        if not actor.has_condition(key):
+            formed = self._form_toggle(actor, found, key, path, doc)
+            if isinstance(formed, str):
+                return self._refuse(intent, f"Nothing takes hold. {formed}",
+                                    code="ability_refused")
+            records.extend(formed[0])
+            tells.append(formed[1])
+        from . import leveling
+
+        price = leveling.multiply_dice(str((spec.get("cost") or {}).get("dice_per_plus")
+                                           or "2d6"), max(1, int(prop.get("plus") or 1)))
+        shown = f"{name} ({pname.lower()})"
+        self._pay_hp_cost(actor, {"hp_cost": {"dice": price}}, None, shown, origin,
+                          rolls, records, tells)
+        label = f"{pname} ({name})"
+        actor.apply_effect(ActiveEffect(
+            name=label, kind="buff", source=label, origin=origin,
+            tags=(f"buff.weapon-property.{prop['id']}",),
+            payload={"weapon_property": prop["id"], "granted_by": key},
+            periodic=[{"upkeep_nonlethal": price, "while": key}]))
+        records.append({"ref": actor.ref, "kind": "weapon_property", "property": prop["id"],
+                        "upkeep": price, "origin": origin})
+        what = str(prop.get("text") or "").strip()
+        tells.append(f"The {name} takes on {pname.lower()}"
+                     + (f": {what[:1].lower()}{what[1:]}" if what else ".")
+                     + f" It costs {price} non-lethal each turn it holds.")
+        crossed = self._hp_state_effects(actor)
+        return Outcome(intent_id=intent.id, op="use_ability", rolls=rolls,
+                       effects=records + crossed,
+                       tell=" ".join(tells) + self._hp_state_tell(crossed),
+                       because=intent.because)
 
     # --- the core classes' abilities (rules/class_abilities.py) -------------------------
     #
@@ -42077,6 +42217,10 @@ def _ward_tell(scene: Scene, e: dict) -> str:
             return held
         return (f"{source} restores {e['amount']} hit points to {name}."
                 + (f" {held}" if held else ""))
+    # A per-turn price paid at the top of the round (`Actor.run_periodic`).
+    if kind == "upkeep_paid":
+        return (f"{name} pays {e.get('amount')} non-lethal to hold {source} "
+                f"({e.get('nonlethal')} in all).")
     if kind == "ward_saved":
         nat = f"{e['natural']}, " if e.get("natural") else ""
         return f"{name} rides out {source} ({nat}{e.get('roll')} against DC {e.get('dc')})."
