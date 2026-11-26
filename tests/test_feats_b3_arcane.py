@@ -476,3 +476,40 @@ def test_tenebrous_cannot_take_a_light_spell_and_costs_nothing_on_darkness():
                                                    ["tenebrous-spell"], spontaneous=False)
     assert metamagic.levels(pc, ["tenebrous-spell"], spells.get("darkness")) == 0
     assert metamagic.levels(pc, ["tenebrous-spell"], spells.get("burning-hands")) == 1
+
+
+# --- Blood Ties -------------------------------------------------------------------------------
+
+def test_blood_ties_lets_a_draconic_gnome_bluff_where_she_would_plead_with_a_dragon():
+    """GoG: "When attempting a Diplomacy check to influence a creature with a plausible
+    connection to your sorcerous bloodline, you may instead make a Bluff check ... a gnome
+    sorcerer with the draconic bloodline may use this feat against dragons and their kin,
+    but no other creatures." Bluff +9 against Diplomacy +1: the pseudodragon is talked to
+    with the Bluff; the thug is not."""
+    pc = _red_sorcerer(["Blood Ties"], level=4)
+    pc.ranks = {"bluff": 4}
+    pc.abilities["cha"] = 18
+    e = Engine(Scene(), Dice(seed=1))
+    plain = list(pc.skill_modifiers("diplomacy"))
+    kin = e._blood_ties(pc, instantiate("pseudodragon", name="the pseudodragon"), plain)
+    assert sum(m.value for m in kin) == sum(m.value for m in pc.skill_modifiers("bluff"))
+    assert all("Blood Ties" in m.source for m in kin)
+    assert e._blood_ties(pc, instantiate("thug", name="the thug"), plain) == plain
+    assert e._blood_ties(_red_sorcerer([], level=4),
+                         instantiate("pseudodragon", name="p"), plain) == plain
+
+
+def test_blood_ties_reaches_the_roll_of_a_real_influence_check():
+    """Through the check op the table sends: the Diplomacy roll at the pseudodragon is
+    made of the Bluff's terms, each labelled for the popup."""
+    pc = _red_sorcerer(["Blood Ties"], level=4)
+    pc.ranks = {"bluff": 4}
+    s = Scene(location_id="5bbd0c40345f")
+    s.add(pc)
+    d = s.add(instantiate("pseudodragon", scene=s, name="the pseudodragon"))
+    e = Engine(s, Dice(seed=2))
+    res = e.run(e.validate([{"op": "check", "actor": pc.ref, "target": d.ref,
+                             "visibility": "hidden", "because": "test",
+                             "params": {"skill": "diplomacy"}}], origin="author:test"))
+    terms = [m.source for o in res.outcomes for r in o.rolls for m in r.modifiers]
+    assert terms and all("(Bluff, Blood Ties)" in t for t in terms)

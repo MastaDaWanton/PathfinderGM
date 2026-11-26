@@ -9591,6 +9591,8 @@ class Engine:
         swayed = None if heard is not None else self._sway_subject(intent, skill)
         if swayed is not None and (refusal := self._sway_refusal(intent, actor, swayed, skill)):
             return refusal
+        if swayed is not None and skill == "diplomacy":
+            mods = self._blood_ties(actor, swayed, mods)
         # Intimidate in a fight at one on a side is Demoralize (`_sway`): its own roll.
         if swayed is not None and skill == "intimidate" and self.scene.in_encounter and any(
                 swayed.ref in refs for refs in (self.scene.sides or {}).values()):
@@ -10159,7 +10161,41 @@ class Engine:
                   f"hear it again. Come back tomorrow, or find another way."),
             because=intent.because)
 
+    # Blood Ties (Gnomes of Golarion p.30, aonprd 2026-11-26): "When attempting a Diplomacy
+    # check to influence a creature with a plausible connection to your sorcerous
+    # bloodline, you may instead make a Bluff check. For example, a gnome sorcerer with the
+    # draconic bloodline may use this feat against dragons and their kin, but no other
+    # creatures." The book names only the draconic case; the rest is this app's reading of
+    # "plausible" (owner call, b3-arcane), by the creature's own type or subtype tags. The
+    # arcane and destined bloodlines name no kind of creature and reach nobody.
+    BLOOD_KIN: dict[str, tuple[str, ...]] = {
+        "draconic": ("type.dragon",), "abyssal": ("subtype.demon",),
+        "infernal": ("subtype.devil",), "fey": ("type.fey",), "undead": ("type.undead",),
+        "aberrant": ("type.aberration",),
+        "celestial": ("subtype.angel", "subtype.archon", "subtype.azata",
+                      "subtype.agathion"),
+        "elemental": ("subtype.$element",),
+    }
+
+    def _blood_ties(self, actor, target, mods: list) -> list:
+        """Diplomacy's terms, or the bearer's Bluff in their place when Blood Ties reaches
+        this creature and the Bluff is the better (the feat's "may": taken when it helps)."""
+        from . import classes as classes_mod
+
+        if not actor.has_state("skill.bluff.blood-ties"):
+            return mods
+        for pick in classes_mod.chosen(actor, "bloodline"):
+            kin = [t.replace("$element", str(pick.get("variant") or "").lower())
+                   for t in self.BLOOD_KIN.get(str(pick.get("id") or "").lower(), ())]
+            if any(t and not t.endswith(".") and target.has_state(t) for t in kin):
+                bluff = list(actor.skill_modifiers("bluff"))
+                if sum(m.value for m in bluff) > sum(m.value for m in mods):
+                    return [Modifier(m.value, f"{m.source} (Bluff, Blood Ties)", m.type)
+                            for m in bluff]
+        return mods
+
     def _sway(self, actor, target, skill: str, margin: int, because: str,
+
               demand: str = ""):
         """Move the target along the track, and say how they now feel.
 
