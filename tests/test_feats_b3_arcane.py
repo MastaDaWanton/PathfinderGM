@@ -513,3 +513,24 @@ def test_blood_ties_reaches_the_roll_of_a_real_influence_check():
                              "params": {"skill": "diplomacy"}}], origin="author:test"))
     terms = [m.source for o in res.outcomes for r in o.rolls for m in r.modifiers]
     assert terms and all("(Bluff, Blood Ties)" in t for t in terms)
+
+
+# --- Unsanctioned Knowledge -------------------------------------------------------------------
+
+def test_unsanctioned_knowledge_puts_four_spells_on_the_paladin_list():
+    """UM: "Pick one 1st-level spell, one 2nd-level spell, one 3rd-level spell, and one
+    4th-level spell from the bard, cleric, inquisitor, or oracle spell lists. Add these
+    spells to your paladin spell list as paladin spells of the appropriate level."
+    Command, silence, searing light and dismissal become paladin spells of levels 1-4; a fifth
+    name, or one off those lists, adds nothing."""
+    picks = ["command", "silence", "searing light", "dismissal", "fireball"]
+    pal = _wren([f"Unsanctioned Knowledge ({', '.join(picks)})"], level=13,
+                **{"class": "paladin"})
+    plain = _wren([], level=13, **{"class": "paladin"})
+    for sid, lvl in (("command", 1), ("silence", 2), ("searing-light", 3), ("dismissal", 4)):
+        sp = spells.get(sid)
+        assert "paladin" not in sp.lists
+        assert casting.spell_level_for(pal, sp) == lvl
+        assert casting.on_class_list(pal, sp) and casting.knows(pal, sp)
+        assert not casting.on_class_list(plain, sp)
+    assert casting.spell_level_for(pal, spells.get("fireball")) is None

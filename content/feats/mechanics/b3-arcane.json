@@ -240,5 +240,21 @@
     "tags": [
       "skill.bluff.blood-ties"
     ]
+  },
+  "unsanctioned-knowledge": {
+    "spell_list_add": {
+      "from": [
+        "bard",
+        "cleric",
+        "inquisitor",
+        "oracle"
+      ],
+      "levels": [
+        1,
+        2,
+        3,
+        4
+      ]
+    }
   }
 }

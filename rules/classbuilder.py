@@ -1144,7 +1144,10 @@ _FEAT_DOC_KEYS = frozenset({"modifiers", "tags", "budget", "choice", "attack_abi
                             "luck",
                             # Feat loop b3-arcane: a bloodline's powers by feat
                             # (Eldritch Heritage; rules/grantedpowers.heritage_sources).
-                            "heritage"})
+                            "heritage",
+                            # Spells added to the class list (Unsanctioned Knowledge;
+                            # rules/casting.feat_list_spells).
+                            "spell_list_add"})
 
 # The keys a feat's `luck` entry may carry (rules/luck.py, which reads them).
 _LUCK_KEYS = frozenset({"reroll", "bonus", "ally_save", "on_reroll", "surge", "rolls",
@@ -1474,7 +1477,17 @@ def validate_feat_document(feat_id: str, doc) -> list[str]:
         problems.extend(_on_hit_problems(at, doc["on_hit"], doc))
     if doc.get("luck") is not None:
         problems.extend(_luck_problems(at, doc["luck"]))
+    add = doc.get("spell_list_add")
+    if add is not None and (
+            not isinstance(add, dict) or set(add) - {"from", "levels"}
+            or not add.get("from") or not all(isinstance(x, str) for x in add["from"])
+            or not add.get("levels")
+            or not all(isinstance(n, int) and 0 <= n <= 9 for n in add["levels"])):
+        problems.append(
+            f"{at}.spell_list_add: {{\"from\": [\"cleric\", \"bard\"], \"levels\": [1, 2]}} "
+            f"— the class lists the picks come from and the one level each pick adds.")
     heritage = doc.get("heritage")
+
     if heritage is not None and (
             not isinstance(heritage, dict)
             or set(heritage) - {"powers", "level_offset", "pick", "lifts"}

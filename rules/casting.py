@@ -549,12 +549,14 @@ def granted_known(actor) -> dict[str, int]:
     highest the caster could cast at the class level it arrived (Celestial's bless, a
     cleric spell, is a 1st-level sorcerer spell for her)."""
     data = caster_data(actor)
-    if not data or not (getattr(actor, "class_choices", None) or {}):
+    if not data:
         return {}
+    out: dict[str, int] = feat_list_spells(actor)
+    if not (getattr(actor, "class_choices", None) or {}):
+        return out
     from . import grantedpowers
 
     level = int(getattr(actor, "level", 1) or 1)
-    out: dict[str, int] = {}
     for src in grantedpowers.sources(actor):
         cat = (src.get("pick") or {}).get("entry") or {}
         for at, name in (cat.get("bonus_spells") or {}).items():
@@ -569,7 +571,40 @@ def granted_known(actor) -> dict[str, int]:
     return out
 
 
+def feat_list_spells(actor) -> dict[str, int]:
+    """Spells a feat adds to the caster's own list, by id, at the level it adds each.
+
+    Unsanctioned Knowledge (UM, aonprd 2026-11-26): "Pick one 1st-level spell, one
+    2nd-level spell, one 3rd-level spell, and one 4th-level spell from the bard, cleric,
+    inquisitor, or oracle spell lists. Add these spells to your paladin spell list as
+    paladin spells of the appropriate level." The document's `spell_list_add` names the
+    lists and levels; the sheet's parenthetical names the spells, comma-separated, and a
+    pick off those lists, or a second pick of one level, adds nothing."""
+    from . import feats as feats_mod
+
+    out: dict[str, int] = {}
+    for raw in getattr(actor, "feats", None) or ():
+        doc = feats_mod.document(raw)
+        add = (doc or {}).get("spell_list_add")
+        if not isinstance(add, dict) or not doc.get("target"):
+            continue
+        taken: set[int] = set()
+        for name in str(doc["target"]).split(","):
+            spell = spell_named(name.strip())
+            if spell is None:
+                continue
+            at = [int(v) for k, v in (spell.lists or {}).items()
+                  if k in add.get("from", ()) and v is not None]
+            lvl = next((n for n in sorted(set(at)) if n in add.get("levels", ())
+                        and n not in taken), None)
+            if lvl is not None:
+                out[spell.id] = lvl
+                taken.add(lvl)
+    return out
+
+
 def _domain_levels(actor) -> dict[str, int]:
+
     """Every spell this character's domains grant, at its domain level (the lowest)."""
     from . import domains as domains_mod
 
