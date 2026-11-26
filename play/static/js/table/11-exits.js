@@ -301,20 +301,28 @@ function visibleOr(el) {
 // Above its door, where the eye already is, right edges together; below only when there is
 // more room there. Measured before it opens (`beforetoggle`), so it never paints in the
 // UA's centre first: the width is the CSS one, given here, not read from the box.
-const PEN_POP_WIDTH = { wayspop: 560, morepop: 420 };
+const PEN_POP_WIDTH = { wayspop: 560, morepop: 420, "cb-declpop": 540 };
+// Declare opens above its whole row, not its door: the combat bar's actions wrap, and above a
+// door on the second line it covered Strike and Full attack (tools/table_hit_test.js at
+// 1024x700, 2026-11-26). The row's top is cut to the desk's scroll box it may be scrolled in.
+const PEN_POP_ABOVE = { "cb-declpop": ".cb-acts" };
 function placePenPop(pop) {
   const door = document.querySelector(`[popovertarget="${pop.id}"]`);
   if (!door) return;
   const r = door.getBoundingClientRect();
+  const row = PEN_POP_ABOVE[pop.id] && door.closest(PEN_POP_ABOVE[pop.id]);
+  const box = row && row.parentElement && row.parentElement.closest(".choices");
+  const top = row ? Math.max(row.getBoundingClientRect().top,
+                             box ? box.getBoundingClientRect().top : 0) : r.top;
   const vw = document.documentElement.clientWidth, vh = window.innerHeight;
   const w = Math.min(PEN_POP_WIDTH[pop.id] || 420, vw - 24);
   pop.style.width = `${w}px`;
   pop.style.left = `${Math.round(Math.max(12, Math.min(r.right - w, vw - w - 12)))}px`;
   pop.style.right = "auto";
-  const above = r.top - 16, below = vh - r.bottom - 16;
+  const above = top - 16, below = vh - r.bottom - 16;
   if (above >= 220 || above >= below) {
     pop.style.top = "auto";
-    pop.style.bottom = `${Math.round(vh - r.top + 8)}px`;
+    pop.style.bottom = `${Math.round(vh - top + 8)}px`;
     pop.style.maxHeight = `${Math.round(Math.max(140, Math.min(480, above)))}px`;
   } else {
     pop.style.bottom = "auto";
@@ -361,8 +369,12 @@ function fitMore() {
   }
 }
 
+// The combat bar's Declare door (2026-11-26) is the same kind of door, drawn by
+// 04-combat-and-turns.js `renderDeclDoor`, so it is wired and placed here with the pen's.
+const PEN_POPS = ["wayspop", "morepop", "cb-declpop"];
+
 (function wirePenDoors() {
-  for (const id of ["wayspop", "morepop"]) {
+  for (const id of PEN_POPS) {
     const pop = penPop(id);
     if (!pop || !pop.addEventListener) continue;
     if (typeof pop.showPopover !== "function") {
@@ -371,6 +383,9 @@ function fitMore() {
       pop.classList.add("inline");
       const door = document.querySelector(`[popovertarget="${id}"]`);
       if (door) door.remove();
+      // Declare's band goes back under the actions row, where it stood before its door.
+      const row = pop.closest && pop.closest(".cb-acts");
+      if (row) row.after(pop);
       continue;
     }
     pop.addEventListener("beforetoggle", e => { if (e.newState === "open") placePenPop(pop); });
@@ -384,7 +399,7 @@ function fitMore() {
     });
   }
   window.addEventListener("resize", () => {
-    for (const id of ["wayspop", "morepop"]) if (penOpen(id)) placePenPop(penPop(id));
+    for (const id of PEN_POPS) if (penOpen(id)) placePenPop(penPop(id));
   });
 })();
 

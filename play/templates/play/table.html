@@ -854,8 +854,8 @@
   .cb-target.on { border-color: var(--alarm); color: #e8b0a8;
     box-shadow: 0 0 8px rgba(168,68,58,.3); }
   .cb-target small { color: var(--dim); margin-left: 5px; }
-  #combatbar .cb-acts button { padding: 8px 14px; font-size: 13px; }
-  #combatbar .cb-acts .go { border-color: var(--brew-dim); color: var(--brew); }
+  #combatbar .cb-acts > button { padding: 8px 14px; font-size: 13px; }
+  #combatbar .cb-acts > .go { border-color: var(--brew-dim); color: var(--brew); }
   #cb-plan:empty { display: none; }
   /* A plan step, numbered in the order Commit turn posts it (the owner, 2026-11-06: "so i
      can attack and then move after"). The chip drags (pointer events, so a finger on the
@@ -2585,13 +2585,29 @@
   /* The combat bar: a fight is its own state, at the top of the desk, in the alarm's
      border it has always worn. */
   #combatbar { margin: 0; background: rgba(30, 12, 10, .55); box-shadow: var(--sunken); }
-  #combatbar .cb-acts .v2-btn { min-height: 34px; }
-  #combatbar .cb-acts .v2-btn[hidden] { display: none; }
-  /* Declare: a labelled band of its own between the plan and the actions, in the bar's
-     materials — a gilt rule over it and the display face for its name, so a declared
-     option never reads as one more action button. */
-  #combatbar .cb-decl { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 14px;
-    margin: 0 0 8px; padding: 7px 0 0; border-top: 1px solid rgba(201, 162, 39, .28); }
+  #combatbar .cb-acts > .v2-btn { min-height: 34px; }
+  #combatbar .cb-acts > .v2-btn[hidden] { display: none; }
+  /* Declare: behind its own door in the actions row since 2026-11-26 (the owner: "put the
+     combat declare section inside a button as well"), in the pen's popover materials, its
+     name in the display face so a declared option never reads as one more action button.
+     The door wears the gilt border and names what is declared while it is shut (Fight
+     defensively rides every blow, so a player must see it on without opening anything). */
+  #cb-declbtn.on { border-color: var(--accent); color: #f4e6c0; }
+  #cb-declbtn.on .pen-count { color: #e8d9ae; }
+  #cb-declbtn .pen-count:not(:empty) { margin-left: .4em; }
+  #combatbar .cb-decl { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 8px 14px; }
+  /* A browser with no popover gets the old band under the actions (11-exits.js moves it
+     there), with the gilt rule over it. */
+  #cb-declpop.inline .cb-decl { margin: 0 0 8px; padding: 7px 0 0;
+    border-top: 1px solid rgba(201, 162, 39, .28); }
+  /* In the popover, one row a group: its name in a label column and its buttons wrapping
+     beside it, as More's rows are, so a third option never wraps under the label (Feint
+     did, measured at 1400x950 with five options). */
+  #cb-declpop:popover-open .cb-decl:not([hidden]) { display: grid; gap: 10px; }
+  #cb-declpop:popover-open .cb-decl-grp:not([hidden]) { display: grid; align-items: start;
+    grid-template-columns: 96px minmax(0, 1fr); gap: 6px 10px; }
+  #cb-declpop:popover-open .cb-decl-k { padding-top: 8px; }
+  #cb-declpop:popover-open .cb-decl-btns { display: flex; flex-wrap: wrap; gap: 6px; }
   #combatbar .cb-decl[hidden], #combatbar .cb-decl-grp[hidden] { display: none; }
   #combatbar .cb-decl-h { flex-basis: 100%; color: var(--accent);
     font: 400 12px/1 var(--display); letter-spacing: .08em; text-transform: uppercase; }
@@ -2607,13 +2623,14 @@
     letter-spacing: 0; text-transform: none; font-variant: normal; white-space: nowrap; }
   #combatbar .cb-decl .v2-btn[aria-disabled="true"] { opacity: .5; cursor: help; }
   #combatbar .cb-decl .v2-btn[aria-pressed="true"] small { color: #e8d9ae; }
-  /* A short or narrow window: each group one row that scrolls sideways, as the actions
-     row does on a phone. Measured at 800x600 with four feats: wrapped, the section stood
-     318px tall in a bar the desk shows 90px of. */
+  /* The inline fallback in a short or narrow window: each group one row that scrolls
+     sideways, as the actions row does on a phone. Measured at 800x600 with four feats:
+     wrapped, the section stood 318px tall in a bar the desk shows 90px of. In the popover
+     the rows wrap and the popover scrolls instead. */
   @media (max-width: 760px), (max-height: 759.98px) {
-    #combatbar .cb-decl-grp { flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto;
+    #cb-declpop.inline .cb-decl-grp { flex: 1 1 100%; flex-wrap: nowrap; overflow-x: auto;
       padding-bottom: 4px; }
-    #combatbar .cb-decl-grp > *, #combatbar .cb-decl .v2-btn { flex: none; }
+    #cb-declpop.inline .cb-decl-grp > *, #cb-declpop.inline .cb-decl .v2-btn { flex: none; }
   }
   #combatbar .cb-decl .v2-btn[aria-pressed="true"], #cb-menu [data-offhand][aria-pressed="true"] {
     color: #f4e6c0; border-color: var(--accent); transform: translate(1px, 2px);
@@ -3685,7 +3702,7 @@
     #sayform #input { font-size: 16px; }
     .actions .v2-btn { flex: 1 1 auto; padding: 8px 10px; font-size: 14px; }
     #combatbar .cb-acts { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 6px; }
-    #combatbar .cb-acts .v2-btn { flex: none; }
+    #combatbar .cb-acts > .v2-btn { flex: none; }
     .modepage { padding: 14px 12px 10px; }
     .modepage > .notice { width: auto; align-self: stretch; margin: 24px 12px; padding: 22px 20px; }
   }
@@ -3983,26 +4000,34 @@
                   aria-haspopup="dialog" aria-expanded="false">Cast…</button>
           <button type="button" class="v2-btn is-small" id="cb-swift" data-tut="cb-swift">Swift…</button>
           <button type="button" class="v2-btn is-small" id="cb-free" data-tut="cb-free">Free…</button>
+          <!-- Declare (the owner, 2026-11-22: "a section for feats like power attack or
+               cleave that must be declared to be used"): every option the engine says this
+               character may declare, each with its numbers, in three groups by what it
+               rides. Filled by 04-combat-and-turns.js `renderOptions` from
+               `attacks.options`; nothing here names an option. Behind one labelled door
+               since 2026-11-26 (the owner: "put the combat declare section inside a button
+               as well"; docs/research/2026-11-26-ui-declare-door.md): open under the
+               actions it stood 219px tall in a 283px desk at 1400x950. The door names what
+               is declared while it is shut. The popover follows its door, so Tab walks
+               straight into it; 11-exits.js places it and gives the inline rows back to a
+               browser with no popover. -->
+          <button type="button" class="v2-btn is-small pen-door" id="cb-declbtn" data-tut="cb-declared"
+                  popovertarget="cb-declpop" aria-haspopup="dialog" hidden
+                  title="Feats and manoeuvres declared before the blow">Declare<span class="pen-count" id="cb-decl-n"></span></button>
+          <div id="cb-declpop" class="penpop" popover="auto" role="dialog" aria-labelledby="cb-decl-h">
+            <div class="cb-decl" id="cb-declared" role="group" aria-labelledby="cb-decl-h" hidden>
+              <span class="cb-decl-h" id="cb-decl-h">Declare</span>
+              <div class="cb-decl-grp" data-group="blow" data-tut="cb-decl-blow" hidden>
+                <span class="cb-decl-k">With the blow</span><span class="cb-decl-btns"></span></div>
+              <div class="cb-decl-grp" data-group="act" data-tut="cb-decl-act" hidden>
+                <span class="cb-decl-k">As the action</span><span class="cb-decl-btns"></span></div>
+              <div class="cb-decl-grp" data-group="move" data-tut="cb-decl-move" hidden>
+                <span class="cb-decl-k">With the move</span><span class="cb-decl-btns"></span></div>
+            </div>
+          </div>
           <button type="button" class="v2-btn is-small is-quiet" id="cb-clear" data-tut="cb-clear">Clear</button>
           <button type="button" class="v2-btn is-small is-go" id="cb-commit" data-tut="cb-commit">Commit turn</button>
           <button type="button" class="v2-btn is-small is-quiet" id="cb-end" data-tut="cb-end">End turn</button>
-        </div>
-        <!-- Declare (the owner, 2026-11-22: "a section for feats like power attack or
-             cleave that must be declared to be used"): every option the engine says this
-             character may declare, each with its numbers, in three groups by what it
-             rides. Under the actions, so the turn's own buttons keep their place: above
-             them it pushed Commit turn under the fold of the desk on a phone. Filled by
-             04-combat-and-turns.js `renderOptions` from `attacks.options`; nothing here
-             names an option. -->
-        <div class="cb-decl" id="cb-declared" data-tut="cb-declared" role="group"
-             aria-labelledby="cb-decl-h" hidden>
-          <span class="cb-decl-h" id="cb-decl-h">Declare</span>
-          <div class="cb-decl-grp" data-group="blow" data-tut="cb-decl-blow" hidden>
-            <span class="cb-decl-k">With the blow</span><span class="cb-decl-btns"></span></div>
-          <div class="cb-decl-grp" data-group="act" data-tut="cb-decl-act" hidden>
-            <span class="cb-decl-k">As the action</span><span class="cb-decl-btns"></span></div>
-          <div class="cb-decl-grp" data-group="move" data-tut="cb-decl-move" hidden>
-            <span class="cb-decl-k">With the move</span><span class="cb-decl-btns"></span></div>
         </div>
         <div class="cb-menu" id="cb-menu" hidden></div>
         <div class="sub" id="cb-hint">Pick a target, click a lit square to move, or just
