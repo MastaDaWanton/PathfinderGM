@@ -481,3 +481,40 @@ def test_human_spirit_adds_a_rank_a_hit_die_up_to_four():
         before = leveling.skill_ranks(pc)["total"]
         pc.feats = list(pc.feats) + ["Human Spirit"]
         assert leveling.skill_ranks(pc)["total"] - before == more
+
+
+# --- Siphon Poison -----------------------------------------------------------------------
+
+def _bitten(scene, pc, vector="injury", dc=14):
+    from rules.sheet import situated
+
+    aff = {"kind": "poison", "vector": vector, "save": "fort", "dc": dc, "cure": 1,
+           "effects": [{"ability": "str", "dice": "1", "drain": False}]}
+    with situated(scene):
+        eff, _ = pc.take_affliction(aff, name="spider venom", source="t",
+                                    origin="author:test", onset_rounds=1, every_rounds=1,
+                                    limit=6)
+    return eff
+
+
+def test_siphon_poison_draws_a_fresh_injury_poison_out_in_a_full_round():
+    """Siphon Poison (Champions of Purity): "As a full-round action, you can remove an
+    injury poison ... with a successful Heal check. The DC of this check is equal to the
+    poison's DC. You can only draw out poison in this way within the first 2 rounds."
+    Measured before: Heal on a fresh bite only lent +4 to the next save."""
+    from tests.test_body_skills import _check, _run, _scene
+
+    scene, engine, pc = _scene(faces={"Heal": 15}, fight=True)
+    pc.feats = list(pc.feats) + ["Siphon Poison"]
+    _bitten(scene, pc)
+    out = _run(engine, _check(skill="heal", dc={"band": "average"}))[0]
+    assert "Siphon Poison" in out.tell and not pc.has_state("state.poisoned"), out.tell
+    assert scene.move_spent.get("pc") == scene.round        # the whole round
+    # Three rounds on, or an ingested poison: the plain treatment and its +4.
+    for later, vector in ((3, "injury"), (0, "ingested")):
+        scene, engine, pc = _scene(faces={"Heal": 15}, fight=True)
+        pc.feats = list(pc.feats) + ["Siphon Poison"]
+        _bitten(scene, pc, vector=vector)
+        scene.round += later
+        out = _run(engine, _check(skill="heal", dc={"band": "average"}))[0]
+        assert "Siphon Poison" not in out.tell and pc.has_state("care.treated.poison")

@@ -569,3 +569,77 @@ def charge_save_ctx(c: dict) -> dict:
     if str(c.get("condition") or "") in ("stunned", "staggered"):
         return {"against": ("stun_or_stagger",)}
     return {}
+
+
+# --- Siphon Poison ------------------------------------------------------------------------
+
+SIPHON_POISON = "skill.heal.siphon-poison"
+
+
+def contracted_rounds_ago(engine, aff) -> int | None:
+    """How many rounds ago this affliction was taken, or None when it cannot be said (no
+    record, or the clock has moved a minute or more since: far past any round window)."""
+    at = (aff.payload or {}).get("contracted")
+    scene = engine.scene
+    if not isinstance(at, dict):
+        return None
+    if int(getattr(scene, "clock_minutes", 0) or 0) != int(at.get("clock", -1)):
+        return None
+    if at.get("fight") and scene.in_encounter:
+        return max(0, int(scene.round) - int(at.get("round", 0)))
+    return 0 if not at.get("fight") and not scene.in_encounter else None
+
+
+def siphon_poison(engine, intent, actor, patient, aff, mods, partial):
+    """Siphon Poison (Champions of Purity): "As a full-round action, you can remove an
+    injury poison from a helpless or willing creature's bloodstream with a successful Heal
+    check. The DC of this check is equal to the poison's DC. You can only draw out poison
+    in this way within the first 2 rounds of when the target was poisoned. If the check is
+    successful, the creature no longer suffers any additional effects from the poison."
+
+    Asked by the treat-poison door before its own +4: None when it does not apply (no
+    feat, not an injury poison, past the window, an unwilling patient, no full round left),
+    and the treatment goes on as the book's. Owner call: when it applies it is taken — it
+    ends the poison where treating it only helps the next save. Willing is the patient
+    themself or one on the healer's side; anybody else must be helpless."""
+    from . import skilluses
+    from .activeeffect import ActiveEffect  # noqa: F401 — the effect store's own type
+    from . import dc as dc_mod
+
+    if not actor.has_state(SIPHON_POISON):
+        return None
+    held = (aff.payload or {}).get("affliction") or {}
+    if "injury" not in str(held.get("vector") or ""):
+        return None
+    ago = contracted_rounds_ago(engine, aff)
+    if ago is None or ago > 1:
+        return None
+    willing = patient is actor or not engine._against(actor, patient)
+    if not willing and not patient.is_helpless:
+        return None
+    if skilluses._no_action_left(engine, actor, "full-round", "drawing out a poison"):
+        return None
+    value = int(held.get("dc") or 10)
+    roll = engine._roll_or_suspend(intent, actor, list(mods),
+                                   label="Heal check (draw out the poison)", dc=value,
+                                   partial=partial)
+    skilluses._spend_action(engine, actor, "full-round")
+    margin = roll.total - value
+    whose = "their own" if patient is actor else f"{patient.name}'s"
+    if margin >= 0:
+        patient.remove_effects(match=lambda e: e is aff)
+        effects = [{"ref": patient.ref, "kind": "condition_removed",
+                    "conditions": ["poisoned"], "from": aff.name,
+                    "origin": "rule:feat-siphon-poison"}]
+        tell = (f"{actor.name} draws the {aff.name} out of {whose} blood before it can "
+                f"spread (Siphon Poison, Heal {roll.total} against DC {value}"
+                f"{dc_mod.by(margin)}): it does nothing more.")
+    else:
+        effects = [{"ref": patient.ref, "kind": "treat", "of": "poison", "made": False,
+                    "origin": "rule:feat-siphon-poison"}]
+        tell = (f"{actor.name} tries to draw the {aff.name} out of {whose} blood and "
+                f"cannot (Heal {roll.total} against DC {value}).")
+    return skilluses._outcome(intent, rolls=[roll], dc_value=value,
+                              basis=f"Siphon Poison: the {aff.name}'s DC {value}",
+                              verdict="success" if margin >= 0 else "failure",
+                              margin=margin, effects=effects, tell=tell)

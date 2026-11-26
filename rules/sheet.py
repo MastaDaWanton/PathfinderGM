@@ -1961,7 +1961,10 @@ class Actor:
         eff = ActiveEffect(
             name=name, kind="affliction", key=key, source=source, origin=origin,
             tags=states.tags_for(key),
-            payload={"id": ident, "affliction": dict(aff)},
+            payload={"id": ident, "affliction": dict(aff),
+                     # Feat loop b4-maneuver: when it was taken, for Siphon Poison's "within
+                     # the first 2 rounds" (rules/maneuver_feats.py `contracted_at`).
+                     **_contracted_at()},
             periodic=[{"per": "round", "affliction": {
                 "wait": max(1, int(onset_rounds or every_rounds)),
                 "every": max(1, int(every_rounds)),
@@ -9031,6 +9034,17 @@ class Situation:
             if threatens(ref):
                 return False
         return True
+
+
+def _contracted_at() -> dict:
+    """The round and clock an affliction is taken at, when there is a moment (b4)."""
+    m = _MOMENT.get()
+    scene = getattr(m, "scene", None)
+    if scene is None:
+        return {}
+    return {"contracted": {"round": int(getattr(scene, "round", 0) or 0),
+                           "clock": int(getattr(scene, "clock_minutes", 0) or 0),
+                           "fight": bool(getattr(scene, "in_encounter", False))}}
 
 
 def situation_of(actor) -> Situation | None:

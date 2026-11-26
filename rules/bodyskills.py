@@ -1132,6 +1132,14 @@ def _treat(engine, intent, actor, mods, partial, *, key: str):
         spent = _no_action_left(engine, actor, "standard", "treating poison")
         if spent:
             return engine._refuse(intent, spent + " Nothing is rolled.", code="action_spent")
+    # Feat loop b4-maneuver: Siphon Poison draws a fresh injury poison out instead.
+    from . import maneuver_feats
+
+    if kind == "poison":
+        drawn = maneuver_feats.siphon_poison(engine, intent, actor, patient, aff, mods,
+                                             partial)
+        if drawn is not None:
+            return drawn
     held = (aff.payload or {}).get("affliction") or {}
     value = int(held.get("dc") or 10)
     save = str(held.get("save") or "fort")

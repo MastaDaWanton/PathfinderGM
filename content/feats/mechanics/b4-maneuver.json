@@ -124,5 +124,10 @@
         "note": "1 bonus skill rank, and another each Hit Die after, four at most"
       }
     ]
+  },
+  "siphon-poison": {
+    "tags": [
+      "skill.heal.siphon-poison"
+    ]
   }
 }
