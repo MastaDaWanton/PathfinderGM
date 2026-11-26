@@ -186,3 +186,88 @@ def _flay(actor, defender) -> list[dict]:
                         "amount": -cut, "origin": origin},
              "tell": f"{actor.name}'s critical tears {defender.name}'s hide: natural "
                      f"armour {-cut} for the rest of the fight (Flaying Critical)."}]
+
+
+# --- range: Far Shot, Distance Thrower ---------------------------------------------------
+FAR_SHOT = "range.far-shot"                  # CRB: "-1 penalty per full range increment"
+DISTANCE_THROWER = "range.thrown.less-2"     # UC: "reduce your penalty ... by 2"
+
+
+def range_penalty(actor, increments: int, thrown: bool) -> int:
+    """The attack penalty for `increments` full range increments past the first (CRB:
+    -2 each), as the shooter's feats change it."""
+    pen = -(1 if actor.has_state(FAR_SHOT) else 2) * int(increments)
+    if thrown and actor.has_state(DISTANCE_THROWER):
+        pen = min(0, pen + 2)
+    return pen
+
+
+# --- cover and concealment: Improved Precise Shot, Elven Accuracy ------------------------
+# Improved Precise Shot (CRB): "Your ranged attacks ignore the AC bonus granted to targets
+# by anything less than total cover, and the miss chance granted to targets by anything
+# less than total concealment." Total cover is refused before this is asked.
+PRECISE_PAST_COVER = "shot.past-partial-cover"
+# Elven Accuracy (APG): "If you miss due to concealment when making a ranged attack with a
+# longbow or shortbow (including composite bows), you can reroll your miss chance roll one
+# time" — taken always, since a reroll of a miss can only help.
+BOW_REROLL = "miss_chance.reroll.bow"
+_BOWS = ("longbow", "shortbow", "composite-longbow", "composite-shortbow")
+
+
+def cover_kept(actor, weapon: dict, mods: list) -> list:
+    """The board's cover terms this shot still meets."""
+    if weapon.get("category") == "ranged" and actor.has_state(PRECISE_PAST_COVER):
+        return []
+    return mods
+
+
+def bow_reroll(actor, weapon: dict, weapon_key: str) -> bool:
+    if weapon.get("category") != "ranged" or not actor.has_state(BOW_REROLL):
+        return False
+    return base_key(weapon, weapon_key) in _BOWS
+
+
+def base_key(weapon: dict, weapon_key) -> str:
+    """The table key a blow's weapon answers to: a crafted one's base, else its own."""
+    from . import weapons as weapons_mod
+
+    base = str(weapon.get("crafted_base") or weapon_key or "").strip().lower()
+    return str(weapons_mod.key_for(base) or base).replace(" ", "-")
+
+
+# --- improvised weapons: Catch Off-Guard, Throw Anything --------------------------------
+# Catch Off-Guard (CRB): "You do not suffer any penalties for using an improvised melee
+# weapon. Unarmed opponents are flat-footed against any attacks you make with an
+# improvised melee weapon." Throw Anything (CRB): "You do not suffer any penalties for
+# using an improvised ranged weapon" (its +1 on thrown splash weapons is a modifier).
+IMPROVISED_MELEE = "proficiency.improvised.melee"
+IMPROVISED_THROWN = "proficiency.improvised.ranged"
+
+
+def _improvised(weapon: dict, key) -> bool:
+    return str(key or "").strip().lower() == "improvised" \
+        or "improvised" in (weapon.get("traits") or ())
+
+
+def improvised_waived(actor, key, weapon: dict, thrown: bool) -> bool:
+    """Whether the -4 for an improvised weapon is waived by the wielder's feat."""
+    if not _improvised(weapon, key):
+        return False
+    ranged = thrown or weapon.get("category") == "ranged"
+    return actor.has_state(IMPROVISED_THROWN if ranged else IMPROVISED_MELEE)
+
+
+def unarmed(actor) -> bool:
+    """No weapon in hand and no natural weapon, nor a fist that counts as armed (CRB,
+    Unarmed Attacks: Improved Unarmed Strike or a monk's strike is "considered armed")."""
+    from . import classfeatures
+    from .sheet import STRIKES_EITHER_WAY
+
+    return actor.wielded_key() == "unarmed" and not (
+        actor.has_state(STRIKES_EITHER_WAY) or actor.has_state(classfeatures.UNARMED_STRIKE))
+
+
+def caught_off_guard(actor, defender, key, weapon: dict) -> bool:
+    return (defender is not None and weapon.get("category") != "ranged"
+            and _improvised(weapon, key) and actor.has_state(IMPROVISED_MELEE)
+            and unarmed(defender))

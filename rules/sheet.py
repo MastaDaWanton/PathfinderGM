@@ -4207,7 +4207,10 @@ class Actor:
             if am:
                 mods.append(Modifier(am, label))
 
-            if not self.is_proficient(key):
+            from . import strike_feats
+
+            if not self.is_proficient(key) \
+                    and not strike_feats.improvised_waived(self, key, w, thrown):
                 # Improved Improvisation (ARG): "Your nonproficiency penalty with weapons,
                 # armor, and shields is halved" — its document's tag (feat loop b2).
                 halved = self.has_state(NONPROFICIENCY_HALVED)

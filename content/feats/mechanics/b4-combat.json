@@ -7,30 +7,106 @@
     "still does not run is each document's `not_yet`."
   ],
   "blinding-critical": {
-    "tags": ["critical.blinding"],
+    "tags": [
+      "critical.blinding"
+    ],
     "not_yet": [
       "'creatures with more than two eyes' are spared: no stat block counts a creature's eyes, so only a creature immune to blindness is spared"
     ]
   },
   "deafening-critical": {
-    "tags": ["critical.deafening"]
+    "tags": [
+      "critical.deafening"
+    ]
   },
   "exhausting-critical": {
-    "tags": ["critical.exhausting"]
+    "tags": [
+      "critical.exhausting"
+    ]
   },
   "tiring-critical": {
-    "tags": ["critical.tiring"]
+    "tags": [
+      "critical.tiring"
+    ]
   },
   "sickening-critical": {
-    "tags": ["critical.sickening"]
+    "tags": [
+      "critical.sickening"
+    ]
   },
   "staggering-critical": {
-    "tags": ["critical.staggering"]
+    "tags": [
+      "critical.staggering"
+    ]
   },
   "stunning-critical": {
-    "tags": ["critical.stunning"]
+    "tags": [
+      "critical.stunning"
+    ]
   },
   "flaying-critical": {
-    "tags": ["critical.flaying"]
+    "tags": [
+      "critical.flaying"
+    ]
+  },
+  "far-shot": {
+    "tags": [
+      "range.far-shot"
+    ]
+  },
+  "distance-thrower": {
+    "tags": [
+      "range.thrown.less-2"
+    ]
+  },
+  "improved-precise-shot": {
+    "tags": [
+      "shot.past-partial-cover"
+    ]
+  },
+  "elven-accuracy": {
+    "tags": [
+      "miss_chance.reroll.bow"
+    ]
+  },
+  "halfling-slinger": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 1,
+        "bonus_type": "racial",
+        "when": {
+          "weapon": {
+            "key": "sling"
+          }
+        },
+        "note": "Halfling Slinger: with a sling"
+      }
+    ]
+  },
+  "catch-off-guard": {
+    "tags": [
+      "proficiency.improvised.melee"
+    ]
+  },
+  "throw-anything": {
+    "tags": [
+      "proficiency.improvised.ranged"
+    ],
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 1,
+        "bonus_type": "circumstance",
+        "when": {
+          "weapon": {
+            "key": "splash"
+          }
+        },
+        "note": "Throw Anything: a thrown splash weapon"
+      }
+    ]
   }
 }

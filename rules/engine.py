@@ -11194,7 +11194,8 @@ class Engine:
 
         flat_footed = self._flat_footed(defender) or (
             self._unseen_attacker(defender, actor)
-            and not self._pinpointed_shooter(defender, actor, weapon))
+            and not self._pinpointed_shooter(defender, actor, weapon)) \
+            or strike_feats.caught_off_guard(actor, defender, weapon_key, weapon)
         # Surprise Follow-Through (ARG): "When using Cleave or Great Cleave, the second foe
         # you attack on your turn is denied its Dexterity bonus against you" — the first
         # blow the cleave carries on into (`cleaving` lists the one struck before it).
@@ -11287,8 +11288,8 @@ class Engine:
                 intent,
                 f"{defender.name} is behind total cover: there is no line to them from "
                 f"where {actor.name} is standing.")
-        cover_mods = position_mod.ac_mods(self.scene, actor, defender) \
-            + self._dark_ac_mods(defender, actor)
+        cover_mods = strike_feats.cover_kept(actor, weapon, position_mod.ac_mods(
+            self.scene, actor, defender)) + self._dark_ac_mods(defender, actor)
         if cover_mods:
             target_ac += sum(m.value for m in cover_mods)
             ac_parts.extend((m.source, m.value) for m in cover_mods)
@@ -11715,6 +11716,11 @@ class Engine:
                 # Improved Blind-Fight (APG): "Your melee attacks ignore the miss chance for
                 # less than total concealment" — anything under total's 50% — the feat
                 # document's tag, asked of the vocabulary as Blind-Fight's reroll is.
+                # Improved Precise Shot (CRB): "the miss chance granted to targets by
+                # anything less than total concealment" - ranged, its tag (feat loop b4).
+                if chance and chance < 50 and weapon.get("category") == "ranged" \
+                        and actor.has_state(strike_feats.PRECISE_PAST_COVER):
+                    chance = 0
                 if chance and chance < 50 and weapon.get("category") != "ranged" \
                         and actor.has_state(states.IGNORES_PARTIAL_CONCEALMENT):
                     if not state.get("blind_fight_said"):
@@ -11739,8 +11745,10 @@ class Engine:
                     # time to see if you actually hit." The feat document's tag, asked of
                     # the vocabulary (2026-10-09); always taken, since a reroll of a miss
                     # can only help.
-                    if miss.total <= chance and weapon.get("category") != "ranged" \
-                            and actor.has_state("miss_chance.reroll.melee"):
+                    if miss.total <= chance and (
+                            (weapon.get("category") != "ranged"
+                             and actor.has_state("miss_chance.reroll.melee"))
+                            or strike_feats.bow_reroll(actor, weapon, weapon_key)):
                         miss = self.dice.roll("1d100",
                                               label=f"miss chance ({why}), rerolled",
                                               visibility="hidden")
@@ -12651,8 +12659,13 @@ class Engine:
         n = max(0, (int(feet) - 1) // inc)
         if not n:
             return None, ""
-        return Modifier(-2 * n, f"range ({int(feet)} ft: {n} increment"
-                                f"{'s' if n != 1 else ''} of {inc} ft past the first)"), ""
+        # Feat loop b4: Far Shot's "-1 penalty per full range increment", Distance
+        # Thrower's "with a thrown weapon, you reduce your penalty ... due to range by 2".
+        pen = strike_feats.range_penalty(actor, n, thrown)
+        if not pen:
+            return None, ""
+        return Modifier(pen, f"range ({int(feet)} ft: {n} increment"
+                             f"{'s' if n != 1 else ''} of {inc} ft past the first)"), ""
 
     def _thrown_lands(self, actor: Actor, defender: Actor, weapon_key: str,
                       weapon: dict) -> dict:
@@ -35357,9 +35370,11 @@ class Engine:
                 self.scene, actor, defender, {"category": "ranged"})
         if feet and int(feet) > inc:
             n = (int(feet) - 1) // inc
-            mods = mods + [Modifier(-2 * n, f"range ({int(feet)} ft: {n} increment"
-                                            f"{'s' if n != 1 else ''} of {inc} ft past the "
-                                            f"first)")]
+            # The range rule's other copy: Far Shot and Distance Thrower reach a flask too.
+            pen = strike_feats.range_penalty(actor, n, True)
+            mods = mods + ([Modifier(pen, f"range ({int(feet)} ft: {n} increment"
+                                          f"{'s' if n != 1 else ''} of {inc} ft past the "
+                                          f"first)")] if pen else [])
         atk = self._roll_or_suspend_stage(intent, actor, mods, f"Throw {name}", ac,
                                           partial, state, "1d20")
         state["rolls"].append(atk.as_dict())
