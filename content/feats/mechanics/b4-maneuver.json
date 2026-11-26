@@ -160,5 +160,8 @@
         "note": "+4 insight on combat maneuvers against foes on rocky, difficult ground"
       }
     ]
+  },
+  "gory-finish": {
+    "choice": "gory_finish"
   }
 }

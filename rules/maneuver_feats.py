@@ -378,6 +378,14 @@ def choice_refusal(actor, weapon: dict, declared, params: dict) -> str:
     if "feinting_flurry" in declared and ("flurry" not in declared
                                           or not params.get("full_attack")):
         return "Feinting Flurry is made with a flurry of blows, as a full attack."
+    if GORY in declared:
+        from .feat_events import has_weapon_focus
+
+        if params.get("full_attack") or params.get("iteration") is not None:
+            return "Gory Finish is the attack action — one blow — not a full attack's."
+        key = str(params.get("weapon") or actor.wielded_key() or "").strip().lower()
+        if not has_weapon_focus(actor, key):
+            return f"Gory Finish is made with a weapon {actor.name} has Weapon Focus in."
     if TWIRL in declared:
         if params.get("manoeuvre") not in (None, "", "trip"):
             return "Tripping Twirl is a trip at each foe beside you; declare it with a trip."
@@ -724,3 +732,37 @@ def on_rocky_ground(creature) -> bool:
     if word not in ROCKY_TERRAINS:
         return False
     return tuple(at)[:2] in grid.difficult
+
+
+# --- Gory Finish ----------------------------------------------------------------------------
+
+GORY = "gory_finish"
+
+
+def gory_finish(engine, actor, defender, choices, state) -> list[dict]:
+    """Gory Finish (UC): "When you use the attack action, you can use a weapon with which
+    you have Weapon Focus to make a single attack at your highest base attack bonus. If you
+    reduce your target to negative hit points, you can spend a swift action to make an
+    Intimidate check to demoralize all foes within 30 feet who could see your attack."
+    The declared option is the single blow (`choice_refusal` holds it to the attack action
+    and the Weapon Focus weapon); the demoralize is Dazzling Display's one roll read against
+    each foe (`Engine._free_demoralize`), paid with the swift action, taken when it is free."""
+    from . import awareness
+
+    if GORY not in (choices or ()) or state.get("gory_finish") \
+            or not (defender.is_dead or defender.hp < 0):
+        return []
+    if engine._spend_swift(actor, False, "Gory Finish"):
+        return []
+    state["gory_finish"] = True
+    foes = [a for a in engine.scene.actors.values()
+            if a is not actor and a is not defender and not a.is_down
+            and engine._against(actor, a) and awareness.sees(engine.scene, a, actor)
+            and ((g := engine._gap_ft(actor, a)) is None or g <= 30)]
+    if not foes:
+        return []
+    return [{"effect": {"ref": actor.ref, "kind": "gory_finish",
+                        "origin": "rule:feat-gory-finish"},
+             "tell": f"{defender.name} falls in a spray of blood, and {actor.name} rounds on "
+                     f"the rest (Gory Finish)."}] + engine._free_demoralize(actor, foes,
+                                                                          "Gory Finish")

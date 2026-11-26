@@ -888,6 +888,9 @@ _OPTION_SHAPES = {
     # Feat loop b4-maneuver.
     "feinting_flurry": ("full", "Feinting Flurry",
                         "With a flurry: a feint in place of the first blow."),
+    "gory_finish": ("strike", "Gory Finish",
+                    "One blow with your Weapon Focus weapon; if it fells the foe, a swift "
+                    "Intimidate shakes every foe within 30 feet who saw it."),
     "tripping_twirl": ("strike", "Tripping Twirl",
                        "The whole round, quarterstaff in both hands: a trip at every foe "
                        "beside you."),

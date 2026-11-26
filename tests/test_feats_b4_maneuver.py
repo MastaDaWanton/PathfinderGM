@@ -562,3 +562,31 @@ def test_undermining_exploit_adds_four_against_a_foe_on_rocky_difficult_ground()
             scene.grid.difficult.add((7, 10))
         res = _maneuver(engine, "trip")
         assert _named(_rolls(res, "Trip (CMB)")[0], "Undermining Exploit") == want, ground
+
+
+# --- Gory Finish -----------------------------------------------------------------------------
+
+def test_gory_finish_shakes_every_foe_who_saw_the_kill():
+    """Gory Finish (UC): a single attack with a Weapon Focus weapon; "If you reduce your
+    target to negative hit points, you can spend a swift action to make an Intimidate check
+    to demoralize all foes within 30 feet who could see your attack." Measured before: the
+    second thug watched his friend fall unmoved."""
+    scene, engine, pc, thug = _fight(feats=["Dazzling Display", "Gory Finish"],
+                                     faces={"Attack with": 18, "Intimidate": 20,
+                                            "Damage": 12})
+    scene.add(instantiate("thug", scene=scene, name="the second"))
+    scene.positions["c2"] = (9, 12)
+    scene.sides = {"pc": ["pc"], "them": ["c1", "c2"]}
+    scene.resync_zones()
+    scene.turn = [r for r, _ in scene.initiative].index("pc")
+    thug.hp = 1
+    assert engine._attack_choice_refusal(pc, "longsword", {"gory_finish": True,
+                                                           "full_attack": True})
+    pc.weapons = list(pc.weapons) + ["club"]
+    assert engine._attack_choice_refusal(pc, "club", {"gory_finish": True, "weapon": "club"})
+    res = _settle(engine, engine.run(engine.validate([{
+        "op": "attack", "actor": "pc", "target": "c1", "visibility": "hidden",
+        "params": {"gory_finish": True}}])))
+    assert thug.hp < 0
+    assert scene.get("c2").has_state("state.fear.shaken"), _tells(res)
+    assert scene.swift_spent.get("pc") == scene.round

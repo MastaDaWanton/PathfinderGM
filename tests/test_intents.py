@@ -71,7 +71,7 @@ def test_engine_owned_params_are_dropped_and_logged_not_rejected():
 
 
 def test_the_rejection_names_the_params_the_op_does_take():
-    with pytest.raises(IntentError, match="attack takes aid, aid_ally, aid_with, bloody_assault, charge, chokehold, cleave, combat_expertise, coup_de_grace, dazing_assault, deadly_aim, dragonslayer, feinting_flurry, fighting_defensively, flurry, footslasher, full_attack, furious_finish, guess, item, iteration, lethality, lunge, manoeuvre"):
+    with pytest.raises(IntentError, match="attack takes aid, aid_ally, aid_with, bloody_assault, charge, chokehold, cleave, combat_expertise, coup_de_grace, dazing_assault, deadly_aim, dragonslayer, feinting_flurry, fighting_defensively, flurry, footslasher, full_attack, furious_finish, gory_finish, guess, item, iteration, lethality, lunge, manoeuvre"):
         parse({"op": "attack", "actor": "pc", "target": "c1",
                "params": {"enthusiasm": "high"}})
 
