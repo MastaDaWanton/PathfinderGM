@@ -5,7 +5,7 @@
   "tutorials": [
     {
       "id": "fight.bar",
-      "v": 2,
+      "v": 3,
       "title": "The fight",
       "manual": "combat",
       "root": "combat-bar",
@@ -74,10 +74,11 @@
           ]
         },
         {
-          "since": 2,
+          "since": 3,
           "anchor": "cb-declared",
           "title": "Declare",
-          "words": "Declare holds what you choose before the blow: feats such as Power Attack or Cleave, and anyone's Fight defensively, Total defense, Feint and Tumble. Each shows what it does in numbers; a grey one says why the planned action cannot carry it.",
+          "words": "Declare holds what you choose before the blow: Power Attack or Cleave, and anyone's Fight defensively, Total defense, Feint and Tumble. Each shows its numbers; a grey one says why the planned action cannot carry it. A toggle you declare is named on the button.",
+          "controls": [{"tut": "cb-declared", "label": "Declare"}],
           "source": {
             "file": "play/static/js/table/04-combat-and-turns.js",
             "literal": "the planned action cannot carry it, is greyed with"

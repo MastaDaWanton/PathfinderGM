@@ -99,6 +99,10 @@ function renderOptions() {
   const opts = attackOptions();
   for (const id of [...COMBAT.opts]) if (!opts.some(o => o.id === id)) COMBAT.opts.delete(id);
   box.hidden = !opts.length;
+  renderDeclDoor(opts);
+  // The rows are redrawn on every press; the pressed option keeps the focus, so a keyboard
+  // player toggling inside the popover is not dropped back to the page.
+  const had = box.contains(document.activeElement) && document.activeElement.dataset.cbopt;
   for (const g of box.querySelectorAll("[data-group]")) {
     const mine = opts.filter(o => DECL_GROUPS[o.shape] === g.dataset.group);
     g.hidden = !mine.length;
@@ -111,6 +115,27 @@ function renderOptions() {
         o.says ? `<small> ${esc(o.says)}</small>` : ""}</button>`;
     }).join("");
   }
+  const back = had && box.querySelector(`[data-cbopt="${CSS.escape(had)}"]`);
+  if (back) back.focus({ preventScroll: true });
+}
+
+// The Declare door (2026-11-26, the owner: "put the combat declare section inside a button
+// as well"). Drawn only when there is something behind it, and while it is shut it names
+// what is declared: a toggle rides every blow staged (Fight defensively's −4), so it must
+// show without opening anything (ChatGPT's tools menu shows the chosen tool on the bar;
+// NWN lit the quickslot of an active combat mode; docs/research/2026-11-26-ui-declare-door.md).
+// An option that stages its own action (Charge, Feint) shows in the plan, as every action does.
+function renderDeclDoor(opts) {
+  const door = $("#cb-declbtn");
+  if (!door) return;
+  door.hidden = !opts.length;
+  const on = opts.filter(o => COMBAT.opts.has(o.id)).map(o => o.name);
+  const n = $("#cb-decl-n");
+  if (n) n.textContent = on.length === 1 ? `· ${on[0]}` : on.length ? `· ${on.length} on` : "";
+  door.classList.toggle("on", on.length > 0);
+  door.title = on.length ? `Declared: ${on.join(", ")}`
+                         : "Feats and manoeuvres declared before the blow";
+  if (!opts.length && typeof closePenPop === "function") closePenPop("cb-declpop");
 }
 
 function actionKind(text) {
@@ -156,7 +181,10 @@ function renderCombat(s) {
   const on = s.scene && s.scene.in_encounter && !s.scene.pc_down;
   bar.hidden = !on;
   if (!on) { COMBAT.target = COMBAT.move = COMBAT.standard = COMBAT.swift = COMBAT.moveact = null;
-             COMBAT.frees = []; COMBAT.order = []; COMBAT.aim = COMBAT.picked = null; return; }
+             COMBAT.frees = []; COMBAT.order = []; COMBAT.aim = COMBAT.picked = null;
+             // An open popover is in the top layer, so a hidden bar would not hide it.
+             if (typeof closePenPop === "function") closePenPop("cb-declpop");
+             return; }
 
   // The surprise round (rules/surprise.py): its one rule said where the round is.
   $("#cb-round").textContent = s.scene.surprise_round
@@ -945,6 +973,11 @@ document.addEventListener("click", async e => {
       restage();
       if ($("#cb-menu").querySelector("#cb-fullok") || (o.shape === "full" && !COMBAT.standard
           && COMBAT.target)) $("#cb-fullatk").click();
+    }
+    // A toggle keeps the Declare popover open (a second may follow it); an option that
+    // stages its own action folds it, so the plan and Commit turn are in view.
+    if ((o.shape === "strike" || o.shape === "act") && typeof closePenPop === "function") {
+      closePenPop("cb-declpop");
     }
     renderPlan();
     return;
