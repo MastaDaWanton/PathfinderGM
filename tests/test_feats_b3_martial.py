@@ -374,3 +374,114 @@ def test_witchbreaker_adds_two_to_saves_against_a_hag_only():
     against = sum(m.value for m in pc.save_modifiers(
         "will", {"against": ("spell", "hag_or_witch")}))
     assert against == plain + 2
+
+
+# --- declared options: Furious Finish, Pushing Assault, Dragonslayer, Wingclipper --------
+
+def test_furious_finish_maximises_vital_strike_and_ends_the_rage_in_fatigue():
+    """Furious Finish (UC): raging, a Vital Strike's dice at their maximum (a longsword's
+    2d8: 16), the rage ended at once and the barbarian fatigued."""
+    scene, engine, pc, thug = _fight(feats=["Vital Strike", "Furious Finish"],
+                                     cls="barbarian", level=8,
+                                     faces={"Attack with": 18, "Damage": 1})
+    thug.hp = thug.hp_max = 400
+    _rage(pc, spent=1)
+    assert engine._attack_choice_refusal(pc, "longsword", {"furious_finish": True})
+    res = _attack(engine, vital_strike=True, furious_finish=True)
+    dmg = _rolls(res, "Damage")[0]
+    assert "maximised" in dmg["label"] and dmg["raw"] == 16
+    assert not pc.has_state("buff.stance.rage")
+    assert pc.has_state("state.impaired.fatigued")
+
+
+def test_pushing_assault_trades_the_power_attack_damage_for_a_push():
+    """Pushing Assault (APG): a two-handed Power Attack hit pushes a foe no larger than you
+    5 feet away instead of the extra damage; its -1 to hit stands."""
+    scene, engine, pc, thug = _fight(feats=["Pushing Assault"], level=4,
+                                     faces={"Attack with": 18, "Damage": 1})
+    pc.weapons = list(pc.weapons) + ["greatsword"]
+    pc.shield = ""
+    thug.hp = thug.hp_max = 400
+    assert engine._attack_choice_refusal(pc, "longsword", {"pushing_assault": True,
+                                                           "power_attack": True})
+    res = _attack(engine, weapon="greatsword", power_attack=True, pushing_assault=True)
+    dmg = _rolls(res, "Damage")[0]
+    assert not _named(dmg, "Power Attack")
+    assert _named(_rolls(res, "Attack with")[0], "Power Attack") < 0
+    assert tuple(scene.positions["c1"][:2]) == (8, 10)
+
+
+def test_wingclipper_grounds_a_flier_and_keeps_none_of_the_critical_damage():
+    """Wingclipper (Dragonslayer's Handbook): the extra critical damage is traded for no
+    flight for twice the multiplier in rounds."""
+    scene, engine, pc, bird = _fight(feats=["Wingclipper"], level=9, foe="griffon",
+                                     faces={"Attack with": 20, "Confirm": 20, "Damage": 1})
+    bird.hp = bird.hp_max = 400
+    res = _attack(engine, wingclipper=True)
+    assert "CRITICAL" not in _rolls(res, "Damage")[0]["label"]
+    assert "fly" not in bird.movement_modes()
+    bird.tick_effects(4)                                   # longsword x2: four rounds
+    assert "fly" in bird.movement_modes()
+
+
+def test_dragonslayer_bars_the_breath_and_only_against_a_breather():
+    scene, engine, pc, wyrm = _fight(feats=["Dragonslayer"], level=4,
+                                     foe="young-red-dragon",
+                                     faces={"Attack with": 20, "Confirm": 20, "Damage": 1})
+    wyrm.hp = wyrm.hp_max = 400
+    pc.ranks["knowledge (arcana)"] = 4
+    _attack(engine, dragonslayer=True)
+    assert wyrm.has_state("state.breath-barred")
+    scene, engine, pc, thug = _fight(feats=["Dragonslayer"], level=4,
+                                     faces={"Attack with": 20, "Confirm": 20, "Damage": 1})
+    thug.hp = thug.hp_max = 400
+    pc.ranks["knowledge (arcana)"] = 4
+    res = _attack(engine, dragonslayer=True)
+    assert "CRITICAL" in _rolls(res, "Damage")[0]["label"]
+
+
+# --- what a landed blow sets off: Violent Display, Betraying Blow, Hold the Blade ---------
+
+def test_violent_display_demoralizes_on_a_critical_with_the_focused_weapon():
+    """Violent Display (Blood of the Moon): a critical with a Weapon Focus weapon opens
+    Dazzling Display as an immediate action — Intimidate against every foe who sees you."""
+    for weapon, want in (("longsword", True), ("dagger", False)):
+        scene, engine, pc, thug = _fight(feats=["Dazzling Display", "Violent Display"],
+                                         level=6, faces={"Attack with": 20, "Confirm": 20,
+                                                         "Damage": 1})
+        thug.hp = thug.hp_max = 400
+        res = _attack(engine, weapon=weapon)
+        assert ("Violent Display: Intimidate" in _tells(res)) is want, weapon
+
+
+def test_betraying_blow_adds_half_the_bluff_margin_as_nonlethal_capped_at_hit_dice():
+    """Betraying Blow (Bastards of Golarion): a nonlethal melee hit on a foe only you
+    threaten; Bluff against Sense Motive, half the difference more nonlethal, at most the
+    bearer's Hit Dice (8)."""
+    scene, engine, pc, thug = _fight(feats=["Solo Maneuvers", "Betraying Blow"], level=8,
+                                     faces={"Attack with": 18, "Damage": 1, "Bluff": 20,
+                                            "the foe's Sense": 1})
+    thug.hp = thug.hp_max = 400
+    res = _attack(engine, lethality="nonlethal")
+    extra = [e for o in res.outcomes for e in o.effects
+             if e.get("origin") == "rule:feat-betraying-blow"]
+    assert extra and 0 < int(extra[0]["amount"]) <= 8
+    assert "Betraying Blow" in _tells(res)
+
+
+def test_hold_the_blade_disarms_back_at_a_flanker_and_drops_the_guard(monkeypatch):
+    """Hold the Blade (Dragon Empires Primer): a flanking blow that wounds you lets you try
+    a disarm as an immediate action, at -4 AC until your next turn, once a round."""
+    from rules import feat_events
+
+    monkeypatch.setattr(feat_events, "_hand_free", lambda a: True)
+    scene, engine, pc, thug = _fight(feats=["Improved Disarm", "Hold the Blade"], level=10,
+                                     second=("thug", (5, 10)),
+                                     faces={"Attack with": 18, "Damage": 1})
+    pc.hp = pc.hp_max = 400
+    ac = pc.ac()
+    res = _attack(engine, by="c1", target="pc")
+    assert any(e.get("maneuver") == "disarm" for e in _effects(res, "rider"))
+    assert pc.ac() == ac - 4
+    again = _attack(engine, by="c2", target="pc")
+    assert not any(e.get("maneuver") == "disarm" for e in _effects(again, "rider"))

@@ -13,7 +13,7 @@ Each trigger, validated by `problems` (rules/classbuilder.py calls it):
 
 - `on`: `crit_dealt` (the bearer confirmed a critical), `crit_taken` (one was confirmed
   on the bearer), `felled` (the bearer's attack took a foe below 0 hit points or killed
-  it â€” "negative hit points", "-1 or fewer": the same line), `hit` (a blow landed).
+  it — "negative hit points", "-1 or fewer": the same line), `hit` (a blow landed).
 - `when`: the roll grammar's clauses — `bearer` (a held state: `buff.stance.rage`),
   `weapon` (melee), `critical`, `nonlethal` — answered by `classfeatures.holds`.
 - `foe`: `{"hd_gte_bearer": true}` (Thrill of the Kill's "at least as many Hit Dice as
@@ -227,8 +227,8 @@ def blow_ctx(actor, weapon_key, weapon, defender) -> dict:
 
 def _daily(actor, key: str):
     """(document, pool) of a held feat whose `budget` names `key` and has a use left
-    today â€” the uses a day are a pool named for the feat, refreshed by a night's rest (the
-    shape `rules/luck.py` gives a luck feat's) â€” or (None, None)."""
+    today — the uses a day are a pool named for the feat, refreshed by a night's rest (the
+    shape `rules/luck.py` gives a luck feat's) — or (None, None)."""
     from . import feats as feats_mod, resources
 
     for raw in getattr(actor, "feats", None) or ():
@@ -283,7 +283,7 @@ def half_nonlethal(defender, amount: int, state, lethality: str) -> tuple[int, i
     return amount - spared, spared
 
 
-def crit_events(engine, actor, defender, weapon_key, weapon, state) -> None:
+def crit_events(engine, actor, defender, weapon_key, weapon, state, choices=()) -> None:
     """A critical just confirmed: the defender's guard against it (Survivor's negation,
     Resilient Brute's half nonlethal), then the attacker's `crit_dealt` triggers and the
     defender's `crit_taken` (Gore Fiend's both halves)."""
@@ -300,6 +300,7 @@ def crit_events(engine, actor, defender, weapon_key, weapon, state) -> None:
         _land([{"effect": _use(defender, doc, pool, "critical hit"),
                 "tell": f"{defender.name} takes the critical on muscle and bone: half of "
                         f"it will only bruise ({doc['name']})."}], state)
+    crit_trade(engine, actor, defender, weapon, state, choices)
     ctx = blow_ctx(actor, weapon_key, weapon, defender)
     pieces = fire(actor, "crit_dealt", ctx, foe=defender, crit=True)
     pieces += fire(defender, "crit_taken", {"weapon": ctx["weapon"]}, foe=actor, crit=True)
@@ -371,6 +372,8 @@ def after_hit(engine, intent, actor, defender, weapon_key, weapon, state, choice
     out += _violent_display(engine, actor, weapon_key, state, crit)
     out += _betraying_blow(engine, actor, defender, blow, melee, dealt, state)
     out += _hold_the_blade(engine, intent, actor, defender, weapon, state, melee, dealt)
+    out += push_after_hit(engine, actor, defender, choices, state,
+                          bool(intent.params.get("power_attack")))
     return out
 
 
@@ -581,3 +584,180 @@ def precision_dice(engine, intent, actor, defender, weapon_key, weapon, state, p
             state.setdefault("rolls", []).append(roll.as_dict())
         out.append(Modifier(int(state[key]), f"{doc['name']} ({e['dice']})"))
     return out
+
+
+# --- declared options (feat loop b3): sheet.ATTACK_CHOICES' last four ---------------------
+
+RAGING = "buff.stance.rage"
+FATIGUED = "fatigued"          # the condition Furious Finish leaves, by the table's key
+BREATH_BARRED = "state.breath-barred"
+GROUNDED = "state.grounded"
+
+
+def choice_refusal(actor, w: dict, declared, params=None) -> str:
+    """Why one of this lane's options cannot ride this swing, or "" (called from
+    `Engine._attack_choice_refusal`, after the feat itself is checked held)."""
+    if "furious_finish" in declared:
+        # Furious Finish (UC): "While raging, when you use the Vital Strike feat".
+        if "vital_strike" not in declared:
+            return "Furious Finish rides Vital Strike: declare both."
+        if not actor.has_state(RAGING):
+            return "Furious Finish is used while raging."
+    if "pushing_assault" in declared:
+        # Pushing Assault (APG): "a two-handed weapon attack modified by the Power Attack
+        # feat".
+        if not (params or {}).get("power_attack"):
+            return "Pushing Assault rides Power Attack: declare both."
+        if int(w.get("hands", 1) or 1) < 2 or w.get("category") == "ranged":
+            return f"Pushing Assault is a two-handed weapon's, not a {w['name']}'s."
+    return ""
+
+
+def _no_larger(actor, defender) -> bool:
+    from .tables import SIZE_ORDER
+
+    order = list(SIZE_ORDER)
+    mine = str(getattr(actor, "size", "medium") or "medium").lower()
+    theirs = str(getattr(defender, "size", "medium") or "medium").lower()
+    return order.index(theirs) <= order.index(mine) if mine in order and theirs in order \
+        else True
+
+
+def power_damage(actor, defender, weapon: dict, choices, power: bool) -> bool:
+    """Whether Power Attack's damage rides this blow: not when Pushing Assault trades it
+    for the push (APG: "you can choose to push the target 5 feet directly away from you
+    instead of dealing the extra damage from Power Attack") at a foe no larger than the
+    bearer. Its -1 to hit stands either way."""
+    if power and "pushing_assault" in choices and defender is not None \
+            and _no_larger(actor, defender):
+        return False
+    return power
+
+
+def _breathes(defender) -> bool:
+    getter = getattr(defender, "_creature_doc", None)
+    doc = (getter() if callable(getter) else None) or {}
+    # Squeezed: the corpus's prose breaks words ("breath weapo n", young red dragon).
+    return "breathweapon" in "".join(str(doc.get("special_attacks") or "").lower().split())
+
+
+def _flies(defender) -> bool:
+    return bool((defender.movement_modes() or {}).get("fly"))
+
+
+def crit_trade(engine, actor, defender, weapon, state, choices) -> None:
+    """Dragonslayer (Dragonslayer's Handbook): on a confirmed critical against a foe with a
+    breath weapon, "forgo the extra critical damage to instead prevent your foe from using
+    its breath weapon for a number of rounds equal to twice the critical multiplier".
+    Wingclipper (same): against a creature that flies, "prevent it from flying for a
+    number of rounds equal to twice the critical multiplier of your attack. Opponents that
+    are flying at the time ... must succeed at a DC 20 Fly check to avoid taking falling
+    damage". The extra damage goes (`crit_traded`, read where the multiplier is set)."""
+    from . import sheet as sheet_mod
+
+    rounds = 2 * int(weapon.get("crit_mult") or 2)
+    if "dragonslayer" in choices and _breathes(defender):
+        state["crit_traded"] = "dragonslayer"
+        defender.apply_effect(ActiveEffect(
+            name="breath choked", kind="situation", key="breath choked",
+            source=f"{actor.name}'s Dragonslayer", origin="rule:feat-dragonslayer",
+            duration="rounds", rounds_left=rounds, tags=(BREATH_BARRED,)))
+        _land([{"effect": {"ref": defender.ref, "kind": "situation", "what": "breath barred",
+                           "rounds": rounds, "origin": "rule:feat-dragonslayer"},
+                "tell": f"{actor.name}'s critical goes for the throat instead of the kill: "
+                        f"{defender.name} cannot breathe its fire for {rounds} rounds "
+                        f"(Dragonslayer)."}], state)
+        return
+    if "wingclipper" in choices and _flies(defender):
+        state["crit_traded"] = "wingclipper"
+        was_aloft = bool(sheet_mod.aloft(defender))
+        defender.apply_effect(ActiveEffect(
+            name="wings clipped", kind="situation", key="wings clipped",
+            source=f"{actor.name}'s Wingclipper", origin="rule:feat-wingclipper",
+            duration="rounds", rounds_left=rounds, tags=(GROUNDED,)))
+        pieces = [{"effect": {"ref": defender.ref, "kind": "situation", "what": "grounded",
+                              "rounds": rounds, "origin": "rule:feat-wingclipper"},
+                   "tell": f"{actor.name}'s critical tears at the wing instead: "
+                           f"{defender.name} cannot fly for {rounds} rounds (Wingclipper)."}]
+        if was_aloft:
+            pieces += _fall_or_fly(engine, defender, state)
+        _land(pieces, state)
+
+
+def _fall_or_fly(engine, defender, state) -> list[dict]:
+    """A Fly check against DC 20, or down to the floor of its square with 1d6 per 10 feet
+    fallen (CRB, Falling: "1d6 points of damage per 10 feet fallen")."""
+    roll = engine.dice.d20(defender.skill_modifiers("fly"), label=f"{defender.name}'s Fly "
+                           f"(DC 20)", visibility="hidden")
+    state.setdefault("rolls", []).append(roll.as_dict())
+    if roll.total >= 20:
+        return [{"effect": {"ref": defender.ref, "kind": "check", "skill": "fly",
+                            "total": roll.total, "dc": 20, "origin": "rule:feat-wingclipper"},
+                 "tell": f"{defender.name} glides down under control (Fly {roll.total} "
+                         f"against DC 20)."}]
+    scene = engine.scene
+    spot = scene.positions.get(defender.ref)
+    floor = scene.grid.ground(spot) if scene.grid is not None and spot else 0
+    feet = max(0, (int(spot[2]) - floor) * 5) if spot and len(spot) > 2 else 0
+    scene.positions[defender.ref] = (spot[0], spot[1], floor) if spot else spot
+    out = [{"effect": {"ref": defender.ref, "kind": "position", "fell": feet,
+                       "origin": "rule:feat-wingclipper"},
+            "tell": f"{defender.name} falls {feet} feet (Fly {roll.total} against DC 20)."}]
+    dice = feet // 10
+    if dice:
+        hurt = engine.dice.roll(f"{dice}d6", label=f"Falling ({feet} ft)", visibility="hidden")
+        state.setdefault("rolls", []).append(hurt.as_dict())
+        hit = engine._apply_damage(defender, max(1, hurt.total), "bludgeoning")
+        hit["origin"] = "rule:feat-wingclipper"
+        out.append({"effect": hit, "tell": f"The ground takes {hit.get('amount', 0)} from "
+                                           f"{defender.name}."})
+    return out
+
+
+def furious_finish(engine, actor, choices, notation: str, state):
+    """Furious Finish (UC): "While raging, when you use the Vital Strike feat, you can
+    choose not to roll your damage dice and instead deal damage equal to the maximum roll
+    possible on those damage dice. If you do, your rage immediately ends, and you are
+    fatigued (even if you would not normally be)." The dice total, or None. Run once per
+    swing (the damage stage is re-entered on every resume)."""
+    import re
+
+    if "furious_finish" not in choices or "vital_strike" not in choices:
+        return None
+    if "furious_max" in state:
+        return state["furious_max"]
+    stance = next((e for e in actor.effects if RAGING in e.tags), None)
+    if stance is None:
+        return None
+    top = sum(int(n or 1) * int(m) for n, m in re.findall(r"(\d*)d(\d+)", str(notation)))
+    state["furious_max"] = top
+    records, said = engine._end_class_stance(actor, stance)
+    if not actor.has_state("state.impaired.fatigued"):
+        actor.add_condition(FATIGUED, None, source="Furious Finish",
+                            origin="rule:feat-furious-finish")
+        records.append({"ref": actor.ref, "kind": "condition", "condition": FATIGUED,
+                        "origin": "rule:feat-furious-finish"})
+    state.setdefault("effects", []).extend(records)
+    state.setdefault("tells", []).extend(
+        [f"{actor.name} pours the whole rage into the blow: {notation} at its maximum, "
+         f"{top} (Furious Finish), and the rage is spent."] + list(said))
+    return top
+
+
+def push_after_hit(engine, actor, defender, choices, state, power) -> list[dict]:
+    """Pushing Assault's push, once the hit has landed: 5 feet directly away, 10 on a
+    critical, provoking nothing (`Engine._shove`, the one copy of forced movement)."""
+    if "pushing_assault" not in choices or not power \
+            or defender.is_down or not _no_larger(actor, defender):
+        return []
+    steps = 2 if state.get("crit") else 1
+    moved = 0
+    for _ in range(steps):
+        if not engine._shove(actor, defender, toward=False):
+            break
+        moved += 1
+    return [{"effect": {"ref": defender.ref, "kind": "position", "pushed": moved * 5,
+                        "origin": "rule:feat-pushing-assault"},
+             "tell": (f"The blow drives {defender.name} back {moved * 5} feet (Pushing "
+                      f"Assault)." if moved else
+                      f"{defender.name} has nowhere to be pushed to (Pushing Assault).")}]

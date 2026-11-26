@@ -10911,7 +10911,7 @@ class Engine:
         if actor.has_state(states.IN_A_BOUT) and defender is not None \
                 and defender.has_state(states.IN_A_BOUT):
             lethality = "nonlethal"
-        # Pulled is a lethal weapon dealing nonlethal at the -4 â€” not a fist Improved
+        # Pulled is a lethal weapon dealing nonlethal at the -4 — not a fist Improved
         # Unarmed Strike lets strike either way, nor a club Bludgeoner pulls for free
         # (feat loop b3: both waive the -4 in `lethality_swap`, and a rogue's nonlethal
         # unarmed sneak attack is the book's own example; measured before, a monk-trained
@@ -11624,7 +11624,7 @@ class Engine:
                 if state["crit"]:
                     self._surge(actor, "a confirmed critical hit")
                     feat_events.crit_events(self, actor, defender, weapon_key, weapon,
-                                            state)
+                                            state, choices)
                 state["stage"] = "damage"
 
             if state["stage"] == "damage" and printed.get("ability"):
@@ -11680,7 +11680,10 @@ class Engine:
                     state["fortified"] = self._fortify(
                         actor, defender, weapon, state,
                         flat_footed=flat_footed or defender.loses_dex_to_ac, pulled=pulled)
-                mult = weapon["crit_mult"] if state.get("crit") else 1
+                # A critical traded for its effect keeps none of its extra damage
+                # (Dragonslayer, Wingclipper: `feat_events.crit_trade`, feat loop b3).
+                mult = weapon["crit_mult"] if state.get("crit") \
+                    and not state.get("crit_traded") else 1
                 # Vital Strike: the weapon's dice again per feat, "not multiplied on a
                 # critical hit, but ... added to the total" — so past `mult`, never in it.
                 vital = actor.weapon_dice(weapon_key, choices) \
@@ -11693,7 +11696,10 @@ class Engine:
                 dice_notation = _multiply_dice(weapon["damage"], mult + vital)
                 dmg_mods = (actor.weapon_own_mods("combat_mod", "damage", weapon_key,
                                                   defender=defender) if dancing
-                            else actor.damage_modifiers(weapon_key, power_attack=power,
+                            else actor.damage_modifiers(weapon_key,
+                                                        power_attack=feat_events.power_damage(
+                                                            actor, defender, weapon, choices,
+                                                            power),
                                                         defender=defender,
                                                         thrown=thrown_any,
                                                         range_ft=self._gap_ft(actor,
@@ -11814,6 +11820,9 @@ class Engine:
                     if rider["joins"]:
                         dmg_mods = dmg_mods + [Modifier(max(0, int(state[f"magic_{n}"])),
                                                         rider["term"])]
+                # Furious Finish (feat loop b3): the dice at their maximum, not rolled.
+                maxed = None if dancing else feat_events.furious_finish(
+                    self, actor, choices, dice_notation, state)
                 dmg = self._roll_or_suspend_stage(
                     intent, actor, dmg_mods,
                     # A granted weapon's damage is several named things — Blood DMG +
@@ -11830,7 +11839,8 @@ class Engine:
                     + (" — CRITICAL" if mult > 1 else "")
                     + ("" if weapon.get("damage_label") else ")"),
                     None, partial, state, dice_notation,
-                )
+                ) if maxed is None else self.dice.given_total(
+                    maxed, dice_notation, dmg_mods, f"Damage ({weapon['name']}), maximised")
                 state["rolls"].append(dmg.as_dict())
                 amount = max(1, dmg.total)
                 # Half, for a blade swung in water. The book halves the DAMAGE of a
@@ -12076,7 +12086,7 @@ class Engine:
                     state["effects"].append(extra["effect"])
                     if extra.get("tell"):
                         state["tells"].append(extra["tell"])
-                # Feat loop b3: what a held feat answers once a blow has landed â€” a fall
+                # Feat loop b3: what a held feat answers once a blow has landed — a fall
                 # (Thrill of the Kill), the struck foe's mark (Flanking Foil), and more
                 # (`_b3_after_hit`).
                 for extra in ([] if dancing else feat_events.after_hit(
@@ -27751,6 +27761,9 @@ class Engine:
         w = actor.weapon(key)
         ranged = w.get("category") == "ranged" or bool(params.get("thrown"))
         said = {c: c.replace("_", " ").title() for c in declared}
+        why = feat_events.choice_refusal(actor, w, declared, params)    # feat loop b3
+        if why:
+            return why
         for c in ("vital_strike", "cleave", "scorpion_style"):
             if c in declared and full:
                 return (f"{said[c]} is the attack action — one blow — and cannot ride a "

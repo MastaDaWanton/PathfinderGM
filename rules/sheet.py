@@ -384,7 +384,11 @@ ATTACK_CHOICES = ("power_attack", "deadly_aim", "piranha_strike", "combat_expert
                   # next turn", and three one-blow options (Pinpoint Targeting, Footslasher,
                   # Sliding Axe Throw), each its feat document's `choice`.
                   "risky_striker", "shield_of_swings", "pinpoint_targeting", "footslasher",
-                  "sliding_axe_throw")
+                  "sliding_axe_throw",
+                  # Feat loop b3 (2026-11-26): Furious Finish's maximised Vital Strike,
+                  # Pushing Assault's push for Power Attack's damage, and the two crit
+                  # trades (Dragonslayer, Wingclipper) — `rules/feat_events.py`.
+                  "furious_finish", "pushing_assault", "dragonslayer", "wingclipper")
 # The options nobody needs a feat for (combat bar round 2, 2026-11-22). CRB, Combat
 # ("Fighting Defensively as a Standard Action"): "You can choose to fight defensively when
 # attacking" — anyone, with any attack. Its numbers are `defensive_dodge` and the stance
@@ -414,7 +418,9 @@ ATTACK_CHOICE_FEATS = {"power_attack": "power-attack", "deadly_aim": "deadly-aim
                        "whirlwind_attack": "whirlwind-attack",
                        "risky_striker": "risky-striker", "shield_of_swings": "shield-of-swings",
                        "pinpoint_targeting": "pinpoint-targeting",
-                       "footslasher": "footslasher", "sliding_axe_throw": "sliding-axe-throw"}
+                       "footslasher": "footslasher", "sliding_axe_throw": "sliding-axe-throw",
+                       "furious_finish": "furious-finish", "pushing_assault": "pushing-assault",
+                       "dragonslayer": "dragonslayer", "wingclipper": "wingclipper"}
 
 _IMPLIED_GENDER = {"she": "woman", "he": "man"}
 
@@ -6278,6 +6284,14 @@ class Actor:
         into a save could not be taken away by an effect, and this is the modifier
         funnel's own argument applied to movement.
         """
+        out = {"land": self.speed_feet}
+        out.update(self._movement_modes_read())
+        # Grounded (Wingclipper's clipped wing, feat loop b3): no flight while it holds.
+        if self.has_state("state.grounded"):
+            out.pop("fly", None)
+        return out
+
+    def _movement_modes_read(self) -> dict[str, int]:
         out = {"land": self.speed_feet}
         doc = self._creature_doc()
         if doc:
