@@ -1,0 +1,423 @@
+{
+  "class": "feat",
+  "_source": "Feat loop b3, lane b3-martial (2026-11-26): the rage feats a character USES — a weaker rage beside a raging ally, a swift action's spend of rage rounds. Each is had by a holder of the feat its `feat` names (rules/class_abilities.py), whatever their class, and run by the one executor the class abilities use (`Engine._use_class_ability`). Benefit text from content/feats/feats.json, checked against aonprd.com FeatDisplay 2026-11-26.",
+  "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
+  "abilities": [
+    {
+      "key": "sympathetic rage",
+      "name": "Sympathetic Rage",
+      "feat": "sympathetic-rage",
+      "aliases": [
+        "sympathetic rage",
+        "rage beside them",
+        "share the rage"
+      ],
+      "level": 1,
+      "source": "Sympathetic Rage (ARG): 'Whenever you are adjacent to an ally who is raging, you may choose to enter a similar but less powerful rage as a free action on your turn. This weaker rage gives you all the benefits and penalties of a barbarian's rage, except your morale bonus to Strength and Constitution is only +2. There is no limit to how long you can rage, as long as you remain adjacent to a raging ally ... As with a barbarian's rage, when this weaker rage ends, you are fatigued. You cannot use this feat if you are fatigued.' Warleader's Rage (Orcs of Golarion): such a rage 'persist[s] as long as your ally is within 30 feet of you and can see you' when that ally holds Warleader's Rage.",
+      "text": "+2 Str and Con, +2 Will, -2 AC while beside a raging ally; fatigued after.",
+      "action": "free",
+      "toggle": {
+        "key": "sympathetic rage"
+      },
+      "requires_not": [
+        "state.impaired.fatigued",
+        "state.impaired.exhausted",
+        "buff.stance.rage"
+      ],
+      "requires_ally": {
+        "state": "buff.stance.rage",
+        "within_ft": 5
+      },
+      "self": {
+        "tags": [
+          "buff.stance.rage",
+          "buff.stance.sympathetic-rage"
+        ],
+        "modifiers": [
+          {
+            "type": "ability_mod",
+            "target": "str",
+            "bonus_type": "morale",
+            "amount": 2
+          },
+          {
+            "type": "ability_mod",
+            "target": "con",
+            "bonus_type": "morale",
+            "amount": 2
+          },
+          {
+            "type": "save_mod",
+            "target": "will",
+            "bonus_type": "morale",
+            "amount": 2
+          },
+          {
+            "type": "combat_mod",
+            "target": "ac",
+            "bonus_type": "untyped",
+            "amount": -2
+          }
+        ],
+        "ends_when": {
+          "holder": [
+            "state.down"
+          ],
+          "ally": {
+            "state": "buff.stance.rage",
+            "within_ft": 5,
+            "far_feat": "warleader-s-rage",
+            "far_ft": 30
+          }
+        },
+        "forbids": {
+          "skills": {
+            "abilities": [
+              "cha",
+              "dex",
+              "int"
+            ],
+            "except": [
+              "acrobatics",
+              "fly",
+              "intimidate",
+              "ride"
+            ]
+          }
+        }
+      },
+      "after": {
+        "condition": "fatigued",
+        "rounds_per_held": 2
+      },
+      "tell": "{name} catches the fury of the one beside them.",
+      "tell_off": "{name}'s borrowed rage gutters out."
+    },
+    {
+      "key": "sympathetic rage",
+      "name": "Sympathetic Rage",
+      "feat": "sympathetic-rage-orcs",
+      "aliases": [
+        "sympathetic rage",
+        "rage beside them",
+        "share the rage"
+      ],
+      "level": 1,
+      "source": "Sympathetic Rage (Orcs of Golarion): the same text as the Advanced Race Guide's, without its last sentence ('You cannot use this feat if you are fatigued'); a fatigued creature still cannot rage (CRB, Rage), so the refusal stands.",
+      "text": "+2 Str and Con, +2 Will, -2 AC while beside a raging ally; fatigued after.",
+      "action": "free",
+      "toggle": {
+        "key": "sympathetic rage"
+      },
+      "requires_not": [
+        "state.impaired.fatigued",
+        "state.impaired.exhausted",
+        "buff.stance.rage"
+      ],
+      "requires_ally": {
+        "state": "buff.stance.rage",
+        "within_ft": 5
+      },
+      "self": {
+        "tags": [
+          "buff.stance.rage",
+          "buff.stance.sympathetic-rage"
+        ],
+        "modifiers": [
+          {
+            "type": "ability_mod",
+            "target": "str",
+            "bonus_type": "morale",
+            "amount": 2
+          },
+          {
+            "type": "ability_mod",
+            "target": "con",
+            "bonus_type": "morale",
+            "amount": 2
+          },
+          {
+            "type": "save_mod",
+            "target": "will",
+            "bonus_type": "morale",
+            "amount": 2
+          },
+          {
+            "type": "combat_mod",
+            "target": "ac",
+            "bonus_type": "untyped",
+            "amount": -2
+          }
+        ],
+        "ends_when": {
+          "holder": [
+            "state.down"
+          ],
+          "ally": {
+            "state": "buff.stance.rage",
+            "within_ft": 5,
+            "far_feat": "warleader-s-rage",
+            "far_ft": 30
+          }
+        },
+        "forbids": {
+          "skills": {
+            "abilities": [
+              "cha",
+              "dex",
+              "int"
+            ],
+            "except": [
+              "acrobatics",
+              "fly",
+              "intimidate",
+              "ride"
+            ]
+          }
+        }
+      },
+      "after": {
+        "condition": "fatigued",
+        "rounds_per_held": 2
+      },
+      "tell": "{name} catches the fury of the one beside them.",
+      "tell_off": "{name}'s borrowed rage gutters out."
+    },
+    {
+      "key": "raging brutality",
+      "name": "Raging Brutality",
+      "feat": "raging-brutality",
+      "level": 1,
+      "source": "Raging Brutality (UC): 'While raging and using Power Attack, you can spend 3 additional rounds of your rage as a swift action to add your Constitution bonus on damage rolls for melee attacks or thrown weapon attacks you make on your turn. If you are using the weapon two-handed, instead add 1-1/2 times your Constitution bonus. This bonus damage is not multiplied on a critical hit.' A thrown melee weapon keeps its melee category, so the melee clause carries it.",
+      "text": "Swift, 3 rounds of rage: + Con to Power Attack damage this turn (1-1/2 two-handed).",
+      "action": "swift",
+      "cost": {
+        "pool": "rage",
+        "amount": 3
+      },
+      "requires": [
+        "buff.stance.rage"
+      ],
+      "requires_said": "only while raging",
+      "self": {
+        "rounds": "1",
+        "modifiers": [
+          {
+            "type": "combat_mod",
+            "target": "damage_unmultiplied",
+            "bonus_type": "untyped",
+            "formula": "max(0, con_mod)",
+            "when": {
+              "choice": "power_attack",
+              "own_turn": true,
+              "weapon": {
+                "category": "melee",
+                "strength_share": 1.0
+              }
+            }
+          },
+          {
+            "type": "combat_mod",
+            "target": "damage_unmultiplied",
+            "bonus_type": "untyped",
+            "formula": "max(0, con_mod)",
+            "when": {
+              "choice": "power_attack",
+              "own_turn": true,
+              "weapon": {
+                "category": "melee",
+                "strength_share": 0.5
+              }
+            }
+          },
+          {
+            "type": "combat_mod",
+            "target": "damage_unmultiplied",
+            "bonus_type": "untyped",
+            "formula": "max(0, con_mod) * 3 // 2",
+            "when": {
+              "choice": "power_attack",
+              "own_turn": true,
+              "weapon": {
+                "category": "melee",
+                "strength_share": 1.5
+              }
+            }
+          }
+        ]
+      },
+      "tell": "{name} burns the rage hotter behind each blow."
+    },
+    {
+      "key": "raging throw",
+      "name": "Raging Throw",
+      "feat": "raging-throw",
+      "level": 1,
+      "source": "Raging Throw (UC): 'While raging, when you attempt a bull rush combat maneuver, you can spend 1 additional round of your rage as a swift action to add your Constitution bonus on your combat maneuver check to the bull rush.'",
+      "text": "Swift, 1 round of rage: + Con on bull rush checks this turn.",
+      "action": "swift",
+      "cost": {
+        "pool": "rage",
+        "amount": 1
+      },
+      "requires": [
+        "buff.stance.rage"
+      ],
+      "requires_said": "only while raging",
+      "self": {
+        "rounds": "1",
+        "tags": [
+          "bull-rush.collision.str-con"
+        ],
+        "modifiers": [
+          {
+            "type": "combat_mod",
+            "target": "cmb",
+            "bonus_type": "untyped",
+            "formula": "max(0, con_mod)",
+            "when": {
+              "maneuver": "bull rush"
+            }
+          }
+        ]
+      },
+      "tell": "{name} gathers the rage to drive someone off their feet."
+    },
+    {
+      "key": "quick wild shape",
+      "name": "Quick Wild Shape",
+      "feat": "quick-wild-shape",
+      "as": "wild shape",
+      "aliases": [
+        "quick wild shape",
+        "quick shape"
+      ],
+      "action": "move",
+      "level_down": 2,
+      "source": "Quick Wild Shape (UM): 'You can wild shape as a move action or a swift action. However, you are limited to forms available to a druid two levels lower when changing form as a move action, or four levels lower as a swift action.' The move-action use.",
+      "text": "Wild shape as a move action, into the forms of two levels lower."
+    },
+    {
+      "key": "swift wild shape",
+      "name": "Swift Wild Shape",
+      "feat": "quick-wild-shape",
+      "as": "wild shape",
+      "aliases": [
+        "swift wild shape",
+        "swift shape"
+      ],
+      "action": "swift",
+      "level_down": 4,
+      "source": "Quick Wild Shape (UM): the swift-action use, 'limited to forms available to a druid ... four levels lower as a swift action'.",
+      "text": "Wild shape as a swift action, into the forms of four levels lower."
+    },
+    {
+      "key": "wild speech",
+      "name": "Wild Speech",
+      "feat": "wild-speech",
+      "level": 1,
+      "aliases": [
+        "wild speech",
+        "speak with animals"
+      ],
+      "source": "Wild Speech (UM): 'When using wild shape to take the form of an animal, you may use speak with animals to communicate with animals of your assumed form. This is a spell-like ability with a caster level equal to your druid level, and you may use it for a number of minutes per day equal to your druid level ... in one-minute increments.' One use is one minute (10 rounds) of the permission speak with animals grants (rules/animals.py).",
+      "text": "In an animal's shape, speak with animals for a minute (druid level minutes a day).",
+      "action": "standard",
+      "ability_type": "sp",
+      "requires": [
+        "form.animal"
+      ],
+      "requires_said": "only in an animal's shape",
+      "pool": {
+        "id": "wild speech",
+        "max": "level",
+        "refresh": "rest.night"
+      },
+      "cost": {
+        "pool": "wild speech",
+        "amount": 1
+      },
+      "self": {
+        "rounds": "10",
+        "tags": [
+          "permission.speak_with_animals"
+        ]
+      },
+      "tell": "{name} speaks in the voice of the beast they wear."
+    },
+    {
+      "key": "invoke primal instinct",
+      "name": "Invoke Primal Instinct",
+      "feat": "invoke-primal-instinct",
+      "level": 1,
+      "aliases": [
+        "invoke primal instinct",
+        "primal instinct"
+      ],
+      "source": "Invoke Primal Instinct (Gnomes of Golarion): 'As a standard action, you can pantomime or describe predator- or prey-like behavior, expend one of your uses of wild shape, and make a Bluff check. All creatures within 30 feet that fail a Will save against your Bluff check DC regard you as a figure of either fear or contempt ... If you choose fear, the targets are frightened for 1 round per druid level.' The fear half; contempt waits (see the feat document's not_yet).",
+      "text": "Standard, one wild shape: Bluff sets a Will DC; those within 30 feet who fail are frightened a round a level.",
+      "action": "standard",
+      "ability_type": "ex",
+      "cost": {
+        "pool": "wild shape",
+        "amount": 1
+      },
+      "affects": "all",
+      "radius_ft": 30,
+      "harmful": true,
+      "save": {
+        "save": "will",
+        "check": "bluff",
+        "success": "negates"
+      },
+      "effect": {
+        "condition": "frightened",
+        "rounds": "level",
+        "on": "failed"
+      },
+      "tell": "{name} becomes, for a heartbeat, the thing every animal fears."
+    },
+    {
+      "key": "celestial wild shape",
+      "name": "Celestial Wild Shape",
+      "feat": "planar-wild-shape",
+      "as": "wild shape",
+      "aliases": [
+        "celestial wild shape",
+        "celestial shape"
+      ],
+      "cost": {
+        "pool": "wild shape",
+        "amount": 2
+      },
+      "self_tags": [
+        "form.celestial",
+        "sense.darkvision.60"
+      ],
+      "source": "Planar Wild Shape (UC): 'When you use wild shape to take the form of an animal, you can expend an additional daily use of your wild shape class feature to add the celestial template or fiendish template to your animal form. (Good druids must use the celestial template.)' Alignment is not tracked (owner ruling 2026-10-05), so the player names the template. The template's numbers are the feat document's terms on `form.celestial`.",
+      "text": "Wild shape with the celestial template, for two uses.",
+      "tell": "{name}'s body folds into the shape of an animal, lit from within."
+    },
+    {
+      "key": "fiendish wild shape",
+      "name": "Fiendish Wild Shape",
+      "feat": "planar-wild-shape",
+      "as": "wild shape",
+      "aliases": [
+        "fiendish wild shape",
+        "fiendish shape"
+      ],
+      "cost": {
+        "pool": "wild shape",
+        "amount": 2
+      },
+      "self_tags": [
+        "form.fiendish",
+        "sense.darkvision.60"
+      ],
+      "source": "Planar Wild Shape (UC): 'When you use wild shape to take the form of an animal, you can expend an additional daily use of your wild shape class feature to add the celestial template or fiendish template to your animal form. (Evil druids must use the fiendish template.)' Alignment is not tracked (owner ruling 2026-10-05), so the player names the template. The template's numbers are the feat document's terms on `form.fiendish`.",
+      "text": "Wild shape with the fiendish template, for two uses.",
+      "tell": "{name}'s body folds into the shape of an animal, smoke in its eyes."
+    }
+  ]
+}

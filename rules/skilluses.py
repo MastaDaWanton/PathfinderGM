@@ -264,7 +264,8 @@ def feint(engine, intent, actor, mods, partial):
     try:
         trained = target.printed_skill("sense motive") is not None \
             or bool((target.ranks or {}).get("sense motive"))
-        sense = _total(target.skill_modifiers("sense motive")) if trained else 0
+        sense = _total(target.skill_modifiers("sense motive", ctx={"against": "feint"})) \
+            if trained else 0
     except Exception:  # noqa: BLE001 — a sheet with no Sense Motive reads as untrained
         sense = 0
     value = dc(FEINT, target, sense_motive=sense)

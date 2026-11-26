@@ -277,7 +277,7 @@ def feat_rank_name(skill: str) -> str:
 # The names a feat document's formula may ask beyond the sheet's (`Actor._feat_formula_
 # extra`): the ranks in the skill the term lands on, in any named skill, and the adjacent
 # allies holding the same feat. The validator probes formulas with these.
-FEAT_FORMULA_NAMES = ("ranks", "allies", "allies_threatening",
+FEAT_FORMULA_NAMES = ("ranks", "allies", "allies_threatening", "weapon_dice",
                       *(feat_rank_name(s) for s in SKILLS))
 # A feat's class-skill grant, `skill.class.$target` bound to each pick (`class_skills`).
 FEAT_CLASS_SKILL = "skill.class."
@@ -352,6 +352,8 @@ def _trait_word(text) -> str:
 # attack roll asks `has_state` and never looks for the feat by name.
 STRIKES_EITHER_WAY = "lethality.either.unarmed"
 LETHALITY_EITHER = "lethality.either"
+PULLS_BLUDGEONING = "lethality.nonlethal.bludgeoning"     # Bludgeoner (feat loop b3)
+UNTIL_REST = "duration.until-rest"                         # gone at the next rest (b3)
 # The tag Quick Draw's feat document grants: "You can draw a weapon as a free action
 # instead of as a move action" (Core Rulebook p.132). Asked by `Engine._draw_paid`.
 QUICK_DRAW = "action.draw.free"
@@ -382,7 +384,11 @@ ATTACK_CHOICES = ("power_attack", "deadly_aim", "piranha_strike", "combat_expert
                   # next turn", and three one-blow options (Pinpoint Targeting, Footslasher,
                   # Sliding Axe Throw), each its feat document's `choice`.
                   "risky_striker", "shield_of_swings", "pinpoint_targeting", "footslasher",
-                  "sliding_axe_throw")
+                  "sliding_axe_throw",
+                  # Feat loop b3 (2026-11-26): Furious Finish's maximised Vital Strike,
+                  # Pushing Assault's push for Power Attack's damage, and the two crit
+                  # trades (Dragonslayer, Wingclipper) — `rules/feat_events.py`.
+                  "furious_finish", "pushing_assault", "dragonslayer", "wingclipper")
 # The options nobody needs a feat for (combat bar round 2, 2026-11-22). CRB, Combat
 # ("Fighting Defensively as a Standard Action"): "You can choose to fight defensively when
 # attacking" — anyone, with any attack. Its numbers are `defensive_dodge` and the stance
@@ -412,7 +418,9 @@ ATTACK_CHOICE_FEATS = {"power_attack": "power-attack", "deadly_aim": "deadly-aim
                        "whirlwind_attack": "whirlwind-attack",
                        "risky_striker": "risky-striker", "shield_of_swings": "shield-of-swings",
                        "pinpoint_targeting": "pinpoint-targeting",
-                       "footslasher": "footslasher", "sliding_axe_throw": "sliding-axe-throw"}
+                       "footslasher": "footslasher", "sliding_axe_throw": "sliding-axe-throw",
+                       "furious_finish": "furious-finish", "pushing_assault": "pushing-assault",
+                       "dragonslayer": "dragonslayer", "wingclipper": "wingclipper"}
 
 _IMPLIED_GENDER = {"she": "woman", "he": "man"}
 
@@ -4127,6 +4135,12 @@ class Actor:
         base = str(w.get("crafted_base") or weapons_mod.key_for(str(weapon_key or "")) or "")
         if base and self.has_state(f"{LETHALITY_EITHER}.{base}"):
             return ""
+        # Bludgeoner (UC): "You take no penalty on attack rolls for using a lethal
+        # bludgeoning weapon to deal nonlethal damage" - that direction only (feat loop b3).
+        if wanted == "nonlethal" and usual == "lethal" \
+                and "bludgeoning" in str(w.get("type") or "").lower() \
+                and self.has_state(PULLS_BLUDGEONING):
+            return ""
         if wanted == "nonlethal":
             return f"pulling the blow with a {w['name']} (non-lethal)"
         return f"striking to kill with a {w['name']}"
@@ -6272,6 +6286,14 @@ class Actor:
         funnel's own argument applied to movement.
         """
         out = {"land": self.speed_feet}
+        out.update(self._movement_modes_read())
+        # Grounded (Wingclipper's clipped wing, feat loop b3): no flight while it holds.
+        if self.has_state("state.grounded"):
+            out.pop("fly", None)
+        return out
+
+    def _movement_modes_read(self) -> dict[str, int]:
+        out = {"land": self.speed_feet}
         doc = self._creature_doc()
         if doc:
             from . import bestiary as bestiary_mod
@@ -6708,6 +6730,19 @@ class Actor:
                 fid, (ctx or {}).get("target_actor")))
         if "allies" in text:
             out["allies"] = len(self.adjacent_allies_with(fid))
+        if "weapon_dice" in text:
+            # The extra weapon dice the held feats' `weapon_dice` terms grant (feat loop
+            # b3): Devastating Strike's "+2 bonus on each extra weapon damage dice roll
+            # those feats grant (+6 maximum)". Counted off the documents, not the funnel,
+            # because this is read from inside the feat reader.
+            from . import feats as feats_mod
+
+            out["weapon_dice"] = sum(
+                int(m.get("amount") or 0)
+                for doc in {d["id"]: d for d in (feats_mod.document(r) for r in self.feats)
+                            if d}.values()
+                for m in doc.get("modifiers") or ()
+                if m.get("type") == "combat_mod" and m.get("target") == "weapon_dice")
         return out
 
     def allies_threatening_with(self, fid: str, foe) -> list:
@@ -7092,6 +7127,9 @@ class Actor:
         # fight the night before is the sort of stale state that quietly poisons every
         # roll for the rest of the campaign.
         self.clear_states("recovery.rest")
+        # What lasts "for that day" and is "lost" at the next rest (Raging Deathblow's
+        # extra rounds, feat loop b3): an effect of any kind carrying this tag.
+        self.remove_effects(match=lambda e: UNTIL_REST in e.tags)
         # A night's sleep is what fatigue is for, by the hour (CRB Appendix 2): an hour
         # turns exhaustion into fatigue, and eight more lift the fatigue. Except the fatigue
         # thirst and hunger leave: "Characters who have taken nonlethal damage from lack of
@@ -7252,7 +7290,8 @@ class Actor:
         # Injury and Death). No die is rolled, so not even a natural 20 saves them: the
         # wound has to be stopped first (a Heal check, a cure, the fire put out).
         continuous = self.taking_continuous_damage()
-        roll = None if continuous else dice.d20(self.ability_check_modifiers("con"),
+        roll = None if continuous else dice.d20(self.ability_check_modifiers(
+                                                    "con", {"against": "stabilize"}),
                                                 label=f"{self.name} stabilise",
                                                 visibility="hidden")
         if roll is not None and (roll.natural == 20 or roll.total >= dc):

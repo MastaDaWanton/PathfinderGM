@@ -486,10 +486,26 @@ def pick_levels(ch: dict, option: dict, level: int) -> list[int]:
     return [n for n in choice_levels(ch) if n <= int(level) for _ in range(_per_level(option))]
 
 
-def open_slots(ch: dict, option: dict, level: int, said) -> list[int]:
+def feat_slots(actor) -> dict[str, int]:
+    """The extra picks of a class choice the character's feats grant, by choice id:
+    Extra Rage Power's "You gain one additional rage power" is `choice_slots: {"rage
+    power": 1}`, each copy of the feat one more (its Special: "multiple times"). Feat loop
+    b3, 2026-11-26."""
+    from . import feats as feats_mod
+
+    out: dict[str, int] = {}
+    for raw in getattr(actor, "feats", None) or ():
+        doc = feats_mod.document(raw)
+        for cid, n in ((doc or {}).get("choice_slots") or {}).items():
+            out[_norm(cid)] = out.get(_norm(cid), 0) + int(n)
+    return out
+
+
+def open_slots(ch: dict, option: dict, level: int, said, extra: int = 0) -> list[int]:
     """The levels still owed a pick: every slot by this level, less the slot each stored
-    pick filled (a pick saved without one fills the oldest left)."""
-    left = pick_levels(ch, option, level)
+    pick filled (a pick saved without one fills the oldest left). `extra` picks a feat
+    grants are owed at the character's level, so any power they now qualify for fits."""
+    left = sorted(pick_levels(ch, option, level) + [int(level)] * max(0, int(extra)))
     loose = 0
     for p in _said_picks(said):
         at = int(p.get("level", 0) or 0)
@@ -518,7 +534,8 @@ def candidates(class_id: str, option: dict, answers: dict, domains=()) -> list[d
             if isinstance(e, dict) and _norm(e.get("id")) not in exclude]
 
 
-def owed_rows(class_id: str, level: int, answers: dict, domains=()) -> list[dict]:
+def owed_rows(class_id: str, level: int, answers: dict, domains=(),
+              extra_slots: dict | None = None) -> list[dict]:
     """Every class choice still to be made by this level: one row per pick owed,
     `{"choice", "name", "for_level", "need"}`, oldest first within a choice. `need` says
     what is missing: "option" (which of a choice's options), "domain", "animal", "pick"."""
@@ -548,7 +565,8 @@ def owed_rows(class_id: str, level: int, answers: dict, domains=()) -> list[dict
                 rows.append({**base, "for_level": first, "need": "option"})
         else:
             rows += [{**base, "for_level": n, "need": "pick"}
-                     for n in open_slots(ch, option, level, said)]
+                     for n in open_slots(ch, option, level, said,
+                                         (extra_slots or {}).get(_norm(cid), 0))]
     return rows
 
 
@@ -758,7 +776,7 @@ def choice_menu(actor, choice_id: str) -> dict:
     answers = dict(getattr(actor, "class_choices", None) or {})
     domains = list(getattr(actor, "domains", None) or [])
     level = int(getattr(actor, "level", 1) or 1)
-    rows = [r for r in owed_rows(cid, level, answers, domains)
+    rows = [r for r in owed_rows(cid, level, answers, domains, feat_slots(actor))
             if r["choice"] == str(ch.get("id"))]
     said = answers.get(str(ch.get("id"))) or {}
     taken = option_taken(ch, {str(ch.get("id")): said} if said else {})
@@ -840,7 +858,8 @@ def take_choice(actor, choice_id: str, body: dict) -> tuple[list[str], list[str]
     level = int(getattr(actor, "level", 1) or 1)
     answers = dict(getattr(actor, "class_choices", None) or {})
     domains = list(getattr(actor, "domains", None) or [])
-    rows = [r for r in owed_rows(cid, level, answers, domains) if r["choice"] == key]
+    rows = [r for r in owed_rows(cid, level, answers, domains, feat_slots(actor))
+            if r["choice"] == key]
     if not rows:
         first = choice_levels(ch)[0]
         if first > level:

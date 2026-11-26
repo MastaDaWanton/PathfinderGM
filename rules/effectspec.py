@@ -633,7 +633,15 @@ VOCAB: dict[str, list[dict]] = {
         ("reach", "Melee reach, in feet"),
         # Feat loop b2: Cut Your Losses' "treat your Strength score as 2 higher for the
         # purpose of determining your carrying capacity", read by `gear.encumbrance`.
-        ("carry_str", "Strength for carrying capacity"))],
+        ("carry_str", "Strength for carrying capacity"),
+        # Feat loop b3: damage a blow adds that is "not multiplied on a critical hit"
+        # (Raging Brutality's Constitution), read past the crit scaling by
+        # `feat_events.damage_terms` with the blow's context.
+        ("damage_unmultiplied", "Damage never multiplied on a critical"),
+        # Feat loop b3: levels added to the druid level an animal companion is figured
+        # at, never past the character's own (Boon Companion; `animal_companion.
+        # effective_level`).
+        ("companion_level", "Animal companion's effective druid level"))],
     "sense": [{"id": k, "name": n} for k, n in (
         ("low_light", "Low-light vision"), ("darkvision", "Darkvision"),
         ("scent", "Scent"), ("tremorsense", "Tremorsense"),
@@ -2583,6 +2591,16 @@ AGAINST: dict[str, str] = {
     "divination": "a divination (the school)",
     "scrying": "a scrying (the divination subschool)",
     "mind-reading": "a mind-affecting divination: detect thoughts, mind probe",
+    # Feat loop b3 (2026-11-26): Survivor's "+5 bonus on all Constitution checks made to
+    # stabilize while dying" (Actor.stabilise_check) and Shrewd Tactician's "+3 bonus on
+    # Sense Motive checks made to resist a foe's Bluff checks to feint in combat" (the
+    # feint's DC, skilluses.feint).
+    "stabilize": "the Constitution check a dying creature makes to stabilize",
+    "feint": "the Sense Motive that sets a feint's DC (skilluses)",
+    # Witchbreaker's "saving throws against the hexes, spells, spell-like abilities, and
+    # supernatural abilities of witches and hags": a save whose source is a hag or a
+    # witch (Engine._cast_save, Engine._op_save off the source creature).
+    "hag_or_witch": "a save against a hag's or a witch's spell or ability",
 }
 
 

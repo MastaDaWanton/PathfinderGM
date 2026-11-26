@@ -185,9 +185,10 @@ Kept up to date by the loop after every batch.
 - Extra Elemental Assault
 - Incremental Elemental Assault
 
-## class feature: ranger trap (not on the ranger document) (1)
+## class feature: ranger trap (not on the ranger document) (2)
 
 - Advanced Ranger Trap
+- Extra Ranger Trap
 
 ## class: gunslinger (1)
 
@@ -197,9 +198,10 @@ Kept up to date by the loop after every batch.
 
 - Split Hex
 
-## multiclassing (a second favored class) (1)
+## multiclassing (a second favored class) (2)
 
 - Eclectic
+- Shapeshifting Hunter (favored enemy and wild shape: a ranger who is also a druid)
 
 ## mythic tiers (1)
 
@@ -272,3 +274,13 @@ feature no playable class grants.
 - Pinpoint Poisoner: poison use (alchemist, assassin)
 - Revelation Strike: an oracle's revelation
 - Kobold Flood: Kobold Groundling, a kobold feat
+
+## Class features no playable class has (feat loop batch 3)
+
+- Practiced Tactician: the tactician class feature (cavalier, inquisitor)
+- Branded for Retribution: the bane class feature (inquisitor)
+
+## Systems not in the game (feat loop batch 3)
+
+- Savage Display: performance combat checks (Ultimate Combat's performance combat), which
+  no part of the engine runs

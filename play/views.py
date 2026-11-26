@@ -872,6 +872,19 @@ _OPTION_SHAPES = {
                     "speed."),
     "sliding_axe_throw": ("swing", "Sliding Axe Throw",
                           "A thrown axe along the ground: less to hit, a hit trips."),
+    # Feat loop b3.
+    "furious_finish": ("strike", "Furious Finish",
+                       "With Vital Strike while raging: the dice at their maximum, and the "
+                       "rage ends in fatigue."),
+    "pushing_assault": ("swing", "Pushing Assault",
+                        "With Power Attack two-handed: a hit pushes them 5 feet (10 on a "
+                        "critical) instead of the extra damage."),
+    "dragonslayer": ("swing", "Dragonslayer",
+                     "A critical on a breathing foe trades its extra damage for a "
+                     "silenced breath."),
+    "wingclipper": ("swing", "Wingclipper",
+                    "A critical on a winged flier trades its extra damage for grounding "
+                    "it."),
     "total_defense": ("act", "Total defense",
                       "Your standard action spent guarding: no attacks, and no attacks of "
                       "opportunity."),
@@ -895,7 +908,8 @@ _OPTION_SHAPES = {
 
 # Options whose whole effect is on the defender's side of the roll (Pinpoint Targeting's
 # armour ignored), so the sheet has no number of its own to show for them.
-_SAID_IN_WORDS = frozenset({"pinpoint_targeting"})
+_SAID_IN_WORDS = frozenset({"pinpoint_targeting", "furious_finish", "pushing_assault",
+                            "dragonslayer", "wingclipper"})
 
 
 def _signed(n: int) -> str:

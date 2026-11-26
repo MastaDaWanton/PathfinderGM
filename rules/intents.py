@@ -390,7 +390,10 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                     "aid", "aid_ally", "aid_with",
                     # Feat loop b2: five more feats' declared options (sheet.ATTACK_CHOICES).
                     "risky_striker", "shield_of_swings", "pinpoint_targeting",
-                    "footslasher", "sliding_axe_throw"), "player"),
+                    "footslasher", "sliding_axe_throw",
+                    # Feat loop b3: four more (sheet.ATTACK_CHOICES).
+                    "furious_finish", "pushing_assault", "dragonslayer", "wingclipper"),
+                   "player"),
     # `lethality` because a Blood Bender paying for an ability in non-lethal
     # damage and one taking a sword are not in the same trouble.
     # `when`: the "against X only" clause a jar's or a flask's document carries (alchemy
@@ -1121,6 +1124,7 @@ FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "faile
                          "stunning_assault", "scorpion_style", "second_chance",
                          "risky_striker", "shield_of_swings",
                          "pinpoint_targeting", "footslasher", "sliding_axe_throw",
+                         "furious_finish", "pushing_assault", "dragonslayer", "wingclipper",
                          "disengage", "squares_off"})
 from .skilluses import OWN_DOORS as _OWN_DOORS  # noqa: E402 — the uses with their own door
 

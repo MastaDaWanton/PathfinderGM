@@ -1141,7 +1141,12 @@ _FEAT_DOC_KEYS = frozenset({"modifiers", "tags", "budget", "choice", "attack_abi
                             "stacks", "summoned", "summon_extra", "metamagic", "crit_range",
                             "on_hit",
                             # Feat loop b2-styles: rerolls and after-the-die bonuses.
-                            "luck"})
+                            "luck",
+                            # Feat loop b3 (2026-11-26): what a feat answers in a fight
+                            # (rules/feat_events.py), the class choices it adds a pick to
+                            # (Extra Rage Power: `classes.feat_slots`), and the precision
+                            # dice a blow carries (Precise Strike: `Engine._b3_precision`).
+                            "triggers", "choice_slots", "precision"})
 
 # The keys a feat's `luck` entry may carry (rules/luck.py, which reads them).
 _LUCK_KEYS = frozenset({"reroll", "bonus", "ally_save", "on_reroll", "surge", "rolls",
@@ -1465,6 +1470,25 @@ def validate_feat_document(feat_id: str, doc) -> list[str]:
         problems.extend(_on_hit_problems(at, doc["on_hit"], doc))
     if doc.get("luck") is not None:
         problems.extend(_luck_problems(at, doc["luck"]))
+    if doc.get("triggers") is not None:
+        from . import feat_events
+
+        problems.extend(feat_events.problems(at, doc["triggers"], doc))
+    slots = doc.get("choice_slots")
+    if slots is not None and (not isinstance(slots, dict) or not slots or any(
+            not isinstance(n, int) or n < 1 for n in slots.values())):
+        problems.append(f"{at}.choice_slots: a map of class choice id to picks added, "
+                        f"like {{\"rage power\": 1}}.")
+    for i, entry in enumerate(doc.get("precision") or ()):
+        if not isinstance(entry, dict) or set(entry) - {"dice", "when"} \
+                or not re.fullmatch(r"[0-9]+d[0-9]+", str(entry.get("dice") or "")):
+            problems.append(f"{at}.precision[{i}]: {{\"dice\": \"1d6\", \"when\": {{...}}}}.")
+            continue
+        when = entry.get("when")
+        if isinstance(when, dict) and when:
+            rest = {k: v for k, v in when.items() if k != "bearer"}
+            if rest:
+                problems.extend(effectspec.when_problems(rest, f"{at}.precision[{i}].when"))
     sub = doc.get("cmb_ability")
     if sub is not None:
         from .tables import ABILITIES

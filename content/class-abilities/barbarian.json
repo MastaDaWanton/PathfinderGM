@@ -69,7 +69,11 @@
          "tags": ["sense.darkvision.60"]},
         {"choice": "rage power", "pick": "scent",
          "_source": "CRB rage power: the scent ability while raging.",
-         "tags": ["sense.scent"]}
+         "tags": ["sense.scent"]},
+        {"feat": "raging-vitality",
+         "_source": "Raging Vitality (APG): 'Whenever you are raging, the morale bonus to your Constitution increases by +2. Your rage does not end if you become unconscious. While unconscious you must still expend rounds of rage per day each round.' The drain runs whether or not she can act (Scene._drain_periodic); only death ends it.",
+         "raises": [{"kind": "ability_mod", "target": "con", "bonus_type": "morale", "amount": 2}],
+         "ends_when": {"holder": ["state.down.dead"]}}
       ],
       "tell": "{name} flies into a rage.",
       "tell_off": "{name}'s rage burns out.",

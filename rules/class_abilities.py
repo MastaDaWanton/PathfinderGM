@@ -60,7 +60,9 @@ The grammar, one ability:
 - `spends_pool`: n of the user's Blood Pools here, drawn back in; refused without them.
 - `roll`: `{"count": <formula>, "die": 6, "bonus": <formula>, "as": "heal"|"damage",
   "type": ..., "lethality": ...}` — rolled ONCE, as a fireball is, and shared.
-- `save`: `{"save": "will", "dc": <formula>, "success": "half"|"negates"}`.
+- `save`: `{"save": "will", "dc": <formula>, "success": "half"|"negates"}`; or `check`
+  (a skill) in place of `dc`: the user's check, rolled once, is the DC (Invoke Primal
+  Instinct's Bluff, feat loop b3).
 - `charge`: arms the user's next hit with a weapon in `weapons`: `{"weapons": [...],
   "save": {...}, "condition": ..., "rounds": ...}` (stunning fist).
 - `removes`: `{"choice": "mercy", "catalogue": {"<pick>": [<condition keys>]}}` — what the
@@ -71,6 +73,11 @@ The grammar, one ability:
   player types for it ("negative energy to harm" is harm the living; `option_for`), never
   laid over; `"kind": "form"` reads the animal
   catalogue; `"kind": "skill"` aims a skill modifier; `"kind": "condition"` picks a rung.
+- `addons` may name a `feat` (a feats.json id) in place of `choice`/`pick`, and carry
+  `raises` (`[{"kind", "target", "bonus_type", "amount"}]`: the stance's own matching term
+  raised, not a second bonus of its type) and `ends_when` (replacing `self.ends_when`):
+  Raging Vitality's "+2" on rage's morale Constitution and its rage that outlasts
+  unconsciousness (feat loop b3).
 - `addons`: `[{"choice": "rage power", "pick": ..., "modifiers": [...],
   "natural_weapons": [...], "tags": [...]}]` — what a chosen rage power adds to the
   stance it rides (a sense while raging is a tag: `sense.darkvision.60`).
@@ -207,6 +214,17 @@ def level_of(actor) -> int:
 
 # --- what was chosen ---------------------------------------------------------------------
 
+def addon_held(actor, add: dict) -> bool:
+    """Whether an `addons` entry rides this character's use: a class choice they picked
+    (`choice` + `pick`, a rage power) or a feat they hold (`feat`, a feats.json id —
+    Raging Vitality on rage, feat loop b3)."""
+    if add.get("feat"):
+        from . import feats as feats_mod
+
+        return str(add["feat"]) in feats_mod._held(actor)
+    return _norm(add.get("pick")) in chosen(actor, add.get("choice", ""))
+
+
 def chosen(actor, choice: str) -> list[str]:
     """What this character picked for a class choice — rage powers, mercies — lowercased.
 
@@ -336,7 +354,20 @@ DOC_KEYS = frozenset({
     "undead_only", "charge_condition", "charge_rounds", "charge_rounds_dice", "feat",
     "charge_push_ft", "gaze", "light", "runs", "eases", "hands_free",
     "target_requires_not", "marked_by", "before", "overlay",
-    "contest"})
+    "contest",
+    # Feat loop b3: an ally who must stand close holding a state (Sympathetic Rage).
+    "requires_ally",
+    # Feat loop b3: another document used another way (Quick Wild Shape).
+    "as", "level_down", "self_tags"})
+
+
+def _ally_want_problems(at: str, want) -> list[str]:
+    """`requires_ally` / `self.ends_when.ally`: {"state", "within_ft", "far_feat",
+    "far_ft"} (`feat_events.ally_holds`)."""
+    if not isinstance(want, dict) or not str(want.get("state") or "").strip()             or set(want) - {"state", "within_ft", "far_feat", "far_ft"}:
+        return [f"{at} is {{\"state\": \"buff.stance.rage\", \"within_ft\": 5}}, with an "
+                f"optional far_feat and far_ft."]
+    return []
 SELF_KEYS = frozenset({"ends_when", "forbids", "modifiers", "natural_weapons", "rounds",
                        "strikes_as", "tags", "vs_target", "forgoes"})
 EFFECT_KEYS = frozenset({"condition", "modifiers", "on", "rounds", "skill_modifiers",
@@ -463,8 +494,27 @@ def _docs_for(actor) -> list[dict]:
     # rungs are laid over the document (claws grow at 7th).
     held = feat_ids(actor)
     for doc in (documents().get(FEAT_KIND) or {}).get("abilities") or ():
-        if str(doc.get("feat") or "") in held:
-            out.append({**doc, "class": FEAT_KIND})
+        if str(doc.get("feat") or "") not in held:
+            continue
+        if doc.get("as"):
+            # Another document of the character's, used another way (feat loop b3):
+            # Quick Wild Shape is wild shape at a move or swift action with a lower
+            # level's forms — the class's own document, so its stance, its pool and its
+            # toggle are the one wild shape, and nothing of it is written twice.
+            base = next((d for d in out if _norm(d.get("key")) == _norm(doc["as"])), None)
+            if base is not None:
+                used = {**base, **{k: doc[k] for k in (
+                    "name", "aliases", "action", "level_down", "text", "source", "feat",
+                    "cost", "tell") if k in doc}}
+                # `self_tags`: tags the use adds to the document's own effect (Planar
+                # Wild Shape's template), so they go when the one stance goes.
+                if doc.get("self_tags"):
+                    own = dict(base.get("self") or {})
+                    own["tags"] = list(own.get("tags") or ()) + list(doc["self_tags"])
+                    used["self"] = own
+                out.append(used)
+            continue
+        out.append({**doc, "class": FEAT_KIND})
     from . import grantedpowers
 
     kinds = grantedpowers.kinds()
@@ -713,7 +763,10 @@ def forms_for(actor, doc: dict) -> dict[str, dict]:
     from . import animal_companion
 
     spec = doc.get("choice") or {}
-    sizes = rung_at(spec.get("sizes") or {}, level_of(actor)) or []
+    # `level_down` (feat loop b3): Quick Wild Shape's "limited to forms available to a
+    # druid two levels lower when changing form as a move action, or four levels lower".
+    sizes = rung_at(spec.get("sizes") or {},
+                    level_of(actor) - int(doc.get("level_down", 0) or 0)) or []
     allowed = {_norm(s) for s in sizes}
     return {k: v for k, v in animal_companion.animals().items()
             if _norm(v.get("size")) in allowed}
@@ -927,6 +980,11 @@ def validate_documents(docs: dict | None = None) -> list[str]:
         elif cid == FEAT_KIND:
             from . import feats as feats_mod
 
+            # A feat may spend a class's pool (Raging Brutality's rounds of rage, feat
+            # loop b3): the holder has the pool only if a class gave it, and the cost's
+            # refusal says so at use.
+            class_pools = {_norm(p.get("id")) for c in classes_mod.all_classes().values()
+                           for p in c.get("pools") or ()}
             for d in file.get("abilities") or ():
                 if str(d.get("feat") or "") not in feats_mod.all_feats():
                     problems.append(f"feat: {d.get('name')!r} names no feat — `feat` is "
@@ -1143,11 +1201,17 @@ def _shape_problems(at: str, doc: dict) -> list[str]:
     mine = doc.get("self") or {}
     ends = mine.get("ends_when")
     if ends is not None:
-        if not isinstance(ends, dict) or not ends or set(ends) - {"holder", "target"}:
-            out.append(f"{at}: self.ends_when is {{\"holder\": [...], \"target\": [...]}}.")
+        if not isinstance(ends, dict) or not ends or set(ends) - {"holder", "target", "ally"}:
+            out.append(f"{at}: self.ends_when is {{\"holder\": [...], \"target\": [...], "
+                       f"\"ally\": {{\"state\": ..., \"within_ft\": 5}}}}.")
         else:
             for k, v in ends.items():
-                tag_list(f"self.ends_when.{k}", v)
+                if k == "ally":
+                    out.extend(_ally_want_problems(f"{at}: self.ends_when.ally", v))
+                else:
+                    tag_list(f"self.ends_when.{k}", v)
+    if doc.get("requires_ally") is not None:
+        out.extend(_ally_want_problems(f"{at}: requires_ally", doc["requires_ally"]))
     forbids = mine.get("forbids")
     if forbids is not None:
         skills = (forbids or {}).get("skills") if isinstance(forbids, dict) else None

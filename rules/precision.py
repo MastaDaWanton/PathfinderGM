@@ -60,6 +60,28 @@ IMMUNE_TRAITS = frozenset({"ooze traits", "elemental traits"})
 # Held apart on purpose: believed immune, not confirmed on the source pages. See header.
 IMMUNE_SUBTYPES_UNSOURCED = frozenset({"incorporeal", "swarm"})
 
+# Feat loop b3 (2026-11-26), each a feat document's tag asked of the vocabulary:
+# Shadow Strike (APG) "You can deal precision damage, such as sneak attack damage, against
+# targets with concealment (but not total concealment)"; Bludgeoner (UC, Special) "A rogue
+# with this feat can use a lethal bludgeoning weapon to deal nonlethal damage with a sneak
+# attack"; Flanking Foil (UC) "that opponent ... cannot deal sneak attack damage to you",
+# the mark its hit leaves on the foe, whose payload names whom it is foiled against.
+# Bludgeoner's sneak attack is the engine's `pulled` itself, which a blow whose -4 is
+# waived (`Actor.lethality_swap`) never is.
+THROUGH_CONCEALMENT = "precision.through-concealment"
+FOILED = "flank.foiled"
+
+
+def foiled(actor, defender) -> bool:
+    """Whether a Flanking Foil mark on `actor` names `defender`: no flanking bonus and no
+    precision dice against them until the mark's round runs out."""
+    from . import states
+
+    return any(isinstance(e.payload, dict) and e.payload.get("by") == getattr(defender, "ref", None)
+               and any(states.matches(str(t), FOILED) for t in e.tags)
+               for e in getattr(actor, "effects", ()) or ())
+
+
 def dice_for(actor) -> str:
     """The sneak attack dice this character's class table grants by their level, or "".
 
@@ -141,6 +163,8 @@ def applies(scene, actor, defender, weapon, *, flat_footed: bool,
         return "", f"{defender.name} {reason}"
     if pulled:
         return "", "a blow pulled to spare them cannot also be aimed at the vitals"
+    if foiled(actor, defender):
+        return "", f"{defender.name} has turned the angle against them (Flanking Foil)"
     if concealed:
         # "A rogue cannot sneak attack while striking a creature with concealment."
         return "", f"{defender.name} is concealed — nothing to aim at precisely"

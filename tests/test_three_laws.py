@@ -458,7 +458,21 @@ _REACHES = {
         "combat_mod", "charge_ac", a._roll_context(None, charge=True))),
     # Feat loop b2: the Strength carrying capacity is figured from (Cut Your Losses).
     ("combat_mod", "carry_str"): lambda a: _carry_str(a),
+    # Feat loop b3: damage a critical never multiplies (Raging Brutality), read by the
+    # attack's damage stage off this funnel call (`feat_events.damage_terms`).
+    ("combat_mod", "damage_unmultiplied"):
+        lambda a: sum(m.value for m in a._buff_mods("combat_mod", "damage_unmultiplied")),
+    # Feat loop b3: an animal companion's effective druid level (Boon Companion), read by
+    # `animal_companion.effective_level` with an offset that leaves room under the cap.
+    ("combat_mod", "companion_level"): lambda a: _companion_level(a),
 }
+
+
+def _companion_level(a) -> int:
+    from rules import animal_companion
+
+    a.level = 20
+    return animal_companion.effective_level(a, -10)
 
 
 def _reach(a) -> int:

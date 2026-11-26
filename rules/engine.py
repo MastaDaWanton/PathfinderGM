@@ -32,6 +32,7 @@ from . import crafting
 from . import dc as dc_mod
 from . import effectspec
 from . import metamagic
+from . import feat_events
 from . import finish_uses
 from . import foraging
 from . import ingredients as ing_mod
@@ -1418,7 +1419,13 @@ class Scene:
             start = payload.get("pool_start")
             spent = max(1, int(start) - (pool.current if pool else 0)) \
                 if start is not None else 1
-            rounds = int(after.get("rounds_per_spent", 1) or 1) * spent
+            # A stance with no pool counts the rounds it was held (Sympathetic Rage's
+            # rage "as with a barbarian's rage", feat loop b3: `rounds_per_held`).
+            if after.get("rounds_per_held"):
+                spent = max(1, int(getattr(self, "round", 0) or 0)
+                            - int(payload.get("began_round") or 0))
+            rounds = int(after.get("rounds_per_spent", after.get("rounds_per_held", 1))
+                         or 1) * spent
             cond = str(after["condition"])
             actor.add_condition(cond, rounds, source=f"the end of {e.name}", origin=e.origin)
             records.append({"kind": "condition", "ref": actor.ref, "condition": cond,
@@ -5059,6 +5066,10 @@ class Engine:
                 why = ""
                 if any(actor.has_state(q) for q in ends.get("holder") or ()):
                     why = f"{actor.name} has fallen"
+                # Ends when no ally holds what it needs close by (`ends_when.ally`, b3).
+                if not why and ends.get("ally") \
+                        and not feat_events.ally_holds(self, actor, ends["ally"]):
+                    why = f"{actor.name} has no one left beside them to share it"
                 mark = self.scene.actors.get(str(p.get("ends_when_ref") or ""))
                 if not why and ends.get("target") and p.get("ends_when_ref"):
                     if mark is None or any(mark.has_state(q) for q in ends["target"]):
@@ -10297,6 +10308,15 @@ class Engine:
         # alchemy plan §16.7). Unasked until alchemy lane C, so the clause had no reader.
         if ctx is None and str(intent.gate or "").startswith("poison"):
             ctx = {"against": "poison"}
+        # A hag's own ability called for this save (`creature:<template>`): Witchbreaker's
+        # "+2 ... against the hexes, spells, spell-like abilities, and supernatural
+        # abilities of witches and hags" (feat loop b3).
+        from . import feat_events
+
+        if feat_events.origin_is_hag_or_witch(intent.origin):
+            got = (ctx or {}).get("against") or ()
+            got = (got,) if isinstance(got, str) else tuple(got)
+            ctx = {**(ctx or {}), "against": got + ("hag_or_witch",)}
         # An unreliable cloak or ring that lends this save its bonus is used by the save
         # (`_save_gutters`): rolled once, kept across the dice popup.
         gut = partial.get("save_gutter")
@@ -10930,7 +10950,13 @@ class Engine:
         if actor.has_state(states.IN_A_BOUT) and defender is not None \
                 and defender.has_state(states.IN_A_BOUT):
             lethality = "nonlethal"
-        pulled = usual == "lethal" and lethality == "nonlethal"
+        # Pulled is a lethal weapon dealing nonlethal at the -4 — not a fist Improved
+        # Unarmed Strike lets strike either way, nor a club Bludgeoner pulls for free
+        # (feat loop b3: both waive the -4 in `lethality_swap`, and a rogue's nonlethal
+        # unarmed sneak attack is the book's own example; measured before, a monk-trained
+        # rogue's pulled fist lost its sneak dice).
+        pulled = usual == "lethal" and lethality == "nonlethal" \
+            and bool(actor.lethality_swap(weapon_key, lethality))
 
         if coup:
             from . import coup_de_grace as coup_mod
@@ -11636,6 +11662,8 @@ class Engine:
                 self._judge(confirm, state["crit"])
                 if state["crit"]:
                     self._surge(actor, "a confirmed critical hit")
+                    feat_events.crit_events(self, actor, defender, weapon_key, weapon,
+                                            state, choices)
                 state["stage"] = "damage"
 
             if state["stage"] == "damage" and printed.get("ability"):
@@ -11691,7 +11719,10 @@ class Engine:
                     state["fortified"] = self._fortify(
                         actor, defender, weapon, state,
                         flat_footed=flat_footed or defender.loses_dex_to_ac, pulled=pulled)
-                mult = weapon["crit_mult"] if state.get("crit") else 1
+                # A critical traded for its effect keeps none of its extra damage
+                # (Dragonslayer, Wingclipper: `feat_events.crit_trade`, feat loop b3).
+                mult = weapon["crit_mult"] if state.get("crit") \
+                    and not state.get("crit_traded") else 1
                 # Vital Strike: the weapon's dice again per feat, "not multiplied on a
                 # critical hit, but ... added to the total" — so past `mult`, never in it.
                 vital = actor.weapon_dice(weapon_key, choices) \
@@ -11704,7 +11735,10 @@ class Engine:
                 dice_notation = _multiply_dice(weapon["damage"], mult + vital)
                 dmg_mods = (actor.weapon_own_mods("combat_mod", "damage", weapon_key,
                                                   defender=defender) if dancing
-                            else actor.damage_modifiers(weapon_key, power_attack=power,
+                            else actor.damage_modifiers(weapon_key,
+                                                        power_attack=feat_events.power_damage(
+                                                            actor, defender, weapon, choices,
+                                                            power),
                                                         defender=defender,
                                                         thrown=thrown_any,
                                                         range_ft=self._gap_ft(actor,
@@ -11757,6 +11791,8 @@ class Engine:
                     pulled=pulled)
                 if sneak_dice and state.get("fortified"):
                     sneak_dice, sneak_why = "", ""     # turned by the armour; said above
+                sneak_dice, sneak_why = feat_events.negate_precision(   # Survivor (b3)
+                    defender, sneak_dice, sneak_why, state)
                 if sneak_dice:
                     if "sneak_total" not in state:
                         sneak_roll = self._roll_or_suspend_stage(
@@ -11781,6 +11817,14 @@ class Engine:
                         # letter is raised: `capitalize()` lowercases the rest, and it
                         # turned "Troop, Goblin" into "Troop, goblin".
                         else sneak_why[:1].upper() + sneak_why[1:] + ".")
+                # Feat loop b3: a held feat's precision dice (Precise Strike) and its
+                # terms on this damage roll (Hammer the Gap, Knockout Artist).
+                if not dancing:
+                    dmg_mods = dmg_mods + feat_events.precision_dice(
+                        self, intent, actor, defender, weapon_key, weapon, state, partial)
+                    dmg_mods = dmg_mods + feat_events.damage_terms(
+                        self, intent, actor, defender, weapon, state, mult, lethality,
+                        flat_footed or defender.loses_dex_to_ac)
                 # "plus 1d6 fire", "plus 2d6 cold": a second packet of a second type,
                 # rolled here BEFORE the main die for the reason the rider and sneak
                 # dice are — a suspension after damage had landed would land it twice
@@ -11816,6 +11860,9 @@ class Engine:
                     if rider["joins"]:
                         dmg_mods = dmg_mods + [Modifier(max(0, int(state[f"magic_{n}"])),
                                                         rider["term"])]
+                # Furious Finish (feat loop b3): the dice at their maximum, not rolled.
+                maxed = None if dancing else feat_events.furious_finish(
+                    self, actor, choices, dice_notation, state)
                 dmg = self._roll_or_suspend_stage(
                     intent, actor, dmg_mods,
                     # A granted weapon's damage is several named things — Blood DMG +
@@ -11832,7 +11879,8 @@ class Engine:
                     + (" — CRITICAL" if mult > 1 else "")
                     + ("" if weapon.get("damage_label") else ")"),
                     None, partial, state, dice_notation,
-                )
+                ) if maxed is None else self.dice.given_total(
+                    maxed, dice_notation, dmg_mods, f"Damage ({weapon['name']}), maximised")
                 state["rolls"].append(dmg.as_dict())
                 amount = max(1, dmg.total)
                 # Half, for a blade swung in water. The book halves the DAMAGE of a
@@ -11940,9 +11988,20 @@ class Engine:
                         state["tells"].append(
                             f"Half the blow passes through {defender.name}'s "
                             f"insubstantial form.")
+                # Resilient Brute (feat loop b3): half a critical's damage as nonlethal.
+                amount, spared = feat_events.half_nonlethal(defender, amount, state,
+                                                            lethality)
                 hit = self._apply_damage(defender, amount, weapon["type"],
                                          traits=struck_as + attacker_traits(actor),
                                          lethality=lethality)
+                if spared:
+                    bruise = self._apply_damage(defender, spared, weapon["type"],
+                                                traits=struck_as + attacker_traits(actor),
+                                                lethality="nonlethal")
+                    bruise["origin"] = "rule:feat-resilient-brute"
+                    state["effects"].append(bruise)
+                    state["tells"].append(f"{bruise.get('amount', spared)} of it lands as "
+                                          f"bruising, nonlethal.")
                 if printed:
                     # Whose numbers these were: the stat block's, by the provenance
                     # vocabulary stage 8 gave every other amount.
@@ -12065,6 +12124,14 @@ class Engine:
                 # Critical Shot (`_feat_after_hit`).
                 for extra in ([] if dancing else self._feat_after_hit(
                         actor, defender, weapon, power, hand, state)):
+                    state["effects"].append(extra["effect"])
+                    if extra.get("tell"):
+                        state["tells"].append(extra["tell"])
+                # Feat loop b3: what a held feat answers once a blow has landed — a fall
+                # (Thrill of the Kill), the struck foe's mark (Flanking Foil), and more
+                # (`_b3_after_hit`).
+                for extra in ([] if dancing else feat_events.after_hit(
+                        self, intent, actor, defender, weapon_key, weapon, state, choices)):
                     state["effects"].append(extra["effect"])
                     if extra.get("tell"):
                         state["tells"].append(extra["tell"])
@@ -25540,7 +25607,11 @@ class Engine:
         """The defender's save against a rider, the engine's roll (an NPC's intent: hidden,
         as `_distraction` and `_magic_gate` roll theirs), kept in the attack's rolls, and
         the words the tell quotes: "Fortitude 9 against DC 13"."""
-        ctx = {**({"against": against} if against else {}),
+        from . import feat_events
+
+        words = tuple(w for w in (against, "hag_or_witch" if feat_events.is_hag_or_witch(
+            attacker) else "") if w)
+        ctx = {**({"against": words if len(words) > 1 else words[0]} if words else {}),
                **({"attacker_actor": attacker} if attacker is not None else {})}
         roll = self.dice.d20(defender.save_modifiers(save, ctx or None),
                              label=label, visibility="hidden")
@@ -27734,6 +27805,9 @@ class Engine:
         w = actor.weapon(key)
         ranged = w.get("category") == "ranged" or bool(params.get("thrown"))
         said = {c: c.replace("_", " ").title() for c in declared}
+        why = feat_events.choice_refusal(actor, w, declared, params)    # feat loop b3
+        if why:
+            return why
         for c in ("vital_strike", "cleave", "scorpion_style"):
             if c in declared and full:
                 return (f"{said[c]} is the attack action — one blow — and cannot ride a "
@@ -30283,6 +30357,10 @@ class Engine:
                 return self._refuse(intent, f"{actor.name} cannot speak the words of "
                                             f"{spell.name}. Nothing is spent.",
                                     code="silenced")
+            # In an animal's shape (feat loop b3): Natural Spell's and Wild Speech's gate.
+            why = feat_events.shaped_casting_refusal(actor, spell)
+            if why:
+                return self._refuse(intent, why, code="shaped")
             barred = actor.barred_from_casting(arcane=armour_mod.is_arcane(actor))
             if barred is not None:
                 found = self._curse_said(actor, barred, found=True)
@@ -33092,6 +33170,10 @@ class Engine:
             out.append("arcane_spell" if armour_mod.is_arcane(caster) else "divine_spell")
         if "negative" in casting.spell_context(spell).get("energy", ()):
             out.append("negative_energy")
+        from . import feat_events
+
+        if feat_events.is_hag_or_witch(caster):          # Witchbreaker (feat loop b3)
+            out.append("hag_or_witch")
         return tuple(out)
 
     def _focused_dc(self, spell, dc: int, target: Actor, state: dict) -> int:
@@ -35528,7 +35610,12 @@ class Engine:
         # `state.hidden` alone — the rule written two ways (ponytail audit): a rogue
         # stabbing a blurred or fog-wrapped foe rolled both the 20% miss chance and her
         # sneak dice, and one who had found a hiding foe was still refused them.
-        concealed = bool(self._concealment_of(actor, defender)[0] > 0
+        chance = self._concealment_of(actor, defender)[0]
+        # Shadow Strike (APG): "precision damage ... against targets with concealment (but
+        # not total concealment)" — its document's tag, asked of the vocabulary.
+        if 0 < chance < 50 and actor.has_state(precision_mod.THROUGH_CONCEALMENT):
+            chance = 0
+        concealed = bool(chance > 0
                          or position_mod.cover_of(self.scene, actor, defender) == "total")
         return precision_mod.applies(
             self.scene, actor, defender, weapon,
@@ -37437,6 +37524,11 @@ class Engine:
         for q in doc.get("requires_not") or ():
             if actor.has_state(str(q)):
                 return f"{found.title()} cannot be used while {q} holds on {actor.name}."
+        # An ally who must stand close holding a state (`requires_ally`, feat loop b3).
+        want = doc.get("requires_ally")
+        if want and not feat_events.ally_holds(self, actor, want):
+            return (f"{found.title()} needs an ally within {want.get('within_ft', 5)} feet "
+                    f"of {actor.name} holding {want.get('state')}, and there is none.")
         cost = doc.get("cost") or {}
         if cost.get("pool"):
             pool = actor.pool(str(cost["pool"]))
@@ -37916,6 +38008,17 @@ class Engine:
                                               records, tells)
             saving = doc.get("save") or {}
             dc = ca.amount(saving.get("dc"), actor) if saving else 0
+            if saving.get("check"):
+                # A DC set by the user's own check (`save.check`, feat loop b3): Invoke
+                # Primal Instinct's "make a Bluff check. All creatures within 30 feet that
+                # fail a Will save against your Bluff check DC" — rolled once, shared.
+                skill = str(saving["check"])
+                chk = self.dice.d20(actor.skill_modifiers(skill),
+                                    label=f"{shown}: {skill.title()} check",
+                                    visibility=intent.visibility or "player")
+                rolls.append(chk)
+                dc = chk.total
+                tells.append(f"{actor.name}'s {skill.title()} sets the DC at {dc}.")
             dc += sum(int(m.get("amount", 0)) for m in (doc.get("_harmonic") or [[]])[0]
                       if str(m.get("target", "")).endswith(".dc")) if saving else 0
             if saving and extra_dc:
@@ -39066,11 +39169,23 @@ class Engine:
         weapons: list[dict] = []
         said: list[str] = []
         add_tags: list[str] = []
+        ends_over = None
         for add in doc.get("addons") or ():
             if add.get("requires"):
                 continue                       # a feat's addon: `_feat_addons`
-            if ca._norm(add.get("pick")) in ca.chosen(actor, add.get("choice", "")):
+            if ca.addon_held(actor, add):
                 mods += ca.modifiers(add.get("modifiers"), actor)
+                # A feat's addon (feat loop b3): Raging Vitality's "the morale bonus to
+                # your Constitution increases by +2" raises the stance's own term rather
+                # than laying a second morale bonus the stacking rule would drop, and
+                # "your rage does not end if you become unconscious" narrows its end.
+                for up in add.get("raises") or ():
+                    for m in mods:
+                        if all(m.get(k) == up.get(k) for k in ("kind", "target",
+                                                               "bonus_type")):
+                            m["amount"] = int(m.get("amount") or 0) + int(up["amount"])
+                if add.get("ends_when") is not None:
+                    ends_over = add["ends_when"]
                 weapons += [_sized_weapon(w, actor.size) for w in add.get("natural_weapons") or ()]
                 # A rage power's sense while raging (low-light vision, night vision,
                 # scent): tags on the one stance effect, gone when it goes.
@@ -39113,6 +39228,7 @@ class Engine:
             payload["natural_weapons"] = weapons
         if doc.get("after"):
             payload["after"] = dict(doc["after"])
+            payload["began_round"] = int(getattr(self.scene, "round", 0) or 0)
             payload["pool"] = str((doc.get("cost") or {}).get("pool") or "")
             payload["pool_start"] = pool_start
         if key and doc.get("bonus_from"):
@@ -39150,9 +39266,10 @@ class Engine:
         # the effect: the end a tag brings (`ends_when`, swept by
         # `_ability_ends_settle`), the checks it refuses (`forbids`, read by `_op_check`),
         # and the traits its holder's blows carry (`strikes_as`, read by the attack op).
-        if spec.get("ends_when"):
-            payload["ends_when"] = {k: [str(q) for q in v]
-                                    for k, v in dict(spec["ends_when"]).items()}
+        if spec.get("ends_when") or ends_over:
+            payload["ends_when"] = {k: ([str(q) for q in v] if isinstance(v, list)
+                                        else dict(v)) for k, v in dict(
+                ends_over if ends_over is not None else spec["ends_when"]).items()}
             if target is not None:
                 payload["ends_when_ref"] = target.ref
         if spec.get("forbids"):
@@ -39195,10 +39312,11 @@ class Engine:
                             "modifiers": [dict(m) for m in mods], "rounds": rounds,
                             "origin": origin,
                             **({"vs": target.ref} if spec.get("vs_target") and target else {})})
-        bits = [f"{m['amount']:+d} {m['target']}"
-                + (f" against {target.name}" if m.get("vs") and target else "")
-                + (f" ({m['when']})" if m.get("when") else "")
-                for m in mods]
+        bits = list(dict.fromkeys(
+            f"{m['amount']:+d} {m['target'].replace('_', ' ')}"
+            + (f" against {target.name}" if m.get("vs") and target else "")
+            + (f" ({_when_said(m['when'])})" if m.get("when") else "")
+            for m in mods))
         line = ""
         if bits:
             line = f"{actor.name}: " + ", ".join(bits)
@@ -43534,3 +43652,21 @@ def _to_rounds(amount: int, unit: str) -> int:
 
 def _to_minutes(amount: int, unit: str) -> int:
     return {"round": 0, "minute": 1, "hour": 60, "day": 1440}[unit] * int(amount)
+
+
+def _when_said(when) -> str:
+    """A `when` clause in words for a tell (feat loop b3): its words, not its dict — the
+    stance's tell printed "({'choice': 'power_attack', 'own_turn': True, ...})" to the
+    narrator. True flags by name, words as written, numbers left out."""
+    out: list[str] = []
+
+    def walk(v, k=""):
+        if isinstance(v, dict):
+            for kk, vv in v.items():
+                walk(vv, kk)
+        elif v is True:
+            out.append(k.replace("_", " "))
+        elif isinstance(v, str):
+            out.append(v.replace("_", " "))
+    walk(when if isinstance(when, dict) else {})
+    return ", ".join(dict.fromkeys(out)) or "in some cases"

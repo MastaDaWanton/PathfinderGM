@@ -125,9 +125,17 @@ def attack_mods(scene, actor, defender, weapon: dict | None = None) -> list[Modi
     # Stance of the Xorn (Dwarves of Golarion): "Flanking creatures do not gain a +2 bonus
     # to attack you (this does not prevent you from being sneak attacked ...). A condition
     # that makes you lose your Dex bonus to AC also makes you lose the benefits of this
-    # feat." Only the bonus goes; the flank itself still stands for sneak attack.
-    if with_whom and not (defender.has_state(NO_FLANK_BONUS)
-                          and not defender.loses_dex_to_ac):
+    # feat." Shrewd Tactician (ISWG): "Opponents do not gain a +2 bonus on attack rolls for
+    # flanking you, although they can still sneak attack you"; Flanking Foil (UC): the one
+    # it struck "does not gain any flanking bonus on attack rolls while it is flanking
+    # you". The flank stands (sneak dice, an ally's teamwork feat); only the +2 goes.
+    from . import precision
+
+    if with_whom and ((defender.has_state(NO_FLANK_BONUS) and not defender.loses_dex_to_ac)
+                      or defender.has_state(NO_FLANK_BONUS_AGAINST)
+                      or precision.foiled(actor, defender)):
+        with_whom = ""
+    if with_whom:
         mods.append(Modifier(FLANKING_BONUS, f"flanking with {with_whom}", "flanking"))
 
     if _level(here) - _level(there) >= HIGHER_GROUND_SQUARES:
@@ -138,6 +146,8 @@ def attack_mods(scene, actor, defender, weapon: dict | None = None) -> list[Modi
 INTO_MELEE_PENALTY = -4
 # Stance of the Xorn's tag (content/feats/mechanics/b3-divine.json).
 NO_FLANK_BONUS = "defence.no-flank-bonus"
+# Shrewd Tactician's tag (feat loop b3): flankers get no +2 against its holder.
+NO_FLANK_BONUS_AGAINST = "flanking.no-bonus-against"
 # Precise Shot's tag (content/feats/mechanics/core.json): "You can shoot or throw ranged
 # weapons at an opponent engaged in melee without taking the standard -4 penalty".
 SHOOTS_INTO_MELEE = "shot.into-melee.unpenalised"
