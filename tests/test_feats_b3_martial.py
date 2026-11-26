@@ -752,3 +752,22 @@ def test_invoke_primal_instinct_spends_a_wild_shape_and_frightens_on_a_bluff_dc(
     assert pc.pool("wild shape").current == left - 1
     assert thug.has_state("state.fear.frightened")
     assert "sets the DC" in out.tell
+
+
+def test_planar_wild_shape_spends_two_uses_for_the_template_s_resistances():
+    """Planar Wild Shape (UC): an extra daily use of wild shape adds the celestial (or
+    fiendish) template: at 8 Hit Dice, resist acid, cold and electricity 10, darkvision;
+    +2 to confirm a critical against an evil creature."""
+    scene, engine, pc = _druid(["Planar Wild Shape"], level=8)
+    pc.ranks["knowledge (planes)"] = 5
+    from rules import classes, resources
+
+    for p in classes.get("druid").get("pools") or ():
+        resources.define(pc, p)
+    left = pc.pool("wild shape").current
+    assert _use(engine, "Celestial Wild Shape (wolf)").status != "refused"
+    assert pc.pool("wild shape").current == left - 2
+    assert pc.resistance("acid") == 10 and pc.resistance("fire") == 0
+    assert pc.has_state("sense.darkvision")
+    assert _use(engine, "Wild Shape").status != "refused"
+    assert pc.resistance("acid") == 0

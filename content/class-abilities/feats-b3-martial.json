@@ -376,6 +376,48 @@
         "on": "failed"
       },
       "tell": "{name} becomes, for a heartbeat, the thing every animal fears."
+    },
+    {
+      "key": "celestial wild shape",
+      "name": "Celestial Wild Shape",
+      "feat": "planar-wild-shape",
+      "as": "wild shape",
+      "aliases": [
+        "celestial wild shape",
+        "celestial shape"
+      ],
+      "cost": {
+        "pool": "wild shape",
+        "amount": 2
+      },
+      "self_tags": [
+        "form.celestial",
+        "sense.darkvision.60"
+      ],
+      "source": "Planar Wild Shape (UC): 'When you use wild shape to take the form of an animal, you can expend an additional daily use of your wild shape class feature to add the celestial template or fiendish template to your animal form. (Good druids must use the celestial template.)' Alignment is not tracked (owner ruling 2026-10-05), so the player names the template. The template's numbers are the feat document's terms on `form.celestial`.",
+      "text": "Wild shape with the celestial template, for two uses.",
+      "tell": "{name}'s body folds into the shape of an animal, lit from within."
+    },
+    {
+      "key": "fiendish wild shape",
+      "name": "Fiendish Wild Shape",
+      "feat": "planar-wild-shape",
+      "as": "wild shape",
+      "aliases": [
+        "fiendish wild shape",
+        "fiendish shape"
+      ],
+      "cost": {
+        "pool": "wild shape",
+        "amount": 2
+      },
+      "self_tags": [
+        "form.fiendish",
+        "sense.darkvision.60"
+      ],
+      "source": "Planar Wild Shape (UC): 'When you use wild shape to take the form of an animal, you can expend an additional daily use of your wild shape class feature to add the celestial template or fiendish template to your animal form. (Evil druids must use the fiendish template.)' Alignment is not tracked (owner ruling 2026-10-05), so the player names the template. The template's numbers are the feat document's terms on `form.fiendish`.",
+      "text": "Wild shape with the fiendish template, for two uses.",
+      "tell": "{name}'s body folds into the shape of an animal, smoke in its eyes."
     }
   ]
 }

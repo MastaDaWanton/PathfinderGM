@@ -356,7 +356,7 @@ DOC_KEYS = frozenset({
     # Feat loop b3: an ally who must stand close holding a state (Sympathetic Rage).
     "requires_ally",
     # Feat loop b3: another document used another way (Quick Wild Shape).
-    "as", "level_down"})
+    "as", "level_down", "self_tags"})
 
 
 def _ally_want_problems(at: str, want) -> list[str]:
@@ -502,9 +502,16 @@ def _docs_for(actor) -> list[dict]:
             # toggle are the one wild shape, and nothing of it is written twice.
             base = next((d for d in out if _norm(d.get("key")) == _norm(doc["as"])), None)
             if base is not None:
-                out.append({**base, **{k: doc[k] for k in (
-                    "name", "aliases", "action", "level_down", "text", "source", "feat")
-                    if k in doc}})
+                used = {**base, **{k: doc[k] for k in (
+                    "name", "aliases", "action", "level_down", "text", "source", "feat",
+                    "cost", "tell") if k in doc}}
+                # `self_tags`: tags the use adds to the document's own effect (Planar
+                # Wild Shape's template), so they go when the one stance goes.
+                if doc.get("self_tags"):
+                    own = dict(base.get("self") or {})
+                    own["tags"] = list(own.get("tags") or ()) + list(doc["self_tags"])
+                    used["self"] = own
+                out.append(used)
             continue
         out.append({**doc, "class": FEAT_KIND})
     from . import grantedpowers

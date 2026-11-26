@@ -414,5 +414,103 @@
     "not_yet": [
       "'you also choose one creature other than you within line of sight ... gains a deflection bonus to AC equal to your Charisma modifier against attacks made by the target of the smite', and the paladin's own deflection given up: smite names one creature, and nothing yet lets the player name a second"
     ]
+  },
+  "planar-wild-shape": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "resist.acid",
+        "formula": "5 + 5 * min(1, level // 5) + 5 * min(1, level // 11)",
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "form.celestial"
+          }
+        },
+        "note": "celestial template: resist acid 5 (HD 1-4), 10 (5-10), 15 (11+)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "resist.cold",
+        "formula": "5 + 5 * min(1, level // 5) + 5 * min(1, level // 11)",
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "form.celestial"
+          }
+        },
+        "note": "celestial template: resist cold 5 (HD 1-4), 10 (5-10), 15 (11+)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "resist.electricity",
+        "formula": "5 + 5 * min(1, level // 5) + 5 * min(1, level // 11)",
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "form.celestial"
+          }
+        },
+        "note": "celestial template: resist electricity 5 (HD 1-4), 10 (5-10), 15 (11+)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "resist.cold",
+        "formula": "5 + 5 * min(1, level // 5) + 5 * min(1, level // 11)",
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "form.fiendish"
+          }
+        },
+        "note": "fiendish template: resist cold 5 (HD 1-4), 10 (5-10), 15 (11+)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "resist.fire",
+        "formula": "5 + 5 * min(1, level // 5) + 5 * min(1, level // 11)",
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "form.fiendish"
+          }
+        },
+        "note": "fiendish template: resist fire 5 (HD 1-4), 10 (5-10), 15 (11+)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "crit_confirm",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "form.celestial"
+          },
+          "target": {
+            "alignment": "evil"
+          }
+        },
+        "note": "a celestial form's natural weapons confirming against an evil creature"
+      },
+      {
+        "type": "combat_mod",
+        "target": "crit_confirm",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "form.fiendish"
+          },
+          "target": {
+            "alignment": "good"
+          }
+        },
+        "note": "a fiendish form's natural weapons confirming against a good creature"
+      }
+    ],
+    "not_yet": [
+      "the template's damage reduction (5/evil or /good at 5-10 Hit Dice, 10/ at 11+), its spell resistance (CR + 5) and its once-a-day smite: the energy resistances and darkvision 60 ft are laid",
+      "'Good druids must use the celestial template, while evil druids must use the fiendish template': alignment is not tracked, so the player names which"
+    ]
   }
 }
