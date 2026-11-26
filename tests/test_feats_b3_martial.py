@@ -641,6 +641,9 @@ def _druid(feats=(), level=8):
 
 
 def _cast(engine, spell="cure-light-wounds", at="pc"):
+    from tests._board import new_turn
+
+    new_turn(engine.scene)                  # the shape was this turn's standard action
     return engine.run(engine.validate([{"op": "cast", "actor": "pc", "because": "test",
                                         "params": {"spell": spell, "at": at}}])).outcomes[-1]
 
@@ -668,6 +671,9 @@ def test_wild_speech_speaks_with_animals_a_minute_a_use_in_a_shape_only():
     scene, engine, pc = _druid(["Wild Speech"], level=6)
     assert _use(engine, "Wild Speech").status == "refused"
     assert _use(engine, "Wild Shape (wolf)").status != "refused"
+    from tests._board import new_turn
+
+    new_turn(scene)                         # the shape was this turn's standard action
     assert _use(engine, "Wild Speech").status != "refused"
     assert animals.speaks_with_animals(pc) if hasattr(animals, "speaks_with_animals") \
         else pc.has_state("permission.speak_with_animals")

@@ -7037,6 +7037,52 @@ class Engine:
                                        "action. A move is still theirs to take."),
                             code="standard_spent")
 
+    def _spend_ability_action(self, intent: Intent, actor, action: str, what: str,
+                              armed: bool = False) -> "Outcome | None":
+        """Spend a class ability's (or an activated feat's) declared action from the
+        turn's budget, or refuse it with the reason. Feat loop b4 (b4-moves): the
+        executor recorded `action` and spent nothing — Smite Evil, Channel Smite,
+        Bewildering Koan and Crusader's Fist, each "as a swift action", were used twice in
+        one turn and the swift record (`Scene.swift_spent`) never moved. Out of a fight
+        nothing is counted (`_swift_turn`'s rule). A move action may be paid with the
+        turn's standard (CRB, Action Types: "You can take a move action in place of a
+        standard action"); a full-round action needs both untouched."""
+        sc = self.scene
+        if not sc.in_encounter or intent.params.get("reaction"):
+            return None
+        act = str(action or "standard").lower()
+        if act in ("swift", "immediate"):
+            why = self._spend_swift(actor, act == "immediate", what)
+            return self._refuse(intent, why, code="swift_spent") if why else None
+        rnd, ref = sc.round, actor.ref
+        moved = sc.move_spent.get(ref) == rnd
+        stood = sc.standard_spent.get(ref) == rnd
+        if act == "move":
+            if not moved:
+                sc.move_spent[ref] = rnd
+            elif not stood:
+                sc.standard_spent[ref] = rnd
+            else:
+                return self._refuse(intent, f"{actor.name} has already used this turn's "
+                                            f"standard and move actions, and {what} is a "
+                                            f"move action.", code="standard_spent")
+            return None
+        if act in ("standard", "full-round", "full round"):
+            if act != "standard":
+                why = self._coup_round_spent(actor, what, "Nothing is spent.")
+                if why:
+                    return self._refuse(intent, why, code="standard_spent")
+            elif stood:
+                return self._standard_spent_refusal(intent, actor)
+            if armed:
+                # A `charge` arms the blow the action is made of (Crushing Blow's "a
+                # Stunning Fist attempt as a full-round action"): the blow pays, not this.
+                return None
+            if act != "standard":
+                sc.move_spent[ref] = rnd
+            sc.standard_spent[ref] = rnd
+        return None
+
     COUP_UNPROVOKING = "coup_de_grace.unprovoking"      # Slaying Sprint's tag
     # --- the swift and immediate action (feat loop b2, 2026-11-22) -------------------
     #
@@ -38080,6 +38126,13 @@ class Engine:
             gated = self._ability_gate(intent, actor, shown, foes)
             if gated is not None:
                 return gated
+
+        # 4b. The turn's action, spent (`_spend_ability_action`, feat loop b4).
+        late = self._spend_ability_action(intent, actor, ca.action_of(
+            doc, actor, on_self=([a.ref for a in who] == [actor.ref])), shown,
+            armed=bool(doc.get("charge")))
+        if late is not None:
+            return late
 
         # 5. The price, paid.
         records: list[dict] = []
