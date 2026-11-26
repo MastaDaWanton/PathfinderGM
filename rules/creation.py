@@ -796,13 +796,18 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         problems.append(f"The favoured class bonus is {' or '.join(FAVOURED_BONUSES)}, "
                         f"not {favoured!r}.")
         favoured = FAVOURED_DEFAULT
+    # Fast Learner (ARG, feat loop b4-moves): "When you gain a level in a favored class,
+    # you gain both +1 hit point and +1 skill rank" — the level's bonus is "both".
+    if "fast-learner" in {str(f.get("id", "") if isinstance(f, dict) else f).strip().lower()
+                          for f in payload.get("feats") or ()}:
+        favoured = "both"
 
     # --- skills --------------------------------------------------------------------
     ranks_budget = 0
     if cls:
         ranks_budget = max(1, int(cls["skill_ranks"]) + int_mod) \
             + (int((race.get("budget") or {}).get("ranks", 0)) if race else 0) \
-            + (1 if favoured == "skill" else 0)
+            + (1 if favoured in ("skill", "both") else 0)
     picked = [str(s).strip().lower() for s in (payload.get("skills") or [])]
     for s in picked:
         if s not in SKILLS:
@@ -1018,8 +1023,8 @@ def build(payload: dict) -> tuple[dict | None, list[str]]:
         "goods": {outfit: 1},
         "slots": {"body": [outfit]},
         "purse": starting_purse(cls),
-        "hp": hp + (1 if favoured == "hp" else 0),
-        "hp_max": hp + (1 if favoured == "hp" else 0),
+        "hp": hp + (1 if favoured in ("hp", "both") else 0),
+        "hp_max": hp + (1 if favoured in ("hp", "both") else 0),
         "favoured": [favoured],
         "notes": str(payload.get("notes", "")).strip(),
     }

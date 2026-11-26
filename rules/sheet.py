@@ -3976,6 +3976,12 @@ class Actor:
         # carries its attacks in the race documents' shape, damage keyed by size.
         borrowed = [w for e in self.effects if isinstance(e.payload, dict)
                     for w in (e.payload.get("natural_weapons") or ())]
+        # Feat loop b4-moves: a feat's own natural attack (Razortusk's bite), read live off
+        # its document as every feat term is, so dropping the feat drops the jaws.
+        from . import feats as _feats_mod
+
+        borrowed += [w for raw in self.feats or ()
+                     for w in ((_feats_mod.document(raw) or {}).get("natural_weapons") or ())]
         doc = animal_companion.natural_weapon_doc(self) or self._race_doc() or {}
         if borrowed:
             doc = {**doc, "weapons": borrowed + list(doc.get("weapons") or ())}
@@ -4001,8 +4007,8 @@ class Actor:
                 # Natural Attacks; d20pfsrd.com/bestiary/rules-for-monsters/
                 # universal-monster-rules/#Natural_Attacks). One attack in all, counted
                 # across the body's whole list.
-                "sole": sum(int(x.get("count", 1) or 1)
-                            for x in doc.get("weapons") or ()) == 1,
+                "sole": bool(w.get("sole", sum(int(x.get("count", 1) or 1)
+                                               for x in doc.get("weapons") or ()) == 1)),
                 "hands": 0,
             })
             return base
@@ -6839,7 +6845,7 @@ class Actor:
         """The favoured class bonus taken in hit points: one for every level the player
         chose "hp" for (CRB p.31, `favoured`). Read here, beside the feat channel, so
         `set_hp_max` takes out exactly what the read adds."""
-        return sum(1 for b in self.favoured or () if b == "hp")
+        return sum(1 for b in self.favoured or () if b in ("hp", "both"))
 
     def hp_max_modifiers(self) -> list["Modifier"]:
         """What the maximum is made of, itemised the way AC is.
@@ -8946,6 +8952,15 @@ class Situation:
             # Duck and Cover's "as long as your ally is wielding a shield" (feat loop b3).
             if want.get("shield") and not (other.shield_stats() or {}).get("ac"):
                 continue
+            # Paired Opportunists' "creatures that you both threaten" (feat loop b4-moves):
+            # the ally threatens the foe's square too (`reactions.threatens`).
+            if want.get("threatens_foe"):
+                from . import reactions as _reactions
+
+                spot = self._placed(getattr(foe, "ref", None)) if foe is not None else None
+                if spot is None or not _reactions.threatens(self.scene, ref, spot,
+                                                            foe.size or "medium"):
+                    continue
             if want.get("foe_larger"):
                 if foe is None:
                     continue
@@ -9132,6 +9147,17 @@ def _when_holds(when, ctx: dict | None) -> bool:
                     return False
             elif have != str(want):
                 return False
+        elif key == "higher_ground":
+            # Feat loop b4-moves: Death from Above's "from higher ground, or from above
+            # while flying" — the board's own higher-ground test (`position.higher_than`)
+            # between the bearer and the foe of the roll. No board, no answer.
+            sit = ctx.get("situation")
+            foe = ctx.get("target_actor")
+            from . import position as _position
+
+            if sit is None or foe is None or bool(want) is not _position.higher_than(
+                    sit.scene, sit.actor, foe):
+                return False
         elif key == "ally_state":
             # An ally in the fight holding the feat and the state (feat loop b2): Horde
             # Charge's "charging during the same round as an ally with this feat" asks the
@@ -9168,6 +9194,14 @@ def _when_holds(when, ctx: dict | None) -> bool:
                     # Shieldwall Phalanx's "attacks of evil creatures" (feat loop b3): the
                     # owner's ruling on the target's alignment above holds here too — no
                     # alignment is tracked, so the clause holds against any attacker.
+                    continue
+                if field_name == "state":
+                    # Feat loop b4-moves: a state the attacker holds, by prefix — Wings of
+                    # the Androsphinx's "+2 to AC against charge attacks" asks the
+                    # charger's one-round stance. Only an attacker the roll knows.
+                    held = value if isinstance(value, list) else [value]
+                    if who is None or not any(who.has_state(str(v or "")) for v in held):
+                        return False
                     continue
                 if field_name not in ("type", "subtype"):
                     return False
@@ -10211,7 +10245,7 @@ def validate(actor: Actor) -> None:
         per_level = max(1, cls["skill_ranks"] + ability_modifier(actor.abilities.get("int", 10)))
         per_level += races_mod.budget(actor.race, "ranks")
         # And the favoured class bonus's ranks (CRB p.31), one a level taken as "skill".
-        allowed = per_level * actor.level + sum(1 for b in actor.favoured if b == "skill")
+        allowed = per_level * actor.level + sum(1 for b in actor.favoured if b in ("skill", "both"))
         spent = sum(actor.ranks.values())
         if spent > allowed:
             raise IllegalSheet(

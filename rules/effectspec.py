@@ -2525,6 +2525,10 @@ WHEN_KEYS: dict[str, str] = {
     # (Engine._where_ctx).
     "combatants": "how many stand in the fight the roll is made in, compared: "
                   "{\"gte\": 12} (Engine._where_ctx)",
+    # Feat loop b4-moves: Death from Above's "from higher ground, or from above while
+    # flying", the board's own test (position.higher_than).
+    "higher_ground": "whether the bearer stands on higher ground than the foe of the roll "
+                     "(position.higher_than); no board, no answer",
 }
 # `larger` / `smaller` (feat loop b2): size categories against the bearer's own, answered
 # by `classfeatures.holds` where the bearer is known (Risky Striker, Underfoot).
@@ -2532,11 +2536,15 @@ _WHEN_CREATURE_KEYS = {"target": ("type", "subtype", "armour_metal", "alignment"
                                   "state", "aloft", "larger", "smaller", "casts"),
 
                        "attacker": ("type", "subtype", "larger", "smaller", "unprovoked",
-                                    "alignment")}
+                                    "alignment",
+                                    # Feat loop b4-moves: a state the attacker holds.
+                                    "state")}
 _WHEN_COMPARE = ("lte", "gte", "lt", "gt", "eq")
 _WHEN_BOOLS = ("daylight", "underground", "wielder_casts", "resting", "full_attack",
                "flanked", "sole_threat", "opportunity", "first_attack", "adjacent",
-               "own_turn", "critical", "nonlethal", "spell_known")
+               "own_turn", "critical", "nonlethal", "spell_known",
+               # Feat loop b4-moves:
+               "higher_ground")
 
 
 # What a roll may be made AGAINST — the `against` of a roll context, one word per danger,
@@ -2734,7 +2742,8 @@ def when_problems(when, where: str = "when") -> list[str]:
         elif key == "ally_beside":
             from . import feats as feats_mod
 
-            if (not isinstance(want, dict) or set(want) - {"feat", "foe_larger", "shield"}
+            if (not isinstance(want, dict)
+                    or set(want) - {"feat", "foe_larger", "shield", "threatens_foe"}
                     or str(want.get("feat") or "") not in feats_mod.all_feats()):
                 out.append(f"{where}.ally_beside is {{\"feat\": \"<a feat id>\"}}, with "
                            f"an optional \"foe_larger\": true and \"shield\": true (the "

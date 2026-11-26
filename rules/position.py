@@ -143,6 +143,19 @@ def attack_mods(scene, actor, defender, weapon: dict | None = None) -> list[Modi
     return mods
 
 
+def higher_than(scene, actor, defender) -> bool:
+    """Whether `actor` stands on higher ground than `defender` on this board — the test
+    `attack_mods` gives the +1 by (Table 8-5). Feat loop b4-moves: Death from Above asks
+    it as a `when`. False with no map or either unplaced."""
+    if getattr(scene, "grid", None) is None or actor is None or defender is None:
+        return False
+    here = scene.positions.get(actor.ref)
+    there = scene.positions.get(defender.ref)
+    if here is None or there is None:
+        return False
+    return _level(here) - _level(there) >= HIGHER_GROUND_SQUARES
+
+
 INTO_MELEE_PENALTY = -4
 # Stance of the Xorn's tag (content/feats/mechanics/b3-divine.json).
 NO_FLANK_BONUS = "defence.no-flank-bonus"

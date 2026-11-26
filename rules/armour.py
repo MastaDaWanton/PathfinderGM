@@ -322,6 +322,15 @@ def spell_failure(actor, spell) -> tuple[int, str]:
     if s_key != "none" and s.get("asf"):
         pct += int(s["asf"])
         why.append(str(s["name"]))
+    # Feat loop b4-moves: what the bearer's effects take off the ARMOUR's share (the
+    # `spell_failure` target, a negative term): Arcane Armor Training's swift "reduce the
+    # arcane spell failure chance due to the armor you are wearing by 10% for any spells
+    # you cast this round". Never the shield's, never below 0.
+    worn = int(a.get("asf") or 0) if a_key != "none" and not (
+        bard and a.get("weight") == "light") else 0
+    if worn and hasattr(actor, "_buff_mods"):
+        off = -sum(m.value for m in actor._buff_mods("combat_mod", "spell_failure"))
+        pct -= min(worn, max(0, off))
     return pct, " and ".join(why)
 
 
