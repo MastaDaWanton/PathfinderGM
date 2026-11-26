@@ -33,6 +33,7 @@ from . import dc as dc_mod
 from . import effectspec
 from . import metamagic
 from . import feat_events
+from . import strike_feats
 from . import finish_uses
 from . import foraging
 from . import ingredients as ing_mod
@@ -2479,6 +2480,10 @@ class Scene:
             who.remove_effects(match=lambda e: any(
                 states.matches(str(t), states.SURPRISED)
                 or states.matches(str(t), states.ONE_ACTION_TURN) for t in e.tags or ()))
+        # "For the duration of the encounter" (Flaying Critical, feat loop b4): the effects
+        # tagged to end with the fight end here, the one door.
+        for who in list(self.people.values()):
+            who.remove_effects(match=lambda e: strike_feats.ENDS_WITH_FIGHT in (e.tags or ()))
         # A combat style is a fight's stance (rules/styles.py): the next fight starts in
         # none, since a style "cannot be used before combat begins".
         from . import styles as _styles
@@ -26244,7 +26249,9 @@ class Engine:
                          f"of opportunity for a round."}]
 
     # A critical feat's tag (its document's), in the order the book's riders are written.
-    CRITICAL_FEATS: ClassVar[tuple] = ("critical.bleeding", "critical.crippling")
+    CRITICAL_FEATS: ClassVar[tuple] = ("critical.bleeding", "critical.crippling",
+                                       # Feat loop b4-combat: the condition criticals.
+                                       *strike_feats.TAGS)
 
     def _critical_feat(self, actor: Actor, defender: Actor, weapon: dict) -> list[dict]:
         """A critical feat's rider on a confirmed critical hit (feat loop b1, 2026-11-22).
@@ -26320,6 +26327,7 @@ class Engine:
                                 f"speed for {rounds} round{'s' if rounds != 1 else ''}"
                                 + (f" (Fortitude {roll.total} against {dc} shortens it)."
                                    if saved else f" (Fortitude {roll.total} against {dc})." )})
+        out += strike_feats.critical_riders(self, actor, defender, held)   # feat loop b4
         return out
 
     def _rider_bleed(self, intent: Intent, actor: Actor, defender: Actor, rule: dict,

@@ -1,0 +1,36 @@
+{
+  "_about": [
+    "Feat loop, batch 4, lane b4-combat (2026-11-26): the critical feats, shots and thrown",
+    "weapons, the monk's strike feats and the one-blow options. Each benefit is the book's",
+    "(content/feats/feats.json, checked against aonprd.com FeatDisplay 2026-11-26). The",
+    "engine reads the tags at the moment it already knows (rules/strike_feats.py); what",
+    "still does not run is each document's `not_yet`."
+  ],
+  "blinding-critical": {
+    "tags": ["critical.blinding"],
+    "not_yet": [
+      "'creatures with more than two eyes' are spared: no stat block counts a creature's eyes, so only a creature immune to blindness is spared"
+    ]
+  },
+  "deafening-critical": {
+    "tags": ["critical.deafening"]
+  },
+  "exhausting-critical": {
+    "tags": ["critical.exhausting"]
+  },
+  "tiring-critical": {
+    "tags": ["critical.tiring"]
+  },
+  "sickening-critical": {
+    "tags": ["critical.sickening"]
+  },
+  "staggering-critical": {
+    "tags": ["critical.staggering"]
+  },
+  "stunning-critical": {
+    "tags": ["critical.stunning"]
+  },
+  "flaying-critical": {
+    "tags": ["critical.flaying"]
+  }
+}
