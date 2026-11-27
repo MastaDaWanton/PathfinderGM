@@ -31785,6 +31785,12 @@ class Engine:
                 effects.extend(got)
                 tells.extend(words)
         dispel_mod.stamp(self.scene, actor, spell, cl, level, cast_ctx["origin"], live)
+        if metamagic.flag(spell, "bounce") and not item:
+            got, words, rolled = self._bounce(intent, actor, spell, cl, level, dc, live,
+                                              state)
+            effects.extend(got)
+            tells.extend(words)
+            state["rolls"].extend(rolled)
         state["rolls"].extend(r.as_dict() for r in cast_ctx.pop("dispel_rolls", ()))
 
         # A spell that harms a foe it reached is an attack for invisibility's purposes —
@@ -33616,6 +33622,56 @@ class Engine:
                         owner.remove_effects(match=lambda e, h=holder: e is h)
                         break
         return {"what": what, "was": left, "now": getattr(holder, "rounds_left", None)}
+
+    def _bounce(self, intent: Intent, actor: Actor, spell, cl: int, level: int, dc: int,
+                live: list, state: dict) -> tuple[list[dict], list[str], list[dict]]:
+        """Bouncing Spell (APG; feat loop b6-rules): a single-target spell that "has no
+        effect on its intended target (whether due to spell resistance or a successful
+        saving throw)" may be redirected "as a swift action ... to target another eligible
+        creature within range. The redirected spell behaves in all ways as if its new
+        target were the original target" — but "Spells that affect a target in any way
+        (including a lesser effect from a successful saving throw) may not be redirected".
+        No effect: spell resistance held, or a made save against a spell whose save
+        negates. Owner call: the engine picks the new target, the nearest other creature on
+        the first target's side within the spell's range (the bar asks no second aim).
+        Recast through the item door (`partial["item_cast"]`): no slot again."""
+        if len(live) != 1 or live[0] == actor.ref:
+            return [], [], []
+        first = self.scene.actors.get(live[0])
+        if first is None:
+            return [], [], []
+        resisted = (state.get("sr") or {}).get(first.ref) is False
+        saved = any(v.get("saved") for k, v in (state.get("saved") or {}).items()
+                    if k.endswith(f":{first.ref}"))
+        negates = str(getattr(spell, "save_effect", "") or "").lower() == "negates"
+        if not (resisted or (saved and negates)):
+            return [], [], []
+        reach = spells_mod.range_feet(spell, cl)
+        side = next((s for s, refs in (self.scene.sides or {}).items()
+                     if first.ref in refs), None)
+        others = [a for s, refs in (self.scene.sides or {}).items() if s == side
+                  for a in (self.scene.actors.get(r) for r in refs)
+                  if a is not None and a.ref not in (first.ref, actor.ref) and not a.is_dead]
+        far = {a.ref: self._gap_ft(actor, a) for a in others}
+        others = [a for a in others if reach is None or far[a.ref] is None
+                  or far[a.ref] <= reach]
+        if not others:
+            return [], [f"The bouncing {spell.name} finds nobody else in range to go to."], []
+        why = self._spend_swift(actor, False, "Bouncing Spell")             if self.scene.in_encounter else ""
+        if why:
+            return [], [f"Bouncing Spell: {why}"], []
+        to = min(others, key=lambda a: (far[a.ref] if far[a.ref] is not None else 0, a.ref))
+        again = Intent(op="cast", actor=actor.ref, target=to.ref,
+                       params={"spell": spell.id, "at": to.ref, "reaction": "bounced"},
+                       visibility="hidden", because="Bouncing Spell",
+                       origin=f"spell:{spell.id}", origin_name=spell.name)
+        res = self._op_cast(again, {"item_cast": {"cl": cl, "level": level, "dc": dc,
+                                                  "origin": f"spell:{spell.id}",
+                                                  "name": spell.name}})
+        return (list(res.effects or ()),
+                [f"The spell has no hold on {first.name} and bounces to {to.name} "
+                 f"(Bouncing Spell): {res.tell}"],
+                [r.as_dict() for r in res.rolls or ()])
 
     def _cast_light(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
         """A spell's light or magical darkness, carried by whoever it was cast on (the

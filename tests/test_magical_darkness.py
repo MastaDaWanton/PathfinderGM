@@ -147,3 +147,27 @@ def test_shadow_grasp_entangles_those_in_the_darkness_who_fail_the_reflex_save()
         any(c.key == "entangled" for c in s.actors["c1"].conditions), said
     assert not any(c.key == "entangled" for c in pc.conditions)
     assert "Shadow Grasp" in " ".join(said)
+
+
+# --- Bouncing Spell (a metamagic of the same lane, tested with the casts above) -----------------
+
+def test_a_bouncing_hold_person_saved_against_goes_to_the_next_foe():
+    """APG Bouncing Spell: "Whenever a bouncing spell targeting a single creature has no
+    effect on its intended target (whether due to spell resistance or a successful saving
+    throw) you may, as a swift action, redirect it". Before: no document. The first thug
+    shrugs off hold person (Will +30); the spell goes to the second, who is held, and the
+    caster's swift action is spent."""
+    from rules import casting
+
+    pc = _caster("pc", prepared=(), feats=("Bouncing Spell",))
+    pc.spellbook = list(pc.spellbook or ()) + ["hold-person"]
+    casting.prepare(pc, casting.metamagic_key("hold-person", ["bouncing-spell"]), 1)
+    s, e = _board(pc, ("thug", (8, 5)), ("thug", (9, 6)))
+    s.actors["c1"].add_buff("save_mod", "will", 30, source="test", rounds=10)
+    s.actors["c2"].add_buff("save_mod", "will", -30, source="test", rounds=10)
+    res = _cast(e, "hold-person", at="c1", metamagic=["bouncing-spell"])
+    said = _tells(res)
+    assert "bounces to the thug 2" in said, said
+    assert s.actors["c2"].has_state("state.held"), said
+    assert not s.actors["c1"].has_state("state.held")
+    assert s.swift_spent.get("pc") == s.round

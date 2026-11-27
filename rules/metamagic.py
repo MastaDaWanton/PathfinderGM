@@ -88,7 +88,12 @@ DOES = ("extend", "empower", "maximize", "enlarge", "silent", "still", "quicken"
         # (`Engine._umbral`); Shadow Grasp (+1): "When you cast a spell with the darkness
         # descriptor that affects an area, creatures in the area are entangled"
         # (`Engine._cast_light`).
-        "umbral", "shadow_grasp")
+        "umbral", "shadow_grasp",
+        # APG, aonprd FeatDisplay read 2026-11-27: Bouncing (+1): "Whenever a bouncing
+        # spell targeting a single creature has no effect on its intended target (whether
+        # due to spell resistance or a successful saving throw) you may, as a swift action,
+        # redirect it to target another eligible creature within range" (`Engine._bounce`).
+        "bounce")
 # What Shadow Grasp lays on a creature in its darkness that fails the save.
 GRASP_CONDITION = "entangled"
 
@@ -310,6 +315,9 @@ def _not_for(does: str, spell, actor, spontaneous: bool, doc: dict | None = None
             return "its duration is instantaneous."
         if not str(getattr(spell, "targets", "") or "").strip():
             return "it does not target a creature or object."
+    if does == "bounce" and (str(getattr(spell, "area", "") or "").strip()
+                             or getattr(spell, "area_value", None)):
+        return "it does not target a single creature."
     if does == "shadow_grasp" and not ("darkness" in words
                                        and _darkens_an_area(spell)):
         return "it is not a darkness spell that affects an area."
@@ -524,7 +532,7 @@ ADJECTIVE = {"extend": "extended", "empower": "empowered", "maximize": "maximize
              # Feat loop b5-spells:
              "threnodic": "threnodic", "coaxing": "coaxing", "thanatopic": "thanatopic",
              # Feat loop b6-rules:
-             "umbral": "umbral", "shadow_grasp": "grasping"}
+             "umbral": "umbral", "shadow_grasp": "grasping", "bounce": "bouncing"}
 
 
 
