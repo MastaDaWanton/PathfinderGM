@@ -904,3 +904,17 @@ def test_target_of_opportunity_answers_an_ally_s_ranged_hit_with_a_shot():
     swings = [o for o in res.outcomes if o.op == "attack"]
     assert any(o.actor == "ally0" for o in swings), _tells(res)
     assert "Target of Opportunity" in _tells(res)
+
+
+def test_a_foe_the_death_or_glory_blow_stuns_has_no_answer():
+    """"After you resolve your attack, the opponent ... can spend an immediate action":
+    measured in play 2026-11-26, a Stunning Critical's stunned ogre still swung back."""
+    scene, engine, pc, ogre = _fight(feats=["Death or Glory", "Stunning Critical"],
+                                     foe="ogre", level=17, at=((6, 10), (7, 10)),
+                                     faces={"Attack with": 20, "Confirm": 20, "Damage": 1,
+                                            "Fortitude save": 1})
+    ogre.hp = ogre.hp_max = 900
+    res = _attack(engine, death_or_glory=True)
+    assert _cond(ogre, "stunned") is not None
+    assert not any(o.actor == "c1" for o in res.outcomes if o.op == "attack"), _tells(res)
+    assert "answers" not in _tells(res)

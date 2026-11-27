@@ -885,6 +885,30 @@ _OPTION_SHAPES = {
     "wingclipper": ("swing", "Wingclipper",
                     "A critical on a winged flier trades its extra damage for grounding "
                     "it."),
+    # Feat loop b4-combat (rules/strike_feats.py).
+    "death_or_glory": ("strike", "Death or Glory",
+                       "The whole round: one blow at a Large or larger foe, sharper and "
+                       "harder; it may answer in kind."),
+    "punch_through": ("strike", "Punch Through",
+                      "The whole round: one blow; a hit opens its damage reduction to "
+                      "allies who fight the same way."),
+    "deadly_finish": ("swing", "Deadly Finish",
+                      "A blow that leaves them below 0 makes them save or die."),
+    "reckless_aim": ("swing", "Reckless Aim",
+                     "At a foe in melee: surer shot, −1 AC; a natural 1 hits whoever "
+                     "fights them."),
+    "butterfly_sting": ("swing", "Butterfly's Sting",
+                        "A critical given away: the next ally's melee hit on them is the "
+                        "critical."),
+    "two_handed_throw": ("swing", "Two-Handed Throw",
+                         "A weapon thrown with both hands: half again your Strength on "
+                         "damage."),
+    "hamatulatsu": ("swing", "Hamatulatsu",
+                    "The fist pierces; a piercing critical sickens, or staggers the "
+                    "sickened."),
+    "cockatrice_strike": ("strike", "Cockatrice Strike",
+                          "The whole round: one strike at a foe off guard; a critical "
+                          "turns it to stone unless it resists."),
     "total_defense": ("act", "Total defense",
                       "Your standard action spent guarding: no attacks, and no attacks of "
                       "opportunity."),
@@ -909,7 +933,10 @@ _OPTION_SHAPES = {
 # Options whose whole effect is on the defender's side of the roll (Pinpoint Targeting's
 # armour ignored), so the sheet has no number of its own to show for them.
 _SAID_IN_WORDS = frozenset({"pinpoint_targeting", "furious_finish", "pushing_assault",
-                            "dragonslayer", "wingclipper"})
+                            "dragonslayer", "wingclipper",
+                            # Feat loop b4-combat:
+                            "punch_through", "deadly_finish", "butterfly_sting",
+                            "hamatulatsu", "cockatrice_strike"})
 
 
 def _signed(n: int) -> str:

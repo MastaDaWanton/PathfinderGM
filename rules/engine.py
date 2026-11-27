@@ -11426,7 +11426,10 @@ class Engine:
         # rather than by the passive's name (audit 2026-11-22, law 1).
         repeat = next((g for g in leveling_mod.passive_grants(actor)
                        if isinstance(g.get("repeat_swings"), dict)), None)
+        # "A single melee attack" (feat loop b4: Death or Glory, Punch Through, Cockatrice
+        # Strike) is one blow, as a coup de grace is.
         if (not coup and not dancing and repeat
+                and not strike_feats.whole_round(intent.params)
                 and f"{actor.ref}>{defender.ref}" in self.scene.attacked):
             swift_extra = int(repeat["repeat_swings"].get("full" if full else "standard", 0)
                               or 0)
@@ -12367,6 +12370,10 @@ class Engine:
                         state["effects"].append(extra["effect"])
                         if extra.get("tell"):
                             state["tells"].append(extra["tell"])
+                # Death or Glory's answer, once the blow and its critical riders are all
+                # resolved: a foe they stopped has none (feat loop b4).
+                if "death_or_glory" in swing_choices:
+                    strike_feats.glory_settled(self, defender, state)
                 # The confirmation's total is this swing's alone: both of its readers
                 # (`_feat_after_hit`, `_crit_strike`) have had it, so the next swing starts
                 # without it (batch 2 merge: the first reader cleared it for the second).

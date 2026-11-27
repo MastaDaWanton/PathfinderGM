@@ -81,7 +81,9 @@ def _lay(defender, key: str, rounds, origin: str, source: str, adds: bool) -> in
     additional hits add to the duration (never two copies). Returns the rounds it holds."""
     from . import states
 
-    mine = next((e for e in defender.effects if e.origin == origin and e.key == key), None)
+    tag = states.tags_for(key)[0]
+    mine = next((e for e in defender.effects if e.origin == origin and tag in (e.tags or ())),
+                None)
     if mine is not None and adds and rounds is not None and mine.rounds_left is not None:
         mine.rounds_left += int(rounds)
         return mine.rounds_left
@@ -145,8 +147,8 @@ def critical_riders(engine, actor, defender, held: list[str]) -> list[dict]:
             if d20_succeeds(roll, dc):
                 key, spec = row["made"]
         for gone in row.get("replaces", ()):
-            defender.remove_effects(match=lambda e, g=gone: e.kind == "condition"
-                                    and e.key == g)
+            defender.remove_effects(match=lambda e, g=states.tags_for(gone)[0]:
+                                    e.kind == "condition" and g in (e.tags or ()))
         rounds = _rounds(engine, spec, f"{row['feat']} (rounds)")
         held_for = _lay(defender, key, rounds, origin, source, bool(row.get("adds")))
         rec.update(condition=key, rounds=held_for)
@@ -744,7 +746,7 @@ def death_or_glory_answer(engine, actor, defender, choices) -> list[dict]:
     n = glory_bonus(actor)
     lay_next_attack(defender, f"Death or Glory's answer to {actor.name}",
                     "rule:feat-death-or-glory", n, "untyped", "melee", vs=actor.ref,
-                    targets=("attack", "damage", "crit_confirm"))
+                    targets=("attack", "damage"))
     raw = {"op": "attack", "actor": defender.ref, "target": actor.ref,
            "because": "Death or Glory", "visibility": "player" if defender.is_pc else "hidden",
            "params": {"full_attack": False, "reaction": "death_or_glory"}}
@@ -782,8 +784,8 @@ def after_hit(engine, intent, actor, defender, weapon_key, weapon, state, choice
         from . import states
 
         if not states.immune_to(defender, "dazzled", "dazzled"):
-            defender.add_condition("dazzled", rounds=1, source=f"{actor.name}'s Spear Dancer",
-                                   origin="rule:feat-spear-dancer")
+            _lay(defender, "dazzled", 1, "rule:feat-spear-dancer",
+                 f"{actor.name}'s Spear Dancer", False)
             out.append({"effect": {"ref": defender.ref, "kind": "condition",
                                    "condition": "dazzled", "rounds": 1,
                                    "origin": "rule:feat-spear-dancer"},
@@ -844,7 +846,7 @@ def _hamatulatsu(actor, defender) -> list[dict]:
     key = "staggered" if defender.has_state(states.tags_for("sickened")[0]) else "sickened"
     if states.immune_to(defender, key, key):
         return []
-    defender.add_condition(key, rounds=1, source=f"{actor.name}'s Hamatulatsu", origin=origin)
+    _lay(defender, key, 1, origin, f"{actor.name}'s Hamatulatsu", False)
     return [{"effect": {"ref": defender.ref, "kind": "condition", "condition": key,
                         "rounds": 1, "origin": origin},
              "tell": f"The piercing strike's pain leaves {defender.name} {key} for a round "
@@ -871,8 +873,7 @@ def _cockatrice(engine, actor, defender, state) -> list[dict]:
                             "made": True, "dc": dc, "origin": origin},
                  "tell": f"{defender.name}'s flesh stiffens and holds (Fortitude "
                          f"{roll.total} against {dc}, Cockatrice Strike)."}]
-    defender.add_condition("petrified", source=f"{actor.name}'s Cockatrice Strike",
-                           origin=origin)
+    _lay(defender, "petrified", None, origin, f"{actor.name}'s Cockatrice Strike", False)
     return [{"effect": {"ref": defender.ref, "kind": "condition", "condition": "petrified",
                         "save": roll.total, "dc": dc, "origin": origin},
              "tell": f"{defender.name} turns to stone where the blow struck (Fortitude "
@@ -1054,3 +1055,24 @@ def target_of_opportunity(engine, actor, defender, weapon: dict) -> list[dict]:
                     "tell": f"{ally.name} looses at the same mark as {actor.name}'s shot "
                             f"lands (Target of Opportunity)."})
     return out
+
+
+def glory_settled(engine, defender, state) -> None:
+    """Death or Glory's answer is the foe's "after you resolve your attack": a foe the blow
+    dropped, stunned or otherwise stopped from attacking has no answer, its immediate
+    action given back; one still standing answers after the blow's own tells (measured in
+    play 2026-11-26: a stunned ogre swung back, its answer said before the hit)."""
+    owed = [e for e in state.get("effects") or ()
+            if e.get("kind") == "owed_swing" and e.get("origin") == "rule:feat-death-or-glory"]
+    if not owed:
+        return
+    said = [t for t in state["tells"] if "(Death or Glory)" in t and "answers" in t]
+    for t in said:
+        state["tells"].remove(t)
+    if defender.is_down or defender.is_dead or defender.blocking_key("attack"):
+        for e in owed:
+            state["effects"].remove(e)
+        defender.remove_effects(match=lambda x: x.origin == "rule:feat-death-or-glory")
+        engine.scene.swift_spent.pop(defender.ref, None)
+        return
+    state["tells"].extend(said)

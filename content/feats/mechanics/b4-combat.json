@@ -238,21 +238,11 @@
         "when": {
           "choice": "death_or_glory"
         },
-        "note": "Death or Glory"
+        "note": "Death or Glory (the confirmation roll too: it is the attack roll's)"
       },
       {
         "type": "combat_mod",
         "target": "damage",
-        "formula": "4 + min(1, bab // 11) + min(1, bab // 16) + min(1, bab // 20)",
-        "bonus_type": "untyped",
-        "when": {
-          "choice": "death_or_glory"
-        },
-        "note": "Death or Glory"
-      },
-      {
-        "type": "combat_mod",
-        "target": "crit_confirm",
         "formula": "4 + min(1, bab // 11) + min(1, bab // 16) + min(1, bab // 20)",
         "bonus_type": "untyped",
         "when": {

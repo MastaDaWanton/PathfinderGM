@@ -7,35 +7,107 @@
       "key": "elemental fist",
       "name": "Elemental Fist",
       "feat": "elemental-fist",
-      "aliases": ["elemental strike", "elemental fist"],
+      "aliases": [
+        "elemental strike",
+        "elemental fist"
+      ],
       "level": 1,
       "source": "Elemental Fist (APG): 'When you use Elemental Strike pick one of the following energy types: acid, cold, electricity, or fire. On a successful hit, the attack deals damage normally plus 1d6 points of damage of the chosen type. You must declare that you are using this feat before you make your attack roll (thus a failed attack roll ruins the attempt). You may attempt an elemental fist attack once per day for every four levels you have attained (see Special), and no more than once per round.' Special: a monk 'a number of times per day equal to his monk level, plus one more time per day for every four levels he has in classes other than monk'.",
       "text": "Your next unarmed hit adds 1d6 acid, cold, electricity or fire; a miss wastes it.",
       "action": "free",
-      "pool": {"id": "elemental fist", "max": "max(level // 4, level_monk)", "refresh": "rest.night"},
-      "cost": {"pool": "elemental fist", "amount": 1},
-      "requires_not": ["spent.elemental-fist"],
-      "self": {"rounds": 1, "tags": ["spent.elemental-fist"]},
+      "pool": {
+        "id": "elemental fist",
+        "max": "max(level // 4, level_monk)",
+        "refresh": "rest.night"
+      },
+      "cost": {
+        "pool": "elemental fist",
+        "amount": 1
+      },
+      "requires_not": [
+        "spent.elemental-fist"
+      ],
+      "self": {
+        "rounds": 1,
+        "tags": [
+          "spent.elemental-fist"
+        ]
+      },
       "charge": {
-        "weapons": ["unarmed", "unarmed strike"],
+        "weapons": [
+          "unarmed",
+          "unarmed strike"
+        ],
         "spent_on": "swing",
-        "dice": {"count": 1, "die": 6, "type": "fire"}
+        "dice": {
+          "count": 1,
+          "die": 6,
+          "type": "fire"
+        }
       },
       "choice": {
         "kind": "mode",
-        "default": "fire",
+        "default": "flame",
         "options": {
-          "fire": {"aliases": ["flame", "burning"]},
-          "acid": {"aliases": ["corrosive"],
-                   "charge": {"weapons": ["unarmed", "unarmed strike"], "spent_on": "swing",
-                              "dice": {"count": 1, "die": 6, "type": "acid"}}},
-          "cold": {"aliases": ["frost", "ice"],
-                   "charge": {"weapons": ["unarmed", "unarmed strike"], "spent_on": "swing",
-                              "dice": {"count": 1, "die": 6, "type": "cold"}}},
-          "electricity": {"aliases": ["lightning", "shock"],
-                          "charge": {"weapons": ["unarmed", "unarmed strike"],
-                                     "spent_on": "swing",
-                                     "dice": {"count": 1, "die": 6, "type": "electricity"}}}
+          "flame": {
+            "aliases": [
+              "burning",
+              "flames"
+            ]
+          },
+          "acid": {
+            "aliases": [
+              "corrosive"
+            ],
+            "charge": {
+              "weapons": [
+                "unarmed",
+                "unarmed strike"
+              ],
+              "spent_on": "swing",
+              "dice": {
+                "count": 1,
+                "die": 6,
+                "type": "acid"
+              }
+            }
+          },
+          "cold": {
+            "aliases": [
+              "frost",
+              "ice"
+            ],
+            "charge": {
+              "weapons": [
+                "unarmed",
+                "unarmed strike"
+              ],
+              "spent_on": "swing",
+              "dice": {
+                "count": 1,
+                "die": 6,
+                "type": "cold"
+              }
+            }
+          },
+          "electricity": {
+            "aliases": [
+              "lightning",
+              "electric"
+            ],
+            "charge": {
+              "weapons": [
+                "unarmed",
+                "unarmed strike"
+              ],
+              "spent_on": "swing",
+              "dice": {
+                "count": 1,
+                "die": 6,
+                "type": "electricity"
+              }
+            }
+          }
         }
       },
       "tell": "{name}'s fist gathers the element."
@@ -48,12 +120,32 @@
       "source": "Perfect Strike (APG): 'You must declare that you are using this feat before you make your attack roll (thus a failed attack roll ruins the attempt). You must use one of the following weapons to make the attack: kama, nunchaku, quarterstaff, sai, and siangham. You can roll your attack roll twice and take the higher result. If one of these rolls is a critical threat, the other roll is used as your confirmation roll (your choice if they are both critical threats). You may attempt a perfect attack once per day for every four levels you have attained (but see Special), and no more than once per round.' Special: a monk his monk level times a day.",
       "text": "Your next blow with a kama, nunchaku, quarterstaff, sai or siangham rolls twice and keeps the better.",
       "action": "free",
-      "pool": {"id": "perfect strike", "max": "max(level // 4, level_monk)", "refresh": "rest.night"},
-      "cost": {"pool": "perfect strike", "amount": 1},
-      "requires_not": ["spent.perfect-strike"],
-      "self": {"rounds": 1, "tags": ["spent.perfect-strike"]},
+      "pool": {
+        "id": "perfect strike",
+        "max": "max(level // 4, level_monk)",
+        "refresh": "rest.night"
+      },
+      "cost": {
+        "pool": "perfect strike",
+        "amount": 1
+      },
+      "requires_not": [
+        "spent.perfect-strike"
+      ],
+      "self": {
+        "rounds": 1,
+        "tags": [
+          "spent.perfect-strike"
+        ]
+      },
       "charge": {
-        "weapons": ["kama", "nunchaku", "quarterstaff", "sai", "siangham"],
+        "weapons": [
+          "kama",
+          "nunchaku",
+          "quarterstaff",
+          "sai",
+          "siangham"
+        ],
         "spent_on": "swing",
         "roll_twice": true
       },
@@ -67,17 +159,37 @@
       "source": "Disorienting Blow (Dragon Empires Primer): 'You must choose to use this ability before making an attack roll with your Stunning Fist, and this effect replaces other effects or conditions that would be caused by Stunning Fist. If you successfully hit your opponent and it fails its Fortitude save, it becomes confused for 1 round. Additional disorienting blows to the confused target add to the duration of its confusion. This feat is otherwise subject to all of the limits and conditions of Stunning Fist.' A Stunning Fist use (Fortitude, DC 10 + 1/2 level + Wis; the creatures Stunning Fist cannot stun are spared).",
       "text": "Your next unarmed hit spends a Stunning Fist: Fortitude save or confused for a round, longer with each blow.",
       "action": "free",
-      "pool": {"id": "stunning fist", "max": "max(level // 4, level_monk)", "refresh": "rest.night"},
-      "cost": {"pool": "stunning fist", "amount": 1},
+      "pool": {
+        "id": "stunning fist",
+        "max": "max(level // 4, level_monk)",
+        "refresh": "rest.night"
+      },
+      "cost": {
+        "pool": "stunning fist",
+        "amount": 1
+      },
       "aim": "foe",
       "charge": {
-        "weapons": ["unarmed", "unarmed strike"],
+        "weapons": [
+          "unarmed",
+          "unarmed strike"
+        ],
         "spent_on": "swing",
-        "save": {"save": "fort", "dc": "10 + level // 2 + wis_mod"},
+        "save": {
+          "save": "fort",
+          "dc": "10 + level // 2 + wis_mod"
+        },
         "condition": "confused",
         "adds_duration": true,
-        "immune_types": ["construct", "ooze", "plant", "undead"],
-        "immune_subtypes": ["incorporeal"],
+        "immune_types": [
+          "construct",
+          "ooze",
+          "plant",
+          "undead"
+        ],
+        "immune_subtypes": [
+          "incorporeal"
+        ],
         "immune_crit": true
       },
       "charge_rounds": 1,
@@ -87,16 +199,33 @@
       "key": "bullseye shot",
       "name": "Bullseye Shot",
       "feat": "bullseye-shot",
-      "aliases": ["steady my aim", "steady the shot", "bullseye"],
+      "aliases": [
+        "steady my aim",
+        "steady the shot",
+        "bullseye"
+      ],
       "level": 1,
       "source": "Bullseye Shot (Faiths of Purity): 'You can spend a move action to steady your shot. When you do, you gain a +4 bonus on the next ranged attack roll you make before the end of your turn.'",
       "text": "Move action: +4 on your next ranged attack this turn.",
       "action": "move",
       "self": {
         "rounds": 1,
-        "tags": ["next-attack.ranged"],
-        "modifiers": [{"type": "combat_mod", "target": "attack", "bonus_type": "untyped",
-                       "amount": 4, "when": {"weapon": {"ranged": true}}}]
+        "tags": [
+          "next-attack.ranged"
+        ],
+        "modifiers": [
+          {
+            "type": "combat_mod",
+            "target": "attack",
+            "bonus_type": "untyped",
+            "amount": 4,
+            "when": {
+              "weapon": {
+                "ranged": true
+              }
+            }
+          }
+        ]
       },
       "tell": "{name} steadies the shot."
     }
