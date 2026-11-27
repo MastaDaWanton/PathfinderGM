@@ -738,7 +738,7 @@ UNDEAD = "type.undead"
 # read by channel only) and `energy.negative.affinity` (Necromantic Affinity, read by the
 # cast loop beside `type.undead`), so an inflict wounded a Death's Embrace cleric.
 #   `.spells`  — inflict spells heal and cure spells harm, "as if you were an undead
-#                creature" (Necromantic Affinity; every undead, by `type_tags`);
+#                creature" (Necromantic Affinity; every undead, `Actor.standing_tags`);
 #   `.channel` — channelled negative energy heals instead of harming (Death's Embrace).
 # Inflict asks the root; cure asks `.spells`; channel's documents ask `.channel`.
 NEGATIVE_HEALS = "energy.negative.heals"
@@ -838,8 +838,6 @@ def type_tags(creature_type="", subtype="", immunities=()) -> tuple[str, ...]:
         bundle = TRAIT_TYPES.get(str(printed or "").strip().lower())
         if bundle and f"{TYPE}.{bundle}" not in out:
             out.append(f"{TYPE}.{bundle}")
-    if UNDEAD in out:
-        out.append(NEGATIVE_HEALS_SPELLS)       # "since undead are powered by negative energy"
     return tuple(out)
 
 

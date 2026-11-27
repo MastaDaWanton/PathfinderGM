@@ -6371,8 +6371,13 @@ class Actor:
 
         doc = self._creature_doc() or {}
         walk = self._worn_walk()                 # one walk for both readers below
-        out.extend(_states.type_tags(doc.get("creature_type"), doc.get("subtype"),
-                                     self._immunities(walk)))
+        typed = _states.type_tags(doc.get("creature_type"), doc.get("subtype"),
+                                  self._immunities(walk))
+        out.extend(typed)
+        # Feat loop b7-fixes: "since undead are powered by negative energy" (CRB, Cure
+        # Light Wounds), every undead body holds the family inflict and cure ask.
+        if _states.UNDEAD in typed:
+            out.append(_states.NEGATIVE_HEALS_SPELLS)
         # What carried gear grants (content/rules/gear.json, 2026-10-01): a bedroll is
         # `gear.bedding`, a tent `gear.shelter`. Live-read from the pack like a feat
         # from the feat list, so the bedroll sold is the bedding gone.

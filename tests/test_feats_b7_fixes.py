@@ -33,7 +33,7 @@ def test_inflict_mends_a_deaths_embrace_cleric_and_a_cure_does_not_hurt_her():
 
 def test_the_undead_hold_the_family_by_their_type():
     """One vocabulary: the cast loop asks `energy.negative.heals`, never `type.undead`
-    beside a second tag, so the undead must answer it by their type (`states.type_tags`)."""
+    beside a second tag, so the undead must answer it by their type (`Actor.standing_tags`)."""
     z = instantiate("zombie", scene=Scene(location_id="5bbd0c40345f"))
     assert z.has_state(states.NEGATIVE_HEALS)
     assert z.has_state(states.NEGATIVE_HEALS_SPELLS)
