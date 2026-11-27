@@ -1432,7 +1432,7 @@ def unsighted_budget(engine, actor, budget: int) -> int:
     blind = actor.has_state("state.senses.blinded")
     if not blind:
         try:
-            blind = bool(engine.sees_nothing(actor))
+            blind = bool(engine.scene.sees_nothing(actor))
         except Exception:  # noqa: BLE001 — a bare scene with no place to light
             blind = False
     return max(gridmod.SQUARE_FT, _half(budget)) if blind else budget
