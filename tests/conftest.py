@@ -444,6 +444,51 @@ def worlds(request):
     return load_cached(request.param)
 
 
+def undo_leaked(made) -> list[str]:
+    """Undo every MonkeyPatch in `made` still holding a change; name what each held.
+
+    A `pytest.MonkeyPatch()` built in a test body is undone only by the test itself.
+    Measured 2026-11-27: two Feinting Flurry tests in test_feats_b4_maneuver.py built one
+    each to swap `rules.feats.meets` for "always yes" and never undid it, so every later
+    test on that xdist worker saw every prerequisite met — the forge offered 1,246 feats
+    where a fighter qualifies for ~145 (test_guided_choices, test_npc_classes,
+    test_level_up_feats_and_points), and only when the scheduler put them on one worker.
+    """
+    names = []
+    for mp in made:
+        held = [f"{getattr(o, '__name__', type(o).__name__)}.{n}" for o, n, _ in mp._setattr]
+        held += [f"[{k!r}]" for _, k, _ in mp._setitem]
+        if held or mp._cwd is not None or mp._savesyspath is not None:
+            names += held or ["cwd/sys.path"]
+            mp.undo()
+    return names
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_call(item):
+    """A MonkeyPatch made in the test body and left live when it ends is undone here and
+    fails that test by name (`undo_leaked`). Only the body is watched: the `monkeypatch`
+    fixture and module-scoped `MonkeyPatch.context()` fixtures are built during set-up
+    and undo themselves at teardown."""
+    made = []
+    real = pytest.MonkeyPatch.__init__
+
+    def tracked(self):
+        real(self)
+        made.append(self)
+
+    pytest.MonkeyPatch.__init__ = tracked
+    try:
+        result = yield
+    finally:
+        pytest.MonkeyPatch.__init__ = real
+        leaked = undo_leaked(made)
+    if leaked:
+        raise AssertionError(f"MonkeyPatch() left live at the end of the test, undone now: "
+                             f"{', '.join(leaked)}. Use the monkeypatch fixture.")
+    return result
+
+
 def pytest_sessionfinish(session, exitstatus):
     """The shared catalogues came through the run untouched.
 

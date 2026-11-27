@@ -347,12 +347,12 @@ def _flurry(feats, monkeypatch, **params):
     return scene, e, thug, res
 
 
-def test_feinting_flurry_trades_the_first_blow_for_a_feint_that_opens_the_next():
+def test_feinting_flurry_trades_the_first_blow_for_a_feint_that_opens_the_next(monkeypatch):
     """Feinting Flurry (Dragon Empires Primer): "While using flurry of blows to make melee
     attacks, you can forgo your first attack to make a Bluff check to feint." Measured
     before: no flurry could feint; a feint was its own standard action."""
-    _s, _e, _t, plain = _flurry(["Feinting Flurry"], monkeypatch=_MP())
-    scene, e, thug, res = _flurry(["Feinting Flurry"], _MP(), feinting_flurry=True)
+    _s, _e, _t, plain = _flurry(["Feinting Flurry"], monkeypatch)
+    scene, e, thug, res = _flurry(["Feinting Flurry"], monkeypatch, feinting_flurry=True)
     swings = lambda r: len(_rolls(r, "Attack with"))            # noqa: E731
     assert _rolls(res, "Bluff check (feint)"), _tells(res)
     assert swings(res) == swings(plain) - 1
@@ -360,23 +360,21 @@ def test_feinting_flurry_trades_the_first_blow_for_a_feint_that_opens_the_next()
     assert not thug.has_state("state.feinted.pc")       # the next blow spent it
 
 
-def test_improved_feinting_flurry_keeps_the_foe_open_for_the_whole_turn():
+def test_improved_feinting_flurry_keeps_the_foe_open_for_the_whole_turn(monkeypatch):
     """Improved Feinting Flurry: "if you successfully feint, your opponent is denied its
     Dexterity bonus to AC until the end of your turn" — not only against the next blow."""
-    scene, e, thug, res = _flurry(["Feinting Flurry", "Improved Feinting Flurry"], _MP(),
+    scene, e, thug, res = _flurry(["Feinting Flurry", "Improved Feinting Flurry"], monkeypatch,
                                   feinting_flurry=True)
     assert thug.has_state("state.feinted.pc"), _tells(res)
     assert _tells(res).count("feint has drawn") >= 1
 
 
-def test_feinting_flurry_is_refused_without_a_flurry():
-    _no = _MP()
-    _no_prereqs(_no)
+def test_feinting_flurry_is_refused_without_a_flurry(monkeypatch):
+    _no_prereqs(monkeypatch)
     monk = _monk(["Feinting Flurry"])
     scene, e, thug = _bout(monk)
     assert "flurry" in e._attack_choice_refusal(monk, "unarmed", {"feinting_flurry": True,
                                                                   "full_attack": True})
-    _no.undo()
 
 
 def test_wave_strike_feints_with_the_swift_action_behind_a_first_turn_draw():
@@ -420,21 +418,6 @@ def test_disengaging_shot_strikes_the_feinted_foe_open_before_stepping_away():
     attacks = [o for o in res.outcomes if o.op == "attack"]
     assert attacks and "feint has drawn" in attacks[0].tell, _tells(res)
     assert not thug.has_state("state.feinted.pc")
-
-
-class _MP:
-    """A monkeypatch usable outside the fixture (two set-ups in one test)."""
-
-    def __init__(self):
-        import pytest
-
-        self._mp = pytest.MonkeyPatch()
-
-    def setattr(self, *a, **k):
-        self._mp.setattr(*a, **k)
-
-    def undo(self):
-        self._mp.undo()
 
 
 # --- Hard-Headed, Human Spirit -----------------------------------------------------------
