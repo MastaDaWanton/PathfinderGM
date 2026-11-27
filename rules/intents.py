@@ -406,7 +406,7 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                     # Feat loop b6-rules (sheet.ATTACK_CHOICES): Stalwart.
                     "stalwart",
                     # Feat loop b7-small (sheet.ATTACK_CHOICES).
-                    "two_weapon_feint"),
+                    "two_weapon_feint", "impact_bull_rush"),
                    "player"),
     # `lethality` because a Blood Bender paying for an ability in non-lethal
     # damage and one taking a sword are not in the same trouble.
@@ -1169,7 +1169,7 @@ FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "faile
                          # Feat loop b6-rules.
                          "stalwart",
                          # Feat loop b7-small.
-                         "two_weapon_feint"})
+                         "two_weapon_feint", "impact_bull_rush"})
 from .skilluses import OWN_DOORS as _OWN_DOORS  # noqa: E402 — the uses with their own door
 
 

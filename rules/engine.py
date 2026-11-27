@@ -12754,7 +12754,8 @@ class Engine:
                 # Smash's demoralize, Dreadful Carnage's at a fall, Two-Weapon Rend, Impact
                 # Critical Shot (`_feat_after_hit`).
                 for extra in ([] if dancing else self._feat_after_hit(
-                        actor, defender, weapon, power, hand, state)):
+                        actor, defender, weapon, power, hand, state,
+                        push=bool(intent.params.get("impact_bull_rush")))):
                     state["effects"].append(extra["effect"])
                     if extra.get("tell"):
                         state["tells"].append(extra["tell"])
@@ -26643,7 +26644,7 @@ class Engine:
     IMPACT_CRITICAL = "critical.ranged.impact"                     # Impact Critical Shot
 
     def _feat_after_hit(self, actor: Actor, defender: Actor, weapon: dict, power: bool,
-                        hand: str, state: dict) -> list[dict]:
+                        hand: str, state: dict, push: bool = False) -> list[dict]:
         """A held feat's free action once a blow has landed (feat loop b2, 2026-11-22).
 
         - Cornugon Smash (Cheliax): "When you damage an opponent with a Power Attack, you
@@ -26703,6 +26704,9 @@ class Engine:
                             "tell": f"{actor.name}'s two blades rend {defender.name} for "
                                     f"{more['amount']} more (Two-Weapon Rend)."})
         if state.get("crit") and weapon.get("category") == "ranged" \
+                and actor.has_state(self.IMPACT_CRITICAL) and defender.hp > 0 and push:
+            out.extend(self._impact_push(actor, defender, int(state.get("confirm_total") or 0)))
+        elif state.get("crit") and weapon.get("category") == "ranged" \
                 and actor.has_state(self.IMPACT_CRITICAL) and defender.hp > 0:
             total = int(state.get("confirm_total") or 0)
             cmd = defender.cmd()
@@ -26723,6 +26727,44 @@ class Engine:
                             "tell": f"{defender.name} takes the shot's impact standing "
                                     f"({total} against CMD {cmd})."})
         return out
+
+    def _impact_push(self, actor: Actor, defender: Actor, total: int) -> list[dict]:
+        """Impact Critical Shot's other half (APG): "you can push your opponent back as if
+        from the bull rush combat maneuver ... If you choose to bull rush, you cannot move
+        with the target" — declared with the shot (`impact_bull_rush`), the confirmation
+        roll against the bull rush CMD, the bull rush's own size limit and its push
+        (`_outcome_push`, 5 feet and 5 more per 5 it beats the CMD). Feat loop b7-small:
+        before it, the shot always tripped."""
+        from .tables import SIZE_ORDER
+
+        m, origin = MANEUVERS["bull rush"], "rule:feat-impact-critical-shot"
+        order = list(SIZE_ORDER)
+        try:
+            too_big = m.get("size_limit") is not None and order.index(
+                defender.size or "medium") - order.index(actor.size or "medium") \
+                > int(m["size_limit"])
+        except ValueError:
+            too_big = False
+        cmd = sum(x.value for x in defender.cmd_modifiers(
+            self._flat_footed(defender), maneuver="bull rush", attacker=actor))
+        if too_big or total <= cmd:
+            return [{"effect": {"ref": defender.ref, "kind": "rider_resisted",
+                                "rider": "impact", "origin": origin},
+                     "tell": f"{defender.name} takes the shot's impact standing "
+                             f"({total} against CMD {cmd})."}]
+
+        def say(template: str, capital: bool = True, **values) -> str:
+            return maneuver_text(template, actor.name, defender.name, capital=capital,
+                                 **values)
+
+        clause, _extra, done = self._outcome_push(m, None, actor, defender, total - cmd,
+                                                  None, None, say)
+        for d in done:
+            d.setdefault("origin", origin)
+        return [{"effect": done[0] if done else {"ref": defender.ref, "kind": "rider",
+                                                 "rider": "impact", "origin": origin},
+                 "tell": f"The shot's impact ({total} against CMD {cmd}) drives "
+                         f"{defender.name} back: {clause}."}]
 
     def _free_demoralize(self, actor: Actor, foes: list, why: str) -> list[dict]:
         """One Intimidate roll, read against each foe with its own size terms and DC (CRB

@@ -478,9 +478,7 @@
     "tags": [
       "critical.ranged.impact"
     ],
-    "not_yet": [
-      "the bull rush in place of the trip ('push your opponent back as if from the bull rush combat maneuver ... you cannot move with the target'): the engine always takes the trip"
-    ]
+    "choice": "impact_bull_rush"
   },
   "improved-feint-partner": {
     "tags": [

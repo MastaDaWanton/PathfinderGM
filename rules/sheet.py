@@ -455,8 +455,9 @@ ATTACK_CHOICES = ("power_attack", "deadly_aim", "piranha_strike", "combat_expert
                   "furys_snare",
                   # Feat loop b6-rules: Stalwart's dodge traded for DR (rules/stalwart.py).
                   "stalwart",
-                  # Feat loop b7-small: Two-Weapon Feint's feint for the first blow.
-                  "two_weapon_feint")
+                  # Feat loop b7-small: Two-Weapon Feint's feint for the first blow,
+                  # Impact Critical Shot's bull rush in place of its trip.
+                  "two_weapon_feint", "impact_bull_rush")
 # The options nobody needs a feat for (combat bar round 2, 2026-11-22). CRB, Combat
 # ("Fighting Defensively as a Standard Action"): "You can choose to fight defensively when
 # attacking" — anyone, with any attack. Its numbers are `defensive_dodge` and the stance
@@ -504,7 +505,8 @@ ATTACK_CHOICE_FEATS = {"power_attack": "power-attack", "deadly_aim": "deadly-aim
                        # Feat loop b6-rules.
                        "stalwart": "stalwart",
                        # Feat loop b7-small.
-                       "two_weapon_feint": "two-weapon-feint"}
+                       "two_weapon_feint": "two-weapon-feint",
+                       "impact_bull_rush": "impact-critical-shot"}
 
 _IMPLIED_GENDER = {"she": "woman", "he": "man"}
 

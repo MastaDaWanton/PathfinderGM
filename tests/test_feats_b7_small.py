@@ -227,3 +227,26 @@ def test_two_weapon_feint_is_refused_without_an_off_hand(monkeypatch):
     s, e, thug = board2(pc, foes=["thug"])
     assert "two-weapon full attack" in e._attack_choice_refusal(
         pc, "shortsword", {"two_weapon_feint": True, "full_attack": True})
+
+
+def test_impact_critical_shot_can_bull_rush_in_place_of_the_trip(monkeypatch):
+    """APG, Impact Critical Shot: "you can push your opponent back as if from the bull
+    rush combat maneuver or knock that target prone as if from a trip combat maneuver. If
+    you choose to bull rush, you cannot move with the target." Measured before: the
+    engine always took the trip. Declared, the shot drives the thug back and the archer
+    stays where she stood."""
+    from tests.test_feats_b2_attack_a import _board as board2, _swing, _wren
+    from tests.test_feats_b4_maneuver import _no_prereqs
+
+    _no_prereqs(monkeypatch)
+    pc = _wren(["Point-Blank Shot", "Impact Critical Shot"], equipped="longbow")
+    pc.abilities["dex"] = 30
+    pc.goods["arrows"] = 20
+    s, e, thug = board2(pc, foes=["thug"])
+    thug.hp_max = thug.hp = 500
+    e._ensure_encounter("pc")
+    s.positions.update({"pc": (5, 5), thug.ref: (8, 5)})
+    res = _swing(e, target=thug.ref, face=20, impact_bull_rush=True)
+    assert not thug.has_condition("prone"), _tells(res)
+    assert s.positions[thug.ref][0] > 8 and s.positions["pc"][:2] == (5, 5), _tells(res)
+    assert "drives" in _tells(res)
