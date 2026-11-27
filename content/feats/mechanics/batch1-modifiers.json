@@ -138,15 +138,12 @@
     "tags": ["skill.bluff.demoralize"]
   },
   "desert-dweller": {
-    "tags": ["climate.heat.very-hot.unhindered"],
+    "tags": ["climate.heat.very-hot.unhindered", "climate.heat.band-down"],
     "modifiers": [
       {"type": "combat_mod", "target": "con_check", "amount": 4, "bonus_type": "untyped",
        "when": {"against": "starvation"}},
       {"type": "combat_mod", "target": "con_check", "amount": 4, "bonus_type": "untyped",
        "when": {"against": "thirst"}}
-    ],
-    "not_yet": [
-      "extreme heat treated as severe and severe as very hot: the engine's heat is one row (very hot, above 90 F), with no severe or extreme tier to step down"
     ]
   },
   "storm-lashed": {

@@ -204,9 +204,6 @@
           }
         }
       }
-    ],
-    "not_yet": [
-      "the same bonuses in severe cold (below 0 F): the engine models one cold band (below 40 F, hazards.json cold), not severe cold"
     ]
   },
   "torch-handling": {

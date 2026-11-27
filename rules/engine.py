@@ -42533,6 +42533,14 @@ class Engine:
         down: a sleeper knocked out by the cold is the moment the player must be told,
         not an hour count to finish rolling."""
         row = hazards.get(rule) or {}
+        # Feat loop b7-small: a band the bearer treats as one step milder (Rugged
+        # Northerner's "treat extreme cold ... as severe cold" and severe as cold, Desert
+        # Dweller's "one step less severe") is rolled as the row it steps down to.
+        milder = row.get("milder") or {}
+        if milder.get("tag") and target.has_state(str(milder["tag"])) \
+                and hazards.get(str(milder.get("to") or "")):
+            rule = str(milder["to"])
+            row = hazards.get(rule) or {}
         save = row.get("save") or {}
         rolls, effects = [], []
         if not save:
@@ -42550,19 +42558,44 @@ class Engine:
                                     f"{row.get('against') or rule}: endure elements.")
         # Desert Dweller (ISWG): "You are not impacted at all by very hot conditions" —
         # the one heat this row models (above 90° F); its document's tag.
-        if str(row.get("against") or rule) == "heat" \
-                and target.has_state(states.HEAT_UNHINDERED):
+        if rule == "heat" and target.has_state(states.HEAT_UNHINDERED):
             return rolls, effects, (f"{target.name} is at home in the heat and feels "
                                     f"none of it.")
         # Rugged Northerner (ISWG, feat loop b4-other): "not impacted at all by normal
         # cold weather conditions" — so no frostbite and no fatigue from it either.
-        if str(row.get("against") or rule) == "cold" \
-                and target.has_state(states.COLD_UNHINDERED):
+        # The normal band only (feat loop b7-small): severe and extreme cold step down a
+        # band for the feat (`milder`) and are felt.
+        if rule == "cold" and target.has_state(states.COLD_UNHINDERED):
             return rolls, effects, (f"{target.name} is at home in the cold and feels "
                                     f"none of it.")
-        failed = taken = 0
+        # Cold Celerity (People of the North): "When you are in conditions of severe cold
+        # (below 0° F), you gain a +2 bonus on initiative checks" and the attack bonus — the
+        # quickened state laid for the exposure's whole stretch (feat loop b7-small).
+        from .sheet import COLD_QUICKENED, COLD_QUICKENS
+
+        if row.get("severe_cold") and target.has_state(COLD_QUICKENS):
+            target.apply_effect(ActiveEffect(
+                name="quickened by the cold", kind="buff", key="cold-quickened",
+                source="severe cold", origin=f"rule:{rule}", duration="rounds",
+                rounds_left=int(hours) * 600, tags=(COLD_QUICKENED,)))
+        failed = taken = burned = 0
         made = 0
-        for i in range(max(0, int(hours))):
+        # Severe and extreme bands save more than once an hour (`saves_per_unit`: every
+        # 10 minutes, every minute, every 5), and the extreme ones burn lethally between
+        # saves with no save at all (`lethal_per_save`), CRB Cold and Heat Dangers.
+        every = max(1, int(row.get("saves_per_unit") or 1))
+        lethal = str(row.get("lethal_per_save") or "")
+        for i in range(max(0, int(hours)) * every):
+            if lethal:
+                burn = self.dice.roll(lethal, label=f"{row.get('name', rule)} (no save)",
+                                      visibility="hidden")
+                rolls.append(burn)
+                hit = self._apply_damage(target, burn.total, str(row.get("type", "untyped")))
+                hit["origin"] = f"rule:{rule}"
+                effects.append(hit)
+                burned += int(hit.get("amount", 0) or 0)
+                if target.is_down or target.hp <= 0:
+                    break
             dc = int(save.get("dc", 15)) + i * int(save.get("rises", 1))
             roll = self.dice.d20(target.save_modifiers(str(save.get("save", "fort")), ctx),
                                  label=f"{row.get('name', rule)} (Fortitude, DC {dc})",
@@ -42590,6 +42623,10 @@ class Engine:
         # The condition is the row's to name (`fatigues`), asked by tag, so this site adds
         # no literal condition key to the engine (tests/test_three_laws.py).
         cond = str(row.get("fatigues") or "")
+        # Rugged Northerner: "you do not become fatigued by frostbite or hypothermia".
+        if cond and str(row.get("against") or "") == "cold" \
+                and target.has_state(states.COLD_UNHINDERED):
+            cond = ""
         if taken and cond and not any(target.has_state(t) for t in states.tags_for(cond)):
             target.add_condition(cond, source=str(row.get("name", rule)))
             effects.append({"ref": target.ref, "kind": "condition", "condition": cond,
@@ -42607,6 +42644,8 @@ class Engine:
         danger = str(row.get("against") or rule)
         line += (f", {taken} nonlethal damage and {harm} ({cond or 'harmed'})." if taken
                  else f"; the {danger} did not get in.")
+        if burned:
+            line += f" The {row.get('name', rule)} itself deals {burned} lethal damage."
         line += self._hp_state_tell(crossed)
         return rolls, effects, line
 

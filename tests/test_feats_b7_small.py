@@ -277,3 +277,64 @@ def test_raging_throw_slams_a_bull_rushed_foe_into_the_one_behind_it():
     a, b, n, tell = shove(True)
     assert a == n and b == n and "Raging Throw" in tell, tell
     assert shove(False)[:2] == (0, 0)
+
+
+def _exposed(feats, rule, hours=1):
+    from tests.test_feats_b4_moves import _run
+
+    pc = _pc("fighter", feats=feats)
+    pc.hp_max = pc.hp = 400                               # standing through the stretch
+    s, e = _board(pc)
+    s.initiative, s.round = [], 0                          # out of a fight
+    res = _run(e, {"op": "hazard", "actor": "pc",
+                   "params": {"rule": rule, "hours": hours, "to": "pc"}})
+    out = res.outcomes[-1]
+    saves = [r for r in out.rolls if "Fortitude" in r.label]
+    burns = [r for r in out.rolls if "(no save)" in r.label]
+    return pc, out, saves, burns
+
+
+def test_severe_and_extreme_cold_are_bands_of_their_own():
+    """CRB, Cold Dangers: severe cold (below 0 F) saves "once every 10 minutes"; extreme
+    cold (below -20 F) "deals 1d6 points of lethal damage per minute (no save)" beside a
+    save. Measured before: the engine had one cold band (below 40 F, a save an hour)."""
+    _, _, saves, burns = _exposed([], "severe-cold")
+    assert len(saves) == 6 and not burns
+    pc, out, saves, burns = _exposed([], "extreme-cold")
+    assert burns and len(burns) == len(saves)
+    assert "lethal damage" in out.tell and pc.hp < 400
+
+
+def test_rugged_northerner_steps_severe_and_extreme_cold_down_a_band():
+    """ISWG, Rugged Northerner: "You treat extreme cold conditions as severe cold," severe
+    as cold, "You are not impacted at all by normal cold weather conditions" and "do not
+    become fatigued by frostbite or hypothermia". Measured before: only the one band
+    existed, so the step-down had nothing to step."""
+    pc, out, saves, burns = _exposed(["Rugged Northerner"], "severe-cold")
+    assert not saves and "at home in the cold" in out.tell
+    pc, out, saves, burns = _exposed(["Rugged Northerner"], "extreme-cold")
+    assert len(saves) == 6 and not burns
+    assert not pc.has_state("state.impaired.fatigued")
+
+
+def test_desert_dweller_treats_heat_one_step_less_severe():
+    """ISWG, Desert Dweller: "You treat hot environments as though they were one step
+    less severe". Measured before: heat was one row (above 90 F) with no tier to step."""
+    _, _, saves, burns = _exposed([], "extreme-heat")
+    assert len(saves) == 12 and burns
+    _, _, saves, burns = _exposed(["Desert Dweller"], "extreme-heat")
+    assert len(saves) == 6 and not burns
+    _, out, saves, _ = _exposed(["Desert Dweller"], "severe-heat")
+    assert not saves and "at home in the heat" in out.tell
+
+
+def test_cold_celerity_quickens_its_bearer_in_severe_cold():
+    """People of the North, Cold Celerity: "When you are in conditions of severe cold
+    (below 0 F), you gain a +2 bonus on initiative checks" (and the +1 on attacks).
+    Measured before: only a round after cold damage gave them; severe cold did not exist."""
+    pc, *_ = _exposed(["Cold Celerity"], "severe-cold")
+    terms = sum(m.value for m in pc.initiative_modifiers() if "Cold Celerity" in m.source)
+    assert pc.has_state("buff.cold-celerity") and terms == 2
+    plain, *_ = _exposed(["Cold Celerity"], "cold")
+    assert not any(e.origin == "rule:cold" and e.key == "cold-quickened"
+                   for e in plain.effects)

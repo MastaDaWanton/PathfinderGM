@@ -296,10 +296,8 @@
   },
   "rugged-northerner": {
     "tags": [
-      "climate.cold.unhindered"
-    ],
-    "not_yet": [
-      "severe and extreme cold stepping down a band: the engine models one cold band (below 40 F, hazards.json cold), which the feat already shrugs off"
+      "climate.cold.unhindered",
+      "climate.cold.band-down"
     ]
   },
   "keen-scent": {
