@@ -521,6 +521,11 @@ GEAR: dict[str, dict] = {
     "mirror": {"name": "small steel mirror", "cost_gp": 10.0, "lb": 0.5},
     "thieves' tools": {"name": "thieves' tools", "cost_gp": 30.0, "lb": 1},
     "spell component pouch": {"name": "spell component pouch", "cost_gp": 5.0, "lb": 2},
+    # Feat loop b5-core: a spell's costly material, counted in gp of value and spent by the
+    # casting (rules/components.py). Its price is its value, as the book prices the
+    # substances ("diamond dust worth 250 gp"); no weight is printed, and none is given.
+    "costly spell components": {"name": "costly spell components", "cost_gp": 1.0,
+                                "unit": "gp", "per": 1, "lb": 0},
     "holy symbol": {"name": "wooden holy symbol", "cost_gp": 1.0, "lb": 0},
     "manacles": {"name": "manacles", "cost_gp": 15.0, "lb": 2},
     "candle": {"name": "candle", "cost_gp": 0.01, "unit": "hours", "per": 1, "lb": 0},

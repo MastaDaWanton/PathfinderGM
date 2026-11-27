@@ -120,6 +120,7 @@ def _caster(ref, prepared=("magic-missile", "dispel-magic"), name="Vell the Hedg
     a.abilities["int"] = 18
     from rules import casting
 
+    casting.define_slots(a)            # the slots of the Intelligence just set
     for sid in prepared:
         a.spellbook = list(dict.fromkeys(list(a.spellbook or ()) + [sid]))
         casting.prepare(a, sid, 1)

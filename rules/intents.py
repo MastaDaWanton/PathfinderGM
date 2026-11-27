@@ -1014,7 +1014,9 @@ PLAYER_FIXABLE = frozenset({
     "no_such_weapon", "out_of_reach", "absent_ground",
     # The cast-time choices (lane C): which creature, which energy, which metamagic are the
     # player's to make; a plan that invents one is a choice the player never made.
-    "choose_creature", "choose_energy", "metamagic"})
+    "choose_creature", "choose_energy", "metamagic",
+    # Feat loop b5-core: a costly material component the character does not carry.
+    "no_component"})
 
 
 class IntentError(ValueError):

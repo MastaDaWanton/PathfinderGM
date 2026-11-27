@@ -34,3 +34,45 @@ def test_hard_headed_adds_one_to_a_helmet_blow_and_nothing_to_a_sword():
     assert to_hit(("Hard-Headed",), "helmet-dwarven-boulder") == \
         to_hit((), "helmet-dwarven-boulder") + 1
     assert to_hit(("Hard-Headed",), "longsword") == to_hit((), "longsword")
+
+
+# --- costly material components (rules/components.py) ---------------------------------------
+
+def _stoneskin(goods=0):
+    from tests.test_readied_action import _caster
+
+    pc = _caster("pc", prepared=("stoneskin",))
+    if goods:
+        pc.goods["costly spell components"] = goods
+    s, e = _board(pc, ("thug", (15, 15)))
+    from tests.test_feats_b4_moves import _run
+
+    res = _run(e, {"op": "cast", "actor": "pc", "target": "pc", "visibility": "hidden",
+                   "params": {"spell": "stoneskin"}})
+    return pc, res.outcomes[-1]
+
+
+def test_stoneskin_needs_its_250_gp_of_diamond_dust_on_hand():
+    """Measured before: `component_cost` was read by nothing, and stoneskin's 250 gp of
+    granite and diamond dust was free. Without it the spell is refused and the slot kept;
+    with it the casting annihilates 250 gp of the stock."""
+    pc, out = _stoneskin()
+    assert out.status == "refused" and out.code == "no_component", out.tell
+    from rules import casting
+
+    assert casting.prepared_count(pc, "stoneskin") == 1, "nothing was spent"
+    pc, out = _stoneskin(goods=300)
+    assert out.status == "resolved", out.tell
+    assert pc.goods.get("costly spell components") == 50
+    assert any(x.get("kind") == "component_spent" for x in out.effects)
+
+
+def test_a_negligible_component_is_never_asked():
+    """The owner's instruction: no bat guano. Magic missile (no M) and a spell whose
+    material has no listed cost cast with nothing carried."""
+    from rules import components, spells
+
+    assert components.kind(spells.get("magic-missile")) == ""
+    assert components.kind(spells.get("fireball")) == ""
+    assert components.kind(spells.get("stoneskin")) == "M"
+

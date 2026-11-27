@@ -20,9 +20,6 @@
   "eschew-materials": {
     "tags": [
       "casting.eschew-materials"
-    ],
-    "not_yet": [
-      "material components are not modelled: no caster is asked for one, cheap or costly (rules/spells.py keeps `component_cost` and nothing reads it), so the feat waives nothing the engine would have asked"
     ]
   },
   "lightning-stance": {

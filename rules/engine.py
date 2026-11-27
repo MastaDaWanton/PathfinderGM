@@ -30935,6 +30935,14 @@ class Engine:
                     return deferred
 
             pool = source["pool"] or casting.slot_pool(level)
+            # Feat loop b5-core: a costly material component, on hand before anything is
+            # spent, and annihilated with the slot (rules/components.py).
+            from . import components as components_mod
+
+            if not item:
+                short = components_mod.refusal(actor, spell)
+                if short:
+                    return self._refuse(intent, short, code="no_component")
             # A cantrip or orison is "not expended when cast and may be used again" (AoN,
             # Wizard/Cleric/Druid; "do not consume any slots", Sorcerer/Bard). Measured
             # 2026-09-29: this spent "spell slot 0" per cast, and a level 5 wizard's Light
@@ -30953,6 +30961,12 @@ class Engine:
                     intent, f"{actor.name} has no {pool} left, so {spell.name} is not "
                             f"cast. What was cast before it stands.", code="no_slots",
                     for_a_person=f"{actor.name} has no level {level} spell slots left.")
+            if not item:
+                gone = components_mod.spend(actor, spell)
+                if gone:
+                    state["effects"].append(gone)
+                    state["tells"].append(f"{actor.name} spends {gone['gp']} gp of costly "
+                                          f"components on {spell.name}.")
             # The prepared copy is spent with the slot — for every prepared caster, not
             # only the ones who prepare from a book (item 25).
             converted = ""
