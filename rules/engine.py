@@ -25336,13 +25336,19 @@ class Engine:
                 raise ValueError
         except (TypeError, ValueError):
             return self._refuse(intent, "hex_move needs `hex`: the hex's [q, r].")
-        # Below ground first, before the day's hours or the water (owner ask 2026-11-26 A4):
-        # from the tower's dungeon the travel-day refusal answered instead, and read on the
-        # page as a day on the road that never happened.
-        below = self._hex_held_below(pc)
-        if below:
-            return self._refuse(intent, below)
+        # Trapped first, before the day's hours or the water (owner ask 2026-11-26 A4: from
+        # the tower's dungeon the travel-day refusal answered instead, and read on the page
+        # as a day on the road that never happened). Owner ruling 2026-11-26: "Hex traveling
+        # should walk you out from anywhere unless you are in combat or trapped", so below
+        # ground the move walks up (after the roll, below) and only a body held fast or a
+        # way up that cannot be walked refuses here. Afloat or into the water, the water
+        # step asks the body its own way (a swimmer out cold "cannot swim"; a crewed ship
+        # sails on while her master sleeps), so the body is asked here only on land.
         dest = g.cell(*to)
+        on_land = dest["land"] and not self.afloat(g)[0]
+        held = (self._hex_trapped(pc) if on_land else "") or self._hex_held_below(pc)
+        if held:
+            return self._refuse(intent, held)
         far = hexes.distance(here, to)
         rides = self.party_rides()
         if far == 0:
@@ -25394,7 +25400,12 @@ class Engine:
             # Up out of the hex's site first, to the hex itself, the way the party went in:
             # said as coming out, not as a second arrival (playtest 2026-11-20 #4).
             up = hexes.place_doc(g, here[0], here[1], "")["id"]
-            site_name = self.here().name
+            # The site itself (the tower), not the room walked out of (the hall of pillars).
+            by = {p.id: p for p in self.places()}
+            site = by.get(self.scene.at or "") or self.here()
+            while site.parent in by and hexes.in_site(site.parent):
+                site = by[site.parent]
+            site_name = site.name
             self._hex_quiet.add(up)
             try:
                 walked = self._op_travel(Intent(
@@ -25408,6 +25419,9 @@ class Engine:
             tells.append(f"You come out of {site_name}. {walked.tell}".strip())
             effects.extend(walked.effects)
             self._journeyed = ""
+            stopped = self._hex_walk_out_stopped(intent, up, look, tells, effects)
+            if stopped is not None:
+                return stopped
         elif places_mod.setting_of(self.scene.at or "") != "outside":
             # Out through the town's own way out first, as any walk out goes.
             ring = self._ring(self.world.get(self.scene.location_id) if self.world else None, "")
@@ -25429,6 +25443,9 @@ class Engine:
             tells.append(walked.tell)
             effects.extend(walked.effects)
             self._journeyed = ""
+            stopped = self._hex_walk_out_stopped(intent, out.id, look, tells, effects)
+            if stopped is not None:
+                return stopped
         stop = here
         hours = 0
         rolls = [look]
@@ -25620,17 +25637,64 @@ class Engine:
         return Outcome(intent_id=intent.id, op="hex_move", rolls=rolls, effects=effects,
                        tell=tell, because=intent.because)
 
-    def _hex_held_below(self, pc) -> str:
-        """Why a hex move is refused from under the ground, naming the way up, or "".
+    # What holds a body where it is, asked of the tag families (law one): grappled, pinned,
+    # entangled and glued are `state.held`; paralyzed, stunned, helpless, petrified are
+    # `state.unable`; unconscious and the dead are `state.down`. The pit is asked first.
+    _HEX_HOLDS = ("state.down", "state.unable", "state.held")
 
-        Owner ask 2026-11-26 A4. PF1e moves at three scales (CRB, Movement: tactical,
-        local "for exploring an area", overland "for getting from place to place"); the
-        region map is the overland one, and a dungeon is walked at the local one. CRPGs
-        hand over to the world map only at an area's exit (Baldur's Gate's map edge,
-        Kingmaker's compass rose), roguelikes only by the up stairs, so the way out is
-        walked first. A site on the surface (the tower's own floors, the ruins' gate) is
-        still walked out of by the move itself, as playtest 2026-11-20 #4 built it."""
-        from . import hexes, places as places_mod
+    def _hex_trapped(self, pc) -> str:
+        """Why the PC cannot walk anywhere at all, naming what to do first, or "".
+
+        Owner ruling 2026-11-26: a hex move walks the party out "from anywhere unless you
+        are in combat or trapped". The fight is refused by the caller; this is the body."""
+        from . import dungeons as dungeons_mod
+
+        pit = dungeons_mod.in_pit(pc)
+        if pit is not None:
+            return (f"{pc.name} is at the bottom of the pit: climbing out is a DC "
+                    f"{pit['climb']} Climb check first, then choose the hex again.")
+        for tag in self._HEX_HOLDS:
+            if pc.has_state(tag):
+                if survival.asleep(pc) is not None:
+                    # The toll's sleep (`survival._fall_asleep`): until 0.5.2 the next click
+                    # walked the sleeper eight hours on.
+                    return (f"{pc.name} is asleep where they dropped and cannot walk "
+                            "anywhere: rest first, then choose the hex again.")
+                what = next((e.key for e in pc.effects
+                             if any(states.matches(t, tag) for t in e.tags)), "held fast")
+                if tag == "state.held":
+                    return (f"{pc.name} is {what} and cannot walk anywhere: get free of it "
+                            "first, then choose the hex again.")
+                return (f"{pc.name} is {what} and cannot walk anywhere until that has "
+                        "passed; then choose the hex again.")
+        return ""
+
+    def _hex_walk_out_stopped(self, intent, meant: str, look, tells, effects):
+        """The move's Outcome when the walk out stopped short of `meant` (a meeting, a
+        foe lying in wait, a shut door met on the way), else None: the journey never
+        starts from a dungeon room or a cellar. Before it, a walk out cut short went on
+        across the hexes from wherever it stopped."""
+        if self.scene.at == meant and not self.scene.in_encounter:
+            return None
+        tells.append(f"The walk out stops in {self.here().name}, before the journey begins.")
+        effects.append({"kind": "hex_walk", "to": [], "stopped": [], "hexes": 0,
+                        "why": "walk-out", "hours": 0, "origin": "rule:hex-walk"})
+        return Outcome(intent_id=intent.id, op="hex_move", rolls=[look], effects=effects,
+                       tell=" ".join(t for t in tells if t).strip(), because=intent.because)
+
+    def _hex_held_below(self, pc) -> str:
+        """Why the PC cannot walk up out from under the ground to start a hex move, or "".
+
+        Owner ruling 2026-11-26 ("walk you out from anywhere unless you are in combat or
+        trapped") replaced the 0.5.2 refusal (ask A4), which refused every hex move from
+        below. PF1e moves at three scales (CRB, Movement: local "for exploring an area",
+        overland "for getting from place to place"), and CRPGs and roguelikes hand over to
+        the world map at the area's exit; so the move walks that exit first, room by room
+        through `travel` (a minute a room, each door asked), and refuses only when the way
+        up cannot be walked: no route the engine knows, or a shut door on it. An empty
+        route is refused rather than walked, because `travel`'s floor for an empty route
+        is the single direct step that lifted the party out of the dungeon in 0.5.1."""
+        from . import dungeons as dungeons_mod, hexes, places as places_mod
 
         at = self.scene.at or ""
         if not self.scene.underground(at):
@@ -25650,19 +25714,18 @@ class Engine:
             ground = by[ground].parent
         if ground not in by:
             ground = top
-        if up is None or here is None:
-            return (f"{pc.name} is below ground, and the region map is walked from open "
-                    "ground: find the way back up first.")
-        hops = ([by[h].name for h in places_mod.route(list(by.values()), at, ground)]
-                or [by[ground].name])
-        if len(hops) == 1:
-            way = f"back up to {hops[0]}"
-        else:
-            through = hops[:-1]
-            said = through[0] if len(through) == 1 else (", ".join(through[:-1]) + " and " + through[-1])
-            way = f"back through {said} to {hops[-1]}"
-        return (f"{pc.name} is in {here.name}, below {up.name}, and the region map is walked "
-                f"from open ground. Leave first: {way}, then choose the hex again.")
+        route = places_mod.route(list(by.values()), at, ground) \
+            if up is not None and here is not None else ()
+        if not route:
+            return (f"{pc.name} is below ground with no way up the party knows of, and the "
+                    "region map is walked from open ground: find the way back up first.")
+        for a, b in zip((at,) + tuple(route), route):
+            shut = dungeons_mod.shut_line(self.scene, a, b)
+            if shut:
+                return (f"{pc.name} is in {here.name}, below {up.name}, and the way up is "
+                        f"shut between {by[a].name} and {by[b].name}. {shut} Then choose "
+                        "the hex again.")
+        return ""
 
     def _op_hex_enter(self, intent: Intent, partial: dict) -> Outcome:
         """Into the site of the hex the party stands in, once it has been spotted: the
