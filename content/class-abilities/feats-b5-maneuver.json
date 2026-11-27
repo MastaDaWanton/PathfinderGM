@@ -1,0 +1,209 @@
+{
+  "class": "feat",
+  "_source": "Feat loop b5, lane b5-maneuver (2026-11-26): the elemental style feats' areas, each spending two Elemental Fist attempts (b4-combat's pool `elemental fist`) and dealing the user's unarmed strike beside the energy (`roll.unarmed`, rules/maneuver_feats.py `fist_share`). Each is had by a holder of the feat its `feat` names and run by the one executor (`Engine._use_class_ability`). Benefit text from content/feats/feats.json, checked against aonprd.com FeatDisplay 2026-11-26.",
+  "_grammar": "rules/class_abilities.py, module docstring; this lane's fields: roll.unarmed, effect.rounds_dice, effect.escape_dc, effect.burn. The engine reads these fields and never these names.",
+  "abilities": [
+    {
+      "key": "djinni spin",
+      "name": "Djinni Spin",
+      "feat": "djinni-spin",
+      "aliases": [
+        "djinni spin",
+        "whirlwind of electrified air",
+        "electric whirlwind"
+      ],
+      "level": 1,
+      "source": "Djinni Spin (UC): 'While using Djinni Style, as a standard action you can spend two Elemental Fist attempts to surround yourself with a whirlwind of electrified air. Creatures adjacent to you take your unarmed strike damage plus the electricity damage from your Elemental Fist and are deafened for 1d4 rounds. A successful Fortitude save (DC 10 + 1/2 your character level + your Wis modifier) reduces the damage by half and prevents a target from being deafened.' Djinni Spirit, its prerequisite: 'Those who take damage from your Djinni Spin are deafened, even on a successful saving throw' - so the deafness lands on every creature it reaches.",
+      "text": "Two Elemental Fist attempts: everyone adjacent takes your unarmed strike plus 1d6 electricity (Fortitude half) and is deafened 1d4 rounds.",
+      "action": "standard",
+      "harmful": true,
+      "requires": [
+        "style.djinni-style"
+      ],
+      "requires_said": "only while in Djinni Style",
+      "pool": {
+        "id": "elemental fist",
+        "max": "max(level // 4, level_monk)",
+        "refresh": "rest.night"
+      },
+      "cost": {
+        "pool": "elemental fist",
+        "amount": 2
+      },
+      "bonus_from": "elemental-fist.electricity",
+      "roll": {
+        "count": 1,
+        "die": 6,
+        "as": "damage",
+        "type": "electricity",
+        "unarmed": true
+      },
+      "save": {
+        "save": "fort",
+        "dc": "10 + level // 2 + wis_mod",
+        "success": "half"
+      },
+      "effect": {
+        "condition": "deafened",
+        "rounds_dice": "1d4"
+      },
+      "tell": "{name} spins, and the air around them crackles.",
+      "affects": "all",
+      "radius_ft": 5
+    },
+    {
+      "key": "efreeti touch",
+      "name": "Efreeti Touch",
+      "feat": "efreeti-touch",
+      "aliases": [
+        "efreeti touch",
+        "cone of flame",
+        "burst of flame"
+      ],
+      "level": 1,
+      "source": "Efreeti Touch (UC): 'While using Efreeti Style, as a standard action, you can spend two Elemental Fist attempts to unleash a 15-foot cone-shaped burst of flame. Creatures caught in the cone take your unarmed strike damage plus the fire damage from your Elemental Fist and catch on fire. A successful Reflex save (DC 10 + 1/2 your character level + your Wis modifier) reduces the damage by half and prevents a target from catching on fire.'",
+      "text": "Two Elemental Fist attempts: a 15-ft cone of your unarmed strike plus 1d6 fire (Reflex half); those who fail catch fire.",
+      "action": "standard",
+      "harmful": true,
+      "requires": [
+        "style.efreeti-style"
+      ],
+      "requires_said": "only while in Efreeti Style",
+      "pool": {
+        "id": "elemental fist",
+        "max": "max(level // 4, level_monk)",
+        "refresh": "rest.night"
+      },
+      "cost": {
+        "pool": "elemental fist",
+        "amount": 2
+      },
+      "area": {
+        "shape": "cone",
+        "ft": 15
+      },
+      "bonus_from": "elemental-fist.fire",
+      "roll": {
+        "count": 1,
+        "die": 6,
+        "as": "damage",
+        "type": "fire",
+        "unarmed": true
+      },
+      "save": {
+        "save": "ref",
+        "dc": "10 + level // 2 + wis_mod",
+        "success": "half"
+      },
+      "effect": {
+        "on": "failed",
+        "burn": true
+      },
+      "tell": "{name} thrusts a fist and flame pours out of it."
+    },
+    {
+      "key": "marid coldsnap",
+      "name": "Marid Coldsnap",
+      "feat": "marid-coldsnap",
+      "aliases": [
+        "marid coldsnap",
+        "line of frigid water",
+        "coldsnap"
+      ],
+      "level": 1,
+      "source": "Marid Coldsnap (UC): 'While using Marid Style, as a standard action, you can spend two Elemental Fist attempts to unleash a 30-foot line of frigid water. Creatures caught in the line take your unarmed strike damage plus the cold damage from your Elemental Fist attack and are entangled in ice as per the Marid Spirit feat. A successful Reflex save (DC 10 + 1/2 your character level + your Wis modifier) reduces the damage by half and prevents a target from becoming entangled.' Marid Spirit's ice: 1d4 rounds, a break DC of 15 + base attack bonus or monk level.",
+      "text": "Two Elemental Fist attempts: a 30-ft line of your unarmed strike plus 1d6 cold (Reflex half); those who fail are entangled in ice for 1d4 rounds.",
+      "action": "standard",
+      "harmful": true,
+      "requires": [
+        "style.marid-style"
+      ],
+      "requires_said": "only while in Marid Style",
+      "pool": {
+        "id": "elemental fist",
+        "max": "max(level // 4, level_monk)",
+        "refresh": "rest.night"
+      },
+      "cost": {
+        "pool": "elemental fist",
+        "amount": 2
+      },
+      "area": {
+        "shape": "line",
+        "ft": 30
+      },
+      "bonus_from": "elemental-fist.cold",
+      "roll": {
+        "count": 1,
+        "die": 6,
+        "as": "damage",
+        "type": "cold",
+        "unarmed": true
+      },
+      "save": {
+        "save": "ref",
+        "dc": "10 + level // 2 + wis_mod",
+        "success": "half"
+      },
+      "effect": {
+        "on": "failed",
+        "condition": "entangled",
+        "rounds_dice": "1d4",
+        "escape_dc": "15 + max(bab, monk_level)"
+      },
+      "tell": "{name} lashes out and a line of freezing water follows the blow."
+    },
+    {
+      "key": "shaitan earthblast",
+      "name": "Shaitan Earthblast",
+      "feat": "shaitan-earthblast",
+      "aliases": [
+        "shaitan earthblast",
+        "column of acid",
+        "earthblast"
+      ],
+      "level": 1,
+      "source": "Shaitan Earthblast (UC): 'While using the Shaitan Style feat, as a standard action, you can spend two Elemental Fist attempts to unleash a 20-foot column of acid that has a 5-foot radius and erupts from a point of origin within 30 feet of you. Creatures caught in the column take your unarmed strike damage plus the acid damage from your Elemental Fist and are staggered for 1 round. A successful Reflex save (DC 10 + 1/2 your character level + your Wis modifier) reduces the damage by half and prevents a target from being staggered.' The column's 20 feet of height is not on the board, whose areas are laid flat.",
+      "text": "Two Elemental Fist attempts: a 5-ft-radius column of acid within 30 ft, your unarmed strike plus 1d6 acid (Reflex half); those who fail are staggered 1 round.",
+      "action": "standard",
+      "harmful": true,
+      "requires": [
+        "style.shaitan-style"
+      ],
+      "requires_said": "only while in Shaitan Style",
+      "pool": {
+        "id": "elemental fist",
+        "max": "max(level // 4, level_monk)",
+        "refresh": "rest.night"
+      },
+      "cost": {
+        "pool": "elemental fist",
+        "amount": 2
+      },
+      "area": {
+        "shape": "burst",
+        "ft": 5,
+        "range_ft": 30
+      },
+      "bonus_from": "elemental-fist.acid",
+      "roll": {
+        "count": 1,
+        "die": 6,
+        "as": "damage",
+        "type": "acid",
+        "unarmed": true
+      },
+      "save": {
+        "save": "ref",
+        "dc": "10 + level // 2 + wis_mod",
+        "success": "half"
+      },
+      "effect": {
+        "on": "failed",
+        "condition": "staggered",
+        "rounds": 1
+      },
+      "tell": "{name} strikes the ground and acid erupts beneath {target}."
+    }
+  ]
+}

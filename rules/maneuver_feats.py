@@ -930,3 +930,91 @@ def field_repair_cost(actor, obj, cost_gp: float) -> float:
             or int((actor.ranks or {}).get("craft", 0) or 0) < 1:
         return cost_gp
     return 0.0
+
+
+# === Feat loop batch 5, lane b5-maneuver (2026-11-26) =====================================
+#
+# The elemental style feats finished on Elemental Fist (b4-combat's charge, pool
+# `elemental fist`), and the manoeuvre and defence feats of b5-maneuver.tsv. As above, the
+# engine reads documents' TAGS and fields here, never a feat's name.
+
+def fist_share(engine, actor, shown: str, rolls: list, tells: list):
+    """(amount, type) of the user's unarmed strike, rolled once for an area that deals
+    "your unarmed strike damage plus the [energy] damage from your Elemental Fist"
+    (Djinni Spin, Efreeti Touch, Marid Coldsnap, Shaitan Earthblast, UC/Champions of
+    Balance). The strike's own dice and its damage terms (`Actor.damage_modifiers`, the
+    one funnel the punch itself uses); bludgeoning, as an unarmed strike is."""
+    from .dice import stack
+
+    notation = actor.damage_dice("unarmed")
+    mods = list(stack(actor.damage_modifiers("unarmed")))
+    r = engine.dice.roll(notation, mods, label=f"{shown}: unarmed strike", visibility="player")
+    rolls.append(r)
+    total = max(1, r.total)
+    tells.append(f"The unarmed strike behind it: {notation} — {total}.")
+    return total, "bludgeoning"
+
+
+def escape_payload(actor, rule: dict) -> dict | None:
+    """The payload a save-or-condition rider lays when its hold is one a check ends
+    (`escape_dc`, a formula over the maker's sheet): Marid Spirit's "entangled in ice ...
+    a break DC of 15 + your base attack bonus or monk level, whichever is higher.
+    Destroying or breaking the ice ends the entangled condition." The `escape` op answers
+    it (`Engine._escape_spell_hold`: a combat manoeuvre or Escape Artist against the DC, a
+    standard action), as it answers a web. None when the rider names no escape."""
+    from . import resources
+
+    if not rule.get("escape_dc"):
+        return None
+    try:
+        dc = int(resources.evaluate(str(rule["escape_dc"]), actor))
+    except resources.FormulaError:
+        return None
+    return {"ends_when": {"escape": {"dc": dc}}}
+
+
+def rider_catch_fire(engine, intent, actor, defender, rule: dict, origin: str,
+                     state: dict) -> list[dict]:
+    """Efreeti Stance (UC): "Creatures that take fire damage from your Elemental Fist
+    attack must succeed at a Reflex save (DC 10 + 1/2 your character level + your Wis
+    modifier) or catch on fire." The catching is the engine's one clinging fire (the `burn`
+    op: 1d6 a round, put out by `extinguish` — Reflex DC 15, +4 rolling on the ground), for
+    1d4 rounds, the length the Burn rider gives a caught creature (`Engine._rider_burn`).
+    Owner call: the CRB's "Catching on Fire" burns until a save puts it out; the engine's
+    fire runs a counted number of rounds, so the Burn rider's 1d4 is taken."""
+    if defender.hp <= 0 or defender.is_dead:
+        return []
+    dc = int(rule.get("dc") or 10)
+    made, said = engine._rider_save(defender, str(rule.get("save") or "ref"), dc,
+                                    "Reflex save against catching fire", state,
+                                    attacker=actor)
+    word = str(rule.get("name") or rule.get("rider") or "the fire")
+    if made:
+        return [{"effect": {"ref": defender.ref, "kind": "rider_resisted", "rider": word,
+                            "origin": origin},
+                 "tell": f"{defender.name} does not catch fire ({said})."}]
+    got, said2 = set_alight(engine, actor, defender, origin, word, state)
+    return got + [{"effect": {"ref": defender.ref, "kind": "rider", "rider": word,
+                              "origin": origin},
+                   "tell": f"{defender.name} catches fire ({said}). {said2}".strip()}]
+
+
+def set_alight(engine, actor, defender, origin: str, word: str, state: dict):
+    """(effect/tell pairs, tell) for the engine's one clinging fire laid on `defender`: the
+    `burn` op (1d6 fire a round for 1d4 rounds, put out by `extinguish`), as the Burn
+    rider lays it. Shared by Efreeti Stance's rider and Efreeti Touch's cone."""
+    rounds = engine.dice.roll("1d4", label="burning rounds", visibility="hidden")
+    state.setdefault("rolls", []).append(rounds.as_dict())
+    res = engine._run_within(engine.validate([{
+        "op": "burn", "actor": defender.ref, "visibility": "hidden",
+        "because": f"{actor.name}'s {word}",
+        "params": {"to": defender.ref, "dice": "1d6", "damage_type": "fire",
+                   "rounds": max(1, rounds.total), "put_out_with": "ref",
+                   "put_out_dc": 15, "smother_bonus": 4},
+    }], origin=origin, origin_name=word))
+    out, said = [], []
+    for o in res:
+        out.extend({"effect": e, "tell": ""} for e in o.effects or [])
+        if o.tell:
+            said.append(o.tell)
+    return out, " ".join(said) or f"{defender.name} is alight."

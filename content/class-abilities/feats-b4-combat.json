@@ -43,7 +43,8 @@
           "count": 1,
           "die": 6,
           "type": "fire"
-        }
+        },
+        "bonus_from": "elemental-fist.fire"
       },
       "choice": {
         "kind": "mode",
@@ -53,6 +54,10 @@
             "aliases": [
               "burning",
               "flames"
+            ],
+            "requires_not": [
+              "spent.elemental-fist",
+              "style.djinni-style"
             ]
           },
           "acid": {
@@ -69,8 +74,13 @@
                 "count": 1,
                 "die": 6,
                 "type": "acid"
-              }
-            }
+              },
+              "bonus_from": "elemental-fist.acid"
+            },
+            "requires_not": [
+              "spent.elemental-fist",
+              "style.djinni-style"
+            ]
           },
           "cold": {
             "aliases": [
@@ -87,7 +97,20 @@
                 "count": 1,
                 "die": 6,
                 "type": "cold"
-              }
+              },
+              "bonus_from": "elemental-fist.cold"
+            },
+            "requires_not": [
+              "spent.elemental-fist",
+              "style.djinni-style"
+            ],
+            "self": {
+              "rounds": 1,
+              "tags": [
+                "spent.elemental-fist",
+                "elemental-fist.cold",
+                "reach.extended"
+              ]
             }
           },
           "electricity": {
@@ -105,7 +128,8 @@
                 "count": 1,
                 "die": 6,
                 "type": "electricity"
-              }
+              },
+              "bonus_from": "elemental-fist.electricity"
             }
           }
         }

@@ -370,17 +370,19 @@ def reach_with(actor, weapon_key: str | None) -> tuple[int, bool]:
     from . import weapons as weapons_mod
 
     natural = gridmod.natural_reach(actor.size)
-    more = _reach_more(actor)
+    more = _reach_more(actor, weapon_key)
     if weapon_key and weapons_mod.has_trait(weapon_key, "reach"):
         return natural * 2 + more, True
     return natural + more, False
 
 
-def _reach_more(actor) -> int:
+def _reach_more(actor, weapon_key: str | None = None) -> int:
     """Feet the bearer's effects and feats add to melee reach (the `reach` target, feat
     loop b2): Lunge's "+5 feet until the end of your turn" (`when: {"own_turn": true}`),
     Combat Patrol's widened threat. Asked with the moment, so `own_turn` is answered by
-    the scene's own turn order; no moment, no own turn."""
+    the scene's own turn order; no moment, no own turn. The weapon swung is in the
+    context too (feat loop b5-maneuver): Marid Style's "your reach with your unarmed
+    strike increases by 5 feet" asks `when.weapon.key` "unarmed" (no weapon is the body)."""
     if not hasattr(actor, "_buff_mods"):
         return 0
     if not actor.has_state("reach.extended") and not any(
@@ -394,6 +396,7 @@ def _reach_more(actor) -> int:
                                   and sit.scene.current_ref() == actor.ref)}
     if sit is not None:
         ctx["situation"] = sit
+    ctx["weapon"] = {"key": str(weapon_key or "unarmed").strip().lower()}
     try:
         return max(0, sum(m.value for m in actor._buff_mods("combat_mod", "reach", ctx)))
     except Exception:  # noqa: BLE001 — a sheet the documents cannot read reaches as it is

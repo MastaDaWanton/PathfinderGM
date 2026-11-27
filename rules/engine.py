@@ -11770,7 +11770,8 @@ class Engine:
                     state["tells"].append(
                         f"{actor.name}'s attack{_instrument(weapon, weapon_key)} goes "
                         f"badly wide (natural 1).")
-                    state["tells"].extend(self._charges_missed(actor, weapon_key, weapon))
+                    state["tells"].extend(self._charges_missed(
+                        actor, weapon_key, weapon, defender, state))
                     # A round that misses lies somewhere out there, to be looked for
                     # when the fight is over (`_recover_ammunition`); one that hits is
                     # spent ("destroyed or rendered useless", CRB "Ammunition").
@@ -11794,7 +11795,8 @@ class Engine:
                     state["tells"].append(
                         f"{actor.name}'s attack{_instrument(weapon, weapon_key)} misses "
                         f"{defender.name} ({atk.total} against {swing_note}).")
-                    state["tells"].extend(self._charges_missed(actor, weapon_key, weapon))
+                    state["tells"].extend(self._charges_missed(
+                        actor, weapon_key, weapon, defender, state))
                     if counts_ammo:
                         state["ammo_missed"] = int(state.get("ammo_missed", 0)) + 1
                     if self._second_chance(actor, state, choices):
@@ -11883,8 +11885,8 @@ class Engine:
                         state["tells"].append(
                             f"{actor.name} finds nothing there — {why}, {chance}% miss "
                             f"chance ({miss.total}).")
-                        state["tells"].extend(
-                            self._charges_missed(actor, weapon_key, weapon))
+                        state["tells"].extend(self._charges_missed(
+                            actor, weapon_key, weapon, defender, state))
                         if counts_ammo:
                             state["ammo_missed"] = int(state.get("ammo_missed", 0)) + 1
                         state["i"] += 1
@@ -12403,13 +12405,21 @@ class Engine:
                     state["tells"].append(extra["tell"])
                 # A blow charged before the roll — stunning fist's save — spends itself on
                 # the first hit with the weapon it names (`_deliver_charges`).
-                for extra in ([] if dancing else self._deliver_charges(
-                        actor, defender, weapon_key, intent.visibility or "player", weapon,
-                        full=bool(intent.params.get("full_attack"))
-                        or intent.params.get("iteration") is not None,
-                        charging=bool(intent.params.get("charge")))):
+                charged = [] if dancing else self._deliver_charges(
+                    actor, defender, weapon_key, intent.visibility or "player", weapon,
+                    full=bool(intent.params.get("full_attack"))
+                    or intent.params.get("iteration") is not None,
+                    charging=bool(intent.params.get("charge")))
+                for extra in charged:
                     state["effects"].append(extra["effect"])
                     state["tells"].append(extra["tell"])
+                # Feat loop b5-maneuver: the energy a charge dealt with THIS blow, for an
+                # `on_hit` rider's `when.charge_energy` (Djinni Spirit's "creatures that
+                # take electricity damage from your Elemental Fist attack").
+                state["charge_energy"] = tuple(
+                    str(x["effect"].get("type")) for x in charged
+                    if x["effect"].get("ref") == defender.ref
+                    and int(x["effect"].get("amount") or 0) > 0 and x["effect"].get("type"))
                 # A raging feint (Tantrum) lasts until the first blow that lands.
                 if state.get("feinted"):
                     skilluses.spend_feint(defender, actor, landed=True)
@@ -26166,7 +26176,9 @@ class Engine:
         state.setdefault("rolls", []).append(roll.as_dict())
         rounds = max(1, roll.total) * unit
         made_cond = defender.add_condition(cond, rounds, source=f"{actor.name}'s {word}",
-                                           origin=origin)
+                                           origin=origin,
+                                           payload=maneuver_feats.escape_payload(
+                                               actor, rule))           # feat loop b5
         name = CONDITIONS.get(cond, {}).get("name", cond).lower()
         return [{"effect": {"ref": defender.ref, "kind": "condition", "condition": cond,
                             "rounds_left": made_cond.rounds_left, "from": word,
@@ -26204,6 +26216,7 @@ class Engine:
         blow = (state.get("blows") or [{}])[-1]
         ctx.update({c: True for c in choices})
         ctx["critical"] = bool(state.get("crit"))
+        ctx["charge_energy"] = tuple(state.get("charge_energy") or ())  # feat loop b5
         ctx["nonlethal"] = bool(blow.get("nonlethal"))
         ctx["weapon"] = dict(ctx["weapon"], shield_bash=bool(weapon.get("shield_bash")))
         dealt = next((int(e.get("amount") or 0) for e in reversed(state.get("effects") or ())
@@ -27039,6 +27052,8 @@ class Engine:
         "condition": _rider_condition,
         "ally_swing": _rider_ally_swing,
         "free_swing": _rider_free_swing,
+        # Feat loop b5-maneuver: Efreeti Stance's "Reflex save ... or catch on fire".
+        "catch_fire": maneuver_feats.rider_catch_fire,
     }
 
     def _natural_riders(self, actor: Actor, defender: Actor,
@@ -38501,6 +38516,12 @@ class Engine:
                 traits += ("area",)
             hd_rule = doc.get("hit_dice") or {}
             hd_cap = ca.amount(hd_rule.get("max"), actor) if hd_rule.get("max") else 0
+            # Feat loop b5-maneuver: `roll.unarmed` — "your unarmed strike damage plus the
+            # electricity damage from your Elemental Fist" (Djinni Spin and its three
+            # kin): the user's unarmed strike rolled once beside the energy, as a fireball
+            # is, and landed as its own type so a resistance meets only its own part.
+            fist = maneuver_feats.fist_share(self, actor, shown, rolls, tells) \
+                if spec.get("unarmed") and total is not None else None
             for other in who:
                 share = total
                 each = doc
@@ -38683,6 +38704,16 @@ class Engine:
                             + f"{hit['type']}"
                             + (" energy" if hit["type"] in ("positive", "negative") else "")
                             + (f" ({hit['note']})." if hit["note"] else "."))
+                        if fist:
+                            # Feat loop b5-maneuver: the unarmed strike's own share, halved
+                            # with the energy's and landed as its own type.
+                            part = fist[0] if share >= (total or 0) else fist[0] // 2
+                            more = self._apply_damage(other, part, fist[1], traits=traits)
+                            more["origin"] = origin
+                            records.append(more)
+                            tells.append(f"{other.name} takes {more['amount']} {more['type']}"
+                                         f" from the blow"
+                                         + (f" ({more['note']})." if more["note"] else "."))
                 if (each.get("effect") or {}).get("on") == "failed" and not failed:
                     continue
                 records.extend(self._class_effect_on(actor, other, each, origin, shown, tells))
@@ -39505,6 +39536,11 @@ class Engine:
         out: list[dict] = []
         source = f"{shown} ({actor.name})"
         rounds = ca.amount(spec.get("rounds"), actor) if spec.get("rounds") else None
+        if spec.get("rounds_dice"):
+            # Feat loop b5-maneuver: "deafened for 1d4 rounds" (Djinni Spin), rolled for
+            # each creature it lands on.
+            rounds = max(1, self.dice.roll(str(spec["rounds_dice"]), label=f"{shown}: "
+                                           f"rounds", visibility="hidden").total)
         mods = ca.modifiers(spec.get("modifiers"), actor)
         for m in spec.get("skill_modifiers") or ():
             n = ca.amount(m, actor)
@@ -39538,11 +39574,19 @@ class Engine:
                     m.value for m in self._bonus_from(actor, doc)[1])
                 payload = {"ends_when": {"save_each_turn": {
                     "save": str(doc["save"].get("save", "will")), "dc": dc}}}
+            # Feat loop b5-maneuver: a hold a check ends (Marid Coldsnap's ice).
+            payload = payload or maneuver_feats.escape_payload(actor, spec)
             other.add_condition(cond, rounds, source=source, origin=origin, payload=payload)
             out.append({"ref": other.ref, "kind": "condition", "condition": cond,
                         "rounds": rounds, "from": shown, "origin": origin})
             tells.append(_ward_tell(self.scene, {"kind": "condition", "ref": other.ref,
                                                  "condition": cond, "from": shown}))
+        if spec.get("burn"):
+            # Feat loop b5-maneuver: "catch on fire" (Efreeti Touch), the engine's one
+            # clinging fire (`maneuver_feats.set_alight`).
+            got, said = maneuver_feats.set_alight(self, actor, other, origin, shown, {})
+            out.extend(got)
+            tells.append(said)
         if spec.get("vulnerable"):
             # Elemental Blast: "vulnerable to your energy type until the end of your
             # next turn" — a timed defence through the one door all four go by.
@@ -39905,19 +39949,39 @@ class Engine:
             out.append(e)
         return out
 
-    def _charges_missed(self, actor: Actor, weapon_key: str, weapon: dict | None = None
+    def _charges_missed(self, actor: Actor, weapon_key: str, weapon: dict | None = None,
+                        defender: Actor | None = None, state: dict | None = None
                         ) -> list[str]:
         """A swing that missed spends the charges it carried — "if the attack roll misses,
         the attempt is wasted" (Stunning Fist) and Destructive Smite's "single melee
         attack". Before this (lane 4's own not_yet) a monk's missed punch left the charge
         armed and a second unarmed hit that round still stunned. A charge `spent_on`
-        "hit" waits for the hit. Returns the sentences for the swing's tell."""
+        "hit" waits for the hit. Returns the sentences for the swing's tell.
+
+        Feat loop b5-maneuver: a charge's dice may still land on a miss (`dice.miss`, the
+        `<bonus_from>.miss` funnel target worked out when armed) — Efreeti Style's "if
+        your Elemental Fist melee attack misses while you are using it to deal fire
+        damage, you still deal 1d6 points of fire damage to your target". The record goes
+        in the attack's effects (`state`)."""
         said = []
         for e in self._charges_for(actor, weapon_key, weapon):
             if e.payload["charge"].get("spent_on", "swing") != "swing":
                 continue
             actor.remove_effects(match=lambda x, e=e: x is e)
             said.append(f"{e.name} is spent on the miss.")
+            d = e.payload["charge"].get("dice") or {}
+            if defender is not None and state is not None and int(d.get("miss") or 0) > 0 \
+                    and not defender.is_dead:
+                notation = f"{int(d['miss'])}d{int(d.get('die') or 6)}"
+                roll = self.dice.roll(notation, label=f"{e.name} (on the miss)",
+                                      visibility="player")
+                state["rolls"].append(roll.as_dict())
+                hit = self._apply_damage(defender, max(0, roll.total), str(d["type"]))
+                hit["origin"] = e.origin
+                state["effects"].append(hit)
+                said.append(f"The {d['type']} still reaches {defender.name}: {notation}, "
+                            f"{hit['amount']} {hit['type']}"
+                            + (f" ({hit['note']})." if hit.get("note") else "."))
         return said
 
     def _first_hits_spent(self, actor: Actor, defender: Actor) -> list[dict]:
@@ -40079,6 +40143,12 @@ class Engine:
                         "ignores_dr": bool(d.get("ignores_dr"))},
                "save_half": str(save.get("success") or "") == "half",
                "dc_more": sum(m.value for m in dc)}
+        if charge.get("bonus_from"):
+            # Feat loop b5-maneuver: dice that land on a miss too (`_charges_missed`).
+            from .dice import stack
+
+            out["dice"]["miss"] = max(0, sum(m.value for m in stack(actor._buff_mods(
+                "combat_mod", f"{str(charge['bonus_from']).strip()}.miss"))))
         if isinstance(charge.get("pays"), dict):
             out["pays"] = {"pool": str(charge["pays"].get("pool") or ""),
                            "amount": charge["pays"].get("amount", 1)}
