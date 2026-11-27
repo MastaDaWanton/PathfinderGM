@@ -175,3 +175,55 @@ def test_extra_channel_gives_a_paladin_four_lay_on_hands_only_for_channelling():
     plain.rebuild_pools()
     assert plain.pool("extra channel").maximum == 0
     assert all(p["id"] != "extra channel" for p in plain.summary()["pools"])
+
+
+def _two_blades(feats, monkeypatch, **params):
+    from tests.test_feats_b2_attack_a import _board as board2, _swing, _wren
+    from tests.test_feats_b4_maneuver import _no_prereqs
+
+    _no_prereqs(monkeypatch)
+    pc = _wren(["Two-Weapon Fighting", "Combat Expertise", *feats],
+               weapons=["shortsword", "dagger"], equipped="shortsword")
+    pc.abilities["cha"] = 40                               # the feint lands
+    s, e, thug = board2(pc, foes=["thug"])
+    thug.hp_max = thug.hp = 500
+    e._ensure_encounter("pc")
+    s.positions.update({"pc": (5, 5), thug.ref: (6, 5)})
+    return thug, _swing(e, target=thug.ref, face=12, full_attack=True, off_hand="dagger",
+                        **params)
+
+
+def test_two_weapon_feint_trades_the_first_primary_blow_for_a_feint(monkeypatch):
+    """UC, Two-Weapon Feint: "While using Two-Weapon Fighting to make melee attacks, you
+    can forgo your first primary-hand melee attack to make a Bluff check to feint an
+    opponent." Measured before: no declared option existed; a feint was its own standard
+    action. Now the full attack has one blow fewer, a feint in front of it, and the next
+    blow spends the opening."""
+    from tests.test_feats_b4_moves import _rolls
+
+    _, plain = _two_blades(["Two-Weapon Feint"], monkeypatch)
+    thug, res = _two_blades(["Two-Weapon Feint"], monkeypatch, two_weapon_feint=True)
+    swings = lambda r: len(_rolls(r, "Attack with"))            # noqa: E731
+    assert _rolls(res, "Bluff check (feint)"), _tells(res)
+    assert swings(res) == swings(plain) - 1
+    assert not thug.has_state("state.feinted.pc")
+
+
+def test_improved_two_weapon_feint_keeps_the_foe_open_for_the_turn(monkeypatch):
+    """Improved Two-Weapon Feint: "that opponent is denied his Dexterity bonus to AC until
+    the end of your turn" — not only against the next blow."""
+    thug, res = _two_blades(["Two-Weapon Feint", "Improved Two-Weapon Feint"], monkeypatch,
+                            two_weapon_feint=True)
+    assert thug.has_state("state.feinted.pc"), _tells(res)
+
+
+def test_two_weapon_feint_is_refused_without_an_off_hand(monkeypatch):
+    from tests.test_feats_b4_maneuver import _no_prereqs
+    from tests.test_feats_b2_attack_a import _board as board2, _wren
+
+    _no_prereqs(monkeypatch)
+    pc = _wren(["Two-Weapon Fighting", "Two-Weapon Feint"], weapons=["shortsword"],
+               equipped="shortsword")
+    s, e, thug = board2(pc, foes=["thug"])
+    assert "two-weapon full attack" in e._attack_choice_refusal(
+        pc, "shortsword", {"two_weapon_feint": True, "full_attack": True})

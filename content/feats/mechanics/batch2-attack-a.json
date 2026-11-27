@@ -676,14 +676,12 @@
     ]
   },
   "improved-two-weapon-feint": {
-    "not_yet": [
-      "forgoing the first primary-hand attack of a two-weapon full attack to feint, the foe denied Dexterity for the rest of your turn"
+    "tags": [
+      "skill.bluff.feint.two-weapon-turn"
     ]
   },
   "two-weapon-feint": {
-    "not_yet": [
-      "forgoing the first primary-hand attack of a two-weapon full attack to make a feint"
-    ]
+    "choice": "two_weapon_feint"
   },
   "mocking-dance": {
     "not_yet": [
