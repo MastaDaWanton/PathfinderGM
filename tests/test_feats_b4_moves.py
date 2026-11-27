@@ -316,7 +316,7 @@ def test_landing_roll_rolls_out_of_the_trippers_reach_and_stays_prone():
 
 def test_lightning_stance_two_moves_give_fifty_percent_concealment_for_a_round():
     """CRB: "If you take two actions to move ... you gain 50% concealment for 1 round."
-    One move gives nothing; the second move action also spends the turn's standard."""
+    One move gives nothing."""
     pc = _pc("fighter", feats=["Lightning Stance"])
     s, e = _board(pc, ("thug", (18, 18)))
     _run(e, {"op": "move", "actor": "pc", "params": {"square": [8, 5]}})
@@ -324,7 +324,6 @@ def test_lightning_stance_two_moves_give_fifty_percent_concealment_for_a_round()
     res = _run(e, {"op": "move", "actor": "pc", "params": {"square": [11, 5]}})
     assert pc.concealment()[0] == 50, _tells(res)
     assert "Lightning Stance" in _tells(res)
-    assert s.standard_spent.get("pc") == s.round
     pc.tick_effects(1)
     assert pc.concealment()[0] == 0
 

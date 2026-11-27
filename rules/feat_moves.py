@@ -105,15 +105,19 @@ def _walked(outcome, ref: str):
 
 
 def _second_move(engine, intent, outcome, twice: bool) -> list:
-    """A second move action this turn: the standard action is what paid for it (CRB:
-    "You can take a move action in place of a standard action"), so it is recorded spent;
-    and Lightning Stance's 50% concealment for a round is laid on its holder."""
+    """A second move action this turn: Lightning Stance's 50% concealment for a round is
+    laid on its holder.
+
+    Not done here, on purpose: recording the standard action as spent by the second move
+    (CRB: "You can take a move action in place of a standard action"). Tried in this lane
+    and backed out — the reach refusal's own repair ("Click square ...", then move and
+    strike) is offered with the move already walked (tests/test_maneuver_reach.py), so
+    the rule needs that advice changed first. Reported to the owner as a defect."""
     from .engine import Outcome
 
     actor = engine.scene.actors.get(intent.actor or "")
     if actor is None or not twice or _walked(outcome, actor.ref) <= gridmod.SQUARE_FT:
         return []
-    engine.scene.standard_spent[actor.ref] = engine.scene.round
     if not actor.has_state(LIGHTNING_STANCE):
         return []
     actor.apply_effect(ActiveEffect(

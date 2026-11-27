@@ -47,6 +47,9 @@ def _fight(pc, *foes, allies=()):
     e = Engine(scene, dice=Dice(seed=11))
     e.run(e.validate([{"op": "begin_encounter", "params": {
         "sides": {"pc": ["pc"] + [a.ref for a in allies], "them": them}}}]))
+    # The PC's turn: a swift action is taken only on one's own (`Engine._spend_swift`,
+    # feat loop b4: a class ability spends its declared action).
+    scene.turn = [r for r, _ in scene.initiative].index("pc")
     return scene, e
 
 
@@ -470,7 +473,10 @@ def test_ki_was_a_counter_and_now_buys_dodge_and_speed():
     pc = _pc("monk", 6)
     _scene, e = _fight(pc)
     ac, speed, ki = pc.ac(), pc.speed_feet, pc.pool("ki").current
+    from tests._board import new_turn
+
     _use(e, "Ki Dodge")
+    new_turn(_scene)                        # each is the turn's one swift action
     _use(e, "Ki Speed")
     assert pc.ac() == ac + 4 and pc.speed_feet == speed + 20
     assert pc.pool("ki").current == ki - 2
@@ -499,6 +505,9 @@ def test_inspire_courage_reaches_the_allies_and_leaves_with_the_song():
         "never the foe"
     assert bard.pool("bardic performance").current == pool - 1
     # Another performance replaces it, and the courage goes with the old song.
+    from tests._board import new_turn
+
+    new_turn(scene)                         # each starts as the turn's standard action
     _use(e, "Fascinate")
     assert sum(m.value for m in ally.attack_modifiers()) == a0
     _use(e, "Fascinate")

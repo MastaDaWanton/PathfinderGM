@@ -36,8 +36,7 @@
       "feat": "combat-patrol",
       "aliases": [
         "combat patrol",
-        "set up a patrol",
-        "patrol"
+        "set up a patrol"
       ],
       "level": 1,
       "source": "Combat Patrol (APG): 'As a full-round action, you may set up a combat patrol, increasing your threatened area by 5 feet for every 5 points of your base attack bonus. Until the beginning of your next turn, you may make attacks of opportunity against any opponent in this threatened area that provokes attacks of opportunity.' The widened ring is reach off the bearer's own turn (rules/reactions.py `_reach_more`), so it is the attacks of opportunity alone that reach further.",
