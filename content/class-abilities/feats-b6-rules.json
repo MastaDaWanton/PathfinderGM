@@ -1,0 +1,66 @@
+{
+  "class": "feat",
+  "_source": "Feat loop b6, lane b6-rules (2026-11-27): the feats a character USES that the lane's base rules needed. Each is had by a holder of the feat its `feat` names (rules/class_abilities.py `_docs_for`), whatever their class, and run by the one executor the class abilities use (`Engine._use_class_ability`). Benefit text from content/feats/feats.json (aonprd.com FeatDisplay).",
+  "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
+  "abilities": [
+    {
+      "key": "stunning fist",
+      "name": "Stunning Fist",
+      "feat": "stunning-fist",
+      "aliases": [
+        "stunning attack"
+      ],
+      "level": 1,
+      "source": "Stunning Fist (CRB): 'Stunning Fist forces a foe damaged by your unarmed attack to make a Fortitude saving throw (DC 10 + 1/2 your character level + your Wis modifier) ... A defender who fails this saving throw is stunned for 1 round ... You may attempt a stunning attack once per day for every four levels you have attained ... Constructs, oozes, plants, undead, incorporeal creatures, and creatures immune to critical hits cannot be stunned.' The feat held by any class; a monk's own Stunning Fist (content/class-abilities/monk.json, monk level times a day) stands in its place (class_abilities._docs_for).",
+      "text": "Your next unarmed hit this round: Fortitude save or stunned for a round.",
+      "action": "free",
+      "pool": {
+        "id": "stunning fist",
+        "max": "max(level // 4, level_monk)",
+        "refresh": "rest.night"
+      },
+      "cost": {
+        "pool": "stunning fist",
+        "amount": 1
+      },
+      "aim": "foe",
+      "charge": {
+        "weapons": [
+          "unarmed",
+          "unarmed strike"
+        ],
+        "spent_on": "swing",
+        "save": {
+          "save": "fort",
+          "dc": "10 + level // 2 + wis_mod"
+        },
+        "immune_types": [
+          "construct",
+          "ooze",
+          "plant",
+          "undead"
+        ],
+        "immune_subtypes": [
+          "incorporeal"
+        ],
+        "immune_crit": true
+      },
+      "choice": {
+        "kind": "condition",
+        "default": "stunned",
+        "options": {
+          "stunned": {
+            "level": 1,
+            "charge_condition": "stunned",
+            "charge_rounds": 1,
+            "aliases": [
+              "stun",
+              "stuns"
+            ]
+          }
+        }
+      },
+      "tell": "{name} gathers the next blow to stun."
+    }
+  ]
+}

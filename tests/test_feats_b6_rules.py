@@ -264,3 +264,38 @@ def test_stalwart_is_on_the_declare_section():
     assert ids["total_defense_stalwart"]["op"] == {"op": "total_defense",
                                                    "params": {"stalwart": True}}
     assert "DR 4/—" in ids["total_defense_stalwart"]["says"]
+
+
+# --- Stunning Fist for any class -----------------------------------------------------------------
+
+def test_a_fighter_with_stunning_fist_stuns_level_over_four_times_a_day():
+    """Measured before (audit 2026-11-22): Stunning Fist "runs only as the monk class ability
+    ... a non-monk taking the feat gets no uses" — "use Stunning Fist" from a fighter was
+    refused by name. CRB: "once per day for every four levels you have attained": a fighter
+    8 has two; the unarmed hit's failed Fortitude save stuns."""
+    from tests.test_feats_b2_attack_a import _adjacent, _fight, _swing, _use
+    from tests.test_feats_b2_attack_a import _pc as pc2
+
+    f = pc2("fighter", 8, feats=["Improved Unarmed Strike", "Stunning Fist"])
+    f.abilities["wis"] = 40
+    f.equipped = "unarmed"
+    scene, e = _fight(f)
+    _adjacent(scene)
+    thug = scene.actors["c1"]
+    thug.hp_max = thug.hp = 500
+    out = _use(e, "Stunning Fist")
+    assert out.status == "resolved", out.tell
+    assert f.pool("stunning fist").maximum == 2
+    res = _swing(e, face=19)
+    assert thug.has_condition("stunned"), _tells(res)
+
+
+def test_a_monk_keeps_one_stunning_fist_at_monk_level_uses():
+    """The monk's own Stunning Fist (monk level times a day) stands in the feat's place:
+    one ability, not two, and its pool is the class's."""
+    from rules import class_abilities
+    from tests.test_feats_b4_maneuver import _monk
+
+    monk = _monk(["Stunning Fist"])
+    docs = [d for d in class_abilities._docs_for(monk) if d.get("key") == "stunning fist"]
+    assert len(docs) == 1 and docs[0]["class"] == "monk"
