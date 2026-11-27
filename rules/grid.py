@@ -470,7 +470,8 @@ class Grid:
     # --- movement ------------------------------------------------------------------------
 
     def reachable(self, start: Point, feet: int, size: str = "medium",
-                  occupied: set[Point] | None = None, swims: str = "") -> dict[Point, int]:
+                  occupied: set[Point] | None = None, swims: str = "",
+                  easy_ft: int = 0) -> dict[Point, int]:
         """Every square this creature can end its move in, and what it costs to get there.
 
         Dijkstra rather than a flood fill, because difficult terrain means the cheapest
@@ -487,17 +488,29 @@ class Grid:
         of it — CRB Swim: "a quarter of your speed as a move action", so half as a
         full-round one (two moves). Whether they may swim at all this round is the Swim
         check's (`Engine.swim`), asked by the move op.
+
+        `easy_ft`: feet of difficult terrain this move crosses as if it were normal
+        (Nimble Moves' 5, Acrobatic Steps' 15 — "Whenever you move, you may move through up
+        to 15 feet of difficult terrain each round as if it were normal terrain"; Light
+        Step's "ignore the effects of difficult terrain in natural environments" is all
+        of it, `EASY_ALL`). Carried per path in the queue, as the diagonal is: which
+        squares the allowance is spent on changes which route is cheapest (feat loop
+        b4-other). shortcut: the allowance is per move, not per round, so a double move
+        gets it twice; upgrade if a round's moves are ever priced together.
         """
         occupied = occupied or set()
         start = tuple(start)
-        best: dict[tuple[Point, int], int] = {}
+        free0 = max(0, int(easy_ft)) // SQUARE_FT
+        every = self.EASY_ALL // SQUARE_FT
+        best: dict[tuple[Point, int, int], int] = {}
         out: dict[Point, int] = {}
-        # (cost so far, square, whether the next diagonal is the expensive one)
-        queue: list[tuple[int, Point, int]] = [(0, start, 0)]
+        # (cost so far, square, whether the next diagonal is the expensive one, difficult
+        # squares still to cross as normal)
+        queue: list[tuple[int, Point, int, int]] = [(0, start, 0, free0)]
 
         while queue:
-            cost, here, odd = heappop(queue)
-            if best.get((here, odd), 1 << 30) < cost:
+            cost, here, odd, free = heappop(queue)
+            if best.get((here, odd, free), 1 << 30) < cost:
                 continue
             if here not in out or cost < out[here]:
                 out[here] = cost
@@ -509,23 +522,29 @@ class Grid:
                 diagonal = dx and dy
                 if diagonal and not self._corner_open(here, there, bool(swims)):
                     continue
-                step = self.enter_cost(there)
+                hard = there in self.difficult and not free
+                # All of it (Light Step) is never counted down: one state, not thousands.
+                left = free - 1 if there in self.difficult and 0 < free < every else free
+                step = SQUARE_FT * (2 if hard else 1)
                 if swims == "over" and there in self.water:
                     step *= 4
                 # Every second diagonal costs an extra square. Difficult terrain doubles
                 # the whole step, expensive diagonal included.
                 if diagonal and odd:
-                    step += SQUARE_FT * (2 if there in self.difficult else 1)
+                    step += SQUARE_FT * (2 if hard else 1)
                 nxt = cost + step
                 if nxt > feet:
                     continue
                 flag = (odd ^ 1) if diagonal else odd
-                if nxt < best.get((there, flag), 1 << 30):
-                    best[(there, flag)] = nxt
-                    heappush(queue, (nxt, there, flag))
+                if nxt < best.get((there, flag, left), 1 << 30):
+                    best[(there, flag, left)] = nxt
+                    heappush(queue, (nxt, there, flag, left))
 
         out.pop(start, None)
         return out
+
+    # `reachable(easy_ft=EASY_ALL)`: every difficult square crossed as normal (Light Step).
+    EASY_ALL = 10_000
 
     def _fits(self, anchor: Point, size: str, occupied: set[Point], swims: bool = False) -> bool:
         squares = footprint(anchor, size)

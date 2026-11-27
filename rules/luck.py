@@ -37,11 +37,22 @@ from __future__ import annotations
 from .dice import Modifier
 
 SURGE = "luck.surge"
-KINDS = ("reroll", "bonus", "ally_save", "on_reroll", "surge")
+KINDS = ("reroll", "bonus", "ally_save", "on_reroll", "surge",
+         # Feat loop b4-other (2026-11-26):
+         # * `{"confirm_against": "lowest"}` — Deathless Zealot's "Whenever a creature rolls
+         #   to confirm a critical hit against you, it must roll twice and take the lowest";
+         # * `{"confirm_against": "reroll", "per_day": 1}` — Defiant Luck's "force the
+         #   creature that confirmed the critical hit against you to reroll" (the bearer is
+         #   the one struck; `Engine._confirm_against` asks);
+         # * `{"twice": "higher", "rolls": ["skill.climb"]}` — Sure Grasp's "Roll twice ...
+         #   and take the higher result" (`twice`, asked by the roll's own door).
+         "confirm_against", "twice")
 
 
 def _entries(actor):
-    """(feat document, entry) for every luck entry the creature's feats carry."""
+    """(feat document, entry) for every luck entry the creature's feats carry. An entry with
+    `while` holds only while the bearer holds that tag (b4-other: Meditation Master's +1
+    exists for the 24 hours after a meditation)."""
     from . import feats as feats_mod
 
     seen = set()
@@ -51,7 +62,24 @@ def _entries(actor):
             continue
         seen.add(doc["id"])
         for entry in doc.get("luck") or ():
+            if entry.get("while") and not actor.has_state(str(entry["while"])):
+                continue
             yield doc, entry
+
+
+def confirm_against(actor, how: str) -> list:
+    """(doc, entry) of the struck creature's luck on a roll to confirm against it, `how`
+    "lowest" or "reroll", those with a use left."""
+    return [(d, e) for d, e in _entries(actor)
+            if e.get("confirm_against") == how and uses_left(actor, d, e)]
+
+
+def twice(actor, kind: str, against=()):
+    """The document whose `twice` entry covers this roll (Sure Grasp), or None."""
+    for doc, entry in _entries(actor):
+        if entry.get("twice") and covers(entry, kind, against):
+            return doc
+    return None
 
 
 def covers(entry: dict, kind: str, against=()) -> bool:

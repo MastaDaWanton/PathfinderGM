@@ -619,6 +619,17 @@ VOCAB: dict[str, list[dict]] = {
         # confirm a critical against them (Snapping Turtle Shell's "your enemies take a
         # -4 penalty on critical confirmation rolls against you"), read at the confirm.
         ("crit_confirm_against", "Rolls to confirm a critical against you"),
+        # Feat loop b4-other: damage reduction /— (Body Mastery's "damage reduction 2/-"),
+        # read by `Actor.damage_reduction` beside every other DR, best only.
+        ("dr", "Damage reduction /— (no material passes it)"),
+        # And the two healing readers: `natural_healing` doubles a night's (Attuned to
+        # the Wild, `Actor.rest`), `healing_extra` adds to a night's or a magical heal
+        # (Fast Healer, `Actor.rest` and `Engine._fast_healer`).
+        ("natural_healing", "Natural healing doubled (any term)"),
+        ("healing_extra", "Hit points added to rest and magical healing"),
+        # Feet of difficult terrain crossed as normal in a move (Acrobatic Steps' 15),
+        # read by `Engine._easy_ft` into `Grid.reachable(easy_ft=)`.
+        ("difficult_ft", "Difficult terrain crossed as normal, in feet"),
         # Feat loop b1, 2026-11-22: the caster level a spell is CAST at, read by
         # `casting.spell_caster_level` with the spell's roll context (school, spell,
         # energy, descriptor, subschool) — Spell Specialization's "treat your caster level
@@ -2634,6 +2645,9 @@ AGAINST: dict[str, str] = {
     # land either condition (`spell_against`), and an armed blow that does (stunning
     # fist's save, `Engine._deliver_charges`).
     "stun_or_stagger": "a save against a spell or ability that staggers or stuns",
+    # Feat loop b4-other: Sure Grasp's "a Reflex save to avoid falling" — the jump's grab
+    # at the far edge (bodyskills.jump), passed by the save that rolls it.
+    "fall": "a Reflex save to avoid falling (bodyskills)",
 }
 
 
@@ -2781,6 +2795,7 @@ def when_problems(when, where: str = "when") -> list[str]:
 
             if (not isinstance(want, dict)
                     or set(want) - {"feat", "foe_larger", "shield", "threatens_foe"}
+                    or want.get("shield") not in (None, True, False, "light", "heavy")
                     or str(want.get("feat") or "") not in feats_mod.all_feats()):
                 out.append(f"{where}.ally_beside is {{\"feat\": \"<a feat id>\"}}, with "
                            f"an optional \"foe_larger\": true and \"shield\": true (the "

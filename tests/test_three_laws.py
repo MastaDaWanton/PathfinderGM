@@ -469,6 +469,12 @@ _REACHES = {
     # `leveling.skill_ranks` into the total a character may place.
     ("combat_mod", "skill_ranks"): lambda a: _skill_ranks(a),
     ("combat_mod", "wild_empathy"): lambda a: _wild_empathy(a),
+    # Feat loop b4-other: a term's DR/— (Body Mastery), the night's healing doubled
+    # (Attuned to the Wild) and the hit points added to a rest or a cure (Fast Healer).
+    ("combat_mod", "dr"): lambda a: getattr(a.damage_reduction("slashing"), "amount", 0),
+    ("combat_mod", "natural_healing"): lambda a: _natural_healing(a),
+    ("combat_mod", "healing_extra"): lambda a: a.healing_extra(),
+    ("combat_mod", "difficult_ft"): lambda a: _easy_ft(a),
 }
 
 
@@ -482,6 +488,17 @@ def _skill_ranks(a) -> int:
     from rules import leveling
 
     return leveling.skill_ranks(a)["total"]
+
+
+def _easy_ft(a) -> int:
+    from rules.engine import Engine
+
+    return Engine._easy_ft(a)
+
+
+def _natural_healing(a) -> int:
+    a.hp = 0
+    return a.rest("night")["healed"]
 
 
 def _companion_level(a) -> int:

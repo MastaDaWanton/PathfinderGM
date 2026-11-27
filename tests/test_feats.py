@@ -267,7 +267,9 @@ def test_a_mechanical_feat_is_reachable_from_the_index():
     """Both halves describe the same feat, and the index says which ones the engine
     actually computes with."""
     assert feats.get("weapon-finesse").mechanical.get("attack_ability")
-    assert feats.get("acrobatic-steps").mechanical == {}
+    # Leadership: cohorts are not in the game (Acrobatic Steps, the old example, gained a
+    # document in feat loop b4).
+    assert feats.get("leadership").mechanical == {}
 
 
 def test_the_index_did_not_break_the_sheet(kesst):
@@ -320,12 +322,12 @@ def test_the_sheet_shows_a_feats_real_benefit_rather_than_calling_it_flavour(kes
     useless to a player trying to remember what the feat does."""
     from rules.sheet import full_sheet
 
-    kesst.feats = ["acrobatic steps"]
+    kesst.feats = ["leadership"]
     shown = full_sheet(kesst)["feats"][0]
     assert shown["known"] is True
     assert shown["applied"] is False
-    assert "difficult terrain" in shown["effect"]
-    assert shown["prerequisites"].startswith("Dex 15")
+    assert "cohort" in shown["effect"]
+    assert shown["prerequisites"].startswith("Character level 7th")
 
 
 def test_a_feat_nothing_has_ever_heard_of_is_still_carried(kesst):

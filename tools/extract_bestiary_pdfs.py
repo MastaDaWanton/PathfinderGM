@@ -274,6 +274,12 @@ def parse_block(text: str, name: str, cr: str) -> dict | None:
             word = cls.split()[-1]
             if word in _CLASS_WORDS:
                 classes[word] = classes.get(word, 0) + int(lvl)
+    # The people the class line names ("Orc warrior 1"): Bestiary 1's orc prints its type
+    # line as "CE Medium humanoid" with no "(orc)", so the plain orc carried no subtype and
+    # War Singer's "+2 for creatures of the orc subtype" missed it (feat loop b4). Kept for
+    # `kin_subtypes`, which takes it only where another block prints it as a subtype.
+    kin = desc.group(1).lower().split()[0] if desc and classes and desc.group(1).split() \
+        else ""
     hp = re.search(r"\bhp\s+(\d+)\s*(?:each\s*)?\(([^)]{2,40})\)", t, re.I)
     # The book prints a minus as an en dash ("Will –1"), and every signed figure below
     # was read with an ASCII "-" only: 39 blocks lost all three saves (the goblin, the
@@ -372,6 +378,7 @@ def parse_block(text: str, name: str, cr: str) -> dict | None:
         "size": (head.group(2).lower() if head else "medium"),
         "creature_type": (_type_of(head.group(3)) if head else ""),
         "subtype": (head.group(4).lower() if head and head.group(4) else ""),
+        **({"_kin": kin} if kin and head and not head.group(4) else {}),
         "alignment": ((head.group(1).upper() if len(head.group(1)) <= 2 else "Any") if head else ""),
         "abilities": abil,
         "hp": int(hp.group(1)),
@@ -785,6 +792,23 @@ def aliases_for(old: list[dict], new: dict[str, dict]) -> tuple[dict[str, str], 
     return out, lost
 
 
+def kin_subtypes(creatures: list[dict]) -> int:
+    """A humanoid whose type line printed no subtype takes the people its own class line
+    names, when some other humanoid block prints that people as a subtype ("Orc warrior
+    1" and the orc subtype of 30 Monster Codex blocks). Never a word no block prints as a
+    subtype, so nothing is guessed. Pops every `_kin`; returns how many were filled."""
+    printed = {s.strip() for c in creatures if c.get("creature_type") == "humanoid"
+               for s in re.split(r"[,()]", str(c.get("subtype") or "").lower()) if s.strip()}
+    filled = 0
+    for c in creatures:
+        kin = c.pop("_kin", "")
+        if kin and c.get("creature_type") == "humanoid" and not c.get("subtype") \
+                and kin in printed:
+            c["subtype"] = kin
+            filled += 1
+    return filled
+
+
 def run_scan(pdf_dir: Path, out: Path, keep_ids: dict[tuple[str, ...], str],
              texts: dict[str, list[str]] | None = None,
              old: list[dict] | None = None) -> dict:
@@ -829,6 +853,9 @@ def run_scan(pdf_dir: Path, out: Path, keep_ids: dict[tuple[str, ...], str],
             got += 1
         report.append((slug_name, len(found), got,
                        f"{shared} given their family's environment" if shared else ""))
+    kin = kin_subtypes(list(creatures.values()))
+    if kin:
+        report.append(("subtypes read off the class line", kin, 0, ""))
     kerned = join_kerned(list(creatures.values()))
     if kerned:
         report.append(("kerned words rejoined", kerned, 0, ""))
@@ -891,6 +918,7 @@ def run(pdf_dir: Path, out: Path) -> dict:
             creatures.setdefault(parsed["id"], parsed)
             got += 1
         report.append((slug_name, len(anchors), got, ""))
+    kin_subtypes(list(creatures.values()))
 
     payload = {
         "source": "Bestiary PDFs, via the reference index's creature anchors",

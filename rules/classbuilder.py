@@ -33,6 +33,7 @@ through `validate_effect` here rather than straight to `effectspec.validate`:
 """
 from __future__ import annotations
 
+import functools
 import re
 from dataclasses import dataclass, field as dc_field
 
@@ -1159,7 +1160,10 @@ _FEAT_DOC_KEYS = frozenset({"modifiers", "tags", "budget", "choice", "attack_abi
 
 # The keys a feat's `luck` entry may carry (rules/luck.py, which reads them).
 _LUCK_KEYS = frozenset({"reroll", "bonus", "ally_save", "on_reroll", "surge", "rolls",
-                        "per_day", "bonus_type", "against"})
+                        "per_day", "bonus_type", "against",
+                        # Feat loop b4-other: a critical's confirmation against the
+                        # bearer, a roll made twice, and the tag an entry holds while.
+                        "confirm_against", "twice", "while"})
 
 
 def _luck_problems(at: str, entries) -> list[str]:
@@ -1183,6 +1187,10 @@ def _luck_problems(at: str, entries) -> list[str]:
             out.append(f"{where}: exactly one of {', '.join(luck_mod.KINDS)}.")
         if "reroll" in e and e["reroll"] not in ("natural_1", "any"):
             out.append(f"{where}.reroll: \"natural_1\" or \"any\".")
+        if "confirm_against" in e and e["confirm_against"] not in ("lowest", "reroll"):
+            out.append(f"{where}.confirm_against: \"lowest\" or \"reroll\".")
+        if "twice" in e and e["twice"] != "higher":
+            out.append(f"{where}.twice: \"higher\".")
         if "bonus" in e and (not isinstance(e["bonus"], dict) or not e["bonus"]
                              or set(e["bonus"]) - {"before", "after"}):
             out.append(f"{where}.bonus: {{\"before\": 8, \"after\": 4}}.")
@@ -1312,7 +1320,32 @@ def _feat_funnel_targets() -> set[str]:
                 walk(v)
 
     walk(class_abilities.documents())
+    # Feat loop b4-other: a luck feat's own uses a day (`luck.pool_id`, the feat's id) —
+    # Bestow Luck's "an extra use per day of your Defiant Luck ability".
+    out |= _luck_pool_targets()
     return out
+
+
+@functools.cache
+def _luck_pool_targets() -> frozenset[str]:
+    """`pool.<feat id>` for every feat document whose `luck` counts uses a day, read off
+    the files themselves: asking `feats.documents()` here would validate inside its own
+    validation."""
+    import json
+    from pathlib import Path
+
+    from django.conf import settings
+
+    out = set()
+    folder = Path(settings.BASE_DIR) / "content" / "feats" / "mechanics"
+    for path in sorted(folder.glob("*.json")) if folder.is_dir() else ():
+        for fid, doc in json.loads(path.read_text(encoding="utf-8")).items():
+            if isinstance(doc, dict) and any(isinstance(e, dict) and e.get("per_day")
+                                             for e in doc.get("luck") or ()):
+                out.add(f"pool.{str(fid).strip().lower()}")
+    return frozenset(out)
+
+
 _FEAT_MOD_KEYS = frozenset({"type", "target", "amount", "formula", "bonus_type", "scope",
                             "when", "note"})
 

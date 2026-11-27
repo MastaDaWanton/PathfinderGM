@@ -691,7 +691,10 @@ def wild_empathy(engine, intent, actor, target, partial, how: str = "diplomacy")
         return _refused(engine, intent, f"Wild empathy reaches animals, and magical beasts "
                                         f"of an animal's mind: not {target.name}. Nothing "
                                         f"is rolled.")
-    if engine.scene.in_encounter:
+    # Fast Empathy (UM, feat loop b4-other): "Using wild empathy is a standard action for
+    # you" — its document's tag lets it into a fight's round, where the check op spends
+    # the standard action as any check does.
+    if engine.scene.in_encounter and not actor.has_state("empathy.fast"):
         return _refused(engine, intent, f"Wild empathy takes a minute of calm work, not a "
                                         f"fight's round. Nothing is rolled.")
     gap = engine._gap_ft(actor, target)
