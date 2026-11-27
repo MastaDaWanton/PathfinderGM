@@ -280,5 +280,46 @@
     "tags": [
       "guard.covering-defense"
     ]
-  }
+  },
+  "smash": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "str_check",
+        "amount": 5,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "door"
+        },
+        "note": "APG: '+5 bonus on Strength checks made to knock down or break open doors' (a house door, a dungeon's forced door)"
+      }
+    ],
+    "not_yet": [
+      "ignoring the first 5 points of an inanimate, unattended object's hardness when attacking it: no attack is made at an object"
+    ]
+  },
+  "skilled-driver": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "profession",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "vehicle": "$pick"
+        },
+        "note": "UC: '+4 bonus on driving checks with your chosen vehicle' — Skilled Driver (sailing ship); a ship's driving check is Profession (sailor), or Wisdom untrained (Engine._helm)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "wis_check",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "vehicle": "$pick"
+        }
+      }
+    ]
+  },
+  "slow-time": {}
 }

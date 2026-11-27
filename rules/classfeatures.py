@@ -793,6 +793,10 @@ def holds(when, actor, ctx: dict | None, pick: str = "") -> bool:
             return False
     if rest.get("target") == "$pick":
         rest["target"] = _enemy_clause(pick)
+    # Feat loop b5-spells: Skilled Driver (sailing ship)'s "your chosen vehicle" is the
+    # feat's own parenthetical, compared with the vehicle the driving check names.
+    if rest.get("vehicle") == "$pick":
+        rest["vehicle"] = str(pick or "").strip().lower()
     # Size against the BEARER's (feat loop b2): Risky Striker's "creatures two or more size
     # categories larger than you", Underfoot's "a larger opponent". Only here does the
     # bearer stand beside the roll, so the relative clause is answered here and the rest

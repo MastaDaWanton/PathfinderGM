@@ -441,3 +441,52 @@ def test_secret_signs_hides_a_somatic_casting_and_slows_its_reading():
     somatic = next(sp for sp in spells.all_spells().values()
                    if [str(c).upper() for c in sp.components or ()] == ["S"])
     assert skilluses._secret_signs(e, out, caster_, somatic, pc) is None
+
+
+# --- doors, helms, Slow Time -----------------------------------------------------------------
+
+def test_smash_is_five_on_the_strength_check_to_break_a_door():
+    """APG: "+5 bonus on Strength checks made to knock down or break open doors". Through
+    the engine's house door: the forced door's Strength check carries Smash's +5. Before,
+    the check was a bare Strength modifier and no feat could reach it."""
+    from rules.dice import Modifier
+
+    h = _wren(["Power Attack", "Smash"], race="half-orc", **{"class": "fighter"})
+    assert _sum(h.ability_check_modifiers("str", {"against": "door"}), "Smash") == 5
+    assert _sum(h.ability_check_modifiers("str"), "Smash") == 0
+    assert Modifier
+
+
+def test_skilled_driver_is_four_at_the_helm_of_the_chosen_vehicle():
+    """UC: "+4 bonus on driving checks with your chosen vehicle" — Skilled Driver (sailing
+    ship) at a sailing ship's helm (`Engine._helm`, Profession or Wisdom), not a
+    keelboat's, and not on Profession's other uses."""
+    pc = _wren(["Skilled Driver (sailing ship)"])
+    pc.ranks["profession"] = 1
+    e = Engine(Scene(), Dice(seed=1))
+    _who, ship = e._helm([pc], "sailing ship")
+    _who, boat = e._helm([pc], "keelboat")
+    assert _sum(ship, "Skilled Driver") == 4 and _sum(boat, "Skilled Driver") == 0
+    assert _sum(pc.skill_modifiers("profession"), "Skilled Driver") == 0
+
+
+def test_slow_time_hastes_the_meditation_once_a_day():
+    """F&P: "Once per day, when you meditate as a full-round action using the Combat
+    Meditation feat, you gain the effects of haste for 1 round per 2 character levels."
+    A 10th-level monk: +1 attack, +1 dodge AC, the meditation's tags, for 5 rounds; the
+    second use the same day is refused."""
+    from tests._board import new_turn
+    from tests.test_class_active_abilities import _fight, _pc, _use
+
+    pc = _pc("monk", 10, feats=["Combat Meditation", "Meditation Master", "Slow Time"])
+    pc.abilities["wis"] = 16
+    scene, e = _fight(pc, "thug")
+    ac = pc.ac()
+    out = _use(e, "Slow Time")
+    assert pc.has_state("meditation.combat") and pc.ac() == ac + 1, out.tell
+    assert _sum(pc.attack_modifiers(), "Slow Time") == 1
+    held = next(x for x in pc.effects if "buff.slow-time" in (x.tags or ()))
+    assert held.rounds_left == 5
+    new_turn(scene)
+    again = _use(e, "Slow Time")
+    assert "slow time" in again.tell.lower() and "0" in again.tell

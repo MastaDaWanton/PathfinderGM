@@ -9144,7 +9144,9 @@ class Engine:
                            tell=f"The door of {house.name} is already open to you.",
                            because=intent.because)
         if how == "force":
-            mods = [Modifier(pc.ability_mod("str"), "Strength")]
+            # The plain Strength check, through the funnel and against a door (feat loop
+            # b5-spells: Smash's "+5 bonus on Strength checks made to ... break open doors").
+            mods = list(pc.ability_check_modifiers("str", {"against": "door"}))
             dc, label = self.DOOR_BREAK_DC, f"Strength check — breaking down the door of {house.name}"
         else:
             try:
@@ -23461,7 +23463,7 @@ class Engine:
             intent, f"{do or 'that'} is not something to do to a ship. There is close, "
                     f"sheer off, ram, grapple, board and cruise.")
 
-    def _helm(self, people) -> tuple[str, list]:
+    def _helm(self, people, vehicle: str = "") -> tuple[str, list]:
         """(who, the modifiers) of the best hand at a helm among `people`: Profession
         (sailor), the vehicle rules' driving check for a ship (Ultimate Combat, Vehicles:
         the sailing ship's "Profession (sailor)"), or Wisdom for anybody untrained — "a
@@ -23469,11 +23471,14 @@ class Engine:
         from .sheet import IllegalSheet
 
         best = ("nobody", [])
+        # The driving check names its vehicle (feat loop b5-spells): Skilled Driver's "+4
+        # bonus on driving checks with your chosen vehicle".
+        drive = {"skill_use": "drive", "vehicle": str(vehicle or "").strip().lower()}
         for a in people:
             try:
-                mods = list(a.skill_modifiers("profession"))
+                mods = list(a.skill_modifiers("profession", ctx=drive))
             except IllegalSheet:
-                mods = list(a.ability_check_modifiers("wis"))
+                mods = list(a.ability_check_modifiers("wis", drive))
             if best[0] == "nobody" or sum(m.value for m in mods) > sum(m.value for m in best[1]):
                 best = (a.name, mods)
         return best
@@ -23503,13 +23508,13 @@ class Engine:
             rooms = {p.id for p in ships_mod.places_of(ours)}
             hands = [a for a in self.scene.people.values()
                      if a.at in rooms and not a.is_down]
-            mine, my_mods = self._helm(hands)
+            mine, my_mods = self._helm(hands, getattr(ours, "kind", ""))
             level = int(getattr(self.scene.pc(), "level", 1) or 1)
             row = npcs.choose(["pirate", "sailor"], level) or {}
             try:
                 master = instantiate(str(row.get("id") or "thug"), scene=self.scene,
                                      name="her master")
-                _them, their_mods = self._helm([master])
+                _them, their_mods = self._helm([master], getattr(theirs, "kind", ""))
             except Exception:  # noqa: BLE001 — no codex pirate: an untrained helm, +0
                 their_mods = []
             won = None

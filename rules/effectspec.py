@@ -2551,6 +2551,10 @@ WHEN_KEYS: dict[str, str] = {
     # flying", the board's own test (position.higher_than).
     "higher_ground": "whether the bearer stands on higher ground than the foe of the roll "
                      "(position.higher_than); no board, no answer",
+    # Feat loop b5-spells: Skilled Driver's "driving checks with your chosen vehicle" — the
+    # vehicle a driving check is made with (`Engine._helm`), "$pick" for the feat's own.
+    "vehicle": "the vehicle a driving check is made with: \"sailing ship\" or \"$pick\" "
+               "(Engine._helm)",
 }
 # `larger` / `smaller` (feat loop b2): size categories against the bearer's own, answered
 # by `classfeatures.holds` where the bearer is known (Risky Striker, Underfoot).
@@ -2654,6 +2658,9 @@ AGAINST: dict[str, str] = {
     # Feat loop b5-spells: Meditative Concentration's "a Fortitude save to resist a
     # distraction effect (such as the distraction ability of a swarm)" (Engine._distraction).
     "distraction": "a swarm's distraction, or another distraction effect",
+    # Feat loop b5-spells: Smash's "Strength checks made to knock down or break open doors"
+    # (Engine._op_break_in, dungeons' forced doors).
+    "door": "a Strength check to break open a door",
 }
 
 
