@@ -139,11 +139,7 @@
       "attack.second-chance.improved"
     ]
   },
-  "archon-style": {
-    "not_yet": [
-      "the standard action that guards adjacent allies (+2 dodge against one opponent's next melee attack, -2 AC to you against it): no door lays a guard on an ally against one attacker"
-    ]
-  },
+  "archon-style": {},
   "wolf-style": {
     "not_yet": [
       "the speed a foe loses when your attack of opportunity deals 10 or more, and the free trip when it meets its remaining move: an attack of opportunity's damage is read by no style hook"

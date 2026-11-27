@@ -1,0 +1,141 @@
+"""Feat loop batch 7, lane b7-scoped (2026-11-27): the PARTIAL feats of the ledger's
+groups 5, 9, 10, 11, 12, 17, 19, 21, 28, 30, 31, 34, 36 and 38 (docs/feats-partial-ledger.md)
+that this lane finished. Each test names what the engine did before.
+"""
+from __future__ import annotations
+
+from rules.activeeffect import ActiveEffect
+from rules.sheet import from_dict, load_pc, to_dict
+from tests.test_feats_b4_moves import _attack, _board, _named, _pc, _rolls, _tells, _use
+
+
+def _held_by(actor, key, tags, rounds=5):
+    actor.apply_effect(ActiveEffect(name=key, kind="buff", key=key, source="test",
+                                    origin="author:test", duration="rounds",
+                                    rounds_left=rounds, tags=tuple(tags)))
+
+
+def _ally(ref="ally", feats=(), cls="fighter", level=8):
+    d = to_dict(load_pc("fixtures/pc-kesst.json"))
+    d.update({"class": cls, "level": level, "ranks": {}, "name": "Lia"})
+    d.pop("paths", None)
+    d["feats"] = list(feats)
+    return from_dict(d, ref=ref)
+
+
+# --- group 5: an effect on a creature scoped to its attacks on one named creature ----------
+
+ARCHON = ["Combat Expertise", "Improved Unarmed Strike", "Archon Style"]
+
+
+def _archon_board(feats=ARCHON):
+    pc = _pc("monk", feats=list(feats))
+    ally = _ally()
+    s, e = _board(pc, ("thug", (6, 5)), allies=[(ally, (5, 6))])
+    _held_by(pc, "archon style", ["style.archon-style"])
+    return pc, ally, s, e
+
+
+def test_archon_style_guards_the_adjacent_ally_against_one_foe_s_next_melee_blow():
+    """Archon Style (Blood of Angels): "+2 dodge bonus to AC against that opponent's next
+    melee attack ... but causes you to take a -2 penalty to AC against that opponent until
+    your next turn." Measured before: no door laid a guard on an ally against one attacker
+    (the feat's not_yet). Now Lia's AC against the thug is +2 and against anyone else is
+    not; the monk's is -2 against the thug; the thug's next melee attack on Lia spends it."""
+    pc, ally, s, e = _archon_board()
+    thug = s.actors["c1"]
+    ac_ally, ac_pc = ally.ac("melee", False, attacker=thug), pc.ac("melee", False,
+                                                                   attacker=thug)
+    out = _use(e, "Archon Guard", to="c1")
+    assert out.status == "resolved", out.tell
+    assert ally.ac("melee", False, attacker=thug) == ac_ally + 2
+    assert ally.ac("melee", False) == ally.ac("melee", False)       # no foe, no term
+    assert pc.ac("melee", False, attacker=thug) == ac_pc - 2
+    assert "against the thug 1" in out.tell
+    s.turn = 2
+    _attack(e, by="c1", target="ally")
+    assert ally.ac("melee", False, attacker=thug) == ac_ally
+
+
+def test_archon_diversion_and_justice_quicken_the_guard_and_lift_the_penalty():
+    """Archon Diversion: "The penalty to AC ... decreases to -1, and you can spend a move
+    action"; Archon Justice: "You no longer take a penalty ... a swift action". Measured
+    before: neither feat changed anything (both not_yet lines)."""
+    from rules import class_abilities as ca
+
+    pc, ally, s, e = _archon_board(ARCHON + ["Archon Diversion"])
+    thug = s.actors["c1"]
+    doc = ca.find(pc, "Archon Guard")[0]
+    assert ca.action_of(doc, pc) == "move"
+    ac_pc = pc.ac("melee", False, attacker=thug)
+    _use(e, "Archon Guard", to="c1")
+    assert pc.ac("melee", False, attacker=thug) == ac_pc - 1
+    pc2, _a, s2, e2 = _archon_board(ARCHON + ["Archon Diversion", "Archon Justice"])
+    assert ca.action_of(ca.find(pc2, "Archon Guard")[0], pc2) == "swift"
+    ac2 = pc2.ac("melee", False, attacker=s2.actors["c1"])
+    _use(e2, "Archon Guard", to="c1")
+    assert pc2.ac("melee", False, attacker=s2.actors["c1"]) == ac2
+
+
+def test_archon_guard_is_refused_at_a_foe_not_adjacent_or_outside_the_style():
+    pc, ally, s, e = _archon_board()
+    s.positions["c1"] = (9, 9)
+    assert _use(e, "Archon Guard", to="c1").status == "refused"
+    pc.remove_effects(name="archon style")
+    s.positions["c1"] = (6, 5)
+    assert _use(e, "Archon Guard", to="c1").status == "refused"
+
+
+def test_broken_wing_gambit_opens_the_foe_after_a_hit_and_its_swing_provokes_the_partner():
+    """Broken Wing Gambit (UC): "Whenever you make a melee attack and hit your opponent,
+    you can use a free action to grant that opponent a +2 bonus on attack and damage rolls
+    against you ... until your opponent attacks you ... it provokes attacks of
+    opportunity from your allies who have this feat." Measured before: nothing (the
+    feat's not_yet). Refused before a hit; after one the thug carries +2/+2 against the
+    PC alone; its attack on the PC draws Lia's swing and spends the bonus."""
+    pc = _pc("fighter", feats=["Broken Wing Gambit"])
+    ally = _ally(feats=["Broken Wing Gambit"])
+    s, e = _board(pc, ("thug", (6, 5)), allies=[(ally, (7, 5))],
+                  faces={"Attack": 18, "Damage": 1})
+    thug = s.actors["c1"]
+    assert _use(e, "Broken Wing Gambit", to="c1").status == "refused"
+    _attack(e, target="c1")
+    out = _use(e, "Broken Wing Gambit", to="c1")
+    assert out.status == "resolved", out.tell
+    terms = [m for x in thug.effects for m in x.modifiers if m.get("vs") == "pc"]
+    assert sorted((m["target"], m["amount"]) for m in terms) == [("attack", 2), ("damage", 2)]
+    s.turn = 2
+    res = _attack(e, by="c1", target="pc")
+    assert any(o.op == "attack" and getattr(o, "intent_id", "") and "Lia" in (o.tell or "")
+               for o in res.outcomes), _tells(res)
+    assert not [m for x in thug.effects for m in x.modifiers if m.get("vs") == "pc"]
+
+
+def test_caustic_slur_makes_a_favoured_enemy_power_attack_the_gnome_until_the_fight_ends():
+    """Caustic Slur (Gnomes of Golarion): "Any creature of that type within 60 feet ... must
+    make a Will saving throw or become angered. If an affected creature attacks you, it's
+    treated as if it were using Power Attack ... These modifiers end when combat ends."
+    Measured before: no effect on another creature was scoped to attacks against the user
+    (the feat's not_yet). The near orc (a favoured enemy) is angered at its own BAB's
+    Power Attack; the goblin (no favoured enemy) and the orc past 60 feet are not."""
+    pc = _pc("ranger", level=5, feats=["Caustic Slur"])
+    pc.class_choices = {"favored enemy": [{"pick": "humanoid-orc", "bonus": 2}]}
+    pc.ranks["bluff"] = 5
+    s, e = _board(pc, ("orc", (8, 5)), ("goblin", (5, 8)), ("orc", (19, 19)),
+                  faces={"Will": 1, "Caustic Slur": 20})
+    near, goblin, far = s.actors["c1"], s.actors["c2"], s.actors["c3"]
+    out = _use(e, "Caustic Slur", to="c1")
+    assert out.status == "resolved", out.tell
+    terms = {m["target"]: m["amount"] for x in near.effects for m in x.modifiers
+             if m.get("vs") == "pc" and not (m.get("when") or {}).get("weapon", {}).get(
+                 "strength_share")}
+    step = 1 + near.bab // 4
+    assert terms == {"attack": -step, "damage": 2 * step}
+    assert not any(m.get("vs") == "pc" for a in (goblin, far) for x in a.effects
+                   for m in x.modifiers)
+    s.turn = 1
+    res = _attack(e, by="c1", target="pc")
+    rolled = [r for r in _rolls(res, "") if "Caustic Slur" in str(r)]
+    assert rolled and _named(rolled[0], "Caustic Slur") == -step, _tells(res)
+    s.end_encounter()
+    assert not any(m.get("vs") == "pc" for x in near.effects for m in x.modifiers)

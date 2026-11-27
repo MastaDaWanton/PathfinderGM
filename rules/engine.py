@@ -331,6 +331,11 @@ class Scene:
     # The round each combatant last made an attack on its own turn (feat loop b2):
     # Furious Focus's "the first attack you make each turn" (APG). `move_spent`'s shape.
     swung: dict[str, int] = field(default_factory=dict)
+    # Feat loop b7-scoped: each combatant's last attack action that hit, as [round, the
+    # one it hit, weapon key, "melee" | "ranged"] — Broken Wing Gambit's "Whenever you make
+    # a melee attack and hit your opponent, you can use a free action", Janni Tempest's
+    # "a foe your unarmed strike just hit". `move_spent`'s shape: no second ticker.
+    last_hit: dict[str, list] = field(default_factory=dict)
     # The round whose turn's swift action is spent, by ref (feat loop b2, 2026-11-22). CRB,
     # Combat, Action Types: "You can perform only a single swift action per turn", and an
     # immediate action taken when it is not your turn "counts as your swift action for
@@ -2629,6 +2634,7 @@ class Scene:
         self.move_spent = {}
         self.standard_spent = {}
         self.swung = {}
+        self.last_hit = {}
         self.swift_spent = {}
         self.walked = {}                 # feat loop b5-core
         self.sides = {}
@@ -6728,7 +6734,7 @@ class Engine:
             from . import shooting
 
             return shooting.provoked(self, raw) + self._bodyguards(raw) \
-                + self._provoked_by_unarmed(raw)
+                + self._provoked_by_unarmed(raw) + self._gambit_provokes(raw)
         if raw.get("op") == "cast":
             return self._provoked_by_casting(raw)
         if raw.get("op") == "use_item":
@@ -13045,6 +13051,12 @@ class Engine:
         # It still opens with the attacker's name, which `_blows_from` reads.
         lead = (f"{actor.name} takes an attack of opportunity on {defender.name}: "
                 if intent.params.get("reaction") == "attack_of_opportunity" else "")
+        if not dancing and not coup:
+            # Feat loop b7-scoped: what this attack action spent (Broken Wing Gambit's
+            # "until your opponent attacks you"), and the round's last hit, which a
+            # follow-up asks of (`_note_last_hit`).
+            strike_feats.spend_scoped(actor, defender, "action", weapon)
+            self._note_last_hit(actor, defender, weapon_key, weapon, any_hit)
         if "cleave" in choices and not coup:
             nxt, said = self._cleave_next(actor, defender, weapon_key, intent, any_hit)
             if nxt is not None:
@@ -39041,6 +39053,10 @@ class Engine:
         if aimed is None:
             to = intent.params.get("to") or next(iter(intent.targets()), None)
             aimed = self.scene.actors.get(str(to)) if to else None
+        if any(doc.get(k) for k in ("aims_foe", "after_hit", "favored_sort", "understood")):
+            who, problem = self._scoped_use_reach(actor, doc, name, aimed, who)
+            if problem:
+                return self._refuse(intent, problem, code="ability_reach")
         if target is not None and doc.get("undead") and target.has_state("type.undead"):
             # Lay on hands turned on the undead: the same dice, as harm, on a touch.
             u = doc["undead"]
@@ -39412,7 +39428,8 @@ class Engine:
                                          + (f" ({more['note']})." if more["note"] else "."))
                 if (each.get("effect") or {}).get("on") == "failed" and not failed:
                     continue
-                records.extend(self._class_effect_on(actor, other, each, origin, shown, tells))
+                records.extend(self._class_effect_on(actor, other, each, origin, shown, tells,
+                                                     aimed=aimed))
             rolls.extend(_roll_from_dict(r) for r in b5["rolls"])
             # Whatever the document lifts, by tag query through the one door that ends
             # states (`Actor.clear_states`): Calming Touch's fatigue, fear and nausea.
@@ -39442,7 +39459,10 @@ class Engine:
         # contest lost (`contest`) lays nothing.
         if (hit_ok or not doc.get("attack")) and not (
                 doc.get("contest") and not any(a is not actor for a in landed)):
-            mine = self._class_self_effect(actor, doc, origin, shown, key, target,
+            mine = self._class_self_effect(actor, doc, origin, shown, key,
+                                           # The foe a guard is aimed at (`aims_foe`) is
+                                           # the user's own mark (Archon Style's -2 AC).
+                                           aimed if doc.get("aims_foe") else target,
                                            pool_start, [a.ref for a in landed
                                                         if a is not actor])
             if mine:
@@ -40275,8 +40295,169 @@ class Engine:
                 f"{'touch AC' if touch else 'AC'} {ac}).")
         return made, roll, said
 
+    def _scoped_use_reach(self, actor: Actor, doc: dict, name: str, aimed: Actor | None,
+                          who: list[Actor]) -> tuple[list[Actor], str]:
+        """(who it reaches, why not) for the feat loop b7-scoped fields:
+
+        - `aims_foe: <feet>`: one foe named (`to`) within that distance — Archon Style's
+          "a single opponent that you are currently adjacent to" — and never one of the
+          allies it guards;
+        - `after_hit: "melee"`: the foe named is the one the user's last attack action
+          this round hit, with that kind of attack (`Scene.last_hit`) — Broken Wing
+          Gambit's "Whenever you make a melee attack and hit your opponent";
+        - `favored_sort`: only creatures of the favoured enemy sort the one named belongs
+          to — Caustic Slur's "a Bluff check against one sort of favored enemy. Any
+          creature of that type within 60 feet"."""
+        if aimed is None and any(doc.get(k) for k in ("aims_foe", "after_hit",
+                                                       "favored_sort")):
+            return who, (f"{name} is aimed at one foe: name them "
+                         f"(use_ability ability={name!r} to=<ref>).")
+        if (doc.get("aims_foe") or doc.get("after_hit")) and not self._against(actor, aimed):
+            return who, f"{name} is aimed at a foe, and {aimed.name} is not one."
+        feet = doc.get("aims_foe")
+        if feet:
+            gap = self.scene.distance_between(actor.ref, aimed.ref)
+            if gap is not None and gap > int(feet):
+                return who, (f"{aimed.name} is {gap} ft away, and {name} guards against "
+                             f"a foe within {feet} ft.")
+            who = [a for a in who if a is not aimed]
+        want = doc.get("after_hit")
+        if want:
+            hit = self.scene.last_hit.get(actor.ref) or []
+            if not (len(hit) >= 4 and hit[0] == self.scene.round and hit[1] == aimed.ref
+                    and (want == "any" or hit[3] == want)):
+                return who, (f"{name} answers a {want} hit {actor.name} has just landed on "
+                             f"{aimed.name}, and {actor.name}'s last attack this round did "
+                             f"not hit them.")
+        if doc.get("favored_sort"):
+            sort = self._favored_sort(actor, aimed)
+            if not sort:
+                return who, (f"{name} is made against one of {actor.name}'s favoured "
+                             f"enemies, and {aimed.name} is none of them.")
+            who = [a for a in who if a is aimed or self._favored_sort(actor, a) == sort]
+        if doc.get("understood"):
+            # "This ability does not work on creatures that cannot understand you" (Caustic
+            # Slur): words lost on a wordless beast (`animals.understands`).
+            from . import animals
+
+            who = [a for a in who if a is actor or animals.understands(a, actor)]
+        return who, ""
+
+    @staticmethod
+    def _favored_sort(actor: Actor, other: Actor) -> str:
+        """The user's favoured enemy pick `other` answers (`classfeatures.holds` with
+        `$pick`, favoured enemy's own reader), or ""."""
+        from . import classfeatures as cf
+
+        for leaf, fdoc in cf.held(actor):
+            if str(fdoc.get("choice") or "") != "favored enemy":
+                continue
+            for pick, _bonus in cf._picks(actor, leaf, fdoc):
+                if cf.holds({"target": "$pick"}, actor, {"target_actor": other}, pick):
+                    return str(pick)
+        return ""
+
+    def _note_last_hit(self, actor: Actor, defender: Actor, weapon_key: str, weapon: dict,
+                       hit: bool) -> None:
+        """`Scene.last_hit`: the round's last attack action that hit, or nothing when the
+        last one missed — the follow-up answers the blow just landed, not an older one."""
+        if hit:
+            self.scene.last_hit[actor.ref] = [
+                int(self.scene.round or 0), defender.ref, str(weapon_key or ""),
+                "ranged" if weapon.get("category") == "ranged" else "melee"]
+        else:
+            self.scene.last_hit.pop(actor.ref, None)
+
+    def _gambit_provokes(self, raw: dict) -> list[dict]:
+        """Broken Wing Gambit (UC): "If that opponent attacks you with this bonus, it
+        provokes attacks of opportunity from your allies who have this feat." The attacker
+        holds an effect whose `provokes_from` names the one it is scoped against; each of
+        that creature's allies holding the tag who threatens the attacker swings, off its
+        own allowance (`_swings_at`). No board, no threatened square, no swing."""
+        params = raw.get("params") or {}
+        if params.get("reaction") or not self.scene.has_grid:
+            return []
+        from .position import _same_side
+
+        attacker = self.scene.actors.get(str(raw.get("actor") or ""))
+        target = raw.get("target")
+        target = (target[0] if target else None) if isinstance(target, list) else target
+        if attacker is None or not target or attacker.ref not in self.scene.positions:
+            return []
+        wants = [p for p in ((e.payload or {}).get("provokes_from") for e in attacker.effects)
+                 if isinstance(p, dict) and p.get("vs") == target]
+        if not wants:
+            return []
+        body = attacker.size or "medium"
+        squares = gridmod.footprint(tuple(self.scene.positions[attacker.ref][:2]), body)
+        fired = []
+        for ref, ally in self.scene.actors.items():
+            if ref in (attacker.ref, target) or ally.is_down \
+                    or not any(ally.has_state(p["tag"]) for p in wants) \
+                    or not _same_side(self.scene, ref, target) \
+                    or not reactions.reactions_for(ally) \
+                    or not any(reactions.threatens(self.scene, ref, q, body) for q in squares):
+                continue
+            fired.append((ref, reactions.attack_of_opportunity(ally)))
+        return self._swings_at(attacker.ref, fired, why="gambit")
+
+    # Feat loop b7-scoped: an effect on another creature scoped to its attacks on ONE
+    # creature — Broken Wing Gambit's "+2 bonus on attack and damage rolls against you
+    # until the end of your next turn or until your opponent attacks you", Archon Style's
+    # "+2 dodge bonus to AC against that opponent's next melee attack", Caustic Slur's
+    # foe "treated as if it were using Power Attack" when it attacks you. The `vs` scope
+    # (`sheet._effect_scope_holds`) was already asked by every attack, damage and AC
+    # line; what was missing is laying it on somebody other than the user and spending
+    # it on the one attack it answers (`strike_feats.spend_scoped`).
+    SPENT_BY = "spent_by"
+
+    def _scoped_on(self, actor: Actor, other: Actor, spec: dict, aimed: Actor | None):
+        """(modifiers or None, payload, tags) for `effect`'s scoped fields:
+
+        - `vs` "$user" / "$aimed" on a modifier: the user's ref, or the foe aimed at;
+        - `numbers: "holder"`: formulas read off the creature it lands on (Caustic
+          Slur's Power Attack is the angered foe's own, by its base attack bonus);
+        - `holder_feat: {<feat id>: [modifiers]}`: more terms when it holds that feat
+          ("If the creature already has the power attack feat, the attack penalty
+          increases by 1 and the damage bonus increases by 2");
+        - `spent_by: "melee" | "attack"`: gone after the holder's next such attack with
+          the `vs` creature, either way round (`strike_feats.spend_scoped`);
+        - `provokes_from: <tag>`: that attack provokes from the `vs` creature's allies
+          holding the tag (`Engine._gambit_provokes`);
+        - `ends_with_fight`: ended by `Scene.end_encounter` ("These modifiers end when
+          combat ends")."""
+        from . import class_abilities as ca, feats as feats_mod, strike_feats
+
+        fields = ("numbers", "holder_feat", "spent_by", "provokes_from", "ends_with_fight")
+        has_vs = any(isinstance(m, dict) and m.get("vs") for m in spec.get("modifiers") or ())
+        if not has_vs and not any(spec.get(k) for k in fields):
+            return None, {}, ()
+        reader = other if spec.get("numbers") == "holder" else actor
+        mods = ca.modifiers(spec.get("modifiers"), reader)
+        held = feats_mod._held(other)
+        for fid, extra in (spec.get("holder_feat") or {}).items():
+            if str(fid) in held:
+                mods += ca.modifiers(extra, reader)
+        refs = {"$user": actor.ref, "$aimed": aimed.ref if aimed is not None else ""}
+        out = []
+        for m in mods:
+            if m.get("vs") in refs:
+                if not refs[m["vs"]]:
+                    continue                     # aimed at nobody: the term has no foe
+                m["vs"] = refs[m["vs"]]
+            out.append(m)
+        payload: dict = {}
+        vs = next((m["vs"] for m in out if m.get("vs")), "")
+        if spec.get("spent_by") and vs:
+            payload[self.SPENT_BY] = {"attack": str(spec["spent_by"]), "vs": vs}
+        if spec.get("provokes_from") and vs:
+            payload["provokes_from"] = {"tag": str(spec["provokes_from"]), "vs": vs}
+        tags = (strike_feats.ENDS_WITH_FIGHT,) if spec.get("ends_with_fight") else ()
+        return out, payload, tags
+
     def _class_effect_on(self, actor: Actor, other: Actor, doc: dict, origin: str,
-                         shown: str, tells: list[str]) -> list[dict]:
+                         shown: str, tells: list[str], aimed: Actor | None = None
+                         ) -> list[dict]:
         """The standing effect a document lays on someone it reached (`effect`), through
         the one applicator. Linked to the user's stance when there is one: the stance's
         payload lists who holds a piece of it, and its end takes every piece back."""
@@ -40294,6 +40475,9 @@ class Engine:
             rounds = max(1, self.dice.roll(str(spec["rounds_dice"]), label=f"{shown}: "
                                            f"rounds", visibility="hidden").total)
         mods = ca.modifiers(spec.get("modifiers"), actor)
+        scoped, payload, more_tags = self._scoped_on(actor, other, spec, aimed)
+        if scoped is not None:
+            mods = scoped
         for m in spec.get("skill_modifiers") or ():
             n = ca.amount(m, actor)
             if n and doc.get("skill"):
@@ -40301,16 +40485,25 @@ class Engine:
                              "bonus_type": str(m.get("bonus_type") or "untyped")})
         if mods or spec.get("tags"):
             before = other.hp_max
+            if payload.get("spent_by"):
+                # One guard per giver and foe: a second use replaces the first, never
+                # stacks a dodge bonus the book gives once.
+                other.remove_effects(match=lambda e: e.origin == origin and (
+                    e.payload or {}).get("spent_by") == payload["spent_by"])
             other.apply_effect(ActiveEffect(
                 name=shown, kind="buff", source=source, origin=origin,
                 duration="rounds" if rounds else "until-dismissed", rounds_left=rounds,
                 # `$user`: the user's ref (feat loop b6-partials, `attack.withheld.$user`).
                 tags=tuple(str(t).replace("$user", actor.ref)
-                           for t in spec.get("tags") or ()), modifiers=mods))
+                           for t in spec.get("tags") or ()) + more_tags, modifiers=mods,
+                payload=payload))
             other._follow_con(before)
             out.append({"ref": other.ref, "kind": "buff", "ability": shown,
                         "modifiers": mods, "rounds": rounds, "origin": origin})
-            said = ", ".join(f"{m['amount']:+d} {m['target']}" for m in mods)
+            said = ", ".join(dict.fromkeys(
+                f"{m['amount']:+d} {m['target']}" + (
+                    f" against {self.scene.actors[m['vs']].name}"
+                    if m.get("vs") in self.scene.actors else "") for m in mods))
             tells.append(f"{other.name} gains {said or shown}"
                          + (f" for {rounds} round{'s' if rounds != 1 else ''}." if rounds
                             else "."))
@@ -40458,6 +40651,9 @@ class Engine:
                 # scent): tags on the one stance effect, gone when it goes.
                 add_tags += [str(t) for t in add.get("tags") or ()]
                 said.append(str(add.get("pick")).title())
+        # A penalty a feat raised to nothing (Archon Justice's "You no longer take a
+        # penalty to AC for using Archon Style") is no term at all (feat loop b7-scoped).
+        mods = [m for m in mods if m.get("amount")]
         form = doc.get("form")
         if form:
             size = str(form.get("size") or "medium").lower()

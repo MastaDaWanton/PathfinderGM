@@ -626,10 +626,45 @@ def lay_next_attack(actor, name: str, origin: str, amount: int, bonus_type: str,
                    for t in targets]))
 
 
+# --- an effect on another, spent by one attack (feat loop b7-scoped) ----------------------
+# `payload.spent_by = {"attack": <how>, "vs": <ref>}`, laid by `Engine._scoped_on`:
+#   "attacked_in_melee": the `vs` creature's next melee attack ON the holder (Archon
+#       Style's "+2 dodge bonus to AC against that opponent's next melee attack"), spent
+#       once its attack roll is down;
+#   "attacking": the holder's next attack on the `vs` creature (Broken Wing Gambit's
+#       "until your opponent attacks you"), spent once that attack action is over, so its
+#       damage rolls keep the +2 the bonus also gives them.
+SPENT_BY = "spent_by"
+
+
+def spend_scoped(attacker, defender, how: str, weapon: dict | None = None) -> list[str]:
+    """Remove what this attack spends; returns the names spent. `how` is the moment:
+    "roll" (one attack roll is down) or "action" (the attack action is over)."""
+    if attacker is None or defender is None:
+        return []
+    melee = (weapon or {}).get("category") != "ranged"
+
+    def spends(holder, other_ref):
+        def match(e) -> bool:
+            want = (e.payload or {}).get(SPENT_BY)
+            if not isinstance(want, dict) or want.get("vs") != other_ref:
+                return False
+            if how == "roll":
+                return holder is defender and want.get("attack") == "attacked_in_melee" \
+                    and melee
+            return holder is attacker and want.get("attack") == "attacking"
+        return match
+    gone: list[str] = []
+    for holder, other in ((defender, attacker.ref), (attacker, defender.ref)):
+        gone += [e.name for e in holder.remove_effects(match=spends(holder, other)) or ()]
+    return gone
+
+
 def after_roll(engine, intent, actor, defender, weapon_key, weapon, atk, state, choices):
     """Once a swing's attack roll is down, hit or miss: the next-attack bonuses it spent,
     Reckless Aim's lowered guard and its natural 1 (`Engine._op_attack`)."""
     _spend_next(actor, weapon, defender)
+    spend_scoped(actor, defender, "roll", weapon)            # feat loop b7-scoped
     if not state.get("glory_said"):
         state["glory_said"] = True
         for p in death_or_glory_answer(engine, actor, defender, choices):

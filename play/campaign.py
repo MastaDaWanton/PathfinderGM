@@ -393,6 +393,8 @@ class Campaign:
             # The round each combatant last attacked on its own turn (Furious Focus's
             # first attack, feat loop b2): saved for the reason `move_spent` is.
             "swung": (dict(self.scene.swung), {}),
+            # Feat loop b7-scoped: the round's last hit (Broken Wing Gambit): the same reason.
+            "last_hit": ({k: list(v) for k, v in self.scene.last_hit.items()}, {}),
             # The round a swift or immediate action spent (feat loop b2): the same reason.
             "swift_spent": (dict(self.scene.swift_spent), {}),
             # The round's walking (feat loop b5-core, the 5-foot step): the same reason.
@@ -508,6 +510,8 @@ class Campaign:
             standard_spent={k: int(v) for k, v in
                             (s.get("standard_spent") or {}).items()},
             swung={k: int(v) for k, v in (s.get("swung") or {}).items()},
+            last_hit={k: list(v) for k, v in (s.get("last_hit") or {}).items()
+                      if isinstance(v, list)},
             swift_spent={k: int(v) for k, v in (s.get("swift_spent") or {}).items()},
             walked={k: [int(v[0]), str(v[1])] for k, v in (s.get("walked") or {}).items()
                     if isinstance(v, (list, tuple)) and len(v) == 2},

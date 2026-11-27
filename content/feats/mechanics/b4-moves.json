@@ -198,7 +198,7 @@
   },
   "archon-justice": {
     "not_yet": [
-      "Archon Style's ally guard and Archon Diversion's diverted blow do not run (batch2-styles' and batch2-attack-a's not_yet), so there is no penalty to waive, no move action to make swift and no diversion to answer"
+      "'Whenever you take damage from using Archon Diversion to divert an opponent's attack toward yourself, any allies threatening your opponent can make an attack of opportunity': Archon Diversion's diverted blow does not run (its not_yet), so there is no diversion to answer (the guard's lifted penalty and its swift action are built)"
     ]
   },
   "beartrap-bite": {
@@ -216,11 +216,7 @@
       "'When you succeed at a sunder ... against a holy or unholy symbol, you can attempt an Intimidate check to demoralize as a free action ... all followers of the deity': a sundered item is not known to be a holy symbol, and no follower of a deity is recorded"
     ]
   },
-  "caustic-slur": {
-    "not_yet": [
-      "'As a standard action, you can make a Bluff check against one sort of favored enemy ... must make a Will saving throw or become angered ... treated as if it were using Power Attack' when attacking you: no effect on another creature is scoped to attacks against the user"
-    ]
-  },
+  "caustic-slur": {},
   "false-casting": {
     "not_yet": [
       "'If an onlooker attempts a Spellcraft check to identify your \"casting,\" his check is opposed by your Bluff check': nobody identifies a power used from an item or a spell-like ability, so there is no onlooker's check to oppose"
