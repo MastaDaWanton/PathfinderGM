@@ -105,3 +105,22 @@ def test_a_ferocious_creature_below_zero_fights_on_staggered_and_loses_a_point_a
     boar.take_damage(50)
     boar.apply_hp_state()
     assert boar.is_dead, "still dies at minus its Constitution"
+
+
+# --- Ki Throw (APG) ---------------------------------------------------------------------------
+
+def test_ki_throw_throws_the_tripped_foe_into_the_named_threatened_square():
+    """Ki Throw: "you may throw the target prone in any square you threaten rather than its
+    own square." Measured before: the document's not_yet — the trip left it in its own
+    square, and Enhanced Ki Throw, Improved Ki Throw and Spinning Throw waited on it."""
+    from tests.test_feats_b4_moves import _board, _pc, _run
+
+    pc = _pc("monk", level=6, feats=("Improved Unarmed Strike", "Improved Trip", "Ki Throw"))
+    pc.equipped = "unarmed"
+    s, e = _board(pc, ("thug", (6, 5)), faces={"Trip": 20})
+    res = _run(e, {"op": "attack", "actor": "pc", "target": "c1", "visibility": "hidden",
+                   "params": {"manoeuvre": "trip", "weapon": "unarmed", "square": [5, 6]}})
+    thug = s.actors["c1"]
+    assert thug.has_state("state.position.prone"), [o.tell for o in res.outcomes]
+    assert tuple(s.positions["c1"])[:2] == (5, 6), [o.tell for o in res.outcomes]
+    assert "Ki Throw" in " ".join(o.tell for o in res.outcomes)

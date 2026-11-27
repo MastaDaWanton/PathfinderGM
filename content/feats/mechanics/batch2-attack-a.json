@@ -549,8 +549,8 @@
     ]
   },
   "ki-throw": {
-    "not_yet": [
-      "a won unarmed trip throws the target prone into any square you threaten: the trip leaves it prone in its own square"
+    "tags": [
+      "maneuver.ki-throw"
     ]
   },
   "under-and-over": {

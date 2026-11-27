@@ -51,7 +51,7 @@
       "maneuver.after-trip.bull-rush"
     ],
     "not_yet": [
-      "'If the bull rush fails, you can use the Ki Throw feat as normal' and the Improved Ki Throw throw into a secondary target's space: Ki Throw's own throw into a threatened square does not run yet (its document's not_yet)"
+      "the Improved Ki Throw throw into a secondary target's space after the bull rush: Improved Ki Throw's secondary-target throw is not built (Ki Throw's own throw is, feat loop b5-core, rules/maneuver_feats.py ki_throw)"
     ]
   },
   "break-guard": {
