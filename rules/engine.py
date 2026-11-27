@@ -6946,6 +6946,9 @@ class Engine:
         actor = self.scene.actors.get(actor_ref or "")
         if actor is None or not target_ref:
             return []
+        if self._janni_follow(actor, self.scene.actors.get(str(target_ref)),
+                              str(params.get("manoeuvre") or "")):
+            return []                   # Janni Tempest: "You do not provoke" (b7-scoped)
         # Keeping a hold or breaking one provokes nothing: only starting a grapple does
         # ("this does not provoke an attack of opportunity", CRB p.200, of the escape; the
         # maintaining check is the same standard action and the book gives it no swing).
@@ -14552,6 +14555,24 @@ class Engine:
                     f"first of the full attack, not a later one.")
         return ""
 
+    JANNI_TEMPEST = "maneuver.janni-tempest"
+
+    def _janni_follow(self, actor: Actor, defender: Actor | None, key: str) -> bool:
+        """Janni Tempest (UC): "While you are using the Janni Style feat, whenever you make
+        an unarmed attack and hit an opponent, you gain a +4 bonus on checks made to bull
+        rush or trip that opponent, as long as the combat maneuver is your next attack by
+        the end of your turn. You do not provoke an attack of opportunity from the target
+        of the maneuver." The round's last attack action hit that foe unarmed
+        (`Scene.last_hit`, which a miss clears), so this manoeuvre is the next attack.
+        Measured before (feat loop b6): no reader asked what the last blow hit."""
+        if defender is None or key not in ("bull rush", "trip") \
+                or not actor.has_state(self.JANNI_TEMPEST) \
+                or not actor.has_state("style.janni-style"):
+            return False
+        hit = self.scene.last_hit.get(actor.ref) or []
+        return len(hit) >= 3 and hit[0] == self.scene.round and hit[1] == defender.ref \
+            and str(hit[2]) in ("unarmed", "unarmed strike")
+
     def _resolve_maneuver(self, intent: Intent, actor: Actor, defender: Actor,
                           weapon_key: str, partial: dict) -> Outcome:
         """A combat manoeuvre: the same attack roll, with CMB instead of the attack
@@ -14574,6 +14595,8 @@ class Engine:
         self._ensure_encounter(intent.actor, intent.target)
 
         mods = list(actor.cmb_modifiers(key, defender=defender))
+        if self._janni_follow(actor, defender, key):
+            mods.append(Modifier(4, "Janni Tempest"))                 # feat loop b7-scoped
         # A manoeuvre standing in a later swing of a full attack is made at that swing's
         # bonus (CRB: "in place of a melee attack"): the iterative's -5, -10, -15.
         it = intent.params.get("iteration")
@@ -27462,6 +27485,21 @@ class Engine:
                                 f"DC {dc})"})
         return out
 
+    def _rider_rounds(self, actor: Actor, rule: dict) -> int:
+        """A feat rider's rounds: an int, a formula over the sheet, plus `rounds_roll`
+        dice (feat loop b7-scoped: Dragon Ferocity's "1d4 + your Strength bonus")."""
+        from . import resources
+
+        raw = rule.get("rounds") or (0 if rule.get("rounds_roll") else 1)
+        try:
+            n = int(raw) if not isinstance(raw, str) else resources.evaluate(raw, actor)
+        except resources.FormulaError:
+            n = 1
+        if rule.get("rounds_roll"):
+            n += self.dice.roll(str(rule["rounds_roll"]), label=f"{rule.get('rider')}: "
+                                f"rounds", visibility="hidden").total
+        return max(1, int(n))
+
     def _rider_condition(self, intent: Intent, actor: Actor, defender: Actor,
                          rule: dict, origin: str, state: dict) -> list[dict]:
         """A condition the hit itself lays, no save (feat loop b2): Footslasher's "if you
@@ -27477,7 +27515,7 @@ class Engine:
             return [{"effect": {"ref": defender.ref, "kind": "rider_refused",
                                 "rider": rule["rider"], "why": "already", "origin": origin},
                      "tell": ""}]
-        rounds = int(rule.get("rounds") or 1)
+        rounds = self._rider_rounds(actor, rule)
         defender.add_condition(key, rounds, source=f"{actor.name}'s {rule['rider']}",
                                origin=origin)
         return [{"effect": {"ref": defender.ref, "kind": "condition", "condition": key,
@@ -41341,7 +41379,28 @@ class Engine:
                             "condition": c["condition"], "from": e.name})
                         + (f" It lasts {rounds} round{'s' if rounds != 1 else ''}."
                            if rounds else "")})
+            # Dragon Ferocity (UC): "When you score a critical hit or a successful
+            # Stunning Fist attempt against an opponent while using this style, that
+            # opponent is also shaken for a number of rounds equal to 1d4 + your Strength
+            # bonus" — the critical half is the feat's own `on_hit` rider (feat loop
+            # b7-scoped); this is the Stunning Fist half.
+            if actor.has_state(self.SHAKEN_ON_STUN) and actor.has_state("style.dragon-style") \
+                    and str(e.origin or "").split("/", 1)[-1] == "stunning fist" \
+                    and not defender.is_down \
+                    and not states.immune_to(defender, "fear", "shaken"):
+                n = self._rider_rounds(actor, {"rider": "Dragon Ferocity",
+                                               "rounds": "max(0, str_mod)",
+                                               "rounds_roll": "1d4"})
+                defender.add_condition("shaken", n, source=f"{actor.name}'s dragon ferocity",
+                                       origin="rule:feat-dragon-ferocity")
+                out.append({"effect": {"ref": defender.ref, "kind": "condition",
+                                       "condition": "shaken", "rounds": n,
+                                       "origin": "rule:feat-dragon-ferocity"},
+                            "tell": f"{defender.name} is shaken for {n} round"
+                                    f"{'s' if n != 1 else ''} (Dragon Ferocity)."})
         return out
+
+    SHAKEN_ON_STUN = "stun.shakes.dragon-ferocity"            # feat loop b7-scoped
 
     def _charge_dice_spec(self, actor: Actor, charge: dict) -> dict:
         """A charge that carries energy dice (`charge.dice`, feat loop b3-divine): Channel

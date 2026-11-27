@@ -1241,7 +1241,9 @@ _ON_HIT_KINDS = {"bleed": {"kind", "when", "amount"},
                               "unless_held"},
                  "demoralize": {"kind", "when", "rounds", "crit_condition", "crit_bonus",
                                 "all_threatened"},
-                 "condition": {"kind", "when", "condition", "rounds", "tell"},
+                 "condition": {"kind", "when", "condition", "rounds", "tell",
+                               # Feat loop b7-scoped: dice on the rounds (Dragon Ferocity).
+                               "rounds_roll"},
                  "ally_swing": {"kind", "when", "flanking"},
                  "free_swing": {"kind", "when"}}
 

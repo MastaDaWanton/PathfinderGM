@@ -503,8 +503,25 @@
       }
     ],
     "not_yet": [
-      "shaken for 1d4 + Strength rounds on a critical hit or a Stunning Fist that lands: neither raises a rider a feat may add to",
       "qualifying for Elemental Fist without its prerequisites (and the one energy that leaves until they are met): the feat picker has no prerequisite waiver a feat can grant"
+    ],
+    "on_hit": [
+      {
+        "kind": "condition",
+        "condition": "shaken",
+        "rounds": "max(0, str_mod)",
+        "rounds_roll": "1d4",
+        "when": {
+          "critical": true,
+          "bearer": {
+            "state": "style.dragon-style"
+          }
+        },
+        "tell": "{target} is shaken by the blow (Dragon Ferocity)."
+      }
+    ],
+    "tags": [
+      "stun.shakes.dragon-ferocity"
     ]
   },
   "dragon-roar": {
@@ -624,8 +641,8 @@
     ]
   },
   "janni-tempest": {
-    "not_yet": [
-      "+4 to bull rush or trip a foe your unarmed strike just hit, provoking nothing: no reader asks what the last blow of the turn hit"
+    "tags": [
+      "maneuver.janni-tempest"
     ]
   },
   "janni-rush": {

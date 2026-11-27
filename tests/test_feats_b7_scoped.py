@@ -461,3 +461,56 @@ def test_boar_ferocity_demoralizes_the_foe_whose_flesh_is_torn():
                           "params": {"full_attack": True, "weapon": "unarmed"}}])
     assert any(x.get("kind") == "demoralize" and x.get("from") == "Boar Ferocity"
                for o in res.outcomes for x in o.effects or ()), _tells(res)
+
+
+# --- group 17: per-round attack history --------------------------------------------------------
+
+def test_janni_tempest_follows_an_unarmed_hit_with_a_plus_four_trip_that_provokes_nothing():
+    """Janni Tempest (UC): after an unarmed hit, "+4 bonus on checks made to bull rush or
+    trip that opponent, as long as the combat maneuver is your next attack ... You do not
+    provoke an attack of opportunity from the target". Measured before: no reader asked
+    what the last blow of the turn hit. The hit is recorded (`Scene.last_hit`); the trip
+    after it carries +4 and draws no swing; after a miss it does neither."""
+    pc = _pc("monk", feats=["Improved Unarmed Strike", "Janni Style", "Janni Rush",
+                            "Janni Tempest"])
+    _held_by(pc, "janni style", ["style.janni-style"])
+    s, e = _board(pc, ("thug", (6, 5)), faces={"Attack": 18, "Damage": 1})
+    thug = s.actors["c1"]
+    thug.hp = thug.hp_max = 300
+    _attack(e, target="c1", weapon="unarmed")
+    assert e._janni_follow(pc, thug, "trip")
+    assert e._provoked_by_maneuver({"op": "attack", "actor": "pc", "target": "c1",
+                                    "params": {"manoeuvre": "trip"}}) == []
+    res = _attack(e, target="c1", manoeuvre="trip")
+    trip = [r for r in _rolls(res, "") if "Janni Tempest" in str(r)]
+    assert trip and _named(trip[0], "Janni Tempest") == 4, _tells(res)
+    s.last_hit.pop("pc", None)
+    assert not e._janni_follow(pc, thug, "trip")
+
+
+def test_dragon_ferocity_shakes_the_foe_on_a_critical_and_on_a_stunning_fist():
+    """Dragon Ferocity (UC): "When you score a critical hit or a successful Stunning Fist
+    attempt against an opponent while using this style, that opponent is also shaken for a
+    number of rounds equal to 1d4 + your Strength bonus." Measured before: neither raised a
+    rider a feat could add to. Now both shake the foe, for 1d4 + Str rounds."""
+    feats = ["Improved Unarmed Strike", "Stunning Fist", "Dragon Style", "Dragon Ferocity"]
+    pc = _pc("monk", feats=feats)
+    _held_by(pc, "dragon style", ["style.dragon-style"])
+    s, e = _board(pc, ("thug", (6, 5)), faces={"Attack": 20, "Damage": 1})
+    thug = s.actors["c1"]
+    thug.hp = thug.hp_max = 300
+    res = _attack(e, target="c1", weapon="unarmed")
+    shaken = next((x for x in thug.effects if x.key == "shaken"), None)
+    assert shaken is not None, _tells(res)
+    assert 1 + max(0, pc.ability_mod("str")) <= shaken.rounds_left <= 4 + max(
+        0, pc.ability_mod("str"))
+    pc2 = _pc("monk", feats=feats)
+    _held_by(pc2, "dragon style", ["style.dragon-style"])
+    s2, e2 = _board(pc2, ("thug", (6, 5)), faces={"Attack": 15, "Damage": 1,
+                                                    "Fortitude": 1})
+    thug2 = s2.actors["c1"]
+    thug2.hp = thug2.hp_max = 300
+    used = _use(e2, "Stunning Fist")
+    assert used.status == "resolved", used.tell
+    res = _attack(e2, target="c1", weapon="unarmed")
+    assert thug2.has_condition("stunned") and thug2.has_condition("shaken"), _tells(res)
