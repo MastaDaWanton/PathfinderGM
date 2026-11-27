@@ -918,6 +918,26 @@ _OPTION_SHAPES = {
     "tripping_twirl": ("strike", "Tripping Twirl",
                        "The whole round, quarterstaff in both hands: a trip at every foe "
                        "beside you."),
+    # Feat loop b5-core: Ready (CRB, Combat), one option per trigger the engine answers
+    # (rules/readied.py TRIGGERS) and the counterspell; `act` shape, no target.
+    "ready_reach": ("act", "Ready: strike when they close",
+                    "Your standard action held: strike the first foe who comes within "
+                    "reach, before they act."),
+    "ready_attacked": ("act", "Ready: strike when attacked",
+                       "Your standard action held: strike the first foe who attacks you, "
+                       "before their blow lands."),
+    "ready_charge": ("act", "Ready: set against a charge",
+                     "Your standard action held: strike a foe who charges you; a brace "
+                     "weapon deals double."),
+    "ready_cast": ("act", "Ready: strike a caster",
+                   "Your standard action held: strike a foe who begins a spell, so they "
+                   "must hold it together."),
+    "ready_patient": ("act", "Ready: Patient Strike",
+                      "The whole round held: strike the first foe who comes within reach, "
+                      "+2 to hit."),
+    "ready_counterspell": ("act", "Ready: counterspell",
+                           "Your standard action held: name a foe's spell as it is cast and "
+                           "answer it with the same spell or dispel magic."),
     "total_defense": ("act", "Total defense",
                       "Your standard action spent guarding: no attacks, and no attacks of "
                       "opportunity."),
@@ -1158,6 +1178,24 @@ def _attack_options(pc) -> dict:
         own("disengaging_feint", f"Bluff {_signed(skill('bluff'))} against the target's guard",
             action="standard",
             op={"op": "check", "params": {"skill": "bluff", "feint": True, "disengage": True}})
+    # Feat loop b5-core: the readied actions (rules/readied.py), each greyed with the
+    # engine's own refusal.
+    from rules import readied as readied_mod
+
+    for key, trigger, action, patient in (
+            ("ready_reach", "enters_reach", "attack", False),
+            ("ready_attacked", "attacks_me", "attack", False),
+            ("ready_charge", "charges_me", "attack", False),
+            ("ready_cast", "casts", "attack", False),
+            ("ready_patient", "enters_reach", "attack", True),
+            ("ready_counterspell", "casts", "counterspell", False)):
+        why = readied_mod.refusal(pc, trigger, action, patient)
+        if why and (patient or action == "counterspell"):
+            continue                       # offered only to those who may take it
+        own(key, readied_mod.said(action, trigger), why=why,
+            action="full-round" if patient else "standard",
+            op={"op": "ready", "params": {"trigger": trigger, "action": action,
+                                          **({"patient": True} if patient else {})}})
     own("tumble", f"Acrobatics {_signed(skill('acrobatics'))} against each foe's CMD",
         why=("Armour that slows you cannot tumble past foes."
              if skilluses._armour_slows(pc) else ""),
@@ -4396,7 +4434,8 @@ def _put_back_free_actions(c, pending: list) -> None:
 # here, so a player on fire from a thrown flask, or glued by a tanglefoot bag, could only
 # type it and hope the planner sampled it. The bar offers each only while it applies.
 _COMBAT_OPS = {"attack", "move", "use_ability", "use_item", "manoeuvre", "cast",
-               "extinguish", "break_free", "escape", "total_defense", "check", "style"}
+               "extinguish", "break_free", "escape", "total_defense", "check", "style",
+               "ready"}                    # Feat loop b5-core
 # The checks the bar's Declare section may post (combat bar round 2, 2026-11-22): a feint
 # and a tumble, each to its own door (`skilluses.OWN_DOORS`). Any other check is a spoken
 # turn's, so `check` is not a door to every skill.

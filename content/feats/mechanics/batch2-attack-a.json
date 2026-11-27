@@ -57,10 +57,20 @@
           }
         },
         "note": "an attack of opportunity against a flying opponent"
+      },
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 2,
+        "bonus_type": "circumstance",
+        "when": {
+          "choice": "braced",
+          "target": {
+            "aloft": true
+          }
+        },
+        "note": "a weapon set against a flying opponent's charge (a readied attack, rules/readied.py)"
       }
-    ],
-    "not_yet": [
-      "'when you have set a weapon against a charge': no readied action sets a weapon against a charge yet (the charge lane's machinery)"
     ]
   },
   "snap-shot": {

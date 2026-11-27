@@ -474,8 +474,8 @@
     ]
   },
   "strike-back": {
-    "not_yet": [
-      "'You can ready an action to make a melee attack against any foe that attacks you in melee, even if the foe is outside of your reach': the engine has no readied actions"
+    "tags": [
+      "ready.strike-back"
     ]
   },
   "net-adept": {

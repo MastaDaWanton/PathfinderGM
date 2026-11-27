@@ -82,9 +82,6 @@
         },
         "note": "Wings of the Androsphinx: +2 AC against a charging attacker"
       }
-    ],
-    "not_yet": [
-      "'If you use a readied action to attack a creature charging you, you can ... reposition that creature as a free action before it resolves its charge attack': the engine has no readied action"
     ]
   },
   "razortusk": {
@@ -238,8 +235,20 @@
     ]
   },
   "patient-strike": {
-    "not_yet": [
-      "'ready an attack as a full-round action ... +2 bonus on your attack roll when your readied action triggers': the engine has no readied action"
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "patient_readied"
+        },
+        "note": "Patient Strike: a readied attack readied as a full-round action"
+      }
+    ],
+    "tags": [
+      "ready.patient"
     ]
   },
   "rhino-charge": {

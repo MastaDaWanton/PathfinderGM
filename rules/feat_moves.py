@@ -89,6 +89,7 @@ def after(engine, intent, outcome, twice: bool = False) -> tuple[list[dict], lis
     more += _sidestep(engine, intent, outcome)
     more += _landing_roll(engine, intent, outcome)
     more += _wings(engine, intent, outcome)
+    more += _wings_readied(engine, intent, outcome)          # feat loop b5-core
     return more, []
 
 
@@ -266,6 +267,29 @@ def _wings(engine, intent, outcome) -> list[dict]:
                     "params": {"full_attack": False, "reaction": "wings-of-the-androsphinx",
                                "manoeuvre": "reposition"}})
     return out
+
+
+def _wings_readied(engine, intent, outcome) -> list[dict]:
+    """Wings of the Androsphinx's readied clause (feat loop b5-core): "If you use a readied
+    action to attack a creature charging you, you can roll to attack and then attempt to
+    reposition that creature as a free action before it resolves its charge attack." The
+    readied blow set against the charge (rules/readied.py, `vs_charge`) is followed, ahead of
+    the charge's own blow, by the reposition — a free action, so no swift is spent."""
+    params = intent.params or {}
+    if params.get("reaction") != "readied" or not params.get("vs_charge"):
+        return []
+    who = engine.scene.actors.get(intent.actor or "")
+    charger = engine.scene.actors.get(str(intent.target or ""))
+    if who is None or charger is None or charger.is_down or who.is_down \
+            or not who.has_state(WINGS) or who.blocking_key("attack"):
+        return []
+    return [{"op": "attack", "actor": who.ref, "target": charger.ref,
+             "id": f"{intent.id}-androsphinx-readied",
+             "visibility": "player" if who.is_pc else "hidden",
+             "because": f"{who.name} turns {charger.name}'s charge aside before it lands "
+                        f"(Wings of the Androsphinx)",
+             "params": {"full_attack": False, "reaction": "wings-of-the-androsphinx",
+                        "manoeuvre": "reposition"}}]
 
 
 __all__ = ["charge_multiple", "moved_already", "after"]

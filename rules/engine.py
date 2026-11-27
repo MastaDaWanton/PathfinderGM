@@ -48,6 +48,7 @@ from . import worldclass
 from . import grid as gridmod
 from . import guards as guards_mod
 from . import reactions
+from . import readied
 from . import services as services_mod
 from . import spells as spells_mod
 from . import weapons as weapons_mod
@@ -1253,6 +1254,8 @@ class Scene:
                 # narrated and the fight simply ended with no reason given.
                 self.hazards.extend(self.tick_standing(1))
             ref = self.initiative[nxt][0]
+            # Feat loop b5-core: a readied action not taken lapses at its holder's turn.
+            self.hazards.extend(readied.lapse(self, ref))
             # Their turn has come round, able or not: a hold that a new save may end
             # (hold person) is tried now, and trying it is the turn (a full-round action).
             self.hazards.extend(self._held_saves(ref))
@@ -4024,7 +4027,9 @@ class Engine:
         # a 502 and the player's line popped — where this refusal gets its retry.
         needs_actor = intent.op in ("check", "save", "attack", "move", "cast",
                                     "sell", "buy", "use_item", "extinguish", "break_free",
-                                    "total_defense", "style")
+                                    "total_defense", "style",
+                                    # Feat loop b5-core:
+                                    "ready")
         if needs_actor and not self._known(intent.actor, extra):
             self._refuse_ref(intent, index, intent.actor, "actor", extra)
         # `_op_condition` lands on `to`, else the actor, else the target. `to` and the
@@ -6122,7 +6127,8 @@ class Engine:
             # arrive. The flag is what stops the spliced reaction from provoking itself
             # forever — it is stripped before anything else sees the intent.
             if not raw.pop("_reacted", False):
-                fired = self._reactions_before(raw)
+                # Feat loop b5-core: a readied attack goes in front with them (rules/readied.py).
+                fired = readied.before(self, raw) + self._reactions_before(raw)
                 if fired:
                     queue[0:0] = fired
                     raw["_reacted"] = True
@@ -6328,7 +6334,8 @@ class Engine:
             if intent.op == "attack" and outcome.status == "resolved":
                 queue[0:0] = self._retorts(outcome) + self._panther_retort(intent)
             if intent.op == "move" and outcome.status == "resolved":
-                queue[0:0] = self._reactions_on_arrival(outcome)
+                queue[0:0] = self._reactions_on_arrival(outcome) + readied.on_arrival(
+                    self, outcome)
             # A feint that drew a guard opens the foe to a partner's swing (Improved Feint
             # Partner, `_reactions_after_feint`): next in the queue, as the arrival's is.
             if intent.op == "check" and outcome.status == "resolved":
@@ -10927,6 +10934,7 @@ class Engine:
             return self._refuse(intent, why, code="charge_refused")
         if (partial.get("attack_state") is None and not self._battle_joined
                 and not intent.params.get("squares_off")
+                and not intent.params.get("strike_back")      # Feat loop b5-core
                 and (self.scene.in_encounter or intent.params.get("coup_de_grace"))):
             out_of_reach = self._reach_refusal(intent, actor, defender, weapon_key,
                                                voice="tell")
@@ -11135,6 +11143,11 @@ class Engine:
         # circumstance bonus on attack rolls" is on "additional attacks" alone.
         if intent.params.get("cleaving"):
             choices += ("cleaving_on",)
+        # Feat loop b5-core: a readied attack (rules/readied.py), Patient Strike's, and one
+        # set against a charge, as roll-context keys a document's `when.choice` asks.
+        if intent.params.get("reaction") == "readied":
+            choices += tuple(k for k in ("readied", "patient_readied", "braced")
+                             if k == "readied" or intent.params.get(k))
         # Pinpoint Targeting: "You do not gain the benefit of this feat if you move this
         # round" — a move already made this round (`Scene.move_spent`) refuses it.
         if ("pinpoint_targeting" in choices and partial.get("attack_state") is None
@@ -12022,6 +12035,10 @@ class Engine:
                 from . import feat_moves
 
                 mult = feat_moves.charge_multiple(actor, weapon, weapon_key, choices, mult)
+                # A brace weapon set against a charge: "double damage if you score a hit
+                # with it against a charging character" (CRB, Ready; feat loop b5-core).
+                if "braced" in choices and weapons_mod.has_trait(weapon_key, "brace"):
+                    mult += 1
                 # Vital Strike: the weapon's dice again per feat, "not multiplied on a
                 # critical hit, but ... added to the total" — so past `mult`, never in it.
                 vital = actor.weapon_dice(weapon_key, choices) \
@@ -28399,6 +28416,10 @@ class Engine:
                         "amount": defensive_dodge(actor, total=True),
                         "bonus_type": "dodge", "note": "total defense"}])
 
+    def _op_ready(self, intent: Intent, partial: dict) -> Outcome:
+        """Ready (CRB, Combat): the combat bar's, rules/readied.py (feat loop b5-core)."""
+        return readied.op_ready(self, intent)
+
     def _op_total_defense(self, intent: Intent, partial: dict) -> Outcome:
         """Total defense (CRB, Combat): "You can defend yourself as a standard action ...
         You can't combine total defense with fighting defensively or with the benefit of
@@ -30961,6 +30982,10 @@ class Engine:
             # gestures), and asks none.
             if not item:
                 lost = self._concentrate(intent, actor, spell, level, state, pool)
+                if lost is not None:
+                    return lost
+                # Feat loop b5-core: a readied counterspell ruins it (rules/readied.py).
+                lost = readied.counterspell(self, intent, actor, spell, level, state, pool)
                 if lost is not None:
                     return lost
             # Cast INTO a spell storing weapon (`_store_spell`): the slot is spent and the
