@@ -41913,6 +41913,10 @@ class Engine:
             tell = (f"{actor.name} drinks the {c['name']}, {survival._amount(gallons)} "
                     f"gallon{'s' if gallons != 1 else ''}; thirst holds off for "
                     f"{max(0, due)} hours more.")
+            if row.get("alcohol"):                      # Drunken Brawler (b5-spells)
+                from . import spell_feats
+
+                tell += spell_feats.drunken_brawler(actor)
         else:
             freed = survival.drink(actor)
             effects = [{"ref": actor.ref, "kind": "drink", "at": well}]

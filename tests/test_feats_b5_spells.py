@@ -542,3 +542,20 @@ def test_arcane_school_spirit_weakens_the_next_save_against_the_school_then_ends
     save = next(r for o in res.outcomes for r in o.rolls if r.label.startswith("Reflex save"))
     assert any(m.value == -2 and "Arcane School Spirit" in m.source for m in save.modifiers)
     assert not thug.has_state("mark.school-spirit")
+
+
+def test_drunken_brawler_takes_heart_from_a_mug_of_ale():
+    """Faiths of Purity: "When you drink a tankard of ale ... a -2 penalty on Reflex saving
+    throws, but gain a number of temporary hit points equal to your level, and gain a +2
+    alchemical bonus on Fortitude and Will saving throws". Through the drink op: ale lays
+    it, water does not."""
+    for item, held in (("mug of ale", True), ("waterskin", False)):
+        pc = _wren(["Endurance", "Drunken Brawler"], level=5)
+        pc.goods[item] = 1
+        s = Scene(location_id="5bbd0c40345f")
+        s.add(pc)
+        e = Engine(s, Dice(seed=1))
+        out = e.run(e.validate([{"op": "drink", "actor": pc.ref, "because": "test",
+                                 "params": {"item": item}}])).outcomes[-1]
+        fort = sum(m.value for m in pc.save_modifiers("fort") if m.type == "alchemical")
+        assert (pc.temp_hp, fort) == ((5, 2) if held else (0, 0)), out.tell

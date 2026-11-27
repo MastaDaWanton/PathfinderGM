@@ -331,5 +331,13 @@
     "tags": [
       "spirit.arcane-school"
     ]
+  },
+  "drunken-brawler": {
+    "tags": [
+      "drink.brawler"
+    ],
+    "not_yet": [
+      "the Fortitude and Will bonuses ending early when the temporary hit points are spent: both last the hour (rules/spell_feats.py drunken_brawler)"
+    ]
   }
 }

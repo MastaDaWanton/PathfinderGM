@@ -193,3 +193,33 @@ def spend_school_mark(caster, target, spell) -> None:
     if caster is None or not school or not caster.has_state(SCHOOL_SPIRIT):
         return
     target.remove_effects(match=lambda e: SCHOOL_MARK + school in (e.tags or ()))
+
+
+# --- Drunken Brawler ---------------------------------------------------------------------------
+# Faiths of Purity: "When you drink a tankard of ale or strong alcohol, you take a -2 penalty
+# on Reflex saving throws, but gain a number of temporary hit points equal to your level, and
+# gain a +2 alchemical bonus on Fortitude and Will saving throws. These bonuses lasts an hour
+# or until the temporary hit points gained by this effect are spent, whichever occurs first.
+# The penalties last for a full hour." Laid by the drink op on a gear row marked `alcohol`.
+BRAWLER = "drink.brawler"                       # the feat document's tag
+HOUR = 600                                      # rounds
+
+
+def drunken_brawler(actor) -> str:
+    from .activeeffect import ActiveEffect
+
+    if not actor.has_state(BRAWLER):
+        return ""
+    lvl = int(getattr(actor, "level", 1) or 1)
+    actor.gain_temp_hp(lvl, source="Drunken Brawler", rounds=HOUR,
+                       origin="rule:drunken-brawler")
+    actor.apply_effect(ActiveEffect(
+        name="the ale's courage", kind="buff", key="drunken-brawler", source="ale",
+        origin="rule:drunken-brawler", duration="rounds", rounds_left=HOUR,
+        modifiers=[{"kind": "save_mod", "target": t, "amount": 2,
+                    "bonus_type": "alchemical", "note": "Drunken Brawler"}
+                   for t in ("fort", "will")]
+        + [{"kind": "save_mod", "target": "ref", "amount": -2, "bonus_type": "",
+            "note": "Drunken Brawler"}]))
+    return (f" The drink settles warm in {actor.name}'s belly: {lvl} temporary hit points, "
+            f"steadier in body and will, a step slower to dodge, for an hour.")

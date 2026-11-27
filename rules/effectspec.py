@@ -2661,6 +2661,14 @@ AGAINST: dict[str, str] = {
     # Feat loop b5-spells: Smash's "Strength checks made to knock down or break open doors"
     # (Engine._op_break_in, dungeons' forced doors).
     "door": "a Strength check to break open a door",
+    # Feat loop b5-spells: Arcane School Spirit's "the next spell of this school" — every
+    # school a spell's save names (`spell_against`; enchantment and divination are above).
+    "abjuration": "an abjuration (the school)",
+    "conjuration": "a conjuration (the school)",
+    "evocation": "an evocation (the school)",
+    "illusion": "an illusion (the school)",
+    "necromancy": "a necromancy (the school)",
+    "transmutation": "a transmutation (the school)",
 }
 
 

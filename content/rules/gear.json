@@ -83,21 +83,21 @@
       "does": "A mug of ale: about a pint, an eighth of the gallon of fluids a day needs.",
       "source": "CRB Table 6-9 (Food, Drink, and Lodging): ale, mug, 4 cp. CRB p.444: 'at least a gallon of fluids'.",
       "house_rule": "The book gives the mug no size. A pint (1/8 gallon) is this table's. Ale counts as fluid (the owner, 2026-11-18); drunkenness is not modelled. Fallout: New Vegas's hardcore mode made alcohol worsen thirst, and players' mods turned it back; the owner's ruling is the one kept.",
-      "drink": {"spends": 1, "gallons": 0.125}
+      "drink": {"spends": 1, "gallons": 0.125, "alcohol": true}
     },
     "ale gallon": {
       "names": ["gallon of ale", "ale gallon", "gallons of ale"],
       "does": "A gallon of ale: a day's fluids.",
       "source": "CRB Table 6-9: ale, gallon, 2 sp.",
       "house_rule": "Ale counts as fluid (the owner, 2026-11-18); drunkenness is not modelled.",
-      "drink": {"spends": 1, "gallons": 1}
+      "drink": {"spends": 1, "gallons": 1, "alcohol": true}
     },
     "wine": {
       "names": ["pitcher of common wine", "pitcher of wine", "common wine", "wine"],
       "does": "A pitcher of common wine: about half a gallon of fluids.",
       "source": "CRB Table 6-9: wine, common (pitcher), 2 sp.",
       "house_rule": "The book gives the pitcher no size. Half a gallon is this table's. Wine counts as fluid (the owner, 2026-11-18); drunkenness is not modelled.",
-      "drink": {"spends": 1, "gallons": 0.5}
+      "drink": {"spends": 1, "gallons": 0.5, "alcohol": true}
     },
     "fine wine": {
       "names": ["bottle of fine wine", "fine wine"],
