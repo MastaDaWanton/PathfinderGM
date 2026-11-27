@@ -100,6 +100,7 @@ def after(engine, intent, outcome, twice: bool = False) -> tuple[list[dict], lis
     _mark_pounce(engine, intent, outcome)
     _count_unarmed(engine, intent, outcome)
     more: list[dict] = []
+    more += _cleave_through(engine, intent, outcome)
     more += _mounted_blade(engine, intent, outcome)
     more += _sidestep(engine, intent, outcome)
     more += _landing_roll(engine, intent, outcome)
@@ -1186,6 +1187,179 @@ def thrown_charge_path(engine, actor, defender, weapon_key: str, budget: int):
         return first
     return why if n > 2 else (f"A charge must move at least 10 ft, and {defender.name} is "
                               f"too close for a thrown charge.")
+
+
+# --- Cleave Through and Swap Places (feat loop b7-moves; ledger groups 1 and 2) ---------------
+#
+# Cleave Through (Dwarves of Golarion): "When using Cleave or Great Cleave, if your initial
+# attack hits, you may take a single 5-foot step as a free action before making your
+# additional attacks. If doing so places a creature within your threatened area, that
+# creature becomes a legal target for your additional Cleave attack(s) as long as it meets
+# all the other prerequisites." Measured before (its not_yet line): Cleave's extra blows were
+# chosen only from those threatened when it was declared. The step is the round's 5-foot
+# step (owner call: not taken after other movement), and the engine picks the square, as it
+# picks the cleave's next foe.
+#
+# Swap Places (UC, teamwork): "Whenever you are adjacent to an ally who also has this feat,
+# you can move into your ally's square as part of normal movement. At the same time, your
+# ally moves into your previous space as an immediate action ... Your ally must be the same
+# size as you ... Your ally does not provoke an attack of opportunity from this movement, but
+# you provoke as normal. This movement does not count against your ally's movement on his
+# next turn." Measured before (its not_yet line): a move into an occupied square was refused.
+
+CLEAVE_THROUGH = "attack.cleave.step"
+SWAP_PLACES = "teamwork.swap-places"
+
+
+def _cleave_through(engine, intent, outcome) -> list[dict]:
+    from . import position as position_mod
+    from . import reactions as reactions_mod
+
+    sc = engine.scene
+    params = intent.params or {}
+    actor = sc.actors.get(intent.actor or "")
+    defender = sc.actors.get(str(intent.target or ""))
+    if actor is None or defender is None or not params.get("cleave") \
+            or params.get("cleaving") or not actor.has_state(CLEAVE_THROUGH) \
+            or not sc.has_grid or actor.ref not in sc.positions \
+            or defender.ref not in sc.positions or stepping.walked(sc, actor.ref):
+        return []
+    if not any(b.get("ref") == defender.ref and b.get("result") in ("hit", "critical")
+               for b in outcome.blows or ()):
+        return []
+    if any(e.get("kind") == "cleave" for e in outcome.effects or ()):
+        return []                               # a foe was already in reach
+    weapon = str(params.get("weapon") or actor.wielded_key() or "").lower()
+    here = tuple(sc.positions[actor.ref])
+    there = tuple(sc.positions[defender.ref])
+    foes = [ref for ref, foe in sc.actors.items()
+            if ref not in (actor.ref, defender.ref) and not foe.is_down
+            and ref in sc.positions and not reactions_mod._allied(sc, actor.ref, ref)
+            and gridmod.distance_between(there, defender.size,
+                                         tuple(sc.positions[ref]), foe.size)
+            <= gridmod.SQUARE_FT]
+    if not foes:
+        return []
+    squares, level = _open_squares(engine, actor, here[:2])
+    for sq in sorted(squares, key=lambda q: (q[1], q[0])):
+        if not stepping.is_step(sc, actor, here, sq + level):
+            continue
+        sc.positions[actor.ref] = tuple(sq) + level
+        try:
+            reached = [r for r in foes if position_mod.out_of_reach(
+                sc, actor, sc.actors[r], weapon) is None]
+        finally:
+            sc.positions[actor.ref] = here
+        if not reached:
+            continue
+        foe = sc.actors[reached[0]]
+        keep = {k: v for k, v in params.items()
+                if k in ("weapon", "power_attack", "lethality")}
+        keep.update({"weapon": weapon, "cleave": True, "cleaving": [defender.ref]})
+        vis = intent.visibility or ("player" if actor.is_pc else "hidden")
+        return [{"op": "move", "actor": actor.ref, "id": f"{intent.id}-cleave-through",
+                 "target": None, "visibility": vis,
+                 "because": f"{actor.name} steps through the cleave (Cleave Through)",
+                 "params": {"square": list(sq) + list(level)}},
+                {"op": "attack", "actor": actor.ref, "target": foe.ref,
+                 "id": f"{intent.id}-cleave1", "visibility": vis,
+                 "because": f"cleaving on from {defender.name} (Cleave Through)",
+                 "params": keep}]
+    return []
+
+
+def swap_partner(engine, mover, square):
+    """The ally whose square this walk ends in, by Swap Places: adjacent to the mover, the
+    same size, both holding the feat, able to move and with an immediate action to spend;
+    else None."""
+    sc = engine.scene
+    if square is None or not mover.has_state(SWAP_PLACES) or not sc.has_grid:
+        return None
+    start = sc.positions.get(mover.ref)
+    if start is None:
+        return None
+    for ref, ally in sc.actors.items():
+        spot = sc.positions.get(ref)
+        if ref == mover.ref or spot is None or tuple(spot)[:2] != tuple(square)[:2] \
+                or not ally.has_state(SWAP_PLACES) or ally.size != mover.size \
+                or ally.is_down or ally.blocking_key("move") or not _friends(sc, ref, mover.ref) \
+                or gridmod.distance(tuple(start)[:2], tuple(spot)[:2]) > gridmod.SQUARE_FT:
+            continue
+        if sc.in_encounter and engine._swift_refusal(ally, True, "Swap Places"):
+            return None
+        return ally
+    return None
+
+
+def swap(engine, mover, ally, from_square) -> dict:
+    """The ally into the mover's old square: an immediate action, no attack of
+    opportunity (moved by the engine, never walked), and no step or move spent."""
+    sc = engine.scene
+    if sc.in_encounter:
+        engine._spend_swift(ally, True, "Swap Places")
+    sc.positions[ally.ref] = tuple(from_square)
+    return {"ref": ally.ref, "kind": "position", "from": None, "to": tuple(from_square),
+            "swapped_with": mover.ref, "origin": "rule:feat-swap-places"}
+
+
+# --- a full attack of throws (feat loop b7-moves; ledger group 27) ---------------------------
+#
+# Quick Draw (CRB): "you can draw a weapon as a free action instead of as a move action ...
+# A character who has selected this feat may throw weapons at his full normal rate of
+# attacks (much like a character with a bow)." Two-Handed Thrower (APG): "Using two hands to
+# throw any weapon requires only a standard action for you. If you also have the Quick Draw
+# feat, you can throw two-handed weapons at your full normal rate of attacks"; Normal:
+# "Throwing a two-handed weapon is a full-round action." Raging Hurler (APG): "While raging,
+# you can throw a two-handed weapon as a standard action, and you double the range increment
+# for weapons you throw. If you also have the Quick Draw feat, you can throw two-handed
+# weapons at your full normal rate of attacks."
+#
+# Measured before: a thrown weapon was one throw an op (`Engine._op_attack`, "full = False"
+# for every throw), and throwing a spear two-handed cost a standard action like a dagger.
+# Each throw of a full attack is one of the weapons carried (`Actor.weapons`), each landing
+# where it fell (`Engine._thrown_lands`, once a throw).
+
+QUICK_DRAW = "action.draw.free"
+TWO_HANDED_THROWER = "throw.two-handed"
+RAGING_HURLER = "throw.raging"
+RAGE = "buff.stance.rage"
+
+
+def raging_hurler(actor) -> bool:
+    return actor.has_state(RAGING_HURLER) and actor.has_state(RAGE)
+
+
+def _two_handed(weapon: dict) -> bool:
+    return int(weapon.get("hands", 1) or 1) >= 2
+
+
+def throws_at_full_rate(actor, weapon: dict) -> bool:
+    """Whether this thrower may make a full attack of throws with this weapon."""
+    if not actor.has_state(QUICK_DRAW):
+        return False
+    return not _two_handed(weapon) or actor.has_state(TWO_HANDED_THROWER) \
+        or raging_hurler(actor)
+
+
+def copies(actor, weapon_key: str) -> int:
+    """How many of this table weapon the thrower carries (each throw is one)."""
+    from . import weapons as weapons_mod
+
+    want = weapons_mod.key_for(weapon_key) or str(weapon_key).lower()
+    return sum(1 for w in actor.weapons if (weapons_mod.key_for(w) or w.lower()) == want)
+
+
+def whole_round_throw(actor, weapon: dict, params) -> str:
+    """The full-round action a two-handed throw is (Two-Handed Thrower's Normal), or ""."""
+    if actor is None or not (params or {}).get("thrown") or not _two_handed(weapon) \
+            or actor.has_state(TWO_HANDED_THROWER) or raging_hurler(actor):
+        return ""
+    return f"throwing the {str(weapon.get('name') or 'weapon').lower()} two-handed"
+
+
+def thrown_increment(actor, inc: int, thrown: bool) -> int:
+    """Raging Hurler: "you double the range increment for weapons you throw"."""
+    return inc * 2 if thrown and inc and raging_hurler(actor) else inc
 
 
 __all__ = ["charge_multiple", "moved_already", "after", "no_move_left", "allowance",

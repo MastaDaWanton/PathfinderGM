@@ -554,8 +554,8 @@
     "tags": ["maneuver.after-grappled.trip"]
   },
   "cleave-through": {
-    "not_yet": [
-      "a free 5-foot step between Cleave's attacks that brings a new foe into reach: Cleave's extra blows are chosen from those threatened when it is declared"
+    "tags": [
+      "attack.cleave.step"
     ]
   },
   "giant-killer": {
@@ -699,8 +699,11 @@
     ]
   },
   "raging-hurler": {
+    "tags": [
+      "throw.raging"
+    ],
     "not_yet": [
-      "while raging: two-handed weapons thrown as a standard action, thrown range increments doubled, improvised objects picked up as part of the throw"
+      "picking up an unattended object within reach as part of the attack action to throw it: an improvised throw is of a thing already held or on the shelf (Engine._improvised_held), and no object on the ground is picked up by the throw"
     ]
   },
   "school-strike": {

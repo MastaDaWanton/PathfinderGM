@@ -7504,6 +7504,12 @@ class Engine:
             intent.params.get("charged") is not None
             and (intent.params.get("charge") or intent.params.get("spring_attack"))) \
             or strike_feats.whole_round(intent.params)          # feat loop b4
+        if not whole and intent.params.get("thrown"):           # feat loop b7-moves
+            from . import feat_moves as _fm
+
+            thrower = self.scene.actors.get(intent.actor or "")
+            whole = bool(thrower is not None and _fm.whole_round_throw(
+                thrower, thrower.weapon(intent.params.get("weapon") or None), intent.params))
         if not self.scene.in_encounter or outcome.status != "resolved" \
                 or not whole or intent.params.get("reaction"):
             return
@@ -11290,6 +11296,12 @@ class Engine:
         # Feat loop b4: Death or Glory, Punch Through, Cockatrice Strike are one attack
         # as a full-round action, the round asked as the coup de grace asks it.
         whole = strike_feats.whole_round(intent.params)
+        # Feat loop b7-moves: a two-handed weapon thrown is a full-round action (Two-Handed
+        # Thrower's Normal), unless that feat or Raging Hurler in a rage.
+        from . import feat_moves as _fm_throw
+
+        whole = whole or _fm_throw.whole_round_throw(actor, actor.weapon(weapon_key),
+                                                     intent.params)
         if whole and partial.get("attack_state") is None and self.scene.in_encounter \
                 and not intent.params.get("reaction"):
             spent = self._coup_round_spent(actor, whole)
@@ -11466,8 +11478,16 @@ class Engine:
         # distance (the hairball at fifteen feet, the 2026-10-16 report).
         thrown_any = thrown_real or (bool(intent.params.get("thrown")) and not dancing
                                      and weapon_key == "improvised")
-        if thrown_any:
+        # Feat loop b7-moves: Quick Draw throws at the full rate (Two-Handed Thrower or
+        # Raging Hurler for a two-handed weapon); anybody else throws once.
+        full_rate = thrown_real and _fm_throw.throws_at_full_rate(actor, weapon)
+        if thrown_any and not full_rate:
             full = False
+            if intent.params.get("iteration") and partial.get("attack_state") is None \
+                    and self.scene.in_encounter and not intent.params.get("reaction"):
+                return self._refuse(intent, f"{actor.name} throws once a turn: a full "
+                                            f"attack of throws needs Quick Draw.",
+                                    code="one_throw")
         # The range increment (CRB, Combat: "each full range increment imposes a
         # cumulative -2 penalty on the attack roll ... A thrown weapon has a maximum range
         # of five range increments. Projectile weapons can shoot to ten range
@@ -11770,6 +11790,8 @@ class Engine:
         # (weapon, iteration) per swing. One weapon for a character; for a monster, the
         # whole printed option — an owlbear's claw, claw, bite (`Actor.attack_plan`).
         sequence = actor.attack_plan(weapon_key, full, choices, off_key, defender=defender)
+        if full and thrown_real:             # feat loop b7-moves: a throw a weapon carried
+            sequence = sequence[:max(1, _fm_throw.copies(actor, weapon_key))]
         # Which hand each swing is (`hands`, parallel to `sequence`): a two-weapon full
         # attack's off-hand swings follow the primary hand's (`Actor.attack_plan`).
         off_from = len(actor.attack_plan(weapon_key, True, choices)) if off_key else None
@@ -13054,9 +13076,12 @@ class Engine:
                                   turn=int(self.scene.clock_minutes))
             state["tells"].append(f"The {thrown_thing} lies where it fell.")
         if thrown_real:
-            landed = self._thrown_lands(actor, defender, named_key, named)
-            effects.extend(landed["effects"])
-            state["tells"].append(landed["tell"])
+            # Feat loop b7-moves: each throw of a full attack lands where it fell.
+            for _ in range(max(1, len(state.get("blows") or []) if full else 1)):
+                landed = self._thrown_lands(actor, defender, named_key, named)
+                effects.extend(landed["effects"])
+                if landed["tell"] not in state["tells"]:
+                    state["tells"].append(landed["tell"])
         # First blood is remembered only once the attack completes, so the decision
         # "is this a subsequent attack?" cannot flip between a suspension and its resume.
         self.scene.attacked.add(f"{actor.ref}>{defender.ref}")
@@ -13153,6 +13178,9 @@ class Engine:
         inc = int(weapon.get("range_ft") or 0)
         if not inc or not (weapon.get("category") == "ranged" or thrown):
             return None, ""
+        from . import feat_moves as _fm      # feat loop b7-moves: Raging Hurler doubles it
+
+        inc = _fm.thrown_increment(actor, inc, thrown)
         feet = self._gap_ft(actor, defender)
         if feet is None:
             return None, ""
@@ -17106,6 +17134,12 @@ class Engine:
         # (ID=179). So the squares it is going TO are not taken for it; the squares on
         # the way still are (`position.occupancy_toward` says why).
         if gridmod.enters_occupied(actor.size):
+            occupied -= set(gridmod.footprint(target, actor.size))
+        # Feat loop b7-moves: Swap Places — the ally's square is the mover's to enter.
+        from . import feat_moves as _fm
+
+        partner = _fm.swap_partner(self, actor, target)
+        if partner is not None:
             occupied -= set(gridmod.footprint(target, actor.size))
         if not grid.inside(target):
             raise IntentError(
@@ -34854,7 +34888,11 @@ class Engine:
                     if stopped is not None:
                         return stopped
                     ran = True
+            # Feat loop b7-moves: Swap Places — the ally steps into the square left.
+            swapped = _fm.swap_partner(self, actor, tuple(square)) \
+                if from_square is not None else None
             self.scene.positions[ref] = tuple(square)
+            swap_fx = [_fm.swap(self, actor, swapped, from_square)] if swapped else []
             bodyskills.carry_rider(self.scene, ref)
             self.scene.settle_levels()
             # The zone is now measured rather than taken on trust. The GM may still have
@@ -34959,6 +34997,9 @@ class Engine:
             apart_fx = apart_fx + list(more_fx)
             if apart_said:
                 tell = " ".join([tell, *apart_said])
+            if swap_fx:                            # feat loop b7-moves: Swap Places
+                tell += (f" {swapped.name} trades places with {actor.name} and takes the "
+                         f"space left (Swap Places).")
             if climbed is not None:
                 effect["climb"] = {"onto": climb[0], "dc": climb[1], "made": True}
                 # Said once: "moves 10 ft, up onto a cart (Climb 14 against DC 10)". Live,
@@ -34971,7 +35012,7 @@ class Engine:
                         f"{tell} {actor.name} climbs up onto {climb[0]}{rolled}.")
             return Outcome(
                 intent_id=intent.id, op="move",
-                effects=[effect, *apart_fx],
+                effects=[effect, *apart_fx, *swap_fx],
                 rolls=([climbed] if climbed is not None else []) + list(run_rolls),
                 tell=tell,
                 because=intent.because,
@@ -35309,6 +35350,11 @@ class Engine:
             # A Tiny body may end in somebody's square (`_check_move`); the walk there is
             # still paid, so the square it stops in is not a wall to it.
             if gridmod.enters_occupied(size):
+                occupied -= set(gridmod.footprint(there, size))
+            # Feat loop b7-moves: Swap Places (rules/feat_moves.py `swap_partner`).
+            from . import feat_moves as _fm
+
+            if _fm.swap_partner(self, self.scene.actors[ref], end) is not None:
                 occupied -= set(gridmod.footprint(there, size))
             reach = self.scene.grid.reachable(
                 here, 10_000, size=size, occupied=occupied,

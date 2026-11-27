@@ -644,3 +644,108 @@ def test_improved_charging_hurler_throws_from_further_and_adds_two_damage_close(
     dmg = [r for o in _of(res, "attack") for r in o.rolls
            if not (r.label or "").startswith(("Attack with", "Confirm"))]
     assert any(_named(r, "Improved Charging Hurler") == 2 for r in dmg), _tells(res)
+
+
+# --- Swap Places and Cleave Through ---------------------------------------------------------
+
+def test_swap_places_trades_squares_with_an_ally_who_has_the_feat():
+    """Swap Places (UC): "you can move into your ally's square as part of normal movement.
+    At the same time, your ally moves into your previous space as an immediate action."
+    Measured before (its not_yet line): a move into an occupied square was refused."""
+    ally = _pc(base="fixtures/pc-borin.json", feats=["Swap Places"])
+    ally.ref, ally.kind = "ally", "npc"
+    pc = _pc(feats=["Swap Places"])
+    s, e = _board(pc, ("thug", (15, 15)), at=(5, 5), allies=((ally, (6, 5)),))
+    res = _run(e, _move(6, 5))
+    assert _of(res, "move")[0].status == "resolved", _tells(res)
+    assert tuple(s.positions["pc"])[:2] == (6, 5)
+    assert tuple(s.positions["ally"])[:2] == (5, 5)
+    assert s.swift_spent.get("ally") is not None
+    plain = _pc()
+    other = _pc(base="fixtures/pc-borin.json")
+    other.ref, other.kind = "ally", "npc"
+    s, e = _board(plain, ("thug", (15, 15)), at=(5, 5), allies=((other, (6, 5)),))
+    with pytest.raises(IntentError, match="taken"):
+        _run(e, _move(6, 5))
+
+
+def test_cleave_through_steps_to_bring_a_new_foe_into_reach():
+    """Cleave Through (Dwarves of Golarion): "if your initial attack hits, you may take a
+    single 5-foot step as a free action before making your additional attacks", and a foe
+    it brings into reach is a legal target. Measured before (its not_yet line): the cleave
+    ended "no other foe stands beside" when the second foe was 10 ft away."""
+    feats = ["Power Attack", "Cleave", "Cleave Through"]
+    pc = _pc(level=11, feats=feats,
+             abilities={"str": 16, "dex": 17, "con": 12, "int": 13, "wis": 10, "cha": 14})
+    s, e = _board(pc, ("thug", (6, 5)), ("thug", (7, 6)), at=(5, 5),
+                  faces={"Attack with": 18})
+    for ref in ("c1", "c2"):
+        s.get(ref).hp = s.get(ref).hp_max = 400
+    res = _run(e, _hit(weapon="rapier", cleave=True))
+    blows = _of(res, "attack")
+    assert [o.blows[0]["ref"] for o in blows] == ["c1", "c2"], _tells(res)
+    assert tuple(s.positions["pc"])[:2] != (5, 5)
+    assert stepping.walked(s, "pc") == "step"
+
+
+# --- group 27: a full attack of throws ------------------------------------------------------
+
+def test_quick_draw_throws_daggers_at_the_full_rate_each_one_landing():
+    """Quick Draw (CRB): "A character who has selected this feat may throw weapons at his
+    full normal rate of attacks." Measured before (its not_yet line): a thrown weapon was
+    one throw an op — a level-8 fighter's full attack of daggers threw one."""
+    pc = _pc(feats=["Quick Draw"], weapons=["dagger", "dagger", "dagger"])
+    s, e = _board(pc, ("thug", (8, 5)), faces={"Attack with": 15})
+    s.get("c1").hp = s.get("c1").hp_max = 400
+    res = _run(e, _hit(weapon="dagger", thrown=True, full_attack=True))
+    blows = [b for o in _of(res, "attack") for b in o.blows]
+    assert len(blows) == 2, _tells(res)
+    assert pc.weapons.count("dagger") == 1
+    plain = _pc(weapons=["dagger", "dagger", "dagger"])
+    s, e = _board(plain, ("thug", (8, 5)), faces={"Attack with": 15})
+    s.get("c1").hp = s.get("c1").hp_max = 400
+    res = _run(e, _hit(weapon="dagger", thrown=True, full_attack=True))
+    assert len([b for o in _of(res, "attack") for b in o.blows]) == 1, _tells(res)
+    again = _run(e, _hit(weapon="dagger", thrown=True, iteration=1))
+    assert _of(again, "attack")[0].code == "one_throw", _tells(again)
+
+
+def test_a_two_handed_throw_is_the_whole_round_without_two_handed_thrower():
+    """Two-Handed Thrower (APG): "Using two hands to throw any weapon requires only a
+    standard action for you. If you also have the Quick Draw feat, you can throw two-handed
+    weapons at your full normal rate"; Normal: "Throwing a two-handed weapon is a full-round
+    action." Measured before (its not_yet line): a spear thrown cost what a dagger did, and
+    no full attack of throws was offered."""
+    pc = _pc(weapons=["spear"])
+    s, e = _board(pc, ("thug", (10, 5)), faces={"Attack with": 15})
+    s.get("c1").hp = s.get("c1").hp_max = 400
+    res = _run(e, _move(6, 5), _hit(weapon="spear", thrown=True))
+    assert _of(res, "attack")[-1].status == "refused", _tells(res)
+    feats = ["Quick Draw", "Two-Handed Thrower"]
+    pc = _pc(feats=feats, weapons=["spear", "spear"],
+             abilities={"str": 15, "dex": 17, "con": 12, "int": 13, "wis": 10, "cha": 14})
+    s, e = _board(pc, ("thug", (10, 5)), faces={"Attack with": 15})
+    s.get("c1").hp = s.get("c1").hp_max = 400
+    res = _run(e, _move(6, 5), _hit(weapon="spear", thrown=True))
+    assert _of(res, "attack")[-1].status == "resolved", _tells(res)
+    new_turn(s)
+    res = _run(e, _hit(weapon="spear", thrown=True, full_attack=True))
+    assert len([b for o in _of(res, "attack") for b in o.blows]) == 1   # one spear left
+    assert "spear" not in pc.weapons
+
+
+def test_raging_hurler_throws_two_handed_as_a_standard_and_doubles_the_increment():
+    """Raging Hurler (APG): "While raging, you can throw a two-handed weapon as a standard
+    action, and you double the range increment for weapons you throw." Measured before
+    (its not_yet line): neither held. A spear (20 ft) at 35 ft is one increment past the
+    first (-2); raging, the increment is 40 ft and there is no penalty."""
+    pc = _pc(cls="barbarian", feats=["Throw Anything", "Raging Hurler"], weapons=["spear"])
+    s, e = _board(pc, ("thug", (13, 5)), faces={"Attack with": 15})
+    s.get("c1").hp = s.get("c1").hp_max = 400
+    pc.apply_effect(ActiveEffect(name="rage", kind="condition", key="rage", source="Rage",
+                                 origin="ability:barbarian/rage", tags=("buff.stance.rage",)))
+    res = _run(e, _move(6, 5), _hit(weapon="spear", thrown=True))
+    blow = _of(res, "attack")[-1]
+    assert blow.status == "resolved", _tells(res)
+    roll = [r for r in blow.rolls if (r.label or "").startswith("Attack with")][0]
+    assert _named(roll, "range") == 0, roll.as_dict()

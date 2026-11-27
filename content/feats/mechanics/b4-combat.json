@@ -296,8 +296,8 @@
         "note": "Two-Handed Thrower: 1-1/2 times Strength, thrown with both hands"
       }
     ],
-    "not_yet": [
-      "'If you also have the Quick Draw feat, you can throw two-handed weapons at your full normal rate of attacks': a throw is one attack an op (the weapon leaves the hand), so no full attack of throws is offered"
+    "tags": [
+      "throw.two-handed"
     ]
   },
   "hamatulatsu": {

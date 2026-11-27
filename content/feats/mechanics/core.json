@@ -477,7 +477,6 @@
       "action.draw.free"
     ],
     "not_yet": [
-      "throws weapons at the full rate of attacks: a thrown weapon is one throw a turn (Engine._op_attack thrown_any)",
       "draws a hidden weapon as a move action: there is no hidden-weapon Sleight of Hand roll"
     ]
   },

@@ -171,8 +171,8 @@
     ]
   },
   "swap-places": {
-    "not_yet": [
-      "'you can move into your ally's square ... your ally moves into your previous space as an immediate action': a move into an occupied square is refused, and no swap is spliced"
+    "tags": [
+      "teamwork.swap-places"
     ]
   },
   "teleport-tactician": {
