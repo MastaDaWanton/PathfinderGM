@@ -32,6 +32,7 @@ import secrets
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 
+from rules import cooperative
 from rules import crafting, effectspec, knowledge, sky, survival, worldclass
 from rules import constructs
 from rules import enchanter as en
@@ -241,7 +242,20 @@ def _state_body(c, pc) -> dict:
         "spell_items": _spell_item_options(pc, int(progress.level)),
         # Animate's picker: every construction line and its lock (rules/constructs.py).
         "constructs": constructs.view(int(progress.level)),
+        # Create Reliquary Arms and Shields (feat loop b4-crafting): the spells Bind may cast
+        # into arms or a shield, or None for anyone without the feat.
+        "reliquary": _reliquary_options(pc),
     }
+
+
+def _reliquary_options(pc):
+    from rules import casting, reliquary
+    from rules import spells as spells_mod
+
+    if not reliquary.holds(pc):
+        return None
+    return [{"id": sid, "name": spells_mod.get(sid).name} for sid in reliquary.SPELLS
+            if casting.castable_now(pc, spells_mod.get(sid))]
 
 
 def _spell_item_options(pc, level: int) -> dict:
@@ -259,6 +273,8 @@ def _ready(request):
     pc = c.scene.pc()
     if pc is None:
         return None, None, _err("There is no character to work the circle.", 409)
+    # Cooperative Crafting (feat loop b4-crafting): the companion helping here, if any.
+    cooperative.settle(c.scene, pc)
     return c, pc, None
 
 

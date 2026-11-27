@@ -1092,6 +1092,14 @@ def _resolve(spec: dict, target: str, potency: float, because: str, use: Use) ->
     """One effect into the outcome: as intents if the engine can run it, as a line for the
     GM if it cannot. Never silently nothing — an item that quietly does less than its card
     says is worse than one that says "and the rest is up to you"."""
+    if str(spec.get("type")) == "bloodline_power":
+        # A sanguine elixir's lent power (feat loop b4-crafting, `rules/sanguine.py`):
+        # written only by the feat's own bench door, so it is not an authorable type in
+        # the effectspec vocabulary that homebrew items are built from.
+        from . import sanguine
+
+        use.intents.extend(sanguine.grant_intent(spec, target, because))
+        return
     if not effectspec.executable(spec):
         use.narrate.append(effectspec.render(spec))
         return

@@ -312,6 +312,10 @@ def begin(actor, stock_key: str, *, craft: str, minutes: int, now: int, label: s
     minutes = int(minutes)
     if minutes < 1:
         raise ValueError("work in progress takes at least a minute; finish it on the spot")
+    # Cooperative Crafting halves the time (feat loop b4-crafting, rules/cooperative.py).
+    from . import cooperative
+
+    minutes = cooperative.minutes(actor, minutes, craft=name)
     where = str(where or "carried")
     if where != "carried" and not where.startswith("place:"):
         raise ValueError(f"`where` is 'carried' or 'place:<id>', not {where!r}")

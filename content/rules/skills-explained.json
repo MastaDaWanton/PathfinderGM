@@ -102,7 +102,7 @@
         {"text": "Mending a construct: the better of your Craft and your Knowledge (Engineering). It takes ten minutes and restores 1d6 per Hit Die.",
          "file": "rules/repair.py", "find": "has neither Craft nor Knowledge (engineering) to mend it"},
         {"text": "A feat asking for Craft (alchemy) or any other trade is met by your Craft ranks.",
-         "file": "rules/feats.py", "find": "return actor.ranks.get(base_skill(cond[\"skill\"]), 0) >= int(cond[\"ranks\"])"}
+         "file": "rules/feats.py", "find": "return max(actor.ranks.get(base_skill(n), 0) for n in names) >= int(cond[\"ranks\"])"}
       ],
       "not_yet": "This game has one Craft with no trade named: Craft (weapons), Craft (alchemy) and the rest are all it. Making items by the week from the book's Craft rules is not in play; the crafting benches make things instead.",
       "not_yet_uses": ["skill.craft.by-the-week"]

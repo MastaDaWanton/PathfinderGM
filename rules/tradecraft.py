@@ -103,6 +103,8 @@ def bench_check_terms(actor, level: int, *, track: str, name: str, ability: str,
     own modifier for a bench that reads something narrower (the enchanter's circle counts
     no worn bonus to Intelligence, `enchanter._base_int`).
     """
+    from . import cooperative
+
     track_level = max(0, int(level or 0))
     char_level = max(1, int(getattr(actor, "level", 1) or 1)) if actor is not None else 1
     if ability_mod is None:
@@ -113,6 +115,8 @@ def bench_check_terms(actor, level: int, *, track: str, name: str, ability: str,
         {"label": f"half character level ({char_level})", "value": char_level // 2},
         {"label": _ABILITY_WORDS[ability], "value": int(ability_mod)},
         *bench_terms(actor, track),
+        # Cooperative Crafting's +2 circumstance (feat loop b4-crafting, rules/cooperative.py).
+        *(cooperative.terms(actor) if actor is not None else []),
     ]
 
 

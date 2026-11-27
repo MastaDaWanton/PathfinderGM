@@ -28,6 +28,7 @@ import secrets
 from django.http import JsonResponse
 from django.views.decorators.http import require_GET, require_POST
 
+from rules import cooperative
 from rules import crafting, herbknowledge, inprogress, knowledge, worldclass
 
 from . import bench_clock
@@ -244,6 +245,8 @@ def _ready(request):
     pc = c.scene.pc()
     if pc is None:
         return None, None, _err("There is no character to work the bench.", 409)
+    # Cooperative Crafting (feat loop b4-crafting): the companion helping here, if any.
+    cooperative.settle(c.scene, pc)
     return c, pc, None
 
 

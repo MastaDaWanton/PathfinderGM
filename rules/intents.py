@@ -462,7 +462,9 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # (`light.carried`, with `light`: {radius_ft, raised_ft}). Engine-written only — an
     # amount op (AMOUNT_OPS), refused without a document behind it, since "I grant myself
     # darkvision" is a number of feet nobody wrote down.
-    "grant": (("tag",), ("to", "name", "duration", "light", "per_round"), "hidden"),
+    # Feat loop b4-crafting: `borrowed`, a sanguine elixir's lent bloodline power.
+    "grant": (("tag",), ("to", "name", "duration", "light", "per_round", "borrowed"),
+              "hidden"),
     # Fire that clings (alchemist's fire's next round, plan §16.6): `state.burning` with
     # its own per-round damage, put out by `extinguish`. Engine-written only, as `grant`.
     "burn": (("dice",), ("to", "damage_type", "rounds", "put_out_with", "put_out_dc",
@@ -922,7 +924,10 @@ CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "looks_in", "defending", 
                               # hold it ends; honoured only with an engine origin.
                               "breaks",
                               # The table's Start a fight (play/views.py `combat_act`).
-                              "squares_off"})
+                              "squares_off",
+                              # Feat loop b4-crafting: a sanguine elixir's borrowed power,
+                              # honoured only with an item origin (`Engine._op_grant`).
+                              "borrowed"})
 # Ops only code writes: left out of the plan's op enum (gm/prompts.py) and dropped from a
 # plan that writes one anyway (`acts_to_ops.apply`). A job is offered, taken and turned
 # down by the reader's closed answer about the player's own words, never by the planner:
