@@ -151,3 +151,45 @@ def test_shatterspell_suppresses_a_spell_by_a_narrow_margin_and_dispels_by_ten()
                                                                   "to": "c1"}}).outcomes[-1]
     assert "dispelled" in out.tell, out.tell
     assert not any(x.origin == "spell:bless" for x in foe.effects)
+
+
+def test_lingering_fireball_strikes_a_newcomer_once_and_spares_who_it_hit():
+    """APG Lingering Spell: "persist until the beginning of your next turn. Those already
+    in the area suffer no additional harm, but other creatures ... entering the area are
+    subject to its effects." Measured before b7: no document. And b6-rules noted the
+    trap: a plain area hazard re-harms whoever the cast already struck — here the thug
+    the fireball caught takes nothing more at the round's tick."""
+    from rules.bestiary import instantiate
+    from rules.dice import Dice
+    from rules.engine import Engine, Scene
+    from rules.grid import Grid
+    from tests.test_feat_loop_b1_spells import caster, cast
+
+    pc = caster(feats=("Lingering Spell",))
+    s = Scene(location_id="5bbd0c40345f")
+    s.add(pc, at=(1, 1))
+    for i, sq in enumerate(((12, 5), (17, 10)), start=1):
+        foe = instantiate("thug", scene=s, name=f"the thug {i}")
+        foe.hp_max = foe.hp = 500
+        s.add(foe, at=sq)
+    s.grid = Grid(width=20, height=20)
+    s.initiative = [("pc", 20), ("c1", 10), ("c2", 9)]
+    s.sides = {"pc": ["pc"], "them": ["c1", "c2"]}
+    s.round, s.turn = 1, 0
+    e = Engine(s, Dice(seed=5))
+    out = cast(e, spell="fireball", at="c1", metamagic="lingering")
+    assert "lingers" in out.tell, out.tell
+    c1, c2 = s.actors["c1"], s.actors["c2"]
+    hit_once = c1.hp
+    assert hit_once < 500 and c2.hp == 500
+    s.turn = 2                                           # the thug's turn: it walks in
+    res = e.run(e.validate([{"op": "move", "actor": "c2", "because": "test",
+                             "params": {"square": [13, 6]}}]))
+    said = [o.tell for o in res.outcomes]
+    assert c2.hp < 500, said
+    assert any("walks into the lingering Fireball" in t for t in said), said
+    taken = c2.hp
+    assert not e._linger_entered("c2")                  # once
+    s.tick_standing(1)
+    assert c1.hp == hit_once and c2.hp == taken          # nobody twice
+    assert not any((w.spec or {}).get("lingers") for w in s.wards)

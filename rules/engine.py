@@ -2413,6 +2413,8 @@ class Scene:
         for victim in self._aimed_at(ward, struck_by):
             out.extend(self._resolve_on(victim, ward, ward.spec or {},
                                         ward.save, ward.save_effect))
+            if (ward.spec or {}).get("lingers"):                 # feat loop b7-fixes
+                ward.spec.setdefault("spares", []).append(victim.ref)
         return out
 
     def _resolve_on(self, victim: Actor, ward: "Ward", spec: dict,
@@ -2531,8 +2533,11 @@ class Scene:
             made = next((m for m in self.manifests if m.id == ward.manifest_id), None)
             if made is None:
                 return []
+            # Lingering Spell's "those already in the area suffer no additional harm"
+            # (feat loop b7-fixes): the refs a lingering ward has struck, `spares`.
+            spared = set((ward.spec or {}).get("spares") or ())
             return [a for ref, a in self.actors.items()
-                    if a.hp > 0 and made in self.standing_on(ref)]
+                    if a.hp > 0 and ref not in spared and made in self.standing_on(ref)]
         found = self.actors.get(ward.owner)
         return [found] if found else []
 
@@ -6470,6 +6475,7 @@ class Engine:
             if intent.op == "move" and outcome.status == "resolved":
                 queue[0:0] = self._reactions_on_arrival(outcome) + readied.on_arrival(
                     self, outcome)
+                outcomes.extend(self._linger_entered(intent.actor))   # feat loop b7-fixes
             # A feint that drew a guard opens the foe to a partner's swing (Improved Feint
             # Partner, `_reactions_after_feint`): next in the queue, as the arrival's is.
             if intent.op == "check" and outcome.status == "resolved":
@@ -31932,6 +31938,10 @@ class Engine:
                 effects.extend(got)
                 tells.extend(words)
         dispel_mod.stamp(self.scene, actor, spell, cl, level, cast_ctx["origin"], live)
+        if metamagic.flag(spell, "linger"):                     # feat loop b7-fixes
+            got, words = self._linger(actor, spell, plan, dice, dc, state, live)
+            effects.extend(got)
+            tells.extend(words)
         if metamagic.flag(spell, "bounce") and not item:
             got, words, rolled = self._bounce(intent, actor, spell, cl, level, dc, live,
                                               state)
@@ -32330,6 +32340,67 @@ class Engine:
         if kind == "direction" and value in ("up", "down"):
             return "overhead" if value == "up" else "below"
         return ""
+
+    def _linger(self, actor: Actor, spell, plan: dict, dice: str, dc: int, state: dict,
+                live: list[str]) -> tuple[list[dict], list[str]]:
+        """Lingering Spell (APG, d20pfsrd read 2026-11-27): "You may cause an instantaneous
+        spell that affects an area to persist until the beginning of your next turn. Those
+        already in the area suffer no additional harm, but other creatures or objects
+        entering the area are subject to its effects."
+
+        The area stays as a `Manifestation` over the cast's own squares for one round, with
+        an area `Ward` carrying the spell's dice, save and DC — the incendiary-cloud shape,
+        so the round's tick strikes whoever starts the next round in it and the one ticker
+        ends it. Batch 6 (b6-rules) found the plain area hazard would strike again those
+        the cast already caught; the ward's `spares` holds them, and each creature it
+        strikes joins it, so nobody is harmed twice.
+
+        shortcut: only a spell whose effect is hit point damage lingers (a lingering color
+        spray's conditions are not laid on entrants), an entrant is struck where its walk
+        ends (not passing through), and the book's concealment from a visible lingering
+        spell is not laid — upgrade when a ward carries a spell's whole effect list."""
+        area = state.get("area") or {}
+        squares = [tuple(c) for c in area.get("squares") or ()]
+        if not squares or plan.get("kind") != "damage" or not dice:
+            return [], [f"Nothing of {spell.name} lingers that the engine can run."]
+        made = self.scene.place(Manifestation(
+            what=f"lingering {spell.name}", terrain="none", squares=squares,
+            rounds_left=1, source=spell.name, owner=actor.ref))
+        caught = [r for r in (state.get("caught") or live) if r in self.scene.actors]
+        self.scene.wards.append(Ward(
+            owner="", trigger="each_round", recipient="area",
+            spec={"type": "damage", "dice": str(dice),
+                  "damage_type": str(plan.get("damage_type") or "untyped"),
+                  "lingers": True, "spares": list(dict.fromkeys(caught + [actor.ref]))},
+            caster=actor.ref, rounds_left=1, source=f"lingering {spell.name}",
+            save=str(plan.get("save") or ""), dc=int(dc or 0),
+            save_effect=str(plan.get("save_effect") or ""), manifest_id=made.id))
+        return ([{"kind": "manifest", **made.as_dict(), "lingers": spell.id}],
+                [f"{spell.name} lingers where it struck until {actor.name}'s next turn."])
+
+    def _linger_entered(self, ref) -> list["Outcome"]:
+        """A creature whose walk ends inside a lingering spell's area it has not been
+        struck by is struck now (Lingering Spell: "other creatures ... entering the area
+        are subject to its effects"), once — the ward's `spares` remembers it."""
+        who = self.scene.actors.get(str(ref or ""))
+        if who is None:
+            return []
+        out: list[Outcome] = []
+        for ward in list(self.scene.wards):
+            spec = ward.spec or {}
+            if not spec.get("lingers") or who.ref in (spec.get("spares") or ()):
+                continue
+            made = next((m for m in self.scene.manifests if m.id == ward.manifest_id), None)
+            if made is None or made not in self.scene.standing_on(who.ref):
+                continue
+            fx = self.scene._resolve_on(who, ward, spec, ward.save, ward.save_effect)
+            spec.setdefault("spares", []).append(who.ref)
+            hurt = sum(int(e.get("amount") or 0) for e in fx if e.get("kind") == "damage")
+            out.append(Outcome(
+                intent_id="", op="hazard", effects=fx,
+                tell=(f"{who.name} walks into the {ward.source} and takes {hurt} damage."
+                      if hurt else f"{who.name} walks into the {ward.source} unharmed.")))
+        return out
 
     def _cast_where(self, actor: Actor, spell, state: dict, targets: list[str],
                     no_victim: bool, aim_said: str) -> list[str]:
