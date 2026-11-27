@@ -397,13 +397,17 @@ def test_shield_focus_needs_a_shield():
 
 
 def test_diehard_stabilises_without_the_roll_and_loses_no_blood():
+    """CRB Diehard: "you automatically stabilize ... You may choose to act as if you were
+    disabled, rather than dying." Until feat loop b4 a Diehard body below 0 lay dying and
+    stabilised on its first bleed roll; now it fights on (owner call: a holder always
+    does), so it is never dying, staggered and disabled, and a bleed costs no blood."""
     pc = _pc("Diehard")
     pc.hp = -3
     pc.apply_hp_state()
-    assert pc.has_condition("dying")
-    out = pc.bleed_out(Dice(seed=1))
-    assert out["outcome"] == "stable" and out.get("automatic")
-    assert pc.hp == -3 and pc.has_condition("stable")
+    assert not pc.has_condition("dying")
+    assert pc.has_state("state.fighting-on") and pc.has_state("state.impaired.staggered")
+    pc.bleed_out(Dice(seed=1))
+    assert pc.hp == -3 and not pc.has_condition("dying")
 
 
 def test_greater_focus_and_specialization_stack_with_the_lesser():
