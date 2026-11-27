@@ -93,34 +93,6 @@
       }
     ]
   },
-  "meditative-concentration": {
-    "modifiers": [
-      {
-        "type": "combat_mod",
-        "target": "concentration",
-        "amount": 4,
-        "bonus_type": "untyped",
-        "when": {
-          "bearer": {
-            "state": "meditation.combat"
-          }
-        },
-        "note": "F&P: 'For 1 round per character level after you perform combat meditation, whenever you attempt a concentration check to avoid losing a spell ... you gain a +4 bonus' (Combat Meditation lays meditation.combat for those rounds)"
-      },
-      {
-        "type": "save_mod",
-        "target": "fort",
-        "amount": 4,
-        "bonus_type": "untyped",
-        "when": {
-          "against": "distraction",
-          "bearer": {
-            "state": "meditation.combat"
-          }
-        }
-      }
-    ]
-  },
   "master-alchemist": {
     "modifiers": [
       {
@@ -321,7 +293,6 @@
       }
     ]
   },
-  "slow-time": {},
   "saving-shield": {
     "tags": [
       "guard.saving-shield"

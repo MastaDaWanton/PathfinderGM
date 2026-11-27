@@ -184,26 +184,6 @@ def test_divine_deception_reads_the_devices_tradition():
     assert seen == {"cure-light-wounds": True, "mage-armor": False}
 
 
-def test_meditative_concentration_rides_combat_meditation_only():
-    """F&P: "For 1 round per character level after you perform combat meditation ... a
-    concentration check ... or a Fortitude save to resist a distraction effect (such as
-    the distraction ability of a swarm), you gain a +4 bonus". The combat meditation lays
-    meditation.combat for those rounds; an hour's meditation (meditation.held alone) does
-    not count."""
-    from tests.test_class_active_abilities import _fight, _pc, _use
-
-    pc = _pc("monk", 5, feats=["Combat Meditation", "Meditation Master",
-                               "Meditative Concentration"])
-    pc.abilities["wis"] = 16
-    assert _sum(pc.concentration_modifiers({}), "Meditative Concentration") == 0
-    _scene, e = _fight(pc, "thug")
-    out = _use(e, "Combat Meditation")
-    assert pc.has_state("meditation.combat"), out.tell
-    assert _sum(pc.concentration_modifiers({}), "Meditative Concentration") == 4
-    assert _sum(pc.save_modifiers("fort", {"against": ("distraction",)}),
-                "Meditative Concentration") == 4
-    assert _sum(pc.save_modifiers("fort", {"against": ("poison",)}),
-                "Meditative Concentration") == 0
 
 
 def test_a_swarms_distraction_save_is_against_distraction():
@@ -470,26 +450,6 @@ def test_skilled_driver_is_four_at_the_helm_of_the_chosen_vehicle():
     assert _sum(pc.skill_modifiers("profession"), "Skilled Driver") == 0
 
 
-def test_slow_time_hastes_the_meditation_once_a_day():
-    """F&P: "Once per day, when you meditate as a full-round action using the Combat
-    Meditation feat, you gain the effects of haste for 1 round per 2 character levels."
-    A 10th-level monk: +1 attack, +1 dodge AC, the meditation's tags, for 5 rounds; the
-    second use the same day is refused."""
-    from tests._board import new_turn
-    from tests.test_class_active_abilities import _fight, _pc, _use
-
-    pc = _pc("monk", 10, feats=["Combat Meditation", "Meditation Master", "Slow Time"])
-    pc.abilities["wis"] = 16
-    scene, e = _fight(pc, "thug")
-    ac = pc.ac()
-    out = _use(e, "Slow Time")
-    assert pc.has_state("meditation.combat") and pc.ac() == ac + 1, out.tell
-    assert _sum(pc.attack_modifiers(), "Slow Time") == 1
-    held = next(x for x in pc.effects if "buff.slow-time" in (x.tags or ()))
-    assert held.rounds_left == 5
-    new_turn(scene)
-    again = _use(e, "Slow Time")
-    assert "slow time" in again.tell.lower() and "0" in again.tell
 
 
 def test_saving_shield_spends_the_guards_immediate_action_on_the_first_blow():
