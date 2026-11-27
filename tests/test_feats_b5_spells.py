@@ -515,3 +515,30 @@ def test_saving_shield_spends_the_guards_immediate_action_on_the_first_blow():
         assert "thrusts a shield across Ward" in told, told
         assert ward.ac(attacker=thug) == before + 2
         assert e._swift_refusal(guard, True, "again")
+
+
+def test_arcane_school_spirit_weakens_the_next_save_against_the_school_then_ends():
+    """Gnomes of Golarion: "Make a Bluff check opposed by a target's Sense Motive check; if
+    you win the check, the target takes a -2 penalty on saving throws made to resist the
+    next spell of this school that you cast." Through the engine: the use, then a burning
+    hands whose Reflex save carries the -2, and the mark is gone after it."""
+    from tests._board import new_turn
+    from tests.test_class_active_abilities import _fight, _pc, _use
+
+    pc = _pc("wizard", 5, feats=["Arcane School Spirit"], race="gnome", ranks={"bluff": 5},
+             spellbook=["burning-hands"], prepared={"burning-hands": 2})
+    pc.abilities["cha"] = 18
+    scene, e = _fight(pc, "thug")
+    thug = scene.actors["c1"]
+    out = _use(e, "Arcane School Spirit (evocation)", to="c1")
+    assert "beats" in out.tell, out.tell
+    assert _sum(thug.save_modifiers("ref", {"against": ("spell", "evocation")}),
+                "Arcane School Spirit (Kesst Vayr)") == -2
+    assert _sum(thug.save_modifiers("ref", {"against": ("spell", "illusion")}),
+                "Arcane School Spirit (Kesst Vayr)") == 0
+    new_turn(scene)
+    res = e.run(e.validate([{"op": "cast", "actor": "pc", "target": "c1", "because": "test",
+                             "visibility": "hidden", "params": {"spell": "burning-hands"}}]))
+    save = next(r for o in res.outcomes for r in o.rolls if r.label.startswith("Reflex save"))
+    assert any(m.value == -2 and "Arcane School Spirit" in m.source for m in save.modifiers)
+    assert not thug.has_state("mark.school-spirit")

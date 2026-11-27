@@ -31561,6 +31561,9 @@ class Engine:
         finally:
             self._luck_against = ()
         state["rolls"].append(roll.as_dict())
+        from . import spell_feats                       # Arcane School Spirit (b5-spells)
+
+        spell_feats.spend_school_mark(caster, target, spell)
         saved = d20_succeeds(roll, dc)
         self._judge(roll, saved)
         saved = self._resolve_after_save(target, caster, spell, saved, state)

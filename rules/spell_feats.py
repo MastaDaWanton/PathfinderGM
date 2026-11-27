@@ -175,3 +175,21 @@ def saving_shield(engine, attacker, defender) -> list[str]:
                                        "bonus_type": "shield", "note": "Saving Shield"}]))
         return [f"{guard.name} thrusts a shield across {defender.name} (+2 armour class)."]
     return []
+
+
+# --- Arcane School Spirit ------------------------------------------------------------------
+# Gnomes of Golarion: "the target takes a -2 penalty on saving throws made to resist the
+# next spell of this school that you cast". The ability (content/class-abilities/
+# feats-b5-spells.json) lays the penalty as an effect tagged `mark.school-spirit.<school>`;
+# the save against the holder's next spell of that school spends it (`Engine._cast_save`).
+# shortcut: the penalty answers any caster's spell of the school until a holder's spends
+# it; give the mark its maker's ref (`vs`) when a fight shows two school-spirit gnomes.
+SCHOOL_SPIRIT = "spirit.arcane-school"          # the feat document's tag
+SCHOOL_MARK = "mark.school-spirit."
+
+
+def spend_school_mark(caster, target, spell) -> None:
+    school = str(getattr(spell, "school", "") or "").strip().lower()
+    if caster is None or not school or not caster.has_state(SCHOOL_SPIRIT):
+        return
+    target.remove_effects(match=lambda e: SCHOOL_MARK + school in (e.tags or ()))

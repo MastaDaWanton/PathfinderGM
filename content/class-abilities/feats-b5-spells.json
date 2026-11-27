@@ -100,6 +100,351 @@
         "the combat meditation's own use: Slow Time is spent from its once-a-day pool, not from Combat Meditation's Wisdom-times-a-day, and the meditation benefits it lays last its 1 round per 2 levels, not the 1 round per level of a combat meditation",
         "not stacking with the haste spell or a speed weapon: a haste buff carries no tag to refuse it by, so the attack and dodge terms would stack"
       ]
+    },
+    {
+      "key": "arcane school spirit",
+      "name": "Arcane School Spirit",
+      "feat": "arcane-school-spirit",
+      "aliases": [
+        "arcane school spirit",
+        "extol my school",
+        "extol the virtues of my school"
+      ],
+      "level": 1,
+      "source": "Arcane School Spirit (Gnomes of Golarion): 'As a full-round action, you extol the virtues of your school of magic to one creature within 30 feet. Make a Bluff check opposed by a target's Sense Motive check; if you win the check, the target takes a -2 penalty on saving throws made to resist the next spell of this school that you cast.' The school is named in brackets, Arcane School Spirit (evocation); the save against the next spell of it spends the mark (rules/spell_feats.py spend_school_mark).",
+      "text": "Full round: Bluff against a creature's Sense Motive within 30 ft; beaten, -2 on its saves against your next spell of the school named.",
+      "action": "full-round",
+      "affects": "target",
+      "aim": "foe",
+      "harmful": true,
+      "range_ft": 30,
+      "contest": {
+        "skill": "bluff",
+        "against": "sense motive"
+      },
+      "choice": {
+        "kind": "mode",
+        "default": "evocation",
+        "options": {
+          "abjuration": {
+            "aliases": [
+              "abjuration"
+            ],
+            "effect": {
+              "modifiers": [
+                {
+                  "type": "save_mod",
+                  "target": "fort",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "abjuration"
+                  }
+                },
+                {
+                  "type": "save_mod",
+                  "target": "ref",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "abjuration"
+                  }
+                },
+                {
+                  "type": "save_mod",
+                  "target": "will",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "abjuration"
+                  }
+                }
+              ],
+              "tags": [
+                "mark.school-spirit.abjuration"
+              ]
+            }
+          },
+          "conjuration": {
+            "aliases": [
+              "conjuration"
+            ],
+            "effect": {
+              "modifiers": [
+                {
+                  "type": "save_mod",
+                  "target": "fort",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "conjuration"
+                  }
+                },
+                {
+                  "type": "save_mod",
+                  "target": "ref",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "conjuration"
+                  }
+                },
+                {
+                  "type": "save_mod",
+                  "target": "will",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "conjuration"
+                  }
+                }
+              ],
+              "tags": [
+                "mark.school-spirit.conjuration"
+              ]
+            }
+          },
+          "divination": {
+            "aliases": [
+              "divination"
+            ],
+            "effect": {
+              "modifiers": [
+                {
+                  "type": "save_mod",
+                  "target": "fort",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "divination"
+                  }
+                },
+                {
+                  "type": "save_mod",
+                  "target": "ref",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "divination"
+                  }
+                },
+                {
+                  "type": "save_mod",
+                  "target": "will",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "divination"
+                  }
+                }
+              ],
+              "tags": [
+                "mark.school-spirit.divination"
+              ]
+            }
+          },
+          "enchantment": {
+            "aliases": [
+              "enchantment"
+            ],
+            "effect": {
+              "modifiers": [
+                {
+                  "type": "save_mod",
+                  "target": "fort",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "enchantment"
+                  }
+                },
+                {
+                  "type": "save_mod",
+                  "target": "ref",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "enchantment"
+                  }
+                },
+                {
+                  "type": "save_mod",
+                  "target": "will",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "enchantment"
+                  }
+                }
+              ],
+              "tags": [
+                "mark.school-spirit.enchantment"
+              ]
+            }
+          },
+          "evocation": {
+            "aliases": [
+              "evocation"
+            ],
+            "effect": {
+              "modifiers": [
+                {
+                  "type": "save_mod",
+                  "target": "fort",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "evocation"
+                  }
+                },
+                {
+                  "type": "save_mod",
+                  "target": "ref",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "evocation"
+                  }
+                },
+                {
+                  "type": "save_mod",
+                  "target": "will",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "evocation"
+                  }
+                }
+              ],
+              "tags": [
+                "mark.school-spirit.evocation"
+              ]
+            }
+          },
+          "illusion": {
+            "aliases": [
+              "illusion"
+            ],
+            "effect": {
+              "modifiers": [
+                {
+                  "type": "save_mod",
+                  "target": "fort",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "illusion"
+                  }
+                },
+                {
+                  "type": "save_mod",
+                  "target": "ref",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "illusion"
+                  }
+                },
+                {
+                  "type": "save_mod",
+                  "target": "will",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "illusion"
+                  }
+                }
+              ],
+              "tags": [
+                "mark.school-spirit.illusion"
+              ]
+            }
+          },
+          "necromancy": {
+            "aliases": [
+              "necromancy"
+            ],
+            "effect": {
+              "modifiers": [
+                {
+                  "type": "save_mod",
+                  "target": "fort",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "necromancy"
+                  }
+                },
+                {
+                  "type": "save_mod",
+                  "target": "ref",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "necromancy"
+                  }
+                },
+                {
+                  "type": "save_mod",
+                  "target": "will",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "necromancy"
+                  }
+                }
+              ],
+              "tags": [
+                "mark.school-spirit.necromancy"
+              ]
+            }
+          },
+          "transmutation": {
+            "aliases": [
+              "transmutation"
+            ],
+            "effect": {
+              "modifiers": [
+                {
+                  "type": "save_mod",
+                  "target": "fort",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "transmutation"
+                  }
+                },
+                {
+                  "type": "save_mod",
+                  "target": "ref",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "transmutation"
+                  }
+                },
+                {
+                  "type": "save_mod",
+                  "target": "will",
+                  "amount": -2,
+                  "bonus_type": "untyped",
+                  "when": {
+                    "against": "transmutation"
+                  }
+                }
+              ],
+              "tags": [
+                "mark.school-spirit.transmutation"
+              ]
+            }
+          }
+        }
+      },
+      "tell": "{name} talks up the glories of the craft at {target}, all earnest conviction.",
+      "not_yet": [
+        "the school named is not checked against the wizard's own arcane school, and a universalist's -1 is not built: any of the eight schools takes -2",
+        "the penalty answers any caster's spell of the school until a holder's next one spends it: the mark does not name its maker"
+      ]
     }
   ]
 }

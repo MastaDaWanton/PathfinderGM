@@ -326,5 +326,10 @@
     "tags": [
       "guard.saving-shield"
     ]
+  },
+  "arcane-school-spirit": {
+    "tags": [
+      "spirit.arcane-school"
+    ]
   }
 }
