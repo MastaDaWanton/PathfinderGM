@@ -318,8 +318,9 @@ def after(engine, intent, actor, defender, key: str, verdict: str, weapon_key: s
         out["tells"].append(f"{engine.scene.actors[e['ref']].name} tramples "
                             f"{defender.name} where they fell (Trample).")
     if key == "trip" and won and intent.params.get(FURYS_SNARE):
+        snare = furys_snare(engine, actor, defender, weapon_key)
         for k in out:
-            out[k].extend(furys_snare(engine, actor, defender, weapon_key)[k])
+            out[k].extend(snare[k])
     if key == "trip" and intent.params.get("tripping_twirl"):
         out_twirl = _twirl(engine, intent, actor, defender)
         for k in out:

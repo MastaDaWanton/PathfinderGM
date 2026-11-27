@@ -261,6 +261,7 @@ def test_furys_snare_lets_the_whip_go_and_entangles_the_tripped_foe():
     assert snare is not None, _tells(res)
     esc = snare.payload["ends_when"]["escape"]
     assert (esc["dc"], esc["str_dc"]) == (15, 10)
+    assert "Fury's Snare" in _tells(res), _tells(res)
     assert pc.equipped != "whip"
     out = engine.run(engine.validate([{"op": "escape", "actor": "c1",
                                        "visibility": "hidden", "params": {}}])).outcomes[-1]
