@@ -1,0 +1,506 @@
+{
+  "_about": [
+    "Feat loop batch 4, lane b4-other (2026-11-26): saves and resolve, luck, senses, healing,",
+    "meditation and the Deathless line. Text read on aonprd.com FeatDisplay pages and in",
+    "content/feats/feats.json 2026-11-26; the feats whose class, race or system no player can",
+    "take yet are listed in docs/feats-waiting-on-classes.md, not here."
+  ],
+  "improved-great-fortitude": {
+    "luck": [
+      {
+        "reroll": "any",
+        "rolls": [
+          "save.fort"
+        ],
+        "per_day": 1
+      }
+    ]
+  },
+  "improved-iron-will": {
+    "luck": [
+      {
+        "reroll": "any",
+        "rolls": [
+          "save.will"
+        ],
+        "per_day": 1
+      }
+    ]
+  },
+  "improved-lightning-reflexes": {
+    "luck": [
+      {
+        "reroll": "any",
+        "rolls": [
+          "save.ref"
+        ],
+        "per_day": 1
+      }
+    ]
+  },
+  "pure-faith": {
+    "modifiers": [
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 4,
+        "bonus_type": "sacred",
+        "when": {
+          "against": "poison"
+        },
+        "note": "UM: '+4 sacred bonus to saving throws against poison'"
+      },
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "amount": 4,
+        "bonus_type": "sacred",
+        "when": {
+          "against": "poison"
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "will",
+        "amount": 4,
+        "bonus_type": "sacred",
+        "when": {
+          "against": "poison"
+        }
+      }
+    ]
+  },
+  "extra-rogue-talent": {
+    "stacks": true,
+    "choice_slots": {
+      "rogue talent": 1
+    }
+  },
+  "defiant-luck": {
+    "luck": [
+      {
+        "reroll": "natural_1",
+        "rolls": [
+          "save"
+        ],
+        "per_day": 1
+      },
+      {
+        "confirm_against": "reroll",
+        "per_day": 1
+      }
+    ],
+    "not_yet": [
+      "the hero-point Special (1 hero point to force the reroll): the optional hero point system is not in the game"
+    ]
+  },
+  "bestow-luck": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "pool.defiant-luck",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "note": "ARG: 'You gain an extra use per day of your Defiant Luck ability.'"
+      }
+    ],
+    "not_yet": [
+      "granting Inexplicable Luck's bonus to an ally who can see and hear you, as an immediate action: a creature's luck reaches only its own d20"
+    ]
+  },
+  "deathless-zealot": {
+    "luck": [
+      {
+        "confirm_against": "lowest"
+      }
+    ]
+  },
+  "meditation-master": {
+    "tags": [
+      "meditation.master"
+    ],
+    "luck": [
+      {
+        "bonus": {
+          "before": 1,
+          "after": 1
+        },
+        "rolls": [
+          "d20"
+        ],
+        "per_day": 1,
+        "bonus_type": "insight",
+        "while": "meditation.held"
+      }
+    ]
+  },
+  "body-control": {
+    "modifiers": [
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "poison",
+          "bearer": {
+            "state": "meditation.held"
+          }
+        },
+        "note": "F&P: '+1 bonus on Fortitude saving throws against poison, disease, starvation, and effects that would make you fatigued or exhausted' for 24 hours after you meditate"
+      },
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "disease",
+          "bearer": {
+            "state": "meditation.held"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "con_check",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "starvation",
+          "bearer": {
+            "state": "meditation.held"
+          }
+        },
+        "note": "starvation is a Constitution check in 1e (CRB p.444), so the feat's +1 lands there (owner call)"
+      }
+    ],
+    "not_yet": [
+      "saves against effects that would make you fatigued or exhausted: a save does not say what its failure would leave",
+      "half as much food, water and sleep: the body's needs (rules/survival.py) and a night's eight hours are fixed"
+    ]
+  },
+  "bend-with-the-wind": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "resist.cold",
+        "amount": 5,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "meditation.held"
+          }
+        },
+        "note": "F&P: 'For 24 hours after you meditate, you gain cold resistance 5 and fire resistance 5.'"
+      },
+      {
+        "type": "combat_mod",
+        "target": "resist.fire",
+        "amount": 5,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "meditation.held"
+          }
+        }
+      }
+    ]
+  },
+  "body-mastery": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "dr",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "meditation.held"
+          }
+        },
+        "note": "F&P: 'For 24 hours after you meditate, you gain damage reduction 2/-.'"
+      }
+    ]
+  },
+  "sure-grasp": {
+    "luck": [
+      {
+        "twice": "higher",
+        "rolls": [
+          "skill.climb"
+        ]
+      },
+      {
+        "twice": "higher",
+        "rolls": [
+          "save.ref"
+        ],
+        "against": [
+          "fall"
+        ]
+      }
+    ]
+  },
+  "stage-combatant": {
+    "tags": [
+      "lethality.nonlethal.focused"
+    ],
+    "not_yet": [
+      "an attack that deals no damage at all (a stage blow): no attack declares itself harmless"
+    ]
+  },
+  "fast-healer": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "healing_extra",
+        "formula": "max(1, floor(con_mod / 2))",
+        "bonus_type": "untyped",
+        "note": "APG: 'When you regain hit points by resting or through magical healing, you recover additional hit points equal to half your Constitution modifier (minimum +1)'"
+      }
+    ]
+  },
+  "attuned-to-the-wild": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "natural_healing",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "terrain": "$pick"
+          }
+        },
+        "note": "ARG: 'While you are in your selected terrain type, your natural healing rate ... doubles'"
+      }
+    ]
+  },
+  "rugged-northerner": {
+    "tags": [
+      "climate.cold.unhindered"
+    ],
+    "not_yet": [
+      "severe and extreme cold stepping down a band: the engine models one cold band (below 40 F, hazards.json cold), which the feat already shrugs off"
+    ]
+  },
+  "keen-scent": {
+    "tags": [
+      "sense.scent"
+    ]
+  },
+  "stone-sense": {
+    "tags": [
+      "sense.tremorsense.10"
+    ]
+  },
+  "fast-empathy": {
+    "tags": [
+      "empathy.fast"
+    ]
+  },
+  "ferocious-summons": {
+    "tags": [
+      "summons.grant.ferocity"
+    ]
+  },
+  "stoic": {
+    "tags": [
+      "fear.stoic"
+    ],
+    "modifiers": [
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "fear"
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "fear"
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "will",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "fear"
+        }
+      }
+    ]
+  },
+  "courage-in-numbers": {
+    "modifiers": [
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "formula": "min(8, 2 * allies_10)",
+        "bonus_type": "morale",
+        "when": {
+          "against": "fear"
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "formula": "min(8, 2 * allies_10)",
+        "bonus_type": "morale",
+        "when": {
+          "against": "fear"
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "will",
+        "formula": "min(8, 2 * allies_10)",
+        "bonus_type": "morale",
+        "when": {
+          "against": "fear"
+        }
+      }
+    ]
+  },
+  "exorcist-s-rebuttal": {
+    "tags": [
+      "rebuttal.exorcist"
+    ]
+  },
+  "demonic-nemesis": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "target": {
+            "subtype": "demon"
+          }
+        }
+      },
+      {
+        "type": "combat_mod",
+        "target": "crit_confirm",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "target": {
+            "subtype": "demon"
+          }
+        }
+      }
+    ],
+    "not_yet": [
+      "only the chosen demon lord's followers: no creature records whom it serves, so every demon counts and no mortal cultist does"
+    ]
+  },
+  "deathless-initiate": {
+    "tags": [
+      "dying.fights-on",
+      "deathless.unstaggered",
+      "deathless.two-actions"
+    ],
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "state.fighting-on"
+          },
+          "weapon": {
+            "ranged": false
+          }
+        },
+        "note": "UC: 'while using the Diehard feat, you gain a +2 bonus on melee attacks and damage rolls'"
+      },
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "state.fighting-on"
+          },
+          "weapon": {
+            "ranged": false
+          }
+        }
+      }
+    ],
+    "not_yet": [
+      "the `dying.fights-on` tag is carried here because core.json's Diehard document (another lane's file) does not carry it yet: plain Diehard should fight on too"
+    ]
+  },
+  "deathless-master": {
+    "tags": [
+      "dying.fights-on",
+      "deathless.unstrained"
+    ]
+  },
+  "lookout": {
+    "tags": [
+      "surprise.lookout"
+    ],
+    "not_yet": [
+      "the initiative of a holder lifted into the surprise round ('equal to your initiative roll or the roll of your ally -1, whichever is lower'): the turn order is the one rolled"
+    ]
+  },
+  "shield-wall": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "shield": true
+          },
+          "ally_beside": {
+            "feat": "shield-wall",
+            "shield": "light"
+          }
+        },
+        "note": "APG: the shield bonus +1 beside an ally with the feat and a buckler or light shield (untyped here, so it rides on top of the shield's own; owner call)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "shield": true
+          },
+          "ally_beside": {
+            "feat": "shield-wall",
+            "shield": "heavy"
+          }
+        }
+      }
+    ],
+    "not_yet": [
+      "sharing an adjacent ally's tower-shield total cover when an attack passes through its edge: total cover from a tower shield is not modelled"
+    ]
+  },
+  "ultimate-resolve": {
+    "tags": [
+      "aura.wide.charm",
+      "aura.lasts.charm"
+    ]
+  }
+}

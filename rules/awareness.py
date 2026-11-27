@@ -237,7 +237,40 @@ def locates(scene, observer, subject) -> bool:
     """Whether `observer` knows which square `subject` is in — enough to aim a blow at it
     (with the miss chance invisibility still gives), not enough for an attack of
     opportunity."""
-    return sees(scene, observer, subject) or knows_where(scene, observer, subject)
+    return sees(scene, observer, subject) or knows_where(scene, observer, subject) \
+        or senses(scene, observer, subject) == "pinpoint"
+
+
+def senses(scene, observer, subject) -> str:
+    """What the observer's non-visual senses give of `subject`: "pinpoint", "near" or "".
+
+    The universal monster rules (aonprd.com UMR, checked 2026-11-26): scent "can detect
+    opponents within 30 feet by sense of smell ... When the creature is within 5 feet of
+    the source, it pinpoints the source's location"; tremorsense "can automatically
+    pinpoint the location of anything that is in contact with the ground", at the range
+    its tag names (`sense.tremorsense.10`, Stone Sense). Wind direction (scent's 60 and 15
+    feet) is not modelled. Measured on the board; with no board, nothing (feat loop
+    b4-other: Keen Scent and Stone Sense had a tag and no reader)."""
+    if observer is None or subject is None or observer is subject:
+        return ""
+    gap = _gap(scene, observer, subject)
+    if gap is None:
+        return ""
+    best = ""
+    for tag in _tags_of(observer):
+        if states.matches(tag, "sense.tremorsense"):
+            tail = tag[len("sense.tremorsense"):].strip(".")
+            reach = int(tail) if tail.isdigit() else 30
+            spot = (getattr(scene, "positions", {}) or {}).get(subject.ref) or ()
+            grounded = len(spot) < 3 or int(spot[2]) <= scene.grid.ground(tuple(spot))
+            if gap <= reach and grounded:
+                return "pinpoint"
+        elif states.matches(tag, "sense.scent"):
+            if gap <= 5:
+                return "pinpoint"
+            if gap <= 30:
+                best = "near"
+    return best
 
 
 def player_locates(scene, subject) -> bool:

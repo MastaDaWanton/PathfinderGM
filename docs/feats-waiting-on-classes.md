@@ -307,3 +307,41 @@ feature no playable class grants.
 - Ascendant Spell: mythic rules
 - Create Sanguine Elixir: Brew Potion, removed by the owner's 2026-11-22 ruling (item
   creation lives at the benches), so no one can meet the prerequisite
+
+## Class features no playable class has (feat loop batch 4)
+
+- Deep Drinker, Fast Drinker: drunken ki (the drunken master monk archetype; the content has
+  no archetypes)
+- Extra Discovery: the alchemist's discoveries (alchemist)
+- Extra Revelation: an oracle's revelations (oracle)
+- Extra Arcana: magus arcana (magus)
+- Eyes of Judgment: the detect alignment class feature (inquisitor)
+- Horse Master: the expert trainer class feature (cavalier)
+- Sin Seer: the paladin's detect undead (the undead scourge archetype; a core paladin detects
+  evil already)
+- Learn Ranger Trap (both printings), Improved Learn Ranger Trap, Trapper's Setup: ranger
+  traps (the trapper ranger archetype) — no trap a player sets exists in the engine, so the
+  feat that lends one to anybody has nothing to lend
+
+## Systems not in the game (feat loop batch 4)
+
+- Leadership: cohorts and followers (Table 5-2). Hirelings are paid and are not a cohort
+  (rules/hirelings.py says so); building cohorts is a feature for the owner to scope
+- Additional Traits: character traits (Chapter 8), which no sheet carries
+- Hero's Fortune, Luck of Heroes: the optional hero point system (APG pp. 322-324)
+- Renown: Fame and Prestige Points (Pathfinder Society play)
+- Expert Trainer: retraining (Ultimate Campaign)
+- Monastic Legacy: multiclassing (levels in classes other than monk)
+- Equipment Trick: equipment tricks (Adventurer's Armory, Magical Marketplace)
+- Dented Helm, Cloven Helm: a helmet — no helmet is an item a sheet can wear, so "when
+  wearing a helmet" is never true (Hard-Headed, b4-maneuver's, needs the same)
+- Flagbearer: a clan, house or party flag — no flag or standard is an item
+- Conviction: a vampire's aversion to a holy symbol — the bestiary's vampire weaknesses are
+  printed text, not rules the engine runs
+- Improved Stalwart: Stalwart, which batch 1 left without a document (trading a defensive
+  stance's dodge bonus for DR is not built)
+- Dimensional Savant: Dimensional Dervish's teleporting full attack, still a `not_yet` in
+  batch2-attack-a.json
+- Meditative Concentration, Perfect Center, Slow Time: Combat Meditation, lane
+  b4-maneuver's in this batch (Perfect Center also needs taking 10 as a declared choice,
+  which no check offers a player yet)

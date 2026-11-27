@@ -619,6 +619,14 @@ VOCAB: dict[str, list[dict]] = {
         # confirm a critical against them (Snapping Turtle Shell's "your enemies take a
         # -4 penalty on critical confirmation rolls against you"), read at the confirm.
         ("crit_confirm_against", "Rolls to confirm a critical against you"),
+        # Feat loop b4-other: damage reduction /— (Body Mastery's "damage reduction 2/-"),
+        # read by `Actor.damage_reduction` beside every other DR, best only.
+        ("dr", "Damage reduction /— (no material passes it)"),
+        # And the two healing readers: `natural_healing` doubles a night's (Attuned to
+        # the Wild, `Actor.rest`), `healing_extra` adds to a night's or a magical heal
+        # (Fast Healer, `Actor.rest` and `Engine._fast_healer`).
+        ("natural_healing", "Natural healing doubled (any term)"),
+        ("healing_extra", "Hit points added to rest and magical healing"),
         # Feat loop b1, 2026-11-22: the caster level a spell is CAST at, read by
         # `casting.spell_caster_level` with the spell's roll context (school, spell,
         # energy, descriptor, subschool) — Spell Specialization's "treat your caster level
@@ -2607,6 +2615,9 @@ AGAINST: dict[str, str] = {
     # supernatural abilities of witches and hags": a save whose source is a hag or a
     # witch (Engine._cast_save, Engine._op_save off the source creature).
     "hag_or_witch": "a save against a hag's or a witch's spell or ability",
+    # Feat loop b4-other: Sure Grasp's "a Reflex save to avoid falling" — the jump's grab
+    # at the far edge (bodyskills.jump), passed by the save that rolls it.
+    "fall": "a Reflex save to avoid falling (bodyskills)",
 }
 
 
@@ -2735,6 +2746,7 @@ def when_problems(when, where: str = "when") -> list[str]:
             from . import feats as feats_mod
 
             if (not isinstance(want, dict) or set(want) - {"feat", "foe_larger", "shield"}
+                    or want.get("shield") not in (None, True, False, "light", "heavy")
                     or str(want.get("feat") or "") not in feats_mod.all_feats()):
                 out.append(f"{where}.ally_beside is {{\"feat\": \"<a feat id>\"}}, with "
                            f"an optional \"foe_larger\": true and \"shield\": true (the "

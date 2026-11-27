@@ -278,6 +278,9 @@ def feat_rank_name(skill: str) -> str:
 # extra`): the ranks in the skill the term lands on, in any named skill, and the adjacent
 # allies holding the same feat. The validator probes formulas with these.
 FEAT_FORMULA_NAMES = ("ranks", "allies", "allies_threatening", "weapon_dice",
+                      # Feat loop b4-other: allies within 10 ft with the feat (Courage
+                      # in Numbers' "for every ally within 10 feet who possesses this feat").
+                      "allies_10",
                       *(feat_rank_name(s) for s in SKILLS))
 # A feat's class-skill grant, `skill.class.$target` bound to each pick (`class_skills`).
 FEAT_CLASS_SKILL = "skill.class."
@@ -315,6 +318,15 @@ MAGIC_SUPPRESSED = "suppressed.magic"
 # (content/feats/mechanics, 2026-10-09), read by `Actor.bleed_out` and
 # `Engine._resolve_dying` instead of the Constitution check.
 DYING_STABILISES = "dying.stabilises"
+# Diehard's "act as if you were disabled, rather than dying" (`Actor._fight_on`, feat loop
+# b4-other), Deathless Initiate's "You are not staggered while using the Diehard feat",
+# Deathless Master's "you do not lose 1 hit point when you take an action", and the state
+# a body fighting on below 0 holds.
+DYING_FIGHTS_ON = "dying.fights-on"
+FIGHTS_UNSTAGGERED = "deathless.unstaggered"
+FIGHTS_UNSTRAINED = "deathless.unstrained"
+FIGHTS_STRAINED_BY_TWO = "deathless.two-actions"
+FIGHTING_ON = "state.fighting-on"
 # What counts as magic for it: effects a spell or a ward put there (the provenance stamp,
 # stage 8). A herbal tea's buff (`item:<herb>`) is chemistry and stays; a class ability's
 # rage stays (the owner named buffs and wards).
@@ -354,6 +366,11 @@ STRIKES_EITHER_WAY = "lethality.either.unarmed"
 LETHALITY_EITHER = "lethality.either"
 PULLS_BLUDGEONING = "lethality.nonlethal.bludgeoning"     # Bludgeoner (feat loop b3)
 UNTIL_REST = "duration.until-rest"                         # gone at the next rest (b3)
+# Feat loop b4-other: Meditation Master's document tag, and the 24 hours a meditation lays.
+MEDITATES = "meditation.master"
+MEDITATED = "meditation.held"
+# Stage Combatant: no -4 to pull a blow to nonlethal with a weapon of one's Weapon Focus.
+PULLS_FOCUSED = "lethality.nonlethal.focused"
 # The tag Quick Draw's feat document grants: "You can draw a weapon as a free action
 # instead of as a move action" (Core Rulebook p.132). Asked by `Engine._draw_paid`.
 QUICK_DRAW = "action.draw.free"
@@ -2919,7 +2936,11 @@ class Actor:
         written a condition on it — the tag layer widens the old tests, never narrows
         them.
         """
-        return self.hp < 0 or self.has_state("state.down")
+        # Diehard's body fighting on below 0 (`FIGHTING_ON`, feat loop b4-other) is the one
+        # creature below 0 still in the fight: the book's "act as if you were disabled".
+        if self.hp < 0 and not self.has_state(FIGHTING_ON):
+            return True
+        return self.has_state("state.down")
 
     @property
     def is_helpless(self) -> bool:
@@ -3228,7 +3249,47 @@ class Actor:
 
         mods.extend(self._condition_mods("saves"))
         mods.extend(self._buff_mods("save_mod", save, ctx))
+        mods.extend(self._aura_mods(ctx))
         return stack(mods)
+
+    # A paladin's aura, the ally half (feat loop b4-other): `aura.save.<against>` on the
+    # paladin's class document is "Each ally within 10 feet of her gains a +4 morale bonus
+    # on saving throws against <fear | charm | compulsion> effects" (CRB, Paladin);
+    # `aura.wide.<against>` widens it to 20 feet and `aura.lasts.<against>` keeps it while
+    # she is unconscious (Ultimate Resolve, UM). All three auras print +4 morale.
+    AURA_SAVE, AURA_WIDE, AURA_LASTS = "aura.save", "aura.wide", "aura.lasts"
+
+    def _aura_mods(self, ctx: dict | None) -> list[Modifier]:
+        raw = (ctx or {}).get("against") or ()
+        against = {raw} if isinstance(raw, str) else set(raw)
+        scene = getattr(current_moment(), "scene", None)
+        here = getattr(scene, "actors", None) or {}
+        if not against or self.ref not in here:
+            return []
+        from . import position
+        from . import states as _states
+
+        out = []
+        for ref, other in here.items():
+            if ref == self.ref or other.is_dead or not position._same_side(
+                    scene, self.ref, ref):
+                continue
+            for tag in other.standing_tags():
+                if not _states.matches(str(tag), self.AURA_SAVE):
+                    continue
+                word = str(tag)[len(self.AURA_SAVE) + 1:]
+                if word not in against:
+                    continue
+                if other.is_down and not other.has_state(f"{self.AURA_LASTS}.{word}"):
+                    continue
+                reach = 20 if other.has_state(f"{self.AURA_WIDE}.{word}") else 10
+                try:
+                    feet = scene.distance_between(self.ref, ref)
+                except Exception:  # noqa: BLE001 - unplaced: nobody is measured
+                    feet = None
+                if feet is None or int(feet) <= reach:
+                    out.append(Modifier(4, f"{other.name}'s aura ({word})", "morale"))
+        return out
 
     # --- ability checks and concentration ---------------------------------------------
 
@@ -4141,9 +4202,27 @@ class Actor:
                 and "bludgeoning" in str(w.get("type") or "").lower() \
                 and self.has_state(PULLS_BLUDGEONING):
             return ""
+        # Stage Combatant (UC, feat loop b4-other): "When you make an attack with a weapon
+        # that you have Weapon Focus in, you take no penalty on the attack roll when you
+        # are attempting to make an attack that deals ... nonlethal damage."
+        if wanted == "nonlethal" and self.has_state(PULLS_FOCUSED) and base \
+                and base in self._focus_weapons():
+            return ""
         if wanted == "nonlethal":
             return f"pulling the blow with a {w['name']} (non-lethal)"
         return f"striking to kill with a {w['name']}"
+
+    def _focus_weapons(self) -> set[str]:
+        """The weapon keys this creature's Weapon Focus feats name (a pick each)."""
+        from . import feats as feats_mod
+        from . import weapons as weapons_mod
+
+        out = set()
+        for raw in self.feats or ():
+            feat, pick = feats_mod.resolve(raw)
+            if feat is not None and feat.id == "weapon-focus" and pick:
+                out.add(str(weapons_mod.key_for(pick) or pick).strip().lower())
+        return out
 
     def attack_modifiers(
         self, weapon_key: str | None = None, iteration: int = 0,
@@ -5118,6 +5197,11 @@ class Actor:
                         or (source is not None and e.source != source)]
         return gone
 
+    def healing_extra(self) -> int:
+        """What a heal by rest or by magic adds (`healing_extra` terms: Fast Healer)."""
+        return max(0, sum(m.value for m in stack(self._buff_mods("combat_mod",
+                                                                 "healing_extra"))))
+
     def heal(self, amount: int) -> int:
         """Healing restores real hit points only, and never past your maximum.
 
@@ -5308,6 +5392,10 @@ class Actor:
             if isinstance(d, dict) and int(d.get("amount", 0) or 0) > 0 and wants(d):
                 pool.append(Reduction(int(d["amount"]), str(d.get("bypass") or ""),
                                       e.source or e.name))
+        # Feat loop b4-other: a term's DR/— through the funnel (Body Mastery's 2/-), each
+        # source its own Reduction so best-only still holds.
+        for m in self._buff_mods("combat_mod", "dr"):
+            pool.append(Reduction(int(m.value), "", m.source))
         usable = [r for r in pool if r.amount > 0 and not r.bypassed_by(traits)]
         # A blow that passes DR by its own rule rather than by what it is made of: a
         # smite "bypasses any DR the creature might possess" (CRB p.61), Artificer's Touch
@@ -6736,6 +6824,8 @@ class Actor:
         if "allies_threatening" in text:
             out["allies_threatening"] = len(self.allies_threatening_with(
                 fid, (ctx or {}).get("target_actor")))
+        if "allies_10" in text:
+            out["allies_10"] = len(self.adjacent_allies_with(fid, within=10))
         if "allies" in text:
             out["allies"] = len(self.adjacent_allies_with(fid))
         if "weapon_dice" in text:
@@ -6773,9 +6863,10 @@ class Actor:
                 and position._same_side(scene, self.ref, ref)
                 and reactions.threatens(scene, ref, square, getattr(foe, "size", "medium"))]
 
-    def adjacent_allies_with(self, fid: str) -> list:
-        """The allies beside this creature (same side, up, within 5 ft) who hold feat
-        `fid` — the teamwork-shaped feats' one question (see `_feat_formula_extra`)."""
+    def adjacent_allies_with(self, fid: str, within: int = 5) -> list:
+        """The allies beside this creature (same side, up, within `within` ft, 5 unless
+        said) who hold feat `fid` — the teamwork-shaped feats' one question (see
+        `_feat_formula_extra`)."""
         from . import feats as feats_mod
         from . import position
 
@@ -6794,7 +6885,7 @@ class Actor:
                 feet = scene.distance_between(self.ref, ref)
             except Exception:  # noqa: BLE001 - an unplaced body is unmeasured, not a crash
                 feet = None
-            if feet is None or int(feet) <= 5:
+            if feet is None or int(feet) <= int(within):
                 out.append(other)
         return out
 
@@ -6944,8 +7035,13 @@ class Actor:
         q = (query or "").strip().lower()
         if not q:
             return []
+        # A `recovery.*` family says what ends a state whatever kind of effect holds it:
+        # the climbing situation and smite evil's buff both carry `recovery.rest`, and a
+        # night's sleep swept neither (feat loop b4). Any other query stays on conditions,
+        # so "attitude" or "fatigued" never reaches into a buff.
+        anykind = states.matches(q, "recovery")
         gone = self.remove_effects(
-            kind="condition",
+            kind=None if anykind else "condition",
             match=lambda e: any(states.matches(str(t), q) for t in e.tags))
         return [e.key for e in gone]
 
@@ -7023,7 +7119,11 @@ class Actor:
             # and a lungful of water does not. The rule lives here with the other
             # thresholds because this is the one place that owns what a hit point total
             # means, and `Engine.breathe` owns only the schedule that got them here.
-            if self.has_state("ferocity"):
+            fights_on = self.hp < 0 and self.has_state(DYING_FIGHTS_ON) \
+                and not self.has_state("state.down.unconscious") and not self.drown_failures
+            if fights_on:
+                changed.extend(self._fight_on())
+            elif self.has_state("ferocity"):
                 if not self.has_state("state.impaired.staggered"):
                     self.add_condition("staggered", source="ferocity")
                     changed.append("staggered")
@@ -7033,7 +7133,7 @@ class Actor:
             # Stabilising once keeps you stable; fresh damage starts it again. Not at
             # exactly 0, though: a drowning character is unconscious for a round BEFORE
             # they start dying, which is the middle rung of the three-round fall.
-            if self.hp < 0 and not self.has_condition("stable") \
+            if self.hp < 0 and not fights_on and not self.has_condition("stable") \
                     and not self.has_condition("dying"):
                 self.add_condition("dying", source="hit points")
                 changed.append("dying")
@@ -7045,6 +7145,39 @@ class Actor:
 
         changed.extend(self.apply_nonlethal_state())
         return changed
+
+    def _fight_on(self) -> list[str]:
+        """Diehard's choice, taken (CRB): "You may choose to act as if you were disabled,
+        rather than dying ... When using this feat, you are staggered. You can take a move
+        action without further injuring yourself, but if you perform any standard action
+        ... you take 1 point of damage after completing the act." Below 0 with
+        `dying.fights-on`: disabled (the strain is `Engine._disabled_strain`'s), staggered
+        unless `deathless.unstaggered` (Deathless Initiate), never dying ("you
+        automatically stabilize"), and `FIGHTING_ON` held while it lasts — the state the
+        Deathless feats' terms ask, swept with `recovery.hit-points` when healed above 0.
+        Owner call: a holder always fights on; the choice is the reason to take the feat
+        (feat loop b4-other)."""
+        from . import states
+
+        out = []
+        # Deathless Initiate: "You are not staggered while using the Diehard feat, but if
+        # you take a move and a standard action or a full-round action ... you take 1
+        # point of damage" — a whole turn, so neither staggered nor disabled's one-action
+        # limit is laid (owner call); the strain is `Engine._disabled_strain`'s, asked of
+        # `FIGHTING_ON`.
+        if not self.has_state(FIGHTS_UNSTAGGERED):
+            if not self.has_state("state.impaired.disabled"):
+                self.add_condition(states.DISABLED_KEY, source="Diehard")
+                out.append(states.DISABLED_KEY)
+            if not self.has_state("state.impaired.staggered"):
+                self.add_condition(states.STAGGERED_KEY, source="Diehard")
+                out.append(states.STAGGERED_KEY)
+        if not self.has_state(FIGHTING_ON):
+            self.apply_effect(ActiveEffect(
+                name="fighting on below 0", kind="situation", key="fighting-on",
+                source="Diehard", origin="rule:diehard",
+                tags=(FIGHTING_ON, "recovery.hit-points")))
+        return out
 
     def apply_nonlethal_state(self) -> list[str]:
         """Non-lethal damage against its own threshold.
@@ -7116,6 +7249,13 @@ class Actor:
         if self.has_state("care.long-term"):
             per_level *= 2
             self.remove_effects(source="rule:long-term-care")
+        # Attuned to the Wild (ARG, feat loop b4-other): "While you are in your selected
+        # terrain type, your natural healing rate (the amount of hit points and ability
+        # damage you heal from a full night's rest) doubles" — a term of 1 is one more
+        # rate's worth (doubled), stacking by type as every term does; the feat taken
+        # twice is two terrains, never two terms at once ("Its effects do not stack").
+        per_level *= 1 + max(0, sum(m.value for m in stack(
+            self._buff_mods("combat_mod", "natural_healing"))))
         hours = 24 if kind == "bed rest" else 8
         slept = max(hours, int(slept)) if slept is not None else hours
 
@@ -7130,6 +7270,10 @@ class Actor:
         # a homunculus at 3 of 11 rose to 4 after a night, and a broken one at -5 to 1.
         if not self.has_state(CONSTRUCT):
             self.hp = min(self.hp_max, floor + per_level * max(1, self.level))
+            # Fast Healer (APG): "When you regain hit points by resting ... you recover
+            # additional hit points equal to half your Constitution modifier (minimum +1)".
+            if self.hp > floor:
+                self.hp = min(self.hp_max, self.hp + self.healing_extra())
 
         # You stand up in the morning. Waking still prone, shaken and entangled from a
         # fight the night before is the sort of stale state that quietly poisons every
@@ -7255,7 +7399,26 @@ class Actor:
         if casting.is_caster(self):
             got = casting.ensure_prepared(self, reason="rest")
             prepared = casting.prepared_said(self, got)
+        said = self._meditate() if kind == "night" else ""
+        prepared = f"{prepared} {said}".strip()
         return dict(result, levelled=levelled, refilled=refilled, prepared=prepared)
+
+    def _meditate(self) -> str:
+        """Meditation Master's hour (F&P): "When you meditate for at least 1 hour after
+        getting at least 8 hours of rest" — taken at the end of every full night by a
+        holder of the `meditation.master` tag, the way the owner's Q40 folded a wizard's
+        hour of study into the night (the night already runs to dawn). It lays
+        `MEDITATED` for the "next 24 hours" the meditation feats ask (`while`, `bearer.
+        state`); the +1 itself is the luck pool the night refilled, so "once used ... not
+        again until after you meditate again after another 8 hours of rest" (feat loop
+        b4-other). Combat Meditation's full-round version is lane b4-maneuver's."""
+        if not self.has_state(MEDITATES):
+            return ""
+        self.apply_effect(ActiveEffect(
+            name="meditated", kind="buff", key="meditated", source="Meditation Master",
+            origin="feat:meditation-master", duration="rounds", rounds_left=14400,
+            tags=(MEDITATED,)))
+        return f"{self.name} meditates for an hour at dawn."
 
     def bleed_out(self, dice) -> dict | None:
         """One round of dying: try to stabilise, and lose a hit point only on a failure.
@@ -8946,6 +9109,15 @@ class Situation:
             # Duck and Cover's "as long as your ally is wielding a shield" (feat loop b3).
             if want.get("shield") and not (other.shield_stats() or {}).get("ac"):
                 continue
+            # Shield Wall (APG, feat loop b4-other): "If your ally is wielding a buckler or
+            # a light shield ... +1. If your ally is wielding a heavy shield or a tower
+            # shield ... +2" — the ally's shield by its table's base AC (1, or 2 and more).
+            if want.get("shield") in ("light", "heavy"):
+                from .tables import SHIELDS
+
+                base = int((SHIELDS.get(str(other.shield or "none")) or {}).get("ac") or 0)
+                if (base >= 2) != (want["shield"] == "heavy"):
+                    continue
             if want.get("foe_larger"):
                 if foe is None:
                     continue

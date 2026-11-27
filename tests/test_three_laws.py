@@ -465,7 +465,17 @@ _REACHES = {
     # Feat loop b3: an animal companion's effective druid level (Boon Companion), read by
     # `animal_companion.effective_level` with an offset that leaves room under the cap.
     ("combat_mod", "companion_level"): lambda a: _companion_level(a),
+    # Feat loop b4-other: a term's DR/— (Body Mastery), the night's healing doubled
+    # (Attuned to the Wild) and the hit points added to a rest or a cure (Fast Healer).
+    ("combat_mod", "dr"): lambda a: getattr(a.damage_reduction("slashing"), "amount", 0),
+    ("combat_mod", "natural_healing"): lambda a: _natural_healing(a),
+    ("combat_mod", "healing_extra"): lambda a: a.healing_extra(),
 }
+
+
+def _natural_healing(a) -> int:
+    a.hp = 0
+    return a.rest("night")["healed"]
 
 
 def _companion_level(a) -> int:

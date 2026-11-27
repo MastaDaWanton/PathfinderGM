@@ -144,6 +144,21 @@ def _roll(engine, actor, mods, label: str):
                            visibility="player" if actor.is_pc else "hidden")
 
 
+def _twice(engine, actor, roll, kind: str, against=()):
+    """Sure Grasp (UC, feat loop b4-other): "Roll twice while climbing or when making a
+    Reflex save to avoid falling, and take the higher result" (`luck.twice`). The second
+    die is the engine's, beside the first (the player's own when it is theirs)."""
+    from . import luck as luck_mod
+
+    doc = luck_mod.twice(actor, kind, against)
+    if doc is None:
+        return roll
+    again = engine.dice.d20(list(roll.modifiers), label=f"{roll.label} ({doc['name']}, "
+                            f"the second die)", visibility="player" if actor.is_pc
+                            else "hidden")
+    return again if again.total > roll.total else roll
+
+
 def _band_dc(intent, actor, default: int) -> tuple[int, str]:
     from . import dc as dc_mod
 
@@ -285,8 +300,9 @@ def jump(engine, intent, actor, mods, partial, *, high: bool = False):
     extra, fx = [], [{"ref": actor.ref, "kind": "jump", "feet": feet, "made": False}]
     bits = [f"{actor.name} falls short of the {feet}-foot jump by {-margin}."]
     if margin >= -4:
-        save = _roll(engine, actor, actor.save_modifiers("ref"),
-                     "Reflex save (grab the far edge)")
+        save = _twice(engine, actor, _roll(engine, actor, actor.save_modifiers("ref"),
+                                           "Reflex save (grab the far edge)"),
+                      "save.ref", ("fall",))
         extra.append(save)
         if d20_succeeds(save, int(r["edge_dc"])):
             if drop:
@@ -420,8 +436,9 @@ def climb(engine, intent, actor, mods, partial):
         if spent:
             return engine._refuse(intent, spent + " Nothing is rolled.", code="action_spent")
     speed = int(actor.movement_modes().get("climb") or 0) or max(5, int(actor.speed_feet) // 4)
-    first = engine._roll_or_suspend(intent, actor, list(mods), label="Climb check",
-                                    dc=value, partial=partial)
+    first = _twice(engine, actor, engine._roll_or_suspend(
+        intent, actor, list(mods), label="Climb check", dc=value, partial=partial),
+        "skill.climb")
     _spend_action(engine, actor, "move")
     rolls, roll, fx, bits = [], first, [], []
     while True:
@@ -442,7 +459,8 @@ def climb(engine, intent, actor, mods, partial):
                             f"{top} feet up, without their Dexterity to their defence "
                             f"while on the wall.")
                 break
-            roll = _roll(engine, actor, mods, "Climb check")
+            roll = _twice(engine, actor, _roll(engine, actor, mods, "Climb check"),
+                          "skill.climb")
             rolls.append(roll)
             continue
         if margin >= -4:
@@ -460,9 +478,9 @@ def climb(engine, intent, actor, mods, partial):
         catch_dc = value + int(row("skill.climb.catch")["adds"])
         # A feat's term on this roll alone (feat loop b2): Shield Snag's "+4 bonus ... on
         # Climb checks to catch yourself on a wall or slope when falling" with a shield.
-        caught = _roll(engine, actor, list(mods) + actor._feat_mods(
+        caught = _twice(engine, actor, _roll(engine, actor, list(mods) + actor._feat_mods(
             "skill_mod", "climb", {"skill_use": "catch"}, scoped=True),
-            "Climb check (catch yourself)")
+            "Climb check (catch yourself)"), "skill.climb")
         rolls.append(caught)
         if caught.total >= catch_dc:
             _cling(actor, at=at, top=top, dc=value)

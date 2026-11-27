@@ -7856,8 +7856,21 @@ class Engine:
         if any(e.get("kind") == "battle_joined" for e in outcome.effects or ()):
             return None
         actor = self.scene.actors.get(intent.actor)
-        if actor is None or not actor.has_state("state.impaired.disabled") \
+        from .sheet import FIGHTING_ON, FIGHTS_STRAINED_BY_TWO, FIGHTS_UNSTRAINED
+
+        if actor is None or not (actor.has_state("state.impaired.disabled")
+                                 or actor.has_state(FIGHTING_ON)) \
                 or actor.is_down or actor.hp > 0:
+            return None
+        # Deathless Master (UC): "When you are at 0 or fewer hit points, you do not lose 1
+        # hit point when you take an action"; Deathless Initiate: the point only "if you
+        # take a move and a standard action or a full-round action while you are at 0 or
+        # fewer hit points" (feat loop b4-other, the documents' tags).
+        if actor.has_state(FIGHTS_UNSTRAINED):
+            return None
+        if actor.has_state(FIGHTS_STRAINED_BY_TWO) \
+                and not intent.params.get("full_attack") \
+                and self.scene.move_spent.get(actor.ref) != self.scene.round:
             return None
         from . import names as names_mod
 
@@ -11813,6 +11826,8 @@ class Engine:
                     swing_ac, partial, state, "1d20",
                 )
                 state["rolls"].append(confirm.as_dict())
+                confirm = self._confirm_against(actor, defender, confirm_mods, confirm,
+                                                swing_ac, state)
                 state["crit"] = confirm.total >= swing_ac
                 state["confirm_total"] = confirm.total     # Impact Critical Shot's CMD test
                 self._judge(confirm, state["crit"])
@@ -15395,6 +15410,7 @@ class Engine:
             healed = 0
         else:
             healed = target.heal(amount)
+            healed += self._fast_healer(target, healed, intent.origin)
         nl_healed = nl_before - target.nonlethal
         temp_banked = sum(p.amount for p in target.temp_pools) - temp_before
         # The dying stop dying: back to 0 or above they wake (disabled at exactly 0), and
@@ -25529,9 +25545,10 @@ class Engine:
         # with undead traits become unkillable, immune to the very condition that
         # records their death. The op is where an outside effect asks to impose
         # something; the applicator is the engine's own hand.
-        blocked = states.immunity_blocks(
-            target.immunities, key,
-            intent.params.get("descriptors") or ())
+        # `immune_to`, not the printed list alone (feat loop b4): a gray ooze prints no
+        # "ooze traits" and no Int score, and a charm landed on it.
+        blocked = states.immune_to(
+            target, "", key, intent.params.get("descriptors") or ())
         if blocked:
             # A refusal, not a raise: the schema may require the op the GM declared.
             return Outcome(
@@ -31071,6 +31088,7 @@ class Engine:
             if kind == "heal":
                 had = target.nonlethal
                 healed = target.heal(amount)
+                healed += self._fast_healer(target, healed, "spell:")
                 state["effects"].append({
                     "ref": target.ref, "kind": "heal", "amount": healed,
                     "rolled": amount, "hp_after": target.hp, "hp_max": target.hp_max,
@@ -31312,12 +31330,63 @@ class Engine:
         state["rolls"].append(roll.as_dict())
         saved = d20_succeeds(roll, dc)
         self._judge(roll, saved)
+        saved = self._resolve_after_save(target, caster, spell, saved, state)
         # Half from full without parsing a tell: the saved flag only. The DC and total live
         # on the save's Roll, under its own visibility (§1.6 E12).
         state["effects"].append({"kind": "save", "ref": target.ref, "save": save,
                                  "saved": bool(saved)})
         done[key] = {"saved": bool(saved), "roll": roll.as_dict()}
         return saved, roll
+
+    STOIC = "fear.stoic"                          # Stoic's document tag (b4-other)
+    REBUTTAL = "rebuttal.exorcist"                # Exorcist's Rebuttal's
+
+    @staticmethod
+    def _steeled_tag(caster) -> str:
+        return f"immune.fear.from.{caster.ref}"
+
+    def _resolve_after_save(self, target: Actor, caster, spell, saved: bool,
+                            state: dict) -> bool:
+        """What a feat does once a save against a spell stands (feat loop b4-other).
+
+        * Stoic (ISWG): "If you successfully save against any fear effect, you are immune
+          to further fear effects from that source for 24 hours" — the success lays
+          `immune.fear.from.<caster>` for 14,400 rounds; a later fear from that caster
+          is saved whatever the die (its success branch, a partial save's, still lands:
+          shortcut, upgrade when a gate is told who cast it).
+        * Exorcist's Rebuttal (DHH): "If you use your Improved Iron Will feat to reroll a
+          Will save against a compulsion effect and successfully save against the
+          effect, the creature that created the effect ... takes 1d4 points of Wisdom
+          damage" — the reroll read off the luck this op told (`_luck_said`)."""
+        if caster is None:
+            return saved
+        against = set(effectspec.spell_against(spell))
+        if "fear" in against and target.has_state(self._steeled_tag(caster)):
+            state["tells"].append(f"{target.name} has faced {caster.name}'s fear before "
+                                  f"and it finds no hold (Stoic).")
+            return True
+        if saved and "fear" in against and target.has_state(self.STOIC):
+            target.apply_effect(ActiveEffect(
+                name=f"steeled against {caster.name}", kind="situation",
+                key=f"steeled:{caster.ref}", source="Stoic", origin="feat:stoic",
+                duration="rounds", rounds_left=14400, tags=(self._steeled_tag(caster),)))
+            state["tells"].append(f"{target.name} is steeled against {caster.name}'s fear "
+                                  f"for a day (Stoic).")
+        rerolled = any(r.get("ref") == target.ref
+                       and r.get("origin") == "rule:feat-improved-iron-will"
+                       for r in self.__dict__.get("_luck_said") or ())
+        if saved and rerolled and "compulsion" in against \
+                and target.has_state(self.REBUTTAL) and caster is not target:
+            for o in self._run_within(self.validate([{
+                    "op": "ability_damage", "actor": target.ref, "target": caster.ref,
+                    "visibility": "hidden", "because": "Exorcist's Rebuttal",
+                    "params": {"ability": "wis", "amount": "1d4"}}],
+                    origin="rule:feat-exorcist-s-rebuttal", origin_name="Exorcist's Rebuttal")):
+                state["effects"].extend(o.effects or [])
+                state["rolls"].extend(r.as_dict() for r in (o.rolls or []))
+                state["tells"].append(f"{target.name} throws the compulsion back at "
+                                      f"{caster.name} (Exorcist's Rebuttal). {o.tell}".strip())
+        return saved
 
     # --- where a cast went (rules/areas.py does the geometry) ---------------------------
 
@@ -32833,8 +32902,9 @@ class Engine:
         Constitution bonus raises the hit point total (`Actor.hp_max` follows the score);
         a creature that has just arrived is at its full total."""
         specs = [(d, s) for d in self._feat_docs(caster) for s in d.get("summoned") or ()]
+        said = self._summons_granted(caster, made, ctx)
         if not specs:
-            return []
+            return said
         for m in made:
             actor = self.scene.actors.get(m["ref"])
             if actor is None:
@@ -32847,7 +32917,27 @@ class Engine:
             actor.hp = actor.hp_max
         names = " and ".join(sorted({d["name"] for d, _ in specs}))
         terms = ", ".join(effectspec.render(s) for _, s in specs)
-        return [f"{names}: {terms} on each, for as long as the spell lasts."]
+        return said + [f"{names}: {terms} on each, for as long as the spell lasts."]
+
+    def _summons_granted(self, caster, made: list[dict], ctx: dict) -> list[str]:
+        """A caster's `summons.grant.<tag>` tags laid on each creature called up, for the
+        spell's clock (feat loop b4-other): Ferocious Summons' "Creatures you summon gain
+        the ferocity universal monster ability" is `summons.grant.ferocity`, the tag the
+        hit-point ladder asks (`Actor.apply_hp_state`)."""
+        grants = sorted({str(t)[len("summons.grant."):] for t in caster.standing_tags()
+                         if str(t).startswith("summons.grant.")})
+        if not grants:
+            return []
+        for m in made:
+            actor = self.scene.actors.get(m["ref"])
+            if actor is None:
+                continue
+            actor.apply_effect(ActiveEffect(
+                name="summoned gifts", kind="buff", key="summons-granted",
+                source=f"{caster.name}'s summoning", origin="rule:summons-grant",
+                duration="rounds" if ctx.get("rounds") else "until-dismissed",
+                rounds_left=ctx.get("rounds"), tags=tuple(grants)))
+        return [f"Each creature called up has {', '.join(grants)}."]
 
     def _spell_operation(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
         """Permanency, dispel magic, suppression — spells whose target is another spell.
@@ -41289,6 +41379,12 @@ class Engine:
                 and target.has_state(states.HEAT_UNHINDERED):
             return rolls, effects, (f"{target.name} is at home in the heat and feels "
                                     f"none of it.")
+        # Rugged Northerner (ISWG, feat loop b4-other): "not impacted at all by normal
+        # cold weather conditions" — so no frostbite and no fatigue from it either.
+        if str(row.get("against") or rule) == "cold" \
+                and target.has_state(states.COLD_UNHINDERED):
+            return rolls, effects, (f"{target.name} is at home in the cold and feels "
+                                    f"none of it.")
         failed = taken = 0
         made = 0
         for i in range(max(0, int(hours))):
@@ -42300,7 +42396,8 @@ class Engine:
             doc, entry = luck_mod.find(actor, before, "bonus")
             if doc:
                 extra.append(Modifier(int(entry["bonus"]["before"]),
-                                      f"{doc['name']} (before the roll)"))
+                                      f"{doc['name']} (before the roll)",
+                                      str(entry.get("bonus_type") or "")))
         start = int(first) if first is not None else face
         roll = self.dice.given(start, list(mods) + extra, label=label)
         offers = luck_mod.after_offers(actor, kind, roll, self._short(roll, dc, kind),
@@ -42333,7 +42430,8 @@ class Engine:
                                                 f"{int(first)}, then {face}.")
                 else:
                     roll = self.dice.given(int(first), list(mods) + extra + [Modifier(
-                        int(took["amount"]), f"{doc['name']} (after the roll)")],
+                        int(took["amount"]), f"{doc['name']} (after the roll)",
+                        str(entry.get("bonus_type") or ""))],
                         label=label)
                     self._luck_note(actor, doc, f"{actor.name} calls on {doc['name']} after "
                                                 f"the roll (+{int(took['amount'])}).")
@@ -42367,7 +42465,8 @@ class Engine:
             else:
                 roll = Roll(die=roll.die, faces=list(roll.faces),
                             modifiers=list(roll.modifiers) + [Modifier(
-                                int(o["amount"]), f"{doc['name']} (after the roll)")],
+                                int(o["amount"]), f"{doc['name']} (after the roll)",
+                                str(entry.get("bonus_type") or ""))],
                             label=roll.label, visibility=roll.visibility)
                 self._luck_note(actor, doc, f"{actor.name} calls on {doc['name']} "
                                             f"(+{int(o['amount'])}).")
@@ -42404,6 +42503,51 @@ class Engine:
                     return theirs
                 break
         return roll
+
+    @staticmethod
+    def _fast_healer(target: Actor, healed: int, origin: str) -> int:
+        """Fast Healer (APG, feat loop b4-other): "When you regain hit points ... through
+        magical healing, you recover additional hit points equal to half your Constitution
+        modifier (minimum +1)" — a heal a spell, an item or a class power gave (its stamp),
+        that restored something. Lay on hands counts: a supernatural power (owner call)."""
+        if healed <= 0 or not str(origin or "").startswith(("spell:", "item:", "ability:")):
+            return 0
+        extra = target.healing_extra()
+        return target.heal(extra) if extra else 0
+
+    def _confirm_against(self, actor: Actor, defender: Actor, mods, confirm: Roll,
+                         ac: int, state: dict) -> Roll:
+        """The struck creature's luck on a roll to confirm a critical against it (feat loop
+        b4-other, `luck.confirm_against`): Deathless Zealot's "must roll twice and take the
+        lowest result", then — the critical still confirmed — Defiant Luck's once-a-day
+        "force the creature that confirmed the critical hit against you to reroll". The
+        extra dice are the engine's whoever attacks; the player's own die is the first.
+        The reroll is spent by the book's trigger, a confirmed critical, as every other
+        creature's luck is (`_luck_npc`) — owner call: the player is not stopped mid-blow."""
+        vis = "player" if (actor.is_pc or defender.is_pc) else "hidden"
+        label = str(confirm.label or "Confirm critical")
+        for doc, _ in luck_mod.confirm_against(defender, "lowest")[:1]:
+            again = self.dice.d20(list(mods), label=f"{label}, rolled twice ({doc['name']})",
+                                  visibility=vis)
+            state["rolls"].append(again.as_dict())
+            low = again if again.total < confirm.total else confirm
+            self._luck_note(defender, doc, f"{actor.name} rolls the confirmation twice "
+                                           f"against {defender.name} and takes the lower "
+                                           f"({doc['name']}).")
+            confirm = low
+        if confirm.total >= int(ac):
+            for doc, entry in luck_mod.confirm_against(defender, "reroll"):
+                if not luck_mod.spend(defender, doc, entry):
+                    continue
+                again = self.dice.d20(list(mods), label=f"{label}, rerolled ({doc['name']})",
+                                      visibility=vis)
+                state["rolls"].append(again.as_dict())
+                self._luck_note(defender, doc, f"{defender.name} makes {actor.name} roll the "
+                                               f"confirmation again ({doc['name']}): "
+                                               f"{confirm.total}, then {again.total}.")
+                confirm = again
+                break
+        return confirm
 
     def _surge(self, actor: Actor, why: str) -> None:
         """Surge of Success, earned (a confirmed critical, a natural 20 on a save)."""

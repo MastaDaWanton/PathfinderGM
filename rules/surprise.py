@@ -140,7 +140,9 @@ def decide(engine, sides: dict, ambushers=(), opener: str = "") -> tuple[list[st
             continue
 
         def notices(o) -> bool:
-            if not (awareness.sees(scene, me, o) or awareness.has_hunch(me, o)):
+            # Scent and tremorsense notice a presence too (`awareness.senses`, b4-other).
+            if not (awareness.sees(scene, me, o) or awareness.has_hunch(me, o)
+                    or awareness.senses(scene, me, o)):
                 return False
             if o.ref in bluff:
                 if (r, o.ref) not in read:
@@ -175,11 +177,49 @@ def begin(engine, sides: dict, ambushers=(), opener: str = "") -> dict | None:
     if not aware or not unaware:
         return None
     scene = engine.scene
+    full = _lookouts(engine, sides, aware, unaware)
+    if not unaware:
+        return None
     for r in unaware:
         scene.actors[r].add_condition(SURPRISED_KEY, rounds=1, source=ORIGIN, origin=ORIGIN)
     for r in aware:
-        scene.actors[r].add_condition(ROUND_KEY, rounds=1, source=ORIGIN, origin=ORIGIN)
+        if r not in full:
+            scene.actors[r].add_condition(ROUND_KEY, rounds=1, source=ORIGIN, origin=ORIGIN)
     return {"aware": aware, "unaware": unaware, "rolls": rolls}
+
+
+LOOKOUT = "surprise.lookout"                        # Lookout's tag (feat loop b4-other)
+
+
+def _lookouts(engine, sides: dict, aware: list, unaware: list) -> set:
+    """Lookout (APG): "Whenever you are adjacent to an ally who also has this feat, you
+    may act in the surprise round as long as your ally would normally be able to act in
+    the surprise round ... If both you and your ally would be able to act in the surprise
+    round without the aid of this feat, you may take both a standard and a move action
+    (or a full-round action)". Moves each unaware holder beside an aware one into `aware`
+    (in place) and returns the holders who keep a whole turn (no `surprise round`).
+    shortcut: the initiative clause ("equal to your initiative roll or the roll of your
+    ally -1, whichever is lower") is not applied; the turn order is the one rolled."""
+    scene = engine.scene
+    side_of = {r: s for s, refs in sides.items() for r in refs}
+    own = list(aware)
+
+    def partners(r):
+        me = scene.actors[r]
+        return [o for o in own if o != r and side_of.get(o) == side_of.get(r)
+                and scene.actors[o].has_state(LOOKOUT)
+                and (engine._gap_ft(me, scene.actors[o]) or 99) <= 5]
+
+    full = set()
+    for r in own:
+        if scene.actors[r].has_state(LOOKOUT) and partners(r):
+            full.add(r)
+    for r in list(unaware):
+        me = scene.actors[r]
+        if me.has_state(LOOKOUT) and awareness.can_perceive(me) and partners(r):
+            unaware.remove(r)
+            aware.append(r)
+    return full
 
 
 def tell(scene, record: dict) -> str:
