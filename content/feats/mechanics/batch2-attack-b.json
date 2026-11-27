@@ -176,9 +176,6 @@
       {"type": "combat_mod", "target": "spell_resistance", "formula": "11 + level",
        "bonus_type": "untyped", "when": {"against": "divine_spell"},
        "note": "only against the divine spells Divine Defiance covers"}
-    ],
-    "not_yet": [
-      "lowering the resistance for 1 round as a standard action: the engine has no way to lower spell resistance, so an ally's divine spell still meets it"
     ]
   },
   "cut-your-losses": {
@@ -200,10 +197,7 @@
     "tags": ["skill.heal.combat-medic"]
   },
   "improved-snap-shot": {
-    "tags": ["threat.ranged.15"],
-    "not_yet": [
-      "the tag is the shape lane b2-attack-a's Snap Shot reader asks (`reactions.ranged_threat`, threat.ranged.<feet>); until that lane merges nothing in this branch reads it"
-    ]
+    "tags": ["threat.ranged.15"]
   },
   "trick-riding": {
     "tags": ["skill.ride.trick-riding"]

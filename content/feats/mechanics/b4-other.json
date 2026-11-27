@@ -468,9 +468,6 @@
   "lookout": {
     "tags": [
       "surprise.lookout"
-    ],
-    "not_yet": [
-      "the initiative of a holder lifted into the surprise round ('equal to your initiative roll or the roll of your ally -1, whichever is lower'): the turn order is the one rolled"
     ]
   },
   "shield-wall": {

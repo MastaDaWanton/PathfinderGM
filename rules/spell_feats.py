@@ -213,12 +213,22 @@ def drunken_brawler(actor) -> str:
     lvl = int(getattr(actor, "level", 1) or 1)
     actor.gain_temp_hp(lvl, source="Drunken Brawler", rounds=HOUR,
                        origin="rule:drunken-brawler")
+    courage = [{"kind": "save_mod", "target": t, "amount": 2, "bonus_type": "alchemical",
+                "note": "Drunken Brawler"} for t in ("fort", "will")]
+    # Feat loop b6-partials: "These bonuses last an hour or until the temporary hit points
+    # gained by this effect are spent, whichever occurs first. The penalties last for a
+    # full hour." The +2s ride the temporary hit points' own effect, so the pool's
+    # emptying takes them (law 2); the -2 Reflex is its own hour. A better pool that kept
+    # this one from landing leaves the +2s on the hour's effect instead.
+    pool = next((e for e in actor.effects if e.kind == "temp_hp"
+                 and e.source == "Drunken Brawler"), None)
+    if pool is not None:
+        pool.modifiers = [m for m in pool.modifiers if m.get("note") != "Drunken Brawler"] \
+            + courage
     actor.apply_effect(ActiveEffect(
         name="the ale's courage", kind="buff", key="drunken-brawler", source="ale",
         origin="rule:drunken-brawler", duration="rounds", rounds_left=HOUR,
-        modifiers=[{"kind": "save_mod", "target": t, "amount": 2,
-                    "bonus_type": "alchemical", "note": "Drunken Brawler"}
-                   for t in ("fort", "will")]
+        modifiers=([] if pool is not None else courage)
         + [{"kind": "save_mod", "target": "ref", "amount": -2, "bonus_type": "",
             "note": "Drunken Brawler"}]))
     return (f" The drink settles warm in {actor.name}'s belly: {lvl} temporary hit points, "

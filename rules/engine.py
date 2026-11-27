@@ -1307,6 +1307,12 @@ class Scene:
         who = self.people.get(ref)
         if who is None:
             return []
+        # Feat loop b6-partials: a body still prone as its turn ends has been prone "since
+        # the end of your last turn" from now on (Prone Shooter asks the child tag); the
+        # condition's removal takes it.
+        for e in who.effects:
+            if e.key == "prone" and states.PRONE_SETTLED not in (e.tags or ()):
+                e.tags = tuple(e.tags or ()) + (states.PRONE_SETTLED,)
         had = list(who.effects)
         gone = who.remove_effects(match=lambda e: self._ends_next_turn(e)
                                   and e.payload.get("turn_begun"))
@@ -6721,7 +6727,8 @@ class Engine:
             # Feat loop b5-core: a ranged attack or a whip's lash provokes (rules/shooting.py).
             from . import shooting
 
-            return shooting.provoked(self, raw) + self._bodyguards(raw)
+            return shooting.provoked(self, raw) + self._bodyguards(raw) \
+                + self._provoked_by_unarmed(raw)
         if raw.get("op") == "cast":
             return self._provoked_by_casting(raw)
         if raw.get("op") == "use_item":
@@ -6824,6 +6831,46 @@ class Engine:
         ref = str(effect.get("ref") or "")
         return self._swings_at(ref, reactions.provoked_by_entering(
             self.scene, ref, tuple(effect["from"]), tuple(effect["to"])), why="movement")
+
+    # Feat loop b6-partials: a creature that may not attack one other — Friend to Animals'
+    # "Animals who fail the save cannot attack you unless you attack them or one of their
+    # allies first", Invoke Primal Instinct's contempt ("ignoring you unless you attack
+    # them"). The held creature carries `attack.withheld.<ref>` (a class ability's effect,
+    # `$user` written as the user's ref); one tag per protected creature, asked by prefix.
+    WITHHELD = "attack.withheld"
+
+    def _withheld_refusal(self, intent: Intent, actor: Actor, defender: Actor):
+        """Lift what this attack breaks, then refuse the attack a withheld creature makes.
+
+        An attack BY the protected creature on the held one, or on one of its allies, ends
+        the hold on every such creature (the book's "unless you attack them or one of
+        their allies first"). An attack by the held creature on the one it is held from is
+        refused with the reason; a reaction is not exempt, since it is an attack."""
+        from .reactions import _allied
+
+        mark = f"{self.WITHHELD}.{actor.ref}"
+        for ref, other in self.scene.actors.items():
+            if other.has_state(mark) and (ref == defender.ref
+                                          or _allied(self.scene, ref, defender.ref)):
+                other.remove_effects(match=lambda e: mark in (e.tags or ()))
+        if actor.has_state(f"{self.WITHHELD}.{defender.ref}"):
+            return self._refuse(intent, f"{actor.name} will not attack {defender.name}: "
+                                        f"it holds back until {defender.name} attacks "
+                                        f"first.", code="attack_withheld")
+        return None
+
+    def _provoked_by_unarmed(self, raw: dict) -> list[dict]:
+        """Feat loop b6-partials. CRB, Unarmed Attacks: "Attacking unarmed provokes an
+        attack of opportunity from the character you attack, provided she is armed" —
+        waived by Improved Unarmed Strike (`reactions.fights_unarmed` asks who is armed).
+        A swing made as a reaction provokes nothing."""
+        params = raw.get("params") or {}
+        target = raw.get("target")
+        target_ref = (target[0] if target else None) if isinstance(target, list) else target
+        if params.get("reaction") or not target_ref or not raw.get("actor"):
+            return []
+        return self._swings_at(str(raw["actor"]), reactions.provoked_by_unarmed(
+            self.scene, str(raw["actor"]), str(target_ref), params.get("weapon")))
 
     def _provoked_by_maneuver(self, raw: dict) -> list[dict]:
         """The attack of opportunity a combat manoeuvre owes its target, unless the
@@ -10990,6 +11037,10 @@ class Engine:
             return self._aid_another(intent, actor, defender, partial)
         if intent.params.get("stand_still") and intent.params.get("reaction"):
             return self._stand_still(intent, actor, defender, partial)
+        if partial.get("attack_state") is None:
+            withheld = self._withheld_refusal(intent, actor, defender)
+            if withheld is not None:
+                return withheld
         # A dancing weapon's own round (`_dance`): the blade swings, not its loosener — so
         # nothing of the loosener's but their base attack bonus rides it (no Strength, no
         # feats, no sneak attack, no charged blow), and nothing stops it but the reach.
@@ -11356,6 +11407,11 @@ class Engine:
         # circumstance bonus on attack rolls" is on "additional attacks" alone.
         if intent.params.get("cleaving"):
             choices += ("cleaving_on",)
+        # Feat loop b6-partials: Deadly Aim's "its effects last until your next turn" — a
+        # later ranged attack in the round (a Snap Shot opportunity too) keeps the option
+        # the stance laid with the first (`_ATTACK_STANCES`).
+        if "deadly_aim" not in choices and actor.has_state(states.tags_for("deadly aim")[0]):
+            choices += ("deadly_aim",)
         # Feat loop b5-core: a readied attack (rules/readied.py), Patient Strike's, and one
         # set against a charge, as roll-context keys a document's `when.choice` asks.
         if intent.params.get("reaction") == "readied":
@@ -12178,8 +12234,13 @@ class Engine:
                         swift_at += 1
                 # A threat is not a crit until it is confirmed — exactly the sort of step
                 # a person forgets mid-fight and code does not.
+                # Feat loop b6-partials: the first blow of a charge or Spring Attack at a
+                # foe flat-footed or helpless (Jaguar Pounce).
+                pounce = state["i"] == 0 and bool(
+                    intent.params.get("charge") or intent.params.get("spring_attack")) \
+                    and (self._flat_footed(defender) or defender.is_helpless)
                 threat = natural is not None and natural >= strike_feats.threat_from(
-                    actor, defender, weapon)            # Slayer's Knack (feat loop b4)
+                    actor, defender, weapon, pounce=pounce)  # Slayer's Knack (feat loop b4)
                 state["stage"] = "confirm" if threat else "damage"
                 state["crit"] = False
                 # Butterfly's Sting (feat loop b4): an ally's mark lands this melee hit as
@@ -14220,6 +14281,15 @@ class Engine:
             # made" — laid before the reach is measured, so the closing step and the blow
             # both see the longer reach; its tell rides the blow (`lunge_tell`, code only).
             said = self._lay_attack_stances(actor, ("lunge",), defender=defender)
+            # Feat loop b6-partials: Monkey Lunge's "As a standard action, you can use the
+            # Lunge feat ... without suffering a penalty to your AC" — a lunge on a single
+            # attack carries a child tag its document asks. shortcut: a full attack cut to
+            # one blow by a closing step below still reads as full; upgrade if it matters.
+            if not intent.params.get("full_attack"):
+                actor.apply_effect(ActiveEffect(
+                    name="lunging standard", kind="buff", key="lunging standard",
+                    source="Lunge", origin="rule:lunging", duration="rounds",
+                    rounds_left=1, tags=states.tags_for("lunging standard")))
             raw["params"] = dict(raw.get("params") or {}, lunge_tell=" ".join(said))
             intent = _intent_from_dict(raw)
         # Feat loop b6-rules: a readied charge (Rhino Charge) walks too.
@@ -28600,6 +28670,11 @@ class Engine:
         ("shield_of_swings", "shield of swings", "Shield of Swings",
          "{name} turns the great weapon into a wall of swings: softer blows, a harder "
          "guard until their next turn."),
+        # Feat loop b6-partials: Deadly Aim (CRB): "its effects last until your next
+        # turn". The terms stay the document's `choice`; the stance carries the option
+        # to the round's later ranged attacks (`_op_attack`).
+        ("deadly_aim", "deadly aim", "Deadly Aim",
+         "{name} takes aim for the heavier shot (Deadly Aim) until their next turn."),
     )
 
     @classmethod
@@ -29007,10 +29082,18 @@ class Engine:
             # Goblin Cleaver (ARG): "you may take your additional attacks against any
             # creature smaller than you that you threaten; your targets need not be
             # adjacent to one another" — the document's tag (feat loop b2).
+            # Feat loop b6-partials: Orc Hewer's "your size or smaller" and Giant Killer's
+            # "one size category larger than you or smaller" widen it — the largest
+            # `attack.cleave.any-smaller.upto-<steps>` the bearer's documents hold.
+            upto = max([-1] + [int(str(t).rsplit("-", 1)[-1])
+                               for t in actor.standing_tags()
+                               if str(t).startswith("attack.cleave.any-smaller.upto-")])
+            # Any square of the body, not only its anchor: a Large foe beside the bearer
+            # has its corner square 10 ft off.
             wider = actor.has_state("attack.cleave.any-smaller") \
-                and classfeatures.size_steps(actor, foe) < 0 \
-                and reactions_mod.threatens(self.scene, actor.ref,
-                                            self.scene.positions[ref], foe.size)
+                and classfeatures.size_steps(actor, foe) <= upto \
+                and any(reactions_mod.threatens(self.scene, actor.ref, sq, foe.size)
+                        for sq in grid_mod.footprint(self.scene.positions[ref], foe.size))
             if not wider and grid_mod.distance_between(
                     tuple(here), defender.size, tuple(self.scene.positions[ref]),
                     foe.size) > grid_mod.SQUARE_FT:
@@ -31406,7 +31489,12 @@ class Engine:
         # Worked out here, before spell resistance, because a turned cure is resisted:
         # "An undead creature can apply spell resistance" (CRB, Cure Light Wounds).
         turns = bool(dice) and spells_mod.turns_on_undead(spell, plan["kind"])
-        turned = {r for r in live if turns and self.scene.actors[r].has_state(states.UNDEAD)}
+        # Feat loop b6-partials: Necromantic Affinity's "damage caused by inflict spells
+        # heals you as if you were an undead creature, but you also take damage from cure
+        # spells" — its document's tag, asked beside the undead's.
+        turned = {r for r in live if turns and (
+            self.scene.actors[r].has_state(states.UNDEAD)
+            or self.scene.actors[r].has_state("energy.negative.affinity"))}
         harmless = "harmless" in sr.lower()
         if spell.sr is True and (not harmless or (turned and plan["kind"] == "heal")):
             for ref in live:
@@ -40216,7 +40304,9 @@ class Engine:
             other.apply_effect(ActiveEffect(
                 name=shown, kind="buff", source=source, origin=origin,
                 duration="rounds" if rounds else "until-dismissed", rounds_left=rounds,
-                tags=tuple(str(t) for t in spec.get("tags") or ()), modifiers=mods))
+                # `$user`: the user's ref (feat loop b6-partials, `attack.withheld.$user`).
+                tags=tuple(str(t).replace("$user", actor.ref)
+                           for t in spec.get("tags") or ()), modifiers=mods))
             other._follow_con(before)
             out.append({"ref": other.ref, "kind": "buff", "ability": shown,
                         "modifiers": mods, "rounds": rounds, "origin": origin})

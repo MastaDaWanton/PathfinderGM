@@ -878,11 +878,15 @@ def test_a_prone_archer_is_refused_and_a_prone_slinger_may_sling():
 
 
 def test_prone_shooter_softens_prone_s_ac_both_ways():
-    """Prone Shooter (UC): prone's -4 AC against melee becomes -2, its +4 against ranged
-    becomes +6."""
+    """Prone Shooter (UC): "If you have been prone since the end of your last turn",
+    prone's -4 AC against melee becomes -2, its +4 against ranged becomes +6. Feat loop
+    b6-partials: until the body's own turn has ended prone, it is plain prone."""
     scene, engine, pc, thug = _fight(feats=["Prone Shooter"])
     standing_melee, standing_ranged = pc.ac("melee"), pc.ac("ranged")
     pc.add_condition("prone")
+    assert pc.ac("melee") == standing_melee - 4
+    assert pc.ac("ranged") == standing_ranged + 4
+    scene._turn_ended("pc")
     assert pc.ac("melee") == standing_melee - 2
     assert pc.ac("ranged") == standing_ranged + 6
 

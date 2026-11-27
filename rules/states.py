@@ -513,6 +513,7 @@ TAGS: dict[str, tuple[str, ...]] = {
     # Lane D, 2026-11-22: a feat's declared stance, "until your next turn" (CRB), held
     # as a one-round effect so the feat document's terms can ask for it by tag.
     "combat expertise": ("buff.stance.combat-expertise",),
+    "deadly aim":       ("buff.stance.deadly-aim",),   # feat loop b6-partials
     "cleaving":         ("buff.stance.cleaving",),
     "two-weapon guard": ("buff.stance.two-weapon-guard",),
     # Feat loop b1: Bloody, Dazing and Stunning Assault, "its effects last until your
@@ -533,6 +534,8 @@ TAGS: dict[str, tuple[str, ...]] = {
     # `reach.extended`: the one prefix `reactions._reach_more` asks before it reads any
     # `reach` term — reach is asked per square, and the funnel is not free.
     "lunging":        ("buff.stance.lunging", "reach.extended.lunge"),
+    # Feat loop b6-partials: a lunge made as a standard action (Monkey Lunge asks it).
+    "lunging standard": ("buff.stance.lunging.standard",),
     "combat patrol":  ("buff.stance.combat-patrol", "reach.extended.patrol"),
     "pinning":        ("buff.stance.pinning", "state.exposed.pinning"),
     "choked":         ("state.silenced.choked",),
@@ -656,6 +659,9 @@ IGNORES_PARTIAL_CONCEALMENT = "miss_chance.ignore.partial.melee"
 TOTAL_CONCEALMENT_AS_PARTIAL = "miss_chance.total.as-partial.melee"
 SHIELD_BASH_KEEPS_GUARD = "shield.bash.keeps-guard"
 SHIELD_LOWERED = "buff.stance.shield-lowered"
+# Feat loop b6-partials: prone since the end of the body's own last turn (Prone Shooter's
+# "If you have been prone since the end of your last turn"), laid by `Scene._turn_ended`.
+PRONE_SETTLED = "state.position.prone.settled"
 GIVES_NO_SOFT_COVER = "cover.soft.none"
 # Taunt's "demoralize opponents using Bluff rather than Intimidate" (`Engine._demoralize_mods`).
 DEMORALIZES_WITH_BLUFF = "skill.bluff.demoralize"

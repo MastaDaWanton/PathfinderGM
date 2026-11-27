@@ -404,7 +404,7 @@
         "when": {
           "attack": "melee",
           "bearer": {
-            "state": "state.position.prone"
+            "state": "state.position.prone.settled"
           }
         },
         "note": "Prone Shooter: prone's -4 against melee is -2"
@@ -417,14 +417,11 @@
         "when": {
           "attack": "ranged",
           "bearer": {
-            "state": "state.position.prone"
+            "state": "state.position.prone.settled"
           }
         },
         "note": "Prone Shooter: prone's +4 against ranged is +6"
       }
-    ],
-    "not_yet": [
-      "'If you have been prone since the end of your last turn': the engine does not record when a creature went prone, so the benefit holds from the moment it is prone"
     ]
   },
   "target-of-opportunity": {

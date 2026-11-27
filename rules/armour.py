@@ -329,7 +329,9 @@ def spell_failure(actor, spell) -> tuple[int, str]:
     worn = int(a.get("asf") or 0) if a_key != "none" and not (
         bard and a.get("weight") == "light") else 0
     if worn and hasattr(actor, "_buff_mods"):
-        off = -sum(m.value for m in actor._buff_mods("combat_mod", "spell_failure"))
+        # Feat loop b6-partials: the largest reduction, never a sum — Arcane Armor
+        # Mastery's 20% "replaces, and does not stack with" the Training's 10% (CRB).
+        off = max([0] + [-m.value for m in actor._buff_mods("combat_mod", "spell_failure")])
         pct -= min(worn, max(0, off))
     return pct, " and ".join(why)
 

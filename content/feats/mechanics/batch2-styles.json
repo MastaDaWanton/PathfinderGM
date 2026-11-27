@@ -158,26 +158,20 @@
         "bonus_type": "untyped",
         "when": {
           "bearer": {
-            "state": "buff.stance.lunging",
+            "state": "buff.stance.lunging.standard",
             "load": [
               "light"
             ]
           }
         },
-        "note": "Monkey Lunge: no -2 AC for lunging, under a light load"
+        "note": "Monkey Lunge: no -2 AC for a standard action's lunge, under a light load"
       }
-    ],
-    "not_yet": [
-      "only when the lunge is a standard action: the AC term holds after a full attack's lunge too",
-      "it waits on Lunge's stance (lane b2-actions, `buff.stance.lunging`): until that merges no lunge lays it"
     ]
   },
   "boar-style": {
     "tags": [
-      "unarmed.tear-flesh"
-    ],
-    "not_yet": [
-      "slashing damage with your unarmed strikes (a free action to change): an unarmed strike's damage type is fixed"
+      "unarmed.tear-flesh",
+      "unarmed.damage.slashing"
     ]
   },
   "boar-shred": {
@@ -539,10 +533,19 @@
           "flanked": true
         },
         "note": "Janni Style: a flanker gains only +1"
+      },
+      {
+        "type": "combat_mod",
+        "target": "charge_ac",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.janni-style"
+          }
+        },
+        "note": "Janni Style: only -1 AC for charging (feat loop b6-partials)"
       }
-    ],
-    "not_yet": [
-      "only -1 AC for charging: no charge's AC penalty in this branch (lane b2-actions' charge_ac)"
     ]
   },
   "janni-tempest": {
@@ -1026,8 +1029,11 @@
         "note": "Tiger Style"
       }
     ],
+    "tags": [
+      "unarmed.damage.slashing"
+    ],
     "not_yet": [
-      "slashing damage with your unarmed strikes, and the 1d4 bleed on two turns after a slashing critical: an unarmed strike's damage type is fixed"
+      "the 1d4 bleed at the start of the foe's next two turns after a slashing unarmed critical: a bleed here runs until healed, and no bleed is laid for two turns only"
     ]
   },
   "tiger-claws": {

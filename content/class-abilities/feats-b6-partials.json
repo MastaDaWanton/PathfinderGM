@@ -1,0 +1,75 @@
+{
+  "class": "feat",
+  "_source": "Feat loop b6, lane b6-partials (2026-11-27): the activated feats this lane finished from a not_yet line. Each is had by a holder of the feat its `feat` names (rules/class_abilities.py), run by the one executor (`Engine._use_class_ability`), and spends its declared action (`Engine._spend_ability_action`). Benefit text from content/feats/feats.json, checked against aonprd.com FeatDisplay 2026-11-27.",
+  "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
+  "abilities": [
+    {
+      "key": "arcane armor mastery",
+      "name": "Arcane Armor Mastery",
+      "feat": "arcane-armor-mastery",
+      "aliases": [
+        "arcane armor mastery",
+        "arcane armour mastery"
+      ],
+      "level": 1,
+      "source": "Arcane Armor Mastery (CRB): 'As a swift action, reduce the arcane spell failure chance due to the armor you are wearing by 20% for any spells you cast this round. This bonus replaces, and does not stack with, the bonus granted by Arcane Armor Training.' The armour's share only, and the larger of the two reductions (rules/armour.py spell_failure).",
+      "text": "Swift action: 20% less arcane spell failure from your armour this round.",
+      "action": "swift",
+      "self": {
+        "rounds": "1",
+        "modifiers": [
+          {
+            "type": "combat_mod",
+            "target": "spell_failure",
+            "amount": -20,
+            "bonus_type": "untyped"
+          }
+        ]
+      },
+      "tell": "{name} settles the armour for the gestures to come, closer than training alone allows."
+    },
+    {
+      "key": "lower spell resistance",
+      "name": "Lower Spell Resistance",
+      "feat": "focused-disbelief",
+      "aliases": [
+        "lower spell resistance",
+        "lower my spell resistance",
+        "lower my disbelief",
+        "open myself to the blessing"
+      ],
+      "level": 1,
+      "source": "Focused Disbelief (UM): 'You can lower this resistance for 1 round as a standard action.' Read by Actor.spell_resistance_rating, which answers 0 while the round's `sr.lowered` holds.",
+      "text": "Standard action: your spell resistance is lowered for a round, so an ally's divine spell lands.",
+      "action": "standard",
+      "self": {
+        "rounds": "1",
+        "tags": [
+          "sr.lowered"
+        ]
+      },
+      "tell": "{name} lets the doubt go for a moment, open to the gods' magic."
+    },
+    {
+      "key": "friend to animals",
+      "name": "Friend to Animals",
+      "feat": "friend-to-animals",
+      "aliases": [
+        "friend to animals",
+        "calm the animals",
+        "befriend the animals"
+      ],
+      "level": 1,
+      "source": "Friend to Animals (Animal Archive): 'As a standard action you can require all animals within 30 feet to make a Will saving throw. Animals who fail the save cannot attack you unless you attack them or one of their allies first. The DC of the Will save is equal to 10 + half your character level + your Charisma modifier.' The held animal carries attack.withheld.<you> (Engine._withheld_refusal refuses its attack on you and lifts it when you attack it or its ally).",
+      "text": "Standard: animals within 30 feet save (Will) or cannot attack you until you attack them or theirs.",
+      "action": "standard",
+      "ability_type": "ex",
+      "affects": "all",
+      "radius_ft": 30,
+      "only": {"type": ["animal"]},
+      "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod", "success": "negates"},
+      "effect": {"tags": ["attack.withheld.$user"], "on": "failed"},
+      "tell": "{name} meets the animals' eyes, slow and unafraid."
+    }
+  ]
+}
