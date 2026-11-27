@@ -1155,7 +1155,7 @@ def immune_to(actor, what: str = "", condition_key: str = "", descriptors=()) ->
 
         if morale.intelligence(actor) is None and immunity_blocks(
                 ["mindless"], condition_key, said):
-            return "mindless"
+            return "mind-affecting effects (mindless)"
     return ""
 
 

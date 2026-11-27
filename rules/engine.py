@@ -43293,6 +43293,8 @@ _STATE_SAID = {
     # The owner's house rule (2026-10-01): a construct at 0 to -10. The clause says the
     # half the player can act on — it is not gone, and it can be mended.
     "broken": "{name} is broken: inert, but not destroyed",
+    # Diehard's choice taken below 0 (`Actor._fight_on`, feat loop b4-other).
+    "fighting on": "{name} fights on below 0 hit points, refusing to fall",
 }
 # The Bestiary's word for an undead creature at 0, and a construct past -10.
 _DESTROYED_SAID = "is destroyed"

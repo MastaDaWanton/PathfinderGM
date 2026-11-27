@@ -7177,6 +7177,7 @@ class Actor:
                 name="fighting on below 0", kind="situation", key="fighting-on",
                 source="Diehard", origin="rule:diehard",
                 tags=(FIGHTING_ON, "recovery.hit-points")))
+            out.append("fighting on")             # told (`Engine._STATE_SAID`), law 3
         return out
 
     def apply_nonlethal_state(self) -> list[str]:
