@@ -1512,7 +1512,9 @@ def stealth_synergy(engine, actor, roll):
               and int((e.payload or {}).get("face") or 0) > 0]
     if not hiding:
         return roll
-    own = int(roll.natural or 0)
+    own = int(getattr(roll, "natural", 0) or 0)
+    if not own:
+        return roll                     # a total with no die (a printed result) keeps it
     best = max([own] + [int(e.payload["face"]) for _, e in hiding])
     for o, e in hiding:
         face = int(e.payload["face"])

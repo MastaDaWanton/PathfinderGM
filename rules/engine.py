@@ -5504,7 +5504,7 @@ class Engine:
         payload = {"result": int(roll.total), "at": self.scene.at,
                    # Feat loop b5-maneuver: the d20 kept, for Stealth Synergy's "take
                    # the highest roll" (`maneuver_feats.stealth_synergy`).
-                   "face": int(roll.natural or 0),
+                   "face": int(getattr(roll, "natural", 0) or 0),
                    "ends_when": dict(awareness.ENDS_ON_ATTACK),
                    # Who has already rolled against this hiding: the one it was opposed
                    # by. Everybody else here checks against the result at the end of the
