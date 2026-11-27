@@ -116,3 +116,33 @@ I re-read each source after writing the note:
   and answer "yes" when prompted.
 - The claim that no tradition was found to abandon the exit transition is a negative, and is
   stated as one.
+
+## Superseded the same day: walk out, refuse only in a fight or trapped (lane fix/hex-walk-out)
+
+Owner ruling 2026-11-26: "Hex traveling should walk you out from anywhere unless you are in
+combat or trapped." This replaces the A4 refusal above. The "Rejected: auto-walking" line no
+longer applies.
+
+- **What changed.** Below ground, the hex move now walks up. A dungeon under a hex site is
+  walked through the site's own "up out of the hex's site" walk. Cellars under a town are
+  walked through the town's way out. Either way it goes room by room through `travel`: a
+  minute a room, each door asked, and a foe lying in wait stops it. Then the journey runs as
+  any hex move. If the walk out stops short, the journey does not start (`_hex_walk_out_stopped`).
+- **What still refuses.** Each refusal comes before the die and names what to do first:
+  - a fight;
+  - a body held fast: `state.held` (grappled, pinned, entangled, glued, paralyzed),
+    `state.unable` (stunned, helpless, petrified...), `state.down` (unconscious, dead...),
+    or the pit;
+  - a way up that cannot be walked: a door shut on the route (the sealing trap's portcullis),
+    or no route the engine knows. An empty route is refused because `travel` would otherwise
+    fall back to a single direct step, which is how 0.5.1 lifted the party straight out of the
+    dungeon.
+- **The 0.5.2 worry** ("that walk skips every room's doors and traps") was about that direct
+  step. The test fixture's rooms had no exits. Real rooms have exits grafted both ways
+  (`places.with_founded`), so `travel` walks the actual route.
+- **Prior art.** Bethesda's fast travel is unavailable "near any hostile enemies" (UESP,
+  https://en.m.uesp.net/wiki/Skyrim:Movement). Skyrim also forbids it from interiors
+  (Twinfinite, a secondary source). This ruling keeps the combat rule and drops the interior
+  rule. DCSS's interlevel travel walks you through the levels to the destination, interrupted
+  by what comes into view. That is from memory and the `places.route` docstring; I could not
+  confirm it from a primary source this pass.

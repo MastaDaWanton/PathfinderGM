@@ -12,7 +12,7 @@ from collections import Counter
 import pytest
 
 from play import atlas as atlas_mod
-from rules import hexes, ontheway, states
+from rules import hexes, ontheway, states, survival
 from rules.activeeffect import ActiveEffect
 from rules.bestiary import instantiate
 from rules.dice import Dice
@@ -358,10 +358,14 @@ def test_out_and_back_leaves_no_parent_loop_and_the_site_can_be_left(worlds, qui
         assert d["id"] not in places_mod.up_from(s.founded, d.get("parent", "")), d["id"]
     assert _enter(e).status == "resolved"
     for h in e.hex_reach(g):
+        # Nine hex moves without a night: the body's sleep is not what this measures, and
+        # since the hex-walk-out ruling (2026-11-26) a sleeper is refused the next hex.
+        pc.remove_effects(source=survival.SLEEP_SOURCE)
         out = _move(e, h)
         assert out.status == "resolved", out.tell
         assert "~" not in out.tell and ":@" not in out.tell
         assert e.party_hex(g) == h
+        pc.remove_effects(source=survival.SLEEP_SOURCE)
         _move(e, to, face=20)
         assert _enter(e).status == "resolved"
 
