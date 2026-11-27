@@ -962,6 +962,13 @@ _OPTION_SHAPES = {
                       "opportunity."),
     "feint": ("act", "Feint", "Bluff against the target's guard: they lose their "
                               "Dexterity against your next melee blow."),
+    # Feat loop b6-rules: Antagonize (rules/antagonize.py), by either skill.
+    "antagonize_diplomacy": ("act", "Antagonize (fluster)",
+                             "Diplomacy against 10 + the target's Hit Dice + Wisdom: a "
+                             "minute of -2 on its attacks at anyone but you."),
+    "antagonize_intimidate": ("act", "Antagonize (enrage)",
+                              "Intimidate against 10 + the target's Hit Dice + Wisdom: it "
+                              "turns on you next turn."),
     "disengaging_feint": ("act", "Disengaging Feint",
                           "Bluff against the target's guard: win, and you may move away "
                           "without their swing."),
@@ -1206,6 +1213,12 @@ def _attack_options(pc) -> dict:
         own("disengaging_feint", f"Bluff {_signed(skill('bluff'))} against the target's guard",
             action="standard",
             op={"op": "check", "params": {"skill": "bluff", "feint": True, "disengage": True}})
+    from rules import antagonize as antagonize_mod   # feat loop b6-rules
+
+    if pc.has_state(antagonize_mod.TAG):
+        for sk in ("diplomacy", "intimidate"):
+            own(f"antagonize_{sk}", f"{sk.title()} {_signed(skill(sk))}", action="standard",
+                op={"op": "check", "params": {"skill": sk, "antagonize": True}})
     # Feat loop b5-core: the readied actions (rules/readied.py), each greyed with the
     # engine's own refusal.
     from rules import readied as readied_mod

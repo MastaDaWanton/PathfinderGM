@@ -525,3 +525,13 @@ def test_well_prepared_finds_a_crowbar_once_a_day_and_charges_for_it():
                      "params": {"skill": "sleight of hand", "well_prepared": True,
                                 "item": "crowbar"}})
     assert again.outcomes[-1].status == "refused" and "today" in _tells(again)
+
+
+def test_antagonize_is_on_the_declare_section_for_its_holder():
+    from play.views import _attack_options
+
+    pc = _pc("fighter", feats=("Antagonize",), weapons=("longsword",))
+    _board(pc, ("thug", (8, 5)))
+    ids = {o["id"]: o for o in _attack_options(pc)["options"]}
+    assert ids["antagonize_intimidate"]["op"] == {
+        "op": "check", "params": {"skill": "intimidate", "antagonize": True}}
