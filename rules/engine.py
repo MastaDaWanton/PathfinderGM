@@ -15109,11 +15109,47 @@ class Engine:
         if not self._both_on_the_map(actor, defender):
             return self._unmapped(m, actor, defender, want, say, breaks_reach=True)
         before = self.scene.positions[defender.ref]
-        moved = self._push_line(defender.ref, self._heading(actor.ref, defender.ref),
-                                want)
+        step = self._heading(actor.ref, defender.ref)
+        moved = self._push_line(defender.ref, step, want)
         done = [self._moved(defender.ref, before, m)] if moved else []
-        return (self._moved_clause(m, say, moved, want,
-                                   done[0]["feet"] if done else 0), [], done)
+        clause = self._moved_clause(m, say, moved, want, done[0]["feet"] if done else 0)
+        if moved < want and m.get("name") == "bull rush":
+            slam, said = self._raging_throw_slam(actor, defender, step)
+            done.extend(slam)
+            clause += said
+        return (clause, [], done)
+
+    RAGING_THROW = "bull_rush.slam.raging"          # feat loop b7-small, its document's tag
+
+    def _raging_throw_slam(self, actor, defender, step) -> tuple[list[dict], str]:
+        """Raging Throw (UC): "if you bull rush an opponent into a square another creature
+        occupies or into a solid object, the opponent and the creature or object take
+        bludgeoning damage equal to your Strength modifier + your Constitution modifier"
+        — while raging, as the feat's first sentence holds. The blocking square is the
+        one the push could not enter (`_push_line` stops at wall or somebody); a wall
+        has no hit points here, so only a creature beside the opponent is hurt with it.
+        Feat loop b7-small: before it the push stopped and nobody was hurt."""
+        from .grid import footprint
+
+        if not actor.has_state(self.RAGING_THROW) or not actor.has_state("buff.stance.rage"):
+            return [], ""
+        n = actor.ability_mod("str") + actor.ability_mod("con")
+        if n <= 0:
+            return [], ""
+        here = self.scene.positions[defender.ref]
+        nxt = (here[0] + step[0], here[1] + step[1])
+        ahead = set(footprint(nxt, defender.size))
+        struck = [defender] + [
+            who for ref, who in self.scene.actors.items()
+            if ref not in (defender.ref, actor.ref) and ref in self.scene.positions
+            and ahead & set(footprint(tuple(self.scene.positions[ref][:2]), who.size))]
+        out = []
+        for who in struck:
+            hit = self._apply_damage(who, n, "bludgeoning")
+            hit["origin"] = "rule:feat-raging-throw"
+            out.append(hit)
+        names = _and_list([w.name for w in struck])
+        return out, f"; the slam hurts {names} for {n} bludgeoning each (Raging Throw)"
 
     def _outcome_drag(self, m, intent, actor, defender, margin, weapon_key, loot, say):
         want = 1 + max(0, margin) // 5

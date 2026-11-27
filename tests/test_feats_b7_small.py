@@ -250,3 +250,30 @@ def test_impact_critical_shot_can_bull_rush_in_place_of_the_trip(monkeypatch):
     assert not thug.has_condition("prone"), _tells(res)
     assert s.positions[thug.ref][0] > 8 and s.positions["pc"][:2] == (5, 5), _tells(res)
     assert "drives" in _tells(res)
+
+
+def test_raging_throw_slams_a_bull_rushed_foe_into_the_one_behind_it():
+    """UC, Raging Throw: "if you bull rush an opponent into a square another creature
+    occupies or into a solid object, the opponent and the creature or object take
+    bludgeoning damage equal to your Strength modifier + your Constitution modifier."
+    Measured before: the push stopped at the body behind and nobody was hurt. Raging, both
+    thugs take Str + Con; not raging, the push only stops."""
+    from rules.bestiary import instantiate
+    from tests.test_feats_b6_partials import _held_by
+    from tests.test_maneuver_outcomes import _do, _fight
+
+    def shove(rage):
+        scene, engine, pc, thug = _fight(face=20, strength=30)
+        pc.feats = list(pc.feats) + ["Raging Throw"]
+        if rage:
+            _held_by(pc, "rage", ["buff.stance.rage"])
+        other = scene.add(instantiate("thug", scene=scene, name="the other thug"),
+                          at=(8, 10))
+        hp = (thug.hp, other.hp)
+        out = _do(engine, "bull rush")
+        n = pc.ability_mod("str") + pc.ability_mod("con")
+        return hp[0] - thug.hp, hp[1] - other.hp, n, out.tell
+
+    a, b, n, tell = shove(True)
+    assert a == n and b == n and "Raging Throw" in tell, tell
+    assert shove(False)[:2] == (0, 0)
