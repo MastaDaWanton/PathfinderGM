@@ -380,13 +380,12 @@ Systems not in the game:
 - Expert Trainer: retraining (Ultimate Campaign)
 - Monastic Legacy: multiclassing (levels in classes other than monk)
 - Equipment Trick: equipment tricks (Adventurer's Armory, Magical Marketplace)
-- Dented Helm, Cloven Helm: a helmet — no helmet is an item a sheet can wear, so "when
-  wearing a helmet" is never true (Hard-Headed, b4-maneuver's, needs the same)
+- (Dented Helm, Cloven Helm: moved out in batch 6 — a worn helmet is `gear.helmet`,
+  rules/helmet.py; their deflection clause is still a `not_yet`)
 - Flagbearer: a clan, house or party flag — no flag or standard is an item
 - Conviction: a vampire's aversion to a holy symbol — the bestiary's vampire weaknesses are
   printed text, not rules the engine runs
-- Improved Stalwart: Stalwart, which batch 1 left without a document (trading a defensive
-  stance's dodge bonus for DR is not built)
+- (Improved Stalwart: moved out in batch 6 — Stalwart is built, rules/stalwart.py)
 - Dimensional Savant: Dimensional Dervish's teleporting full attack, still a `not_yet` in
   batch2-attack-a.json
 
@@ -453,3 +452,26 @@ Initiative, Improved Monster Lore, Insightful Gaze, Oracular Intuition, Sin Seer
 
 Dented Helm and Cloven Helm moved out of this list: each carries a document now whose
 `not_yet` names the helmet lane b5-core is building.
+
+## Feat loop batch 6, lane b6-rules
+
+Class, class feature or race no player can take:
+
+- Blowout Shot Deed, Secret Stash Deed: grit (the gunslinger) or Amateur Gunslinger — and
+  no firearm, black powder or alchemical cartridge is an item the engine fires
+- Favored Judgment: the judgment class feature (inquisitor)
+- Resilient Eidolon: the eidolon class feature (summoner)
+- Split Major Hex: major hexes (witch)
+- Evolved Familiar: the summoner's eidolon evolutions, and a familiar that is a creature in
+  play (the wizard's arcane bond names a familiar as a choice word only, as b5-spells
+  found for Familiar Spell)
+
+Systems not in the game:
+
+- Luck of Heroes: the hero point system (confirmed again, as Hero's Fortune)
+- Deadly Dealer: a deck of cards as thrown weapons (confirmed again)
+- Empower Spell-Like Ability: a spell-like ability cast through the cast door with a
+  metamagic copy — racial spell-like abilities are uses of their own, with no metamagic
+- Beast Rider: the five companions it adds (elephant, pteranodon, rhinoceros, stegosaurus,
+  triceratops) have no companion stat lines in content/companions; the +2 effective druid
+  level is the `companion_level` term Boon Companion already uses, once they do
