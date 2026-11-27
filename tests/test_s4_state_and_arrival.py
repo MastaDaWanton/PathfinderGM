@@ -228,7 +228,10 @@ def test_player_fixable_is_exactly_the_registers_set():
         "absent_ground",
         # Lane C, 2026-11-22: which creature a summons calls, which energy a ward is
         # against and which metamagic shapes a cast are the player's choices.
-        "choose_creature", "choose_energy", "metamagic"})
+        "choose_creature", "choose_energy", "metamagic",
+        # Feat loop b5-core: a costly material component the character does not carry
+        # (rules/components.py) — their own pack, never the plan's choice.
+        "no_component"})
     assert "no_such_target" not in PLAYER_FIXABLE and "wrong_aim" not in PLAYER_FIXABLE
 
 
