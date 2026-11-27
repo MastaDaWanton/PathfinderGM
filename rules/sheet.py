@@ -7208,8 +7208,17 @@ class Actor:
             # means, and `Engine.breathe` owns only the schedule that got them here.
             fights_on = self.hp < 0 and self.has_state(DYING_FIGHTS_ON) \
                 and not self.has_state("state.down.unconscious") and not self.drown_failures
-            if fights_on:
+            # Feat loop b5-core: ferocity (Bestiary, Universal Monster Rules) fights on
+            # below 0 as Diehard does, staggered, losing a point a round (`_ferocious`).
+            ferocious = not fights_on and self.hp < 0 and self.has_state("ferocity") \
+                and not self.has_state("state.down.unconscious") and not self.drown_failures
+            if ferocious:
+                changed.extend(self._ferocious())
+            elif fights_on:
                 changed.extend(self._fight_on())
+            fights_on = fights_on or ferocious
+            if fights_on:
+                pass
             elif self.has_state("ferocity"):
                 if not self.has_state("state.impaired.staggered"):
                     self.add_condition("staggered", source="ferocity")
@@ -7232,6 +7241,30 @@ class Actor:
 
         changed.extend(self.apply_nonlethal_state())
         return changed
+
+    def _ferocious(self) -> list[str]:
+        """Ferocity (Bestiary, Universal Monster Rules): "remains conscious and can continue
+        fighting even if its hit point total is below 0. The creature is still staggered and
+        loses 1 hit point each round. A creature with ferocity still dies when its hit point
+        total reaches a negative amount equal to its Constitution score" (`death_floor`).
+        Measured before (feat loop b5-core): the tag laid staggered and the body went on to
+        `dying` anyway — down, out of the fight, rolling to stabilise. Diehard's
+        `FIGHTING_ON` is the one state that keeps a body below 0 in the fight; the point a
+        round is its `periodic`, run in played rounds, and it never stabilises."""
+        from . import states
+
+        out = []
+        if not self.has_state("state.impaired.staggered"):
+            self.add_condition(states.STAGGERED_KEY, source="ferocity")
+            out.append(states.STAGGERED_KEY)
+        if not self.has_state(FIGHTING_ON):
+            self.apply_effect(ActiveEffect(
+                name="fighting on below 0", kind="situation", key="fighting-on",
+                source="Ferocity", origin="rule:ferocity",
+                tags=(FIGHTING_ON, "recovery.hit-points"),
+                periodic=[{"damage": "1", "damage_type": "untyped"}]))
+            out.append("fighting on")
+        return out
 
     def _fight_on(self) -> list[str]:
         """Diehard's choice, taken (CRB): "You may choose to act as if you were disabled,

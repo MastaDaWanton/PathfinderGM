@@ -76,3 +76,32 @@ def test_a_negligible_component_is_never_asked():
     assert components.kind(spells.get("fireball")) == ""
     assert components.kind(spells.get("stoneskin")) == "M"
 
+
+
+# --- ferocity (Bestiary, Universal Monster Rules) -------------------------------------------
+
+def test_a_ferocious_creature_below_zero_fights_on_staggered_and_loses_a_point_a_round():
+    """Ferocity (UMR): "remains conscious and can continue fighting even if its hit point
+    total is below 0. The creature is still staggered and loses 1 hit point each round."
+    Measured before: the `ferocity` tag laid staggered and the body went on to `dying`
+    anyway — `is_down`, out of the fight, rolling to stabilise like anyone."""
+    from rules.activeeffect import ActiveEffect
+    from rules.bestiary import instantiate
+    from rules.engine import Scene
+
+    s = Scene(location_id="5bbd0c40345f")
+    boar = instantiate("thug", scene=s, name="the boar")
+    boar.apply_effect(ActiveEffect(name="ferocity", kind="situation", key="ferocity",
+                                   source="Ferocity", origin="test", tags=("ferocity",)))
+    boar.hp = 2
+    boar.take_damage(4)
+    boar.apply_hp_state()               # what the engine asks after every blow
+    assert boar.hp == -2
+    assert not boar.is_down, "fights on below 0"
+    assert boar.has_state("state.impaired.staggered")
+    assert not boar.has_condition("dying") and not boar.has_condition("unconscious")
+    boar.run_periodic("round", 1)
+    assert boar.hp == -3, "a hit point a round"
+    boar.take_damage(50)
+    boar.apply_hp_state()
+    assert boar.is_dead, "still dies at minus its Constitution"

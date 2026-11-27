@@ -314,13 +314,16 @@ def test_immunity_resistance_and_ferocity_are_read_off_the_tags():
         pc.race = "built-one"
         assert pc.immune_to("cold") and not pc.immune_to("fire")
         assert pc.resistance("fire") == 5 and pc.resistance("acid") == 0
-        # Below 0 with ferocity: staggered and dying, not unconscious.
+        # Below 0 with ferocity: staggered and still in the fight, never dying (the
+        # Bestiary's universal rule, feat loop b5-core: it "loses 1 hit point each round"
+        # instead of bleeding out, rules/sheet.py `_ferocious`).
         pc.hp = -2
         pc.apply_hp_state()
-        assert pc.has_condition("staggered") and pc.has_condition("dying")
-        assert not pc.has_condition("unconscious")
+        assert pc.has_condition("staggered") and not pc.has_condition("dying")
+        assert not pc.has_condition("unconscious") and not pc.is_down
         pc.race = "human"
-        pc.remove_condition("staggered"); pc.remove_condition("dying")
+        pc.remove_condition("staggered")
+        pc.remove_effects(name="fighting on below 0")
         pc.apply_hp_state()
         assert pc.has_condition("unconscious")
     finally:
