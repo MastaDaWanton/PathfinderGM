@@ -231,6 +231,18 @@ def _done(intent, roll, value, basis, margin, effects, bits, *, extra_rolls=()):
 
 # --- Acrobatics -------------------------------------------------------------------------------
 
+RUN_JUMP = "jump.running.run"           # Run's document tag (feat loop b5-spells)
+
+
+def _run_term(actor, running: bool):
+    """Run (CRB): "If you make a jump after a running start (see the Acrobatics skill
+    description), you gain a +4 bonus on your Acrobatics check"."""
+    from .dice import Modifier
+
+    return [Modifier(4, "Run (a running start)")] \
+        if running and actor.has_state(RUN_JUMP) else []
+
+
 def _jump_term(actor):
     """"+4 racial bonus on Acrobatics checks made to jump for every 10 feet of their speed
     above 30 feet ... –4 racial penalty ... for every 10 feet of speed below 30 feet"."""
@@ -275,7 +287,8 @@ def jump(engine, intent, actor, mods, partial, *, high: bool = False):
     value = int(feet) * int(r["per_foot"]) * (1 if running else 2)
     basis = (f"{what} of {feet} ft: {r['per_foot']} x the distance"
              + ("" if running else ", doubled with no running start"))
-    roll = engine._roll_or_suspend(intent, actor, [*mods, *_jump_term(actor)],
+    roll = engine._roll_or_suspend(intent, actor, [*mods, *_jump_term(actor),
+                                                   *_run_term(actor, running)],
                                    label=f"Acrobatics check ({what})", dc=value,
                                    partial=partial)
     if scene.in_encounter:

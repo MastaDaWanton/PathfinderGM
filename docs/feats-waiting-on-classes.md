@@ -389,9 +389,6 @@ Systems not in the game:
   stance's dodge bonus for DR is not built)
 - Dimensional Savant: Dimensional Dervish's teleporting full attack, still a `not_yet` in
   batch2-attack-a.json
-- Meditative Concentration, Perfect Center, Slow Time: Combat Meditation, lane
-  b4-maneuver's in this batch (Perfect Center also needs taking 10 as a declared choice,
-  which no check offers a player yet)
 
 ## Feat loop batch 5, lane b5-maneuver
 
@@ -418,3 +415,29 @@ Systems not in the game:
   (`_push_line` moves the body through `_put`, which asks no ward)
 - Undermine: difficult terrain for one creature alone — the board's difficult squares are
   everybody's
+
+## Feat loop batch 5, lane b5-spells
+
+Class, race or class feature no player can take:
+
+- Prophetic Visionary: the mystery class feature (oracle) — confirmed again
+- Kobold Groundling: race kobold (its Kobold Style prerequisite)
+- Familiar Spell: a familiar in play — the wizard's arcane bond names a familiar as a choice
+  word, but no familiar is a creature that could hold and cast a spell
+
+Systems not in the game:
+
+- Ascendant Spell: mythic spells (confirmed again)
+- Stable Spell: primal magic areas and their events (Mythic Adventures' wild zones)
+- Blighted Critical, Greater Blighted Critical: spellblights (Ultimate Magic pp. 95-96)
+- Spell Mastery: a spellbook in hand — preparing never asks a wizard for the book, so the
+  feat's "without referring to a spellbook" changes nothing until a book can be lost
+- Inspirational Commander: armies and Morale checks (Ultimate Campaign's mass combat)
+- Siege Commander: siege engines and their assembly crews (as Siege Gunner)
+- Ostentatious Display: valuable nonmagical items worn in a magic item slot, and wealth by
+  level (Table 12-4) to price them against
+- Childlike: disguise's age and race modifiers (rules/disguise.py says they are not built)
+  and taking 10 on a Bluff check
+- Altitude Affinity: altitude — no place says how high it lies, so neither acclimation nor
+  "5,000 feet or higher" can be asked
+- Deadly Dealer: a deck of cards as thrown weapons (no card is a weapon in the gear)

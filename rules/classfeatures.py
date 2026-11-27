@@ -686,6 +686,15 @@ def _load_band(actor) -> str | None:
     return str(got.get("band")) if got.get("enforced") else None
 
 
+def attuned_terrains(actor) -> list[str]:
+    """The terrains this sheet's Attuned to the Wild feats name, by their parenthetical."""
+    from . import feats as feats_mod
+
+    return [str(d.get("target") or "") for d in
+            (feats_mod.document(f) for f in getattr(actor, "feats", None) or ())
+            if d and d.get("id") == "attuned-to-the-wild" and d.get("target")]
+
+
 def _bearer_holds(clause: dict, actor, pick: str = "") -> bool:
     facts = bearer_facts(actor)
     for key, want in (clause or {}).items():
@@ -735,7 +744,12 @@ def _bearer_holds(clause: dict, actor, pick: str = "") -> bool:
                 return False
         elif key == "terrain":
             word = pick if want == "$pick" else str(want or "")
-            if facts["terrain"] not in TERRAINS.get(word.strip().lower(), ()):
+            # Feat loop b5-spells: "$attuned" is any terrain the bearer's Attuned to the
+            # Wild names (Guardian and Spirit of the Wild: "a terrain type you have
+            # selected the Attuned to the Wild feat for"; one bonus however many match).
+            words = attuned_terrains(actor) if want == "$attuned" else [word]
+            if not any(facts["terrain"] in TERRAINS.get(w.strip().lower(), ())
+                       for w in words):
                 return False
         elif key == "wielding":
             # Feat loop b1: the weapon in hand, by its table key (Dueling Sword Mastery's
@@ -779,6 +793,10 @@ def holds(when, actor, ctx: dict | None, pick: str = "") -> bool:
             return False
     if rest.get("target") == "$pick":
         rest["target"] = _enemy_clause(pick)
+    # Feat loop b5-spells: Skilled Driver (sailing ship)'s "your chosen vehicle" is the
+    # feat's own parenthetical, compared with the vehicle the driving check names.
+    if rest.get("vehicle") == "$pick":
+        rest["vehicle"] = str(pick or "").strip().lower()
     # Size against the BEARER's (feat loop b2): Risky Striker's "creatures two or more size
     # categories larger than you", Underfoot's "a larger opponent". Only here does the
     # bearer stand beside the roll, so the relative clause is answered here and the rest
@@ -1348,7 +1366,8 @@ def _check_when(when, where: str, doc: dict) -> list[str]:
                     out.append(f"{where}.when.bearer.armour: {w!r} is not one of "
                                f"{', '.join(WEIGHTS)}.")
             terrain = bearer.get("terrain")
-            if terrain is not None and terrain != "$pick" and terrain not in TERRAINS:
+            if terrain is not None and terrain not in ("$pick", "$attuned") \
+                    and terrain not in TERRAINS:
                 out.append(f"{where}.when.bearer.terrain: one of {', '.join(TERRAINS)} "
                            f"or \"$pick\".")
     for key in ("weapon_group", "target"):

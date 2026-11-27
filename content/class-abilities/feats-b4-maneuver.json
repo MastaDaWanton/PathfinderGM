@@ -205,7 +205,8 @@
       },
       "self": {
         "tags": [
-          "meditation.held"
+          "meditation.held",
+          "meditation.combat"
         ],
         "rounds": "level"
       },

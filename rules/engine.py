@@ -1585,8 +1585,15 @@ class Scene:
             for e in actor.effects:
                 lit = (e.payload or {}).get("light")
                 if isinstance(lit, dict):
-                    out.append((tuple(pos[:2]), int(lit.get("radius_ft") or 0),
-                                int(lit.get("raised_ft") or 0), e.name or "a light"))
+                    # Torch Handling (Dungeoneer's Handbook, feat loop b5-spells): "the
+                    # radius of normal and increased illumination shed by any torch or
+                    # mundane light source you carry increases by 10 feet" — a light an
+                    # item lit (`item:` origin), never a spell's.
+                    more = 10 if str(e.origin or "").startswith("item:") \
+                        and actor.has_state(states.LIGHT_WIDER) else 0
+                    out.append((tuple(pos[:2]), int(lit.get("radius_ft") or 0) + more,
+                                int(lit.get("raised_ft") or 0) + more,
+                                e.name or "a light"))
         return out
 
     def light_at(self, square, viewer=None) -> str:
@@ -9151,7 +9158,9 @@ class Engine:
                            tell=f"The door of {house.name} is already open to you.",
                            because=intent.because)
         if how == "force":
-            mods = [Modifier(pc.ability_mod("str"), "Strength")]
+            # The plain Strength check, through the funnel and against a door (feat loop
+            # b5-spells: Smash's "+5 bonus on Strength checks made to ... break open doors").
+            mods = list(pc.ability_check_modifiers("str", {"against": "door"}))
             dc, label = self.DOOR_BREAK_DC, f"Strength check — breaking down the door of {house.name}"
         else:
             try:
@@ -10570,6 +10579,18 @@ class Engine:
             got = (ctx or {}).get("against") or ()
             got = (got,) if isinstance(got, str) else tuple(got)
             ctx = {**(ctx or {}), "against": got + ("hag_or_witch",)}
+        from . import spell_feats                        # Schooled Resolve (b5-spells)
+
+        if spell_feats.origin_is_vampire(intent.origin):
+            ctx = {**(ctx or {}), "against": spell_feats.save_words(
+                (ctx or {}).get("against") or (), origin=intent.origin)}
+        # A swarm's distraction (`_distraction` names its save so): Meditative
+        # Concentration's "a Fortitude save to resist a distraction effect".
+        if str(intent.origin or "").startswith("creature:") \
+                and getattr(intent, "origin_name", "") == "distraction":
+            got = (ctx or {}).get("against") or ()
+            got = (got,) if isinstance(got, str) else tuple(got)
+            ctx = {**(ctx or {}), "against": got + ("distraction",)}
         # An unreliable cloak or ring that lends this save its bonus is used by the save
         # (`_save_gutters`): rolled once, kept across the dice popup.
         gut = partial.get("save_gutter")
@@ -11337,6 +11358,11 @@ class Engine:
         # blow; the stance's own laying below finds it held and says nothing twice.
         early_said = (self._lay_attack_stances(actor, ("charge",), defender=defender)
                       if "charge" in choices and held is None else [])
+        # Saving Shield (feat loop b5-spells): an adjacent ally's immediate action lays its
+        # +2 before the AC is read, said with the stances' words.
+        from . import spell_feats
+
+        early_said = list(early_said) + spell_feats.saving_shield(self, actor, defender)
         # The attacker rides along so a term scoped to THIS attacker counts: a smiting
         # paladin's deflection is against the creature she smote (`_effect_scope_holds`).
         target_ac = defender.ac(against=weapon["category"],
@@ -23488,7 +23514,7 @@ class Engine:
             intent, f"{do or 'that'} is not something to do to a ship. There is close, "
                     f"sheer off, ram, grapple, board and cruise.")
 
-    def _helm(self, people) -> tuple[str, list]:
+    def _helm(self, people, vehicle: str = "") -> tuple[str, list]:
         """(who, the modifiers) of the best hand at a helm among `people`: Profession
         (sailor), the vehicle rules' driving check for a ship (Ultimate Combat, Vehicles:
         the sailing ship's "Profession (sailor)"), or Wisdom for anybody untrained — "a
@@ -23496,11 +23522,14 @@ class Engine:
         from .sheet import IllegalSheet
 
         best = ("nobody", [])
+        # The driving check names its vehicle (feat loop b5-spells): Skilled Driver's "+4
+        # bonus on driving checks with your chosen vehicle".
+        drive = {"skill_use": "drive", "vehicle": str(vehicle or "").strip().lower()}
         for a in people:
             try:
-                mods = list(a.skill_modifiers("profession"))
+                mods = list(a.skill_modifiers("profession", ctx=drive))
             except IllegalSheet:
-                mods = list(a.ability_check_modifiers("wis"))
+                mods = list(a.ability_check_modifiers("wis", drive))
             if best[0] == "nobody" or sum(m.value for m in mods) > sum(m.value for m in best[1]):
                 best = (a.name, mods)
         return best
@@ -23530,13 +23559,13 @@ class Engine:
             rooms = {p.id for p in ships_mod.places_of(ours)}
             hands = [a for a in self.scene.people.values()
                      if a.at in rooms and not a.is_down]
-            mine, my_mods = self._helm(hands)
+            mine, my_mods = self._helm(hands, getattr(ours, "kind", ""))
             level = int(getattr(self.scene.pc(), "level", 1) or 1)
             row = npcs.choose(["pirate", "sailor"], level) or {}
             try:
                 master = instantiate(str(row.get("id") or "thug"), scene=self.scene,
                                      name="her master")
-                _them, their_mods = self._helm([master])
+                _them, their_mods = self._helm([master], getattr(theirs, "kind", ""))
             except Exception:  # noqa: BLE001 — no codex pirate: an untrained helm, +0
                 their_mods = []
             won = None
@@ -29320,7 +29349,14 @@ class Engine:
                                         f"and only someone trained in Use Magic Device can "
                                         f"{how} a {kind} of it anyway.", code="item_power")
         dc = 20 + item_cl if kind == "scroll" else 20
-        roll = self.dice.d20(actor.skill_modifiers("use magic device"),
+        # What the device is (feat loop b5-spells): Divine Deception's "Use Magic Device
+        # checks to use divine spell-trigger or spell completion items" — a scroll's own
+        # tradition, else the spell's (`spellitems.tradition_of`).
+        from . import spellitems as spellitems_mod
+
+        umd = {"against": (str(spec.get("tradition") or spellitems_mod.tradition_of(spell))
+                           + "_spell",)}
+        roll = self.dice.d20(actor.skill_modifiers("use magic device", ctx=umd),
                              label=f"Use Magic Device ({name}, DC {dc})", visibility=visible)
         rolls.append(roll.as_dict())
         if roll.total < dc:
@@ -29337,7 +29373,7 @@ class Engine:
         if kind == "scroll" and level > 0:
             ability = "int" if str(spec.get("tradition") or "") == "arcane" else "wis"
             if actor.ability_score(ability) < 10 + level:
-                second = self.dice.d20(actor.skill_modifiers("use magic device"),
+                second = self.dice.d20(actor.skill_modifiers("use magic device", ctx=umd),
                                        label=f"Use Magic Device, emulating "
                                              f"{ability.title()} {10 + level}",
                                        visibility=visible)
@@ -31142,6 +31178,21 @@ class Engine:
                 state["tells"].extend(
                     f"{spell.name} does not touch {self.scene.actors[r].name}: immune "
                     f"to {why}." for r, why in warded.items())
+        # Feat loop b5-spells: a threnodic spell "has no effect on living creatures", a
+        # coaxing one "has no effect on other creature types" (`metamagic.only_reaches`).
+        kinds = metamagic.only_reaches(spell)
+        if kinds:
+            from .sheet import _is_of_kind
+
+            missed = [r for r in live
+                      if not _is_of_kind(self.scene.actors[r], "type", list(kinds))]
+            live = [r for r in live if r not in missed]
+            if missed and "reach_said" not in state:
+                state["reach_said"] = True
+                cast_effect["unreached"] = sorted(missed)
+                state["tells"].extend(
+                    f"The {metamagic.said(spell)} {spell.name} has no hold on "
+                    f"{self.scene.actors[r].name}." for r in missed)
         # A touch spell's attack roll (the spell's `touch_attack` document; leatherworking
         # plan §18.5): before it, shocking grasp landed on whoever it was aimed at and its
         # +3 against metal was read by nothing. The caster's roll, once per target, kept in
@@ -31568,6 +31619,9 @@ class Engine:
         finally:
             self._luck_against = ()
         state["rolls"].append(roll.as_dict())
+        from . import spell_feats                       # Arcane School Spirit (b5-spells)
+
+        spell_feats.spend_school_mark(caster, target, spell)
         saved = d20_succeeds(roll, dc)
         self._judge(roll, saved)
         saved = self._resolve_after_save(target, caster, spell, saved, state)
@@ -31694,10 +31748,15 @@ class Engine:
             intent, actor, mods,
             f"Caster level check against {target.name}'s spell resistance", sr,
             partial, state, "1d20", state_key="cast_state")
+        from . import spell_feats                       # Spell Chain (b5-spells)
+
+        roll = spell_feats.chained(self, actor, target, roll)
         state["rolls"].append(roll.as_dict())
         beat = roll.total >= sr
         self._judge(roll, beat)
         done[target.ref] = beat
+        if beat:
+            spell_feats.chain_mark(actor, target)
         held = "" if whose == "its own" else f", from {whose}"
         if pierced:
             held += ", 5 lower against a piercing spell"
@@ -33687,6 +33746,10 @@ class Engine:
 
         if feat_events.is_hag_or_witch(caster):          # Witchbreaker (feat loop b3)
             out.append("hag_or_witch")
+        from . import spell_feats                        # Schooled Resolve (b5-spells)
+
+        out += spell_feats.save_words(effectspec.spell_against(spell), caster=caster)[
+            len(effectspec.spell_against(spell)):]
         return tuple(out)
 
     def _focused_dc(self, spell, dc: int, target: Actor, state: dict) -> int:
@@ -38047,8 +38110,10 @@ class Engine:
         # An ally who must stand close holding a state (`requires_ally`, feat loop b3).
         want = doc.get("requires_ally")
         if want and not feat_events.ally_holds(self, actor, want):
+            what = (f"holding {want.get('state')}" if want.get("state") else
+                    "who is flanked and has the feat too")       # feat loop b5-spells
             return (f"{found.title()} needs an ally within {want.get('within_ft', 5)} feet "
-                    f"of {actor.name} holding {want.get('state')}, and there is none.")
+                    f"of {actor.name} {what}, and there is none.")
         cost = doc.get("cost") or {}
         if cost.get("pool"):
             pool = actor.pool(str(cost["pool"]))
@@ -38643,7 +38708,10 @@ class Engine:
                     share, failed = diverted, diverted > 0
                 if saving and other is not actor and diverted is None:
                     sv = str(saving.get("save", "will"))
-                    sroll = self.dice.d20(other.save_modifiers(sv),
+                    # A shaped area is an area of effect (feat loop b5-spells: Covering
+                    # Shield's "Reflex saves against area of effect attacks").
+                    sroll = self.dice.d20(other.save_modifiers(
+                        sv, {"against": ("area",)} if area is not None else None),
                                           label=f"{SAVES.get(sv, sv)} save against {shown}",
                                           visibility=intent.visibility or "player")
                     rolls.append(sroll)
@@ -41983,6 +42051,10 @@ class Engine:
             tell = (f"{actor.name} drinks the {c['name']}, {survival._amount(gallons)} "
                     f"gallon{'s' if gallons != 1 else ''}; thirst holds off for "
                     f"{max(0, due)} hours more.")
+            if row.get("alcohol"):                      # Drunken Brawler (b5-spells)
+                from . import spell_feats
+
+                tell += spell_feats.drunken_brawler(actor)
         else:
             freed = survival.drink(actor)
             effects = [{"ref": actor.ref, "kind": "drink", "at": well}]

@@ -2556,6 +2556,10 @@ WHEN_KEYS: dict[str, str] = {
     # damage from your Elemental Fist attack": "electricity".
     "charge_energy": "an energy a charge (Elemental Fist) dealt with this hit, for an "
                      "on_hit rider: \"electricity\" (Engine._feat_riders)",
+    # Feat loop b5-spells: Skilled Driver's "driving checks with your chosen vehicle" — the
+    # vehicle a driving check is made with (`Engine._helm`), "$pick" for the feat's own.
+    "vehicle": "the vehicle a driving check is made with: \"sailing ship\" or \"$pick\" "
+               "(Engine._helm)",
 }
 # `larger` / `smaller` (feat loop b2): size categories against the bearer's own, answered
 # by `classfeatures.holds` where the bearer is known (Risky Striker, Underfoot).
@@ -2653,6 +2657,23 @@ AGAINST: dict[str, str] = {
     # Feat loop b4-other: Sure Grasp's "a Reflex save to avoid falling" — the jump's grab
     # at the far edge (bodyskills.jump), passed by the save that rolls it.
     "fall": "a Reflex save to avoid falling (bodyskills)",
+    # Feat loop b5-spells: Schooled Resolve's "Will saves against mind-affecting spells and
+    # effects from vampires" (rules/spell_feats.py save_words).
+    "vampire_mind": "a mind-affecting spell or effect of a vampire's",
+    # Feat loop b5-spells: Meditative Concentration's "a Fortitude save to resist a
+    # distraction effect (such as the distraction ability of a swarm)" (Engine._distraction).
+    "distraction": "a swarm's distraction, or another distraction effect",
+    # Feat loop b5-spells: Smash's "Strength checks made to knock down or break open doors"
+    # (Engine._op_break_in, dungeons' forced doors).
+    "door": "a Strength check to break open a door",
+    # Feat loop b5-spells: Arcane School Spirit's "the next spell of this school" — every
+    # school a spell's save names (`spell_against`; enchantment and divination are above).
+    "abjuration": "an abjuration (the school)",
+    "conjuration": "a conjuration (the school)",
+    "evocation": "an evocation (the school)",
+    "illusion": "an illusion (the school)",
+    "necromancy": "a necromancy (the school)",
+    "transmutation": "a transmutation (the school)",
 }
 
 

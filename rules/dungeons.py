@@ -1822,7 +1822,9 @@ def break_door(engine, intent, pc, how: str, partial: dict, *, strict: bool = Fa
         dc = int(door["pick"]) + (0 if tools else engine.NO_TOOLS)
         label = f"Disable Device — the lock of {door['name']}"
     else:
-        mods = list(pc.ability_check_modifiers("str"))
+        # Against a door (feat loop b5-spells): Smash's "+5 bonus on Strength checks made
+        # to knock down or break open doors".
+        mods = list(pc.ability_check_modifiers("str", {"against": "door"}))
         dc = int(door["force"])
         label = f"Strength check — forcing {door['name']}"
     from .engine import Outcome

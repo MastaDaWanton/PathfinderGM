@@ -1,0 +1,343 @@
+{
+  "_about": [
+    "Feat loop batch 5, lane b5-spells (2026-11-26): spell hooks, metamagic, and the situational",
+    "and plain modifiers left in the loop's list. Text from content/feats/feats.json (the OGL",
+    "sheet), checked against aonprd.com FeatDisplay pages 2026-11-26. The feats whose class,",
+    "race or system no player can reach are in docs/feats-waiting-on-classes.md, not here."
+  ],
+  "threnodic-spell": {
+    "metamagic": {
+      "does": "threnodic",
+      "levels": 2
+    }
+  },
+  "coaxing-spell": {
+    "metamagic": {
+      "does": "coaxing",
+      "levels": 2
+    }
+  },
+  "thanatopic-spell": {
+    "metamagic": {
+      "does": "thanatopic",
+      "levels": 2
+    },
+    "not_yet": [
+      "negative levels and energy drain passing a death ward, and an undead's automatic save to shed them after 24 hours: the engine lays no negative levels (enervation and its kin are narrative, energy drain is reported, not applied)"
+    ]
+  },
+  "guardian-of-the-wild": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 2,
+        "bonus_type": "dodge",
+        "when": {
+          "bearer": {
+            "terrain": "$attuned"
+          }
+        },
+        "note": "ARG: '+2 dodge bonus to Armor Class' in a terrain your Attuned to the Wild names; one bonus however many terrains match"
+      }
+    ]
+  },
+  "spirit-of-the-wild": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "perception",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "skill_use": "ambush",
+          "bearer": {
+            "terrain": "$attuned"
+          }
+        },
+        "note": "ARG: '+4 bonus on Perception checks made to act in the surprise round' (rules/surprise.py rolls it as the ambush use)"
+      }
+    ],
+    "tags": [
+      "surprise.sense.blindsense.30"
+    ]
+  },
+  "covering-shield": {
+    "modifiers": [
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "formula": "shield_ac",
+        "bonus_type": "untyped",
+        "when": {
+          "against": "area",
+          "bearer": {
+            "shield": true
+          }
+        },
+        "note": "Dragonslayer's Handbook: 'a bonus on Reflex saves against area of effect attacks equal to your shield's base bonus to armor class plus any bonuses granted by feats or class abilities' (Actor._shield_ac_for_feats); no enhancement; a spell's area and a class ability's shaped area both pass `area`"
+      }
+    ]
+  },
+  "schooledresolve": {
+    "modifiers": [
+      {
+        "type": "save_mod",
+        "target": "will",
+        "formula": "(level_fighter + 2) // 4",
+        "bonus_type": "untyped",
+        "when": {
+          "against": "vampire_mind"
+        },
+        "note": "Blood of the Night: 'add your bravery bonus on Will saves against mind-affecting spells and effects from vampires. This does not stack with the normal bravery bonus on saves against fear effects': a vampire's fear effect is not vampire_mind (rules/spell_feats.py), so bravery alone answers it"
+      }
+    ]
+  },
+  "meditative-concentration": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "concentration",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "meditation.combat"
+          }
+        },
+        "note": "F&P: 'For 1 round per character level after you perform combat meditation, whenever you attempt a concentration check to avoid losing a spell ... you gain a +4 bonus' (Combat Meditation lays meditation.combat for those rounds)"
+      },
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "distraction",
+          "bearer": {
+            "state": "meditation.combat"
+          }
+        }
+      }
+    ]
+  },
+  "master-alchemist": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "craft",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "note": "APG: '+2 bonus on Craft (alchemy) checks'; Craft is one skill on this sheet (tables.base_skill), so the term is Craft's"
+      }
+    ],
+    "tags": [
+      "craft.alchemy.master"
+    ],
+    "not_yet": [
+      "poisons made a dose per point of Intelligence modifier at once: the alchemy bench makes no poisons"
+    ]
+  },
+  "legacy-of-the-crusade": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "amount": 1,
+        "bonus_type": "sacred",
+        "when": {
+          "weapon": {
+            "good": true
+          }
+        },
+        "note": "Champions of Purity: 'When using good-aligned weapons, including those under the effects of a bless weapon spell, you gain a +1 sacred bonus on damage rolls' (a weapon that strikes as good: Actor._roll_context)"
+      }
+    ],
+    "not_yet": [
+      "bless weapon making a weapon good-aligned: the spell is narrative, so only a weapon that strikes as good by its own layer answers"
+    ]
+  },
+  "divine-deception": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "use magic device",
+        "amount": 5,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "divine_spell"
+        },
+        "note": "Faction Guide: '+5 bonus on Use Magic Device checks to use divine spell-trigger or spell completion items' (Engine._spell_item_gate passes the device's tradition)"
+      }
+    ],
+    "not_yet": [
+      "emulating a divine class feature: no Use Magic Device check emulates a class feature in the engine"
+    ]
+  },
+  "secret-signs": {
+    "tags": [
+      "casting.secret-signs"
+    ],
+    "not_yet": [
+      "the +4 on Bluff checks to pass secret messages: Bluff has no secret-message use (content/rules/skill-uses.json)"
+    ]
+  },
+  "smell-fear": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "perception",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "target": {
+            "state": "state.fear"
+          },
+          "bearer": {
+            "state": "sense.scent"
+          }
+        },
+        "note": "APG: '+4 bonus on Perception checks to detect creatures with the shaken, frightened, or panicked conditions using scent' (awareness.check names the one looked for)"
+      }
+    ],
+    "not_yet": [
+      "using Perception in place of Sense Motive against a frightened subject or one covering up fear: a check is rolled with its own skill"
+    ]
+  },
+  "cold-celerity": {
+    "tags": [
+      "celerity.cold"
+    ],
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "initiative",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "buff.cold-celerity"
+          }
+        },
+        "note": "People of the North: '+2 bonus on initiative checks and a +1 bonus on attack rolls ... for 1 round after any round in which you take cold damage' (Actor.take_damage lays the round)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "buff.cold-celerity"
+          }
+        }
+      }
+    ],
+    "not_yet": [
+      "the same bonuses in severe cold (below 0 F): the engine models one cold band (below 40 F, hazards.json cold), not severe cold"
+    ]
+  },
+  "torch-handling": {
+    "tags": [
+      "handling.torch.wider"
+    ],
+    "not_yet": [
+      "a torch as a simple weapon: an improvised blow does not tell the attack roll which object it is, so its -4 cannot be waived for a torch alone",
+      "the once-a-day reroll of a save against an effect that would put the light out: nothing in the engine puts out a carried light"
+    ]
+  },
+  "improved-back-to-back": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "flanked": true,
+          "bearer": {
+            "state": "buff.stance.improved-back-to-back"
+          }
+        },
+        "note": "UC: '+2 bonus to AC against all flankers until the start of your next turn', while the swift action's one-round stance holds (content/class-abilities/feats-b5-spells.json)"
+      }
+    ]
+  },
+  "run": {
+    "tags": [
+      "jump.running.run"
+    ],
+    "not_yet": [
+      "running itself, at five (or four) times speed while keeping the Dexterity bonus to AC: the engine has no run action, only moves and charges"
+    ]
+  },
+  "spell-chain": {
+    "tags": [
+      "chain.spell"
+    ]
+  },
+  "covering-defense": {
+    "tags": [
+      "guard.covering-defense"
+    ]
+  },
+  "smash": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "str_check",
+        "amount": 5,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "door"
+        },
+        "note": "APG: '+5 bonus on Strength checks made to knock down or break open doors' (a house door, a dungeon's forced door)"
+      }
+    ],
+    "not_yet": [
+      "ignoring the first 5 points of an inanimate, unattended object's hardness when attacking it: no attack is made at an object"
+    ]
+  },
+  "skilled-driver": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "profession",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "vehicle": "$pick"
+        },
+        "note": "UC: '+4 bonus on driving checks with your chosen vehicle' — Skilled Driver (sailing ship); a ship's driving check is Profession (sailor), or Wisdom untrained (Engine._helm)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "wis_check",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "vehicle": "$pick"
+        }
+      }
+    ]
+  },
+  "slow-time": {},
+  "saving-shield": {
+    "tags": [
+      "guard.saving-shield"
+    ]
+  },
+  "arcane-school-spirit": {
+    "tags": [
+      "spirit.arcane-school"
+    ]
+  },
+  "drunken-brawler": {
+    "tags": [
+      "drink.brawler"
+    ],
+    "not_yet": [
+      "the Fortitude and Will bonuses ending early when the temporary hit points are spent: both last the hour (rules/spell_feats.py drunken_brawler)"
+    ]
+  }
+}

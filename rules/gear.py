@@ -51,7 +51,8 @@ _DOC: dict | None = None
 ROW_KEYS = frozenset({"names", "does", "source", "house_rule", "modifiers", "tags", "eat",
                       "drink", "fills", "carry", "camp", "writes", "not_yet"})
 EAT_KEYS = frozenset({"spends", "lb"})
-DRINK_KEYS = frozenset({"spends", "gallons", "leaves"})
+# `alcohol` (feat loop b5-spells): ale and wine are strong drink to Drunken Brawler.
+DRINK_KEYS = frozenset({"spends", "gallons", "leaves", "alcohol"})
 MOD_KEYS = frozenset({"type", "target", "amount", "bonus_type", "when", "note"})
 CAMP_KEYS = frozenset({"night_check_scale"})
 

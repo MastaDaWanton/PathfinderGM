@@ -367,10 +367,13 @@ DOC_KEYS = frozenset({
 def _ally_want_problems(at: str, want) -> list[str]:
     """`requires_ally` / `self.ends_when.ally`: {"state", "within_ft", "far_feat",
     "far_ft"} (`feat_events.ally_holds`)."""
-    if not isinstance(want, dict) or not str(want.get("state") or "").strip() \
-            or set(want) - {"state", "within_ft", "far_feat", "far_ft"}:
+    # Feat loop b5-spells: `flanked` and `feat` — Improved Back to Back's "adjacent to an
+    # ally who is flanked and also has this feat"; either `state` or `flanked` is asked.
+    if not isinstance(want, dict) or not (str(want.get("state") or "").strip()
+                                          or want.get("flanked") is True) \
+            or set(want) - {"state", "within_ft", "far_feat", "far_ft", "flanked", "feat"}:
         return [f"{at} is {{\"state\": \"buff.stance.rage\", \"within_ft\": 5}}, with an "
-                f"optional far_feat and far_ft."]
+                f"optional far_feat and far_ft (or flanked: true and a feat)."]
     return []
 SELF_KEYS = frozenset({"ends_when", "forbids", "modifiers", "natural_weapons", "rounds",
                        "strikes_as", "tags", "vs_target", "forgoes"})

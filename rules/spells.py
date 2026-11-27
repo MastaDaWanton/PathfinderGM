@@ -1145,6 +1145,13 @@ def spared_by(spell, target, hit_dice: int, caster=None) -> str:
     if m and int(hit_dice) > int(m.group(1)):
         return f"has {hit_dice} Hit Dice, more than {m.group(1)}"
     undead = target.has_state("type.undead")
+    # Threnodic Spell (feat loop b5-spells): "affects undead creatures ... but has no effect
+    # on living creatures" — a "living creature" line would leave it nobody, so the copy
+    # reads it as the undead it reaches (owner call: the feat's whole purpose).
+    from .metamagic import flag
+
+    if undead and flag(spell, "threnodic"):
+        undead = False
     if re.search(r"\bliving\b", line) and (undead or target.has_state("type.construct")):
         return "is not a living creature"
     from .sheet import _is_of_kind
