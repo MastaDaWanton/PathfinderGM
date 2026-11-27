@@ -67,3 +67,19 @@ def test_source_text_pins_only_go_down():
     assert count <= SOURCE_PINS_CEILING, (
         f"{count} inspect.getsource calls in tests (ceiling {SOURCE_PINS_CEILING}): "
         f"assert behaviour, or walk the AST as test_three_laws does")
+
+
+def test_a_monkeypatch_left_live_is_undone_and_named():
+    """Measured 2026-11-27: two Feinting Flurry tests left a `pytest.MonkeyPatch()` holding
+    `rules.feats.meets = always yes`, and test_guided_choices on the same xdist worker
+    then saw 1,246 open feats where a fighter qualifies for ~145. conftest's
+    `pytest_runtest_call` now hands every body-made MonkeyPatch to `undo_leaked`."""
+    from rules import feats as feats_mod
+    from tests.conftest import undo_leaked
+
+    real = feats_mod.meets
+    mp = pytest.MonkeyPatch()
+    mp.setattr(feats_mod, "meets", lambda actor, feat: {"ok": True, "unmet": [], "unknown": []})
+    assert undo_leaked([mp]) == ["rules.feats.meets"]
+    assert feats_mod.meets is real
+    assert undo_leaked([mp]) == []                      # undone once, nothing left to name
