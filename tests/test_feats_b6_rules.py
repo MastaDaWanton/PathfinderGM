@@ -427,3 +427,46 @@ def test_the_readied_charge_is_offered_on_the_declare_section_to_rhino_charge_on
         assert ("ready_charge_cast" in ids) is offered
         if offered:
             assert ids["ready_charge_cast"]["op"]["params"]["action"] == "charge"
+
+
+# --- Antagonize ---------------------------------------------------------------------------------
+
+def _antagonist(skill, face, ranks=8):
+    pc = _pc("fighter", feats=("Antagonize",), weapons=("longsword",))
+    pc.ranks[skill] = ranks
+    s, e = _board(pc, ("thug", (8, 5)), ("thug", (9, 9)),
+                  faces={f"{skill.title()} check": face})
+    res = _run(e, {"op": "check", "actor": "pc", "target": "c1", "visibility": "hidden",
+                   "params": {"skill": skill, "antagonize": True}})
+    return pc, s, e, res
+
+
+def test_antagonize_by_diplomacy_flusters_the_foe_against_everyone_else():
+    """UM Antagonize, Diplomacy: "For the next minute, the target takes a -2 penalty on all
+    attacks rolls made against creatures other than you". Before: no document, and "I goad
+    him" had no door. The thug's swing at the other thug carries -2, at the antagonist
+    nothing; a second try the same day is refused."""
+    from rules import compulsion
+
+    pc, s, e, res = _antagonist("diplomacy", 18)
+    thug = s.actors["c1"]
+    assert "flustered" in _tells(res), _tells(res)
+    assert sum(m.value for m in compulsion.penalty_against(thug, "c2")) == -2
+    assert compulsion.penalty_against(thug, "pc") == []
+    assert s.standard_spent.get("pc") == s.round
+    s.standard_spent.pop("pc", None)
+    again = _run(e, {"op": "check", "actor": "pc", "target": "c1", "visibility": "hidden",
+                     "params": {"skill": "diplomacy", "antagonize": True}})
+    assert again.outcomes[-1].status == "refused" and "today" in _tells(again)
+
+
+def test_antagonize_by_intimidate_turns_the_foe_on_the_antagonist_and_a_miss_does_nothing():
+    """UM Antagonize, Intimidate: "On its next turn, the target must attempt to make a melee
+    attack against you" — the compulsion's pull, -4 at anyone else (owner call: the app's
+    compulsion penalises and never prohibits). A check under DC 10 + HD + Wis lays nothing."""
+    from rules import compulsion
+
+    pc, s, e, res = _antagonist("intimidate", 18)
+    assert sum(m.value for m in compulsion.penalty_against(s.actors["c1"], "c2")) == -4
+    pc, s, e, res = _antagonist("intimidate", 1, ranks=0)
+    assert compulsion.penalty_against(s.actors["c1"], "c2") == [], _tells(res)

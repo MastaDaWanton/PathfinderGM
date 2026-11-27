@@ -316,6 +316,8 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                            "feint", "tumble", "care", "display", "square",
                            # Disengaging Feint's feint (feat loop b2, skilluses.feint).
                            "disengage",
+                           # Antagonize's door (feat loop b6-rules, rules/antagonize.py).
+                           "antagonize",
                            # Round 2 (skills-mind): the thing appraised or studied, and
                            # the subject a Knowledge question is about: names the engine
                            # grounds (`tradecraft.carries`, the world's own index), never
@@ -1572,7 +1574,11 @@ def _check_params(intent: Intent, index: int) -> None:
                               "and keep diversion.", "schema", index)
         # A use with its own row is rolled at the row's DC (rules/skilluses.py OWN_DOORS):
         # it needs nothing to beat from the plan, and a plan's number beside it is refused.
-        own = next(((sk, flag) for (sk, flag) in _OWN_DOORS if p.get(flag)), None)
+        # Feat loop b6-rules: one flag may be a use of two skills (Antagonize's Diplomacy
+        # or Intimidate): the skill named wins.
+        own = next(((sk, flag) for (sk, flag) in _OWN_DOORS
+                    if p.get(flag) and sk == p.get("skill")), None) \
+            or next(((sk, flag) for (sk, flag) in _OWN_DOORS if p.get(flag)), None)
         if own and own[0] != p.get("skill"):
             raise IntentError(f"check: {own[1]} is a use of {own[0]}. Make that the skill, "
                               f"or drop {own[1]}.", "schema", index)

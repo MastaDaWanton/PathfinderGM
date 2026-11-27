@@ -57,7 +57,10 @@ DISENGAGING_FEINT = "skill.bluff.feint.disengaging"
 # The check params that send a check to its use's own door (`Engine._op_check`), each
 # written by the act table from the reader's closed answers (gm/acts_to_ops.py).
 OWN_DOORS = {("bluff", "feint"): "feint", ("acrobatics", "tumble"): "tumble",
-             ("heal", "care"): "long_term_care", ("intimidate", "display"): "dazzling_display"}
+             ("heal", "care"): "long_term_care", ("intimidate", "display"): "dazzling_display",
+             # Feat loop b6-rules: Antagonize, by either skill (rules/antagonize.py).
+             ("diplomacy", "antagonize"): "antagonize",
+             ("intimidate", "antagonize"): "antagonize"}
 CHECK_FLAGS = frozenset(flag for _skill, flag in OWN_DOORS)
 
 
@@ -751,6 +754,13 @@ def _motivate(engine, actor, total: int, side, range_ft: int):
         said.append(f"{ally.name} takes heart from it: +1 morale on attacks and skill "
                     f"checks for {rounds} round{'s' if rounds != 1 else ''}.")
     return said, effects
+
+
+def antagonize(engine, intent, actor, mods, partial):
+    """Antagonize (UM), its own module's door (rules/antagonize.py; feat loop b6-rules)."""
+    from . import antagonize as antagonize_mod
+
+    return antagonize_mod.door(engine, intent, actor, mods, partial)
 
 
 def dazzling_display(engine, intent, actor, mods, partial):

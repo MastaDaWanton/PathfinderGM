@@ -18,7 +18,8 @@
     "improved-stalwart: ACG: 'Double the DR you gain from Stalwart, to a maximum of DR 10/-'.",
     "stunning-fist: CRB: 'You may attempt a stunning attack once per day for every four levels you have attained' — any class's, content/class-abilities/feats-b6-rules.json; the monk's own document stands in its place.",
     "improved-ki-throw: APG: 'you may throw your target into any square you threaten that is occupied by another creature. Make a bull rush combat maneuver check with a -4 penalty against the secondary target' (rules/maneuver_feats.py `_thrown_into`); Enhanced Ki Throw's landing damage and Spinning Throw's Improved Ki Throw clause are b4's documents, finished here (`_land`, `_spun_into`).",
-    "rhino-charge: APG: 'You may ready a charge, though you may only move up to your speed on the charge' (rules/readied.py READY_CHARGE, Engine._charge_before) — b4-moves' document, finished here."
+    "rhino-charge: APG: 'You may ready a charge, though you may only move up to your speed on the charge' (rules/readied.py READY_CHARGE, Engine._charge_before) — b4-moves' document, finished here.",
+    "antagonize: UM: Diplomacy or Intimidate, a standard action, DC 10 + HD + Wis; flustered (-2 on attacks at others for a minute) or enraged (turns on you next turn), once a day a target (rules/antagonize.py)."
   ],
   "improved-counterspell": {
     "tags": [
@@ -89,6 +90,16 @@
   "improved-ki-throw": {
     "tags": [
       "maneuver.ki-throw.improved"
+    ]
+  },
+  "antagonize": {
+    "tags": [
+      "skill.antagonize"
+    ],
+    "not_yet": [
+      "'has a 10% spell failure chance on all spells that do not target you or that have you within their area of effect': no cast rolls a failure chance but armour's",
+      "'you may make a Sense Motive check (DC 20) as a swift action to gain an insight bonus on these Diplomacy or Intimidate checks equal to your Charisma bonus': the swift read before the check is not offered",
+      "'If it cannot attack you on its turn, you may make the check again as an immediate action to extend the effect for 1 round': the extension is not offered"
     ]
   }
 }
