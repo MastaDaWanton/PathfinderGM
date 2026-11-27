@@ -11392,7 +11392,7 @@ class Engine:
         # Feat loop b7-fixes: Power Attack's "its effects last until your next turn" (CRB):
         # an attack of opportunity before then keeps the stance the declared swing laid.
         power = bool(intent.params.get("power_attack")) or actor.has_state(
-            states.tags_for("power attack")[0])
+            states.tags_for("weighted blows")[0])
         # The other declared attack options (lane D): each a key in the roll context its
         # feat or class document asks, checked legal at validate (`_attack_choice_refusal`).
         from .sheet import ATTACK_CHOICES
@@ -13688,6 +13688,7 @@ class Engine:
     # step) leave it alone, as they leave an attack of opportunity.
 
     _RIDER_TAG = "rider"
+    _SORCEROUS = "strike.sorcerous"                  # Feat loop b7-fixes
 
     def _riders_after(self, intent: Intent, outcome: "Outcome") -> tuple[list, list]:
         """(the intents the feats splice next, the outcomes they tell without a roll)."""
@@ -13748,6 +13749,23 @@ class Engine:
                                        f"{foe.name} on it (Hamatula Strike)",
                             "params": {"full_attack": False, "reaction": "hamatula-strike",
                                        "manoeuvre": "grapple"}})
+            # Feat loop b7-fixes: Sorcerous Strike (UC): "If you make a successful unarmed
+            # strike against an opponent ... you can spend a swift action to deliver the
+            # effects of the chosen bloodline power to that opponent. Doing so provokes no
+            # attacks of opportunity." The power the feat names rides its tag; its use is
+            # spliced `delivered` (no touch roll of its own: the fist already landed).
+            fist = (hit and not params.get("manoeuvre") and not foe.is_down
+                    and str(w.get("name") or "").lower().startswith("unarmed strike"))
+            power = next((t[len(self._SORCEROUS) + 1:] for t in actor.standing_tags()
+                          if t.startswith(self._SORCEROUS + ".")), "") if fist else ""
+            if power and self._spend_swift(actor, False, "Sorcerous Strike") is None:
+                out.append({"op": "use_ability", "actor": actor.ref, "target": foe.ref,
+                            "id": f"{intent.id}-sorcerous",
+                            "visibility": "player" if actor.is_pc else "hidden",
+                            "because": f"{actor.name} drives the bloodline's power through "
+                                       f"the blow (Sorcerous Strike)",
+                            "params": {"ability": power, "to": foe.ref,
+                                       "reaction": "sorcerous-strike", "delivered": True}})
             # Drag Down (UC): "Whenever an opponent successfully trips you, you can attempt
             # to trip that opponent as an immediate action."
             if params.get("manoeuvre") == "trip" and foe.ref in trip_by \
@@ -14675,6 +14693,10 @@ class Engine:
                     effects.append({"ref": actor.ref, "kind": "dropped",
                                     "item": weapon_key, "prop": rec["name"],
                                     "from": f"failed {m['name']}"})
+            # Feat loop b7-fixes: Cornugon Trip, "Failing at this attack does not knock you
+            # prone" — a thrown trip has no backfire, and a thrown weapon nothing to drop.
+            elif m.get("backfire") and margin <= -10 and intent.params.get("thrown"):
+                pass
             # A trip weapon let go instead of falling (feat loop b4-maneuver).
             elif m.get("backfire") and margin <= -10 and not rider \
                     and maneuver_feats.backfire_spared(self, intent, actor, defender, key,
@@ -14696,6 +14718,13 @@ class Engine:
         effects.extend(more["effects"])
         bits.extend(t for t in more["tells"] if t)
         extra_rolls.extend(more["rolls"])
+        # Feat loop b7-fixes: a trip thrown (Cornugon Trip) leaves the hand like any throw.
+        if key == "trip" and intent.params.get("thrown") and roll is not None \
+                and weapon_key and actor.weapon(weapon_key).get("range_ft"):
+            landed = self._thrown_lands(actor, defender, weapon_key,
+                                        actor.weapon(weapon_key))
+            effects.extend(landed["effects"])
+            bits.append(landed["tell"])
         crossed = self._hp_state_effects(defender)
         effects.extend(crossed)
         return Outcome(
@@ -28681,9 +28710,9 @@ class Engine:
          "{name} takes aim for the heavier shot (Deadly Aim) until their next turn."),
         # Feat loop b7-fixes: Power Attack (CRB), "its effects last until your next turn";
         # carried to attacks of opportunity (`_op_attack`) and manoeuvres (`cmb_modifiers`).
-        ("power_attack", "power attack", "Power Attack",
-         "{name} puts their weight behind every blow (Power Attack) until their next "
-         "turn."),
+        # The feat's name is its document's (an empty name here): the engine names none.
+        ("power_attack", "weighted blows", "",
+         "{name} puts their weight behind every blow until their next turn."),
     )
 
     @classmethod
@@ -28705,7 +28734,8 @@ class Engine:
             # and refreshed, said once.
             again = actor.has_state(states.tags_for(key)[0])
             actor.apply_effect(ActiveEffect(
-                name=key, kind="buff", key=key, source=name, origin=origin,
+                name=key, kind="buff", key=key, source=name or str(doc.get("name") or key),
+                origin=origin,
                 duration="rounds", rounds_left=1, tags=states.tags_for(key),
                 modifiers=cls._stance_terms(actor, choice, defender)))
             if not again:
@@ -39135,6 +39165,14 @@ class Engine:
 
         # 6. What it does to whoever it reached: a touch attack, one roll shared, a save
         # each, the heal or the harm, and the standing effect it lays on them.
+        # Feat loop b7-fixes: a sunder at the spells on them (Shatterspell, `dispel.sunder`).
+        if doc.get("spell_sunder") and target is not None:
+            from . import dispel
+
+            fx, said, rolled = dispel.sunder(self, actor, target, origin)
+            return Outcome(intent_id=intent.id, op="use_ability", effects=records + fx,
+                           rolls=rolls + rolled, tell=" ".join(tells + said),
+                           because=intent.because)
         if doc.get("evil_only") and target is not None and not _could_be_evil(target):
             tells.append(f"{target.name} is not evil, and the {name} is wasted.")
             return Outcome(intent_id=intent.id, op="use_ability", effects=records,
@@ -39142,7 +39180,9 @@ class Engine:
         if doc.get("evil_only") and target is not None and not printed_alignment(target):
             tells.append(f"Nothing records {target.name}'s alignment; the {name} holds.")
         hit_ok = True
-        if doc.get("attack") and target is not None:
+        # Feat loop b7-fixes: a power delivered on a blow that already landed (Sorcerous
+        # Strike, engine-written `delivered`) makes no touch attack of its own.
+        if doc.get("attack") and target is not None and not intent.params.get("delivered"):
             hit_ok, roll, said = self._class_touch_attack(intent, actor, target, doc, shown)
             rolls.append(roll)
             tells.append(said)

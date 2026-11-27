@@ -3455,6 +3455,11 @@ class Actor:
         (`{"multiply": 2, "scope": {"weapon": "$target"}}`), read live like every feat
         term; a printed stat block already holds its own."""
         row = self._weapon_stats(key)
+        # Feat loop b7-fixes: Cornugon Trip's "throw your spiked chain (as if it were a
+        # thrown weapon with a range increment of 10 feet)" — the document's
+        # `throws.<weapon>` tag gives the row a range increment it does not print.
+        if not row.get("range_ft") and self._feat_throws(row, key):
+            row = dict(row, range_ft=10)
         if row.get("stat_block") or row.get("crit_range_printed") is not None:
             return row
         mult = self._feat_threat(row, key)
@@ -3462,6 +3467,19 @@ class Actor:
             row = dict(row, crit_range_printed=int(row.get("crit_range", 20) or 20))
             row["crit_range"] = doubled_threat(row["crit_range_printed"], mult)
         return row
+
+    def _feat_throws(self, row: dict, key: str | None) -> bool:
+        """Whether a held feat document's tags make this weapon a thrown one
+        (`throws.<weapon key>`). Read off the feat list, not `has_state`: `weapon` is asked
+        on every roll, and the standing tags walk the whole sheet."""
+        if getattr(self, "_reading_feats", False) or not self.feats:
+            return False
+        from . import feats as feats_mod
+
+        base = str(row.get("crafted_base") or key or self.wielded_key() or "").strip().lower()
+        want = f"throws.{base}"
+        return bool(base) and any(want in ((feats_mod.document(raw) or {}).get("tags") or ())
+                                  for raw in self.feats)
 
     def _feat_threat(self, row: dict, key: str | None) -> int:
         """The best threat-range multiple a held feat document lays on this weapon."""
@@ -5072,16 +5090,29 @@ class Actor:
         return sum(m.value for m in self.ac_modifiers(against, flat_footed, attacker,
                                                       provoked_by))
 
+    def _magic_held_off(self):
+        """Which of this creature's effects contribute nothing right now: every magical
+        one while `MAGIC_SUPPRESSED` holds, and one spell's own while an effect suppressing
+        it holds (feat loop b7-fixes: Shatterspell's "suppresses the effect for 1 round";
+        `dispel.sunder` lays it, its payload naming the spell's `origin`). Read live, so
+        the suppression's end gives the numbers back; the spell's clock runs underneath."""
+        from .dispel import SUPPRESSES
+
+        every = self.has_state(MAGIC_SUPPRESSED)
+        quiet = {str((e.payload or {}).get(SUPPRESSES)) for e in self.effects
+                 if (e.payload or {}).get(SUPPRESSES)}
+        return lambda e: (every and is_magical(e)) or (bool(quiet) and e.origin in quiet)
+
     def _scoped_effect_mods(self, kind: str, target: str, ctx: dict) -> list[Modifier]:
         """Only the effect modifiers that carry a scope (`vs`, `when`) and hold for ctx.
 
         The other half of `_buff_mods`' scope check, for a builder whose ordinary read
         has no context: the AC line. See `_effect_scope_holds`."""
         want = str(target).lower()
-        held_off = self.has_state(MAGIC_SUPPRESSED)
+        held_off = self._magic_held_off()
         out: list[Modifier] = []
         for e in self.effects:
-            if held_off and is_magical(e):
+            if held_off(e):
                 continue
             for m in e.modifiers:
                 amount = int(m.get("amount", 0) or 0)
@@ -7170,7 +7201,7 @@ class Actor:
         # Magic held off (null skymetal's recoil, `MAGIC_SUPPRESSED`): a spell's buff contributes
         # nothing while the suppressing effect holds and everything again when it ends —
         # the effect is not removed, its contribution is (law 2, read live).
-        held_off = self.has_state(MAGIC_SUPPRESSED)
+        held_off = self._magic_held_off()
         # Untyped bonuses "always stack, unless they are from the same source" (CRB,
         # Common Terms). Between two separate effects with one source — the same jar's
         # untyped bonus landed twice by two doors, a stacking effect reapplied — the better
@@ -7179,7 +7210,7 @@ class Actor:
         # it is a label one document splits into several terms (dice.stack says why).
         untyped_best: dict[str, tuple[int, int]] = {}
         for e in self.effects:
-            if held_off and is_magical(e):
+            if held_off(e):
                 continue
             for m in e.modifiers:
                 amount = int(m.get("amount", 0) or 0)

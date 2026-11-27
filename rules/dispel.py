@@ -39,6 +39,10 @@ DIVINE_LISTS = ("cleric", "druid", "paladin", "ranger", "adept", "inquisitor", "
 # Feat tags read here, each a feat document's `tags` line.
 TENACIOUS = "dispel.tenacious.transmutation"   # Tenacious Transmutation (APG)
 SYNERGY = "dispel.synergy"                     # Dispel Synergy (UC)
+# Feat loop b7-fixes: the payload key an effect suppressing one spell names it by (its
+# `origin`), read by `Actor._magic_held_off`; and the tag that effect carries.
+SUPPRESSES = "suppresses"
+SUPPRESSED_SPELL = "suppressed.spell"
 
 
 def is_divine(actor) -> bool:
@@ -255,3 +259,52 @@ def counter_check(engine, counterer, cl: int, spell_id: str, by_school: str, cas
     roll = engine.dice.d20(mods, label=f"{counterer.name}'s dispel check (to counter, "
                                        f"DC {dc})", visibility="hidden")
     return roll.total >= dc, roll, dc
+
+
+def sunder(engine, actor, target, origin: str) -> tuple[list[dict], list[str], list]:
+    """Spell Sunder (UC p.28, aonprd BarbarianRagePowers read 2026-11-27), which
+    Shatterspell (ARG) lends: "To sunder an effect on a creature, the barbarian must succeed
+    at a normal sunder combat maneuver against the creature's CMD + 5, ignoring any miss
+    chance caused by a spell or spell-like ability. If successful, the barbarian suppresses
+    the effect for 1 round, or 2 rounds if she exceeded the CMD by 5 to 9. If she exceeds
+    the CMD by 10 or more, the effect is dispelled."
+
+    The spell struck at is the strongest on the creature (highest caster level, the order
+    `spells_on` walks): the book leaves the pick to the player and the use names no spell
+    (owner call). Suppressed is an effect on the target naming the spell's origin
+    (`SUPPRESSES`), so its numbers go quiet and come back when the round ends.
+
+    shortcut: suppression quiets the spell's modifiers only; a state its tags grant (hold
+    person's paralysis) still answers `has_state` while suppressed. And an effect that is
+    not on a creature (a wall, a fog: CMD 15 + caster level) is not aimed at — upgrade when
+    a manifest carries its caster level."""
+    from .activeeffect import ActiveEffect
+
+    groups = spells_on(target)
+    if not groups:
+        return ([{"kind": "spell_sunder", "ref": target.ref, "found": 0, "origin": origin}],
+                [f"No spell holds on {target.name} for {actor.name} to strike at."], [])
+    g = groups[0]
+    cmd = sum(m.value for m in target.cmd_modifiers(False, maneuver="sunder",
+                                                     attacker=actor)) + 5
+    roll = engine.dice.d20(actor.cmb_modifiers("sunder", defender=target),
+                           label=f"{actor.name}'s sunder at {g['source']}",
+                           visibility="player" if actor.is_pc else "hidden")
+    margin = roll.total - cmd
+    rec = {"kind": "spell_sunder", "ref": target.ref, "spell": g["source"], "cmd": cmd,
+           "total": roll.total, "margin": margin, "origin": origin}
+    if margin < 0:
+        return ([rec], [f"{actor.name}'s blow at {g['source']} on {target.name} fails "
+                        f"({roll.total} against CMD {cmd})."], [roll])
+    if margin >= 10:
+        return ([rec] + _end(engine, target, g, origin),
+                [f"{actor.name} shatters {g['source']} on {target.name}: it is dispelled."],
+                [roll])
+    rounds = 2 if margin >= 5 else 1
+    target.apply_effect(ActiveEffect(
+        name=f"{g['source']} suppressed", kind="situation", key=f"sundered-{g['origin']}",
+        source=f"{actor.name}'s Shatterspell", origin=origin, duration="rounds",
+        rounds_left=rounds, tags=(SUPPRESSED_SPELL,), payload={SUPPRESSES: g["origin"]}))
+    return ([dict(rec, suppressed=rounds)],
+            [f"{actor.name} breaks {g['source']} on {target.name}: held off for {rounds} "
+             f"round{'s' if rounds > 1 else ''}."], [roll])
