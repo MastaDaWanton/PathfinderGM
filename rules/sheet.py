@@ -435,7 +435,9 @@ ATTACK_CHOICES = ("power_attack", "deadly_aim", "piranha_strike", "combat_expert
                   "cockatrice_strike",
                   # Feat loop b4-maneuver: Tripping Twirl's trip at every adjacent foe,
                   # Feinting Flurry's feint for a flurry's first swing.
-                  "tripping_twirl", "feinting_flurry", "gory_finish")
+                  "tripping_twirl", "feinting_flurry", "gory_finish",
+                  # Feat loop b5-maneuver: Fury's Snare's whip let go to entangle.
+                  "furys_snare")
 # The options nobody needs a feat for (combat bar round 2, 2026-11-22). CRB, Combat
 # ("Fighting Defensively as a Standard Action"): "You can choose to fight defensively when
 # attacking" — anyone, with any attack. Its numbers are `defensive_dodge` and the stance
@@ -477,7 +479,9 @@ ATTACK_CHOICE_FEATS = {"power_attack": "power-attack", "deadly_aim": "deadly-aim
                           "cockatrice_strike": "cockatrice-strike"},
                        # Feat loop b4-maneuver.
                        "tripping_twirl": "tripping-twirl",
-                       "feinting_flurry": "feinting-flurry", "gory_finish": "gory-finish"}
+                       "feinting_flurry": "feinting-flurry", "gory_finish": "gory-finish",
+                       # Feat loop b5-maneuver.
+                       "furys_snare": "fury-s-snare"}
 
 _IMPLIED_GENDER = {"she": "woman", "he": "man"}
 
@@ -4860,6 +4864,8 @@ class Actor:
         from . import maneuver_feats
 
         mods.extend(maneuver_feats.lent_shield(self))
+        # Feat loop b5-maneuver: Favored Defense, Blundering Defense.
+        mods.extend(maneuver_feats.ac_terms(self, attacker, loses_dex))
         return stack(mods)
 
     def _ac_context(self, against: str, attacker=None, opportunity: bool = False) -> dict:
@@ -5149,6 +5155,9 @@ class Actor:
         if sit is not None:
             ctx["situation"] = sit
         mods.extend(self._buff_mods("combat_mod", "cmd", ctx or None))
+        from . import maneuver_feats                       # feat loop b5-maneuver
+
+        mods.extend(maneuver_feats.cmd_terms(self, attacker))
         return stack([m for m in mods if m.value])
 
     def cmd(self, flat_footed: bool = False) -> int:

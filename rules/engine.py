@@ -7813,19 +7813,30 @@ class Engine:
         dc = int(held.payload["ends_when"]["escape"].get("dc") or 0)
         cmb = list(actor.cmb_modifiers("escape"))
         art = list(actor.skill_modifiers("escape artist", ctx={"maneuver": "escape"}))
+        # Feat loop b5-maneuver: a hold broken by a Strength check at its own DC in place
+        # of the manoeuvre (`escape.str_dc`): Fury's Snare's "a DC 10 Strength check or a
+        # DC 15 Escape Artist check" — the better chance of the two is taken.
+        str_dc = held.payload["ends_when"]["escape"].get("str_dc")
+        cmb_dc, cmb_word = dc, "Combat manoeuvre"
+        if str_dc is not None:
+            cmb, cmb_dc, cmb_word = (list(actor.ability_check_modifiers("str")),
+                                     int(str_dc), "Strength check")
         how = str(how or "").strip().lower()
         if how not in ("cmb", "escape artist"):
-            how = ("escape artist" if sum(m.value for m in art) > sum(m.value for m in cmb)
-                   else "cmb")
+            how = ("escape artist" if sum(m.value for m in art) - dc
+                   > sum(m.value for m in cmb) - cmb_dc else "cmb")
+        if how == "cmb":
+            dc = cmb_dc
         what = str(held.source or held.name or held.key)
         what = what[4:] if what.startswith("the ") else what
         roll = self._roll_or_suspend(intent, actor, art if how == "escape artist" else cmb,
-                                     f"{'Escape Artist' if how == 'escape artist' else 'Combat manoeuvre'}"
+                                     f"{'Escape Artist' if how == 'escape artist' else cmb_word}"
                                      f" to break free of the {what}", dc, partial)
-        made = d20_succeeds(roll, dc) if how == "cmb" else roll.total >= dc
+        made = d20_succeeds(roll, dc) if how == "cmb" and str_dc is None else roll.total >= dc
         self._judge(roll, made)
-        said = (f"{'Escape Artist' if how == 'escape artist' else 'CMB'} {roll.total} "
-                f"against DC {dc}")
+        word = "Escape Artist" if how == "escape artist" else (
+            "Strength" if str_dc is not None else "CMB")
+        said = f"{word} {roll.total} against DC {dc}"
         if made:
             actor.remove_effects(match=lambda e: e is held)
         return Outcome(intent_id=intent.id, op=intent.op, rolls=[roll],
@@ -11637,6 +11648,13 @@ class Engine:
                 weapon = self._cursed_swing(actor, weapon_key, weapon, state)
                 if thrown_real and weapon.get("category") != "ranged":
                     weapon = dict(weapon, category="ranged", thrown=True)
+            # Feat loop b5-maneuver: jaws a Snoutgrip holds shut bite nobody.
+            if state["stage"] == "attack" and maneuver_feats.mouth_held(actor, weapon_key,
+                                                                        weapon):
+                state["tells"].append(f"{actor.name}'s jaws are held shut; the bite does "
+                                      f"not come.")
+                state["i"] += 1
+                continue
             printed = weapon.get("stat_block") or {}
             swing_ac, swing_note = target_ac, ac_note
             if printed.get("touch"):
@@ -11674,6 +11692,11 @@ class Engine:
                 if state["stage"] == "attack" else None
             if guard is not None:
                 swing_ac, swing_note = guard, f"Sense Motive {guard} (Snake Style)"
+            # Feat loop b5-maneuver: Body Shield's cover, a creature held in the way.
+            shielded = maneuver_feats.body_shield(self, actor, defender, state)[0]                 if state["stage"] == "attack" else 0
+            if shielded:
+                swing_ac += shielded
+                swing_note = f"{swing_note}, +{shielded} cover (Body Shield)"
             # The defender rides in the roll context, so a term that is "against fey"
             # (cold iron's, contract §2) is asked of THIS defender and nobody else.
             if dancing:
@@ -11738,10 +11761,11 @@ class Engine:
                 state["stage"] = "damage"
 
             if state["stage"] == "attack":
-                atk = self._roll_or_suspend_stage(
-                    intent, actor, atk_mods, f"Attack with {weapon['name']}",
-                    swing_ac, partial, state, "1d20", kind="attack",
-                )
+                given = maneuver_feats.reach_waived(intent) and state["i"] == 0
+                atk = maneuver_feats.given_roll(self, intent, f"Attack with {weapon['name']}")                     if given else self._roll_or_suspend_stage(
+                        intent, actor, atk_mods, f"Attack with {weapon['name']}",
+                        swing_ac, partial, state, "1d20", kind="attack",
+                    )   # feat loop b5-maneuver: Body Shield's "using the same attack roll"
                 if not dancing:                                   # Perfect Strike (b4)
                     atk = strike_feats.perfect_strike(self, actor, weapon_key, weapon, atk,
                                                       atk_mods, state)
@@ -11772,6 +11796,7 @@ class Engine:
                         f"badly wide (natural 1).")
                     state["tells"].extend(self._charges_missed(
                         actor, weapon_key, weapon, defender, state))
+                    self._b5_missed(intent, actor, defender, weapon_key, weapon, 1, state)
                     # A round that misses lies somewhere out there, to be looked for
                     # when the fight is over (`_recover_ammunition`); one that hits is
                     # spent ("destroyed or rendered useless", CRB "Ammunition").
@@ -11797,6 +11822,8 @@ class Engine:
                         f"{defender.name} ({atk.total} against {swing_note}).")
                     state["tells"].extend(self._charges_missed(
                         actor, weapon_key, weapon, defender, state))
+                    self._b5_missed(intent, actor, defender, weapon_key, weapon, natural,
+                                    state, atk.total)
                     if counts_ammo:
                         state["ammo_missed"] = int(state.get("ammo_missed", 0)) + 1
                     if self._second_chance(actor, state, choices):
@@ -12889,6 +12916,8 @@ class Engine:
         """
         from . import position as position_mod
 
+        if maneuver_feats.reach_waived(intent):          # feat loop b5: Body Shield
+            return ""
         man = str(intent.params.get("manoeuvre") or "")
         miss = position_mod.out_of_reach(self.scene, actor, defender, weapon_key,
                                          manoeuvre=man,
@@ -13920,6 +13949,8 @@ class Engine:
         if (raw.get("params") or {}).get("mode") == "splash":
             return None
         intent = _intent_from_dict(raw)
+        if maneuver_feats.reach_waived(intent):          # feat loop b5: Body Shield
+            return None
         actor = self.scene.actors.get(intent.actor or "")
         targets = intent.targets()
         defender = self.scene.actors.get(targets[0]) if targets else None
@@ -39948,6 +39979,18 @@ class Engine:
                 continue
             out.append(e)
         return out
+
+    def _b5_missed(self, intent: Intent, actor: Actor, defender: Actor, weapon_key: str,
+                   weapon: dict, natural: int, state: dict, total: int = 0) -> None:
+        """Feat loop b5-maneuver: what the one missed does about it (rules/maneuver_feats.py)
+        — Snoutgrip's grapple at a bite that missed, Body Shield's blow turned onto the
+        creature held in the way. Effects and tells into the attack's state."""
+        got = maneuver_feats.snoutgrip(self, intent, actor, defender, weapon_key, weapon)
+        state["effects"].extend(got["effects"])
+        state["tells"].extend(t for t in got["tells"] if t)
+        state["rolls"].extend(r.as_dict() for r in got["rolls"])
+        state["effects"].extend(maneuver_feats.shield_struck(
+            self, actor, defender, weapon_key, natural, state, total))
 
     def _charges_missed(self, actor: Actor, weapon_key: str, weapon: dict | None = None,
                         defender: Actor | None = None, state: dict | None = None

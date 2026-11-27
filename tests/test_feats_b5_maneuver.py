@@ -197,3 +197,155 @@ def test_the_two_attempt_areas_land_fist_and_energy_and_their_rider_on_a_failed_
     assert {energy, "bludgeoning"} <= kinds, out.tell
     assert check(thug), out.tell
     assert pc.pool("elemental fist").current == pc.pool("elemental fist").maximum - 2
+
+
+# --- the defence feats --------------------------------------------------------------------
+
+def test_favored_defense_adds_half_the_favored_enemy_bonus_against_that_enemy_only():
+    """Favored Defense (APG): "You add half your favored enemy bonus to your CMD and as a
+    dodge bonus to AC when attacked by a favored enemy." Measured before: a ranger with a
+    +4 against animals had the same AC and CMD against the wolf as against the thug."""
+    from rules.sheet import situated
+    from tests.test_feats_b4_combat import _fight
+
+    scene, engine, pc, thug = _fight(feats=["Favored Defense (animal)"], cls="ranger",
+                                     level=5, second=[("wolf", (5, 10))])
+    pc.class_choices = {"favored enemy": [{"pick": "animal", "bonus": 4},
+                                          {"pick": "humanoid-human", "bonus": 2}]}
+    wolf = next(a for a in scene.actors.values() if a.has_state("type.animal"))
+    with situated(scene):
+        assert pc.ac(attacker=wolf) == pc.ac(attacker=thug) + 2
+        assert sum(m.value for m in pc.cmd_modifiers(attacker=wolf)) == \
+            sum(m.value for m in pc.cmd_modifiers(attacker=thug)) + 2
+        assert pc.ac(attacker=wolf, flat_footed=True) == pc.ac(attacker=thug, flat_footed=True)
+
+
+def test_blundering_defense_lends_half_the_dodge_as_luck_to_allies_beside():
+    """Blundering Defense (ARG): "Whenever you fight defensively or use the total defense
+    action, allies gain a luck bonus to AC and CMD equal to 1/2 the dodge bonus you gain
+    from the action ... only while they are adjacent to you." Total defense's +4 (no
+    Acrobatics) lends +2; stepping away takes it back."""
+    from rules.engine import Engine
+    from rules.sheet import situated
+    from tests.test_feats_b4_combat import _fight
+
+    scene, engine, pc, thug = _fight(ally=[((6, 11), ["Blundering Defense"])])
+    ally = scene.actors["ally0"]
+    ally.ranks = {**(ally.ranks or {}), "acrobatics": 0}
+    with situated(scene):
+        plain = pc.ac()
+        ally.apply_effect(Engine.total_defense_effect(ally))
+        assert pc.ac() == plain + 2
+        assert "Blundering" not in str(ally.ac_modifiers())
+        scene.positions["ally0"] = (6, 14)
+        assert pc.ac() == plain
+
+
+# --- Fury's Snare -------------------------------------------------------------------------
+
+def test_furys_snare_lets_the_whip_go_and_entangles_the_tripped_foe():
+    """Fury's Snare (Cheliax): "If you successfully use a whip to trip a foe, you can
+    choose to drop your whip. Your tripped target gains the entangled condition ... a DC 10
+    Strength check or a DC 15 Escape Artist check." Declared with the trip; the escape op
+    reads both DCs. Measured before: the feat did nothing and the option did not exist."""
+    from tests.test_feats_b4_combat import _fight
+
+    scene, engine, pc, thug = _fight(feats=["Fury's Fall", "Improved Trip", "Fury's Snare"],
+                                     faces={"Trip (CMB)": 19})
+    pc.weapons = list(pc.weapons) + ["whip"]
+    pc.shield = "none"
+    pc.equipped = "whip"
+    res = _attack(engine, weapon="whip", manoeuvre="trip", furys_snare=True)
+    assert thug.has_state("state.position.prone"), _tells(res)
+    snare = _cond(thug, "entangled")
+    assert snare is not None, _tells(res)
+    esc = snare.payload["ends_when"]["escape"]
+    assert (esc["dc"], esc["str_dc"]) == (15, 10)
+    assert pc.equipped != "whip"
+    out = engine.run(engine.validate([{"op": "escape", "actor": "c1",
+                                       "visibility": "hidden", "params": {}}])).outcomes[-1]
+    assert "against DC 10" in out.tell or "against DC 15" in out.tell, out.tell
+
+
+def test_furys_snare_is_refused_without_a_whip():
+    from tests.test_feats_b4_combat import _fight
+
+    from rules.intents import IntentError
+
+    scene, engine, pc, thug = _fight(feats=["Fury's Fall", "Improved Trip", "Fury's Snare"])
+    with pytest.raises(IntentError, match="whip"):
+        engine.validate([{"op": "attack", "actor": "pc", "target": "c1",
+                          "params": {"manoeuvre": "trip", "furys_snare": True}}])
+
+
+# --- Snoutgrip, Body Shield ----------------------------------------------------------------
+
+def test_snoutgrip_grapples_the_biter_that_missed_and_shuts_its_jaws():
+    """Snoutgrip (Dragonslayer's Handbook): when a foe "misses you with its bite attack,
+    you can attempt a grapple with a -5 penalty ... holding its mouth shut, preventing it
+    from using its bite attack ... until it escapes your grapple." Measured before: the
+    wolf missed, and nothing happened."""
+    from tests.test_feats_b4_combat import _fight
+
+    scene, engine, pc, _ = _fight(feats=["Improved Unarmed Strike", "Improved Grapple",
+                                         "Snoutgrip"], foe="wolf",
+                                  faces={"Attack with bite": 2, "Grapple (CMB)": 20})
+    wolf = scene.actors["c1"]
+    res = _attack(engine, by="c1", target="pc", weapon="bite")
+    grab = [r for o in res.outcomes for r in o.rolls if r.label.startswith("Grapple (CMB)")]
+    assert grab and any(m.value == -5 for m in grab[0].modifiers), _tells(res)
+    assert wolf.has_state("state.held") and wolf.has_state("state.silenced.mouth-held"), \
+        _tells(res)
+    engine.dice.faces["Attack with bite"] = 20
+    res = _attack(engine, by="c1", target="pc", weapon="bite")
+    assert "jaws are held shut" in _tells(res)
+
+
+def test_body_shield_turns_a_missed_blow_onto_the_creature_held_in_the_way():
+    """Body Shield (UC): grappling an adjacent creature, "make a grapple combat maneuver
+    check against that creature to gain cover against a single attack. If you are
+    successful and the attack misses you, that attack targets the creature you used as
+    cover, using the same attack roll." Measured before: the held thug was no cover, and
+    the missed blow went nowhere."""
+    from rules.engine import _held_by
+    from tests.test_feats_b4_combat import _fight
+
+    scene, engine, pc, held = _fight(feats=["Improved Unarmed Strike", "Improved Grapple",
+                                            "Body Shield"],
+                                     second=[("thug", (5, 10))],
+                                     faces={"Borin Achereth grapple": 20,
+                                            "Attack with": 12, "Damage": 3})
+    held.add_condition("grappled", 10, source="test")
+    _held_by(held, "grappled", "pc", grappler="pc")
+    other = next(a for r, a in scene.actors.items() if r not in ("pc", "c1"))
+    hp = held.hp
+    res = _attack(engine, by=other.ref, target="pc")
+    said = _tells(res)
+    assert "cover, +4" in said, said
+    attacks = [r for o in res.outcomes for r in o.rolls if r.label.startswith("Attack with")]
+    assert len(attacks) == 2 and "instead (Body Shield)" in said, said
+    assert (attacks[1].natural, attacks[1].total) == (attacks[0].natural, attacks[0].total)
+    assert held.nonlethal > 0 or held.hp < hp, said
+
+
+# --- Dampen Presence ----------------------------------------------------------------------
+
+def test_blindsense_pinpoints_a_hider_unless_it_dampens_its_presence():
+    """Blindsense (UMR) "notice[s] and pinpoint[s] the location of creatures within
+    range"; Dampen Presence: "You may use the Stealth skill to hide from any creature
+    attempting to perceive you using blindsight or blindsense." Measured before: no sense
+    but scent and tremorsense located a hider, so blindsense saw nothing and the feat had
+    nothing to beat."""
+    from rules import awareness
+    from rules.activeeffect import ActiveEffect
+    from tests.test_feats_b4_combat import _fight
+
+    scene, engine, pc, thug = _fight(feats=["Skill Focus (stealth)", "Dampen Presence"])
+    thug.apply_effect(ActiveEffect(name="echoes", kind="buff", key="echoes", source="test",
+                                   tags=("sense.blindsense.30",)))
+    pc.apply_effect(ActiveEffect(name="sneaking", kind="situation", key="sneaking",
+                                 source="test", tags=(awareness.SNEAKING,),
+                                 payload={"result": 30}))
+    assert awareness.senses(scene, thug, pc) == ""
+    pc.feats = [f for f in pc.feats if f != "Dampen Presence"]
+    assert awareness.senses(scene, thug, pc) == "pinpoint"

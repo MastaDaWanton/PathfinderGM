@@ -534,6 +534,9 @@ TAGS: dict[str, tuple[str, ...]] = {
     "combat patrol":  ("buff.stance.combat-patrol", "reach.extended.patrol"),
     "pinning":        ("buff.stance.pinning", "state.exposed.pinning"),
     "choked":         ("state.silenced.choked",),
+    # Feat loop b5-maneuver: Snoutgrip's "holding its mouth shut ... its bite attack, breath
+    # weapon, or spells with a verbal component", riding the grapple condition.
+    "mouth held":     ("state.silenced.mouth-held",),
     "sleeper hold":   ("buff.stance.sleeper-hold",),
     "stepped":        ("movement.stepped",),
     "spring attack":  ("buff.stance.spring-attack",),
