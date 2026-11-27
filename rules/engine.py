@@ -16016,6 +16016,8 @@ class Engine:
         points = obj.hp_max - obj.hp
         hours = points * int(r["hours_per_point"])
         cost_gp = round(tradecraft.price_gp(owner, name) * float(r["cost_fraction"]), 2)
+        # Feat loop b4-maneuver: Field Repair mends a broken thing with no raw material.
+        cost_gp = maneuver_feats.field_repair_cost(actor, obj, cost_gp)
         cost_cp = int(round(cost_gp * 100))
         if goods.in_copper(actor.purse) < cost_cp:
             return self._refuse(

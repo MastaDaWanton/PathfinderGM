@@ -183,5 +183,37 @@
     "tags": [
       "spellbook.cypher-script"
     ]
+  },
+  "field-repair": {
+    "tags": [
+      "craft.field-repair"
+    ],
+    "not_yet": [
+      "'If you spend a day, the item regains 1 hit point plus one-quarter of its original hit points': mending here is an hour a point, and no day's rate is offered beside it",
+      "the misfired firearm, mishapped siege engine and fragile weapon's Craft check to lift broken: none of the three is in the game's gear"
+    ]
+  },
+  "planar-hunter": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "terrain": "planes"
+          },
+          "target": {
+            "type": "outsider"
+          }
+        },
+        "note": "+2 on weapon attack rolls against outsiders while on a planar favored terrain"
+      }
+    ],
+    "not_yet": [
+      "'ignore up to 5 points of damage reduction ... except damage reduction without a type': a feat lends no DR-passing trait to a blow",
+      "'against extraplanar creatures you ... identify as being from one of your planar favored terrains ... regardless of what plane you or they are on': no creature records the plane it is native to"
+    ]
   }
 }

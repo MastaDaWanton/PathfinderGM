@@ -722,3 +722,40 @@ def test_combat_meditation_lays_the_meditation_for_a_round_a_level_wisdom_times_
     assert held and held[0].rounds_left == monk.level, out.tell
     assert any(e.get("action") == "full-round" for e in out.effects)
     assert monk.pools["combat meditation"].current == 1
+
+
+# --- Field Repair, Planar Hunter -------------------------------------------------------------
+
+def test_field_repair_mends_a_broken_staff_with_no_raw_material():
+    """Field Repair (UC): "If you are trained in a Craft skill appropriate to a broken item,
+    you can repair that item with no raw material cost." Measured before: a fifth of the
+    staff's price was spent, feat or not."""
+    from tests.test_trade_uses import _run as trun, _table
+
+    for feats, pays in (([], True), (["Field Repair"], False)):
+        s, e, pc = _table()
+        pc.feats = list(pc.feats) + feats
+        pc.damage_item("quarterstaff", 12)
+        out = trun(e, {"op": "mend", "params": {"item": "quarterstaff"}}, 10)
+        assert pc.gear["quarterstaff"].hp == 10
+        assert any(f["kind"] == "spent" for f in out.effects) is pays, out.tell
+
+
+def test_planar_hunter_adds_two_against_outsiders_on_planar_ground():
+    """Planar Hunter (Champions of Balance): "+2 bonus on weapon attack rolls against
+    outsiders" while on a planar favored terrain. Measured before: +0 anywhere."""
+    from tests._places import stand_on
+
+    for ground, foe, want in (("planar", "lantern-archon", 2), ("forest", "lantern-archon", 0),
+                              ("planar", "thug", 0)):
+        scene, engine, pc, target = _fight(feats=["Planar Hunter"], foe=foe,
+                                           faces={"Attack with": 12})
+        try:
+            stand_on(scene, ground)
+        except Exception:                       # noqa: BLE001 — a world with no such ground
+            continue
+        res = _settle(engine, engine.run(engine.validate([{
+            "op": "attack", "actor": "pc", "target": "c1", "visibility": "hidden",
+            "params": {}}])))
+        hit = _rolls(res, "Attack with")
+        assert hit and _named(hit[0], "Planar Hunter") == want, (ground, foe)

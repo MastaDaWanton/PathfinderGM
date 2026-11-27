@@ -913,3 +913,20 @@ def cypher_script(actor, plan: dict, level: int) -> None:
         return
     plan["cost_gp"] = -(-int(plan.get("cost_gp") or 0) // 2)
     plan["minutes"] = formulae.STUDY_MINUTES + (5 if level <= 0 else 10 * level)
+
+
+# --- Field Repair --------------------------------------------------------------------------
+
+FIELD_REPAIR = "craft.field-repair"
+
+
+def field_repair_cost(actor, obj, cost_gp: float) -> float:
+    """Field Repair (UC): "If you are trained in a Craft skill appropriate to a broken item,
+    you can repair that item with no raw material cost and no penalty on your Craft skill
+    check for using improvised tools." The mend's fifth of the price (`Engine._op_mend`),
+    waived for a broken thing by a mender with ranks in Craft. Mending here asks no tools,
+    so there is no improvised-tools penalty to lift."""
+    if not actor.has_state(FIELD_REPAIR) or not getattr(obj, "broken", False) \
+            or int((actor.ranks or {}).get("craft", 0) or 0) < 1:
+        return cost_gp
+    return 0.0
