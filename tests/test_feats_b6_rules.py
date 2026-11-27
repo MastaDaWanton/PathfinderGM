@@ -501,3 +501,27 @@ def test_demon_grafter_is_two_on_heal_regarding_an_outsider_only():
     named = lambda who: sum(m.value for m in pc.skill_modifiers(
         "heal", ctx={"target_actor": who}) if m.source == "Demon Grafter")
     assert named(imp) == 2 and named(s.actors["c1"]) == 0
+
+
+# --- Well-Prepared ------------------------------------------------------------------------------
+
+def test_well_prepared_finds_a_crowbar_once_a_day_and_charges_for_it():
+    """APG Well-Prepared: "a Sleight of Hand check with a DC of 10 plus the item's cost in
+    gold pieces ... having a crowbar would be DC 12 ... You must pay for these items
+    normally." Once per day. Before: no document and no door."""
+    pc = _pc("rogue", race="halfling", feats=["Well-Prepared"])
+    pc.ranks["sleight of hand"] = 5
+    pc.purse = {"gp": 10}
+    s, e = _board(pc, ("thug", (15, 15)), faces={"Sleight of Hand check": 15})
+    s.initiative = []
+    res = _run(e, {"op": "check", "actor": "pc", "visibility": "hidden",
+                   "params": {"skill": "sleight of hand", "well_prepared": True,
+                              "item": "crowbar"}})
+    said = _tells(res)
+    assert "DC 12" in said and "happens to have" in said, said
+    assert any("crowbar" in str(k).lower() for k in list(pc.goods) + list(pc.stock)), said
+    assert sum(pc.purse.values()) < 10 or pc.purse.get("gp", 0) < 10
+    again = _run(e, {"op": "check", "actor": "pc", "visibility": "hidden",
+                     "params": {"skill": "sleight of hand", "well_prepared": True,
+                                "item": "crowbar"}})
+    assert again.outcomes[-1].status == "refused" and "today" in _tells(again)

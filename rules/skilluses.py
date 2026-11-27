@@ -60,7 +60,9 @@ OWN_DOORS = {("bluff", "feint"): "feint", ("acrobatics", "tumble"): "tumble",
              ("heal", "care"): "long_term_care", ("intimidate", "display"): "dazzling_display",
              # Feat loop b6-rules: Antagonize, by either skill (rules/antagonize.py).
              ("diplomacy", "antagonize"): "antagonize",
-             ("intimidate", "antagonize"): "antagonize"}
+             ("intimidate", "antagonize"): "antagonize",
+             # Feat loop b6-rules: Well-Prepared (rules/well_prepared.py).
+             ("sleight of hand", "well_prepared"): "well_prepared"}
 CHECK_FLAGS = frozenset(flag for _skill, flag in OWN_DOORS)
 
 
@@ -761,6 +763,13 @@ def antagonize(engine, intent, actor, mods, partial):
     from . import antagonize as antagonize_mod
 
     return antagonize_mod.door(engine, intent, actor, mods, partial)
+
+
+def well_prepared(engine, intent, actor, mods, partial):
+    """Well-Prepared (APG), its own module's door (rules/well_prepared.py; b6-rules)."""
+    from . import well_prepared as well_prepared_mod
+
+    return well_prepared_mod.door(engine, intent, actor, mods, partial)
 
 
 def dazzling_display(engine, intent, actor, mods, partial):

@@ -317,7 +317,7 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                            # Disengaging Feint's feint (feat loop b2, skilluses.feint).
                            "disengage",
                            # Antagonize's door (feat loop b6-rules, rules/antagonize.py).
-                           "antagonize",
+                           "antagonize", "well_prepared",
                            # Round 2 (skills-mind): the thing appraised or studied, and
                            # the subject a Knowledge question is about: names the engine
                            # grounds (`tradecraft.carries`, the world's own index), never

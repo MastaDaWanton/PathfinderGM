@@ -461,7 +461,9 @@
         {"text": "Say you pick a pocket, palm something or filch it, and the engine rolls Sleight of Hand.",
          "file": "gm/judgement.py", "find": "(\"sleight of hand\", r\"pick"},
         {"text": "A pocket picked or a thing palmed under a Sleight of Hand check moves into your pack.",
-         "file": "rules/engine.py", "find": "_TAKEN_UNDER = frozenset({\"sleight of hand\", \"stealth\"})", "use": "skill.sleight-of-hand.take"}
+         "file": "rules/engine.py", "find": "_TAKEN_UNDER = frozenset({\"sleight of hand\", \"stealth\"})", "use": "skill.sleight-of-hand.take"},
+        {"text": "With Well-Prepared, once a day, you happen to have a mundane item the store sells about you: Sleight of Hand against 10 + its price in gold, and you pay for it.",
+         "file": "rules/well_prepared.py", "find": "def door(engine, intent, actor, mods, partial):", "use": "skill.sleight-of-hand.well-prepared"}
       ],
       "not_yet": "Hiding a weapon on your body from a search is not rolled.",
       "not_yet_uses": ["skill.sleight-of-hand.conceal"]

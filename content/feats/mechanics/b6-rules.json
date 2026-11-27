@@ -22,7 +22,8 @@
     "antagonize: UM: Diplomacy or Intimidate, a standard action, DC 10 + HD + Wis; flustered (-2 on attacks at others for a minute) or enraged (turns on you next turn), once a day a target (rules/antagonize.py).",
     "bouncing-spell: APG: a single-target spell with no effect (spell resistance, or a save that negates) redirected as a swift action to another creature in range (Engine._bounce); +1 level.",
     "neither-elf-nor-human: ARG: 'You are not considered elven or human for the purpose of harmful spells or effects based on your type, like a bane weapon or a ranger's favored enemy' — against Elf Blood, which the lane made real for every half-elf (rules/sheet.py `_is_of_kind`).",
-    "demon-grafter: AP 74: 'You gain a +2 bonus on Heal checks regarding evil outsiders or creatures that already have a demonic graft' — the +2 against an outsider (alignment holds against any until it is tracked, the owner's 2026-10-05 ruling)."
+    "demon-grafter: AP 74: 'You gain a +2 bonus on Heal checks regarding evil outsiders or creatures that already have a demonic graft' — the +2 against an outsider (alignment holds against any until it is tracked, the owner's 2026-10-05 ruling).",
+    "well-prepared: APG: once a day, Sleight of Hand DC 10 + the item's gp to have a mundane item the store sells, paid for (rules/well_prepared.py)."
   ],
   "improved-counterspell": {
     "tags": [
@@ -133,6 +134,15 @@
     ],
     "not_yet": [
       "'or creatures that already have a demonic graft' and 'you can create demonic implants ... as if you had the Craft Wondrous Item feat, using your ranks in Heal as your caster level': no demonic graft or implant is an item or a state in the game"
+    ]
+  },
+  "well-prepared": {
+    "tags": [
+      "skill.sleight-of-hand.well-prepared"
+    ],
+    "not_yet": [
+      "'If you are stripped of your equipment or possessions, you lose the benefits of this feat until you have at least a day to resupply': being stripped is not a state the engine keeps",
+      "Special: 'a character can substitute the Survival skill for Sleight of Hand' (at the GM's option) is not offered"
     ]
   }
 }
