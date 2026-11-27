@@ -11389,7 +11389,10 @@ class Engine:
                 intent, f"The {weapon.get('name') or weapon_key} is dancing on its own; "
                         f"{actor.name} is not holding it. Catching it back is drawing it.")
         full = bool(intent.params.get("full_attack"))
-        power = bool(intent.params.get("power_attack"))
+        # Feat loop b7-fixes: Power Attack's "its effects last until your next turn" (CRB):
+        # an attack of opportunity before then keeps the stance the declared swing laid.
+        power = bool(intent.params.get("power_attack")) or actor.has_state(
+            states.tags_for("power attack")[0])
         # The other declared attack options (lane D): each a key in the roll context its
         # feat or class document asks, checked legal at validate (`_attack_choice_refusal`).
         from .sheet import ATTACK_CHOICES
@@ -11708,7 +11711,8 @@ class Engine:
             guard = ("two_weapon",) if (off_key and off_key != "unarmed"
                                          and actor.has_state("two_weapon.defense")) else ()
             state["tells"].extend(early_said + self._lay_attack_stances(
-                actor, () if intent.params.get("cleaving") else choices + guard,
+                actor, () if intent.params.get("cleaving")
+                else choices + guard + (("power_attack",) if power else ()),
                 defender=defender))
             if "stalwart" in choices and not intent.params.get("cleaving"):
                 from . import stalwart     # feat loop b6-rules
@@ -28675,6 +28679,11 @@ class Engine:
         # to the round's later ranged attacks (`_op_attack`).
         ("deadly_aim", "deadly aim", "Deadly Aim",
          "{name} takes aim for the heavier shot (Deadly Aim) until their next turn."),
+        # Feat loop b7-fixes: Power Attack (CRB), "its effects last until your next turn";
+        # carried to attacks of opportunity (`_op_attack`) and manoeuvres (`cmb_modifiers`).
+        ("power_attack", "power attack", "Power Attack",
+         "{name} puts their weight behind every blow (Power Attack) until their next "
+         "turn."),
     )
 
     @classmethod

@@ -5107,6 +5107,9 @@ class Actor:
     def cmb_modifiers(self, maneuver: str | None = None,
                       power_attack: bool = False, choices=(),
                       defender=None) -> list[Modifier]:
+        # Feat loop b7-fixes: Power Attack's -1 "on all melee attack rolls and combat
+        # maneuver checks" holds until the bearer's next turn (its stance).
+        power_attack = power_attack or self.has_state("buff.stance.power-attack")
         # Tiny or smaller creatures use Dex in place of Str for CMB, and so does a feat
         # document's `cmb_ability` (Agile Maneuvers, which did nothing before 2026-11-15).
         uses_dex = self.size in ("fine", "diminutive", "tiny")

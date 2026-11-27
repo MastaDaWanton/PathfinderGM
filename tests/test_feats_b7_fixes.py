@@ -40,3 +40,26 @@ def test_the_undead_hold_the_family_by_their_type():
     assert not z.has_state(states.NEGATIVE_HEALS_CHANNEL)
     wolf = instantiate("wolf", scene=Scene(location_id="5bbd0c40345f"))
     assert not wolf.has_state(states.NEGATIVE_HEALS)
+
+
+# --- 2. Power Attack lasts until the next turn --------------------------------------------
+
+def test_power_attack_holds_until_the_next_turn_on_a_later_blow_and_a_manoeuvre():
+    """CRB Power Attack: "You must choose to use this feat before making an attack roll,
+    and its effects last until your next turn." Measured before b7: the -3/+6 rode only the
+    declared swing — a second blow in the round (an attack of opportunity is the same
+    path) and a trip carried none of it. Now both do, and the round's end takes it away."""
+    from tests.test_feats_b4_moves import _attack, _board, _pc, _rolls
+
+    pc = _pc("fighter", feats=["Power Attack"], equipped="rapier")
+    pc.abilities["str"] = 16
+    s, e = _board(pc, ("thug", (6, 5)), faces={"Attack with": 15})
+    _attack(e, power_attack=True)
+    assert pc.has_state("buff.stance.power-attack")
+    second = _rolls(_attack(e), "Attack with")
+    assert any(str(m.get("source", "")).startswith("Power Attack")
+               for m in second[0]["modifiers"]), second
+    assert any(m.source.startswith("Power Attack") for m in pc.cmb_modifiers("trip"))
+    pc.tick_effects(1)
+    assert not pc.has_state("buff.stance.power-attack")
+    assert not any(m.source.startswith("Power Attack") for m in pc.cmb_modifiers("trip"))
