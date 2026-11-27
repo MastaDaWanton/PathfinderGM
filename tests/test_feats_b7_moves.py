@@ -772,3 +772,19 @@ def test_a_monks_slow_fall_shortens_a_fall_beside_a_wall_by_the_class_ladder():
     s, e = _board(pc, ("thug", (20, 20)), at=(5, 5))
     rolls, fx, said = bs.fall(e, pc, 30)                 # no wall in arm's reach
     assert not [x for x in fx if x.get("kind") == "slow_fall"]
+
+
+def test_a_blinded_body_walks_at_half_speed_unless_it_has_blind_fight():
+    """CRB, Blinded: "must make a DC 10 Acrobatics check to move faster than half speed";
+    Blind-Fight (CRB): "You do not need to make Acrobatics skill checks to move at full
+    speed while blinded." Measured before (Blind-Fight's not_yet line): movement unable to
+    see was not slowed — a blinded fighter walked 30 ft."""
+    for feats, ok in (([], False), (["Blind-Fight"], True)):
+        pc = _pc(feats=feats)
+        s, e = _board(pc, ("thug", (20, 20)), at=(2, 2))
+        pc.add_condition("blinded", source="test")
+        if ok:
+            assert _of(_run(e, _move(8, 2)), "move")[0].status == "resolved"
+        else:
+            with pytest.raises(IntentError, match="15 ft of movement"):
+                _run(e, _move(8, 2))

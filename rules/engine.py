@@ -17174,7 +17174,7 @@ class Engine:
         # Feat loop b7-moves: a prone body crawls (5 ft, or half speed with Fast Crawl).
         from . import feat_moves as _fm
 
-        budget = _fm.crawl_budget(actor, actor.speed_feet)
+        budget = _fm.unsighted_budget(self, actor, _fm.crawl_budget(actor, actor.speed_feet))
         # The route is found on the floor plan, (x, y); a square on a raised level is
         # (x, y, z) — the map writes the level into every square above the ground — and
         # looking that up in the flat table refused EVERY move on a map with a raised

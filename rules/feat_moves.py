@@ -1411,5 +1411,32 @@ def beside_wall(engine, actor) -> bool:
                for dx in (-1, 0, 1) for dy in (-1, 0, 1) if dx or dy)
 
 
+# --- moving unable to see (feat loop b7-moves; ledger group 2) -------------------------------
+#
+# CRB, Conditions, Blinded: "Blinded creatures must make a DC 10 Acrobatics check to move
+# faster than half speed"; CRB p.172, Vision and Light: "In areas of darkness, creatures
+# without darkvision are effectively blinded" (`Engine.sees_nothing`). Blind-Fight (CRB):
+# "You do not need to make Acrobatics skill checks to move at full speed while blinded";
+# Normal: "The speed reduction for darkness and poor visibility also applies." Measured
+# before (Blind-Fight's not_yet line): a blinded body, or one in the dark, walked its full
+# speed. The walk is priced at half; the Acrobatics check to go faster is not offered
+# (a body may always take half speed; said in the lane report).
+
+BLIND_STRIDE = "movement.blind.full-speed"     # Blind-Fight's document tag
+
+
+def unsighted_budget(engine, actor, budget: int) -> int:
+    """Half the move's feet for a body that cannot see, unless Blind-Fight."""
+    if actor.has_state(BLIND_STRIDE):
+        return budget
+    blind = actor.has_state("state.senses.blinded")
+    if not blind:
+        try:
+            blind = bool(engine.sees_nothing(actor))
+        except Exception:  # noqa: BLE001 — a bare scene with no place to light
+            blind = False
+    return max(gridmod.SQUARE_FT, _half(budget)) if blind else budget
+
+
 __all__ = ["charge_multiple", "moved_already", "after", "no_move_left", "allowance",
            "grant_walk", "coup_walk_ok", "before"]
