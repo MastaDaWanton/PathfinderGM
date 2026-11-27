@@ -43,7 +43,8 @@ def _throw(s, e, foe, face=10):
     r = e.resume(face)
     while r.awaiting:
         r = e.resume(int(r.awaiting["min"]))
-    return first, next(o for o in r.outcomes if o.op == "attack")
+    # The player's throw, behind the attack of opportunity it draws (rules/shooting.py).
+    return first, next(o for o in r.outcomes if o.op == "attack" and o.actor == "pc")
 
 
 # --- 1. "draw my longsword" ---------------------------------------------------------------------

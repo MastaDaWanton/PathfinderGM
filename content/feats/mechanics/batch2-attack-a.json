@@ -495,7 +495,8 @@
   "whip-mastery": {
     "tags": [
       "lethality.either.whip",
-      "weapon.whip.through-armour"
+      "weapon.whip.through-armour",
+      "attack.unprovoking.whip"
     ]
   },
   "slaying-sprint": {

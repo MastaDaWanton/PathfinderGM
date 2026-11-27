@@ -454,7 +454,8 @@ def test_sliding_axe_throw_costs_two_and_trips_on_the_hit(monkeypatch):
     assert Engine._attack_choice_refusal(pc, "longsword", {"sliding_axe_throw": True,
                                                            "thrown": True})
     res = _attack(engine, weapon="handaxe", thrown=True, sliding_axe_throw=True)
-    assert _named(_rolls(res, "Attack with")[0], "Sliding Axe Throw") == -2
+    # The throw's roll, wherever the attack of opportunity it draws puts it (b5-core).
+    assert -2 in [_named(r, "Sliding Axe Throw") for r in _rolls(res, "Attack with")]
     assert thug.has_state("state.position.prone")
 
 

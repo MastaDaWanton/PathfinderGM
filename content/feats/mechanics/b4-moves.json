@@ -302,8 +302,8 @@
     ]
   },
   "sword-and-pistol": {
-    "not_yet": [
-      "ranged attacks provoke no attacks of opportunity in the engine at all (the dispatch asks only manoeuvres, casting, drinking and pick-ups), so the feat waives nothing"
+    "tags": [
+      "attack.unprovoking.sword-and-pistol"
     ]
   },
   "ricochet-splash-weapon": {

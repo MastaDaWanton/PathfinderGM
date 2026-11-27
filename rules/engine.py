@@ -6590,7 +6590,10 @@ class Engine:
         if raw.get("op") == "attack" and (raw.get("params") or {}).get("manoeuvre"):
             return self._provoked_by_maneuver(raw)
         if raw.get("op") == "attack":
-            return self._bodyguards(raw)
+            # Feat loop b5-core: a ranged attack or a whip's lash provokes (rules/shooting.py).
+            from . import shooting
+
+            return shooting.provoked(self, raw) + self._bodyguards(raw)
         if raw.get("op") == "cast":
             return self._provoked_by_casting(raw)
         if raw.get("op") == "use_item":
