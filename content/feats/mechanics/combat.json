@@ -55,11 +55,10 @@
         "target": "damage",
         "formula": "2 * (1 + bab // 4)",
         "bonus_type": "untyped",
-        "when": {"choice": "deadly_aim", "weapon": {"ranged": true}}
+        "when": {"choice": "deadly_aim",
+                 "weapon": {"ranged": true, "touch": false, "hp_damage": true}},
+        "note": "not on touch attacks or effects that deal no hit point damage (CRB)"
       }
-    ],
-    "not_yet": [
-      "Until your next turn: the penalty and bonus ride the declared shot, and a later ranged attack in the same round declares it again."
     ]
   },
   "piranha-strike": {

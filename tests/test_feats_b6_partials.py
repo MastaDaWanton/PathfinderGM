@@ -282,3 +282,61 @@ def test_lookout_s_lifted_holder_acts_at_the_ally_s_roll_less_one():
     surprise._lookouts(engine, sides, aware, unaware)
     assert scene.initiative == [("c1", 15), ("pc", 12), ("ally", 11)]
     assert scene.turn_holder() == "c1"
+
+
+def test_deadly_aim_holds_until_the_next_turn():
+    """CRB Deadly Aim: "You must choose to use this feat before making an attack roll and
+    its effects last until your next turn." Before: the -2/+4 rode the declared shot
+    only, and the next ranged attack that round was made without it. A second shot in the
+    round, undeclared, still carries both; the round's end takes them away."""
+    from tests.test_feats_b4_moves import _rolls
+
+    pc = _pc("fighter", feats=["Deadly Aim"], equipped="longbow")
+    pc.weapons = list(pc.weapons) + ["longbow"]
+    pc.goods["arrows"] = 20
+    s, e = _board(pc, ("thug", (12, 5)), faces={"Attack with": 15})
+    _attack(e, deadly_aim=True)
+    assert pc.has_state("buff.stance.deadly-aim")
+    second = _rolls(_attack(e), "Attack with")
+    assert any(m.get("source", "").startswith("Deadly Aim") for m in second[0]["modifiers"])
+    pc.tick_effects(1)
+    assert not pc.has_state("buff.stance.deadly-aim")
+
+
+def test_drunken_brawler_s_courage_ends_with_its_temporary_hit_points():
+    """Faiths of Purity: "These bonuses last an hour or until the temporary hit points
+    gained by this effect are spent ... The penalties last for a full hour." Before: the
+    +2 Fortitude and Will held the hour after a blow had spent all five hit points."""
+    from rules.dice import Dice
+    from rules.engine import Scene
+    from tests.test_feats_b5_spells import _wren
+
+    pc = _wren(["Endurance", "Drunken Brawler"], level=5)
+    pc.goods["mug of ale"] = 1
+    s = Scene(location_id="5bbd0c40345f")
+    s.add(pc)
+    e = Engine(s, Dice(seed=1))
+    reflex = sum(m.value for m in pc.save_modifiers("ref"))
+    e.run(e.validate([{"op": "drink", "actor": pc.ref, "because": "test",
+                       "params": {"item": "mug of ale"}}]))
+
+    def alchemical(save):
+        return sum(m.value for m in pc.save_modifiers(save) if m.type == "alchemical")
+
+    assert (pc.temp_hp, alchemical("fort"), alchemical("will")) == (5, 2, 2)
+    pc.take_damage(5)
+    assert (pc.temp_hp, alchemical("fort"), alchemical("will")) == (0, 0, 0)
+    assert sum(m.value for m in pc.save_modifiers("ref")) == reflex - 2
+
+
+def test_prone_shooter_counts_from_the_end_of_the_prone_body_s_own_turn():
+    """UC Prone Shooter: "If you have been prone since the end of your last turn". Before:
+    the softer AC held the moment the archer dropped. Dropped on her turn, she is plain
+    prone; the turn passing to the thug settles it."""
+    pc = _pc("fighter", feats=["Prone Shooter"])
+    s, e = _board(pc, ("thug", (12, 5)))
+    standing = pc.ac("ranged")
+    pc.add_condition("prone")
+    assert pc.ac("ranged") == standing + 4
+    assert s.advance_turn() == "c1"
+    assert pc.ac("ranged") == standing + 6

@@ -1307,6 +1307,12 @@ class Scene:
         who = self.people.get(ref)
         if who is None:
             return []
+        # Feat loop b6-partials: a body still prone as its turn ends has been prone "since
+        # the end of your last turn" from now on (Prone Shooter asks the child tag); the
+        # condition's removal takes it.
+        for e in who.effects:
+            if e.key == "prone" and states.PRONE_SETTLED not in (e.tags or ()):
+                e.tags = tuple(e.tags or ()) + (states.PRONE_SETTLED,)
         had = list(who.effects)
         gone = who.remove_effects(match=lambda e: self._ends_next_turn(e)
                                   and e.payload.get("turn_begun"))
@@ -11303,6 +11309,11 @@ class Engine:
         # circumstance bonus on attack rolls" is on "additional attacks" alone.
         if intent.params.get("cleaving"):
             choices += ("cleaving_on",)
+        # Feat loop b6-partials: Deadly Aim's "its effects last until your next turn" — a
+        # later ranged attack in the round (a Snap Shot opportunity too) keeps the option
+        # the stance laid with the first (`_ATTACK_STANCES`).
+        if "deadly_aim" not in choices and actor.has_state(states.tags_for("deadly aim")[0]):
+            choices += ("deadly_aim",)
         # Feat loop b5-core: a readied attack (rules/readied.py), Patient Strike's, and one
         # set against a charge, as roll-context keys a document's `when.choice` asks.
         if intent.params.get("reaction") == "readied":
@@ -28552,6 +28563,11 @@ class Engine:
         ("shield_of_swings", "shield of swings", "Shield of Swings",
          "{name} turns the great weapon into a wall of swings: softer blows, a harder "
          "guard until their next turn."),
+        # Feat loop b6-partials: Deadly Aim (CRB): "its effects last until your next
+        # turn". The terms stay the document's `choice`; the stance carries the option
+        # to the round's later ranged attacks (`_op_attack`).
+        ("deadly_aim", "deadly aim", "Deadly Aim",
+         "{name} takes aim for the heavier shot (Deadly Aim) until their next turn."),
     )
 
     @classmethod
