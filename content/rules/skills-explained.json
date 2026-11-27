@@ -122,7 +122,9 @@
         {"text": "It is the way past a merchant who will not trade with you.",
          "file": "rules/engine.py", "find": "the engine rolls your Diplomacy against how "},
         {"text": "Ask somebody for a favour or for pay: the book's request difficulty, from how they feel about you and their Charisma. What a granted request gives is the engine's to hand over.",
-         "file": "rules/engine.py", "find": "def _make_request(self, intent: Intent, actor, target, mods, partial: dict) -> Outcome:", "use": "skill.diplomacy.request"}
+         "file": "rules/engine.py", "find": "def _make_request(self, intent: Intent, actor, target, mods, partial: dict) -> Outcome:", "use": "skill.diplomacy.request"},
+        {"text": "With Antagonize, a taunt flusters a foe: for a minute it takes -2 on attacks at anyone but you. A standard action, against 10 + its Hit Dice + Wisdom, once a day a foe.",
+         "file": "rules/antagonize.py", "find": "def door(engine, intent, actor, mods, partial):", "use": "skill.diplomacy.antagonize"}
       ],
       "not_yet": "Gathering rumours beyond where somebody lives.",
       "not_yet_uses": ["skill.diplomacy.gather-information"]
@@ -246,7 +248,9 @@
         {"text": "In a fight, a threat demoralises: the foe is shaken for a round, and a round more for every 5 you beat their 10 + Hit Dice + Wisdom by.",
          "file": "rules/engine.py", "find": "def _demoralize(self, actor, target, margin: int, demand: str):", "use": "skill.intimidate.demoralize"},
         {"text": "With Dazzling Display and the weapon you have Weapon Focus in, one roll demoralises every foe within 30 feet who can see you. It takes the whole round.",
-         "file": "rules/skilluses.py", "find": "def dazzling_display(engine, intent, actor, mods, partial)", "use": "skill.intimidate.dazzling-display"}
+         "file": "rules/skilluses.py", "find": "def dazzling_display(engine, intent, actor, mods, partial)", "use": "skill.intimidate.dazzling-display"},
+        {"text": "With Antagonize, a threat enrages a foe so it turns on you next turn: anyone else it attacks is at -4. A standard action, against 10 + its Hit Dice + Wisdom, once a day a foe.",
+         "file": "rules/antagonize.py", "find": "def door(engine, intent, actor, mods, partial):", "use": "skill.intimidate.antagonize"}
       ],
       "not_yet": "A cowed person reporting you to the watch afterwards.",
       "not_yet_uses": ["skill.intimidate.report"]
