@@ -148,16 +148,36 @@
   },
   "storm-lashed": {
     "modifiers": [
-      {"type": "save_mod", "target": "fort", "amount": 2, "bonus_type": "untyped",
-       "when": {"against": "electricity"}},
-      {"type": "save_mod", "target": "ref", "amount": 2, "bonus_type": "untyped",
-       "when": {"against": "electricity"}},
-      {"type": "save_mod", "target": "will", "amount": 2, "bonus_type": "untyped",
-       "when": {"against": "electricity"}}
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "electricity"
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "electricity"
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "will",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "electricity"
+        }
+      }
     ],
     "not_yet": [
-      "rain's visibility and Perception penalties, and the high winds' Perception penalty and size for wind: the engine charges no weather penalty to either, so there is nothing to reduce",
-      "electrical effects that are not spells (a breath weapon): only a spell's save says what it is against"
+      "rain's visibility and Perception penalties, and the high winds' Perception penalty and size for wind: the engine charges no weather penalty to either, so there is nothing to reduce"
     ]
   },
   "harrowed": {
@@ -184,12 +204,19 @@
   },
   "boar-ferocity": {
     "modifiers": [
-      {"type": "skill_mod", "target": "intimidate", "amount": 2, "bonus_type": "untyped",
-       "when": {"against": "demoralize"}}
+      {
+        "type": "skill_mod",
+        "target": "intimidate",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "demoralize"
+        }
+      }
     ],
-    "tags": ["unarmed.damage.piercing"],
-    "not_yet": [
-      "demoralize as a free action on tearing flesh (Boar Style tears it, b2-styles): no door demoralizes as a free action off a hit"
+    "tags": [
+      "unarmed.damage.piercing",
+      "demoralize.on-tear"
     ]
   },
   "motivating-display": {

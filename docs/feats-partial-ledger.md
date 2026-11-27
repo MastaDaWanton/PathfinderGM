@@ -4,6 +4,7 @@ Lane feats/b6-partials, 2026-11-27. Every `not_yet` line in `content/feats/mecha
 
 - **Before this lane** (integrate/feats-b5 3520f6a8): 256 lines on 216 feats.
 - **After it:** 233 lines on 198 feats. 18 feats finished, 25 lines removed (list at the end).
+- **Lane feats/b7-scoped** (2026-11-27, off integrate/feats-b6 89d9fa80: 238 lines on 199 feats): 216 lines on 183 feats. 16 feats finished, 22 lines removed, in groups 5, 9, 10, 17, 21, 28, 31, 36 and 38 (each group's section says what it built and what is left; the table's counts are b6-partials' and were not recomputed). Groups 11, 12, 19, 30 and 34 were not reached.
 
 How to read the table. Each group is one piece of machinery. **Finishes** counts the feats whose every missing clause is in that group, so building that group alone makes them work; **touches** counts every feat with at least one line in it. Groups run in descending order of feats finished. Size: S is a day or less, M a few days, L a whole subsystem. *Buildable by the book* means the Core Rulebook or the feat's own book defines the rule fully; *needs a design call* means a subsystem or a choice that is the owner's to make.
 
@@ -135,14 +136,11 @@ Needs the owner's design call; size M. Finishes 6, touches 8. Needs a bestiary d
 
 ### 5. An effect on a creature scoped to its attacks on one named creature (+2 against you, guard one ally from one attacker, Power Attack forced against you, a second creature named with a smite)
 
-Buildable by the book; size M. Finishes 6, touches 6. The refusal half (attack.withheld.<ref>, Engine._withheld_refusal) and the `vs` modifier scope exist; what is missing is laying them on someone other than the user, and a one-shot "next attack" use.
+Buildable by the book. Lane feats/b7-scoped (2026-11-27) built the machinery: an `effect` on another creature whose terms are scoped to one creature (`vs: "$user"` / `"$aimed"`, numbers read off the holder with `numbers: "holder"`, a held feat's extra terms with `holder_feat`), spent by the next attack either way round (`spent_by`, `strike_feats.spend_scoped`), provoking from the user's allies (`provokes_from`, `Engine._gambit_provokes`) and ended with the fight (`ends_with_fight`); `aims_foe`, `after_hit` (the round's last hit, `Scene.last_hit`), `favored_sort` and `understood` choose who it reaches (`Engine._scoped_use_reach`); a feat addon's `action` quickens the use. Documents: content/class-abilities/feats-b7-scoped.json. Finished: **archon-style**, **broken-wing-gambit**, **caustic-slur**. Left:
 
-- `archon-diversion` (batch2-attack-a.json): Archon Style's lowered penalty, move-action use and the diverted blow: Archon Style is lane b2-styles'
-- `archon-justice` (b4-moves.json): Archon Style's ally guard and Archon Diversion's diverted blow do not run (batch2-styles' and batch2-attack-a's not_yet), so there is no penalty to waive, no move action to make swift and no diversion to answer
-- `archon-style` (batch2-styles.json): the standard action that guards adjacent allies (+2 dodge against one opponent's next melee attack, -2 AC to you against it): no door lays a guard on an ally against one attacker
-- `broken-wing-gambit` (batch2-attack-a.json): a free action after a hit granting the foe +2 attack and damage against you, its attack then provoking from allies with the feat
-- `caustic-slur` (b4-moves.json): 'As a standard action, you can make a Bluff check against one sort of favored enemy ... must make a Will saving throw or become angered ... treated as if it were using Power Attack' when attacking you: no effect on another creature is scoped to attacks against the user
-- `protector-s-strike` (b3-martial.json): 'you also choose one creature other than you within line of sight ... gains a deflection bonus to AC equal to your Charisma modifier against attacks made by the target of the smite', and the paladin's own deflection given up: smite names one creature, and nothing yet lets the player name a second
+- `archon-diversion` (batch2-attack-a.json): the diverted blow only (the -1 penalty and the move action run): group 30's machinery
+- `archon-justice` (b4-moves.json): the allies' attacks of opportunity on a diversion only (no penalty and the swift action run): waits on Archon Diversion's diverted blow
+- `protector-s-strike` (b3-martial.json): naming a second creature at the smite: `use_ability` carries one `to`, and a second target needs either a new op parameter or a reader route (prompt budget). Not built; the owner's call which door.
 
 ### 6. Other optional systems not in the game (siege weapons, spellblights, harrow deck, alternate favoured class rewards, alternate racial traits, figments as standing illusions, divination rounds)
 
@@ -185,48 +183,27 @@ Buildable by the book; size M. Finishes 5, touches 6.
 
 ### 9. Teamwork feats that read an ally's position and feats (both have the feat, ally in the foe's reach, provoked from the partner)
 
-Buildable by the book; size M. Finishes 5, touches 6.
+Buildable by the book. Lane feats/b7-scoped finished **paired-opportunists** (a provoked swing is owed to every threatening partner holding the feat, `Engine._paired_partners`, asked by `_swings_at` and the manoeuvre's provocation) and **extend-the-bulwark** (an activated feat: half the armour bonus to an adjacent ally holding it, the user's lost for the round; `armour_ac` formula name, a document's `armour` weight). Left:
 
-- `amplified-rage` (b4-combat.json): 'Whenever you are raging and adjacent to a raging ally who also has this feat or flanking the same opponent as a raging ally with this feat, your morale bonuses to Strength and Constitution increase by +4': a rage's morale terms are laid when it begins and ability scores are read with no board in their context, so nothing re-reads where a raging ally stands
-- `circling-offense` (batch2-attack-a.json): +1 dodge against attacks of opportunity from a larger creature while an ally with the feat is in its reach, and its misses provoking from those allies
-- `dragonbane-aura` (b3-martial.json): 'your aura of courage expands to a 20-foot-radius emanation' against dragons: the aura's ally half (+4 morale against fear within 10 feet) is not built (content/class-features/paladin.json not_yet)
-- `extend-the-bulwark` (batch2-attack-a.json): a free action giving an adjacent ally with the feat half your armour bonus as circumstance AC for a round while you lose it
-- `out-of-the-sun` (batch2-attack-a.json): a move-action feint after a melee hit that opens the foe to an adjacent ally with the feat, +2/+4 in bright light or sunlight
-- `paired-opportunists` (b4-moves.json): 'Enemies that provoke attacks of opportunity from your ally also provoke attacks of opportunity from you so long as you threaten them (even if the situation or an ability would normally deny you the attack of opportunity)': who is owed a swing is asked of each watcher alone (rules/reactions.py), never shared with a partner
+- `amplified-rage` (b4-combat.json): unchanged — the rage's morale terms are laid at its start and ability scores are read with no board in their context
+- `circling-offense` (batch2-attack-a.json): unchanged — the +1 dodge needs an AC clause "an ally with the feat is in the attacker's reach", and its second half needs group 19's miss hook
+- `dragonbane-aura` (b3-martial.json): unchanged — the aura of courage's ally half is not built
+- `out-of-the-sun` (batch2-attack-a.json): unchanged — a feint made on a partner's behalf after a hit needs its own skill-use row (`rules/skilluses.py` feint, which already lays a partner's tag for Feint Partner) and the light check; not reached
 
 ### 10. A save that says what forced it (creature ability vs spell, trap, paralysis or stun, energy type, negative levels, divine tradition)
 
-Buildable by the book; size M. Finishes 4, touches 8. The roll context of `_op_save` and class-ability saves gains the source's kind; `when.against` already exists.
+Buildable by the book. Lane feats/b7-scoped built `effectspec.harm_words` (one reader of what a save would leave: paralysis, stun, fatigue, ability harm, energy), added `paralysis`, `stun`, `ability_harm` and `divine_sla` to AGAINST, and made every non-spell save say who forced it: a class ability's (`Engine._ability_save_ctx`), an armed blow's (`maneuver_feats.charge_save_ctx`, charge dice), a printed rider's (`_rider_save`, which already named the attacker) and a `save` op stamped `creature:<template>` (`Engine._stamped_creature`). Luck entries take `not_against`. Finished: **divine-defiance**, **necromantic-affinity** (its terms now ask `ability_harm`, which negative energy also answers, so the two never stack), **shieldwall-phalanx**. Lines removed from feats still partial: `dragon-style` (paralysis and stun), `storm-lashed` (electrical effects that are not spells), `dauntless-destiny` (no reroll on a trap's save: `not_against: trap`; trap saves are rolled without the luck door anyway). Left:
 
-- `dauntless-destiny` (batch2-styles.json): the reroll is still offered on a save against a trap: a save's roll does not say what forced it
-- `divine-defiance` (batch1-spells.json): saves against the spell-like abilities of a divine casting class (a class ability's save does not say whose tradition it is)
-- `diviner-s-delving` (batch1-spells.json): checks against effects that impede divination (nondetection)
-- `dragon-style` (batch2-styles.json): the +2 against paralysis and stunning effects: no save says it is against paralysis or a stun
-- `necromantic-affinity` (batch1-spells.json): the +2 against effects that cause negative levels, ability damage, drain or penalties
-- `shieldwall-phalanx` (b3-arcane.json): saves against an evil creature's ability that is not a spell: only a spell's save says who made it (Engine._cast_save)
-- `storm-lashed` (batch1-modifiers.json): electrical effects that are not spells (a breath weapon): only a spell's save says what it is against
-- `witchbreaker` (b3-martial.json): 'whenever you score a critical hit against such a creature, any allies under the effects of a mind-affecting effect from that creature may attempt a new save': no ally's charm or compulsion records which creature laid it for a fresh save to answer
+- `diviner-s-delving` (batch1-spells.json): checks against effects that impede divination (nondetection) — no such check exists; and a concentrated divination's rounds of information
+- `witchbreaker` (b3-martial.json): a mind-affecting effect does not record which creature laid it, so the ally's fresh save on a critical has nothing to answer
 
 ### 11. Grappling with or through a weapon (impaled foe, whip grapple, who-holds-whom damage terms)
 
-Buildable by the book; size M. Finishes 4, touches 5.
-
-- `bear-hug` (batch2-attack-a.json): a grapple without provoking against a foe held by Beartrap Bite (lane b2-attack-b's feat), and +2 damage against a foe you grapple: no grapple-damage term asks who holds whom yet
-- `beartrap-bite` (b4-moves.json): 'if your confirmation roll matches or exceeds your foe's CMD, you can clamp down ... The foe cannot move outside the area threatened by your bite': no hold short of a grapple is laid on a confirmed bite
-- `greater-whip-mastery` (b4-moves.json): 'you gain the ability to grapple using your whip' with the reach kept, the whip's damage and no free-hand penalty: a grapple is always made with the body
-- `hamatula-grasp` (b3-martial.json): the whole feat: the impaled foe's grapple check with the impaling weapon is not offered yet (Hamatula Strike's own not_yet), so neither its lighter -2 nor its +1d6 has a roll to ride
-- `hamatula-strike` (batch2-actions.json): the impaled foe's -4 grapple check to damage it with the piercing weapon, as an attack action, is not offered: the hold deals the grapple's ordinary damage
+Buildable by the book. Not reached by lane feats/b7-scoped (time). Unchanged.
 
 ### 12. Objects as attack targets (hardness, sunder an object's identity, ice prisons, shields that suffer a spell)
 
-Buildable by the book; size M. Finishes 4, touches 5.
-
-- `fury-s-snare` (b5-maneuver.json): 'Escaping the whip by making a Strength check means the whip gains the broken condition': the whip lies on the ground unbroken
-- `fury-s-snare` (b5-maneuver.json): 'If the whip has a magical quality such as flaming, apply this quality's damage to the target every round on your turn': a dropped weapon's properties do nothing
-- `improved-whip-mastery` (b4-moves.json): grasping a Small or Tiny object with a melee touch at AC 10, and swinging from the whip as a grappling hook
-- `marid-spirit` (batch2-styles.json): 'The ice has hit points equal to three times your base attack bonus or monk level ... Destroying ... the ice ends the entangled condition': the ice is not an object anyone can strike; breaking it (the escape op against the break DC) is the way out
-- `ray-shield` (batch1-spells.json): the shield suffering the full effects of the spell it turned
-- `smash` (b5-spells.json): ignoring the first 5 points of an inanimate, unattended object's hardness when attacking it: no attack is made at an object
+Buildable by the book. Not reached by lane feats/b7-scoped (time). Unchanged.
 
 ### 13. Metamagic gaps (split energy, energy chosen at the cast, ethereal, incorporeal 50%, toppling on a push, Disruptive on spell-like abilities)
 
@@ -270,13 +247,11 @@ Buildable by the book; size S. Finishes 3, touches 6. content/rules/skill-uses.j
 
 ### 17. Per-round attack history (first unarmed strike of the round, what the last blow hit, two Stunning Fist attempts in one blow)
 
-Buildable by the book; size M. Finishes 3, touches 5.
+Buildable by the book. Lane feats/b7-scoped built `Scene.last_hit` (each combatant's last attack action that hit: round, the one hit, weapon, melee or ranged; a miss clears it; saved with the scene). Finished: **janni-tempest** (`Engine._janni_follow`: +4 and no attack of opportunity on the bull rush or trip that follows an unarmed hit). Line removed from a feat still partial: `dragon-ferocity` (shaken 1d4 + Str on a critical, by its `on_hit` condition rider with `rounds_roll`, and on a landed Stunning Fist, `Engine.SHAKEN_ON_STUN`). Left:
 
-- `dragon-ferocity` (batch2-styles.json): shaken for 1d4 + Strength rounds on a critical hit or a Stunning Fist that lands: neither raises a rider a feat may add to
-- `dragon-style` (batch2-styles.json): 1-1/2 times Strength on the first unarmed strike of a round: no reader counts a round's unarmed strikes
-- `janni-tempest` (batch2-styles.json): +4 to bull rush or trip a foe your unarmed strike just hit, provoking nothing: no reader asks what the last blow of the turn hit
-- `mantis-torment` (batch2-styles.json): the two-attempt blow that dazzles and staggers, then fatigues: no Stunning Fist choice spends two attempts
-- `tiger-claws` (batch2-styles.json): the full-round two-handed strike (highest bonus, each hand's damage, half Strength with Power Attack) and its free bull rush at +2: no attack option makes one blow of two hands
+- `dragon-style` (batch2-styles.json): 1-1/2 times Strength on the first unarmed strike of a round — a per-swing count of the round's unarmed strikes; not reached
+- `mantis-torment` (batch2-styles.json): no Stunning Fist choice spends two attempts
+- `tiger-claws` (batch2-styles.json): no attack option makes one blow of two hands
 
 ### 18. Weapon handling changes (sling as a flail, quarterstaff one-handed, earth breaker with skull shield, torch as a weapon, gear finish)
 
@@ -290,12 +265,7 @@ Buildable by the book; size M. Finishes 3, touches 5.
 
 ### 19. Attacks of opportunity made as manoeuvres or answered on a miss/damage (trip on an AoO, grapple when missed, AoO damage hooks)
 
-Buildable by the book; size M. Finishes 3, touches 4.
-
-- `pin-down` (batch2-attack-a.json): a foe you threaten taking a 5-foot step or withdrawing provokes from you; a hit stops the move and deals no damage — attacks of opportunity on a step are lane b2-actions'
-- `snapping-turtle-clutch` (batch2-styles.json): the immediate-action grapple at -2 when a melee attack misses you: no reaction answers a miss with a manoeuvre
-- `wolf-style` (batch2-styles.json): the speed a foe loses when your attack of opportunity deals 10 or more, and the free trip when it meets its remaining move: an attack of opportunity's damage is read by no style hook
-- `wolf-trip` (b4-moves.json): '+2 bonus on all combat maneuver checks to trip as part of an attack of opportunity': no attack of opportunity is ever made as a trip — the reaction swing is always a blow
+Buildable by the book. Not reached by lane feats/b7-scoped (time). Unchanged.
 
 ### 20. Bestiary special attacks run (breath weapons first)
 
@@ -308,12 +278,9 @@ Needs the owner's design call; size L. Finishes 3, touches 4. Printed special at
 
 ### 21. An action that removes a dirty trick's condition (and the removal by its giver's touch)
 
-Buildable by the book; size S. Finishes 3, touches 4. The CRB's own move action to shake off a dirty trick is unbuilt too. It needs a new player action, so a reader route, against the reader's prompt budget (about 8 characters of headroom).
+Buildable by the book. Lane feats/b7-scoped finished all three without a reader route: the `escape` op (an act the reader already has) removes a dirty trick's condition when nothing grapples the creature, or always with `how: "trick"` — a move action, a standard for a worsened one (`Engine._shake_off_trick`); a trick laid by Improved Underhanded Teamwork's immediate action rides with the first (`payload.rides_with`) and goes with it; a creature shakes a trick off as its turn begins (`Engine.trick_turn`, play/views.py); the combat bar shows **Shake off the trick** while one holds (the server's `tricked`). Dirty tricks now carry `origin: rule:dirty-trick`. Stunning Fist's conditions carry who laid them (`payload.by`), and a document's `lifts_mine` lifts the user's own. Finished: **dirty-trick-master**, **improved-underhanded-teamwork**, **mantis-wisdom**. Left:
 
-- `dirty-trick-master` (batch2-actions.json): the worsened condition's "until the opponent uses a standard action to remove the condition" ending is not offered (no action removes a dirty trick's condition yet)
-- `fury-s-snare` (b5-maneuver.json): 'or by using a full-round action to disentangle himself': the escape op offers the two checks and no sure way out
-- `improved-underhanded-teamwork` (batch2-actions.json): the foe's action to remove the first condition does not also remove the second (no action removes a dirty trick's condition yet)
-- `mantis-wisdom` (batch2-styles.json): the standard-action touch attack that lifts a Stunning Fist effect you laid: no door removes a condition by its giver's touch
+- `fury-s-snare` (b5-maneuver.json): its full-round sure way out of the whip is the escape op's third option, not built (the line is group 12's whip as an object too)
 
 ### 22. Severe and extreme cold and heat bands, weather penalties
 
@@ -371,10 +338,9 @@ Buildable by the book; size M. Finishes 2, touches 3. A throw is one attack an o
 
 ### 28. Fear that fails or is re-saved (bonus against its source, turn-start re-save stepping fear down)
 
-Buildable by the book; size S. Finishes 2, touches 2.
+Buildable by the book. Lane feats/b7-scoped finished **focused-discipline** (`Engine._fear_shrugged`: a saved fear, or one the target is immune to where the save is still asked, lays +2 morale on attack, damage and CMB against its caster for a round). Left:
 
-- `fearless-curiosity` (batch1-modifiers.json): a new save at the start of each turn under a fear effect to step it down (panicked to frightened to shaken to none): no reader re-saves a fear at turn start
-- `focused-discipline` (batch1-maneuvers.json): a fear effect that fails to affect you does not yet give the +2 morale bonus on attack, weapon damage and CMB against its source for 1 round
+- `fearless-curiosity` (batch1-modifiers.json): a fear's condition keeps no DC to re-save against at turn start; storing the cast's DC on the conditions it lays is the missing piece
 
 ### 29. Hero points (APG optional system)
 
@@ -385,18 +351,13 @@ Needs the owner's design call; size L. Finishes 2, touches 2.
 
 ### 30. A landed blow handed to another body, or resolved before the attack it answers
 
-Buildable by the book; size M. Finishes 2, touches 2.
-
-- `in-harm-s-way` (b5-other.json): intercepting a successful attack on the ally your aid another guards, taking its full damage and riders as an immediate action: the attack loop resolves a blow on the one defender it was aimed at, and nothing hands a landed blow to another body
-- `panther-parry` (batch2-styles.json): retaliatory strikes resolved before the triggering attack, and its -2 on that attack's roll and damage: the strike is resolved after it (Panther Style's order)
+Buildable by the book. Not reached by lane feats/b7-scoped (time). Unchanged. Archon Diversion's diverted blow waits here too.
 
 ### 31. Effective size for manoeuvre size limits and CMD steps (wall of flesh, powerful shape)
 
-Buildable by the book; size S. Finishes 2, touches 2.
+Buildable by the book. Lane feats/b7-scoped built `Engine._maneuver_size` (the size every manoeuvre size limit, a confirmed critical's free manoeuvre and a printed grab read) and the `cmd_size_up` formula name (CRB Table 8-1's step from the bearer's own size). Finished: **wall-offlesh**. Left:
 
-- `powerful-shape` (b3-martial.json): 'carrying capacity, and any size-based special attacks you use or that are used against you (such as grab, swallow whole, and trample)': carrying capacity and the size limits of grab and swallow whole still read the form's own size
-- `wall-offlesh` (batch1-maneuvers.json): the CMD step is +1, the step from Tiny and Small; a Diminutive or Fine bearer's larger step is not computed
-- `wall-offlesh` (batch1-maneuvers.json): the size a manoeuvre's size limit reads ("the way combat maneuvers and abilities affect you") is still the body's own: a foe two sizes larger than your true size may still trip or bull rush you
+- `powerful-shape` (b3-martial.json): carrying capacity still reads the form's own size, and swallow whole and trample never run (bestiary special attacks); grab and the manoeuvres' limits read the larger size now
 
 ### 32. Moot under an owner ruling (item-creation feats removed 2026-11-22; attitude moved once a day)
 
@@ -414,10 +375,7 @@ Needs the owner's design call; size L. Finishes 2, touches 2.
 
 ### 34. Two creatures sharing one save roll (duck and cover, tribe mentality)
 
-Buildable by the book; size S. Finishes 2, touches 2.
-
-- `duck-and-cover` (b3-arcane.json): taking the adjacent ally's Reflex die (and falling prone for it) when both save against the same effect: a save is rolled one creature at a time
-- `tribe-mentality` (b5-other.json): both rolling the save against one compulsion or emotion effect and either using either result: a cast's saves are rolled target by target, and no save sees an ally's roll of the same effect
+Buildable by the book. Not reached by lane feats/b7-scoped (time). Unchanged.
 
 ### 35. Use Magic Device activation and emulation
 
@@ -428,11 +386,10 @@ Buildable by the book; size M. Finishes 2, touches 2.
 
 ### 36. Demoralize as a free or move action off a trigger, and demoralize's action cost
 
-Buildable by the book; size S. Finishes 1, touches 3.
+Buildable by the book. Lane feats/b7-scoped finished **boar-ferocity** (the free Demoralize when Boar Style tears flesh, through `_free_demoralize`). Left:
 
-- `boar-ferocity` (batch1-modifiers.json): demoralize as a free action on tearing flesh (Boar Style tears it, b2-styles): no door demoralizes as a free action off a hit
-- `boar-shred` (batch2-styles.json): demoralize as a move action: the engine does not charge an action for demoralizing at all
-- `dauntless-destiny` (batch2-styles.json): the free-action Intimidate to demoralize after a reroll that succeeds: no door demoralizes as a free action off a roll
+- `boar-shred` (batch2-styles.json): demoralize as a move action — the engine charges no action for a demoralize at all (a standard by the CRB); charging it touches every test that demoralizes then acts, so it is left for its own change; and the extra bleed
+- `dauntless-destiny` (batch2-styles.json): the free-action Intimidate after a reroll that succeeds — the luck door does not hand back who forced the roll
 
 ### 37. Alignment tracked (celestial vs fiendish template, bless weapon making a weapon good)
 
@@ -443,10 +400,9 @@ Needs the owner's design call; size M. Finishes 1, touches 2.
 
 ### 38. Damage reduction passed by a feat (ignore 5 DR of a type, DR once on a full attack's total)
 
-Buildable by the book; size S. Finishes 1, touches 2.
+Buildable by the book. Lane feats/b7-scoped finished **clustered-shots** (each ranged hit of a full attack on one foe passes the reduction its predecessors already absorbed, `strike_feats.clustered_traits` — the same sum as totalling first). Line removed from a feat still partial: `planar-hunter` (5 of a typed DR passed against an outsider on a planar favoured terrain, `strike_feats.dr_traits`). Left:
 
-- `clustered-shots` (batch2-attack-a.json): damage reduction applied once to the total of a full attack's ranged hits on one foe: each hit meets the reduction alone
-- `planar-hunter` (b4-maneuver.json): 'ignore up to 5 points of damage reduction ... except damage reduction without a type': a feat lends no DR-passing trait to a blow
+- `planar-hunter` (b4-maneuver.json): a creature's native plane is not recorded
 
 ### 39. Poisons made at the alchemy bench
 
@@ -572,6 +528,25 @@ These feats have no line in a feat document; their activated use carries one.
 
 - ~~**Power Attack lasts until your next turn**~~ BUILT by lane b7-fixes: a one-round stance (`buff.stance.power-attack`) laid by the declared swing, read by a later blow (an attack of opportunity included) and by `cmb_modifiers` for manoeuvres.
 - **The dirty trick's own removal** (CRB: a move action) is unbuilt, so Dirty Trick Master's and Improved Underhanded Teamwork's lines wait on a player action, which costs reader prompt budget.
+
+- **Power Attack lasts until your next turn** (CRB: "its effects last until your next turn"), exactly as Deadly Aim does, but its document carries no line saying so: the -1/+2 rides the declared swing only. This lane gave Deadly Aim a one-round stance (`buff.stance.deadly-aim`); Power Attack needs the same, and touches every melee test that declares it, so it is left for its own change.
+- **The dirty trick's own removal** (APG: a move action): built by lane feats/b7-scoped through the existing `escape` op and the bar's Shake off, no reader route.
+- **Found by lane feats/b7-scoped, not fixed:** the bestiary's `thug` carries no `type.humanoid` tag and the `bandit` no `subtype.human`, so a ranger's favoured enemy humanoid (human) and anything asking that type never answer against the game's commonest foes. Demoralizing charges no action at all (CRB: a standard action; Boar Shred's move action waits on it).
+
+## Finished by lane feats/b7-scoped
+
+16 feats lost their last `not_yet` line; 22 lines were removed in all. Each is proved through the engine in `tests/test_feats_b7_scoped.py`.
+
+- archon-style, broken-wing-gambit, caustic-slur (group 5)
+- paired-opportunists, extend-the-bulwark (group 9)
+- divine-defiance, necromantic-affinity, shieldwall-phalanx (group 10)
+- janni-tempest (group 17)
+- dirty-trick-master, improved-underhanded-teamwork, mantis-wisdom (group 21)
+- focused-discipline (group 28)
+- wall-offlesh (group 31)
+- boar-ferocity (group 36)
+- clustered-shots (group 38)
+- Lines removed from feats still partial: archon-diversion and archon-justice (rewritten to the one clause left), dauntless-destiny, dragon-ferocity, dragon-style, planar-hunter, powerful-shape (rewritten), storm-lashed.
 
 ## Finished by this lane
 

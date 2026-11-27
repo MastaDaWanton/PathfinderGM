@@ -372,7 +372,10 @@
       }
     ],
     "not_yet": [
-      "'carrying capacity, and any size-based special attacks you use or that are used against you (such as grab, swallow whole, and trample)': carrying capacity and the size limits of grab and swallow whole still read the form's own size"
+      "'carrying capacity': the load still reads the form's own size; and swallow whole and trample are never used by the engine (bestiary special attacks have no locator), so only grab and the manoeuvres' size limits read the larger size (Engine._maneuver_size)"
+    ],
+    "tags": [
+      "size.powerful-shape"
     ]
   },
   "boon-companion": {

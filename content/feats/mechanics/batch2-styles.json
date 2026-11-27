@@ -44,12 +44,14 @@
           "save",
           "attack"
         ],
-        "per_day": 1
+        "per_day": 1,
+        "not_against": [
+          "trap"
+        ]
       }
     ],
     "not_yet": [
-      "the free-action Intimidate to demoralize after a reroll that succeeds: no door demoralizes as a free action off a roll",
-      "the reroll is still offered on a save against a trap: a save's roll does not say what forced it"
+      "the free-action Intimidate to demoralize after a reroll that succeeds: no door demoralizes as a free action off a roll"
     ]
   },
   "inexplicable-luck": {
@@ -139,11 +141,7 @@
       "attack.second-chance.improved"
     ]
   },
-  "archon-style": {
-    "not_yet": [
-      "the standard action that guards adjacent allies (+2 dodge against one opponent's next melee attack, -2 AC to you against it): no door lays a guard on an ally against one attacker"
-    ]
-  },
+  "archon-style": {},
   "wolf-style": {
     "not_yet": [
       "the speed a foe loses when your attack of opportunity deals 10 or more, and the free trip when it meets its remaining move: an attack of opportunity's damage is read by no style hook"
@@ -401,10 +399,87 @@
           "against": "sleep"
         },
         "note": "Dragon Style, against sleep"
+      },
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.dragon-style"
+          },
+          "against": "paralysis"
+        },
+        "note": "Dragon Style, against paralysis"
+      },
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.dragon-style"
+          },
+          "against": "paralysis"
+        },
+        "note": "Dragon Style, against paralysis"
+      },
+      {
+        "type": "save_mod",
+        "target": "will",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.dragon-style"
+          },
+          "against": "paralysis"
+        },
+        "note": "Dragon Style, against paralysis"
+      },
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.dragon-style"
+          },
+          "against": "stun"
+        },
+        "note": "Dragon Style, against stunning"
+      },
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.dragon-style"
+          },
+          "against": "stun"
+        },
+        "note": "Dragon Style, against stunning"
+      },
+      {
+        "type": "save_mod",
+        "target": "will",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.dragon-style"
+          },
+          "against": "stun"
+        },
+        "note": "Dragon Style, against stunning"
       }
     ],
     "not_yet": [
-      "the +2 against paralysis and stunning effects: no save says it is against paralysis or a stun",
       "1-1/2 times Strength on the first unarmed strike of a round: no reader counts a round's unarmed strikes"
     ],
     "tags": [
@@ -430,8 +505,25 @@
       }
     ],
     "not_yet": [
-      "shaken for 1d4 + Strength rounds on a critical hit or a Stunning Fist that lands: neither raises a rider a feat may add to",
       "qualifying for Elemental Fist without its prerequisites (and the one energy that leaves until they are met): the feat picker has no prerequisite waiver a feat can grant"
+    ],
+    "on_hit": [
+      {
+        "kind": "condition",
+        "condition": "shaken",
+        "rounds": "max(0, str_mod)",
+        "rounds_roll": "1d4",
+        "when": {
+          "critical": true,
+          "bearer": {
+            "state": "style.dragon-style"
+          }
+        },
+        "tell": "{target} is shaken by the blow (Dragon Ferocity)."
+      }
+    ],
+    "tags": [
+      "stun.shakes.dragon-ferocity"
     ]
   },
   "dragon-roar": {
@@ -551,8 +643,8 @@
     ]
   },
   "janni-tempest": {
-    "not_yet": [
-      "+4 to bull rush or trip a foe your unarmed strike just hit, provoking nothing: no reader asks what the last blow of the turn hit"
+    "tags": [
+      "maneuver.janni-tempest"
     ]
   },
   "janni-rush": {
@@ -603,9 +695,6 @@
         },
         "note": "Mantis Wisdom: an unarmed blow carrying Stunning Fist"
       }
-    ],
-    "not_yet": [
-      "the standard-action touch attack that lifts a Stunning Fist effect you laid: no door removes a condition by its giver's touch"
     ]
   },
   "mantis-torment": {

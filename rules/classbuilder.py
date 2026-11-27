@@ -1170,7 +1170,9 @@ _LUCK_KEYS = frozenset({"reroll", "bonus", "ally_save", "on_reroll", "surge", "r
                         # bearer, a roll made twice, and the tag an entry holds while.
                         "confirm_against", "twice", "while",
                         # Feat loop b5-other: take 10, a lent feat, a twice paid for.
-                        "take_ten", "lend", "spends"})
+                        "take_ten", "lend", "spends",
+                        # Feat loop b7-scoped: what the roll must NOT be made against.
+                        "not_against"})
 
 
 def _luck_problems(at: str, entries) -> list[str]:
@@ -1212,12 +1214,15 @@ def _luck_problems(at: str, entries) -> list[str]:
         if not isinstance(rolls, list) or not all(isinstance(r, str) and r for r in rolls):
             out.append(f"{where}.rolls: a list of roll kinds — attack, save, save.fort, "
                        f"skill, skill.disable device, ability, d20.")
-        if "against" in e:
+        for key in ("against", "not_against"):          # not_against: feat loop b7
+            if key not in e:
+                continue
             from .effectspec import AGAINST
 
-            if not isinstance(e["against"], list) or not e["against"] \
-                    or set(e["against"]) - set(AGAINST):
-                out.append(f"{where}.against: a list of what the roll is made against, "
+            if not isinstance(e[key], list) or not e[key] \
+                    or set(e[key]) - set(AGAINST):
+                out.append(f"{where}.{key}: a list of what the roll is "
+                           f"{'not ' if key == 'not_against' else ''}made against, "
                            f"each one of {', '.join(AGAINST)}.")
         if not isinstance(e.get("per_day", 0), int) or int(e.get("per_day", 0)) < 0:
             out.append(f"{where}.per_day: a count of uses a day, or left out for no limit.")
@@ -1242,7 +1247,9 @@ _ON_HIT_KINDS = {"bleed": {"kind", "when", "amount",
                               "unless_held"},
                  "demoralize": {"kind", "when", "rounds", "crit_condition", "crit_bonus",
                                 "all_threatened"},
-                 "condition": {"kind", "when", "condition", "rounds", "tell"},
+                 "condition": {"kind", "when", "condition", "rounds", "tell",
+                               # Feat loop b7-scoped: dice on the rounds (Dragon Ferocity).
+                               "rounds_roll"},
                  "ally_swing": {"kind", "when", "flanking"},
                  "free_swing": {"kind", "when"}}
 

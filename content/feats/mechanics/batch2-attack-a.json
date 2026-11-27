@@ -574,7 +574,7 @@
   },
   "archon-diversion": {
     "not_yet": [
-      "Archon Style's lowered penalty, move-action use and the diverted blow: Archon Style is lane b2-styles'"
+      "'Once per round while using Archon Style, when you have at least one hand free, you can divert one melee weapon attack that would have struck an adjacent ally and take the blow in your ally's stead ... the ally you protected can make an attack of opportunity against the diverted opponent': the attack loop resolves a blow on the one defender it was aimed at, and nothing hands it to another body (the guard's lowered -1 and its move action are built: content/class-abilities/feats-b7-scoped.json)"
     ]
   },
   "bear-hug": {
@@ -604,8 +604,8 @@
     ]
   },
   "extend-the-bulwark": {
-    "not_yet": [
-      "a free action giving an adjacent ally with the feat half your armour bonus as circumstance AC for a round while you lose it"
+    "tags": [
+      "teamwork.extend-the-bulwark"
     ]
   },
   "collective-recollection": {
@@ -642,8 +642,8 @@
     "tags": ["crit.pounce.flat-footed"]
   },
   "broken-wing-gambit": {
-    "not_yet": [
-      "a free action after a hit granting the foe +2 attack and damage against you, its attack then provoking from allies with the feat"
+    "tags": [
+      "teamwork.broken-wing-gambit"
     ]
   },
   "cavalry-formation": {
@@ -652,8 +652,8 @@
     ]
   },
   "clustered-shots": {
-    "not_yet": [
-      "damage reduction applied once to the total of a full attack's ranged hits on one foe: each hit meets the reduction alone"
+    "tags": [
+      "dr.clustered-shots"
     ]
   },
   "deceptive-exchange": {

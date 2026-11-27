@@ -312,6 +312,13 @@ def action_of(doc: dict, actor, on_self: bool = False) -> str:
     act = (doc.get("self_action") if on_self else None) or doc.get("action") or "standard"
     if isinstance(act, dict):
         act = rung_at(act, level_of(actor)) or "standard"
+    # Feat loop b7-scoped: a feat held that quickens the use — Archon Diversion's "spend a
+    # move action instead of a standard action", Archon Justice's swift (an addon's
+    # `action`); the quickest held wins.
+    quick = [str(a["action"]) for a in doc.get("addons") or ()
+             if a.get("feat") and a.get("action") in ACTIONS and addon_held(actor, a)]
+    if quick:
+        act = min([str(act)] + quick, key=lambda x: ACTIONS.index(x) if x in ACTIONS else 9)
     return str(act)
 
 
@@ -334,8 +341,17 @@ def modifiers(specs, actor) -> list[dict]:
             m["when"] = dict(spec["when"])
         if spec.get("first_hit"):
             m["first_hit"] = True
+        # Feat loop b7-scoped: "+2 against you" (Broken Wing Gambit), "against that
+        # opponent" (Archon Style): "$user" or "$aimed", made a ref by the executor
+        # (`Engine._class_effect_on`), then the `vs` scope every roll already asks.
+        if spec.get("vs") in VS_WORDS:
+            m["vs"] = str(spec["vs"])
         out.append(m)
     return out
+
+
+# Feat loop b7-scoped: who an effect's `vs` may name before the executor makes it a ref.
+VS_WORDS = ("$user", "$aimed")
 
 
 # Every field a document may carry, each with a reader (audit 2026-11-22: lay on hands'
@@ -364,7 +380,17 @@ DOC_KEYS = frozenset({
     "charge_ability",
     # Feat loop b7-fixes: a sunder check at the spells on the creature aimed at
     # (Shatterspell, by Spell Sunder's rule; `dispel.sunder`).
-    "spell_sunder"})
+    "spell_sunder",
+    # Feat loop b7-scoped: the one foe a use is aimed at among allies it reaches
+    # (Archon Style), and the user's own last hit it answers (Broken Wing Gambit).
+    "aims_foe", "after_hit",
+    # Feat loop b7-scoped: only the favoured enemies of the aimed one's sort (Caustic Slur).
+    "favored_sort", "understood",
+    # Feat loop b7-scoped: the suit's weight class the user must wear (Extend the
+    # Bulwark's "wearing medium or heavy armor"; Engine._ability_refusal).
+    "armour",
+    # Feat loop b7-scoped: lifts what the user's own uses of an ability laid (Mantis Wisdom).
+    "lifts_mine"})
 
 
 def _ally_want_problems(at: str, want) -> list[str]:
@@ -384,7 +410,13 @@ EFFECT_KEYS = frozenset({"condition", "modifiers", "on", "rounds", "skill_modifi
                          "tags", "temp_hp", "vulnerable", "resave", "commanded",
                          # Feat loop b5-maneuver: rounds rolled, a hold a check ends, a
                          # clinging fire (Engine._class_effect_on).
-                         "rounds_dice", "escape_dc", "burn"})
+                         "rounds_dice", "escape_dc", "burn",
+                         # Feat loop b7-scoped: an effect on another scoped to its attacks
+                         # on one creature (Engine._class_effect_on): formulas read off
+                         # the holder, terms a feat it holds adds, spent by the next
+                         # attack, provoking from the user's allies, ended with the fight.
+                         "numbers", "holder_feat", "spent_by", "provokes_from",
+                         "ends_with_fight"})
 
 AREA_SHAPES = ("cone", "line", "burst")
 _AREA_WORDS = re.compile(r"^\s*(\d+)\s*-?\s*(?:foot|feet|ft\.?)\s*-?\s*(?:radius\s+)?"

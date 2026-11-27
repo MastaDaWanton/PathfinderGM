@@ -392,6 +392,32 @@ PUNCHED = "rule:feat-punch-through"
 CLEAVING_FINISH_UNLIMITED = "attack.cleaving-finish.unlimited"   # Improved Cleaving Finish
 
 
+PLANAR_HUNTER = "dr.planar-hunter"            # feat loop b7-scoped
+CLUSTERED = "dr.clustered-shots"
+
+
+def clustered_traits(actor, defender, weapon, state, full: bool) -> tuple[str, ...]:
+    """Clustered Shots (UC): "When you use a full-attack action to make multiple ranged
+    weapon attacks against the same opponent, total the damage from all hits before
+    applying that opponent's damage reduction." Measured before: each hit met the
+    reduction alone, so four arrows of 6 into DR 5 dealt 4. Totalled first is the same
+    sum as each hit passing the DR its predecessors already absorbed: `ignores_dr:<n>`,
+    n the reduction spent so far on this foe (`clustered_spent`)."""
+    from .sheet import IGNORES_DR
+
+    if not full or weapon.get("category") != "ranged" or not actor.has_state(CLUSTERED):
+        return ()
+    spent = int((state.get("clustered") or {}).get(defender.ref, 0))
+    return (f"{IGNORES_DR}:{spent}",) if spent else ()
+
+
+def clustered_spent(actor, defender, weapon, state, full: bool, hit: dict) -> None:
+    if not full or weapon.get("category") != "ranged" or not actor.has_state(CLUSTERED):
+        return
+    book = state.setdefault("clustered", {})
+    book[defender.ref] = int(book.get(defender.ref, 0)) + int(hit.get("reduced") or 0)
+
+
 def dr_traits(actor, defender, weapon_key) -> tuple[str, ...]:
     from . import feat_events
     from .sheet import IGNORES_DR, IGNORES_TYPED_DR, current_moment
@@ -399,6 +425,18 @@ def dr_traits(actor, defender, weapon_key) -> tuple[str, ...]:
     out: list[str] = []
     if actor.has_state(GREATER_PENETRATING) and feat_events.has_weapon_focus(actor, weapon_key):
         out += [f"{IGNORES_TYPED_DR}:10", f"{IGNORES_DR}:5"]
+    # Feat loop b7-scoped: Planar Hunter (Planar Adventures) — "When you are on one of the
+    # planes you've selected as a favored terrain ... You also ignore up to 5 points of
+    # damage reduction when making weapon attacks against outsiders native to that plane,
+    # except for damage reduction without a type". The clause its +2 to hit already asks
+    # (`classfeatures.holds`): a planar favoured terrain, an outsider.
+    if actor.has_state(PLANAR_HUNTER):
+        from . import classfeatures
+
+        if classfeatures.holds({"bearer": {"terrain": "planes"},
+                                "target": {"type": "outsider"}}, actor,
+                               {"target_actor": defender}):
+            out.append(f"{IGNORES_TYPED_DR}:5")
     scene = getattr(current_moment(), "scene", None)
     if scene is not None and actor.has_state(PUNCH_THROUGH):
         from . import position
@@ -632,10 +670,45 @@ def lay_next_attack(actor, name: str, origin: str, amount: int, bonus_type: str,
                    for t in targets]))
 
 
+# --- an effect on another, spent by one attack (feat loop b7-scoped) ----------------------
+# `payload.spent_by = {"attack": <how>, "vs": <ref>}`, laid by `Engine._scoped_on`:
+#   "attacked_in_melee": the `vs` creature's next melee attack ON the holder (Archon
+#       Style's "+2 dodge bonus to AC against that opponent's next melee attack"), spent
+#       once its attack roll is down;
+#   "attacking": the holder's next attack on the `vs` creature (Broken Wing Gambit's
+#       "until your opponent attacks you"), spent once that attack action is over, so its
+#       damage rolls keep the +2 the bonus also gives them.
+SPENT_BY = "spent_by"
+
+
+def spend_scoped(attacker, defender, how: str, weapon: dict | None = None) -> list[str]:
+    """Remove what this attack spends; returns the names spent. `how` is the moment:
+    "roll" (one attack roll is down) or "action" (the attack action is over)."""
+    if attacker is None or defender is None:
+        return []
+    melee = (weapon or {}).get("category") != "ranged"
+
+    def spends(holder, other_ref):
+        def match(e) -> bool:
+            want = (e.payload or {}).get(SPENT_BY)
+            if not isinstance(want, dict) or want.get("vs") != other_ref:
+                return False
+            if how == "roll":
+                return holder is defender and want.get("attack") == "attacked_in_melee" \
+                    and melee
+            return holder is attacker and want.get("attack") == "attacking"
+        return match
+    gone: list[str] = []
+    for holder, other in ((defender, attacker.ref), (attacker, defender.ref)):
+        gone += [e.name for e in holder.remove_effects(match=spends(holder, other)) or ()]
+    return gone
+
+
 def after_roll(engine, intent, actor, defender, weapon_key, weapon, atk, state, choices):
     """Once a swing's attack roll is down, hit or miss: the next-attack bonuses it spent,
     Reckless Aim's lowered guard and its natural 1 (`Engine._op_attack`)."""
     _spend_next(actor, weapon, defender)
+    spend_scoped(actor, defender, "roll", weapon)            # feat loop b7-scoped
     if not state.get("glory_said"):
         state["glory_said"] = True
         for p in death_or_glory_answer(engine, actor, defender, choices):

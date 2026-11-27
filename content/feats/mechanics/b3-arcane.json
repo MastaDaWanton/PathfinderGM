@@ -152,9 +152,6 @@
           }
         }
       }
-    ],
-    "not_yet": [
-      "saves against an evil creature's ability that is not a spell: only a spell's save says who made it (Engine._cast_save)"
     ]
   },
   "duck-and-cover": {

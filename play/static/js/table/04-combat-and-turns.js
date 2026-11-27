@@ -209,6 +209,10 @@ function renderCombat(s) {
   // Held in somebody's grapple (`grappled`, the server's `held_in_grapple`): Break free.
   const esc_ = $("#cb-escape");
   if (esc_) esc_.hidden = !me.grappled;
+  // Hampered by a dirty trick (the server's `tricked`: the action it costs), Shake off.
+  const shake = $("#cb-shake");
+  if (shake) shake.hidden = !me.tricked;
+  COMBAT.tricked = me.tricked || "";
   // A flask to throw: offered while one is carried (the server's `attacks.flasks`).
   const thr = $("#cb-throw");
   if (thr) thr.hidden = !flasksCarried().length;
@@ -1005,6 +1009,13 @@ document.addEventListener("click", async e => {
       <button data-stuck="break_free:slash">Hack the goo off</button>
       <span class="cb-note">Hacking needs a slashing weapon in hand.</span>`);
     return;
+  }
+  // A dirty trick shaken off (APG: a move action; a worsened one, a standard).
+  if (t.closest("#cb-shake")) {
+    const step = { label: "Shake off the dirty trick",
+                   actions: [{ op: "escape", params: { how: "trick" } }] };
+    if (COMBAT.tricked === "standard") COMBAT.standard = step; else COMBAT.moveact = step;
+    renderPlan(); return;
   }
   // Breaking a grapple (CRB p.200): a standard action, the combat manoeuvre or Escape
   // Artist against the holder's CMD; the engine takes the better when none is named.

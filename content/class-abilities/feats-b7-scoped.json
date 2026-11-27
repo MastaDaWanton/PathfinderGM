@@ -1,0 +1,185 @@
+{
+  "class": "feat",
+  "_source": "Feat loop b7, lane b7-scoped (2026-11-27): activated feats whose effect lands on another creature scoped to its attacks on one named creature (Engine._scoped_on, the `vs` scope sheet._effect_scope_holds already asked). Benefit text from content/feats/feats.json (imported from aonprd.com FeatDisplay), read 2026-11-27.",
+  "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
+  "abilities": [
+    {
+      "key": "archon guard",
+      "name": "Archon Guard",
+      "feat": "archon-style",
+      "aliases": [
+        "archon guard",
+        "archon style guard",
+        "guard my allies",
+        "archon style protection"
+      ],
+      "level": 1,
+      "source": "Archon Style (Blood of Angels): 'While using this style, as a standard action, you can actively protect adjacent allies from a single opponent that you are currently adjacent to. This grants any adjacent allies a +2 dodge bonus to AC against that opponent's next melee attack (as long as that attack comes before the beginning of your next turn), but causes you to take a -2 penalty to AC against that opponent until your next turn.' Archon Diversion: 'The penalty to AC ... decreases to -1, and you can spend a move action instead of a standard action'. Archon Justice: 'You no longer take a penalty to AC ... and you can spend a swift action instead of a move action'.",
+      "text": "While in Archon Style: adjacent allies gain +2 dodge AC against one adjacent foe's next melee attack; you take -2 AC against it.",
+      "action": "standard",
+      "requires": ["style.archon-style"],
+      "affects": "others",
+      "radius_ft": 5,
+      "aims_foe": 5,
+      "self": {
+        "rounds": "1",
+        "vs_target": true,
+        "modifiers": [
+          {"type": "combat_mod", "target": "ac", "amount": -2, "bonus_type": "untyped"}
+        ]
+      },
+      "effect": {
+        "rounds": "1",
+        "spent_by": "attacked_in_melee",
+        "modifiers": [
+          {"type": "combat_mod", "target": "ac", "amount": 2, "bonus_type": "dodge",
+           "vs": "$aimed", "when": {"attack": "melee"}},
+          {"type": "combat_mod", "target": "touch_ac", "amount": 2, "bonus_type": "dodge",
+           "vs": "$aimed", "when": {"attack": "melee"}}
+        ]
+      },
+      "addons": [
+        {"feat": "archon-diversion", "pick": "Archon Diversion", "action": "move",
+         "raises": [{"kind": "combat_mod", "target": "ac", "bonus_type": "untyped", "amount": 1}]},
+        {"feat": "archon-justice", "pick": "Archon Justice", "action": "swift",
+         "raises": [{"kind": "combat_mod", "target": "ac", "bonus_type": "untyped", "amount": 1}]}
+      ],
+      "tell": "{name} steps across the line of {target}'s reach, open-handed, drawing the blow."
+    },
+    {
+      "key": "broken wing gambit",
+      "name": "Broken Wing Gambit",
+      "feat": "broken-wing-gambit",
+      "aliases": [
+        "broken wing gambit",
+        "broken-wing gambit",
+        "feign an opening",
+        "show an opening"
+      ],
+      "level": 1,
+      "source": "Broken Wing Gambit (Ultimate Combat): 'Whenever you make a melee attack and hit your opponent, you can use a free action to grant that opponent a +2 bonus on attack and damage rolls against you until the end of your next turn or until your opponent attacks you, whichever happens first. If that opponent attacks you with this bonus, it provokes attacks of opportunity from your allies who have this feat.' Spent when the foe's attack action on you is over (strike_feats.spend_scoped); the allies' swings are Engine._gambit_provokes.",
+      "text": "Free, after a melee hit: the foe gains +2 attack and damage against you until it attacks you; that attack provokes from your allies with the feat.",
+      "action": "free",
+      "affects": "target",
+      "after_hit": "melee",
+      "effect": {
+        "rounds": "2",
+        "spent_by": "attacking",
+        "provokes_from": "teamwork.broken-wing-gambit",
+        "modifiers": [
+          {"type": "combat_mod", "target": "attack", "amount": 2, "bonus_type": "untyped",
+           "vs": "$user"},
+          {"type": "combat_mod", "target": "damage", "amount": 2, "bonus_type": "untyped",
+           "vs": "$user"}
+        ]
+      },
+      "tell": "{name} lets the guard fall a hair too far, an opening {target} can see."
+    },
+    {
+      "key": "caustic slur",
+      "name": "Caustic Slur",
+      "feat": "caustic-slur",
+      "aliases": [
+        "caustic slur",
+        "slur",
+        "insult them",
+        "goad them"
+      ],
+      "level": 1,
+      "source": "Caustic Slur (Gnomes of Golarion): 'As a standard action, you can make a Bluff check against one sort of favored enemy. Any creature of that type within 60 feet of you must make a Will saving throw or become angered. If an affected creature attacks you, it's treated as if it were using Power Attack ... If the creature already has the power attack feat, the attack penalty increases by 1 and the damage bonus increases by 2. These modifiers end when combat ends. This ability does not work on creatures that cannot understand you'. The Bluff check is the Will DC (save.check). Power Attack's own numbers (CRB), read off the angered creature's base attack bonus.",
+      "text": "Standard: one sort of your favoured enemies within 60 ft saves (Will vs your Bluff) or attacks you as if Power Attacking until the fight ends.",
+      "action": "standard",
+      "affects": "enemies",
+      "radius_ft": 60,
+      "favored_sort": true,
+      "understood": true,
+      "save": {"save": "will", "check": "bluff", "success": "negates"},
+      "effect": {
+        "on": "failed",
+        "numbers": "holder",
+        "ends_with_fight": true,
+        "modifiers": [
+          {"type": "combat_mod", "target": "attack", "formula": "-(1 + bab // 4)",
+           "bonus_type": "untyped", "vs": "$user",
+           "when": {"weapon": {"category": "melee", "touch": false, "hp_damage": true}}},
+          {"type": "combat_mod", "target": "damage", "formula": "2 * (1 + bab // 4)",
+           "bonus_type": "untyped", "vs": "$user",
+           "when": {"weapon": {"category": "melee", "touch": false, "hp_damage": true}}},
+          {"type": "combat_mod", "target": "damage", "formula": "(1 + bab // 4)",
+           "bonus_type": "untyped", "vs": "$user",
+           "when": {"weapon": {"category": "melee", "touch": false, "hp_damage": true,
+                               "strength_share": 1.5}}},
+          {"type": "combat_mod", "target": "damage", "formula": "-(1 + bab // 4)",
+           "bonus_type": "untyped", "vs": "$user",
+           "when": {"weapon": {"category": "melee", "touch": false, "hp_damage": true,
+                               "strength_share": 0.5}}}
+        ],
+        "holder_feat": {
+          "power-attack": [
+            {"type": "combat_mod", "target": "attack", "amount": -1, "bonus_type": "untyped",
+             "vs": "$user",
+             "when": {"weapon": {"category": "melee", "touch": false, "hp_damage": true}}},
+            {"type": "combat_mod", "target": "damage", "amount": 2, "bonus_type": "untyped",
+             "vs": "$user",
+             "when": {"weapon": {"category": "melee", "touch": false, "hp_damage": true}}}
+          ]
+        }
+      },
+      "tell": "{name} finds the one thing about their kind that stings, and says it."
+    },
+    {
+      "key": "extend the bulwark",
+      "name": "Extend the Bulwark",
+      "feat": "extend-the-bulwark",
+      "aliases": [
+        "extend the bulwark",
+        "share my armour",
+        "share my armor",
+        "cover my ally"
+      ],
+      "level": 1,
+      "source": "Extend the Bulwark (Ultimate Combat, teamwork): 'If you are wearing medium or heavy armor and are adjacent to an ally who also has this feat, as a free action, you may give your ally a circumstance bonus to her AC equal to half the armor bonus provided by your armor. This bonus lasts for 1 round. During this round, you gain no bonus to your AC from your armor.' The ally must hold the feat (target_requires its tag); the user's own armour bonus is answered by an equal penalty for the round.",
+      "text": "Free, in medium or heavy armour: an adjacent ally with the feat gains half your armour bonus as circumstance AC for a round; you lose your armour's AC.",
+      "action": "free",
+      "affects": "ally",
+      "reach_ft": 5,
+      "armour": ["medium", "heavy"],
+      "target_requires": ["teamwork.extend-the-bulwark"],
+      "target_requires_said": "an ally who also has Extend the Bulwark",
+      "self": {
+        "rounds": "1",
+        "modifiers": [
+          {"type": "combat_mod", "target": "ac", "formula": "-armour_ac", "bonus_type": "untyped"}
+        ]
+      },
+      "effect": {
+        "rounds": "1",
+        "modifiers": [
+          {"type": "combat_mod", "target": "ac", "formula": "armour_ac // 2",
+           "bonus_type": "circumstance"}
+        ]
+      },
+      "tell": "{name} turns a shoulder of plate across {target}, armour shared between them."
+    },
+    {
+      "key": "mantis wisdom touch",
+      "name": "Mantis Wisdom Touch",
+      "feat": "mantis-wisdom",
+      "aliases": [
+        "mantis wisdom touch",
+        "mantis wisdom",
+        "lift my stunning fist",
+        "undo my stunning fist"
+      ],
+      "level": 1,
+      "source": "Mantis Wisdom (Ultimate Combat): 'You can also use a standard action and a successful melee touch attack to remove any Stunning Fist effect you have applied to a target.' Each Stunning Fist condition carries who laid it (payload.by, Engine._deliver_charges); lifts_mine removes those of the user's own.",
+      "text": "Standard, melee touch: remove the Stunning Fist effects you laid on the one touched.",
+      "action": "standard",
+      "affects": "target",
+      "attack": "melee touch",
+      "reach_ft": 5,
+      "lifts_mine": "stunning fist",
+      "tell": "{name} presses two fingers to {target}, and the knot the blow tied lets go."
+    }
+  ]
+}
