@@ -284,10 +284,34 @@
         "when": {
           "against": "divine_spell"
         }
+      },
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "divine_sla"
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "divine_sla"
+        }
+      },
+      {
+        "type": "save_mod",
+        "target": "will",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "divine_sla"
+        }
       }
-    ],
-    "not_yet": [
-      "saves against the spell-like abilities of a divine casting class (a class ability's save does not say whose tradition it is)"
     ]
   },
   "necromantic-affinity": {
@@ -298,7 +322,7 @@
         "amount": 2,
         "bonus_type": "untyped",
         "when": {
-          "against": "negative_energy"
+          "against": "ability_harm"
         }
       },
       {
@@ -307,7 +331,7 @@
         "amount": 2,
         "bonus_type": "untyped",
         "when": {
-          "against": "negative_energy"
+          "against": "ability_harm"
         }
       },
       {
@@ -316,13 +340,12 @@
         "amount": 2,
         "bonus_type": "untyped",
         "when": {
-          "against": "negative_energy"
+          "against": "ability_harm"
         }
       }
     ],
-    "tags": ["energy.negative.affinity"],
-    "not_yet": [
-      "the +2 against effects that cause negative levels, ability damage, drain or penalties"
+    "tags": [
+      "energy.negative.affinity"
     ]
   },
   "bloatmage-initiate": {

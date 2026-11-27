@@ -793,10 +793,14 @@ def disengaging_shot(engine, actor, target) -> list[dict]:
 def charge_save_ctx(c: dict) -> dict:
     """The save against an armed blow, said for what it would leave: a stunning fist that
     stuns or staggers is a save "against ... special abilities that cause you to become
-    staggered or stunned" (Hard-Headed, `effectspec.AGAINST`)."""
-    if str(c.get("condition") or "") in ("stunned", "staggered"):
-        return {"against": ("stun_or_stagger",)}
-    return {}
+    staggered or stunned" (Hard-Headed, `effectspec.AGAINST`). Feat loop b7-scoped: the
+    one reader of what a save would leave (`effectspec.harm_words`), so a stun is also
+    "stun" (Dragon Style) and an ability-damaging blow is "ability_harm"."""
+    from .effectspec import harm_words
+
+    words = harm_words(str(c.get("condition") or ""), "",
+                       bool(c.get("ability") or c.get("ability_damage")))
+    return {"against": words} if words else {}
 
 
 # --- Siphon Poison ------------------------------------------------------------------------

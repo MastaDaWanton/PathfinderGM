@@ -148,6 +148,10 @@ def covers(entry: dict, kind: str, against=()) -> bool:
         return False
     if entry.get("against") and not set(entry["against"]) & set(against or ()):
         return False
+    # Feat loop b7-scoped: Dauntless Destiny's "This effect does not apply on saving
+    # throws against traps or other objects".
+    if set(entry.get("not_against") or ()) & set(against or ()):
+        return False
     for want in entry.get("rolls") or ("d20",):
         want = str(want).lower()
         if want == "d20" or kind == want or kind.startswith(want + ".") \

@@ -44,12 +44,14 @@
           "save",
           "attack"
         ],
-        "per_day": 1
+        "per_day": 1,
+        "not_against": [
+          "trap"
+        ]
       }
     ],
     "not_yet": [
-      "the free-action Intimidate to demoralize after a reroll that succeeds: no door demoralizes as a free action off a roll",
-      "the reroll is still offered on a save against a trap: a save's roll does not say what forced it"
+      "the free-action Intimidate to demoralize after a reroll that succeeds: no door demoralizes as a free action off a roll"
     ]
   },
   "inexplicable-luck": {
@@ -397,10 +399,87 @@
           "against": "sleep"
         },
         "note": "Dragon Style, against sleep"
+      },
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.dragon-style"
+          },
+          "against": "paralysis"
+        },
+        "note": "Dragon Style, against paralysis"
+      },
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.dragon-style"
+          },
+          "against": "paralysis"
+        },
+        "note": "Dragon Style, against paralysis"
+      },
+      {
+        "type": "save_mod",
+        "target": "will",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.dragon-style"
+          },
+          "against": "paralysis"
+        },
+        "note": "Dragon Style, against paralysis"
+      },
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.dragon-style"
+          },
+          "against": "stun"
+        },
+        "note": "Dragon Style, against stunning"
+      },
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.dragon-style"
+          },
+          "against": "stun"
+        },
+        "note": "Dragon Style, against stunning"
+      },
+      {
+        "type": "save_mod",
+        "target": "will",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.dragon-style"
+          },
+          "against": "stun"
+        },
+        "note": "Dragon Style, against stunning"
       }
     ],
     "not_yet": [
-      "the +2 against paralysis and stunning effects: no save says it is against paralysis or a stun",
       "1-1/2 times Strength on the first unarmed strike of a round: no reader counts a round's unarmed strikes",
       "charging or running through difficult terrain and through allies' squares: there is no charge through terrain to ease"
     ]

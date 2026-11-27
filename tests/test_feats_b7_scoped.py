@@ -188,3 +188,79 @@ def test_extend_the_bulwark_lends_half_the_armour_bonus_and_takes_the_user_s():
     s2, e2 = _board(pc2, ("thug", (8, 8)), allies=[(_ally(feats=["Extend the Bulwark"]),
                                                     (5, 6))])
     assert "medium or heavy" in _use(e2, "Extend the Bulwark", to="ally").tell
+
+
+# --- group 10: a save that says what forced it -----------------------------------------------
+
+def test_dragon_style_adds_two_against_a_ghoul_s_paralysing_bite():
+    """Dragon Style (UC): "a +2 bonus on saving throws against sleep effects, paralysis
+    effects, and stunning effects." Measured before: no save said it was against paralysis
+    or a stun, so the ghoul's paralysis save carried nothing from the style. Now the rider's
+    save is against "paralysis" (`effectspec.harm_words`) and the +2 rides it."""
+    pc = _pc("monk", feats=["Improved Unarmed Strike", "Dragon Style"])
+    _held_by(pc, "dragon style", ["style.dragon-style"])
+    s, e = _board(pc, ("ghoul", (6, 5)), faces={"Attack": 18, "Fortitude": 10})
+    s.turn = 1
+    res = _attack(e, by="c1", target="pc")
+    saves = [r for r in _rolls(res, "Fortitude save against") if "paralysis" in r["label"]]
+    assert saves, _tells(res)
+    assert _named(saves[0], "Dragon Style") == 2
+
+
+def test_a_class_ability_s_save_says_who_forced_it_and_what_it_leaves():
+    """Before: a class ability's save said "area" or nothing (Engine._class_ability saves),
+    so Shieldwall Phalanx's "abilities of evil creatures", Storm-Lashed's "electrical
+    effects", Necromantic Affinity's negative energy and Divine Defiance's "spell-like
+    abilities granted by levels in a divine casting class" answered none of them."""
+    from rules.engine import Engine
+
+    cleric = _pc("cleric")
+    ctx = Engine._ability_save_ctx(cleric, {"ability_type": "sp", "damage_type": "negative",
+                                            "effect": {"condition": "stunned"}}, None)
+    assert ctx["attacker_actor"] is cleric
+    assert {"divine_sla", "negative_energy", "ability_harm", "stun",
+            "stun_or_stagger"} <= set(ctx["against"])
+    wizard = _pc("wizard")
+    ctx = Engine._ability_save_ctx(wizard, {"ability_type": "sp", "damage_type": "electricity"},
+                                   None)
+    assert "divine_sla" not in ctx["against"] and "electricity" in ctx["against"]
+    target = _pc("fighter", feats=["Divine Defiance", "Necromantic Affinity", "Storm-Lashed"])
+    base = sum(m.value for m in target.save_modifiers("will"))
+    both = Engine._ability_save_ctx(cleric, {"ability_type": "sp", "damage_type": "negative"},
+                                    None)
+    assert sum(m.value for m in target.save_modifiers("will", both)) == base + 4
+    shock = Engine._ability_save_ctx(wizard, {"damage_type": "electricity"}, None)
+    assert sum(m.value for m in target.save_modifiers("ref", shock)) == \
+        sum(m.value for m in target.save_modifiers("ref")) + 2
+
+
+def test_a_save_op_stamped_by_a_creature_names_it_for_shieldwall_phalanx():
+    """Shieldwall Phalanx (Champions of Purity): "a sacred bonus to saves against the
+    spells and abilities of evil creatures equal to the number of adjacent allies who also
+    have this feat." Measured before: only a spell's save said who made it; a save the
+    ogre's own ability called for (`creature:ogre`) carried no attacker, so no bonus."""
+    from rules.engine import Engine
+
+    pc = _pc("fighter", feats=["Shieldwall Phalanx"])
+    ally = _ally(feats=["Shieldwall Phalanx"])
+    s, e = _board(pc, ("ogre", (8, 5)), allies=[(ally, (5, 6))])
+    assert e._stamped_creature(pc, "creature:ogre") is s.actors["c1"]
+    assert e._stamped_creature(pc, "creature:wolf") is None
+    res = e.run(e.validate([{"op": "save", "actor": "pc", "because": "test",
+                             "params": {"save": "will", "dc": 15}}],
+                           origin="creature:ogre"))
+    from tests.test_feats_b4_moves import _settle
+
+    res = _settle(e, res)
+    roll = res.outcomes[-1].rolls[0].as_dict()
+    assert _named(roll, "Shieldwall Phalanx") >= 1, roll
+
+
+def test_luck_not_against_keeps_dauntless_destiny_off_a_trap_save():
+    """Dauntless Destiny: "This effect does not apply on saving throws against traps or
+    other objects." Its reroll entry now names `not_against: trap` (rules/luck.py covers)."""
+    from rules import luck
+
+    entry = {"reroll": "natural_1", "rolls": ["save", "attack"], "not_against": ["trap"]}
+    assert luck.covers(entry, "save.ref", ("spell",))
+    assert not luck.covers(entry, "save.ref", ("trap",))

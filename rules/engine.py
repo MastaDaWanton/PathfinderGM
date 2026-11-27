@@ -10808,6 +10808,18 @@ class Engine:
 
     # save --------------------------------------------------------------------------------
 
+    def _stamped_creature(self, saver: Actor, origin) -> Actor | None:
+        """The creature a `creature:<template>` stamp names, here and against the saver
+        (the nearest when several share the template), or None (feat loop b7-scoped)."""
+        text = str(origin or "")
+        if not text.startswith("creature:"):
+            return None
+        template = text.split(":", 1)[1]
+        here = [a for a in self.scene.actors.values()
+                if a is not saver and a.from_template == template and self._against(saver, a)]
+        here.sort(key=lambda a: self.scene.distance_between(saver.ref, a.ref) or 0)
+        return here[0] if here else None
+
     def _op_save(self, intent: Intent, partial: dict) -> Outcome:
         actor = self.scene.actors[intent.actor]
         save = intent.params["save"]
@@ -10846,9 +10858,17 @@ class Engine:
         # save's own params and the engine's stamp — never a word the model wrote.
         more = ()
         fails = intent.params.get("on_failure")
-        if isinstance(fails, dict) and str(fails.get("condition") or "").lower() \
-                in ("fatigued", "exhausted"):
-            more += ("fatigue",)
+        if isinstance(fails, dict):
+            # Feat loop b7-scoped: the one reader of what a failure lays (fatigue,
+            # paralysis, a stun: `effectspec.harm_words`).
+            more += effectspec.harm_words(str(fails.get("condition") or ""))
+        # Feat loop b7-scoped: a creature's own ability called for this save (the stamp
+        # `creature:<template>`): the creature of that template here who is against the
+        # saver forced it — Shieldwall Phalanx's "saves against the spells and abilities
+        # of evil creatures" asks `attacker`. Before, only a spell's save named who made it.
+        source = self._stamped_creature(actor, intent.origin)
+        if source is not None:
+            ctx = {**(ctx or {}), "attacker_actor": source}
         if intent.origin_name == "distraction" and save == "fort":
             more += ("distraction",)
         if more:
@@ -26362,8 +26382,10 @@ class Engine:
         the words the tell quotes: "Fortitude 9 against DC 13"."""
         from . import feat_events
 
-        words = tuple(w for w in (against, "hag_or_witch" if feat_events.is_hag_or_witch(
-            attacker) else "") if w)
+        # `against` may be several words (feat loop b7-scoped: `effectspec.harm_words`).
+        said = (against,) if isinstance(against, str) else tuple(against or ())
+        words = tuple(w for w in said + ("hag_or_witch" if feat_events.is_hag_or_witch(
+            attacker) else "",) if w)
         ctx = {**({"against": words if len(words) > 1 else words[0]} if words else {}),
                **({"attacker_actor": attacker} if attacker is not None else {})}
         roll = self.dice.d20(defender.save_modifiers(save, ctx or None),
@@ -26566,6 +26588,7 @@ class Engine:
         dc = self._printed_dc(actor, rule)
         made, said = self._rider_save(defender, save, dc,
                                       f"{SAVES[save]} save against {word}", state,
+                                      against=effectspec.harm_words(cond),  # b7-scoped
                                       attacker=actor)
         if made:
             return [{"effect": {"ref": defender.ref, "kind": "rider_resisted",
@@ -34332,6 +34355,7 @@ class Engine:
             out.append("arcane_spell" if armour_mod.is_arcane(caster) else "divine_spell")
         if "negative" in casting.spell_context(spell).get("energy", ()):
             out.append("negative_energy")
+            out.append("ability_harm")       # feat loop b7-scoped: `effectspec.harm_words`
         from . import feat_events
 
         if feat_events.is_hag_or_witch(caster):          # Witchbreaker (feat loop b3)
@@ -39346,7 +39370,7 @@ class Engine:
                     # A shaped area is an area of effect (feat loop b5-spells: Covering
                     # Shield's "Reflex saves against area of effect attacks").
                     sroll = self.dice.d20(other.save_modifiers(
-                        sv, {"against": ("area",)} if area is not None else None),
+                        sv, self._ability_save_ctx(actor, doc, area)),
                                           label=f"{SAVES.get(sv, sv)} save against {shown}",
                                           visibility=intent.visibility or "player")
                     rolls.append(sroll)
@@ -40341,6 +40365,35 @@ class Engine:
                 f"{'touch AC' if touch else 'AC'} {ac}).")
         return made, roll, said
 
+    @staticmethod
+    def _ability_save_ctx(actor: Actor, doc: dict, area) -> dict:
+        """The roll context of a save against a class ability (feat loop b7-scoped): who
+        forced it (`attacker_actor`: Shieldwall Phalanx's "the spells and abilities of evil
+        creatures", Dragonheart's dragon) and what it is against — an area (Covering
+        Shield), what its failure lays and the energy it deals (`effectspec.harm_words`:
+        Dragon Style's paralysis and stuns, Storm-Lashed's "electrical effects",
+        Necromantic Affinity's negative energy and ability harm), and a spell-like ability
+        of a divine casting class (Divine Defiance). Before: a class ability's save said
+        "area" or nothing, so only a spell's save answered any of these."""
+        from . import armour as armour_mod, feat_events
+
+        spec = doc.get("effect") or {}
+        roll = doc.get("roll") or {}
+        energy = str(doc.get("damage_type") or roll.get("type") or "")
+        cond = str(spec.get("condition") or (doc.get("charge") or {}).get("condition") or "")
+        harms = any(str(m.get("type") or "") == "ability_mod" and (
+            (isinstance(m.get("amount"), (int, float)) and m["amount"] < 0)
+            or str(m.get("formula") or "").strip().startswith("-"))
+            for m in spec.get("modifiers") or ()) or bool(doc.get("charge_ability"))
+        words = (("area",) if area is not None else ()) + effectspec.harm_words(
+            cond, energy, harms)
+        if str(doc.get("ability_type") or "") == "sp" and casting.is_caster(actor) \
+                and not armour_mod.is_arcane(actor):
+            words += ("divine_sla",)
+        if feat_events.is_hag_or_witch(actor):
+            words += ("hag_or_witch",)
+        return {"attacker_actor": actor, **({"against": words} if words else {})}
+
     def _scoped_use_reach(self, actor: Actor, doc: dict, name: str, aimed: Actor | None,
                           who: list[Actor]) -> tuple[list[Actor], str]:
         """(who it reaches, why not) for the feat loop b7-scoped fields:
@@ -41082,7 +41135,8 @@ class Engine:
                             "tell": f"{immune}, and {e.name} finds nothing to stun."})
                 continue
             roll = self.dice.d20(defender.save_modifiers(
-                c["save"], ctx=maneuver_feats.charge_save_ctx(c)),   # feat loop b4
+                c["save"], ctx={**maneuver_feats.charge_save_ctx(c),   # feat loop b4
+                                "attacker_actor": actor}),       # feat loop b7-scoped
                                  label=f"{SAVES.get(c['save'], c['save'])} save against "
                                        f"{e.name}", visibility=visibility)
             made = d20_succeeds(roll, int(c["dc"]))
@@ -41196,7 +41250,10 @@ class Engine:
         line = f"{e.name}: {notation} — {total}."
         if c.get("save"):
             dc = int(c.get("dc") or 0) + int(c.get("dc_more") or 0)
-            sv = self.dice.d20(defender.save_modifiers(c["save"]),
+            # Feat loop b7-scoped: who forced it, and the energy it deals (`harm_words`).
+            words = effectspec.harm_words("", str(d.get("type") or c.get("type") or ""))
+            sv = self.dice.d20(defender.save_modifiers(c["save"], {
+                "attacker_actor": actor, **({"against": words} if words else {})}),
                                label=f"{SAVES.get(c['save'], c['save'])} save against "
                                      f"{e.name}", visibility=visibility)
             made = d20_succeeds(sv, dc)

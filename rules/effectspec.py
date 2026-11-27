@@ -2728,7 +2728,46 @@ AGAINST: dict[str, str] = {
     # Feat loop b6-rules: Atheist Abjurations' "+2 bonus to your caster level whenever you
     # use an abjuration spell to dispel or counter a divine spell" (rules/dispel.py).
     "dispel_divine": "a dispel check made with an abjuration against a divine spell",
+    # Feat loop b7-scoped: a save said for what forced it (`harm_words`), whatever made
+    # it — a spell (`spell_against`), a class ability (Engine._ability_save_ctx), an
+    # armed blow (maneuver_feats.charge_save_ctx), a printed rider (Engine._rider_save) or
+    # the save op's own failure branch. Dragon Style's "sleep effects, paralysis effects,
+    # and stunning effects"; Necromantic Affinity's "spells and effects that utilize
+    # negative energy, cause negative levels, or cause ability damage, ability drain, or
+    # ability penalties"; Divine Defiance's "the spell-like abilities granted by levels in
+    # a divine casting class".
+    "paralysis": "a save against an effect that would leave you paralyzed",
+    "stun": "a save against an effect that would leave you stunned",
+    "ability_harm": "a save against an effect of negative energy, negative levels, or "
+                    "ability damage, drain or a penalty to an ability score",
+    "divine_sla": "a save against a spell-like ability of a divine casting class",
 }
+
+
+def harm_words(condition: str = "", energy: str = "", ability_harm: bool = False
+               ) -> tuple[str, ...]:
+    """The AGAINST words for what a save would leave: the condition its failure lays,
+    the energy it deals, and whether it harms ability scores or life (feat loop
+    b7-scoped). One reader, so a spell, a class ability and a monster's rider that
+    paralyze are all "paralysis"."""
+    out: list[str] = []
+    cond = str(condition or "").strip().lower()
+    if cond == "paralyzed":
+        out.append("paralysis")
+    if cond == "stunned":
+        out.append("stun")
+    if cond in ("stunned", "staggered"):
+        out.append("stun_or_stagger")
+    if cond in ("fatigued", "exhausted"):
+        out.append("fatigue")
+    kind = str(energy or "").strip().lower()
+    if kind == "electricity":
+        out.append("electricity")
+    if kind == "negative":
+        out.append("negative_energy")
+    if ability_harm or kind == "negative":
+        out.append("ability_harm")
+    return tuple(out)
 
 
 def spell_against(spell) -> tuple[str, ...]:
@@ -2756,6 +2795,14 @@ def spell_against(spell) -> tuple[str, ...]:
         words.append("stun_or_stagger")                 # feat loop b4-maneuver
     if _lands_condition(getattr(spell, "effects", None) or (), ("fatigued", "exhausted")):
         words.append("fatigue")                         # feat loop b5-other
+    # Feat loop b7-scoped: paralysis and stunning effects (Dragon Style), and a spell that
+    # harms ability scores or life (Necromantic Affinity: `harm_words`).
+    if _lands_condition(getattr(spell, "effects", None) or (), ("paralyzed",)):
+        words.append("paralysis")
+    if _lands_condition(getattr(spell, "effects", None) or (), ("stunned",)):
+        words.append("stun")
+    if _lands_type(getattr(spell, "effects", None) or ()):
+        words.append("ability_harm")
     if "divination" in words and "mind-affecting" in words:
         words.append("mind-reading")
     return tuple(words)
@@ -2773,6 +2820,27 @@ def _lands_condition(specs, keys) -> bool:
             return True
         if _lands_condition(list(spec.get("on_failure") or ())
                             + list(spec.get("on_success") or ()), keys):
+            return True
+    return False
+
+
+def _lands_type(specs) -> bool:
+    """Whether these effect documents harm ability scores or life: negative levels,
+    ability damage or drain, or a penalty to an ability score (feat loop b7-scoped)."""
+    for spec in specs:
+        if not isinstance(spec, dict):
+            continue
+        t = str(spec.get("type") or "")
+        if t in ("negative_level", "ability_damage", "ability_drain"):
+            return True
+        if t == "ability_mod":
+            try:
+                if int(spec.get("amount") or 0) < 0:
+                    return True
+            except (TypeError, ValueError):
+                pass
+        if _lands_type(list(spec.get("on_failure") or ()) + list(spec.get("on_success")
+                                                                 or ())):
             return True
     return False
 
