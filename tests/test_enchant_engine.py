@@ -83,7 +83,9 @@ def _swing(s, e, target, faces, params=None):
         asked.append(r.awaiting["label"])
         face = faces(r.awaiting["label"])
         r = e.resume(int(r.awaiting["min"]) if face is None else face)
-    out = next(o for o in r.outcomes if o.op == "attack")
+    # The player's own blow: a shot from beside the foe draws its attack of opportunity
+    # first since feat loop b5-core (rules/shooting.py).
+    out = next(o for o in r.outcomes if o.op == "attack" and o.actor == "pc")
     return out, asked
 
 

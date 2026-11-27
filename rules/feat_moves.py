@@ -93,6 +93,7 @@ def after(engine, intent, outcome, twice: bool = False) -> tuple[list[dict], lis
     more += _sidestep(engine, intent, outcome)
     more += _landing_roll(engine, intent, outcome)
     more += _wings(engine, intent, outcome)
+    more += _wings_readied(engine, intent, outcome)          # feat loop b5-core
     return more, []
 
 
@@ -109,18 +110,27 @@ def _walked(outcome, ref: str):
 
 
 def _second_move(engine, intent, outcome, twice: bool) -> list:
-    """A second move action this turn: Lightning Stance's 50% concealment for a round is
-    laid on its holder.
+    """A second move action this turn: the standard action is what paid for it, and
+    Lightning Stance's 50% concealment for a round is laid on its holder.
 
-    Not done here, on purpose: recording the standard action as spent by the second move
-    (CRB: "You can take a move action in place of a standard action"). Tried in this lane
-    and backed out — the reach refusal's own repair ("Click square ...", then move and
-    strike) is offered with the move already walked (tests/test_maneuver_reach.py), so
-    the rule needs that advice changed first. Reported to the owner as a defect."""
+    Batch 4 built the standard's spending and backed it out: the reach refusal's repair
+    ("Click square ...", then move and strike) was offered with the move already walked.
+    Batch 5 (b5-core) changed the repair to say the strike waits for the next turn, and
+    the panel's door refuses a walk-and-strike after the move is spent."""
     from .engine import Outcome
 
     actor = engine.scene.actors.get(intent.actor or "")
-    if actor is None or not twice or _walked(outcome, actor.ref) <= gridmod.SQUARE_FT:
+    if actor is None or not twice:
+        return []
+    # Feat loop b5-core: the second move action is paid with the standard (CRB: "You can
+    # take a move action in place of a standard action"), unless it was the round's 5-foot
+    # step (rules/stepping.py), which is no action at all. The reach refusal's repair no
+    # longer offers a walk and a strike after the move is spent (`_reach_refusal`).
+    went = next((e for e in outcome.effects or () if e.get("kind") == "position"
+                 and e.get("ref") == actor.ref), None)
+    if went is not None and not went.get("step"):
+        engine.scene.standard_spent[actor.ref] = engine.scene.round
+    if _walked(outcome, actor.ref) <= gridmod.SQUARE_FT:
         return []
     if not actor.has_state(LIGHTNING_STANCE):
         return []
@@ -332,6 +342,29 @@ def _wings(engine, intent, outcome) -> list[dict]:
                     "params": {"full_attack": False, "reaction": "wings-of-the-androsphinx",
                                "manoeuvre": "reposition"}})
     return out
+
+
+def _wings_readied(engine, intent, outcome) -> list[dict]:
+    """Wings of the Androsphinx's readied clause (feat loop b5-core): "If you use a readied
+    action to attack a creature charging you, you can roll to attack and then attempt to
+    reposition that creature as a free action before it resolves its charge attack." The
+    readied blow set against the charge (rules/readied.py, `vs_charge`) is followed, ahead of
+    the charge's own blow, by the reposition — a free action, so no swift is spent."""
+    params = intent.params or {}
+    if params.get("reaction") != "readied" or not params.get("vs_charge"):
+        return []
+    who = engine.scene.actors.get(intent.actor or "")
+    charger = engine.scene.actors.get(str(intent.target or ""))
+    if who is None or charger is None or charger.is_down or who.is_down \
+            or not who.has_state(WINGS) or who.blocking_key("attack"):
+        return []
+    return [{"op": "attack", "actor": who.ref, "target": charger.ref,
+             "id": f"{intent.id}-androsphinx-readied",
+             "visibility": "player" if who.is_pc else "hidden",
+             "because": f"{who.name} turns {charger.name}'s charge aside before it lands "
+                        f"(Wings of the Androsphinx)",
+             "params": {"full_attack": False, "reaction": "wings-of-the-androsphinx",
+                        "manoeuvre": "reposition"}}]
 
 
 __all__ = ["charge_multiple", "moved_already", "after"]

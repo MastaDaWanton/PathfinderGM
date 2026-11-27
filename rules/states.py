@@ -539,6 +539,9 @@ TAGS: dict[str, tuple[str, ...]] = {
     "mouth held":     ("state.silenced.mouth-held",),
     "sleeper hold":   ("buff.stance.sleeper-hold",),
     "stepped":        ("movement.stepped",),
+    # Feat loop b5-core: a readied action held until the holder's next turn (CRB, Ready);
+    # the trigger's own leaf rides the effect (rules/readied.py `tag`).
+    "readied":        ("action.readied",),
     "spring attack":  ("buff.stance.spring-attack",),
     # Feat loop b2: Risky Striker's and Shield of Swings' "until your next turn" (ARG, APG).
     "risky striking":   ("buff.stance.risky-striking",),

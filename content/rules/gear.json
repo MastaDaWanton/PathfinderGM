@@ -128,6 +128,12 @@
          "when": {"against": "cold", "resting": true}}
       ]
     },
+    "costly spell components": {
+      "names": ["costly spell components", "costly spell component"],
+      "does": "The costly part of a spell's material component, counted in gold pieces of value: a spell whose material costs more than 1 gp spends that much of it when cast (a costly focus must be on hand and is kept).",
+      "source": "CRB, Magic, Components: 'Unless a cost is given for a material component, the cost is negligible'; Eschew Materials: 'If the spell requires a material component that costs more than 1 gp, you must have the material component on hand to cast the spell'.",
+      "house_rule": "One stock for every costly substance (diamond dust, onyx, incense) rather than each by name: no table here names the substances (rules/components.py). Feat loop b5-core, 2026-11-26."
+    },
     "tent": {
       "names": ["tent", "small tent", "tent, small", "medium tent", "large tent", "pavilion"],
       "does": "Pitched when you camp: halves the chance of being found in the night; +2 on Fortitude saves against cold while you sleep, and with a bedroll or blanket inside it the cold of frozen ground does not reach you at all.",

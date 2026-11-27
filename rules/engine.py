@@ -48,6 +48,7 @@ from . import worldclass
 from . import grid as gridmod
 from . import guards as guards_mod
 from . import reactions
+from . import readied
 from . import services as services_mod
 from . import spells as spells_mod
 from . import weapons as weapons_mod
@@ -337,6 +338,12 @@ class Scene:
     # off-turn may set one round ahead (`Engine._spend_swift`). `move_spent`'s shape and
     # reason: no second ticker, a stale entry is a round that is not this one.
     swift_spent: dict[str, int] = field(default_factory=dict)
+    # Feat loop b5-core: the round each combatant last moved on the grid, and whether that
+    # round's first movement was the 5-foot step — [round, "step" | "move"]
+    # (rules/stepping.py). `move_spent` cannot say it: a draw spends the move action and
+    # moves nobody, and "you can't take a 5-foot step in the same round that you move any
+    # distance" asks about the feet. `move_spent`'s shape and reason: no second ticker.
+    walked: dict[str, list] = field(default_factory=dict)
     # What the player's character last struck with this encounter — the weapon and the
     # lethality their own words chose — and what was in hand then, by ref. A blow that
     # names no means carries on with these (`Engine._standing_means`), as a standing action
@@ -1253,6 +1260,8 @@ class Scene:
                 # narrated and the fight simply ended with no reason given.
                 self.hazards.extend(self.tick_standing(1))
             ref = self.initiative[nxt][0]
+            # Feat loop b5-core: a readied action not taken lapses at its holder's turn.
+            self.hazards.extend(readied.lapse(self, ref))
             # Their turn has come round, able or not: a hold that a new save may end
             # (hold person) is tried now, and trying it is the turn (a full-round action).
             self.hazards.extend(self._held_saves(ref))
@@ -2518,6 +2527,7 @@ class Scene:
         self.standard_spent = {}
         self.swung = {}
         self.swift_spent = {}
+        self.walked = {}                 # feat loop b5-core
         self.sides = {}
         # The battlefield does NOT go with the fight any more (item 28, 2026-09-19): the
         # ground belongs to the place, the party is standing on it before and after, and
@@ -2699,6 +2709,7 @@ class Scene:
         self.move_spent.pop(ref, None)
         self.standard_spent.pop(ref, None)
         self.swift_spent.pop(ref, None)
+        self.walked.pop(ref, None)       # feat loop b5-core
         self.spawn_feet.pop(ref, None)
         # Leaked by three of the four old depart doors and persisted, so a stale age was
         # waiting for whoever wore the ref next; with refs never reused it is merely
@@ -4031,7 +4042,9 @@ class Engine:
         # a 502 and the player's line popped — where this refusal gets its retry.
         needs_actor = intent.op in ("check", "save", "attack", "move", "cast",
                                     "sell", "buy", "use_item", "extinguish", "break_free",
-                                    "total_defense", "style")
+                                    "total_defense", "style",
+                                    # Feat loop b5-core:
+                                    "ready")
         if needs_actor and not self._known(intent.actor, extra):
             self._refuse_ref(intent, index, intent.actor, "actor", extra)
         # `_op_condition` lands on `to`, else the actor, else the target. `to` and the
@@ -6132,7 +6145,8 @@ class Engine:
             # arrive. The flag is what stops the spliced reaction from provoking itself
             # forever — it is stripped before anything else sees the intent.
             if not raw.pop("_reacted", False):
-                fired = self._reactions_before(raw)
+                # Feat loop b5-core: a readied attack goes in front with them (rules/readied.py).
+                fired = readied.before(self, raw) + self._reactions_before(raw)
                 if fired:
                     queue[0:0] = fired
                     raw["_reacted"] = True
@@ -6149,6 +6163,16 @@ class Engine:
                     # Wave Strike's swift feint behind the draw (feat loop b4-maneuver).
                     queue[0:0] = [draw] + maneuver_feats.wave_strike(self, raw, draw)
                     raw["_drawn"] = True
+                    continue
+            # Feat loop b5-core: an unloaded crossbow's reload goes in front of the shot,
+            # after any draw, paid from the turn (rules/reloading.py). Asked once per blow.
+            if not partial and not raw.get("_reload_asked"):
+                from . import reloading
+
+                raw["_reload_asked"] = True
+                load = reloading.before(self, raw)
+                if load is not None:
+                    queue[0:0] = [load]
                     continue
             # A blow one move short: the move goes in front of it as a real intent, so it
             # provokes through `_reactions_before` exactly as a declared move does, and
@@ -6251,6 +6275,9 @@ class Engine:
             # And a coup de grâce in a fight is the whole round (`_coup_paid`).
             if intent.op == "attack":
                 self._coup_paid(intent, outcome, queue)
+                from . import reloading          # feat loop b5-core: the bolt is gone
+
+                reloading.after(self, intent, outcome)
             # The surprise round's one action, spent where a later request can see it.
             self._one_action_paid(intent, outcome)
             # What a feat lets its bearer do on the back of this (`_riders_after`,
@@ -6338,7 +6365,8 @@ class Engine:
             if intent.op == "attack" and outcome.status == "resolved":
                 queue[0:0] = self._retorts(outcome) + self._panther_retort(intent)
             if intent.op == "move" and outcome.status == "resolved":
-                queue[0:0] = self._reactions_on_arrival(outcome)
+                queue[0:0] = self._reactions_on_arrival(outcome) + readied.on_arrival(
+                    self, outcome)
             # A feint that drew a guard opens the foe to a partner's swing (Improved Feint
             # Partner, `_reactions_after_feint`): next in the queue, as the arrival's is.
             if intent.op == "check" and outcome.status == "resolved":
@@ -6593,7 +6621,10 @@ class Engine:
         if raw.get("op") == "attack" and (raw.get("params") or {}).get("manoeuvre"):
             return self._provoked_by_maneuver(raw)
         if raw.get("op") == "attack":
-            return self._bodyguards(raw)
+            # Feat loop b5-core: a ranged attack or a whip's lash provokes (rules/shooting.py).
+            from . import shooting
+
+            return shooting.provoked(self, raw) + self._bodyguards(raw)
         if raw.get("op") == "cast":
             return self._provoked_by_casting(raw)
         if raw.get("op") == "use_item":
@@ -10978,6 +11009,14 @@ class Engine:
                 and not intent.params.get("coup_de_grace")
                 and not goods.ammo_carried(actor, ammo_families)):
             return self._refuse(intent, no_ammo)
+        # Feat loop b5-core: a crossbow whose reload was refused shoots nothing.
+        if partial.get("attack_state") is None and self.scene.in_encounter \
+                and not intent.params.get("manoeuvre"):
+            from . import reloading
+
+            unloaded = reloading.refusal(actor, weapon_key)
+            if unloaded:
+                return self._refuse(intent, unloaded, code="action_spent")
         # The floor under validate's reach check, for the lists it could not answer: a
         # move earlier in the list that fell short, a push that put the target out of
         # reach, an attack of opportunity that dropped the mover before they arrived.
@@ -11005,6 +11044,7 @@ class Engine:
             return self._refuse(intent, why, code="charge_refused")
         if (partial.get("attack_state") is None and not self._battle_joined
                 and not intent.params.get("squares_off")
+                and not intent.params.get("strike_back")      # Feat loop b5-core
                 and (self.scene.in_encounter or intent.params.get("coup_de_grace"))):
             out_of_reach = self._reach_refusal(intent, actor, defender, weapon_key,
                                                voice="tell")
@@ -11213,6 +11253,11 @@ class Engine:
         # circumstance bonus on attack rolls" is on "additional attacks" alone.
         if intent.params.get("cleaving"):
             choices += ("cleaving_on",)
+        # Feat loop b5-core: a readied attack (rules/readied.py), Patient Strike's, and one
+        # set against a charge, as roll-context keys a document's `when.choice` asks.
+        if intent.params.get("reaction") == "readied":
+            choices += tuple(k for k in ("readied", "patient_readied", "braced")
+                             if k == "readied" or intent.params.get(k))
         # Pinpoint Targeting: "You do not gain the benefit of this feat if you move this
         # round" — a move already made this round (`Scene.move_spent`) refuses it.
         if ("pinpoint_targeting" in choices and partial.get("attack_state") is None
@@ -12124,6 +12169,10 @@ class Engine:
                 from . import feat_moves
 
                 mult = feat_moves.charge_multiple(actor, weapon, weapon_key, choices, mult)
+                # A brace weapon set against a charge: "double damage if you score a hit
+                # with it against a charging character" (CRB, Ready; feat loop b5-core).
+                if "braced" in choices and weapons_mod.has_trait(weapon_key, "brace"):
+                    mult += 1
                 # Vital Strike: the weapon's dice again per feat, "not multiplied on a
                 # critical hit, but ... added to the total" — so past `mult`, never in it.
                 vital = actor.weapon_dice(weapon_key, choices) \
@@ -13029,6 +13078,22 @@ class Engine:
                 f'[{x}, {y}]}}}}')
         speed = int(getattr(actor, "speed_feet", 0) or 0)
         far = self.scene.in_encounter and speed and cost > speed
+        # Feat loop b5-core: after the turn's move action a second walk is the standard
+        # action ("You can take a move action in place of a standard action", CRB), so the
+        # walk and the strike are two turns, and the advice says so.
+        moved = self.scene.in_encounter \
+            and self.scene.move_spent.get(actor.ref) == self.scene.round
+        if moved and voice == "person":
+            from . import fixtures as _fixtures
+
+            return (f"{_sentence(fault)} {actor.name} has already moved this turn; moving "
+                    f"on to square {_fixtures.square_name((x, y))} ({cost} ft) takes the "
+                    f"standard action too, so close in this turn and strike on the next.")
+        if moved:
+            return (f"{fault} {actor.name} has already moved this turn: a second move takes "
+                    f"the standard action, so the strike waits for the next turn. To close "
+                    f"in now — to square [{x}, {y}], {cost} ft — write {step} with no "
+                    f"attack after it, or take another action.")
         if voice == "person":
             # By the name the board prints (`fixtures.square_name`), never x,y: the player
             # reads E6 on the board's edge (playtest 2026-11-20 #9).
@@ -28521,6 +28586,16 @@ class Engine:
                         "amount": defensive_dodge(actor, total=True),
                         "bonus_type": "dodge", "note": "total defense"}])
 
+    def _op_reload(self, intent: Intent, partial: dict) -> Outcome:
+        """A crossbow loaded (CRB): spliced before a shot, rules/reloading.py (b5-core)."""
+        from . import reloading
+
+        return reloading.op_reload(self, intent)
+
+    def _op_ready(self, intent: Intent, partial: dict) -> Outcome:
+        """Ready (CRB, Combat): the combat bar's, rules/readied.py (feat loop b5-core)."""
+        return readied.op_ready(self, intent)
+
     def _op_total_defense(self, intent: Intent, partial: dict) -> Outcome:
         """Total defense (CRB, Combat): "You can defend yourself as a standard action ...
         You can't combine total defense with fighting defensively or with the benefit of
@@ -30989,6 +31064,14 @@ class Engine:
                     return deferred
 
             pool = source["pool"] or casting.slot_pool(level)
+            # Feat loop b5-core: a costly material component, on hand before anything is
+            # spent, and annihilated with the slot (rules/components.py).
+            from . import components as components_mod
+
+            if not item:
+                short = components_mod.refusal(actor, spell)
+                if short:
+                    return self._refuse(intent, short, code="no_component")
             # A cantrip or orison is "not expended when cast and may be used again" (AoN,
             # Wizard/Cleric/Druid; "do not consume any slots", Sorcerer/Bard). Measured
             # 2026-09-29: this spent "spell slot 0" per cast, and a level 5 wizard's Light
@@ -31007,6 +31090,12 @@ class Engine:
                     intent, f"{actor.name} has no {pool} left, so {spell.name} is not "
                             f"cast. What was cast before it stands.", code="no_slots",
                     for_a_person=f"{actor.name} has no level {level} spell slots left.")
+            if not item:
+                gone = components_mod.spend(actor, spell)
+                if gone:
+                    state["effects"].append(gone)
+                    state["tells"].append(f"{actor.name} spends {gone['gp']} gp of costly "
+                                          f"components on {spell.name}.")
             # The prepared copy is spent with the slot — for every prepared caster, not
             # only the ones who prepare from a book (item 25).
             converted = ""
@@ -31090,6 +31179,10 @@ class Engine:
             # gestures), and asks none.
             if not item:
                 lost = self._concentrate(intent, actor, spell, level, state, pool)
+                if lost is not None:
+                    return lost
+                # Feat loop b5-core: a readied counterspell ruins it (rules/readied.py).
+                lost = readied.counterspell(self, intent, actor, spell, level, state, pool)
                 if lost is not None:
                     return lost
             # Cast INTO a spell storing weapon (`_store_spell`): the slot is spent and the
@@ -34213,6 +34306,14 @@ class Engine:
                         intent, f"Spring Attack's walk is {actor.name}'s speed in all, and "
                                 f"{left} ft of it is left after the blow; {tuple(square)} "
                                 f"is {cost} ft away.", code="too_far")
+            # Feat loop b5-core: no movement after the round's 5-foot step (rules/stepping.py).
+            if not intent.params.get("reaction"):
+                from . import stepping
+
+                stepped = stepping.after_step_refusal(self.scene, actor, from_square,
+                                                      tuple(square))
+                if stepped:
+                    return self._refuse(intent, stepped, code="stepped")
             bumped = self._unseen_in_the_way(actor, from_square, tuple(square))
             if bumped is not None:
                 square = bumped[1]
@@ -34262,8 +34363,16 @@ class Engine:
                     and tuple(from_square) != tuple(square) \
                     and not intent.params.get("reaction"):
                 self.scene.move_spent[ref] = self.scene.round
+            # Feat loop b5-core: the round's walking, for the 5-foot step's rules.
+            walk = ""
+            if not intent.params.get("reaction"):
+                from . import stepping
+
+                walk = stepping.record(self, actor, from_square, tuple(square))
             effect = {"ref": ref, "kind": "position", "from": from_square,
                       "to": tuple(square), "feet": cost, "zone": zone}
+            if walk in ("step", "pack"):
+                effect["step"] = True     # the 5-foot step: no move action (b5-core)
             # The feet walked, never the zone: "Pip moves to near (15 ft)" was read live as
             # near somebody (2026-11-12), and "The second lizard moves to near, out in open
             # ground." went onto the page word for word (playtest 2026-11-20 #107). The zone

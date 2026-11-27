@@ -57,10 +57,20 @@
           }
         },
         "note": "an attack of opportunity against a flying opponent"
+      },
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 2,
+        "bonus_type": "circumstance",
+        "when": {
+          "choice": "braced",
+          "target": {
+            "aloft": true
+          }
+        },
+        "note": "a weapon set against a flying opponent's charge (a readied attack, rules/readied.py)"
       }
-    ],
-    "not_yet": [
-      "'when you have set a weapon against a charge': no readied action sets a weapon against a charge yet (the charge lane's machinery)"
     ]
   },
   "snap-shot": {
@@ -485,7 +495,8 @@
   "whip-mastery": {
     "tags": [
       "lethality.either.whip",
-      "weapon.whip.through-armour"
+      "weapon.whip.through-armour",
+      "attack.unprovoking.whip"
     ]
   },
   "slaying-sprint": {
@@ -521,7 +532,7 @@
         "target": "difficult_ft",
         "amount": 5,
         "bonus_type": "untyped",
-        "note": "CRB: 'Whenever you move, you may move through 5 feet of difficult terrain each round as if it were normal terrain' — per round (feat_moves._spend_easy); stacks with Acrobatic Steps for 20 (feat loop b5-other)"
+        "note": "CRB: 'Whenever you move, you may move through 5 feet of difficult terrain each round as if it were normal terrain. The effects of this feat allow you to take a 5-foot step into difficult terrain.' Per round (feat_moves._spend_easy; stacks with Acrobatic Steps for 20, feat loop b5-other), and the step (rules/stepping.py, feat loop b5-core)"
       }
     ]
   },
@@ -541,8 +552,8 @@
     ]
   },
   "ki-throw": {
-    "not_yet": [
-      "a won unarmed trip throws the target prone into any square you threaten: the trip leaves it prone in its own square"
+    "tags": [
+      "maneuver.ki-throw"
     ]
   },
   "under-and-over": {

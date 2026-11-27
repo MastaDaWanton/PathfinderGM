@@ -251,6 +251,11 @@ def after(engine, intent, actor, defender, key: str, verdict: str, weapon_key: s
         return f"rule:feat-{doc['id']}" if doc else "rule:maneuver-feat"
 
     unarmed = str(weapon_key or "").strip().lower() in ("unarmed", "unarmed strike")
+    # Feat loop b5-core: Ki Throw's throw into the square the thrower named.
+    if key == "trip" and won and unarmed and actor.has_state(KI_THROW):
+        thrown = ki_throw(engine, intent, actor, defender)
+        for k in out:
+            out[k].extend(thrown[k])
     if key == "trip" and won and unarmed and not defender.is_down:
         # Binding Throw (UC): "After you successfully use the Ki Throw feat on an opponent,
         # you can use a swift action to attempt a grapple combat maneuver against that
@@ -325,6 +330,58 @@ def after(engine, intent, actor, defender, key: str, verdict: str, weapon_key: s
         out_twirl = _twirl(engine, intent, actor, defender)
         for k in out:
             out[k].extend(out_twirl[k])
+    return out
+
+
+# Ki Throw's tag (its feat document, feat loop b5-core).
+KI_THROW = "maneuver.ki-throw"
+
+
+def ki_throw(engine, intent, actor, defender) -> dict:
+    """Ki Throw (APG): "On a successful unarmed trip attack against a target your size or
+    smaller, you may throw the target prone in any square you threaten rather than its own
+    square. This movement does not provoke attacks of opportunity, and you cannot throw the
+    creature into a space occupied by other creatures." The square is the thrower's choice
+    (the trip's `square`, as a reposition's is); none named, the target falls where it
+    stood — the book's "may". Measured before: the document's not_yet, "the trip leaves it
+    prone in its own square", and Enhanced Ki Throw, Improved Ki Throw and Spinning Throw
+    waited on it. The walk is the board's write, told, and spliced as no move: nothing is
+    owed for it."""
+    from . import grid as gridmod
+    from . import reactions
+
+    out = {"effects": [], "tells": [], "rolls": []}
+    scene = engine.scene
+    square = (intent.params or {}).get("square")
+    if square is None or not scene.has_grid or defender.ref not in scene.positions \
+            or _size_steps(actor, defender) > 0:
+        return out
+    to = tuple(int(v) for v in list(square)[:2])
+    start = tuple(scene.positions[defender.ref])
+    taken = scene.occupied(ignore=defender.ref)
+    feet = set(gridmod.footprint(to, defender.size))
+    why = ""
+    if not feet <= reactions.threatened_by(scene, actor.ref, defender.size) \
+            and not feet <= set(gridmod.threatened_squares(
+                scene.positions[actor.ref], actor.size, reach=gridmod.SQUARE_FT)):
+        why = "a square the thrower threatens"
+    elif feet & set(taken) or not all(scene.grid.inside(q) and scene.grid.passable(q)
+                                      for q in feet):
+        why = "an open square"
+    if why:
+        out["tells"].append(f"Ki Throw: {defender.name} can only be thrown into {why}, and "
+                            f"falls where they stood.")
+        return out
+    scene.positions[defender.ref] = to + tuple(start[2:3])
+    scene.settle_levels()
+    scene.resync_zones()
+    from . import fixtures
+
+    out["effects"].append({"ref": defender.ref, "kind": "position", "from": start,
+                           "to": scene.positions[defender.ref],
+                           "origin": "rule:feat-ki-throw"})
+    out["tells"].append(f"{actor.name} throws {defender.name} down into "
+                        f"{fixtures.square_name(to)} (Ki Throw).")
     return out
 
 

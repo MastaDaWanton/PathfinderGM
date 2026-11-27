@@ -51,7 +51,7 @@
       "maneuver.after-trip.bull-rush"
     ],
     "not_yet": [
-      "'If the bull rush fails, you can use the Ki Throw feat as normal' and the Improved Ki Throw throw into a secondary target's space: Ki Throw's own throw into a threatened square does not run yet (its document's not_yet)"
+      "the Improved Ki Throw throw into a secondary target's space after the bull rush: Improved Ki Throw's secondary-target throw is not built (Ki Throw's own throw is, feat loop b5-core, rules/maneuver_feats.py ki_throw)"
     ]
   },
   "break-guard": {
@@ -108,10 +108,27 @@
           "against": "stun_or_stagger"
         },
         "note": "saves against spells and special abilities that stagger or stun"
+      },
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "scope": {
+          "weapon": "helmet-dwarven-boulder"
+        },
+        "note": "ARG: attack rolls made using a helmet (the dwarven boulder helmet, the helmet the weapons table carries)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "scope": {
+          "weapon": "helmet-dwarven-boulder"
+        },
+        "note": "ARG: combat maneuver checks made using a helmet"
       }
-    ],
-    "not_yet": [
-      "'+1 bonus on attack rolls and combat maneuver checks made using a helmet': no helmet in the game's gear is a weapon to attack or manoeuvre with"
     ]
   },
   "human-spirit": {

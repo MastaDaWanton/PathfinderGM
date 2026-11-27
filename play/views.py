@@ -922,6 +922,26 @@ _OPTION_SHAPES = {
     "furys_snare": ("strike", "Fury's Snare",
                     "A whip trip that lands lets the whip go to bind the fallen foe: "
                     "entangled until they break or slip it."),
+    # Feat loop b5-core: Ready (CRB, Combat), one option per trigger the engine answers
+    # (rules/readied.py TRIGGERS) and the counterspell; `act` shape, no target.
+    "ready_reach": ("act", "Ready: strike when they close",
+                    "Your standard action held: strike the first foe who comes within "
+                    "reach, before they act."),
+    "ready_attacked": ("act", "Ready: strike when attacked",
+                       "Your standard action held: strike the first foe who attacks you, "
+                       "before their blow lands."),
+    "ready_charge": ("act", "Ready: set against a charge",
+                     "Your standard action held: strike a foe who charges you; a brace "
+                     "weapon deals double."),
+    "ready_cast": ("act", "Ready: strike a caster",
+                   "Your standard action held: strike a foe who begins a spell, so they "
+                   "must hold it together."),
+    "ready_patient": ("act", "Ready: Patient Strike",
+                      "The whole round held: strike the first foe who comes within reach, "
+                      "+2 to hit."),
+    "ready_counterspell": ("act", "Ready: counterspell",
+                           "Your standard action held: name a foe's spell as it is cast and "
+                           "answer it with the same spell or dispel magic."),
     "total_defense": ("act", "Total defense",
                       "Your standard action spent guarding: no attacks, and no attacks of "
                       "opportunity."),
@@ -1162,6 +1182,24 @@ def _attack_options(pc) -> dict:
         own("disengaging_feint", f"Bluff {_signed(skill('bluff'))} against the target's guard",
             action="standard",
             op={"op": "check", "params": {"skill": "bluff", "feint": True, "disengage": True}})
+    # Feat loop b5-core: the readied actions (rules/readied.py), each greyed with the
+    # engine's own refusal.
+    from rules import readied as readied_mod
+
+    for key, trigger, action, patient in (
+            ("ready_reach", "enters_reach", "attack", False),
+            ("ready_attacked", "attacks_me", "attack", False),
+            ("ready_charge", "charges_me", "attack", False),
+            ("ready_cast", "casts", "attack", False),
+            ("ready_patient", "enters_reach", "attack", True),
+            ("ready_counterspell", "casts", "counterspell", False)):
+        why = readied_mod.refusal(pc, trigger, action, patient)
+        if why and (patient or action == "counterspell"):
+            continue                       # offered only to those who may take it
+        own(key, readied_mod.said(action, trigger), why=why,
+            action="full-round" if patient else "standard",
+            op={"op": "ready", "params": {"trigger": trigger, "action": action,
+                                          **({"patient": True} if patient else {})}})
     own("tumble", f"Acrobatics {_signed(skill('acrobatics'))} against each foe's CMD",
         why=("Armour that slows you cannot tumble past foes."
              if skilluses._armour_slows(pc) else ""),
@@ -1250,6 +1288,31 @@ def _strike_out_of_reach(scene, pc, raw: list) -> str:
         return (f"From square {sq} {foe.name} would be {miss.feet} ft away, and you "
                 f"reach {miss.reach} ft — the blow could not land. Nothing was done: pick a "
                 f"square beside them, or strike without moving.")
+    return ""
+
+
+def _strike_after_two_moves(scene, pc, raw: list) -> str:
+    """The sentence that refuses a walk and a blow when the turn's move action is already
+    spent, or "" (feat loop b5-core). The walk would be the second move action, paid with
+    the standard (CRB, Action Types), and the blow behind it would be refused after the
+    walk — the move spent and the blow lost, the shape `_strike_out_of_reach` exists to
+    stop. A one-square walk that is the round's 5-foot step leaves the blow alone."""
+    from rules import stepping
+
+    if not scene.in_encounter or scene.move_spent.get(pc.ref) != scene.round:
+        return ""
+    here = scene.positions.get(pc.ref) if scene.has_grid else None
+    walked = False
+    for r in raw:
+        p = r.get("params") or {}
+        if r.get("op") == "move" and p.get("square") is not None and here is not None:
+            to = tuple(p["square"])
+            walked = walked or not stepping.is_step(scene, pc, here, to)
+            here = to
+        elif r.get("op") == "attack" and walked and not p.get("reaction"):
+            return ("You have already moved this turn: another move takes your standard "
+                    "action, so there is no blow after it. Move now and strike next turn, "
+                    "or strike from where you stand.")
     return ""
 
 
@@ -4400,7 +4463,8 @@ def _put_back_free_actions(c, pending: list) -> None:
 # here, so a player on fire from a thrown flask, or glued by a tanglefoot bag, could only
 # type it and hope the planner sampled it. The bar offers each only while it applies.
 _COMBAT_OPS = {"attack", "move", "use_ability", "use_item", "manoeuvre", "cast",
-               "extinguish", "break_free", "escape", "total_defense", "check", "style"}
+               "extinguish", "break_free", "escape", "total_defense", "check", "style",
+               "ready"}                    # Feat loop b5-core
 # The checks the bar's Declare section may post (combat bar round 2, 2026-11-22): a feint
 # and a tumble, each to its own door (`skilluses.OWN_DOORS`). Any other check is a spoken
 # turn's, so `check` is not a door to every skill.
@@ -4495,7 +4559,8 @@ def combat_act(request):
     # spend the move and lose the blow (the owner's report of 2026-11-01: "move to (5,4);
     # strike giant rot grub", 25 ft from (5,4), the move walked and the blow refused).
     # And the order the player chose (2026-11-06): a walk after a full-round action.
-    stop = _strike_out_of_reach(scene, pc, raw) or _move_after_full_round(scene, pc, raw)
+    stop = _strike_out_of_reach(scene, pc, raw) or _move_after_full_round(scene, pc, raw) \
+        or _strike_after_two_moves(scene, pc, raw)
     if stop:
         return JsonResponse({"error": stop}, status=400)
 

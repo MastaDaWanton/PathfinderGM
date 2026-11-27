@@ -444,7 +444,7 @@
   },
   "enhanced-ki-throw": {
     "not_yet": [
-      "'When using the Ki Throw feat, you can expend 1 ki point ... it takes damage as if you had hit it with an unarmed strike': Ki Throw's own throw is not built yet (its document's not_yet; Improved Ki Throw is lane b4-maneuver's), so there is no throw to amplify"
+      "'you can expend 1 ki point ... it takes damage as if you had hit it with an unarmed strike': Ki Throw's throw runs (feat loop b5-core), but no ki is spent and no unarmed damage is rolled on the landing"
     ]
   },
   "quivering-palm-adept": {
@@ -474,8 +474,8 @@
     ]
   },
   "strike-back": {
-    "not_yet": [
-      "'You can ready an action to make a melee attack against any foe that attacks you in melee, even if the foe is outside of your reach': the engine has no readied actions"
+    "tags": [
+      "ready.strike-back"
     ]
   },
   "net-adept": {
