@@ -389,9 +389,9 @@ Systems not in the game:
   stance's dodge bonus for DR is not built)
 - Dimensional Savant: Dimensional Dervish's teleporting full attack, still a `not_yet` in
   batch2-attack-a.json
-- Meditative Concentration, Perfect Center, Slow Time: Combat Meditation, lane
-  b4-maneuver's in this batch (Perfect Center also needs taking 10 as a declared choice,
-  which no check offers a player yet)
+- Perfect Center: taking 10 as a declared choice, which no check offers a player yet
+  (Meditative Concentration and Slow Time were built in batch 5, lane b5-spells, on lane
+  b4-maneuver's Combat Meditation)
 
 ## Feat loop batch 5, lane b5-spells
 
