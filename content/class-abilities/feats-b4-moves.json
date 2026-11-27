@@ -1,0 +1,110 @@
+{
+  "class": "feat",
+  "_source": "Feat loop b4, lane b4-moves (2026-11-26): the activated feats of the action-economy batch — a swift action's lighter armour for a caster, a full round spent watching a wider ring, a swift action's focus off a paladin's detect evil. Each is had by a holder of the feat its `feat` names (rules/class_abilities.py), run by the one executor (`Engine._use_class_ability`), and each spends its declared action from the turn's budget (`Engine._spend_ability_action`). Benefit text from content/feats/feats.json, checked against aonprd.com FeatDisplay 2026-11-26.",
+  "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
+  "abilities": [
+    {
+      "key": "arcane armor training",
+      "name": "Arcane Armor Training",
+      "feat": "arcane-armor-training",
+      "aliases": [
+        "arcane armor training",
+        "arcane armour training",
+        "settle my armour",
+        "settle my armor"
+      ],
+      "level": 1,
+      "source": "Arcane Armor Training (CRB): 'As a swift action, reduce the arcane spell failure chance due to the armor you are wearing by 10% for any spells you cast this round.' The armour's share only (rules/armour.py spell_failure), never the shield's.",
+      "text": "Swift action: 10% less arcane spell failure from your armour this round.",
+      "action": "swift",
+      "self": {
+        "rounds": "1",
+        "modifiers": [
+          {
+            "type": "combat_mod",
+            "target": "spell_failure",
+            "amount": -10,
+            "bonus_type": "untyped"
+          }
+        ]
+      },
+      "tell": "{name} settles the armour for the gestures to come."
+    },
+    {
+      "key": "combat patrol",
+      "name": "Combat Patrol",
+      "feat": "combat-patrol",
+      "aliases": [
+        "combat patrol",
+        "set up a patrol"
+      ],
+      "level": 1,
+      "source": "Combat Patrol (APG): 'As a full-round action, you may set up a combat patrol, increasing your threatened area by 5 feet for every 5 points of your base attack bonus. Until the beginning of your next turn, you may make attacks of opportunity against any opponent in this threatened area that provokes attacks of opportunity.' The widened ring is reach off the bearer's own turn (rules/reactions.py `_reach_more`), so it is the attacks of opportunity alone that reach further.",
+      "text": "Full round: threaten 5 ft further per 5 base attack until your next turn.",
+      "action": "full-round",
+      "self": {
+        "rounds": "1",
+        "tags": [
+          "reach.extended",
+          "buff.stance.combat-patrol"
+        ],
+        "modifiers": [
+          {
+            "type": "combat_mod",
+            "target": "reach",
+            "amount": "5 * (bab // 5)",
+            "bonus_type": "untyped",
+            "when": {
+              "own_turn": false
+            }
+          }
+        ]
+      },
+      "tell": "{name} settles into a wide patrol, watching every gap around them.",
+      "not_yet": [
+        "'You may move as part of these attacks': an attack of opportunity is swung from where its maker stands."
+      ]
+    },
+    {
+      "key": "unsanctioned detection",
+      "name": "Unsanctioned Detection",
+      "feat": "unsanctioned-detection",
+      "aliases": [
+        "unsanctioned detection",
+        "focus my detect evil"
+      ],
+      "level": 1,
+      "source": "Unsanctioned Detection (UM): 'As a swift action, you can focus the clarity granted by your detect evil ability to heighten your awareness of other things. This gives you a +10 sacred bonus on Perception and Sense Motive checks for one round. This expends your use of the detect evil class ability for the next 24 hours.' The day's use is a pool of one, refilled by a night's rest.",
+      "text": "Swift action, once a day: +10 sacred on Perception and Sense Motive for a round.",
+      "action": "swift",
+      "ability_type": "sp",
+      "pool": {
+        "id": "unsanctioned detection",
+        "max": "1",
+        "refresh": "rest.night"
+      },
+      "cost": {
+        "pool": "unsanctioned detection",
+        "amount": 1
+      },
+      "self": {
+        "rounds": "1",
+        "modifiers": [
+          {
+            "type": "skill_mod",
+            "target": "perception",
+            "amount": 10,
+            "bonus_type": "sacred"
+          },
+          {
+            "type": "skill_mod",
+            "target": "sense motive",
+            "amount": 10,
+            "bonus_type": "sacred"
+          }
+        ]
+      },
+      "tell": "{name} turns the sense for evil outward, and everything sharpens."
+    }
+  ]
+}

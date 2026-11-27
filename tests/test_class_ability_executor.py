@@ -207,6 +207,9 @@ def test_dazing_touch_dazed_a_4_hd_ogre_and_now_has_no_hold_on_it():
     out, _ = _use(e, "Dazing Touch", to="c1")
     assert not s.actors["c1"].has_condition("dazed"), out.tell
     assert "4 Hit Dice, more than 1" in out.tell
+    from tests._board import new_turn
+
+    new_turn(s)                             # a touch is a standard action: the next turn
     out2, _ = _use(e, "Dazing Touch", to="c2")
     assert s.actors["c2"].has_condition("dazed"), out2.tell
     assert "lays a dazing hand on the thug 2" in out2.tell

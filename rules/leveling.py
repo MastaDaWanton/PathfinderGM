@@ -1024,7 +1024,8 @@ def skill_ranks(actor) -> dict:
     ranks = {str(k).lower(): int(v) for k, v in (getattr(actor, "ranks", None) or {}).items()}
     spent = sum(ranks.values())
     # And a rank for every level whose favoured class bonus was taken as one (CRB p.31).
-    favoured = sum(1 for b in getattr(actor, "favoured", None) or () if b == "skill")
+    favoured = sum(1 for b in getattr(actor, "favoured", None) or ()
+                   if b in ("skill", "both"))
     total = per_level * level + favoured
     class_skills = [str(s).lower() for s in actor.class_skills]
     return {
@@ -1437,7 +1438,10 @@ def level_up(actor, dice=None, favoured: str | None = None) -> dict:
         rolled = sum(faces) + flat
     con = ability_modifier(actor.ability_score("con"))
     hp = max(count, sum(max(1, f + con) for f in faces) + flat)
-    if favoured == "hp":
+    # Fast Learner (ARG, feat loop b4-moves): the level's bonus is both, recorded so.
+    if actor.has_state("favoured.both"):
+        favoured = "both"
+    if favoured in ("hp", "both"):
         hp += 1
 
     before_max = actor.hp_max
@@ -1449,7 +1453,7 @@ def level_up(actor, dice=None, favoured: str | None = None) -> dict:
     # the favoured point from `favoured`, so the base takes the rest — a level adds to
     # `hp_base` exactly what makes the derived total rise by `hp`. With Con 3 (-4) and a
     # roll of 1 the base gains 5 so the total gains 1.
-    actor.hp_base += hp - con * per - (1 if favoured == "hp" else 0)
+    actor.hp_base += hp - con * per - (1 if favoured in ("hp", "both") else 0)
     # Current hit points follow the whole rise of the maximum, not only the roll: a
     # feat that scales with Hit Dice moves it too. Measured live 2026-10-04: a fighter
     # with Toughness reached 4th level at 43 of 44, Toughness's +1 for the fourth Hit Die

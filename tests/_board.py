@@ -35,3 +35,12 @@ def face_to_face(scene, a: str = "pc", b: str = "c1") -> None:
             scene.positions[b] = square + tuple(here[2:3])
             break
     scene.resync_zones()
+
+
+def new_turn(scene) -> None:
+    """The bearer's next turn, for a test that uses one ability after another to see what
+    each does, not to see the turn's budget: the round's action ledgers emptied. Since feat
+    loop b4 a class ability spends its declared action (`Engine._spend_ability_action`), so
+    a wild shape and a cast are two standard actions and cannot share a turn."""
+    for ledger in (scene.move_spent, scene.standard_spent, scene.swift_spent):
+        ledger.clear()

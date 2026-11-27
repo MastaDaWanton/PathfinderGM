@@ -321,3 +321,12 @@ feature no playable class grants.
 - Performance Weapon Mastery: performance combat (Ultimate Combat), as Savage Display
 - Siege Gunner: siege weapons (none is fired by the engine)
 - Blighted Critical Mastery: spellblights and Blighted Critical
+## Systems not in the game (feat loop batch 4, b4-moves)
+
+Confirmed again by b4-moves: Adder Strike, Pinpoint Poisoner, Rebounding Leap, Revelation
+Strike and Thoughtful Discernment (listed under batch 2 above) still wait on their class
+features.
+
+- Murderer's Circle: performance combat checks (Ultimate Combat), as Savage Display
+- Focused Overseer: downtime capital (Ultimate Campaign's Purchasing Capital), which the
+  game does not keep

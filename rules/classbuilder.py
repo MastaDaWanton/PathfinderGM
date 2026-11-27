@@ -1152,7 +1152,10 @@ _FEAT_DOC_KEYS = frozenset({"modifiers", "tags", "budget", "choice", "attack_abi
                             "heritage",
                             # Spells added to the class list (Unsanctioned Knowledge;
                             # rules/casting.feat_list_spells).
-                            "spell_list_add"})
+                            "spell_list_add",
+                            # Feat loop b4-moves: a natural attack the feat grants
+                            # (Razortusk's bite; Actor.natural_weapon reads it).
+                            "natural_weapons"})
 
 # The keys a feat's `luck` entry may carry (rules/luck.py, which reads them).
 _LUCK_KEYS = frozenset({"reroll", "bonus", "ally_save", "on_reroll", "surge", "rolls",

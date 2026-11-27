@@ -1,0 +1,305 @@
+{
+  "_about": [
+    "Feat loop, batch 4, lane b4-moves (2026-11-26): the action-economy and attack-shape",
+    "feats. Each benefit is the book's (content/feats/feats.json, checked against aonprd.com",
+    "FeatDisplay 2026-11-26). New grammar: `natural_weapons` (a feat's own natural attack,",
+    "read by Actor.natural_weapon), the `higher_ground` when, `attacker.state`, and",
+    "`ally_beside.threatens_foe`; the moving feats' reactions are tags read by",
+    "rules/feat_moves.py. The activated feats (Arcane Armor Training, Combat Patrol,",
+    "Unsanctioned Detection) are documents in content/class-abilities/feats-b4-moves.json and",
+    "spend their declared action through Engine._spend_ability_action. What still does not",
+    "run is each document's `not_yet`."
+  ],
+  "arcane-armor-training": {},
+  "combat-patrol": {
+    "not_yet": [
+      "'You may move as part of these attacks, provided your total movement before your next turn does not exceed your speed': an attack of opportunity is swung from where its maker stands; no step is spliced in front of it"
+    ]
+  },
+  "unsanctioned-detection": {},
+  "eschew-materials": {
+    "tags": [
+      "casting.eschew-materials"
+    ],
+    "not_yet": [
+      "material components are not modelled: no caster is asked for one, cheap or costly (rules/spells.py keeps `component_cost` and nothing reads it), so the feat waives nothing the engine would have asked"
+    ]
+  },
+  "lightning-stance": {
+    "tags": [
+      "movement.lightning-stance"
+    ]
+  },
+  "spirited-charge": {
+    "tags": [
+      "charge.mounted.multiplied"
+    ]
+  },
+  "death-from-above": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "charge",
+          "higher_ground": true
+        },
+        "note": "Death from Above: +5 in place of the charge's +2 and higher ground's +1"
+      }
+    ]
+  },
+  "sidestep": {
+    "tags": [
+      "movement.sidestep"
+    ]
+  },
+  "improved-sidestep": {
+    "tags": [
+      "movement.sidestep.improved"
+    ]
+  },
+  "landing-roll": {
+    "tags": [
+      "movement.landing-roll"
+    ]
+  },
+  "wings-of-the-androsphinx": {
+    "tags": [
+      "reaction.reposition-failed-charger"
+    ],
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "attacker": {
+            "state": "buff.stance.charging"
+          }
+        },
+        "note": "Wings of the Androsphinx: +2 AC against a charging attacker"
+      }
+    ],
+    "not_yet": [
+      "'If you use a readied action to attack a creature charging you, you can ... reposition that creature as a free action before it resolves its charge attack': the engine has no readied action"
+    ]
+  },
+  "razortusk": {
+    "natural_weapons": [
+      {
+        "key": "bite",
+        "name": "Razortusk bite",
+        "damage": {
+          "small": "1d3",
+          "medium": "1d4",
+          "large": "1d6"
+        },
+        "type": "piercing",
+        "sole": false
+      }
+    ]
+  },
+  "improved-devastating-strike": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "crit_confirm",
+        "formula": "min(6, 2 * weapon_dice)",
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "vital_strike"
+        },
+        "note": "Improved Devastating Strike: Devastating Strike's bonus on the roll to confirm"
+      }
+    ]
+  },
+  "paired-opportunists": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 4,
+        "bonus_type": "circumstance",
+        "when": {
+          "opportunity": true,
+          "ally_beside": {
+            "feat": "paired-opportunists",
+            "threatens_foe": true
+          }
+        },
+        "note": "Paired Opportunists: +4 on attacks of opportunity beside a partner"
+      }
+    ],
+    "not_yet": [
+      "'Enemies that provoke attacks of opportunity from your ally also provoke attacks of opportunity from you so long as you threaten them (even if the situation or an ability would normally deny you the attack of opportunity)': who is owed a swing is asked of each watcher alone (rules/reactions.py), never shared with a partner"
+    ]
+  },
+  "wolf-trip": {
+    "not_yet": [
+      "'+2 bonus on all combat maneuver checks to trip as part of an attack of opportunity': no attack of opportunity is ever made as a trip — the reaction swing is always a blow",
+      "'While using Wolf Style, whenever you successfully trip a creature, as a free action you may choose an available square adjacent to you for the tripped creature to land prone in': a trip leaves the creature where it stood"
+    ]
+  },
+  "fast-learner": {
+    "tags": [
+      "favoured.both"
+    ],
+    "not_yet": [
+      "'or you can choose an alternate class reward': no alternate favoured class rewards exist for anyone (rules/creation.py FAVOURED_BONUSES is hp or skill)"
+    ]
+  },
+  "mounted-archery": {
+    "not_yet": [
+      "the mount's double move and run are not tracked (a ridden walk is the steed's one move op), so neither the book's -4/-8 on a rider's ranged attack nor this feat's halving of it is applied"
+    ]
+  },
+  "charge-through": {
+    "not_yet": [
+      "'you can attempt to overrun one creature in the path of the charge as a free action': a charge's path must be clear (Engine._charge_path) and no overrun is spliced into it"
+    ]
+  },
+  "cloud-step": {
+    "not_yet": [
+      "'air walk ... up to half your slow fall distance': the monk's slow fall is a class-table name only (no distance is read), and no move walks on air"
+    ]
+  },
+  "spider-step": {
+    "not_yet": [
+      "'move up to half your slow fall distance ... across a wall or ceiling ... or even water': slow fall has no distance in the engine, and the grid's walls and water stay impassable to a walker"
+    ]
+  },
+  "crossbow-mastery": {
+    "not_yet": [
+      "reloading is not modelled: a crossbow already fires every iterative of a full attack for anyone and never provokes for its reload, so the feat waives nothing the engine would have asked"
+    ]
+  },
+  "swap-places": {
+    "not_yet": [
+      "'you can move into your ally's square ... your ally moves into your previous space as an immediate action': a move into an occupied square is refused, and no swap is spliced"
+    ]
+  },
+  "teleport-tactician": {
+    "not_yet": [
+      "a teleport in a fight (dimension door, abundant step) moves nobody on the grid as a provoking act; no attack of opportunity is asked of it"
+    ]
+  },
+  "desperate-swing": {
+    "not_yet": [
+      "'Once per day, you can make a single melee attack while taking the total defense action' at -4: total defense spends the standard action and the blow is refused; no daily option lets it through",
+      "'+4 bonus on critical confirmation rolls made while fighting defensively or making an attack of opportunity using this feat'"
+    ]
+  },
+  "surprise-strike": {
+    "not_yet": [
+      "'take no penalty on the attack roll' of Desperate Swing's attack: Desperate Swing does not run"
+    ]
+  },
+  "tenacious-survivor": {
+    "not_yet": [
+      "'your soul lingers in your body for a number of rounds equal to your Constitution bonus ... You can be healed by magic as if you were alive': death by hit points is final at once (Actor.die), and no lingering state answers a heal"
+    ]
+  },
+  "archon-justice": {
+    "not_yet": [
+      "Archon Style's ally guard and Archon Diversion's diverted blow do not run (batch2-styles' and batch2-attack-a's not_yet), so there is no penalty to waive, no move action to make swift and no diversion to answer"
+    ]
+  },
+  "beartrap-bite": {
+    "not_yet": [
+      "'if your confirmation roll matches or exceeds your foe's CMD, you can clamp down ... The foe cannot move outside the area threatened by your bite': no hold short of a grapple is laid on a confirmed bite"
+    ]
+  },
+  "quivering-palm-versatility": {
+    "not_yet": [
+      "the monk's quivering palm is a class-table name only: no use of it exists for the coma, memory loss or pain to replace"
+    ]
+  },
+  "iconoclast": {
+    "not_yet": [
+      "'When you succeed at a sunder ... against a holy or unholy symbol, you can attempt an Intimidate check to demoralize as a free action ... all followers of the deity': a sundered item is not known to be a holy symbol, and no follower of a deity is recorded"
+    ]
+  },
+  "caustic-slur": {
+    "not_yet": [
+      "'As a standard action, you can make a Bluff check against one sort of favored enemy ... must make a Will saving throw or become angered ... treated as if it were using Power Attack' when attacking you: no effect on another creature is scoped to attacks against the user"
+    ]
+  },
+  "false-casting": {
+    "not_yet": [
+      "'If an onlooker attempts a Spellcraft check to identify your \"casting,\" his check is opposed by your Bluff check': nobody identifies a power used from an item or a spell-like ability, so there is no onlooker's check to oppose"
+    ]
+  },
+  "wand-dancer": {
+    "not_yet": [
+      "'you can move both before and after triggering the item, as long as the total distance moved is not greater than your speed ... does not provoke attacks of opportunity from that creature only': no split move is kept around a use"
+    ]
+  },
+  "patient-strike": {
+    "not_yet": [
+      "'ready an attack as a full-round action ... +2 bonus on your attack roll when your readied action triggers': the engine has no readied action"
+    ]
+  },
+  "rhino-charge": {
+    "not_yet": [
+      "'You may ready a charge': the engine has no readied action"
+    ]
+  },
+  "elephant-stomp": {
+    "not_yet": [
+      "'instead of moving through your opponent's space and knocking her prone, you may stop ... and make one attack with an unarmed strike or a natural weapon ... as an immediate action': the overrun's outcome always moves through and knocks prone"
+    ]
+  },
+  "cartwheel-dodge": {
+    "not_yet": [
+      "'When you successfully use improved evasion to avoid taking damage, you can move up to half your speed as an immediate action': the save that evades is rolled with no square to move to; no move is offered after it"
+    ]
+  },
+  "charging-hurler": {
+    "not_yet": [
+      "'use the charge rules to make a thrown weapon attack ... end your movement within 30 feet': a charge's walk ends within melee reach (Engine._charge_path), so a thrown charge is never laid"
+    ]
+  },
+  "dimensional-assault": {
+    "not_yet": [
+      "'use abundant step or cast dimension door as a special charge': abundant step is not built, and a dimension door cast moves nobody into a charge"
+    ]
+  },
+  "greater-whip-mastery": {
+    "tags": [
+      "weapon.whip.never-dropped"
+    ],
+    "not_yet": [
+      "'you gain the ability to grapple using your whip' with the reach kept, the whip's damage and no free-hand penalty: a grapple is always made with the body",
+      "the trip half of 'never drop it': a trip weapon is never dropped to avoid a backfire in the engine, so only the failed disarm's drop is refused"
+    ]
+  },
+  "improved-whip-mastery": {
+    "not_yet": [
+      "'you threaten the area of your natural reach plus 5 feet': the whip already threatens as a reach weapon (rules/reactions.py reach_with), though the book says a whip threatens nothing",
+      "grasping a Small or Tiny object with a melee touch at AC 10, and swinging from the whip as a grappling hook"
+    ]
+  },
+  "pack-attack": {
+    "not_yet": [
+      "'you can spend an immediate action to take a 5-foot step, even if you have otherwise moved this round': the engine does not refuse a 5-foot step after a move (reactions.provoked_by_move measures the step alone), so there is nothing to allow"
+    ]
+  },
+  "rapid-grappler": {
+    "not_yet": [
+      "'Whenever you use Greater Grapple to successfully maintain a grapple as a move action': Greater Grapple's move-action maintenance is not built (core.json carries only its +2), so there is no maintenance to follow with a swift check"
+    ]
+  },
+  "sword-and-pistol": {
+    "not_yet": [
+      "ranged attacks provoke no attacks of opportunity in the engine at all (the dispatch asks only manoeuvres, casting, drinking and pick-ups), so the feat waives nothing"
+    ]
+  },
+  "ricochet-splash-weapon": {
+    "not_yet": [
+      "'Whenever your splash weapon misses and the misdirection roll indicates it lands in a square occupied by a creature': a missed flask's landing square is not rolled onto another creature for a second attack"
+    ]
+  }
+}

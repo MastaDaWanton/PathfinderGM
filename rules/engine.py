@@ -6180,6 +6180,9 @@ class Engine:
                 continue
             here_before = {r: a.name for r, a in self.scene.actors.items()}
             at_before = self.scene.at
+            from . import feat_moves      # feat loop b4-moves: asked before the walk writes
+
+            twice = feat_moves.moved_already(self, intent)
             try:
                 outcome = self._resolve_one(intent, partial)
             except _NeedsPlayerRoll as suspend:
@@ -6240,6 +6243,10 @@ class Engine:
                 queue[0:0] = more
             elif intent.op == "move":
                 queue[0:0] = self._step_up_after(intent, outcome)
+            # The moving feats' answers (feat loop b4-moves, rules/feat_moves.py).
+            moves_more, moves_said = feat_moves.after(self, intent, outcome, twice)
+            queue[0:0] = moves_more
+            rider_said = list(rider_said) + moves_said
             # The deeds this act holds, read off its own records against the snapshot,
             # and carried on its outcome for the history line. Every outcome is read, not
             # only the player's: a death the player's blow caused can land in anybody's
@@ -7043,6 +7050,52 @@ class Engine:
                                     + ("and move actions." if moved else
                                        "action. A move is still theirs to take."),
                             code="standard_spent")
+
+    def _spend_ability_action(self, intent: Intent, actor, action: str, what: str,
+                              armed: bool = False) -> "Outcome | None":
+        """Spend a class ability's (or an activated feat's) declared action from the
+        turn's budget, or refuse it with the reason. Feat loop b4 (b4-moves): the
+        executor recorded `action` and spent nothing — Smite Evil, Channel Smite,
+        Bewildering Koan and Crusader's Fist, each "as a swift action", were used twice in
+        one turn and the swift record (`Scene.swift_spent`) never moved. Out of a fight
+        nothing is counted (`_swift_turn`'s rule). A move action may be paid with the
+        turn's standard (CRB, Action Types: "You can take a move action in place of a
+        standard action"); a full-round action needs both untouched."""
+        sc = self.scene
+        if not sc.in_encounter or intent.params.get("reaction"):
+            return None
+        act = str(action or "standard").lower()
+        if act in ("swift", "immediate"):
+            why = self._spend_swift(actor, act == "immediate", what)
+            return self._refuse(intent, why, code="swift_spent") if why else None
+        rnd, ref = sc.round, actor.ref
+        moved = sc.move_spent.get(ref) == rnd
+        stood = sc.standard_spent.get(ref) == rnd
+        if act == "move":
+            if not moved:
+                sc.move_spent[ref] = rnd
+            elif not stood:
+                sc.standard_spent[ref] = rnd
+            else:
+                return self._refuse(intent, f"{actor.name} has already used this turn's "
+                                            f"standard and move actions, and {what} is a "
+                                            f"move action.", code="standard_spent")
+            return None
+        if act in ("standard", "full-round", "full round"):
+            if act != "standard":
+                why = self._coup_round_spent(actor, what, "Nothing is spent.")
+                if why:
+                    return self._refuse(intent, why, code="standard_spent")
+            elif stood:
+                return self._standard_spent_refusal(intent, actor)
+            if armed:
+                # A `charge` arms the blow the action is made of (Crushing Blow's "a
+                # Stunning Fist attempt as a full-round action"): the blow pays, not this.
+                return None
+            if act != "standard":
+                sc.move_spent[ref] = rnd
+            sc.standard_spent[ref] = rnd
+        return None
 
     COUP_UNPROVOKING = "coup_de_grace.unprovoking"      # Slaying Sprint's tag
     # --- the swift and immediate action (feat loop b2, 2026-11-22) -------------------
@@ -11238,6 +11291,11 @@ class Engine:
         # see the real one.
         wet_defender = defender.water_row(self.scene.afloat(defender.ref))
         flounders = wet_defender and water.loses_dex_to_ac(wet_defender)
+        # Feat loop b4-moves: a charge's stance is laid before the target's AC is read, so
+        # an AC term against a charger (Wings of the Androsphinx's +2) counts on the very
+        # blow; the stance's own laying below finds it held and says nothing twice.
+        early_said = (self._lay_attack_stances(actor, ("charge",), defender=defender)
+                      if "charge" in choices and held is None else [])
         # The attacker rides along so a term scoped to THIS attacker counts: a smiting
         # paladin's deflection is against the creature she smote (`_effect_scope_holds`).
         target_ac = defender.ac(against=weapon["category"],
@@ -11337,7 +11395,7 @@ class Engine:
             # A cleave's later blows are the same attack action: its stance is laid once.
             guard = ("two_weapon",) if (off_key and off_key != "unarmed"
                                          and actor.has_state("two_weapon.defense")) else ()
-            state["tells"].extend(self._lay_attack_stances(
+            state["tells"].extend(early_said + self._lay_attack_stances(
                 actor, () if intent.params.get("cleaving") else choices + guard,
                 defender=defender))
             if intent.params.get("lunge_tell"):
@@ -11930,6 +11988,11 @@ class Engine:
                 # (Dragonslayer, Wingclipper: `feat_events.crit_trade`, feat loop b3).
                 mult = weapon["crit_mult"] if state.get("crit") \
                     and not state.get("crit_traded") else 1
+                # Feat loop b4-moves: a mounted charge's multiple (the lance, Spirited
+                # Charge), combined with the critical's as 1e combines multiples.
+                from . import feat_moves
+
+                mult = feat_moves.charge_multiple(actor, weapon, weapon_key, choices, mult)
                 # Vital Strike: the weapon's dice again per feat, "not multiplied on a
                 # critical hit, but ... added to the total" — so past `mult`, never in it.
                 vital = actor.weapon_dice(weapon_key, choices) \
@@ -14205,7 +14268,11 @@ class Engine:
                 # one: a fist has nothing to let go of, and the tell used to drop "the
                 # weapon used for the disarm" whether or not there was a weapon, and
                 # then leave it in the hand.
-                if self._drops_in_hand(actor, weapon_key):
+                # Greater Whip Mastery (UC, feat loop b4-moves): "you never drop it due to a
+                # failed disarm or trip combat maneuver attempt".
+                kept = actor.has_state("weapon.whip.never-dropped") and "whip" in str(
+                    weapon_key or "").lower()
+                if self._drops_in_hand(actor, weapon_key) and not kept:
                     rec = self._let_go(actor, weapon_key)
                     bits.append(maneuver_text(m["backfire"], actor.name, defender.name,
                                               item=self._the(weapon_key)) + ".")
@@ -38158,6 +38225,13 @@ class Engine:
             gated = self._ability_gate(intent, actor, shown, foes)
             if gated is not None:
                 return gated
+
+        # 4b. The turn's action, spent (`_spend_ability_action`, feat loop b4).
+        late = self._spend_ability_action(intent, actor, ca.action_of(
+            doc, actor, on_self=([a.ref for a in who] == [actor.ref])), shown,
+            armed=bool(doc.get("charge")))
+        if late is not None:
+            return late
 
         # 5. The price, paid.
         records: list[dict] = []

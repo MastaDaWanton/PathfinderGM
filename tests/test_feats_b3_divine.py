@@ -41,6 +41,8 @@ def _fight(pc, *foes, allies=(), seed=11, at=None):
     e = Engine(scene, dice=Dice(seed=seed))
     e.run(e.validate([{"op": "begin_encounter", "params": {
         "sides": {"pc": ["pc"] + [a.ref for a in allies], "them": them}}}]))
+    # The PC's turn: a swift action is taken only on one's own (`Engine._spend_swift`).
+    scene.turn = [r for r, _ in scene.initiative].index("pc")
     return scene, e
 
 
@@ -325,7 +327,11 @@ def test_reward_of_life_heals_the_paladin_cha_for_healing_another():
     hp = pc.hp
     _use(e, "Lay on Hands")
     healed = pc.hp - hp
-    assert healed >= 4 and "Reward of Life" not in _use(e, "Lay on Hands").tell
+    from tests._board import new_turn
+
+    new_turn(_s)                            # on herself it is the turn's swift action
+    again = _use(e, "Lay on Hands")
+    assert healed >= 4 and again.status != "refused" and "Reward of Life" not in again.tell
 
 
 def test_greater_mercy_adds_a_d6_when_there_is_nothing_to_lift():
@@ -335,6 +341,9 @@ def test_greater_mercy_adds_a_d6_when_there_is_nothing_to_lift():
     out = _use(e, "Lay on Hands", to="ally")
     assert "nothing the mercies lift: 1d6" in out.tell
     ally.add_condition("sickened", 5)
+    from tests._board import new_turn
+
+    new_turn(_s)                            # lay on hands on another is a standard action
     out = _use(e, "Lay on Hands", to="ally")
     assert "nothing the mercies lift" not in out.tell
     assert not ally.has_condition("sickened")
@@ -429,6 +438,11 @@ def test_adept_champion_trades_the_smite_s_damage_for_half_on_manoeuvres():
     ctx = pc._roll_context(None, defender=a)
     dmg = sum(m.value for m in pc._buff_mods("combat_mod", "damage", ctx))
     cmb = sum(m.value for m in pc.cmb_modifiers(defender=a))
+    from tests._board import new_turn
+
+    # "as a swift action at the start of your turn": the smite took this turn's swift.
+    assert _use(e, "Adept Champion", to="c1").code == "swift_spent"
+    new_turn(scene)
     assert _use(e, "Adept Champion", to="c2").status == "refused"
     out = _use(e, "Adept Champion", to="c1")
     assert out.status != "refused", out.tell
