@@ -1,0 +1,44 @@
+{
+  "class": "feat",
+  "_source": "Feat loop b5, lane b5-spells (2026-11-26): the activated feats of the spell-hook and modifier batch. Each is had by a holder of the feat its `feat` names (rules/class_abilities.py), run by the one executor (`Engine._use_class_ability`), and each spends its declared action from the turn's budget. Benefit text from content/feats/feats.json, checked against aonprd.com FeatDisplay 2026-11-26.",
+  "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
+  "abilities": [
+    {
+      "key": "improved back to back",
+      "name": "Improved Back to Back",
+      "feat": "improved-back-to-back",
+      "aliases": [
+        "improved back to back",
+        "back to back",
+        "guard my back"
+      ],
+      "level": 1,
+      "source": "Improved Back to Back (UC): 'While you are adjacent to an ally who is flanked and also has this feat, you can spend a swift action to gain a +2 bonus to AC against all flankers until the start of your next turn.' The ally is asked on the board (`feat_events.ally_holds`, `flanked` and `feat`); the bonus answers an attacker who flanks the bearer (owner call: the flankers are the ones flanking you).",
+      "text": "Swift action, beside a flanked ally with this feat: +2 AC against flankers until your next turn.",
+      "action": "swift",
+      "requires_ally": {
+        "flanked": true,
+        "feat": "improved-back-to-back",
+        "within_ft": 5
+      },
+      "self": {
+        "rounds": "1",
+        "tags": [
+          "buff.stance.improved-back-to-back"
+        ],
+        "modifiers": [
+          {
+            "type": "combat_mod",
+            "target": "ac",
+            "amount": 2,
+            "bonus_type": "untyped",
+            "when": {
+              "flanked": true
+            }
+          }
+        ]
+      },
+      "tell": "{name} sets a shoulder to an ally's and turns to face the ones closing in."
+    }
+  ]
+}

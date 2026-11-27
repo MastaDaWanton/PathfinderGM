@@ -63,6 +63,7 @@ from . import alchemy_items as items
 from . import worldclass as wc
 
 TRACK_ID = "alchemist"
+ALCHEMY_MASTER = "craft.alchemy.master"     # Master Alchemist's tag (feat loop b5-spells)
 
 
 def _lane(name: str):
@@ -1274,6 +1275,13 @@ def _common(plan: AlchemyPlan, actor, body: dict, row: dict) -> None:
 
     # Time (plan §7, §12.3): a step past the threshold waits In progress.
     minutes = int(row.get("minutes", 10) or 10) * plan.units
+    # Master Alchemist (APG, feat loop b5-spells): "you may create mundane alchemical items
+    # much more quickly ... use the item's gp value as its sp value when determining your
+    # progress" — a tenth of the time, for a book (classic) formula's Bottle, never a spell
+    # potion's Brew Potion wait (`ALCHEMY_MASTER`, the feat document's tag).
+    if plan.method == "bottle" and plan.formula is not None \
+            and plan.formula.get("kind") == "classic" and actor.has_state(ALCHEMY_MASTER):
+        minutes = max(1, -(-minutes // 10))
     after = int(rules.get("in_progress_after", 480))
     if plan.method == "transmute" or minutes > after:
         plan.hands_on = int(row.get("hands_on", min(minutes, 60)) or 60)

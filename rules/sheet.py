@@ -285,6 +285,9 @@ FEAT_FORMULA_NAMES = ("ranks", "allies", "allies_threatening", "weapon_dice",
                       # Feat loop b4-other: allies within 10 ft with the feat (Courage
                       # in Numbers' "for every ally within 10 feet who possesses this feat").
                       "allies_10",
+                      # Feat loop b5-spells: the shield's base bonus to AC plus the feats'
+                      # shield terms (Covering Shield).
+                      "shield_ac",
                       *(feat_rank_name(s) for s in SKILLS))
 # A feat's class-skill grant, `skill.class.$target` bound to each pick (`class_skills`).
 FEAT_CLASS_SKILL = "skill.class."
@@ -392,6 +395,9 @@ UNTIL_REST = "duration.until-rest"                         # gone at the next re
 # Feat loop b4-other: Meditation Master's document tag, and the 24 hours a meditation lays.
 MEDITATES = "meditation.master"
 MEDITATED = "meditation.held"
+# Feat loop b5-spells: Cold Celerity's document tag, and the round's state cold damage lays.
+COLD_QUICKENS = "celerity.cold"
+COLD_QUICKENED = "buff.cold-celerity"
 # Stage Combatant: no -4 to pull a blow to nonlethal with a weapon of one's Weapon Focus.
 PULLS_FOCUSED = "lethality.nonlethal.focused"
 # The tag Quick Draw's feat document grants: "You can draw a weapon as a free action
@@ -5721,6 +5727,15 @@ class Actor:
         fell = _troops.settle(self.troop, self.hp) if self.troop is not None else 0
         if self.troop is not None:
             self.size = _troops.size_for(self.troop.members or 1)
+        # Cold Celerity (People of the North, feat loop b5-spells): "you gain the same
+        # bonuses for 1 round after any round in which you take cold damage" — the rest of
+        # this round and the next, a tagged effect its document's terms ask for.
+        if taken + absorbed > 0 and normalise_damage_type(dtype) == "cold" \
+                and self.has_state(COLD_QUICKENS):
+            self.apply_effect(ActiveEffect(
+                name="quickened by the cold", kind="buff", key="cold-quickened",
+                source="cold damage", origin="rule:cold-celerity", duration="rounds",
+                rounds_left=2, tags=(COLD_QUICKENED,)))
         return {
             "rolled": rolled + warded, "type": normalise_damage_type(dtype),
             # Reported even when they did nothing, because the visible bookkeeping is the
@@ -6671,6 +6686,9 @@ class Actor:
         # The multiple of Strength this swing's damage takes (`strength_share`): Power
         # Attack's two rungs ask it, as the book ties them to the same three cases.
         weapon["strength_share"] = share if share is not None else self.strength_share(w)
+        # Feat loop b5-spells: Legacy of the Crusade's "good-aligned weapons" — the weapon
+        # strikes as good (a holy weapon's layer, an aligned blade's `strikes_as`).
+        weapon["good"] = "good" in (w.get("strikes_as") or ())
         rec = w.get("crafted_record")
         if isinstance(rec, dict):
             weapon["key"] = str(w.get("crafted_base") or key)
@@ -6907,6 +6925,8 @@ class Actor:
             out.update(maneuver_feats.formula_names(self, fid, (ctx or {}).get("target_actor")))
         if "allies_10" in text:
             out["allies_10"] = len(self.adjacent_allies_with(fid, within=10))
+        if "shield_ac" in text:
+            out["shield_ac"] = self._shield_ac_for_feats()
         if "allies" in text:
             out["allies"] = len(self.adjacent_allies_with(fid))
         if "weapon_dice" in text:
@@ -6923,6 +6943,24 @@ class Actor:
                 for m in doc.get("modifiers") or ()
                 if m.get("type") == "combat_mod" and m.get("target") == "weapon_dice")
         return out
+
+    def _shield_ac_for_feats(self) -> int:
+        """Covering Shield (Dragonslayer's Handbook, feat loop b5-spells): "your shield's
+        base bonus to armor class plus any bonuses granted by feats or class abilities" —
+        the shield's own table bonus (no enhancement) and every held feat's AC term that
+        asks for a shield on the arm (Shield Focus's +1). 0 with no shield."""
+        from . import feats as feats_mod
+
+        base = int((self.shield_stats() or {}).get("ac", 0) or 0)
+        if base <= 0:
+            return 0
+        held = {d["id"]: d for d in (feats_mod.document(r) for r in self.feats) if d}
+        return base + sum(
+            int(m.get("amount") or 0) for d in held.values()
+            for m in d.get("modifiers") or ()
+            if m.get("type") == "combat_mod" and m.get("target") == "ac"
+            and ((m.get("when") or {}).get("bearer") or {}).get("shield") is True
+            and set(m.get("when") or {}) == {"bearer"})
 
     def allies_threatening_with(self, fid: str, foe) -> list:
         """The allies (same side, up) who hold feat `fid` and threaten `foe` on the board

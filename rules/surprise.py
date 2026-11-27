@@ -156,7 +156,10 @@ def decide(engine, sides: dict, ambushers=(), opener: str = "") -> tuple[list[st
             if o.ref not in stealth:
                 return True
             if r not in spot:
-                roll = engine.dice.d20(_mods(me, "perception", opposed=True),
+                # The use (feat loop b5-spells): Spirit of the Wild's "Perception checks
+                # made to act in the surprise round" is a skill_use "ambush" term.
+                roll = engine.dice.d20(_mods(me, "perception", opposed=True,
+                                             ctx={"skill_use": "ambush"}),
                                        label=f"{me.name} Perception, against an ambush",
                                        visibility="hidden")
                 rolls.append(roll)
@@ -185,7 +188,29 @@ def begin(engine, sides: dict, ambushers=(), opener: str = "") -> dict | None:
     for r in aware:
         if r not in full:
             scene.actors[r].add_condition(ROUND_KEY, rounds=1, source=ORIGIN, origin=ORIGIN)
+        _surprise_senses(scene.actors[r])
     return {"aware": aware, "unaware": unaware, "rolls": rolls}
+
+
+SURPRISE_SENSE = "surprise.sense."      # a feat's sense for the surprise round (b5-spells)
+
+
+def _surprise_senses(actor) -> None:
+    """Spirit of the Wild (ARG): "If you act in the surprise round, you gain blindsense out
+    to a range of 30 feet during the surprise round", in a terrain the bearer is attuned to.
+    The feat document's tag names the sense (`surprise.sense.blindsense.30`); it is laid
+    for the one round as an ActiveEffect, so the round's end takes it away."""
+    from . import classfeatures
+    from .activeeffect import ActiveEffect
+
+    words = [t[len(SURPRISE_SENSE):] for t in actor.standing_tags()
+             if str(t).startswith(SURPRISE_SENSE)]
+    if not words or not classfeatures._bearer_holds({"terrain": "$attuned"}, actor):
+        return
+    actor.apply_effect(ActiveEffect(
+        name="senses sharpened by the wild", kind="buff", key="surprise-sense",
+        source="the surprise round", origin=ORIGIN,
+        duration="rounds", rounds_left=1, tags=tuple(f"sense.{w}" for w in words)))
 
 
 LOOKOUT = "surprise.lookout"                        # Lookout's tag (feat loop b4-other)

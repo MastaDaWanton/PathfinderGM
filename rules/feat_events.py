@@ -786,6 +786,14 @@ def push_after_hit(engine, actor, defender, choices, state, power) -> list[dict]
                       f"{defender.name} has nowhere to be pushed to (Pushing Assault).")}]
 
 
+def _flanked(engine, who) -> bool:
+    from . import position
+
+    return any(engine._against(who, foe) and not foe.is_down
+               and position.flanking_with(engine.scene, foe, who)
+               for foe in engine.scene.actors.values() if foe is not who)
+
+
 def ally_holds(engine, actor, want: dict) -> bool:
     """Whether an ally of `actor` holds `want["state"]` within `within_ft` — or, failing
     that, an ally holding both the state and the feat `far_feat` within `far_ft` who can
@@ -802,7 +810,13 @@ def ally_holds(engine, actor, want: dict) -> bool:
     far = int(want.get("far_ft", 0) or 0)
     for other in engine.scene.actors.values():
         if other is actor or other.is_down or engine._against(actor, other) \
-                or not other.has_state(state):
+                or (state and not other.has_state(state)):
+            continue
+        # Feat loop b5-spells: the ally holds a feat, and is flanked on the board (any foe
+        # of theirs flanks them with a friend: `position.flanking_with`).
+        if want.get("feat") and str(want["feat"]) not in feats_mod._held(other):
+            continue
+        if want.get("flanked") and not _flanked(engine, other):
             continue
         gap = engine._gap_ft(actor, other)
         if gap is None:

@@ -509,7 +509,11 @@ def check(engine, observer, subject, *, searching: bool = False) -> dict | None:
     if notice is None:
         return None
     try:
-        mods = list(observer.skill_modifiers("perception", opposed=True))
+        # The one looked for, for a `when: {"target": ...}` term (feat loop b5-spells:
+        # Smell Fear's "+4 bonus on Perception checks to detect creatures with the shaken,
+        # frightened, or panicked conditions").
+        mods = list(observer.skill_modifiers("perception", opposed=True,
+                                             ctx={"target_actor": subject}))
     except Exception:  # noqa: BLE001 — a body with no sheet notices with its d20 alone
         mods = []
     roll = engine.dice.d20(mods, label=f"{observer.name} Perception"

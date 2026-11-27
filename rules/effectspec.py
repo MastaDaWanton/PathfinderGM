@@ -2648,6 +2648,12 @@ AGAINST: dict[str, str] = {
     # Feat loop b4-other: Sure Grasp's "a Reflex save to avoid falling" — the jump's grab
     # at the far edge (bodyskills.jump), passed by the save that rolls it.
     "fall": "a Reflex save to avoid falling (bodyskills)",
+    # Feat loop b5-spells: Schooled Resolve's "Will saves against mind-affecting spells and
+    # effects from vampires" (rules/spell_feats.py save_words).
+    "vampire_mind": "a mind-affecting spell or effect of a vampire's",
+    # Feat loop b5-spells: Meditative Concentration's "a Fortitude save to resist a
+    # distraction effect (such as the distraction ability of a swarm)" (Engine._distraction).
+    "distraction": "a swarm's distraction, or another distraction effect",
 }
 
 

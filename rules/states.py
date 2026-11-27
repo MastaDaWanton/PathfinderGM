@@ -658,6 +658,8 @@ HEAT_UNHINDERED = "climate.heat.very-hot.unhindered"
 # Rugged Northerner's "You are not impacted at all by normal cold weather conditions" (feat
 # loop b4-other, `Engine._exposure`): the one cold band the engine models.
 COLD_UNHINDERED = "climate.cold.unhindered"
+# Torch Handling's document tag (feat loop b5-spells): a carried mundane light is wider.
+LIGHT_WIDER = "handling.torch.wider"
 # The forage encounter's stance (TAGS["holding ground"]), named once for its readers.
 HOLDING_GROUND = "state.holding-ground"
 HOLDING_GROUND_KEY = "holding ground"
@@ -1129,6 +1131,25 @@ TYPE_BUNDLES: dict[str, str] = {
 }
 
 
+# Feat loop b5-spells (2026-11-26): the immunity families a metamagic copy passes through,
+# carried as one descriptor word on the copy (`metamagic.PIERCES`). Threnodic's "as if they
+# weren't immune to mind-affecting effects" and Coaxing's "as if they weren't mindless" are
+# the mind family; Thanatopic's "defenses and immunities that protect against death
+# effects, negative levels, and energy drain" the death family. shortcut: a creature
+# printed with one named member (immunity to charm alone) is passed too; split the family
+# when a block shows such an immunity beside a threnodic cast.
+PIERCE = "pierce."
+PIERCED: dict[str, frozenset] = {
+    "mind-affecting": frozenset(_MIND_AFFECTING),
+    "death": frozenset({"death", "dead", "energy drain", "negative level",
+                        "negative levels", "negative energy"}),
+}
+
+
+def pierce_word(family: str) -> str:
+    return PIERCE + family
+
+
 def immune_to(actor, what: str = "", condition_key: str = "", descriptors=()) -> str:
     """Which immunity stops `what` (an effect word: "poison", "disease", "paralysis",
     "bleed", "energy drain") or the condition it would leave, on this body — "" if none.
@@ -1140,6 +1161,17 @@ def immune_to(actor, what: str = "", condition_key: str = "", descriptors=()) ->
     """
     printed = list(getattr(actor, "immunities", None) or ())
     said = ((what,) if what else ()) + tuple(descriptors or ())
+    # Feat loop b5-spells: a threnodic, coaxing or thanatopic copy passes an immunity
+    # family (`pierce_word`), and that family's words stop nothing on this cast.
+    passed = {w for d in said if str(d).startswith(PIERCE) for w in
+              PIERCED.get(str(d)[len(PIERCE):], ())}
+    if passed:
+        said = tuple(d for d in said if str(d).lower() not in passed
+                     and not str(d).startswith(PIERCE))
+        if str(condition_key or "").strip().lower() in passed:
+            condition_key = ""
+        if not said and not condition_key:
+            return ""
     got = immunity_blocks(printed, condition_key, said)
     if got:
         return got
@@ -1150,7 +1182,8 @@ def immune_to(actor, what: str = "", condition_key: str = "", descriptors=()) ->
                 return got
     # Mindless: an ability block with no Int score in it (`morale.intelligence`). A body
     # with no ability block at all is a sketch, not a mindless creature.
-    if actor is not None and getattr(actor, "abilities", None):
+    if actor is not None and getattr(actor, "abilities", None) \
+            and "mind-affecting" not in passed:
         from . import morale
 
         if morale.intelligence(actor) is None and immunity_blocks(

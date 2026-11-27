@@ -1276,6 +1276,33 @@ def _same_side(scene, a, b) -> bool:
     return any(a.ref in refs and b.ref in refs for refs in (scene.sides or {}).values())
 
 
+SECRET_SIGNS = "casting.secret-signs"       # Secret Signs' tag (feat loop b5-spells)
+
+
+def _secret_signs(engine, out, caster, spell, watcher):
+    """Secret Signs (ISWG): "If you cast a spell that has only somatic components, an
+    observer must make a Perception check opposed by your Sleight of Hand check to notice
+    your spellcasting. Spellcraft checks made to identify any spell you cast that has
+    somatic components take a -2 penalty." The terms on the watcher's Spellcraft, or None
+    when the watcher never noticed the casting at all."""
+    from .dice import Modifier
+
+    comps = {str(c).strip().upper() for c in getattr(spell, "components", None) or ()}
+    if "S" not in comps or not caster.has_state(SECRET_SIGNS):
+        return []
+    if comps & {"V", "M", "F", "DF"} == set():
+        hand = engine.dice.d20(list(caster.skill_modifiers("sleight of hand", opposed=True)),
+                               label=f"{caster.name}'s Sleight of Hand (hiding the casting)",
+                               visibility="hidden")
+        eye = engine.dice.d20(list(watcher.skill_modifiers("perception", opposed=True)),
+                              label=f"{watcher.name}'s Perception (noticing the casting)",
+                              visibility="hidden")
+        out.rolls.extend([hand, eye])
+        if eye.total < hand.total:
+            return None
+    return [Modifier(-2, "Secret Signs (the caster's)")]
+
+
 def identify_casting(engine, out, caster, spell, level) -> dict | None:
     """Spellcraft to identify a spell as it is being cast (CRB: DC 15 + spell level, no
     action, no retry, "you must clearly see the spell as it is being cast"): each player
@@ -1304,8 +1331,13 @@ def identify_casting(engine, out, caster, spell, level) -> dict | None:
         from . import casting
 
         ctx = {"skill_use": "identify-casting", "spell_known": casting.knows(pc, spell)}
-        roll = engine.dice.d20(list(pc.skill_modifiers("spellcraft", ctx=ctx)),
-
+        # Secret Signs (ISWG, feat loop b5-spells), the caster's: a spell of somatic
+        # components only is noticed on Perception against the caster's Sleight of Hand,
+        # and identifying any with a somatic component takes −2.
+        hidden = _secret_signs(engine, out, caster, spell, pc)
+        if hidden is None:
+            continue
+        roll = engine.dice.d20(list(pc.skill_modifiers("spellcraft", ctx=ctx)) + hidden,
                                label=f"{pc.name}'s Spellcraft (identify the casting)",
                                visibility="hidden")
         out.rolls.append(roll)

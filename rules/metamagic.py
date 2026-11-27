@@ -77,7 +77,25 @@ import re
 #   `Engine._concentrate`); "You cannot use this feat on spells with the light descriptor."
 DOES = ("extend", "empower", "maximize", "enlarge", "silent", "still", "quicken",
         "heighten", "widen", "reach", "merciful", "intensify", "elemental", "pierce",
-        "persist", "focus", "select", "disrupt", "ectoplasm", "rider", "echo", "tenebrous")
+        "persist", "focus", "select", "disrupt", "ectoplasm", "rider", "echo", "tenebrous",
+        # Feat loop b5-spells (2026-11-26): Threnodic, Coaxing, Thanatopic (`PIERCES`).
+        "threnodic", "coaxing", "thanatopic")
+
+# Feat loop b5-spells, aonprd FeatDisplay pages read 2026-11-26:
+# - Threnodic (+2, UM): "This feat only works on mind-affecting spells. A threnodic spell
+#   affects undead creatures (even mindless undead) as if they weren't immune to
+#   mind-affecting effects, but has no effect on living creatures."
+# - Coaxing (+2, Dungeoneer's Handbook): "only works with mind-affecting effects. A coaxing
+#   spell affects mindless oozes and vermin as if they weren't mindless, but has no effect
+#   on other creature types."
+# - Thanatopic (+2, UM): "pierces defenses and immunities that protect against death
+#   effects, negative levels, and energy drain ... Undead are susceptible".
+# The copy carries the immunity family it passes as a descriptor word (`states.PIERCE`),
+# which is how the cast's descriptors already reach `states.immune_to`; `ONLY` is who the
+# copy reaches at all (`Engine._cast_reach_refusal`).
+PIERCES = {"threnodic": "mind-affecting", "coaxing": "mind-affecting",
+           "thanatopic": "death"}
+ONLY = {"threnodic": ("undead",), "coaxing": ("ooze", "vermin")}
 
 
 # What a `rider` may lay, and the fields it carries (see `_rider_problems`).
@@ -267,6 +285,9 @@ def _not_for(does: str, spell, actor, spontaneous: bool, doc: dict | None = None
     if does == "tenebrous" and "light" in {str(d).strip().lower()
                                           for d in getattr(spell, "descriptors", None) or ()}:
         return "it has the light descriptor."
+    if does in ("threnodic", "coaxing") and "mind-affecting" not in {
+            str(d).strip().lower() for d in getattr(spell, "descriptors", None) or ()}:
+        return "it is not a mind-affecting spell."
     if does == "still" and "S" not in comps:
 
         return "it has no somatic component."
@@ -372,6 +393,11 @@ def apply(spell, actor, ids):
         out.components = [c for c in out.components if str(c).strip().upper() != "S"]
     if "quicken" in does:
         out.casting_time = "swift action"
+    for d in does:                              # feat loop b5-spells
+        if d in PIERCES:
+            from .states import pierce_word
+
+            out.descriptors = list(out.descriptors or ()) + [pierce_word(PIERCES[d])]
     # The name is left alone: buffs and manifestations take their source from it, and an
     # "Extended Bless" beside a Bless would be two sources where the book has one spell.
     out.metamagic = does
@@ -443,6 +469,15 @@ def _apply_b1(out, spell, mine: dict, ids) -> None:
     out.metamagic_flags = sorted(by)
 
 
+def only_reaches(spell) -> tuple[str, ...]:
+    """The creature types this cast's copy reaches and no other, or () for any: a
+    threnodic spell "has no effect on living creatures" (feat loop b5-spells)."""
+    for does, kinds in ONLY.items():
+        if flag(spell, does):
+            return kinds
+    return ()
+
+
 def flag(spell, does: str) -> bool:
     """Whether this cast's copy was made with that transform (Piercing, Persistent ...)."""
     return does in (getattr(spell, "metamagic_flags", None) or ())
@@ -455,7 +490,9 @@ ADJECTIVE = {"extend": "extended", "empower": "empowered", "maximize": "maximize
              "elemental": "elemental", "pierce": "piercing", "persist": "persistent",
              "focus": "focused", "select": "selective", "disrupt": "disruptive",
              "ectoplasm": "ectoplasmic", "rider": "riding", "echo": "echoing",
-             "tenebrous": "tenebrous"}
+             "tenebrous": "tenebrous",
+             # Feat loop b5-spells:
+             "threnodic": "threnodic", "coaxing": "coaxing", "thanatopic": "thanatopic"}
 
 
 
