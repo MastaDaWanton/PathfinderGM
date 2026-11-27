@@ -524,6 +524,11 @@ def _docs_for(actor) -> list[dict]:
                     used["self"] = own
                 out.append(used)
             continue
+        # Feat loop b6-rules: the class's own document of the same key stands in its place
+        # (the monk's Stunning Fist, monk level times a day, over the feat's level / 4).
+        if any(_norm(d.get("key")) == _norm(doc.get("key"))
+               for d in (documents().get(cid) or {}).get("abilities") or ()):
+            continue
         out.append({**doc, "class": FEAT_KIND})
     from . import grantedpowers
 

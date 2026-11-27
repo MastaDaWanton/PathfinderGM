@@ -2510,8 +2510,13 @@
   "light": {
    "effects": [
     {
+     "type": "light",
+     "radius_ft": 20,
+     "raised_ft": 40
+    },
+    {
      "type": "narrative",
-     "target": "A touched object glows like a torch, shedding normal light in a 20-foot radius from the point touched and raising the light level one step for a further 20 feet — darkness to dim, dim to normal. In normal or bright light it does nothing. The effect is immobile but may be cast on a movable object. You can have only one light spell running at a time; casting another dispels the first, unless the earlier one was made permanent. It counters or dispels any darkness spell of equal or lower spell level."
+     "target": "The effect is immobile but may be cast on a movable object. You can have only one light spell running at a time; casting another dispels the first, unless the earlier one was made permanent."
     }
    ],
    "duration": {
@@ -2521,7 +2526,7 @@
     "dismissible": false
    },
    "converted_by": "read",
-   "notes": "Light levels have no spec type."
+   "notes": " Feat loop b6-rules (2026-11-27): the light model carries it (Scene.light_at, Engine._cast_light)."
   },
   "light-lance": {
    "effects": [

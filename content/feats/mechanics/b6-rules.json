@@ -1,0 +1,148 @@
+{
+  "_about": [
+    "Feat loop batch 6, lane b6-rules (2026-11-27): the base rules the book fully defines that",
+    "blocked feats — the dispel check, the counterspell feats, magical darkness, haste's tag,",
+    "Stalwart, the worn helmet, the Ki Throw line, the readied charge, Stunning Fist for any",
+    "class — and the leftover list. Text read in content/feats/feats.json (aonprd.com",
+    "FeatDisplay pages) 2026-11-27; the feats whose class no player can take are in",
+    "docs/feats-waiting-on-classes.md under 'Feat loop batch 6'.",
+    "improved-counterspell: CRB: 'When counterspelling, you may use a spell of the same school that is one or more spell levels higher than the target spell' (rules/readied.py `_higher_of_school`).",
+    "parry-spell: APG: 'Whenever you successfully counter a spell, it returns back to its caster. This works exactly like the spell turning spell' (rules/readied.py `_parried`).",
+    "disrupting-shot: APG: 'If you ready an action to shoot an opponent casting a spell within 30 feet and successfully hit that opponent with a ranged attack, the concentration DC to successfully cast the spell is increased by +4'.",
+    "dispel-synergy: UC: 'If you successfully dispel an ongoing magical effect on an opponent, that opponent takes a -2 penalty on saving throws against your spells until the end of your next turn' (rules/dispel.py `_synergy`).",
+    "tenacious-transmutation: APG: 'The DC of caster level checks to dispel or remove your transmutations increases by 2; even if the spell is negated, its effects persist for 1 additional round before dissipating' (rules/dispel.py `dc_of`, `_end`).",
+    "atheist-abjurations: F&P: 'You gain a +2 bonus to your caster level whenever you use an abjuration spell to dispel or counter a divine spell'.",
+    "umbral-spell: ISM: 'An umbral spell gains the darkness descriptor. As long as the spell is in effect, the creature or object affected radiates darkness in a 10-foot radius ... An umbral spell uses up a spell slot two levels higher' (rules/metamagic.py `umbral`, Engine._op_cast).",
+    "shadow-grasp: ISM: 'When you cast a spell with the darkness descriptor that affects an area, creatures in the area are entangled ... A Shadow Grasp spell uses up a slot one level higher' (Engine._shadow_grasp).",
+    "stalwart: ACG: 'While using the total defense action, fighting defensively action, or Combat Expertise, you can forgo the dodge bonus to AC you would normally gain to instead gain an equivalent amount of DR, to a maximum of DR 5/-, until the start of your next turn' (rules/stalwart.py).",
+    "improved-stalwart: ACG: 'Double the DR you gain from Stalwart, to a maximum of DR 10/-'.",
+    "stunning-fist: CRB: 'You may attempt a stunning attack once per day for every four levels you have attained' — any class's, content/class-abilities/feats-b6-rules.json; the monk's own document stands in its place.",
+    "improved-ki-throw: APG: 'you may throw your target into any square you threaten that is occupied by another creature. Make a bull rush combat maneuver check with a -4 penalty against the secondary target' (rules/maneuver_feats.py `_thrown_into`); Enhanced Ki Throw's landing damage and Spinning Throw's Improved Ki Throw clause are b4's documents, finished here (`_land`, `_spun_into`).",
+    "rhino-charge: APG: 'You may ready a charge, though you may only move up to your speed on the charge' (rules/readied.py READY_CHARGE, Engine._charge_before) — b4-moves' document, finished here.",
+    "antagonize: UM: Diplomacy or Intimidate, a standard action, DC 10 + HD + Wis; flustered (-2 on attacks at others for a minute) or enraged (turns on you next turn), once a day a target (rules/antagonize.py).",
+    "bouncing-spell: APG: a single-target spell with no effect (spell resistance, or a save that negates) redirected as a swift action to another creature in range (Engine._bounce); +1 level.",
+    "neither-elf-nor-human: ARG: 'You are not considered elven or human for the purpose of harmful spells or effects based on your type, like a bane weapon or a ranger's favored enemy' — against Elf Blood, which the lane made real for every half-elf (rules/sheet.py `_is_of_kind`).",
+    "demon-grafter: AP 74: 'You gain a +2 bonus on Heal checks regarding evil outsiders or creatures that already have a demonic graft' — the +2 against an outsider (alignment holds against any until it is tracked, the owner's 2026-10-05 ruling).",
+    "well-prepared: APG: once a day, Sleight of Hand DC 10 + the item's gp to have a mundane item the store sells, paid for (rules/well_prepared.py)."
+  ],
+  "improved-counterspell": {
+    "tags": [
+      "counterspell.improved"
+    ]
+  },
+  "parry-spell": {
+    "tags": [
+      "counterspell.parry"
+    ]
+  },
+  "disrupting-shot": {
+    "tags": [
+      "ready.disrupting-shot"
+    ]
+  },
+  "dispel-synergy": {
+    "tags": [
+      "dispel.synergy"
+    ]
+  },
+  "tenacious-transmutation": {
+    "tags": [
+      "dispel.tenacious.transmutation"
+    ]
+  },
+  "atheist-abjurations": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "caster_level",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "dispel_divine"
+        }
+      }
+    ],
+    "not_yet": [
+      "'or send an extraplanar outsider summoned or called by a divine caster back to its home plane': dismissal and banishment are told, not run, so there is no caster level check to add to"
+    ]
+  },
+  "umbral-spell": {
+    "metamagic": {
+      "does": "umbral",
+      "levels": 2
+    }
+  },
+  "shadow-grasp": {
+    "metamagic": {
+      "does": "shadow_grasp",
+      "levels": 1
+    },
+    "not_yet": [
+      "'An entangled creature remains so as long as it is in the area of the spell and for 1 round after it leaves. A creature that leaves and reenters the area must make a new saving throw': the entangle is laid once, at the cast, for the spell's rounds; leaving and re-entering the darkness are not asked",
+      "'If the spell allows spell resistance, failing to overcome a creature's spell resistance means it is not entangled': no spell resistance is rolled for the grasp (darkness and deeper darkness allow none)"
+    ]
+  },
+  "stalwart": {
+    "choice": "stalwart"
+  },
+  "improved-stalwart": {
+    "tags": [
+      "defence.stalwart.improved"
+    ]
+  },
+  "stunning-fist": {},
+  "improved-ki-throw": {
+    "tags": [
+      "maneuver.ki-throw.improved"
+    ]
+  },
+  "antagonize": {
+    "tags": [
+      "skill.antagonize"
+    ],
+    "not_yet": [
+      "'has a 10% spell failure chance on all spells that do not target you or that have you within their area of effect': no cast rolls a failure chance but armour's",
+      "'you may make a Sense Motive check (DC 20) as a swift action to gain an insight bonus on these Diplomacy or Intimidate checks equal to your Charisma bonus': the swift read before the check is not offered",
+      "'If it cannot attack you on its turn, you may make the check again as an immediate action to extend the effect for 1 round': the extension is not offered"
+    ]
+  },
+  "bouncing-spell": {
+    "metamagic": {
+      "does": "bounce",
+      "levels": 1
+    }
+  },
+  "neither-elf-nor-human": {
+    "tags": [
+      "harm.not-elf-or-human"
+    ]
+  },
+  "demon-grafter": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "heal",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "target": {
+            "type": "outsider",
+            "alignment": "evil"
+          }
+        }
+      }
+    ],
+    "not_yet": [
+      "'or creatures that already have a demonic graft' and 'you can create demonic implants ... as if you had the Craft Wondrous Item feat, using your ranks in Heal as your caster level': no demonic graft or implant is an item or a state in the game"
+    ]
+  },
+  "well-prepared": {
+    "tags": [
+      "skill.sleight-of-hand.well-prepared"
+    ],
+    "not_yet": [
+      "'If you are stripped of your equipment or possessions, you lose the benefits of this feat until you have at least a day to resupply': being stripped is not a state the engine keeps",
+      "Special: 'a character can substitute the Survival skill for Sleight of Hand' (at the GM's option) is not offered"
+    ]
+  }
+}

@@ -1620,24 +1620,70 @@ class Scene:
 
         A `light` effect moves with whoever carries it (the sunrod struck in a hand, the
         torch a tindertwig lit), so its square is the carrier's square, read live."""
+        return [(spot, r, rr, name) for spot, r, rr, name, *_ in self._lit("light")]
+
+    def _lit(self, key: str) -> list[tuple]:
+        """Every carried `light` or `darkness` payload here: (square, radius, raised ring,
+        name, bright, magic level, steps). The magic level is the casting spell's (its
+        `dispel.stamp`), None for a light no spell made — a torch, a sunrod (feat loop
+        b6-rules: "magical light only does so if of a higher spell level", CRB)."""
+        from . import dispel as dispel_mod
+
         out = []
         for ref, actor in self.actors.items():
             pos = self.positions.get(ref)
             if pos is None:
                 continue
             for e in actor.effects:
-                lit = (e.payload or {}).get("light")
+                lit = (e.payload or {}).get(key)
                 if isinstance(lit, dict):
                     # Torch Handling (Dungeoneer's Handbook, feat loop b5-spells): "the
                     # radius of normal and increased illumination shed by any torch or
                     # mundane light source you carry increases by 10 feet" — a light an
                     # item lit (`item:` origin), never a spell's.
-                    more = 10 if str(e.origin or "").startswith("item:") \
-                        and actor.has_state(states.LIGHT_WIDER) else 0
+                    more = 10 if key == "light" and str(e.origin or "").startswith("item:")                         and actor.has_state(states.LIGHT_WIDER) else 0
+                    magic = int(dispel_mod.cast_of(e).get("level") or 0)                         if str(e.origin or "").startswith("spell:") else None
                     out.append((tuple(pos[:2]), int(lit.get("radius_ft") or 0) + more,
                                 int(lit.get("raised_ft") or 0) + more,
-                                e.name or "a light"))
+                                e.name or "a light", lit.get("bright") in ("yes", True),
+                                magic, int(lit.get("steps") or 1)))
         return out
+
+    def darkness_at(self, square) -> tuple[int, int]:
+        """Magical darkness over a square: (steps lowered, its spell level), (0, -1) where
+        none reaches. "This effect does not stack with itself or with any other effect that
+        creates darkness" (Umbral Spell; deeper darkness "does not stack with itself"):
+        the deepest one counts, and the highest spell level among those reaching.
+
+        With no map the scene is one room's worth of space (as `_cast_buff` reads a burst
+        with no board): every darkness carried here reaches it. Measured on the owner's
+        campaign 2026-11-27: darkness cast in a mapless scene lowered nothing."""
+        if square is None:
+            if self.has_grid:
+                return 0, -1
+            from . import dispel as dispel_mod
+
+            steps, level = 0, -1
+            for actor in self.actors.values():
+                for e in actor.effects:
+                    zone = (e.payload or {}).get("darkness")
+                    if isinstance(zone, dict):
+                        steps = max(steps, int(zone.get("steps") or 1))
+                        level = max(level, int(dispel_mod.cast_of(e).get("level") or 0))
+            return steps, level
+        here = (int(square[0]), int(square[1]))
+        steps, level = 0, -1
+        for spot, radius, _r, _n, _b, magic, n in self._lit("darkness"):
+            if gridmod.distance(spot, here) <= radius:
+                steps, level = max(steps, n), max(level, magic or 0)
+        return steps, level
+
+    def supernatural_dark(self, square) -> bool:
+        """Deeper darkness (CRB): "Areas of dim light and darkness become supernaturally
+        dark. This functions like darkness, but even creatures with darkvision cannot see
+        within it" — two steps over ground already dim or dark."""
+        steps, _ = self.darkness_at(square)
+        return steps >= 2 and self.LIGHT_LEVELS.index(self.ambient_light()) <= 1
 
     def light_at(self, square, viewer=None) -> str:
         """The light level at a square — "dark", "dim", "normal" or "bright" — as `viewer`
@@ -1652,9 +1698,19 @@ class Scene:
         color and detail under these conditions", which is this app's reading of what the
         doubling means under an unbounded sky. Darkvision is the attack's to ask
         (`Actor.concealment`), by distance.
+
+        Magical darkness (feat loop b6-rules; CRB darkness: "causes the illumination level
+        in the area to drop one step ... Nonmagical sources of light, such as torches and
+        lanterns, do not increase the light level in an area of darkness. Magical light
+        sources only increase the light level in an area if they are of a higher spell
+        level than darkness"): the ambient level lowered by its steps, and only a spell's
+        light of a higher level raises it again. Daylight's radius is bright.
         """
         levels = self.LIGHT_LEVELS
         level = levels.index(self.ambient_light())
+        dark_steps, dark_level = self.darkness_at(square)
+        if dark_steps:
+            level = max(0, level - dark_steps)
         eyes = viewer.eyes() if viewer is not None and hasattr(viewer, "eyes") else {}
         if eyes.get("low_light") and levels[level] == "dim":
             level = levels.index("normal")
@@ -1663,12 +1719,15 @@ class Scene:
         mult = 2 if eyes.get("low_light") else 1
         here = (int(square[0]), int(square[1]))
         best = level
-        for spot, radius, raised, _ in self.lights():
+        for spot, radius, raised, _, bright, magic, _n in self._lit("light"):
+            if dark_steps and (magic is None or magic <= dark_level):
+                continue
             feet = gridmod.distance(spot, here)
             if radius and feet <= radius * mult:
-                best = max(best, levels.index("normal"))
+                best = max(best, levels.index("bright" if bright else "normal"))
             elif raised and feet <= raised * mult:
-                best = max(best, min(level + 1, levels.index("normal")))
+                best = max(best, min(level + 1, levels.index("bright" if bright
+                                                             else "normal")))
         return levels[best]
 
     def sees_nothing(self, viewer, subject=None) -> bool:
@@ -1687,7 +1746,9 @@ class Scene:
             return False
         eyes = viewer.eyes() if hasattr(viewer, "eyes") else {}
         dark_ft = int(eyes.get("darkvision") or 0)
-        if not dark_ft:
+        # Feat loop b6-rules: deeper darkness's supernatural dark, where "even creatures
+        # with darkvision cannot see" (`Scene.supernatural_dark`).
+        if not dark_ft or self.supernatural_dark(self.positions.get(getattr(who, "ref", ""))):
             return True
         here = self.positions.get(getattr(viewer, "ref", ""))
         there = self.positions.get(getattr(who, "ref", ""))
@@ -8100,8 +8161,14 @@ class Engine:
         if before is not None:
             taken = int(before) - self._wounds_left(actor)
             if taken > 0:
-                situations.append(("damaged", 10 + taken + level,
-                                   f"struck for {taken} while casting"))
+                # Feat loop b6-rules: Disrupting Shot's +4 (rules/readied.py DISRUPTING).
+                # shortcut: asked as "struck, and a disrupting shooter's readied shot was
+                # among the blows", not of that one shot's hit; upgrade when the readied
+                # blows report back which of them landed.
+                shot = self.scene.actors.get(str(intent.params.get("disrupting_shot") or ""))
+                situations.append(("damaged", 10 + taken + level + (4 if shot else 0),
+                                   f"struck for {taken} while casting"
+                                   + (f" ({shot.name}'s Disrupting Shot)" if shot else "")))
         if bool(intent.params.get("defensively")):
             # Disruptive (CRB): "The DC to cast spells defensively increases by +4 for all
             # enemies that are within your threatened area ... only if you are aware of
@@ -11587,6 +11654,10 @@ class Engine:
             state["tells"].extend(early_said + self._lay_attack_stances(
                 actor, () if intent.params.get("cleaving") else choices + guard,
                 defender=defender))
+            if "stalwart" in choices and not intent.params.get("cleaving"):
+                from . import stalwart     # feat loop b6-rules
+
+                state["tells"].extend(stalwart.convert(actor))
             if intent.params.get("lunge_tell"):
                 state["tells"].append(str(intent.params["lunge_tell"]))
             state["tells"].extend(self._lower_shield_for_bash(actor, weapon, off_key))
@@ -13485,14 +13556,18 @@ class Engine:
         params = dict(intent.params)
         spring = bool(params.get("spring_attack")) and not params.get("charge")
         what = "Spring Attack" if spring else "a charge"
-        why = self._coup_round_spent(actor, what, "Nothing is rolled.")
+        # Feat loop b6-rules: a readied charge (Rhino Charge, rules/readied.py) was paid
+        # for when it was readied, and runs "up to your speed" only.
+        readied_charge = params.get("reaction") == "readied" and not spring
+        why = "" if readied_charge else self._coup_round_spent(actor, what,
+                                                                "Nothing is rolled.")
         # Spring Attack: "You cannot use this ability to attack a foe that is adjacent to
         # you at the start of your turn" — read at the action (the turn's first act).
         if not why and actor.blocking_key("move"):
             why = f"{actor.name} cannot move, and {what} is a move."
         speed = int(getattr(actor, "speed_feet", 0) or 0)
         one_action = actor.has_state(states.ONE_ACTION_TURN)
-        budget = speed if (spring or one_action) else 2 * speed
+        budget = speed if (spring or one_action or readied_charge) else 2 * speed
         found = why or self._charge_path(actor, defender, weapon_key, budget,
                                          straight=not spring)
         if isinstance(found, str):
@@ -14147,8 +14222,9 @@ class Engine:
             said = self._lay_attack_stances(actor, ("lunge",), defender=defender)
             raw["params"] = dict(raw.get("params") or {}, lunge_tell=" ".join(said))
             intent = _intent_from_dict(raw)
+        # Feat loop b6-rules: a readied charge (Rhino Charge) walks too.
         if (intent.params.get("charge") or intent.params.get("spring_attack")) \
-                and not intent.params.get("reaction"):
+                and intent.params.get("reaction") in (None, "", "readied"):
             return self._charge_before(raw, intent, actor, defender, weapon_key)
         found = self._closing_step(intent, actor, defender, weapon_key)
         if found is None:
@@ -28656,12 +28732,18 @@ class Engine:
         effect = self.total_defense_effect(actor)
         actor.apply_effect(effect)
         n = effect.modifiers[0]["amount"]
+        # Feat loop b6-rules: Stalwart's trade (rules/stalwart.py).
+        from . import stalwart as stalwart_mod
+
+        traded = stalwart_mod.convert(actor) if intent.params.get("stalwart") \
+            and stalwart_mod.held(actor) else []
         return Outcome(
             intent_id=intent.id, op="total_defense",
             effects=[{"ref": actor.ref, "kind": "condition", "condition": "total defense",
                       "rounds": 1, "origin": "rule:total-defense"}],
             tell=f"{actor.name} gives up attacking to guard (total defense): +{n} armour "
-                 f"class until their next turn, and no attacks of opportunity.",
+                 f"class until their next turn, and no attacks of opportunity."
+                 + "".join(" " + t for t in traded),
             because=intent.because)
 
     # Crane Wing's tags (its feat document's): the wing itself, and Crane Riposte's
@@ -31695,6 +31777,8 @@ class Engine:
                          "spared": dict(state.get("spared") or {}),
                          "area_measured": bool((state.get("area") or {}).get("measured"))})
         cast_ctx["buffs_said"] = {}
+        # Feat loop b6-rules: the copy's transforms, for Shadow Grasp (`_cast_light`).
+        cast_ctx["metamagic"] = tuple(getattr(spell, "metamagic_flags", None) or ())
         ran, said = self._run_specs(plan["riders"], cast_ctx)
         effects.extend(ran)
         tells.extend(said)
@@ -31702,6 +31786,27 @@ class Engine:
         for spec in plan["riders"]:
             if not self._executes(spec):
                 tells.append(effectspec.render(spec) + ".")
+        # Feat loop b6-rules: every effect this cast laid carries its caster level, the
+        # number a dispel check is made against (rules/dispel.py `stamp`).
+        from . import dispel as dispel_mod
+
+        if metamagic.flag(spell, "umbral"):
+            # Umbral Spell (ISM): "the creature or object affected radiates darkness in a
+            # 10-foot radius, reducing illumination similar to the effects of the darkness
+            # spell" — on each creature it reached, for the spell's own rounds.
+            for ref in [r for r in live if r in self.scene.actors] or [actor.ref]:
+                got, words = self._cast_light({"type": "darkness", "radius_ft": 10,
+                                               "steps": 1}, {**cast_ctx, "targets": [ref]})
+                effects.extend(got)
+                tells.extend(words)
+        dispel_mod.stamp(self.scene, actor, spell, cl, level, cast_ctx["origin"], live)
+        if metamagic.flag(spell, "bounce") and not item:
+            got, words, rolled = self._bounce(intent, actor, spell, cl, level, dc, live,
+                                              state)
+            effects.extend(got)
+            tells.extend(words)
+            state["rolls"].extend(rolled)
+        state["rolls"].extend(r.as_dict() for r in cast_ctx.pop("dispel_rolls", ()))
 
         # A spell that harms a foe it reached is an attack for invisibility's purposes —
         # "any spell targeting a foe or whose area or effect includes a foe" (CRB p.301),
@@ -32296,6 +32401,8 @@ class Engine:
     # +1 lands now, timed and typed, and says so.
 
     _EXECUTES = ("manifest", "summon", "spell_operation", "concealment", "object_damage",
+                 # Feat loop b6-rules: a spell's light or magical darkness (`_cast_light`).
+                 "light", "darkness",
                  "choose_one", "bundle", "attitude", "spell_resistance",
                  # The spells that affect metal (leatherworking plan §18.5). `touch_attack`
                  # is rolled before the dice (`_touches`) and does nothing as a rider; it is
@@ -32710,6 +32817,8 @@ class Engine:
             return self._summon(spec, ctx)
         if kind == "spell_operation":
             return self._spell_operation(spec, ctx)
+        if kind in ("darkness", "light"):
+            return self._cast_light(spec, ctx)
         if kind == "concealment":
             return self._conceal(spec, ctx)
         if kind == "object_damage":
@@ -33423,6 +33532,21 @@ class Engine:
         who = self._recipient(spec, ctx)
         named = str(spec.get("target") or "").strip()
         effects: list[dict] = []
+        if op == "dispel" and spec.get("dispel_cap") and who is not None:
+            # Feat loop b6-rules: the targeted dispel check (rules/dispel.py) — dispel
+            # magic's one roll against each spell's own caster level, highest first.
+            from . import dispel as dispel_mod
+
+            caster = self.scene.actors.get(str(ctx.get("caster") or ""))
+            if caster is not None:
+                sid = str(ctx.get("spell_id") or "")
+                school = str(getattr(spells_mod.get(sid), "school", "") or "").lower() \
+                    if sid else ""
+                got, said, rolls = dispel_mod.targeted(
+                    self, caster, who, int(ctx.get("caster_level") or 1), sid, school,
+                    str(ctx.get("origin") or ""))
+                ctx.setdefault("dispel_rolls", []).extend(rolls)
+                return got, said
 
         if spec.get("check_dc"):
             dc = effectspec.evaluate(spec["check_dc"], ctx.get("vars") or {})
@@ -33513,6 +33637,165 @@ class Engine:
                         owner.remove_effects(match=lambda e, h=holder: e is h)
                         break
         return {"what": what, "was": left, "now": getattr(holder, "rounds_left", None)}
+
+    def _bounce(self, intent: Intent, actor: Actor, spell, cl: int, level: int, dc: int,
+                live: list, state: dict) -> tuple[list[dict], list[str], list[dict]]:
+        """Bouncing Spell (APG; feat loop b6-rules): a single-target spell that "has no
+        effect on its intended target (whether due to spell resistance or a successful
+        saving throw)" may be redirected "as a swift action ... to target another eligible
+        creature within range. The redirected spell behaves in all ways as if its new
+        target were the original target" — but "Spells that affect a target in any way
+        (including a lesser effect from a successful saving throw) may not be redirected".
+        No effect: spell resistance held, or a made save against a spell whose save
+        negates. Owner call: the engine picks the new target, the nearest other creature on
+        the first target's side within the spell's range (the bar asks no second aim).
+        Recast through the item door (`partial["item_cast"]`): no slot again."""
+        if len(live) != 1 or live[0] == actor.ref:
+            return [], [], []
+        first = self.scene.actors.get(live[0])
+        if first is None:
+            return [], [], []
+        resisted = (state.get("sr") or {}).get(first.ref) is False
+        saved = any(v.get("saved") for k, v in (state.get("saved") or {}).items()
+                    if k.endswith(f":{first.ref}"))
+        negates = str(getattr(spell, "save_effect", "") or "").lower() == "negates"
+        if not (resisted or (saved and negates)):
+            return [], [], []
+        reach = spells_mod.range_feet(spell, cl)
+        side = next((s for s, refs in (self.scene.sides or {}).items()
+                     if first.ref in refs), None)
+        others = [a for s, refs in (self.scene.sides or {}).items() if s == side
+                  for a in (self.scene.actors.get(r) for r in refs)
+                  if a is not None and a.ref not in (first.ref, actor.ref) and not a.is_dead]
+        far = {a.ref: self._gap_ft(actor, a) for a in others}
+        others = [a for a in others if reach is None or far[a.ref] is None
+                  or far[a.ref] <= reach]
+        if not others:
+            return [], [f"The bouncing {spell.name} finds nobody else in range to go to."], []
+        why = self._spend_swift(actor, False, "Bouncing Spell")             if self.scene.in_encounter else ""
+        if why:
+            return [], [f"Bouncing Spell: {why}"], []
+        to = min(others, key=lambda a: (far[a.ref] if far[a.ref] is not None else 0, a.ref))
+        again = Intent(op="cast", actor=actor.ref, target=to.ref,
+                       params={"spell": spell.id, "at": to.ref, "reaction": "bounced"},
+                       visibility="hidden", because="Bouncing Spell",
+                       origin=f"spell:{spell.id}", origin_name=spell.name)
+        res = self._op_cast(again, {"item_cast": {"cl": cl, "level": level, "dc": dc,
+                                                  "origin": f"spell:{spell.id}",
+                                                  "name": spell.name}})
+        return (list(res.effects or ()),
+                [f"The spell has no hold on {first.name} and bounces to {to.name} "
+                 f"(Bouncing Spell): {res.tell}"],
+                [r.as_dict() for r in res.rolls or ()])
+
+    def _cast_light(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
+        """A spell's light or magical darkness, carried by whoever it was cast on (the
+        touched object's bearer; the caster when cast at nobody) for the spell's rounds —
+        the `light`/`darkness` payload `Scene.light_at` reads (feat loop b6-rules).
+
+        A `light` spec runs on a cast only for a spell with the light descriptor: the
+        part-21 fire spells' light (a flaming sphere's) belongs where the fire is, and stays
+        told. The light/darkness interplay (CRB: light "counters or dispels any darkness
+        spell of equal or lower spell level", darkness likewise): a spell of the one
+        descriptor laid where a lower-or-equal spell of the other reaches dispels it and is
+        spent doing so (owner call, b6-rules: the newer spell is the one used to dispel)."""
+        from . import dispel as dispel_mod
+        from . import effectspec as fx
+
+        kind = str(spec.get("type") or "")
+        descriptors = {str(d).lower() for d in ctx.get("descriptors") or ()}
+        if kind == "light" and "light" not in descriptors:
+            return [], [fx.render(spec) + "."]
+        who = self._recipient(spec, ctx)
+        if who is None:
+            return [], []
+        level = int((ctx.get("vars") or {}).get("spell_level") or 0)
+        other = "darkness" if kind == "light" else "light"
+        square = self.scene.positions.get(who.ref)
+        if square is not None:
+            for ref, holder in list(self.scene.actors.items()):
+                pos = self.scene.positions.get(ref)
+                for e in list(holder.effects):
+                    zone = (e.payload or {}).get(other)
+                    if not isinstance(zone, dict) or pos is None                             or not str(e.origin or "").startswith("spell:")                             or int(dispel_mod.cast_of(e).get("level") or 0) > level:
+                        continue
+                    reach = int(zone.get("raised_ft") or zone.get("radius_ft") or 0)
+                    if gridmod.distance(tuple(pos[:2]), tuple(square[:2])) > reach:
+                        continue
+                    holder.remove_effects(match=lambda x, h=e: x is h)
+                    return ([{"kind": "dispelled", "ref": ref, "spell": e.source,
+                              "by": ctx.get("source"), "origin": ctx.get("origin")}],
+                            [f"{ctx.get('source')} meets {e.source} and the two cancel: "
+                             f"{e.source} is dispelled and {ctx.get('source')} spent."])
+        rounds = ctx.get("rounds")
+        if kind == "light":
+            payload = {"light": {"radius_ft": int(spec.get("radius_ft") or 0),
+                                 "raised_ft": int(spec.get("raised_ft") or 0),
+                                 "bright": str(spec.get("bright") or "no")}}
+        else:
+            payload = {"darkness": {"radius_ft": int(spec.get("radius_ft") or 20),
+                                    "steps": int(spec.get("steps") or 1)}}
+        if kind == "darkness" and "shadow_grasp" in (ctx.get("metamagic") or ()):
+            grasped = self._shadow_grasp(who, int(payload["darkness"]["radius_ft"]), ctx)
+        else:
+            grasped = ([], [])
+        who.apply_effect(ActiveEffect(
+            name=str(ctx.get("source") or kind), kind="effect",
+            key="light.carried" if kind == "light" else "darkness.radiating",
+            source=str(ctx.get("source") or kind), origin=str(ctx.get("origin") or ""),
+            duration="rounds" if rounds else "until-dismissed", rounds_left=rounds,
+            tags=("light.carried",) if kind == "light" else ("darkness.radiating",),
+            payload=payload))
+        body = payload[kind]
+        said = (f"Light spreads from {who.name}: {'bright' if body.get('bright') == 'yes' else 'normal'}"
+                f" to {body['radius_ft']} ft" + (f", brighter to {body['raised_ft']} ft"
+                                                  if body.get("raised_ft") else "")
+                if kind == "light" else
+                f"Darkness spreads from {who.name} to {body['radius_ft']} ft, the light "
+                f"lowered {'two steps' if body['steps'] == 2 else 'a step'}")
+        return ([{"kind": kind, "ref": who.ref, "rounds": rounds, "origin": ctx.get("origin"),
+                  **body}] + grasped[0], [said + f"{_span(rounds)}."] + grasped[1])
+
+    def _shadow_grasp(self, centre, radius: int, ctx: dict) -> tuple[list[dict], list[str]]:
+        """Shadow Grasp (ISM): "creatures in the area are entangled. If the spell allows a
+        saving throw, a successful save negates the entangle effect. If the spell does not
+        normally allow a save, a creature can make a Reflex save (DC = the spell's DC if it
+        had a saving throw) ... You are never impeded by the effects of your spells modified
+        by this feat." Everyone but the caster within the darkness's radius saves (the
+        spell's own save, else Reflex) or is entangled for the spell's rounds.
+
+        shortcut: the entangle lasts the spell's rounds wherever the creature goes, and the
+        save is the engine's die for a player too; the book's "as long as it is in the area
+        and for 1 round after it leaves" and the new save on re-entering need the area to
+        be asked on every move — upgrade with a darkness `manifest` when manifests can carry
+        light."""
+        caster = self.scene.actors.get(str(ctx.get("caster") or ""))
+        here = self.scene.positions.get(centre.ref)
+        if caster is None or here is None:
+            return [], []
+        save = str(ctx.get("spell_save") or "") or "ref"
+        save = save if save in ("fort", "ref", "will") else "ref"
+        dc = int(ctx.get("dc") or 10)
+        effects, caught = [], []
+        for ref, who in self.scene.actors.items():
+            pos = self.scene.positions.get(ref)
+            if ref == caster.ref or pos is None or who.is_dead                     or gridmod.distance(tuple(here[:2]), tuple(pos[:2])) > radius:
+                continue
+            roll = self.dice.d20(who.save_modifiers(save, {"against": ("spell",),
+                                                         "attacker_actor": caster}),
+                                 label=f"{who.name}'s {SAVES[save]} save against the grasping "
+                                       f"dark", visibility="hidden")
+            if d20_succeeds(roll, dc):
+                continue
+            who.add_condition(metamagic.GRASP_CONDITION, rounds=ctx.get("rounds"),
+                              source=f"{ctx.get('source')} (Shadow Grasp)",
+                              origin=str(ctx.get("origin") or ""))
+            effects.append({"kind": "condition", "ref": ref,
+                            "condition": metamagic.GRASP_CONDITION,
+                            "rounds": ctx.get("rounds"), "origin": ctx.get("origin")})
+            caught.append(who.name)
+        return effects, ([f"Shadows grip {', '.join(caught)}: entangled (Shadow Grasp)."]
+                         if caught else [])
 
     def _conceal(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
         """A miss chance, held as a buff so it expires on the clock everything else uses."""
@@ -35342,7 +35625,10 @@ class Engine:
         light = self.scene.light_at(square, viewer=attacker)
         got = defender.concealment(attacker, light=light,
                                    fog=self._fog_chance(attacker, defender),
-                                   light_ft=self._gap_ft(attacker, defender),
+                                   # Feat loop b6-rules: no darkvision reaches into
+                                   # deeper darkness's supernatural dark.
+                                   light_ft=10 ** 6 if self.scene.supernatural_dark(square)
+                                   else self._gap_ft(attacker, defender),
                                    ctx=None if ranged is None
                                    else {"weapon": {"ranged": bool(ranged)}})
         # Any hiding, not only a Stealth check's: a scheme's `state.hidden` too — a blow at
@@ -39608,7 +39894,9 @@ class Engine:
                                      and x.name == n)
                 actor.apply_effect(ActiveEffect(
                     name=name, kind="buff", source=name, origin=origin,
-                    duration="rounds", rounds_left=rounds, modifiers=mods))
+                    duration="rounds", rounds_left=rounds, modifiers=mods,
+                    # Feat loop b6-rules: an addon's own tags (Slow Time's `buff.haste`).
+                    tags=tuple(str(t) for t in mine.get("tags") or ())))
                 out.append({"ref": actor.ref, "kind": "buff", "ability": name,
                             "modifiers": mods, "rounds": rounds, "origin": origin})
                 tells.append(f"{actor.name}: " + ", ".join(
@@ -39662,6 +39950,12 @@ class Engine:
         if held and any(str(e.origin or "") == held for e in actor.effects):
             tells.append(f"{actor.name} is already under {held.split(':', 1)[-1]}; "
                          f"{name} adds nothing to it.")
+            return True
+        # Feat loop b6-rules: `unless_state`, a tag already held (Slow Time's haste asks
+        # `buff.haste`, which the haste spell's every term carries, `Spell.effect_tags`).
+        state = str(a.get("unless_state") or "")
+        if state and actor.has_state(state):
+            tells.append(f"{actor.name} is already hasted; {name} adds nothing to it.")
             return True
         per_day = int(a.get("per_day") or 0)
         if per_day <= 0:

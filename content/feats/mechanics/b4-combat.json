@@ -443,8 +443,8 @@
     ]
   },
   "enhanced-ki-throw": {
-    "not_yet": [
-      "'you can expend 1 ki point ... it takes damage as if you had hit it with an unarmed strike': Ki Throw's throw runs (feat loop b5-core), but no ki is spent and no unarmed damage is rolled on the landing"
+    "tags": [
+      "maneuver.ki-throw.enhanced"
     ]
   },
   "quivering-palm-adept": {

@@ -3112,7 +3112,10 @@
     "dismissible": false
    },
    "converted_by": "read",
-   "notes": "The +1 to attack rolls is given no bonus type by the text, so it is untyped; the AC and Reflex bonuses are explicitly dodge. Only the land speed is emitted as a speed spec — emitting fly, swim, burrow and climb specs would have handed a fly speed to a creature that has none, so the other modes are described instead."
+   "notes": "The +1 to attack rolls is given no bonus type by the text, so it is untyped; the AC and Reflex bonuses are explicitly dodge. Only the land speed is emitted as a speed spec — emitting fly, swim, burrow and climb specs would have handed a fly speed to a creature that has none, so the other modes are described instead.",
+   "effect_tags": [
+    "buff.haste"
+   ]
   },
   "hasten-judgment": {
    "effects": [

@@ -249,8 +249,8 @@
     ]
   },
   "rhino-charge": {
-    "not_yet": [
-      "'You may ready a charge': the engine has no readied action"
+    "tags": [
+      "ready.charge"
     ]
   },
   "elephant-stomp": {

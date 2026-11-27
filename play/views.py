@@ -942,11 +942,33 @@ _OPTION_SHAPES = {
     "ready_counterspell": ("act", "Ready: counterspell",
                            "Your standard action held: name a foe's spell as it is cast and "
                            "answer it with the same spell or dispel magic."),
+    # Feat loop b6-rules: Rhino Charge's readied charge (rules/readied.py READY_CHARGE).
+    "ready_charge_attacked": ("act", "Ready: charge an attacker",
+                              "Your standard action held: charge, up to your speed, the "
+                              "first foe who attacks you."),
+    "ready_charge_cast": ("act", "Ready: charge a caster",
+                          "Your standard action held: charge, up to your speed, a foe who "
+                          "begins a spell."),
+    # Feat loop b6-rules: Stalwart (rules/stalwart.py), beside Fight defensively or Combat
+    # Expertise; and Total defense with the trade.
+    "stalwart": ("swing", "Stalwart",
+                 "With Fight defensively or Combat Expertise: the dodge bonus becomes DR/— "
+                 "until your next turn."),
+    "total_defense_stalwart": ("act", "Total defense (Stalwart)",
+                               "Guard with the dodge bonus traded for DR/— until your next "
+                               "turn: no attacks, and no attacks of opportunity."),
     "total_defense": ("act", "Total defense",
                       "Your standard action spent guarding: no attacks, and no attacks of "
                       "opportunity."),
     "feint": ("act", "Feint", "Bluff against the target's guard: they lose their "
                               "Dexterity against your next melee blow."),
+    # Feat loop b6-rules: Antagonize (rules/antagonize.py), by either skill.
+    "antagonize_diplomacy": ("act", "Antagonize (fluster)",
+                             "Diplomacy against 10 + the target's Hit Dice + Wisdom: a "
+                             "minute of -2 on its attacks at anyone but you."),
+    "antagonize_intimidate": ("act", "Antagonize (enrage)",
+                              "Intimidate against 10 + the target's Hit Dice + Wisdom: it "
+                              "turns on you next turn."),
     "disengaging_feint": ("act", "Disengaging Feint",
                           "Bluff against the target's guard: win, and you may move away "
                           "without their swing."),
@@ -969,7 +991,9 @@ _SAID_IN_WORDS = frozenset({"pinpoint_targeting", "furious_finish", "pushing_ass
                             "dragonslayer", "wingclipper",
                             # Feat loop b4-combat:
                             "punch_through", "deadly_finish", "butterfly_sting",
-                            "hamatulatsu", "cockatrice_strike"})
+                            "hamatulatsu", "cockatrice_strike",
+                            # Feat loop b6-rules: its number is the DR, not the sheet's.
+                            "stalwart"})
 
 
 def _signed(n: int) -> str:
@@ -1160,6 +1184,13 @@ def _attack_options(pc) -> dict:
     guard = Engine.total_defense_effect(pc)
     own("total_defense", _option_numbers(ac=twin(effect=guard).ac() - base_ac),
         action="standard", op={"op": "total_defense"})
+    from rules import stalwart as stalwart_mod   # feat loop b6-rules
+
+    if stalwart_mod.held(pc):
+        n = int(guard.modifiers[0]["amount"])
+        dr = min(10, 2 * n) if pc.has_state(stalwart_mod.IMPROVED) else min(5, n)
+        own("total_defense_stalwart", f"DR {dr}/— in place of +{n} dodge AC",
+            action="standard", op={"op": "total_defense", "params": {"stalwart": True}})
     feint = skilluses.row(skilluses.FEINT)
     own("feint", f"Bluff {_signed(skill('bluff'))} against the target's guard",
         action=skilluses._action_of(pc, feint),
@@ -1182,6 +1213,12 @@ def _attack_options(pc) -> dict:
         own("disengaging_feint", f"Bluff {_signed(skill('bluff'))} against the target's guard",
             action="standard",
             op={"op": "check", "params": {"skill": "bluff", "feint": True, "disengage": True}})
+    from rules import antagonize as antagonize_mod   # feat loop b6-rules
+
+    if pc.has_state(antagonize_mod.TAG):
+        for sk in ("diplomacy", "intimidate"):
+            own(f"antagonize_{sk}", f"{sk.title()} {_signed(skill(sk))}", action="standard",
+                op={"op": "check", "params": {"skill": sk, "antagonize": True}})
     # Feat loop b5-core: the readied actions (rules/readied.py), each greyed with the
     # engine's own refusal.
     from rules import readied as readied_mod
@@ -1192,9 +1229,11 @@ def _attack_options(pc) -> dict:
             ("ready_charge", "charges_me", "attack", False),
             ("ready_cast", "casts", "attack", False),
             ("ready_patient", "enters_reach", "attack", True),
-            ("ready_counterspell", "casts", "counterspell", False)):
+            ("ready_counterspell", "casts", "counterspell", False),
+            ("ready_charge_attacked", "attacks_me", "charge", False),
+            ("ready_charge_cast", "casts", "charge", False)):
         why = readied_mod.refusal(pc, trigger, action, patient)
-        if why and (patient or action == "counterspell"):
+        if why and (patient or action in ("counterspell", "charge")):
             continue                       # offered only to those who may take it
         own(key, readied_mod.said(action, trigger), why=why,
             action="full-round" if patient else "standard",

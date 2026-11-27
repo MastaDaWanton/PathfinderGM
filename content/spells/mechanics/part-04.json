@@ -1387,8 +1387,13 @@
   "continual-flame": {
    "effects": [
     {
+     "type": "light",
+     "radius_ft": 20,
+     "raised_ft": 40
+    },
+    {
      "type": "narrative",
-     "target": "A flame as bright as a torch springs from the touched object. It looks like fire but gives off no heat and consumes no oxygen. It can be covered and hidden but never smothered or quenched. As a light spell it counters and dispels darkness spells of equal or lower level."
+     "target": "It looks like fire but gives off no heat and consumes no oxygen. It can be covered and hidden but never smothered or quenched."
     }
    ],
    "duration": {
@@ -1396,7 +1401,7 @@
     "dismissible": false
    },
    "converted_by": "read",
-   "notes": "Creates light on an object. Despite the name it deals no damage and is not a fire effect — no element is emitted, and no damage spec belongs here."
+   "notes": "Creates light on an object. Despite the name it deals no damage and is not a fire effect — no element is emitted, and no damage spec belongs here. Feat loop b6-rules (2026-11-27): the light model carries it (Scene.light_at, Engine._cast_light)."
   },
   "control-construct": {
    "effects": [

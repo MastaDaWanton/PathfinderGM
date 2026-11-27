@@ -316,6 +316,8 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                            "feint", "tumble", "care", "display", "square",
                            # Disengaging Feint's feint (feat loop b2, skilluses.feint).
                            "disengage",
+                           # Antagonize's door (feat loop b6-rules, rules/antagonize.py).
+                           "antagonize", "well_prepared",
                            # Round 2 (skills-mind): the thing appraised or studied, and
                            # the subject a Knowledge question is about: names the engine
                            # grounds (`tradecraft.carries`, the world's own index), never
@@ -400,7 +402,9 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                     # Feat loop b4-maneuver (sheet.ATTACK_CHOICES).
                     "tripping_twirl", "feinting_flurry", "gory_finish",
                     # Feat loop b5-maneuver (sheet.ATTACK_CHOICES).
-                    "furys_snare"),
+                    "furys_snare",
+                    # Feat loop b6-rules (sheet.ATTACK_CHOICES): Stalwart.
+                    "stalwart"),
                    "player"),
     # `lethality` because a Blood Bender paying for an ability in non-lethal
     # damage and one taking a sword are not in the same trouble.
@@ -479,7 +483,8 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Total defense (CRB, Combat): a standard action, +4 dodge AC (+6 with 3 ranks of
     # Acrobatics) and no attacks of opportunity until the next turn. Nothing to roll; the
     # combat bar's (`Engine._op_total_defense`), not offered to the reader.
-    "total_defense": ((), (), "hidden"),
+    # `stalwart`: Stalwart's trade of the dodge for DR (feat loop b6-rules).
+    "total_defense": ((), ("stalwart",), "hidden"),
     # Ready (CRB, Combat; feat loop b5-core): a trigger and an action from closed lists
     # (rules/readied.py TRIGGERS, ACTIONS); `patient` is Patient Strike's full-round
     # readying. The combat bar's (`Engine._op_ready`), never the reader's (CODE_ONLY_OPS).
@@ -1158,7 +1163,9 @@ FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "faile
                          "tripping_twirl", "feinting_flurry", "gory_finish",
                          "disengage", "squares_off",
                          # Feat loop b5-maneuver.
-                         "furys_snare"})
+                         "furys_snare",
+                         # Feat loop b6-rules.
+                         "stalwart"})
 from .skilluses import OWN_DOORS as _OWN_DOORS  # noqa: E402 — the uses with their own door
 
 
@@ -1567,7 +1574,11 @@ def _check_params(intent: Intent, index: int) -> None:
                               "and keep diversion.", "schema", index)
         # A use with its own row is rolled at the row's DC (rules/skilluses.py OWN_DOORS):
         # it needs nothing to beat from the plan, and a plan's number beside it is refused.
-        own = next(((sk, flag) for (sk, flag) in _OWN_DOORS if p.get(flag)), None)
+        # Feat loop b6-rules: one flag may be a use of two skills (Antagonize's Diplomacy
+        # or Intimidate): the skill named wins.
+        own = next(((sk, flag) for (sk, flag) in _OWN_DOORS
+                    if p.get(flag) and sk == p.get("skill")), None) \
+            or next(((sk, flag) for (sk, flag) in _OWN_DOORS if p.get(flag)), None)
         if own and own[0] != p.get("skill"):
             raise IntentError(f"check: {own[1]} is a use of {own[0]}. Make that the skill, "
                               f"or drop {own[1]}.", "schema", index)

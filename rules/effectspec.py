@@ -1459,10 +1459,33 @@ CATEGORIES: list[Category] = [
                           required=False,
                           hint="The outer radius of the step-brighter ring: 40 for a "
                                "torch, 60 for a sunrod. Empty: no ring."),
+                    # Feat loop b6-rules: daylight's "bright light in a 60-foot radius".
+                    Field("bright", "Bright, not normal, light", "choice", vocab="yes_no",
+                          required=False, default="no",
+                          hint="Daylight sheds bright light in its radius; a torch "
+                               "normal light."),
                 ],
                 blocked="Read by the light model (Scene.light_at) wherever its carrier "
                         "stands, and so by the attack's miss chance: dim light is 20%, "
-                        "darkness 50%, unless the attacker's eyes say otherwise."),
+                        "darkness 50%, unless the attacker's eyes say otherwise. Cast by "
+                        "a spell with the light descriptor it lands on whoever the spell "
+                        "touched, and a light spell's level is weighed against magical "
+                        "darkness."),
+            # Feat loop b6-rules: magical darkness (CRB, Vision and Light; darkness, deeper
+            # darkness). Carried like a light, read by `Scene.light_at`.
+            EffectType(
+                "darkness", "Magical darkness", "Light lowered one step within 20 ft", [
+                    Field("radius_ft", "Radius (feet)", "int",
+                          hint="20 for darkness, 60 for deeper darkness, 10 for an "
+                               "umbral spell."),
+                    Field("steps", "Steps lowered", "int",
+                          hint="1 for darkness, 2 for deeper darkness (whose dim and dark "
+                               "become supernaturally dark: darkvision fails)."),
+                ],
+                blocked="Read by the light model (Scene.light_at): the level within the "
+                        "radius drops by the steps; nonmagical light cannot raise it, and "
+                        "magical light only when of a higher spell level. Does not stack "
+                        "with itself or other darkness: the deepest one counts."),
             # Routed to the same `bestiary.instantiate` the `spawn` op uses rather than
             # given a creature system of its own. That is the whole design: a summoning
             # spell and a GM saying "two thugs step out of the dark" are the same event.
@@ -1513,6 +1536,13 @@ CATEGORIES: list[Category] = [
                           required=False, default="no",
                           hint="Greater dispel magic ends every effect it beats, not "
                                "the one the caster names."),
+                    # Feat loop b6-rules: the dispel check itself (rules/dispel.py).
+                    Field("dispel_cap", "Dispel check: caster level cap", "int",
+                          required=False,
+                          hint="A dispel check, 1d20 + caster level up to this cap, "
+                               "against 11 + each spell's own caster level: 10 for "
+                               "dispel magic, 20 for greater dispel magic (which ends "
+                               "one spell per four caster levels)."),
                 ],
                 blocked="Making permanent, ending and holding off are applied to the "
                         "real lifetimes the engine keeps — a buff's rounds, a "
@@ -2447,6 +2477,14 @@ def _alchemy_problems(spec: dict, type_id: str, path: str) -> list[str]:
         if (r or 0) <= 0 and (raised or 0) <= 0 and r is not None:
             out.append(f"{path}: a light with no lit radius and no ring lights nothing. A "
                        f"candle is radius 0, raised 5.")
+    elif type_id == "darkness":
+        r, n = number("radius_ft"), number("steps")
+        if r is not None and r <= 0:
+            out.append(f"{path}: darkness covers a radius of more than 0 feet: 20 for "
+                       f"darkness, 60 for deeper darkness.")
+        if n is not None and n not in (1, 2):
+            out.append(f"{path}: darkness lowers the light 1 step (darkness) or 2 (deeper "
+                       f"darkness).")
     elif type_id == "burning":
         rounds = number("rounds")
         if "rounds" in spec and (rounds is None or rounds < 1):
@@ -2687,6 +2725,9 @@ AGAINST: dict[str, str] = {
     # distraction effect (such as the distraction ability of a swarm)".
     "fatigue": "a save against an effect that would leave you fatigued or exhausted",
     "distraction": "a Fortitude save against a swarm's distraction (Engine._distraction)",
+    # Feat loop b6-rules: Atheist Abjurations' "+2 bonus to your caster level whenever you
+    # use an abjuration spell to dispel or counter a divine spell" (rules/dispel.py).
+    "dispel_divine": "a dispel check made with an abjuration against a divine spell",
 }
 
 
@@ -3242,10 +3283,14 @@ def render(spec: dict, *, against: bool = False) -> str:
         body = body[:1].upper() + body[1:]
     elif t in _MAGIC_RENDER:
         body = _MAGIC_RENDER[t](spec)
+    elif t == "darkness":
+        body = (f"Magical darkness to {spec.get('radius_ft') or '?'} ft, the light "
+                f"lowered {spec.get('steps') or 1} step(s)")
     elif t == "light":
         bits = []
         if spec.get("radius_ft"):
-            bits.append(f"Normal light {spec['radius_ft']} ft")
+            bits.append(f"{'Bright' if spec.get('bright') == 'yes' else 'Normal'} light "
+                        f"{spec['radius_ft']} ft")
         if spec.get("raised_ft"):
             bits.append(f"one step brighter out to {spec['raised_ft']} ft")
         body = ", ".join(bits) or "Light"

@@ -116,13 +116,19 @@
     ]
   },
   "cloven-helm": {
+    "modifiers": [
+      {"type": "combat_mod", "target": "crit_confirm_against", "amount": -1, "bonus_type": "untyped", "when": {"bearer": {"state": "gear.helmet"}}, "note": "Dented Helm: 'When wearing a helmet, you add +1 to your AC against critical hit confirmation rolls'"}
+    ],
     "not_yet": [
-      "every clause asks 'when wearing a helmet': no helmet is an item a sheet can wear (lane b5-core is building one)"
+      "'When you use Dented Helm to deflect a critical hit, you may apply all damage from the critical hit to your helmet ... If you take no damage, any additional effects ... are negated': the +1 AC against confirmation is built (feat loop b6-rules); the deflection it widens is Dented Helm's, not built"
     ]
   },
   "dented-helm": {
+    "modifiers": [
+      {"type": "combat_mod", "target": "crit_confirm_against", "amount": -1, "bonus_type": "untyped", "when": {"bearer": {"state": "gear.helmet"}}, "note": "Dented Helm: 'When wearing a helmet, you add +1 to your AC against critical hit confirmation rolls'"}
+    ],
     "not_yet": [
-      "every clause asks 'when wearing a helmet': no helmet is an item a sheet can wear (lane b5-core is building one)"
+      "'When a critical hit is confirmed against you, as an immediate action, you can apply half of the damage from the attack to your helmet rather than yourself, applying hardness as normal ... After using this feat, you are staggered until the end of your next turn': the +1 AC against confirmation is built (feat loop b6-rules, rules/helmet.py); the immediate-action deflection into the helmet is not — a worn cap or helm carries no hardness or hit points the damage could go to, and nothing offers the reaction after a confirmed critical"
     ]
   },
   "brewmaster": {

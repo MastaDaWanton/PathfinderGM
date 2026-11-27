@@ -46,13 +46,19 @@ TRIGGERS = {
     "casts": "a foe begins casting a spell",
     "charges_me": "a foe charges them",
 }
-# What may be readied: a single attack, or a counterspell (CRB, Magic, Counterspells).
-# A readied charge is Rhino Charge's alone (`READY_CHARGE`), and not built (see the report).
-ACTIONS = ("attack", "counterspell")
+# What may be readied: a single attack, or a counterspell (CRB, Magic, Counterspells), and
+# a charge — Rhino Charge's alone (`READY_CHARGE`; feat loop b6-rules): "You may ready a
+# charge, though you may only move up to your speed on the charge" (APG).
+ACTIONS = ("attack", "counterspell", "charge")
+READY_CHARGE = "ready.charge"
+ATTACKS = ("attack", "charge")             # the readied actions that swing
 # Feat tags read here, each a feat document's `tags` line:
 STRIKE_BACK = "ready.strike-back"      # Strike Back (CRB): a melee foe out of reach
 PATIENT = "ready.patient"              # Patient Strike: readied as a full-round action
 MASKED = "counterspell.masked"         # Spell Bluff: +4 on the counterspeller's DC
+IMPROVED = "counterspell.improved"     # Improved Counterspell: a higher spell of the school
+PARRY = "counterspell.parry"           # Parry Spell: the countered spell turns back
+DISRUPTING = "ready.disrupting-shot"   # Disrupting Shot: +4 on the struck caster's DC
 # The two dispel spells "can be used to counterspell another spellcaster, and you don't
 # need to identify the spell he's casting" (CRB, dispel magic): a dispel check, 1d20 +
 # caster level against DC 11 + the caster's level.
@@ -82,6 +88,10 @@ def refusal(actor, trigger: str, action: str, patient: bool = False) -> str:
             return f"{actor.name} casts no spells to counter one with."
         if trigger != "casts":
             return "A counterspell is readied against a foe beginning a spell."
+    if action == "charge" and not actor.has_state(READY_CHARGE):
+        return "Only Rhino Charge readies a charge."
+    if action == "charge" and trigger == "enters_reach":
+        return "A charge is readied against a foe's attack, charge or spell, not its walk."
     if patient and (action != "attack" or not actor.has_state(PATIENT)):
         return "Only Patient Strike readies an attack as a full-round action."
     return ""
@@ -99,7 +109,7 @@ def effect(actor, trigger: str, action: str, patient: bool, rnd: int) -> ActiveE
 
 
 def said(action: str, trigger: str) -> str:
-    what = "a counterspell" if action == "counterspell" else "an attack"
+    what = {"counterspell": "a counterspell", "charge": "a charge"}.get(action, "an attack")
     return f"{what} for when {TRIGGERS.get(trigger, trigger)}"
 
 
@@ -173,6 +183,8 @@ def _taken(engine, actor, maker_ref: str) -> None:
 
 def _blow(engine, actor, e, foe_ref: str, because: str, **params) -> dict:
     extra = {"patient_readied": True} if (e.payload or {}).get("patient") else {}
+    if (e.payload or {}).get("action") == "charge":
+        extra["charge"] = True             # Rhino Charge: up to speed (`_charge_before`)
     return {"op": "attack", "actor": actor.ref, "target": foe_ref, "because": because,
             "params": {"full_attack": False, "reaction": "readied", **extra, **params},
             "visibility": "player" if actor.is_pc else "hidden"}
@@ -205,11 +217,13 @@ def before(engine, raw: dict) -> list[dict]:
             return []
         for trigger in (("charges_me",) if charging else ()) + ("attacks_me",):
             for a, e in _foes_holding(engine, maker, trigger):
-                if a.ref not in aimed or (e.payload or {}).get("action") != "attack":
+                if a.ref not in aimed or (e.payload or {}).get("action") not in ATTACKS:
                     continue
                 if any(x.get("actor") == a.ref for x in out):
                     continue
-                if _reaches(engine, a, foe):
+                if (e.payload or {}).get("action") == "charge":
+                    extra = {}
+                elif _reaches(engine, a, foe):
                     # Set against the charge; "braced" only with a brace weapon, the one
                     # the book's double damage is for (`weapons.has_trait`).
                     extra = {"vs_charge": True} if trigger == "charges_me" else {}
@@ -229,13 +243,22 @@ def before(engine, raw: dict) -> list[dict]:
     elif op == "cast":
         caster = scene.actors.get(maker)
         for a, e in _foes_holding(engine, maker, "casts"):
-            if (e.payload or {}).get("action") != "attack" or caster is None:
+            if (e.payload or {}).get("action") not in ATTACKS or caster is None:
                 continue
-            if not _ranged(a) and not _reaches(engine, a, caster):
+            if (e.payload or {}).get("action") == "attack" and not _ranged(a)                     and not _reaches(engine, a, caster):
                 continue
             out.append(_blow(engine, a, e, maker,
                              f"{a.name}'s readied attack as {caster.name} begins a spell"))
             _taken(engine, a, maker)
+            # Disrupting Shot (APG): "If you ready an action to shoot an opponent casting
+            # a spell within 30 feet and successfully hit that opponent with a ranged
+            # attack, the concentration DC to successfully cast the spell is increased by
+            # +4" — the shooter's ref, so the check asks whether THAT blow landed.
+            gap = engine._gap_ft(a, caster)
+            if a.has_state(DISRUPTING) and _ranged(a) and gap is not None and gap <= 30:
+                params = dict(raw.get("params") or params,
+                              disrupting_shot=a.ref)
+                raw["params"] = params
         if out and "struck_from" not in params:
             # Distracting spellcasters (CRB, Ready): the cast reads its wounds against these.
             raw["params"] = dict(params, struck_from=engine._wounds_left(caster))
@@ -307,7 +330,12 @@ def counterspell(engine, intent, caster, spell, level: int, state: dict, pool: s
         rolls = []
         how, source = "", None
         same = casting.castable_now(a, spell) and casting.cast_source(a, spell)
-        if same:
+        # Improved Counterspell (CRB): "you may use a spell of the same school that is one
+        # or more spell levels higher than the target spell" — the lowest such the
+        # readier can cast now (feat loop b6-rules).
+        higher = None if same or not a.has_state(IMPROVED) else _higher_of_school(
+            a, spell, level)
+        if same or higher:
             need = 15 + int(level or 0) + (4 if caster.has_state(MASKED) else 0)
             ctx = {"skill_use": "identify-casting", "spell_known": casting.knows(a, spell)}
             roll = engine.dice.d20(list(a.skill_modifiers("spellcraft", ctx=ctx)),
@@ -315,8 +343,14 @@ def counterspell(engine, intent, caster, spell, level: int, state: dict, pool: s
                                    visibility="hidden")
             rolls.append(roll)
             if int((a.ranks or {}).get("spellcraft", 0) or 0) and roll.total >= need:
-                how, source, used = "the same spell", same, spell
+                if same:
+                    how, source, used = "the same spell", same, spell
+                else:
+                    used, source = higher
+                    how = f"{used.name}, a higher {spell.school} spell (Improved Counterspell)"
         if source is None:
+            from . import dispel
+
             for sid in DISPELS:
                 try:
                     d = spells_mod.get(sid)
@@ -325,14 +359,14 @@ def counterspell(engine, intent, caster, spell, level: int, state: dict, pool: s
                 src = casting.castable_now(a, d) and casting.cast_source(a, d)
                 if not src:
                     continue
-                mine = casting.spell_caster_level(a, d)
-                theirs = casting.caster_level(caster) or int(
-                    getattr(caster, "level", 1) or 1)
-                check = engine.dice.d20([], label=f"{a.name}'s dispel check "
-                                                  f"(1d20 + {mine} against {11 + theirs})",
-                                        visibility="hidden")
+                # Feat loop b6-rules: the one dispel check (rules/dispel.py) — capped at
+                # +10 (+20 greater, with its +4 to counter), the funnel's caster level
+                # terms, the countered spell's own caster level for the DC.
+                beat, check, _dc = dispel.counter_check(
+                    engine, a, casting.spell_caster_level(a, d), d.id,
+                    str(d.school or "").lower(), caster, spell)
                 rolls.append(check)
-                if check.total + mine >= 11 + theirs:
+                if beat:
                     how, source, used = d.name, src, d
                 break
         _taken(engine, a, caster.ref)
@@ -347,18 +381,72 @@ def counterspell(engine, intent, caster, spell, level: int, state: dict, pool: s
             a.spend_pool(spent_pool, int(source.get("cost", 1) or 1))
         if source.get("key") and casting.prepared_count(a, source["key"]) > 0:
             casting.unprepare(a, source["key"], 1)
+        turned = _parried(engine, intent, a, caster, spell, level, state) \
+            if a.has_state(PARRY) else None
+        back = turned or {}
         return Outcome(
             intent_id=intent.id, op="cast",
-            rolls=[_roll_from_dict(r) for r in state.get("rolls", [])] + rolls,
+            rolls=[_roll_from_dict(r) for r in state.get("rolls", [])] + rolls
+            + list(back.get("rolls") or ()),
             effects=[{"ref": caster.ref, "kind": "countered", "spell": spell.id,
                       "name": spell.name, "by": a.ref, "with": used.id, "slot": pool,
                       "slots_left": casting.pool_left(caster, pool),
-                      "origin": "rule:counterspell"}],
+                      "origin": "rule:counterspell"}] + list(back.get("effects") or ()),
             tell=(f"{caster.name} begins {spell.name}, and {a.name} answers with "
                   f"{how} as a counterspell: the spell is ruined"
-                  + ("." if casting.at_will(level) else ", and its slot with it.")),
+                  + ("." if casting.at_will(level) else ", and its slot with it.")
+                  + (" " + back["tell"] if back.get("tell") else "")),
             because=intent.because)
     return None
+
+
+def _higher_of_school(actor, spell, level: int):
+    """(spell, source) for Improved Counterspell: the lowest-level spell of the countered
+    spell's school, above its level, that `actor` can cast now; None when there is none."""
+    from . import casting
+
+    school = str(getattr(spell, "school", "") or "").lower()
+    if not school:
+        return None
+    for lvl, row in sorted(casting.known_spells(actor).items()):
+        if int(lvl) <= int(level or 0):
+            continue
+        for s in row:
+            if str(getattr(s, "school", "") or "").lower() != school or s.id == spell.id:
+                continue
+            src = casting.castable_now(actor, s) and casting.cast_source(actor, s)
+            if src:
+                return s, src
+    return None
+
+
+def _parried(engine, intent, counterer, caster, spell, level: int, state: dict):
+    """Parry Spell (APG): "Whenever you successfully counter a spell, it returns back to
+    its caster. This works exactly like the spell turning spell" — and spell turning turns
+    only spells "targeted on you": "Area spells and effects that aren't targeted can't be
+    turned" (CRB, spell turning). Cast back by its own caster at itself, at the level and
+    DC it was cast at, through the item door (`partial["item_cast"]`: no slot again).
+    Only a spell aimed at the counterer is turned; one aimed elsewhere is just ruined."""
+    from . import casting
+    from .engine import Intent, IntentError
+
+    aimed = {str(intent.target or "")} | {str(t) for t in (intent.targets() or ())}
+    if counterer.ref not in aimed or getattr(spell, "area", "") or \
+            (getattr(spell, "area_value", None) or {}):
+        return None
+    back = Intent(op="cast", actor=caster.ref, target=caster.ref,
+                  params={"spell": spell.id, "at": caster.ref, "reaction": "parried"},
+                  visibility="hidden", because=f"{counterer.name}'s Parry Spell",
+                  origin=f"spell:{spell.id}", origin_name=spell.name)
+    try:
+        res = engine._op_cast(back, {"item_cast": {
+            "cl": casting.spell_caster_level(caster, spell), "level": int(level or 0),
+            "dc": casting.save_dc(caster, int(level or 0), spell),
+            "origin": f"spell:{spell.id}", "name": spell.name}})
+    except (IntentError, KeyError):
+        return None
+    return {"rolls": list(res.rolls or ()), "effects": list(res.effects or ()),
+            "tell": f"Parried, the spell turns back on {caster.name}: {res.tell}".strip()}
 
 
 def lapse(scene, ref: str) -> list[dict]:

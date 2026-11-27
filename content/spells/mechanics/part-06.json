@@ -5,8 +5,14 @@
   "dispel-magic": {
    "effects": [
     {
+     "type": "spell_operation",
+     "operation": "dispel",
+     "target": "one ongoing spell on the target",
+     "dispel_cap": 10
+    },
+    {
      "type": "narrative",
-     "target": "Roll 1d20 + caster level against DC 11 + the target effect's caster level to end one ongoing spell on a creature, object or area; against a magic item a success suppresses all its magic for 1d4 rounds. Cast as a counterspell it counters the other caster's spell only if the same check succeeds. You automatically succeed against your own spells; artifacts and deities are unaffected."
+     "target": "Against a magic item a success suppresses all its magic for 1d4 rounds; as an area dispel it makes one check against each creature and effect in a 20-foot burst. Cast as a counterspell it counters the other caster's spell only if the same check succeeds. Artifacts and deities are unaffected."
     }
    ],
    "duration": {
@@ -14,20 +20,19 @@
     "dismissible": false
    },
    "converted_by": "read",
-   "notes": "No effect vocabulary can say 'dispel'. The 1d4 rounds is item suppression, not damage or a duration of this spell. The stoneskin/fly passage is a worked example ('a 7th-level caster... results in a 19') and none of its numbers are rules."
+   "notes": "Feat loop b6-rules (2026-11-27): the targeted dispel runs (rules/dispel.py): 1d20 + caster level (max +10) against 11 + each spell's own stamped caster level, highest first, one spell ended; the counterspell use is rules/readied.py. Item suppression and the area dispel stay told. The stoneskin/fly passage is a worked example and none of its numbers are rules."
   },
   "dispel-magic-greater": {
    "effects": [
     {
-     "type": "narrative",
-     "target": "As dispel magic, but a targeted dispel ends one spell per four caster levels working downward from the highest, and can also remove anything remove curse could (DC equal to the curse's DC). An area dispel applies one dispel check to every creature, object and ongoing area effect in a 20-foot-radius burst; magic items are not affected by an area dispel."
+     "type": "spell_operation",
+     "operation": "dispel",
+     "target": "one spell per four caster levels on the target",
+     "dispel_cap": 20
     },
     {
-     "type": "situational_mod",
-     "amount": 4,
-     "bonus_type": "untyped",
-     "target": "dispel checks made to counter another spellcaster's spell",
-     "note": "counterspell mode only"
+     "type": "narrative",
+     "target": "It can also remove anything remove curse could (DC equal to the curse's DC). An area dispel applies one dispel check to every creature, object and ongoing area effect in a 20-foot-radius burst; magic items are not affected by an area dispel."
     }
    ],
    "duration": {
@@ -35,7 +40,7 @@
     "dismissible": false
    },
    "converted_by": "read",
-   "notes": "The +4 is stated plainly and applies only in counterspell mode, so it is a situational_mod rather than a caster-level combat_mod. Book gives no bonus type; recorded untyped rather than guessed."
+   "notes": "Feat loop b6-rules (2026-11-27): the targeted dispel runs (rules/dispel.py, max +20, one spell per four caster levels from the highest); its +4 to counter is rules/dispel.py COUNTER_BONUS, read by the readied counterspell. The curse removal and the area dispel stay told."
   },
   "displacement": {
    "effects": [
