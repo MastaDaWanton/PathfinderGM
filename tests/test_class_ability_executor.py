@@ -298,7 +298,7 @@ def test_deaths_embrace_heals_the_cleric_in_her_own_negative_burst():
     and asks no tag of the cleric herself." With Death's Embrace (8th) the negative burst
     that harms the living heals her instead; without it she is left out of it."""
     pc = _pc("cleric", 8, domains=["Death", "War"])
-    assert pc.has_state("channel.negative.heals")
+    assert pc.has_state("energy.negative.heals.channel")
     s, e = _board(pc, ("thug", (6, 5)), face=2)
     pc.hp = 5
     out, _ = _use(e, "Channel Energy (harm the living)")

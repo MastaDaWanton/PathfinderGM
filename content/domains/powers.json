@@ -306,7 +306,7 @@
      "kind": "Ex",
      "line": "Channelled negative energy heals you instead of harming you.",
      "tags": [
-      "channel.negative.heals"
+      "energy.negative.heals.channel"
      ]
     }
    ]

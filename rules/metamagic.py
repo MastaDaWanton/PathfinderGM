@@ -93,7 +93,13 @@ DOES = ("extend", "empower", "maximize", "enlarge", "silent", "still", "quicken"
         # spell targeting a single creature has no effect on its intended target (whether
         # due to spell resistance or a successful saving throw) you may, as a swift action,
         # redirect it to target another eligible creature within range" (`Engine._bounce`).
-        "bounce")
+        "bounce",
+        # Feat loop b7-fixes, APG (d20pfsrd lingering-spell-metamagic read 2026-11-27):
+        # Lingering (+1): "cause an instantaneous spell that affects an area to persist
+        # until the beginning of your next turn. Those already in the area suffer no
+        # additional harm, but other creatures or objects entering the area are subject
+        # to its effects" (`Engine._linger`).
+        "linger")
 # What Shadow Grasp lays on a creature in its darkness that fails the save.
 GRASP_CONDITION = "entangled"
 
@@ -384,6 +390,10 @@ def _not_for_b1(does: str, spell, actor, doc: dict, n: int) -> str:
     if does == "focus" and not (str(getattr(spell, "area", "") or "").strip()
                                 or spells_mod._counts_its_targets(spell)):
         return "it affects or targets only one creature."
+    if does == "linger" and (not str(getattr(spell, "area", "") or "").strip()
+                             or str((spell.duration_value or {}).get("kind") or "")
+                             != "instantaneous"):
+        return "only an instantaneous spell with an area can linger."
     if does == "select" and (not str(getattr(spell, "area", "") or "").strip()
                              or str((spell.duration_value or {}).get("kind") or "")
                              != "instantaneous"):
@@ -532,7 +542,8 @@ ADJECTIVE = {"extend": "extended", "empower": "empowered", "maximize": "maximize
              # Feat loop b5-spells:
              "threnodic": "threnodic", "coaxing": "coaxing", "thanatopic": "thanatopic",
              # Feat loop b6-rules:
-             "umbral": "umbral", "shadow_grasp": "grasping", "bounce": "bouncing"}
+             "umbral": "umbral", "shadow_grasp": "grasping", "bounce": "bouncing",
+             "linger": "lingering"}
 
 
 

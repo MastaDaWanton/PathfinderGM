@@ -1,0 +1,24 @@
+{
+  "class": "feat",
+  "_source": "Feat loop b7, lane b7-fixes (2026-11-27): Shatterspell, an activated feat run by the one executor (`Engine._use_class_ability`). ARG text and Spell Sunder (UC p.28) read on aonprd.com 2026-11-27.",
+  "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
+  "abilities": [
+    {
+      "key": "shatterspell",
+      "name": "Shatterspell",
+      "feat": "shatterspell",
+      "aliases": ["shatterspell", "shatter spell", "sunder the spell", "sunder their spell",
+                  "break the spell", "shatter the spell"],
+      "level": 1,
+      "source": "Shatterspell (ARG): 'As a standard action, you can attempt to sunder an ongoing spell effect as if you had the spell sunder rage power ... once per day, plus one additional time per day for every 5 points by which your base attack bonus exceeds +10.' Spell Sunder (UC): a sunder check against the creature's CMD + 5; suppressed 1 round, 2 rounds by 5 to 9, dispelled by 10 or more (rules/dispel.py `sunder`).",
+      "text": "Standard action: a sunder check against a creature's CMD + 5 breaks its strongest spell — held off a round or two, or ended outright.",
+      "action": "standard",
+      "pool": {"id": "shatterspell", "max": "1 + max(0, (bab - 10) // 5)", "refresh": "rest.night"},
+      "cost": {"pool": "shatterspell", "amount": 1},
+      "affects": "target",
+      "aim": "foe",
+      "spell_sunder": true,
+      "tell": "{name} swings at the magic on {target} itself."
+    }
+  ]
+}

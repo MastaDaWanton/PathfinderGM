@@ -515,6 +515,7 @@ TAGS: dict[str, tuple[str, ...]] = {
     "combat expertise": ("buff.stance.combat-expertise",),
     "deadly aim":       ("buff.stance.deadly-aim",),   # feat loop b6-partials
     "tiger pounce":     ("buff.stance.tiger-pounce",),  # feat loop b7-moves
+    "weighted blows":   ("buff.stance.power-attack",),  # Feat loop b7-fixes
     "cleaving":         ("buff.stance.cleaving",),
     "two-weapon guard": ("buff.stance.two-weapon-guard",),
     # Feat loop b1: Bloody, Dazing and Stunning Assault, "its effects last until your
@@ -732,6 +733,18 @@ TYPE = "type"
 SUBTYPE = "subtype"
 CONSTRUCT = "type.construct"
 UNDEAD = "type.undead"
+# Feat loop b7-fixes: "negative energy heals this body" — one family, asked by prefix
+# (owner ruling 2026-11-09: inflict heals whoever negative energy heals, not only the
+# undead). Until b7 it was two unrelated tags: `channel.negative.heals` (Death's Embrace,
+# read by channel only) and `energy.negative.affinity` (Necromantic Affinity, read by the
+# cast loop beside `type.undead`), so an inflict wounded a Death's Embrace cleric.
+#   `.spells`  — inflict spells heal and cure spells harm, "as if you were an undead
+#                creature" (Necromantic Affinity; every undead, `Actor.standing_tags`);
+#   `.channel` — channelled negative energy heals instead of harming (Death's Embrace).
+# Inflict asks the root; cure asks `.spells`; channel's documents ask `.channel`.
+NEGATIVE_HEALS = "energy.negative.heals"
+NEGATIVE_HEALS_SPELLS = "energy.negative.heals.spells"
+NEGATIVE_HEALS_CHANNEL = "energy.negative.heals.channel"
 DESTROYED_AT_ZERO: tuple[str, ...] = (UNDEAD,)
 BROKEN_BELOW_ZERO: tuple[str, ...] = (CONSTRUCT,)
 

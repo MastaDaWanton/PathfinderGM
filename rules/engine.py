@@ -2413,6 +2413,8 @@ class Scene:
         for victim in self._aimed_at(ward, struck_by):
             out.extend(self._resolve_on(victim, ward, ward.spec or {},
                                         ward.save, ward.save_effect))
+            if (ward.spec or {}).get("lingers"):                 # feat loop b7-fixes
+                ward.spec.setdefault("spares", []).append(victim.ref)
         return out
 
     def _resolve_on(self, victim: Actor, ward: "Ward", spec: dict,
@@ -2531,8 +2533,11 @@ class Scene:
             made = next((m for m in self.manifests if m.id == ward.manifest_id), None)
             if made is None:
                 return []
+            # Lingering Spell's "those already in the area suffer no additional harm"
+            # (feat loop b7-fixes): the refs a lingering ward has struck, `spares`.
+            spared = set((ward.spec or {}).get("spares") or ())
             return [a for ref, a in self.actors.items()
-                    if a.hp > 0 and made in self.standing_on(ref)]
+                    if a.hp > 0 and ref not in spared and made in self.standing_on(ref)]
         found = self.actors.get(ward.owner)
         return [found] if found else []
 
@@ -6483,6 +6488,7 @@ class Engine:
             if intent.op == "move" and outcome.status == "resolved":
                 queue[0:0] = self._reactions_on_arrival(outcome) + readied.on_arrival(
                     self, outcome)
+                outcomes.extend(self._linger_entered(intent.actor))   # feat loop b7-fixes
             # A feint that drew a guard opens the foe to a partner's swing (Improved Feint
             # Partner, `_reactions_after_feint`): next in the queue, as the arrival's is.
             if intent.op == "check" and outcome.status == "resolved":
@@ -11428,7 +11434,10 @@ class Engine:
                 intent, f"The {weapon.get('name') or weapon_key} is dancing on its own; "
                         f"{actor.name} is not holding it. Catching it back is drawing it.")
         full = bool(intent.params.get("full_attack"))
-        power = bool(intent.params.get("power_attack"))
+        # Feat loop b7-fixes: Power Attack's "its effects last until your next turn" (CRB):
+        # an attack of opportunity before then keeps the stance the declared swing laid.
+        power = bool(intent.params.get("power_attack")) or actor.has_state(
+            states.tags_for("weighted blows")[0])
         # The other declared attack options (lane D): each a key in the roll context its
         # feat or class document asks, checked legal at validate (`_attack_choice_refusal`).
         from .sheet import ATTACK_CHOICES
@@ -11758,7 +11767,8 @@ class Engine:
             guard = ("two_weapon",) if (off_key and off_key != "unarmed"
                                          and actor.has_state("two_weapon.defense")) else ()
             state["tells"].extend(early_said + self._lay_attack_stances(
-                actor, () if intent.params.get("cleaving") else choices + guard,
+                actor, () if intent.params.get("cleaving")
+                else choices + guard + (("power_attack",) if power else ()),
                 defender=defender))
             if "stalwart" in choices and not intent.params.get("cleaving"):
                 from . import stalwart     # feat loop b6-rules
@@ -13758,6 +13768,7 @@ class Engine:
     # step) leave it alone, as they leave an attack of opportunity.
 
     _RIDER_TAG = "rider"
+    _SORCEROUS = "strike.sorcerous"                  # Feat loop b7-fixes
 
     def _riders_after(self, intent: Intent, outcome: "Outcome") -> tuple[list, list]:
         """(the intents the feats splice next, the outcomes they tell without a roll)."""
@@ -13818,6 +13829,23 @@ class Engine:
                                        f"{foe.name} on it (Hamatula Strike)",
                             "params": {"full_attack": False, "reaction": "hamatula-strike",
                                        "manoeuvre": "grapple"}})
+            # Feat loop b7-fixes: Sorcerous Strike (UC): "If you make a successful unarmed
+            # strike against an opponent ... you can spend a swift action to deliver the
+            # effects of the chosen bloodline power to that opponent. Doing so provokes no
+            # attacks of opportunity." The power the feat names rides its tag; its use is
+            # spliced `delivered` (no touch roll of its own: the fist already landed).
+            fist = (hit and not params.get("manoeuvre") and not foe.is_down
+                    and str(w.get("name") or "").lower().startswith("unarmed strike"))
+            power = next((t[len(self._SORCEROUS) + 1:] for t in actor.standing_tags()
+                          if t.startswith(self._SORCEROUS + ".")), "") if fist else ""
+            if power and self._spend_swift(actor, False, "Sorcerous Strike") is None:
+                out.append({"op": "use_ability", "actor": actor.ref, "target": foe.ref,
+                            "id": f"{intent.id}-sorcerous",
+                            "visibility": "player" if actor.is_pc else "hidden",
+                            "because": f"{actor.name} drives the bloodline's power through "
+                                       f"the blow (Sorcerous Strike)",
+                            "params": {"ability": power, "to": foe.ref,
+                                       "reaction": "sorcerous-strike", "delivered": True}})
             # Drag Down (UC): "Whenever an opponent successfully trips you, you can attempt
             # to trip that opponent as an immediate action."
             if params.get("manoeuvre") == "trip" and foe.ref in trip_by \
@@ -14745,6 +14773,10 @@ class Engine:
                     effects.append({"ref": actor.ref, "kind": "dropped",
                                     "item": weapon_key, "prop": rec["name"],
                                     "from": f"failed {m['name']}"})
+            # Feat loop b7-fixes: Cornugon Trip, "Failing at this attack does not knock you
+            # prone" — a thrown trip has no backfire, and a thrown weapon nothing to drop.
+            elif m.get("backfire") and margin <= -10 and intent.params.get("thrown"):
+                pass
             # A trip weapon let go instead of falling (feat loop b4-maneuver).
             elif m.get("backfire") and margin <= -10 and not rider \
                     and maneuver_feats.backfire_spared(self, intent, actor, defender, key,
@@ -14766,6 +14798,13 @@ class Engine:
         effects.extend(more["effects"])
         bits.extend(t for t in more["tells"] if t)
         extra_rolls.extend(more["rolls"])
+        # Feat loop b7-fixes: a trip thrown (Cornugon Trip) leaves the hand like any throw.
+        if key == "trip" and intent.params.get("thrown") and roll is not None \
+                and weapon_key and actor.weapon(weapon_key).get("range_ft"):
+            landed = self._thrown_lands(actor, defender, weapon_key,
+                                        actor.weapon(weapon_key))
+            effects.extend(landed["effects"])
+            bits.append(landed["tell"])
         crossed = self._hp_state_effects(defender)
         effects.extend(crossed)
         return Outcome(
@@ -28787,6 +28826,11 @@ class Engine:
         ("tiger_pounce", "tiger pounce", "Tiger Pounce",
          "{name} throws their weight behind the blow (Tiger Pounce), guard open until "
          "their next turn."),
+        # Feat loop b7-fixes: Power Attack (CRB), "its effects last until your next turn";
+        # carried to attacks of opportunity (`_op_attack`) and manoeuvres (`cmb_modifiers`).
+        # The feat's name is its document's (an empty name here): the engine names none.
+        ("power_attack", "weighted blows", "",
+         "{name} puts their weight behind every blow until their next turn."),
     )
 
     @classmethod
@@ -28808,7 +28852,8 @@ class Engine:
             # and refreshed, said once.
             again = actor.has_state(states.tags_for(key)[0])
             actor.apply_effect(ActiveEffect(
-                name=key, kind="buff", key=key, source=name, origin=origin,
+                name=key, kind="buff", key=key, source=name or str(doc.get("name") or key),
+                origin=origin,
                 duration="rounds", rounds_left=1, tags=states.tags_for(key),
                 modifiers=cls._stance_terms(actor, choice, defender)))
             if not again:
@@ -31601,12 +31646,14 @@ class Engine:
         # Worked out here, before spell resistance, because a turned cure is resisted:
         # "An undead creature can apply spell resistance" (CRB, Cure Light Wounds).
         turns = bool(dice) and spells_mod.turns_on_undead(spell, plan["kind"])
-        # Feat loop b6-partials: Necromantic Affinity's "damage caused by inflict spells
-        # heals you as if you were an undead creature, but you also take damage from cure
-        # spells" — its document's tag, asked beside the undead's.
-        turned = {r for r in live if turns and (
-            self.scene.actors[r].has_state(states.UNDEAD)
-            or self.scene.actors[r].has_state("energy.negative.affinity"))}
+        # Feat loop b7-fixes: one family (`states.NEGATIVE_HEALS`). An inflict turns on
+        # whoever negative energy heals — the undead, Necromantic Affinity, Death's
+        # Embrace (owner ruling 2026-11-09); a cure only on the `.spells` child, "as if
+        # you were an undead creature" (Necromantic Affinity; the undead hold it too).
+        mended_by = (states.NEGATIVE_HEALS if plan["kind"] == "damage"
+                     else states.NEGATIVE_HEALS_SPELLS)
+        turned = {r for r in live
+                  if turns and self.scene.actors[r].has_state(mended_by)}
         harmless = "harmless" in sr.lower()
         if spell.sr is True and (not harmless or (turned and plan["kind"] == "heal")):
             for ref in live:
@@ -31779,10 +31826,13 @@ class Engine:
                 told = state.setdefault("turned_told", [])
                 if target.ref not in told:
                     told.append(target.ref)
+                    it = "it" if target.has_state(states.UNDEAD) else "them"
                     state["tells"].append(
-                        f"{target.name} is undead: {spell.name}'s "
-                        + ("positive energy harms it." if kind == "damage"
-                           else "negative energy mends it."))
+                        (f"{target.name} is undead: " if it == "it" else
+                         f"{target.name} answers to negative energy: ")
+                        + f"{spell.name}'s "
+                        + (f"positive energy harms {it}." if kind == "damage"
+                           else f"negative energy mends {it}."))
 
             # Feat loop b5-maneuver: Divert Harm's foe wrestled into the blast in the
             # target's place (`maneuver_feats.divert_harm`): what the target takes, or None.
@@ -32000,6 +32050,10 @@ class Engine:
                 effects.extend(got)
                 tells.extend(words)
         dispel_mod.stamp(self.scene, actor, spell, cl, level, cast_ctx["origin"], live)
+        if metamagic.flag(spell, "linger"):                     # feat loop b7-fixes
+            got, words = self._linger(actor, spell, plan, dice, dc, state, live)
+            effects.extend(got)
+            tells.extend(words)
         if metamagic.flag(spell, "bounce") and not item:
             got, words, rolled = self._bounce(intent, actor, spell, cl, level, dc, live,
                                               state)
@@ -32398,6 +32452,67 @@ class Engine:
         if kind == "direction" and value in ("up", "down"):
             return "overhead" if value == "up" else "below"
         return ""
+
+    def _linger(self, actor: Actor, spell, plan: dict, dice: str, dc: int, state: dict,
+                live: list[str]) -> tuple[list[dict], list[str]]:
+        """Lingering Spell (APG, d20pfsrd read 2026-11-27): "You may cause an instantaneous
+        spell that affects an area to persist until the beginning of your next turn. Those
+        already in the area suffer no additional harm, but other creatures or objects
+        entering the area are subject to its effects."
+
+        The area stays as a `Manifestation` over the cast's own squares for one round, with
+        an area `Ward` carrying the spell's dice, save and DC — the incendiary-cloud shape,
+        so the round's tick strikes whoever starts the next round in it and the one ticker
+        ends it. Batch 6 (b6-rules) found the plain area hazard would strike again those
+        the cast already caught; the ward's `spares` holds them, and each creature it
+        strikes joins it, so nobody is harmed twice.
+
+        shortcut: only a spell whose effect is hit point damage lingers (a lingering color
+        spray's conditions are not laid on entrants), an entrant is struck where its walk
+        ends (not passing through), and the book's concealment from a visible lingering
+        spell is not laid — upgrade when a ward carries a spell's whole effect list."""
+        area = state.get("area") or {}
+        squares = [tuple(c) for c in area.get("squares") or ()]
+        if not squares or plan.get("kind") != "damage" or not dice:
+            return [], [f"Nothing of {spell.name} lingers that the engine can run."]
+        made = self.scene.place(Manifestation(
+            what=f"lingering {spell.name}", terrain="none", squares=squares,
+            rounds_left=1, source=spell.name, owner=actor.ref))
+        caught = [r for r in (state.get("caught") or live) if r in self.scene.actors]
+        self.scene.wards.append(Ward(
+            owner="", trigger="each_round", recipient="area",
+            spec={"type": "damage", "dice": str(dice),
+                  "damage_type": str(plan.get("damage_type") or "untyped"),
+                  "lingers": True, "spares": list(dict.fromkeys(caught + [actor.ref]))},
+            caster=actor.ref, rounds_left=1, source=f"lingering {spell.name}",
+            save=str(plan.get("save") or ""), dc=int(dc or 0),
+            save_effect=str(plan.get("save_effect") or ""), manifest_id=made.id))
+        return ([{"kind": "manifest", **made.as_dict(), "lingers": spell.id}],
+                [f"{spell.name} lingers where it struck until {actor.name}'s next turn."])
+
+    def _linger_entered(self, ref) -> list["Outcome"]:
+        """A creature whose walk ends inside a lingering spell's area it has not been
+        struck by is struck now (Lingering Spell: "other creatures ... entering the area
+        are subject to its effects"), once — the ward's `spares` remembers it."""
+        who = self.scene.actors.get(str(ref or ""))
+        if who is None:
+            return []
+        out: list[Outcome] = []
+        for ward in list(self.scene.wards):
+            spec = ward.spec or {}
+            if not spec.get("lingers") or who.ref in (spec.get("spares") or ()):
+                continue
+            made = next((m for m in self.scene.manifests if m.id == ward.manifest_id), None)
+            if made is None or made not in self.scene.standing_on(who.ref):
+                continue
+            fx = self.scene._resolve_on(who, ward, spec, ward.save, ward.save_effect)
+            spec.setdefault("spares", []).append(who.ref)
+            hurt = sum(int(e.get("amount") or 0) for e in fx if e.get("kind") == "damage")
+            out.append(Outcome(
+                intent_id="", op="hazard", effects=fx,
+                tell=(f"{who.name} walks into the {ward.source} and takes {hurt} damage."
+                      if hurt else f"{who.name} walks into the {ward.source} unharmed.")))
+        return out
 
     def _cast_where(self, actor: Actor, spell, state: dict, targets: list[str],
                     no_victim: bool, aim_said: str) -> list[str]:
@@ -39268,6 +39383,14 @@ class Engine:
 
         # 6. What it does to whoever it reached: a touch attack, one roll shared, a save
         # each, the heal or the harm, and the standing effect it lays on them.
+        # Feat loop b7-fixes: a sunder at the spells on them (Shatterspell, `dispel.sunder`).
+        if doc.get("spell_sunder") and target is not None:
+            from . import dispel
+
+            fx, said, rolled = dispel.sunder(self, actor, target, origin)
+            return Outcome(intent_id=intent.id, op="use_ability", effects=records + fx,
+                           rolls=rolls + rolled, tell=" ".join(tells + said),
+                           because=intent.because)
         if doc.get("evil_only") and target is not None and not _could_be_evil(target):
             tells.append(f"{target.name} is not evil, and the {name} is wasted.")
             return Outcome(intent_id=intent.id, op="use_ability", effects=records,
@@ -39275,7 +39398,9 @@ class Engine:
         if doc.get("evil_only") and target is not None and not printed_alignment(target):
             tells.append(f"Nothing records {target.name}'s alignment; the {name} holds.")
         hit_ok = True
-        if doc.get("attack") and target is not None:
+        # Feat loop b7-fixes: a power delivered on a blow that already landed (Sorcerous
+        # Strike, engine-written `delivered`) makes no touch attack of its own.
+        if doc.get("attack") and target is not None and not intent.params.get("delivered"):
             hit_ok, roll, said = self._class_touch_attack(intent, actor, target, doc, shown)
             rolls.append(roll)
             tells.append(said)

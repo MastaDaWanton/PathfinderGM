@@ -2607,6 +2607,11 @@
   #cb-declpop:popover-open .cb-decl-grp:not([hidden]) { display: grid; align-items: start;
     grid-template-columns: 96px minmax(0, 1fr); gap: 6px 10px; }
   #cb-declpop:popover-open .cb-decl-k { padding-top: 8px; }
+  /* An option said in words (Pushing Assault's sentence) wraps inside its button instead of
+     running out of the popover: measured 2026-11-27 at 800x600 with 58 options, a 513px
+     button in a 420px column, and a sideways scrollbar under the rows. */
+  #cb-declpop:popover-open .cb-decl .v2-btn { max-width: 100%; }
+  #cb-declpop:popover-open .cb-decl .v2-btn small { white-space: normal; }
   #cb-declpop:popover-open .cb-decl-btns { display: flex; flex-wrap: wrap; gap: 6px; }
   #combatbar .cb-decl[hidden], #combatbar .cb-decl-grp[hidden] { display: none; }
   #combatbar .cb-decl-h { flex-basis: 100%; color: var(--accent);

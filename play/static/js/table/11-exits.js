@@ -315,7 +315,10 @@ function placePenPop(pop) {
   const top = row ? Math.max(row.getBoundingClientRect().top,
                              box ? box.getBoundingClientRect().top : 0) : r.top;
   const vw = document.documentElement.clientWidth, vh = window.innerHeight;
-  const w = Math.min(PEN_POP_WIDTH[pop.id] || 420, vw - 24);
+  // A Declare holding many options takes the window's width before it takes more scrolling:
+  // 58 options (batches 5-6) stood 1724px tall in a 297px box at 800x600, 2026-11-27.
+  const many = pop.id === "cb-declpop" && pop.querySelectorAll("[data-cbopt]").length > 12;
+  const w = Math.min(many ? 900 : PEN_POP_WIDTH[pop.id] || 420, vw - 24);
   pop.style.width = `${w}px`;
   pop.style.left = `${Math.round(Math.max(12, Math.min(r.right - w, vw - w - 12)))}px`;
   pop.style.right = "auto";

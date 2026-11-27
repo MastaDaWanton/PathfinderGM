@@ -361,7 +361,10 @@ DOC_KEYS = frozenset({
     "as", "level_down", "self_tags",
     # Feat loop b4-maneuver: the score a choice names for a charge's ability damage
     # (Bonebreaker, Neckbreaker; `maneuver_feats.charge_ability_damage`).
-    "charge_ability"})
+    "charge_ability",
+    # Feat loop b7-fixes: a sunder check at the spells on the creature aimed at
+    # (Shatterspell, by Spell Sunder's rule; `dispel.sunder`).
+    "spell_sunder"})
 
 
 def _ally_want_problems(at: str, want) -> list[str]:

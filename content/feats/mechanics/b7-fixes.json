@@ -1,0 +1,31 @@
+{
+  "_about": [
+    "Feat loop batch 7, lane b7-fixes (2026-11-27): the leftovers b6-rules did not reach. Text read",
+    "on aonprd.com FeatDisplay pages and d20pfsrd.com 2026-11-27.",
+    "cornugon-trip: the feat's own campaign-setting book (aonprd FeatDisplay): 'You may throw your spiked chain (as if it were a thrown weapon with a range increment of 10 feet) and can make trip attacks when throwing it. Failing at this attack does not knock you prone.' (`throws` on Actor.weapon; position.out_of_reach lets a thrown trip go at range; no backfire on a thrown trip).",
+    "sorcerous-strike: UC: 'When you gain this feat, you choose one bloodline power that you can use to affect a single opponent. If you make a successful unarmed strike against an opponent, in addition to dealing your unarmed strike damage, you can spend a swift action to deliver the effects of the chosen bloodline power to that opponent. Doing so provokes no attacks of opportunity.' (Engine._riders_after splices the power's use, delivered: no touch roll of its own).",
+    "shatterspell: ARG: 'As a standard action, you can attempt to sunder an ongoing spell effect as if you had the spell sunder rage power (Ultimate Combat 28). You may use this feat once per day, plus one additional time per day for every 5 points by which your base attack bonus exceeds +10.' Spell Sunder (UC p.28, aonprd BarbarianRagePowers): 'To sunder an effect on a creature, the barbarian must succeed at a normal sunder combat maneuver against the creature's CMD + 5 ... If successful, the barbarian suppresses the effect for 1 round, or 2 rounds if she exceeded the CMD by 5 to 9. If she exceeds the CMD by 10 or more, the effect is dispelled.' (rules/dispel.py `sunder`, content/class-abilities/feats-b7-fixes.json).",
+    "lingering-spell: APG: 'You may cause an instantaneous spell that affects an area to persist until the beginning of your next turn. Those already in the area suffer no additional harm, but other creatures or objects entering the area are subject to its effects.' +1 level (rules/metamagic.py `linger`, Engine._linger: the area held one round as a manifest with a ward that spares whoever it already struck)."
+  ],
+  "cornugon-trip": {
+    "tags": [
+      "throws.spiked-chain"
+    ]
+  },
+  "sorcerous-strike": {
+    "tags": [
+      "strike.sorcerous.$target"
+    ]
+  },
+  "lingering-spell": {
+    "metamagic": {
+      "does": "linger",
+      "levels": 1
+    },
+    "not_yet": [
+      "a lingering spell's visual concealment (20% beyond 5 feet, 50% beyond 20 feet)",
+      "a lingering spell's effects other than hit point damage (a condition, a push) on those entering",
+      "a creature passing through the area without stopping in it"
+    ]
+  }
+}

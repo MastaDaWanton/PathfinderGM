@@ -416,6 +416,13 @@ def out_of_reach(scene, actor, defender, weapon_key: str | None,
     feet = scene.distance_between(actor.ref, defender.ref)
     if feet is None:
         return None
+    # Feat loop b7-fixes: Cornugon Trip "can make trip attacks when throwing it" — a trip
+    # thrown with a weapon a feat makes thrown (`throws.<key>`, `Actor.weapon`) reaches
+    # that weapon's five range increments (CRB, Ranged Attacks).
+    if (manoeuvre == "trip" and thrown and weapon.get("range_ft") and weapon_key
+            and actor.has_state(f"throws.{str(weapon_key).strip().lower()}")
+            and feet <= 5 * int(weapon["range_ft"])):
+        return None
     with_weapon = not manoeuvre or manoeuvre in MANEUVERS_WITH_THE_WEAPON
     reach, gap = reactions.reach_with(actor, weapon_key if with_weapon else None)
     miss = OutOfReach(feet, reach, gap, with_weapon)

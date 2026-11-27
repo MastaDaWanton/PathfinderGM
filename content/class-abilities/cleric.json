@@ -39,7 +39,7 @@
           "harm the living": {"living": true, "undead_only": false, "roll_as": "damage",
                               "harmful": true, "damage_type": "negative",
                               "bonus_from": "channel.harm-living",
-                              "healed_instead": "channel.negative.heals",
+                              "healed_instead": "energy.negative.heals.channel",
                               "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod",
                                        "success": "half"},
                               "aliases": ["harm the living", "hurt the living",
@@ -47,19 +47,19 @@
                                           "negative energy to hurt",
                                           "negative energy to damage", "inflict"]},
           "heal undead": {"living": false, "undead_only": true, "roll_as": "heal",
-                          "healed_instead": "channel.negative.heals",
+                          "healed_instead": "energy.negative.heals.channel",
                           "aliases": ["heal undead", "heal the undead", "mend the undead",
                                       "negative energy to heal",
                                       "negative energy to mend"]}
         }
       },
-      "_bonus_from_note": "The harm mode reads `channel.harm-undead.damage` and `.dc` through the funnel: Sun's Blessing puts the cleric's level on the first and the Glory domain +2 on the second (content/domains/powers.json, each a passive modifier of its power). Negative energy reads `channel.negative.heals` off whoever it reaches: Death's Embrace grants that tag, and the energy heals them instead.",
+      "_bonus_from_note": "The harm mode reads `channel.harm-undead.damage` and `.dc` through the funnel: Sun's Blessing puts the cleric's level on the first and the Glory domain +2 on the second (content/domains/powers.json, each a passive modifier of its power). Negative energy reads `energy.negative.heals.channel` off whoever it reaches: Death's Embrace grants that tag, and the energy heals them instead.",
       "negative": {
         "heal": {"living": false, "undead_only": true, "roll_as": "heal", "eases": null,
-                 "healed_instead": "channel.negative.heals"},
+                 "healed_instead": "energy.negative.heals.channel"},
         "harm": {"undead_only": false, "living": true, "damage_type": "negative",
                  "bonus_from": "channel.harm-living",
-                 "healed_instead": "channel.negative.heals"}
+                 "healed_instead": "energy.negative.heals.channel"}
       },
       "tell": "{name} channels divine energy.",
       "not_yet": [
