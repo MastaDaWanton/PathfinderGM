@@ -414,3 +414,16 @@ def test_rhino_charge_readies_a_charge_that_moves_up_to_speed():
         if reached:
             assert [o.actor for o in res.outcomes].index("pc") < \
                 [o.actor for o in res.outcomes].index("c1"), _tells(res)
+
+
+def test_the_readied_charge_is_offered_on_the_declare_section_to_rhino_charge_only():
+    from play.views import _attack_options
+
+    for feats, offered in ((("Power Attack", "Improved Bull Rush"), False),
+                           (("Power Attack", "Improved Bull Rush", "Rhino Charge"), True)):
+        pc = _pc("fighter", feats=feats, weapons=("longsword",))
+        _board(pc, ("thug", (9, 5)))
+        ids = {o["id"]: o for o in _attack_options(pc)["options"]}
+        assert ("ready_charge_cast" in ids) is offered
+        if offered:
+            assert ids["ready_charge_cast"]["op"]["params"]["action"] == "charge"

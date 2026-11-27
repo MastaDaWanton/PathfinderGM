@@ -942,6 +942,13 @@ _OPTION_SHAPES = {
     "ready_counterspell": ("act", "Ready: counterspell",
                            "Your standard action held: name a foe's spell as it is cast and "
                            "answer it with the same spell or dispel magic."),
+    # Feat loop b6-rules: Rhino Charge's readied charge (rules/readied.py READY_CHARGE).
+    "ready_charge_attacked": ("act", "Ready: charge an attacker",
+                              "Your standard action held: charge, up to your speed, the "
+                              "first foe who attacks you."),
+    "ready_charge_cast": ("act", "Ready: charge a caster",
+                          "Your standard action held: charge, up to your speed, a foe who "
+                          "begins a spell."),
     # Feat loop b6-rules: Stalwart (rules/stalwart.py), beside Fight defensively or Combat
     # Expertise; and Total defense with the trade.
     "stalwart": ("swing", "Stalwart",
@@ -1209,9 +1216,11 @@ def _attack_options(pc) -> dict:
             ("ready_charge", "charges_me", "attack", False),
             ("ready_cast", "casts", "attack", False),
             ("ready_patient", "enters_reach", "attack", True),
-            ("ready_counterspell", "casts", "counterspell", False)):
+            ("ready_counterspell", "casts", "counterspell", False),
+            ("ready_charge_attacked", "attacks_me", "charge", False),
+            ("ready_charge_cast", "casts", "charge", False)):
         why = readied_mod.refusal(pc, trigger, action, patient)
-        if why and (patient or action == "counterspell"):
+        if why and (patient or action in ("counterspell", "charge")):
             continue                       # offered only to those who may take it
         own(key, readied_mod.said(action, trigger), why=why,
             action="full-round" if patient else "standard",
