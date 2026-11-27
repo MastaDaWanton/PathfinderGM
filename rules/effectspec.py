@@ -1513,6 +1513,13 @@ CATEGORIES: list[Category] = [
                           required=False, default="no",
                           hint="Greater dispel magic ends every effect it beats, not "
                                "the one the caster names."),
+                    # Feat loop b6-rules: the dispel check itself (rules/dispel.py).
+                    Field("dispel_cap", "Dispel check: caster level cap", "int",
+                          required=False,
+                          hint="A dispel check, 1d20 + caster level up to this cap, "
+                               "against 11 + each spell's own caster level: 10 for "
+                               "dispel magic, 20 for greater dispel magic (which ends "
+                               "one spell per four caster levels)."),
                 ],
                 blocked="Making permanent, ending and holding off are applied to the "
                         "real lifetimes the engine keeps — a buff's rounds, a "
@@ -2687,6 +2694,9 @@ AGAINST: dict[str, str] = {
     # distraction effect (such as the distraction ability of a swarm)".
     "fatigue": "a save against an effect that would leave you fatigued or exhausted",
     "distraction": "a Fortitude save against a swarm's distraction (Engine._distraction)",
+    # Feat loop b6-rules: Atheist Abjurations' "+2 bonus to your caster level whenever you
+    # use an abjuration spell to dispel or counter a divine spell" (rules/dispel.py).
+    "dispel_divine": "a dispel check made with an abjuration against a divine spell",
 }
 
 

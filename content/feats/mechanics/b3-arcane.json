@@ -231,10 +231,7 @@
     "metamagic": {
       "does": "tenebrous",
       "levels": 1
-    },
-    "not_yet": [
-      "the -2 on dispelling a tenebrous spell in darkness and the +4 in bright light: a dispel's DC does not know who cast the effect it ends"
-    ]
+    }
   },
   "blood-ties": {
     "tags": [

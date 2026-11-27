@@ -215,10 +215,11 @@
           "requires": "meditation.slow-time",
           "name": "Slow Time",
           "per_day": 1,
-          "unless_origin": "spell:haste",
+          "unless_state": "buff.haste",
           "_source": "Slow Time (F&P): 'Once per day, when you meditate as a full-round action using the Combat Meditation feat, you gain the effects of haste for 1 round per 2 character levels. These effects do not stack with the haste spell' — haste's own terms (content/spells/mechanics/part-08.json).",
           "self": {
             "rounds": "max(1, floor(level / 2))",
+            "tags": ["buff.haste"],
             "modifiers": [
               {"type": "combat_mod", "target": "attack", "amount": 1, "bonus_type": "untyped"},
               {"type": "combat_mod", "target": "ac", "amount": 1, "bonus_type": "dodge"},

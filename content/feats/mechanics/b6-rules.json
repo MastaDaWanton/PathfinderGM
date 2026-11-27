@@ -1,0 +1,40 @@
+{
+  "_about": [
+    "Feat loop batch 6, lane b6-rules (2026-11-27): the base rules the book fully defines that",
+    "blocked feats — the dispel check, the counterspell feats, magical darkness, haste's tag,",
+    "Stalwart, the worn helmet, the Ki Throw line, the readied charge, Stunning Fist for any",
+    "class — and the leftover list. Text read in content/feats/feats.json (aonprd.com",
+    "FeatDisplay pages) 2026-11-27; the feats whose class no player can take are in",
+    "docs/feats-waiting-on-classes.md under 'Feat loop batch 6'.",
+    "improved-counterspell: CRB: 'When counterspelling, you may use a spell of the same school that is one or more spell levels higher than the target spell' (rules/readied.py `_higher_of_school`).",
+    "parry-spell: APG: 'Whenever you successfully counter a spell, it returns back to its caster. This works exactly like the spell turning spell' (rules/readied.py `_parried`).",
+    "disrupting-shot: APG: 'If you ready an action to shoot an opponent casting a spell within 30 feet and successfully hit that opponent with a ranged attack, the concentration DC to successfully cast the spell is increased by +4'.",
+    "dispel-synergy: UC: 'If you successfully dispel an ongoing magical effect on an opponent, that opponent takes a -2 penalty on saving throws against your spells until the end of your next turn' (rules/dispel.py `_synergy`).",
+    "tenacious-transmutation: APG: 'The DC of caster level checks to dispel or remove your transmutations increases by 2; even if the spell is negated, its effects persist for 1 additional round before dissipating' (rules/dispel.py `dc_of`, `_end`).",
+    "atheist-abjurations: F&P: 'You gain a +2 bonus to your caster level whenever you use an abjuration spell to dispel or counter a divine spell'."
+  ],
+  "improved-counterspell": {
+    "tags": ["counterspell.improved"]
+  },
+  "parry-spell": {
+    "tags": ["counterspell.parry"]
+  },
+  "disrupting-shot": {
+    "tags": ["ready.disrupting-shot"]
+  },
+  "dispel-synergy": {
+    "tags": ["dispel.synergy"]
+  },
+  "tenacious-transmutation": {
+    "tags": ["dispel.tenacious.transmutation"]
+  },
+  "atheist-abjurations": {
+    "modifiers": [
+      {"type": "combat_mod", "target": "caster_level", "amount": 2, "bonus_type": "untyped",
+       "when": {"against": "dispel_divine"}}
+    ],
+    "not_yet": [
+      "'or send an extraplanar outsider summoned or called by a divine caster back to its home plane': dismissal and banishment are told, not run, so there is no caster level check to add to"
+    ]
+  }
+}

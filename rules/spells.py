@@ -163,6 +163,10 @@ class Spell:
     bloodline: str = ""
     patron: str = ""
     sla_level: int | None = None
+    # Feat loop b6-rules: tags every effect this spell lays carries (`dispel.stamp`), so a
+    # rule that asks "is this creature under haste" asks a tag, never an origin string:
+    # Slow Time's "do not stack with the haste spell" is `buff.haste`.
+    effect_tags: list[str] = field(default_factory=list)
 
     # --- the structured half -------------------------------------------------------------
     # Every one of these is filled by `normalise` when the stored entry does not carry it,
@@ -2027,7 +2031,7 @@ _META: dict = {}
 # than merged: the reading pass owns the mechanical half, and a partition file that
 # restated a spell's school or class lists would be a second copy of a fact the corpus
 # already holds — the disagreement CLAUDE.md warns about, arriving by a new route.
-_READ_FIELDS = ("effects", "scaling", "duration_value", "element")
+_READ_FIELDS = ("effects", "scaling", "duration_value", "element", "effect_tags")
 
 
 def _layer_read_mechanics(folder: Path, raw: dict[str, dict]) -> dict[str, dict]:

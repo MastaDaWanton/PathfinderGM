@@ -8100,8 +8100,14 @@ class Engine:
         if before is not None:
             taken = int(before) - self._wounds_left(actor)
             if taken > 0:
-                situations.append(("damaged", 10 + taken + level,
-                                   f"struck for {taken} while casting"))
+                # Feat loop b6-rules: Disrupting Shot's +4 (rules/readied.py DISRUPTING).
+                # shortcut: asked as "struck, and a disrupting shooter's readied shot was
+                # among the blows", not of that one shot's hit; upgrade when the readied
+                # blows report back which of them landed.
+                shot = self.scene.actors.get(str(intent.params.get("disrupting_shot") or ""))
+                situations.append(("damaged", 10 + taken + level + (4 if shot else 0),
+                                   f"struck for {taken} while casting"
+                                   + (f" ({shot.name}'s Disrupting Shot)" if shot else "")))
         if bool(intent.params.get("defensively")):
             # Disruptive (CRB): "The DC to cast spells defensively increases by +4 for all
             # enemies that are within your threatened area ... only if you are aware of
@@ -31702,6 +31708,12 @@ class Engine:
         for spec in plan["riders"]:
             if not self._executes(spec):
                 tells.append(effectspec.render(spec) + ".")
+        # Feat loop b6-rules: every effect this cast laid carries its caster level, the
+        # number a dispel check is made against (rules/dispel.py `stamp`).
+        from . import dispel as dispel_mod
+
+        dispel_mod.stamp(self.scene, actor, spell, cl, level, cast_ctx["origin"], live)
+        state["rolls"].extend(r.as_dict() for r in cast_ctx.pop("dispel_rolls", ()))
 
         # A spell that harms a foe it reached is an attack for invisibility's purposes —
         # "any spell targeting a foe or whose area or effect includes a foe" (CRB p.301),
@@ -33423,6 +33435,21 @@ class Engine:
         who = self._recipient(spec, ctx)
         named = str(spec.get("target") or "").strip()
         effects: list[dict] = []
+        if op == "dispel" and spec.get("dispel_cap") and who is not None:
+            # Feat loop b6-rules: the targeted dispel check (rules/dispel.py) — dispel
+            # magic's one roll against each spell's own caster level, highest first.
+            from . import dispel as dispel_mod
+
+            caster = self.scene.actors.get(str(ctx.get("caster") or ""))
+            if caster is not None:
+                sid = str(ctx.get("spell_id") or "")
+                school = str(getattr(spells_mod.get(sid), "school", "") or "").lower() \
+                    if sid else ""
+                got, said, rolls = dispel_mod.targeted(
+                    self, caster, who, int(ctx.get("caster_level") or 1), sid, school,
+                    str(ctx.get("origin") or ""))
+                ctx.setdefault("dispel_rolls", []).extend(rolls)
+                return got, said
 
         if spec.get("check_dc"):
             dc = effectspec.evaluate(spec["check_dc"], ctx.get("vars") or {})
@@ -39608,7 +39635,9 @@ class Engine:
                                      and x.name == n)
                 actor.apply_effect(ActiveEffect(
                     name=name, kind="buff", source=name, origin=origin,
-                    duration="rounds", rounds_left=rounds, modifiers=mods))
+                    duration="rounds", rounds_left=rounds, modifiers=mods,
+                    # Feat loop b6-rules: an addon's own tags (Slow Time's `buff.haste`).
+                    tags=tuple(str(t) for t in mine.get("tags") or ())))
                 out.append({"ref": actor.ref, "kind": "buff", "ability": name,
                             "modifiers": mods, "rounds": rounds, "origin": origin})
                 tells.append(f"{actor.name}: " + ", ".join(
@@ -39662,6 +39691,12 @@ class Engine:
         if held and any(str(e.origin or "") == held for e in actor.effects):
             tells.append(f"{actor.name} is already under {held.split(':', 1)[-1]}; "
                          f"{name} adds nothing to it.")
+            return True
+        # Feat loop b6-rules: `unless_state`, a tag already held (Slow Time's haste asks
+        # `buff.haste`, which the haste spell's every term carries, `Spell.effect_tags`).
+        state = str(a.get("unless_state") or "")
+        if state and actor.has_state(state):
+            tells.append(f"{actor.name} is already hasted; {name} adds nothing to it.")
             return True
         per_day = int(a.get("per_day") or 0)
         if per_day <= 0:
