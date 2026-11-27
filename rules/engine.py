@@ -11342,6 +11342,11 @@ class Engine:
         # blow; the stance's own laying below finds it held and says nothing twice.
         early_said = (self._lay_attack_stances(actor, ("charge",), defender=defender)
                       if "charge" in choices and held is None else [])
+        # Saving Shield (feat loop b5-spells): an adjacent ally's immediate action lays its
+        # +2 before the AC is read, said with the stances' words.
+        from . import spell_feats
+
+        early_said = list(early_said) + spell_feats.saving_shield(self, actor, defender)
         # The attacker rides along so a term scoped to THIS attacker counts: a smiting
         # paladin's deflection is against the creature she smote (`_effect_scope_holds`).
         target_ac = defender.ac(against=weapon["category"],

@@ -490,3 +490,28 @@ def test_slow_time_hastes_the_meditation_once_a_day():
     new_turn(scene)
     again = _use(e, "Slow Time")
     assert "slow time" in again.tell.lower() and "0" in again.tell
+
+
+def test_saving_shield_spends_the_guards_immediate_action_on_the_first_blow():
+    """APG: "Whenever an adjacent ally is the target of an attack, you can, as an immediate
+    action, grant that adjacent ally a +2 shield bonus to AC." A thug swings at the ward:
+    the guard beside, heavy shield on the arm, lays the +2 and its immediate action is
+    gone for the round; a second guard-less blow lays nothing more."""
+    from rules.sheet import situated
+
+    s, e, (guard, ward), (thug,) = _line(
+        ("Guard", ["Shield Proficiency", "Saving Shield"], {"shield": "heavy shield"}),
+        ("Ward", [], {}), foes=["thug"])
+    s.positions.update({guard.ref: (5, 5), ward.ref: (5, 6), thug.ref: (6, 7)})
+    # The guard has acted: until then it is flat-footed, and "a flat-footed character
+    # can't take an immediate action" (CRB) — the engine says so (`_swift_refusal`).
+    s.acted = {guard.ref, ward.ref}
+    s.turn = [r for r, _ in s.initiative].index(thug.ref)
+    with situated(s):
+        before = ward.ac(attacker=thug)
+        res = e.run(e.validate([{"op": "attack", "actor": thug.ref, "target": ward.ref,
+                                 "because": "test", "visibility": "hidden"}]))
+        told = " ".join(o.tell for o in res.outcomes)
+        assert "thrusts a shield across Ward" in told, told
+        assert ward.ac(attacker=thug) == before + 2
+        assert e._swift_refusal(guard, True, "again")

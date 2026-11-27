@@ -134,3 +134,44 @@ def covering(defender) -> list:
             out.append(Modifier(int(shield["ac"]), f"{guard.name}'s shield (Covering "
                                                    f"Defense)", "cover"))
     return out
+
+
+# --- Saving Shield ---------------------------------------------------------------------------
+# APG: "Whenever an adjacent ally is the target of an attack, you can, as an immediate
+# action, grant that adjacent ally a +2 shield bonus to AC. You must be wielding a light
+# shield, heavy shield, or tower shield to use this feat." Asked as the blow is aimed, before
+# the target's AC is read (`Engine._attack` at `target_ac`): the first holder beside the
+# target with a shield on the arm and an immediate action left spends it (`_spend_swift`,
+# immediate) and lays the +2 for the round — a shield bonus, so it is worth nothing to an
+# ally whose own shield gives as much, and is then not spent (owner call: the engine uses
+# it for the guard, when it helps).
+SAVES_ALLY = "guard.saving-shield"
+
+
+def saving_shield(engine, attacker, defender) -> list[str]:
+    from .activeeffect import ActiveEffect
+
+    scene = engine.scene
+    if not scene.in_encounter or defender.is_down:
+        return []
+    if any(e.key == "saving-shield" for e in defender.effects):
+        return []
+    own = int((defender.shield_stats() or {}).get("ac", 0) or 0)
+    if own >= 2:
+        return []
+    for guard in scene.actors.values():
+        if guard is defender or guard is attacker or guard.is_down \
+                or not guard.has_state(SAVES_ALLY) or engine._against(guard, defender) \
+                or str(guard.shield or "none") in ("none", "buckler"):
+            continue
+        gap = engine._gap_ft(guard, defender)
+        if gap is None or gap > 5 or engine._swift_refusal(guard, True, "Saving Shield"):
+            continue
+        engine._spend_swift(guard, immediate=True, what="Saving Shield")
+        defender.apply_effect(ActiveEffect(
+            name="a shield thrust across", kind="buff", key="saving-shield",
+            source=f"{guard.name}'s shield", origin="rule:saving-shield", duration="rounds",
+            rounds_left=1, modifiers=[{"kind": "combat_mod", "target": "ac", "amount": 2,
+                                       "bonus_type": "shield", "note": "Saving Shield"}]))
+        return [f"{guard.name} thrusts a shield across {defender.name} (+2 armour class)."]
+    return []

@@ -321,5 +321,10 @@
       }
     ]
   },
-  "slow-time": {}
+  "slow-time": {},
+  "saving-shield": {
+    "tags": [
+      "guard.saving-shield"
+    ]
+  }
 }
