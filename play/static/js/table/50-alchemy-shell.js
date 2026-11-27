@@ -1480,7 +1480,7 @@
   }
 
   // Create Sanguine Elixir (feat loop b4-crafting): one of the sorcerer's own bloodline
-  // powers bottled through POST api/alchemy/sanguine — 100 gp and an hour, the power lent
+  // powers bottled through POST api/alchemy/sanguine: 100 gp and an hour, the power lent
   // until the next rest. The manuals dialog's frame and classes, so the bench keeps its look.
   A.openSanguine = function (from) {
     var o = (A.state && A.state.sanguine) || { powers: [] };
