@@ -655,6 +655,9 @@ DEMORALIZES_WITH_BLUFF = "skill.bluff.demoralize"
 # impacted at all by very hot conditions" (`Engine._exposure`).
 SCATTERS_RATS = "defense.swarm.rats.scattered"
 HEAT_UNHINDERED = "climate.heat.very-hot.unhindered"
+# Rugged Northerner's "You are not impacted at all by normal cold weather conditions" (feat
+# loop b4-other, `Engine._exposure`): the one cold band the engine models.
+COLD_UNHINDERED = "climate.cold.unhindered"
 # The forage encounter's stance (TAGS["holding ground"]), named once for its readers.
 HOLDING_GROUND = "state.holding-ground"
 HOLDING_GROUND_KEY = "holding ground"
@@ -747,6 +750,9 @@ def is_beast(actor) -> bool:
     return bool(actor is not None and any(actor.has_state(t) for t in BEASTS))
 # The condition key the house rule writes, named once so its writers are not literals.
 BROKEN_KEY = "broken"
+# The two rungs Diehard leaves a body fighting on below 0 in (`Actor._fight_on`, b4-other).
+DISABLED_KEY = "disabled"
+STAGGERED_KEY = "staggered"
 # A construct whose loyalty the player rewrote (`Engine._op_repair`'s claim, the house
 # rule's "a second, harder check ... it becomes yours"). Granted through the one
 # applicator beside `bond.travels-with-you` and the `devoted` step of the attitude track,
@@ -1044,17 +1050,30 @@ def blocking(keys, action: str = "any") -> str:
 # to domination. Found 2026-09-09 while gating the same families against being handed
 # out for free — the table was asked what a condition IS and could not answer for the
 # two words a player reaches for first.
+#
+# And fear had the same hole (feat loop b4, 2026-11-26): every fear effect in 1e is
+# mind-affecting (cause fear, scare, Intimidate's demoralize are all "[fear,
+# mind-affecting]"; undead are immune to "all mind-affecting effects (charms,
+# compulsions, morale effects, patterns, and phantasms)", Bestiary p.309), and the
+# undead bundle carried no fear word, so a skeleton could be frightened.
+_FEAR: tuple[str, ...] = ("shaken", "frightened", "panicked", "cowering", "fear")
 _MIND_AFFECTING: tuple[str, ...] = (
     "confused", "confusion", "fascinated", "fascinate", "charm", "charmed",
     "compulsion", "compelled", "dominate", "dominated", "domination",
-    "suggestion", "mind-affecting")
+    "suggestion", "mind-affecting", *_FEAR)
 _SLEEP: tuple[str, ...] = ("sleep", "asleep", "sleeping")
 
 IMMUNITY_COVERS: dict[str, tuple[str, ...]] = {
     "sleep": _SLEEP,
     "paralysis": ("paralyzed", "paralysis"),
     "stun": ("stunned", "stun"),
-    "fear": ("shaken", "frightened", "panicked", "cowering", "fear"),
+    "fear": _FEAR,
+    # Bestiary, Nonabilities: "A creature with no Intelligence score is mindless ... It
+    # has immunity to mind-affecting effects (charms, compulsions, phantasms, patterns,
+    # and morale effects)". Asked by `immune_to` of a body with no Int score — the
+    # vermin's and the ooze's "Mindless" trait (Bestiary pp.308, 311) as the book states
+    # it, so the 19 oozes and 2 vermin printed WITH an Int score stay reachable.
+    "mindless": _MIND_AFFECTING,
     "mind-affecting": _MIND_AFFECTING,
     "mind affecting": _MIND_AFFECTING,
     "poison": ("poison", "nauseated", "sickened"),
@@ -1110,16 +1129,17 @@ TYPE_BUNDLES: dict[str, str] = {
 }
 
 
-def immune_to(actor, what: str = "", condition_key: str = "") -> str:
+def immune_to(actor, what: str = "", condition_key: str = "", descriptors=()) -> str:
     """Which immunity stops `what` (an effect word: "poison", "disease", "paralysis",
     "bleed", "energy drain") or the condition it would leave, on this body — "" if none.
 
     `immunity_blocks` over the printed list, then the bundle the creature's TYPE carries
     (`TYPE_BUNDLES`), asked by tag (law 1): a ghoul printed without "undead traits" is no
     less immune to poison. The printed words win, so a refusal quotes the block.
+    `descriptors` are what the effect says it is (a spell's "[charm, mind-affecting]").
     """
     printed = list(getattr(actor, "immunities", None) or ())
-    said = (what,) if what else ()
+    said = ((what,) if what else ()) + tuple(descriptors or ())
     got = immunity_blocks(printed, condition_key, said)
     if got:
         return got
@@ -1128,6 +1148,14 @@ def immune_to(actor, what: str = "", condition_key: str = "") -> str:
             got = immunity_blocks([bundle], condition_key, said)
             if got:
                 return got
+    # Mindless: an ability block with no Int score in it (`morale.intelligence`). A body
+    # with no ability block at all is a sketch, not a mindless creature.
+    if actor is not None and getattr(actor, "abilities", None):
+        from . import morale
+
+        if morale.intelligence(actor) is None and immunity_blocks(
+                ["mindless"], condition_key, said):
+            return "mindless"
     return ""
 
 
@@ -1163,7 +1191,7 @@ def ability_harm_refused(actor, ability: str, drain: bool = False) -> str:
 # mind-affecting in 1e when a spell causes them and all four can equally be a blow to
 # the head, so gating them would refuse ordinary violence for having a mental cousin.
 # The line is drawn at families that can ONLY be somebody's mind being altered.
-MIND_FAMILIES: tuple[str, ...] = ("mind-affecting", "fear", "sleep")
+MIND_FAMILIES: tuple[str, ...] = ("fear", "mind-affecting", "sleep")  # fear first: it is mind-affecting too (b4)
 
 # What each family is called when a refusal has to say what was attempted.
 _MIND_CALLED: dict[str, str] = {
@@ -1231,7 +1259,10 @@ def immunity_blocks(immunities, condition_key: str = "",
     said = {str(d).strip().lower() for d in (descriptors or ()) if str(d).strip()}
     for raw in immunities or ():
         name = " ".join(str(raw).split()).strip().lower()
-        covers = IMMUNITY_COVERS.get(name)
+        # "mind-affecting effects" (160 shipped blocks), "fear effects", "charm effects":
+        # the plural noun the Bestiary prints, which no row was keyed by, so those
+        # creatures were immune only to the literal words "mind-affecting effects".
+        covers = IMMUNITY_COVERS.get(name) or IMMUNITY_COVERS.get(name.removesuffix(" effects"))
         if covers is None:
             # An unlisted immunity still protects against its own name, so a homebrew
             # "immune to petrification" works the day it is written — the same
