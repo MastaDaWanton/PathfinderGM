@@ -171,3 +171,19 @@ def test_a_bouncing_hold_person_saved_against_goes_to_the_next_foe():
     assert s.actors["c2"].has_state("state.held"), said
     assert not s.actors["c1"].has_state("state.held")
     assert s.swift_spent.get("pc") == s.round
+
+
+def test_darkness_in_a_scene_with_no_map_darkens_the_one_room():
+    """Measured on a copy of the owner's campaign (2026-11-27): a scene with no board, a
+    darkness cast, and `light_at` still "normal" — the darkness had no square to be
+    measured from. With no map the scene is one room: the darkness lowers it."""
+    from rules.engine import Engine, Scene
+
+    pc = _caster("pc", prepared=("darkness",))
+    s = Scene(location_id="5bbd0c40345f")
+    s.add(pc)
+    s.ambient_light = lambda: "normal"
+    e = Engine(s)
+    _run(e, {"op": "cast", "actor": "pc", "visibility": "hidden",
+             "params": {"spell": "darkness"}})
+    assert not s.has_grid and s.light_at(None) == "dim"

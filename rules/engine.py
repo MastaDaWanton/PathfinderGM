@@ -1653,9 +1653,24 @@ class Scene:
         """Magical darkness over a square: (steps lowered, its spell level), (0, -1) where
         none reaches. "This effect does not stack with itself or with any other effect that
         creates darkness" (Umbral Spell; deeper darkness "does not stack with itself"):
-        the deepest one counts, and the highest spell level among those reaching."""
+        the deepest one counts, and the highest spell level among those reaching.
+
+        With no map the scene is one room's worth of space (as `_cast_buff` reads a burst
+        with no board): every darkness carried here reaches it. Measured on the owner's
+        campaign 2026-11-27: darkness cast in a mapless scene lowered nothing."""
         if square is None:
-            return 0, -1
+            if self.has_grid:
+                return 0, -1
+            from . import dispel as dispel_mod
+
+            steps, level = 0, -1
+            for actor in self.actors.values():
+                for e in actor.effects:
+                    zone = (e.payload or {}).get("darkness")
+                    if isinstance(zone, dict):
+                        steps = max(steps, int(zone.get("steps") or 1))
+                        level = max(level, int(dispel_mod.cast_of(e).get("level") or 0))
+            return steps, level
         here = (int(square[0]), int(square[1]))
         steps, level = 0, -1
         for spot, radius, _r, _n, _b, magic, n in self._lit("darkness"):
