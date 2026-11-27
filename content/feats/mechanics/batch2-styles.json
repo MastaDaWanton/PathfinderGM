@@ -405,8 +405,10 @@
     ],
     "not_yet": [
       "the +2 against paralysis and stunning effects: no save says it is against paralysis or a stun",
-      "1-1/2 times Strength on the first unarmed strike of a round: no reader counts a round's unarmed strikes",
-      "charging or running through difficult terrain and through allies' squares: there is no charge through terrain to ease"
+      "1-1/2 times Strength on the first unarmed strike of a round: no reader counts a round's unarmed strikes"
+    ],
+    "tags": [
+      "movement.charge.through"
     ]
   },
   "dragon-ferocity": {
@@ -751,9 +753,6 @@
         },
         "note": "Monkey Style: no penalty to AC against melee while prone"
       }
-    ],
-    "not_yet": [
-      "crawling and standing up without provoking, and standing as a swift action on a DC 20 Acrobatics check: standing up is not an action the engine prices"
     ]
   },
   "monkey-moves": {
@@ -772,7 +771,10 @@
       }
     ],
     "not_yet": [
-      "climbing and crawling at half speed, a 5-foot step by climbing or crawling, Dexterity kept while climbing, and the swift 5-foot step after two unarmed hits: there is no climb speed or crawl on the board"
+      "a 5-foot step taken by climbing or jumping: a climb is a check made where the body stands (rules/bodyskills.py climb), not a square walked on the board, and a jump is not a step"
+    ],
+    "tags": [
+      "movement.monkey-moves"
     ]
   },
   "monkey-shine": {
@@ -1056,6 +1058,9 @@
           "choice": "tiger_pounce",
           "weapon": {
             "category": "melee"
+          },
+          "bearer": {
+            "state": "style.tiger-style"
           }
         },
         "note": "Tiger Pounce: Power Attack's penalty moved to AC"
@@ -1066,7 +1071,10 @@
         "formula": "1 + bab // 4",
         "bonus_type": "untyped",
         "when": {
-          "choice": "tiger_pounce"
+          "choice": "tiger_pounce",
+          "bearer": {
+            "state": "style.tiger-style"
+          }
         },
         "note": "Tiger Pounce: Power Attack's penalty moved to AC"
       },
@@ -1077,7 +1085,10 @@
         "bonus_type": "untyped",
         "when": {
           "bearer": {
-            "state": "buff.stance.tiger-pounce"
+            "state": [
+              "style.tiger-style",
+              "buff.stance.tiger-pounce"
+            ]
           }
         },
         "note": "Tiger Pounce: Power Attack's penalty on AC"

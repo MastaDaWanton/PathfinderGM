@@ -98,6 +98,7 @@ def after(engine, intent, outcome, twice: bool = False) -> tuple[list[dict], lis
         return [], []
     said = _walk_earned(engine, intent, outcome)          # feat loop b7-moves
     _mark_pounce(engine, intent, outcome)
+    _count_unarmed(engine, intent, outcome)
     more: list[dict] = []
     more += _mounted_blade(engine, intent, outcome)
     more += _sidestep(engine, intent, outcome)
@@ -469,6 +470,8 @@ def no_move_left(engine, intent, actor, start, end):
             or params.get("reaction") or params.get("closing_on") \
             or params.get("charging") or params.get("spring_left") is not None:
         return None
+    if stepping.is_step(sc, actor, start, end):
+        return None                           # a 5-foot step is no action at all
     cost = engine._move_cost(actor.ref, start, tuple(end))
     cost = int(cost) if cost is not None else gridmod.distance(tuple(start)[:2],
                                                               tuple(end)[:2])
@@ -786,6 +789,403 @@ def _mounted_blade(engine, intent, outcome) -> list[dict]:
                  "params": {"full_attack": False, "reaction": "mounted-blade",
                             **({"weapon": weapon} if weapon else {})}}]
     return []
+
+
+# --- the run (feat loop b7-moves; ledger group 40) -------------------------------------------
+#
+# CRB, Combat, Run (aonprd.com/Rules.aspx?ID=149, read 2026-11-27): "You can run as a
+# full-round action. If you do, you do not also get a 5-foot step. When you run, you can
+# move up to four times your speed in a straight line (or three times your speed if you're
+# in heavy armor). You lose any Dexterity bonus to AC unless you have the Run feat. You can
+# run for a number of rounds equal to your Constitution score, but after that you must make
+# a DC 10 Constitution check to continue running. You must check again each round in which
+# you continue to run, and the DC of this check increases by 1 for each check you have
+# made. When you fail this check, you must stop running. A character who has run to his
+# limit must rest for 1 minute (10 rounds) before running again ... You can't run across
+# difficult terrain or if you can't see where you're going." Run (CRB): five times (four in
+# heavy armour or a heavy load) and the Dexterity bonus kept.
+#
+# There is no run op: a single walk further than a double move (two moves are two intents),
+# in a straight line, as the turn's first act, IS the run — the only legal way there in one
+# move. Owner call: a square past a double move's reach in a straight line is read as a run
+# rather than refused. Measured before: no action carried a body further than its speed,
+# and the Run feat's own document said so.
+
+RUNNING = "state.moving.running"
+RUN_EXPOSED = "state.exposed.running"
+RUN_SPENT = "movement.run.spent"           # ran to the limit: a minute's rest first
+RUN_STREAK = "run streak"
+DRAGON_STYLE = "style.dragon-style"
+DRAGON_THROUGH = "movement.charge.through"  # Dragon Style's document tag
+MOUNTED_ARCHERY = "mounted.archery.halved"
+
+
+def _run_feat() -> str:
+    from .bodyskills import RUN_JUMP
+
+    return RUN_JUMP
+
+
+def run_multiple(actor) -> int:
+    """Four times speed (three in heavy armour or a heavy load); the Run feat one more."""
+    from . import classfeatures
+
+    suit = actor.armour_stats() or {}
+    heavy = str(suit.get("move_weight") or suit.get("weight") or "") == "heavy" \
+        or classfeatures._load_band(actor) == "heavy"
+    return (3 if heavy else 4) + (1 if actor.has_state(_run_feat()) else 0)
+
+
+def through_all(actor) -> bool:
+    """Dragon Style (UC): "you can charge or run through difficult terrain and through
+    squares occupied by allies" — while in the style."""
+    return actor.has_state(DRAGON_THROUGH) and actor.has_state(DRAGON_STYLE)
+
+
+def _ally_at(engine, actor, square) -> bool:
+    sc = engine.scene
+    for ref, there in sc.positions.items():
+        if ref != actor.ref and ref in sc.actors and tuple(square) in set(
+                gridmod.footprint(tuple(there)[:2], sc.actors[ref].size)):
+            return _friends(sc, ref, actor.ref)
+    return False
+
+
+def line_blocked(engine, actor, a, b) -> str:
+    """What stops a straight run from `a` to `b`: a solid square, difficult ground or a
+    body, under the runner's footprint along the line (the charge's measure), or ""."""
+    sc = engine.scene
+    grid = sc.grid
+    free = through_all(actor)
+    n = max(abs(b[0] - a[0]), abs(b[1] - a[1]))
+    taken = sc.occupied(ignore=actor.ref)
+    for i in range(1, n + 1):
+        anchor = (round(a[0] + (b[0] - a[0]) * i / n), round(a[1] + (b[1] - a[1]) * i / n))
+        for p in gridmod.footprint(anchor, actor.size):
+            if not grid.passable(p):
+                return f"something solid stands in the way at {p}"
+            if p in grid.difficult and not free:
+                return f"the line crosses difficult ground at {p}, and nobody runs across it"
+            if p in taken and not (free and i < n and _ally_at(engine, actor, p)):
+                return f"somebody stands in the way at {p}"
+    return ""
+
+
+def run_refusal(engine, actor, start, end, routes_far: dict) -> str | None:
+    """None when this walk is a legal run, else why it is not (said beside the too-far
+    refusal). `routes_far`: the cheapest open routes from `start` at any length."""
+    sc = engine.scene
+    if not sc.in_encounter or start is None:
+        return "out of a fight"
+    rnd, ref = sc.round, actor.ref
+    if rnd in (sc.move_spent.get(ref), sc.standard_spent.get(ref), sc.swung.get(ref)) \
+            or stepping.walked(sc, ref):
+        return "a run is the whole round, and this turn is under way"
+    if actor.has_state("state.position.prone") or actor.has_state("state.senses.blinded"):
+        return "nobody runs prone or blind"
+    if actor.has_state(RUN_SPENT):
+        return f"{actor.name} ran to their limit and must rest a minute before running again"
+    speed = int(actor.speed_feet)
+    cost = routes_far.get(tuple(end)[:2])
+    if cost is None or cost <= 2 * speed or cost > run_multiple(actor) * speed:
+        return "too far to run"
+    blocked = line_blocked(engine, actor, tuple(start)[:2], tuple(end)[:2])
+    return f"a run is a straight line, and {blocked}" if blocked else None
+
+
+def is_run(engine, actor, cost) -> bool:
+    """Whether a walk resolving now is the run: further than the walker's speed in one
+    move, in a fight (validation let it through only as a run)."""
+    return bool(engine.scene.in_encounter and cost is not None
+                and int(cost) > 2 * int(actor.speed_feet))
+
+
+def run_starts(engine, intent, actor):
+    """A run about to be made: the Constitution check past the Constitution score's rounds
+    (Endurance's +4 rides `against: running`), then the running state and the round spent.
+    Returns (the refusing Outcome when the runner is spent, else None; the rolls made)."""
+    from .engine import Outcome
+
+    sc = engine.scene
+    held = next((e for e in actor.effects if e.key == RUN_STREAK), None)
+    streak = dict(held.payload) if held is not None and \
+        int(held.payload.get("round", -9)) == sc.round - 1 else {"rounds": 0, "checks": 0}
+    rounds = int(streak.get("rounds", 0)) + 1
+    checks = int(streak.get("checks", 0))
+    rolls = []
+    if rounds > actor.ability_score("con"):
+        dc = 10 + checks
+        roll = engine.dice.d20(actor.ability_check_modifiers("con", {"against": "running"}),
+                               label=f"{actor.name} Constitution (keep running)",
+                               visibility="player" if actor.is_pc else "hidden")
+        rolls.append(roll)
+        checks += 1
+        if roll.total < dc:
+            actor.remove_effects(match=lambda e: e.key == RUN_STREAK)
+            actor.apply_effect(ActiveEffect(
+                name="run to the limit", kind="situation", key="run spent",
+                source="Run", origin="rule:run", duration="rounds", rounds_left=10,
+                tags=(RUN_SPENT,)))
+            return Outcome(intent_id=intent.id, op="move", status="prevented",
+                           effects=[{"ref": actor.ref, "kind": "move_stopped",
+                                     "why": "run to the limit", "origin": "rule:run"}],
+                           rolls=rolls,
+                           tell=f"{actor.name} has run as far as their lungs allow "
+                                f"(Constitution {roll.total} against DC {dc}) and must rest "
+                                f"a minute before running again.",
+                           because=intent.because), rolls
+    actor.remove_effects(match=lambda e: e.key == RUN_STREAK)
+    actor.apply_effect(ActiveEffect(
+        name="running", kind="situation", key=RUN_STREAK, source="Run", origin="rule:run",
+        duration="rounds", rounds_left=2,
+        payload={"rounds": rounds, "checks": checks, "round": sc.round}))
+    tags = (RUNNING,) if actor.has_state(_run_feat()) else (RUNNING, RUN_EXPOSED)
+    actor.apply_effect(ActiveEffect(
+        name="running", kind="situation", key="running", source="Run", origin="rule:run",
+        duration="rounds", rounds_left=1, tags=tags))
+    sc.move_spent[actor.ref] = sc.round
+    sc.standard_spent[actor.ref] = sc.round
+    return None, rolls
+
+
+def mounted_ranged(engine, rider, weapon: dict) -> list:
+    """CRB, Mounted Combat: "If your mount is taking a double move, you take a -4 penalty
+    on ranged attacks; if your mount is running, the penalty is -8"; Mounted Archery
+    halves it. Read off the steed's round: its running state, or more than its speed
+    walked. Measured before (Mounted Archery's not_yet line): neither was tracked."""
+    from . import bodyskills
+    from .dice import Modifier
+
+    if str(weapon.get("category") or "").lower() != "ranged":
+        return []
+    sc = engine.scene
+    steed = bodyskills.mount_of(sc, rider) if rider.has_state(MOUNTED) else None
+    if steed is None or not sc.in_encounter:
+        return []
+    if steed.has_state(RUNNING):
+        n, how = -8, "running"
+    elif stepping.feet_walked(sc, steed.ref) > int(steed.speed_feet):
+        n, how = -4, "double-moving"
+    else:
+        return []
+    if rider.has_state(MOUNTED_ARCHERY):
+        n //= 2
+    return [Modifier(n, f"shooting from a {how} mount")]
+
+
+# --- crawling and standing up (feat loop b7-moves; ledger group 2) ---------------------------
+#
+# CRB, Combat, Move Actions (p.188-189; the text read through forum quotations of the Core
+# Rulebook, aonprd.com's Move Actions page not fetched — said plainly): "Crawl: You can crawl
+# 5 feet as a move action. Crawling incurs attacks of opportunity from any attackers who
+# threaten you at any point of your crawl. A crawling character is considered prone";
+# "Stand Up: Standing up from a prone position requires a move action and provokes attacks
+# of opportunity." Normal (Fast Crawl): "You cannot take a 5-foot step while crawling."
+# Measured before this lane: a prone body walked its full speed and took 5-foot steps, and
+# standing up (the reader's `rise`, `condition ends prone`) cost nothing and drew no swing.
+#
+# - Fast Crawl (APG): "While prone, you can move at half speed ... You can take a 5-foot step
+#   while crawling."
+# - Monkey Style (UC): "you can crawl and stand up from lying prone without provoking attacks
+#   of opportunity, and you can stand up as a swift action if you succeed at a DC 20
+#   Acrobatics check."
+# - Monkey Moves (UC): "you can also climb and crawl at half your speed; you can take a
+#   5-foot step by jumping, crawling, or climbing; and you retain your Dexterity bonus to AC
+#   while climbing. Further, while using Monkey Style, when you use your unarmed strike to
+#   hit an opponent twice or more on your turn, you can spend a swift action to take a
+#   5-foot step even if you have moved this round."
+
+PRONE = "state.position.prone"
+FAST_CRAWL = "movement.crawl.fast"
+MONKEY_MOVES = "movement.monkey-moves"
+MONKEY_STYLE = "style.monkey-style"
+MONKEY_STEP = "movement.step.swift"          # two unarmed hits this turn (Monkey Moves)
+STAND_DC = 20
+
+
+def monkey_moving(actor) -> bool:
+    return actor.has_state(MONKEY_MOVES) and actor.has_state(MONKEY_STYLE)
+
+
+def crawling(actor) -> bool:
+    """Prone and on the ground: a walk is a crawl (a climber or a rider is not)."""
+    from . import bodyskills
+
+    return actor.has_state(PRONE) and not actor.has_state(bodyskills.CLIMBING) \
+        and not actor.has_state(MOUNTED)
+
+
+def crawl_budget(actor, budget: int) -> int:
+    """A move's feet for a crawler: 5, or half speed with Fast Crawl or Monkey Moves."""
+    if not crawling(actor):
+        return budget
+    if actor.has_state(FAST_CRAWL) or monkey_moving(actor):
+        return max(gridmod.SQUARE_FT, _half(actor.speed_feet))
+    return gridmod.SQUARE_FT
+
+
+def crawl_steps(actor) -> bool:
+    """Whether this crawler may take a 5-foot step (Fast Crawl, Monkey Moves in style)."""
+    return actor.has_state(FAST_CRAWL) or monkey_moving(actor)
+
+
+def crawl_unprovoking(actor) -> bool:
+    """Monkey Style: a crawl provokes nothing."""
+    return crawling(actor) and actor.has_state(MONKEY_STYLE)
+
+
+def monkey_step(scene, actor) -> bool:
+    """Monkey Moves' swift 5-foot step "even if you have moved this round", earned by two
+    unarmed hits this turn (`_count_unarmed`)."""
+    return monkey_moving(actor) and actor.has_state(MONKEY_STEP)
+
+
+def _count_unarmed(engine, intent, outcome) -> None:
+    """Two unarmed hits on the holder's own turn: Monkey Moves' swift step is open."""
+    from . import classfeatures
+
+    actor = engine.scene.actors.get(intent.actor or "")
+    params = intent.params or {}
+    if actor is None or not monkey_moving(actor) or params.get("reaction") \
+            or not classfeatures._unarmed_key(str(params.get("weapon") or "unarmed")):
+        return
+    hits = sum(1 for b in outcome.blows or () if b.get("result") in ("hit", "critical"))
+    if not hits:
+        return
+    sc = engine.scene
+    held = next((e for e in actor.effects if e.key == "unarmed hits"), None)
+    before = int(held.payload.get("hits", 0)) if held is not None \
+        and int(held.payload.get("round", -1)) == sc.round else 0
+    actor.remove_effects(match=lambda e: e.key == "unarmed hits")
+    total = before + hits
+    actor.apply_effect(ActiveEffect(
+        name="unarmed hits", kind="situation", key="unarmed hits", source="Monkey Moves",
+        origin="rule:feat-monkey-moves", duration="rounds", rounds_left=1,
+        tags=(MONKEY_STEP,) if total >= 2 else (), payload={"round": sc.round, "hits": total}))
+
+
+def standing_up(raw: dict, actor) -> bool:
+    """Whether this intent is the actor getting up off the ground themselves."""
+    params = raw.get("params") or {}
+    return (raw.get("op") == "condition" and bool(params.get("ends"))
+            and str(params.get("condition") or "").strip().lower() == "prone"
+            and str(params.get("to") or raw.get("actor") or "") == actor.ref
+            and not raw.get("origin") and actor.has_state(PRONE))
+
+
+def provoked_by_standing(engine, raw: dict) -> list[dict]:
+    """CRB, Stand Up: "provokes attacks of opportunity" — from every foe threatening the
+    one rising (`reactions.provoked_by_action`, the cast's question); none in Monkey
+    Style."""
+    from . import reactions
+
+    sc = engine.scene
+    actor = sc.actors.get(str(raw.get("actor") or ""))
+    if actor is None or not sc.in_encounter or not standing_up(raw, actor) \
+            or actor.has_state(MONKEY_STYLE):
+        return []
+    return engine._swings_at(actor.ref, reactions.provoked_by_action(sc, actor.ref),
+                             why="standing up")
+
+
+def stand_up(engine, intent, actor):
+    """Price getting up in a fight: (the refusing Outcome or None, rolls, words said).
+    A move action (paid with the standard when the move is gone); in Monkey Style a DC 20
+    Acrobatics check first makes it the swift action, and a failed one leaves the move."""
+    sc = engine.scene
+    raw = {"op": intent.op, "actor": intent.actor, "params": intent.params,
+           "origin": getattr(intent, "origin", "")}
+    if not sc.in_encounter or not standing_up(raw, actor):
+        return None, [], ""
+    if actor.is_down or actor.blocking_key("move"):
+        return engine._refuse(intent, f"{actor.name} cannot get up: "
+                                      f"{(actor.blocking_condition('move') or 'down').lower()}.",
+                              code="cannot_act"), [], ""
+    rolls: list = []
+    if actor.has_state(MONKEY_STYLE) and not engine._swift_refusal(actor, False, "standing"):
+        roll = engine.dice.d20(actor.skill_modifiers("acrobatics"),
+                               label=f"{actor.name} Acrobatics (stand up)",
+                               visibility="player" if actor.is_pc else "hidden")
+        rolls.append(roll)
+        if roll.total >= STAND_DC:
+            engine._spend_swift(actor, False, "standing up")
+            return None, rolls, (f" {actor.name} springs up as a swift action (Acrobatics "
+                                 f"{roll.total} against DC {STAND_DC}).")
+    why = engine._spend_ability_action(intent, actor, "move", "standing up")
+    if why is not None:
+        why.rolls = list(rolls) + list(why.rolls or [])
+        return why, rolls, ""
+    return None, rolls, ""
+
+
+# --- charge variants (feat loop b7-moves; ledger group 8) ------------------------------------
+#
+# Charging Hurler (APG): "You can use the charge rules to make a thrown weapon attack. All
+# the parameters of a charge apply, except that you must only move closer to your opponent,
+# and you must end your movement within 30 feet of that opponent. If you do, you can make a
+# single thrown weapon attack against that opponent, gaining the +2 bonus on the attack roll
+# and taking a -2 penalty to your AC until the start of your next turn." Improved Charging
+# Hurler (APG): "your target can be at any range up to your weapon's maximum range. If your
+# target is within 30 feet, you gain a +2 bonus on damage rolls" (its document's term).
+# Measured before: a charge's walk always ended within melee reach (`Engine._charge_path`),
+# so a thrown charge was never laid.
+
+CHARGING_HURLER = "charge.thrown"
+CHARGING_HURLER_FAR = "charge.thrown.any-range"
+
+
+def thrown_charge(actor, params) -> bool:
+    return bool(params.get("charge") and params.get("thrown")) \
+        and actor.has_state(CHARGING_HURLER)
+
+
+def thrown_charge_path(engine, actor, defender, weapon_key: str, budget: int):
+    """((x, y), feet) for a thrown charge's walk — the first square along the straight
+    line toward the foe, at least 10 ft on, that ends within 30 ft (Improved: within the
+    weapon's five range increments) — or the sentence refusing it."""
+    from . import position as position_mod
+
+    sc = engine.scene
+    grid = getattr(sc, "grid", None)
+    start = sc.positions.get(actor.ref)
+    there = sc.positions.get(defender.ref)
+    if grid is None or start is None or there is None:
+        return "A charge is measured on the map, and there is none here."
+    w = actor.weapon(weapon_key) or {}
+    far = 5 * int(w.get("range_ft") or 10) if actor.has_state(CHARGING_HURLER_FAR) else 30
+    level = tuple(start[2:3])
+    here = tuple(start[:2])
+    goal = tuple(there[:2])
+    n = max(abs(goal[0] - here[0]), abs(goal[1] - here[1]))
+    taken = position_mod.occupancy_toward(sc, actor, defender)
+    was = gridmod.distance_between(here + level, actor.size, there, defender.size)
+    why = (f"{defender.name} is too far for a thrown charge: it must end within {far} ft.")
+    # The walk ends within 30 ft when the line gets there (Improved's +2 damage, and the
+    # point-blank range), else at the first square in range (owner call: the engine
+    # chooses the stopping square, as it chooses a charge's).
+    first = None
+    for k in range(2, n):
+        sq = (round(here[0] + (goal[0] - here[0]) * k / n),
+              round(here[1] + (goal[1] - here[1]) * k / n))
+        feet = gridmod.distance(here, sq)
+        if feet > budget:
+            break
+        gap = gridmod.distance_between(sq + level, actor.size, there, defender.size)
+        if gap > far or gap >= was:
+            continue
+        if not all(grid.passable(p) and p not in taken
+                   for p in gridmod.footprint(sq, actor.size)) or \
+                engine._charge_line_blocked(actor, here, sq, taken):
+            why = (engine._charge_line_blocked(actor, here, sq, taken)
+                   or f"The line of the charge is blocked at {sq}.")
+            break
+        first = first or (sq, feet)
+        if gap <= 30:
+            return sq, feet
+    if first is not None:
+        return first
+    return why if n > 2 else (f"A charge must move at least 10 ft, and {defender.name} is "
+                              f"too close for a thrown charge.")
 
 
 __all__ = ["charge_multiple", "moved_already", "after", "no_move_left", "allowance",

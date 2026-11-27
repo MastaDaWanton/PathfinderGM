@@ -416,7 +416,10 @@ def balance(engine, intent, actor, mods, partial):
 def _cling(actor, *, at: int, top, dc: int, edge: bool = False):
     from .activeeffect import ActiveEffect
 
-    sure = bool(actor.movement_modes().get("climb"))
+    from . import feat_moves
+
+    # Monkey Moves: "you retain your Dexterity bonus to AC while climbing" (feat loop b7).
+    sure = bool(actor.movement_modes().get("climb")) or feat_moves.monkey_moving(actor)
     actor.apply_effect(ActiveEffect(
         name="climbing", kind="situation", key="climbing", source=CLIMB_SOURCE,
         origin=CLIMB_SOURCE,
@@ -448,7 +451,12 @@ def climb(engine, intent, actor, mods, partial):
         spent = _no_action_left(engine, actor, "move", "climbing")
         if spent:
             return engine._refuse(intent, spent + " Nothing is rolled.", code="action_spent")
-    speed = int(actor.movement_modes().get("climb") or 0) or max(5, int(actor.speed_feet) // 4)
+    # Feat loop b7-moves: Monkey Moves (UC) climbs "at half your speed" in Monkey Style.
+    from . import feat_moves
+
+    share = 2 if feat_moves.monkey_moving(actor) else 4
+    speed = int(actor.movement_modes().get("climb") or 0) or max(
+        5, int(actor.speed_feet) // share)
     first = _twice(engine, actor, engine._roll_or_suspend(
         intent, actor, list(mods), label="Climb check", dc=value, partial=partial),
         "skill.climb")

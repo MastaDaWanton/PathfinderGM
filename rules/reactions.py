@@ -507,6 +507,11 @@ def provoked_by_move(scene, mover_ref: str, start, end) -> list[tuple[str, React
 
     if stepping.is_step(scene, mover, start, end):
         return []
+    # Feat loop b7-moves: Monkey Style's crawl provokes nothing (rules/feat_moves.py).
+    from . import feat_moves
+
+    if feat_moves.crawl_unprovoking(mover):
+        return []
 
     left = set(gridmod.footprint(tuple(start), mover.size))
     arrived = set(gridmod.footprint(tuple(end), mover.size))

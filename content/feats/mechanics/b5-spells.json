@@ -238,9 +238,6 @@
   "run": {
     "tags": [
       "jump.running.run"
-    ],
-    "not_yet": [
-      "running itself, at five (or four) times speed while keeping the Dexterity bonus to AC: the engine has no run action, only moves and charges"
     ]
   },
   "spell-chain": {

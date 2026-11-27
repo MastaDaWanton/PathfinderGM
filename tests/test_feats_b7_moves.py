@@ -259,13 +259,13 @@ def test_tiger_pounce_pays_a_half_speed_move_closer_with_the_swift_action():
 
 # --- Ride-By Attack and Mounted Blade ---------------------------------------------------------
 
-def _mounted(feats, foes=(("thug", (14, 3)),), faces=None):
+def _mounted(feats, foes=(("thug", (14, 3)),), faces=None, at=(15, 15)):
     """A rider on a war-trained heavy horse (Large: its anchor is the rider's square, the
     body reaching east and south), charging north at a thug ahead and to the left."""
     pc = _pc(feats=["Mounted Combat"] + list(feats))
     pc.ranks["ride"] = 8
-    s, e = _board(pc, *foes, at=(15, 15), faces=faces)
-    horse = s.add(instantiate("heavy-horse", scene=s, name="the bay"), at=(15, 15))
+    s, e = _board(pc, *foes, at=at, faces=faces)
+    horse = s.add(instantiate("heavy-horse", scene=s, name="the bay"), at=at)
     horse.apply_effect(ActiveEffect(name="trained for war", kind="trait", key="war-trained",
                                     source="test", origin="author:test",
                                     tags=("trained.combat-riding",)))
@@ -360,3 +360,287 @@ def test_tiger_pounce_moves_power_attacks_penalty_onto_ac_until_the_next_turn():
             if (r.label or "").startswith("Attack with")][0]
     assert roll.total - plain_roll.total == 3, _tells(res)
     assert pc.ac() == ac - 3
+
+
+# --- group 40: the run ----------------------------------------------------------------------
+
+def test_a_straight_walk_past_a_double_move_is_a_run_that_spends_the_round_and_the_dex():
+    """CRB, Run: "You can run as a full-round action ... up to four times your speed in a
+    straight line ... You lose any Dexterity bonus to AC unless you have the Run feat."
+    Measured before (the Run feat's not_yet line): no action carried a body past its
+    speed — 90 ft in a line was refused "too far". Now it runs, the round is spent, and the
+    runner is denied Dexterity until the round ends."""
+    pc = _pc()
+    s, e = _board(pc, ("thug", (5, 28)), at=(2, 2))
+    res = _run(e, _move(20, 2))
+    went = _of(res, "move")[0]
+    assert went.status == "resolved" and "runs 90 ft" in went.tell, _tells(res)
+    assert pc.has_state("state.moving.running") and pc.loses_dex_to_ac
+    assert s.standard_spent.get("pc") == s.round
+    assert _run(e, _move(26, 2)).outcomes[0].code == "standard_spent"
+    blow = _run(e, _hit(target="c1", weapon="shortbow"))
+    assert _of(blow, "attack")[0].status == "refused"
+
+
+def test_the_run_feat_runs_five_times_speed_and_keeps_the_dexterity():
+    """Run (CRB): "you move five times your normal speed ... While running, you retain
+    your Dexterity bonus to your Armor Class." Measured before: the feat's only working
+    clause was the jump's +4."""
+    pc = _pc(feats=["Run"])
+    s, e = _board(pc, ("thug", (5, 28)), at=(0, 2))
+    res = _run(e, _move(28, 2))
+    assert "runs 140 ft" in _of(res, "move")[0].tell, _tells(res)
+    assert pc.has_state("state.moving.running") and not pc.loses_dex_to_ac
+
+
+def test_a_run_needs_a_straight_line_clear_of_difficult_ground():
+    """CRB, Run: "You can't run across difficult terrain". A route around is a walk, not a
+    run, so the far square stays out of reach."""
+    pc = _pc()
+    s, e = _board(pc, ("thug", (5, 28)), at=(2, 2))
+    s.grid.difficult.add((10, 2))
+    with pytest.raises(IntentError):
+        _run(e, _move(20, 2))
+
+
+def test_endurance_helps_the_constitution_check_to_keep_running():
+    """CRB, Run: past rounds equal to the Constitution score, "a DC 10 Constitution check
+    to continue running"; failed, the runner stops and must rest a minute. Endurance (CRB):
+    +4 on "Constitution checks made to continue running". Measured before (its not_yet
+    line): running was not an action, and the check never rolled."""
+    def runner(feats, face):
+        pc = _pc(feats=feats)
+        s, e = _board(pc, ("thug", (5, 28)), at=(2, 2), faces={"Kesst Vayr Constitution": face})
+        held = ActiveEffect(name="running", kind="situation", key=feat_moves.RUN_STREAK,
+                            source="Run", origin="rule:run", duration="rounds", rounds_left=2,
+                            payload={"rounds": pc.ability_score("con"), "checks": 0,
+                                     "round": 0})
+        pc.apply_effect(held)
+        return pc, s, _run(e, _move(20, 2))
+
+    pc, s, res = runner([], 7)               # 7 + 1 (Con 12) = 8 < 10
+    assert _of(res, "move")[0].status == "prevented", _tells(res)
+    assert pc.has_state(feat_moves.RUN_SPENT)
+    pc, s, res = runner(["Endurance"], 7)    # 8 + 4 = 12
+    assert _of(res, "move")[0].status == "resolved", _tells(res)
+
+
+def test_sliding_axe_throw_slides_under_a_charging_targets_shield():
+    """Sliding Axe Throw (APG): "If the target is flat-footed, running, or charging, this
+    attack ignores any bonuses to the target's AC from its shield." Measured before (its
+    not_yet line): no running or charging state was asked — a charging shieldbearer's +2
+    stood against the axe."""
+    foe = load_pc("fixtures/pc-borin.json")
+    foe.ref, foe.kind = "c1", "npc"
+    foe.hp = foe.hp_max = 400
+    pc = _pc(feats=["Sliding Axe Throw"], weapons=["handaxe", "handaxe"])
+    s, e = _board(pc, faces={"Attack with": 10}, allies=())
+    s.add(foe, at=(8, 5))
+    s.sides["them"] = ["c1"]
+    s.initiative.append(("c1", 5))
+    s.acted.add("c1") if isinstance(s.acted, set) else s.acted.append("c1")
+    plain = _of(_run(e, _hit(weapon="handaxe", thrown=True, sliding_axe_throw=True)),
+                "attack")[0]
+    foe.apply_effect(ActiveEffect(name="charging", kind="buff", key="charging",
+                                  source="Charge", origin="rule:charging", duration="rounds",
+                                  rounds_left=1, tags=("buff.stance.charging",)))
+    new_turn(s)
+    slid = _of(_run(e, _hit(weapon="handaxe", thrown=True, sliding_axe_throw=True)),
+               "attack")[0]
+    assert "shield slid under" not in plain.dc["explain"], plain.dc
+    assert "-2 the shield slid under" in slid.dc["explain"], slid.dc
+
+
+def test_a_rider_shooting_from_a_running_mount_takes_minus_eight_or_minus_four_archer():
+    """CRB, Mounted Combat: "-4 penalty on ranged attacks" from a double-moving mount, "-8
+    if your mount is running"; Mounted Archery (CRB) halves it. Measured before (its
+    not_yet line): the mount's double move and run were not tracked."""
+    for feats, want in (([], -8), (["Mounted Archery"], -4)):
+        s, e, pc, horse = _mounted(feats, foes=(("thug", (2, 2)),),
+                                   faces={"Attack with": 10}, at=(15, 27))
+        s.get("c1").hp = s.get("c1").hp_max = 400
+        run = _run(e, _move(15, 2))
+        assert horse.has_state("state.moving.running"), _tells(run)
+        res = _run(e, _hit(weapon="shortbow"))
+        roll = [r for r in _of(res, "attack")[0].rolls
+                if (r.label or "").startswith("Attack with")][0]
+        assert _named(roll, "shooting from a running mount") == want, _tells(res)
+
+
+def test_dragon_style_charges_through_difficult_ground_and_an_ally():
+    """Dragon Style (UC): "you can charge or run through difficult terrain and through
+    squares occupied by allies". Measured before (its not_yet line): every charge line
+    crossing rubble or a friend was refused."""
+    ally = _pc(base="fixtures/pc-borin.json")
+    ally.ref, ally.kind = "ally", "npc"
+    pc = _pc(feats=["Improved Unarmed Strike", "Dragon Style"],
+             abilities={"str": 14, "dex": 17, "con": 14, "int": 13, "wis": 14, "cha": 14})
+    pc.ranks["acrobatics"] = 3
+    s, e = _board(pc, ("thug", (12, 5)), at=(2, 5), allies=((ally, (5, 5)),),
+                  faces={"Attack with": 15})
+    s.get("c1").hp = s.get("c1").hp_max = 400
+    s.grid.difficult.add((8, 5))
+    refused = _run(e, _hit(weapon="rapier", charge=True))
+    assert _of(refused, "attack")[0].status == "refused", _tells(refused)
+    pc.apply_effect(ActiveEffect(name="dragon style", kind="buff", key="dragon style",
+                                 source="Dragon Style", origin="rule:feat-dragon-style",
+                                 tags=("style.dragon-style",)))
+    new_turn(s)
+    res = _run(e, _hit(weapon="rapier", charge=True))
+    assert _of(res, "attack")[-1].status == "resolved", _tells(res)
+
+
+# --- group 2: crawling and standing up ------------------------------------------------------
+
+def _prone(actor):
+    actor.add_condition("prone", source="test")
+
+
+def _stand(actor="pc"):
+    return {"op": "condition", "actor": actor,
+            "params": {"condition": "prone", "to": actor, "ends": True}}
+
+
+def test_a_prone_body_crawls_five_feet_and_its_step_provokes():
+    """CRB, Crawl: "You can crawl 5 feet as a move action. Crawling incurs attacks of
+    opportunity ... You cannot take a 5-foot step while crawling." Measured before (Fast
+    Crawl's not_yet line): no move asked whether the mover was prone — a prone fighter
+    walked 30 ft, and a crawl out of a thug's reach was a free 5-foot step."""
+    pc = _pc()
+    s, e = _board(pc, ("thug", (6, 5)), faces={"Attack with": 2})
+    _prone(pc)
+    with pytest.raises(IntentError, match="5 ft of movement"):
+        _run(e, _move(5, 8))
+    res = _run(e, _move(4, 5))
+    assert [o for o in res.outcomes if o.op == "attack" and o.actor == "c1"], _tells(res)
+    assert s.move_spent.get("pc") == s.round
+
+
+def test_fast_crawl_crawls_at_half_speed_and_steps():
+    """Fast Crawl (APG): "While prone, you can move at half speed ... You can take a
+    5-foot step while crawling." Measured before: its whole benefit was a not_yet line."""
+    pc = _pc(feats=["Fast Crawl"])
+    s, e = _board(pc, ("thug", (6, 5)), faces={"Attack with": 2})
+    _prone(pc)
+    res = _run(e, _move(4, 5))
+    assert not [o for o in res.outcomes if o.op == "attack" and o.actor == "c1"], _tells(res)
+    new_turn(s)
+    far = _run(e, _move(4, 8))
+    assert _of(far, "move")[-1].status == "resolved", _tells(far)
+
+
+def test_standing_up_is_a_move_action_that_provokes():
+    """CRB, Stand Up: "Standing up from a prone position requires a move action and
+    provokes attacks of opportunity." Measured before (Monkey Style's not_yet line):
+    standing up cost nothing and drew no swing."""
+    pc = _pc()
+    s, e = _board(pc, ("thug", (6, 5)), faces={"Attack with": 2})
+    _prone(pc)
+    res = _run(e, _stand())
+    assert [o for o in res.outcomes if o.op == "attack" and o.actor == "c1"], _tells(res)
+    assert not pc.has_state("state.position.prone")
+    assert s.move_spent.get("pc") == s.round
+
+
+def test_monkey_style_stands_without_provoking_and_as_a_swift_action_on_dc_20():
+    """Monkey Style (UC): "you can crawl and stand up from lying prone without provoking
+    attacks of opportunity, and you can stand up as a swift action if you succeed at a DC
+    20 Acrobatics check." Measured before (its not_yet line): standing up was not an
+    action the engine priced."""
+    feats = ["Improved Unarmed Strike", "Monkey Style"]
+    for face, swift in ((19, True), (2, False)):
+        pc = _pc(cls="monk", level=6, feats=feats)
+        pc.ranks["acrobatics"] = 6
+        s, e = _board(pc, ("thug", (6, 5)),
+                      faces={"Attack with": 2, "Kesst Vayr Acrobatics": face})
+        pc.apply_effect(ActiveEffect(name="monkey style", kind="buff", key="monkey style",
+                                     source="Monkey Style", origin="rule:feat-monkey-style",
+                                     tags=("style.monkey-style",)))
+        _prone(pc)
+        res = _run(e, _stand())
+        assert not [o for o in res.outcomes if o.op == "attack" and o.actor == "c1"]
+        assert not pc.has_state("state.position.prone"), _tells(res)
+        assert (s.swift_spent.get("pc") == s.round) is swift, _tells(res)
+        assert (s.move_spent.get("pc") == s.round) is not swift, _tells(res)
+        crawl = _pc(cls="monk", level=6, feats=feats)
+        s, e = _board(crawl, ("thug", (6, 5)), faces={"Attack with": 2})
+        crawl.apply_effect(ActiveEffect(name="monkey style", kind="buff", key="monkey style",
+                                        source="Monkey Style", origin="rule:feat-monkey-style",
+                                        tags=("style.monkey-style",)))
+        _prone(crawl)
+        away = _run(e, _move(4, 5))
+        assert not [o for o in away.outcomes if o.op == "attack" and o.actor == "c1"]
+
+
+def test_monkey_moves_climbs_at_half_speed_with_dexterity_and_steps_after_two_hits():
+    """Monkey Moves (UC): "climb and crawl at half your speed ... you retain your Dexterity
+    bonus to AC while climbing ... when you use your unarmed strike to hit an opponent
+    twice or more on your turn, you can spend a swift action to take a 5-foot step even if
+    you have moved this round." Measured before (its not_yet line): a climb went a quarter
+    of speed and dropped Dexterity, and no step followed a walk."""
+    from rules import bodyskills as bs
+
+    feats = ["Improved Unarmed Strike", "Monkey Style", "Monkey Moves"]
+    pc = _pc(cls="monk", level=8, feats=feats)
+    pc.apply_effect(ActiveEffect(name="monkey style", kind="buff", key="monkey style",
+                                 source="Monkey Style", origin="rule:feat-monkey-style",
+                                 tags=("style.monkey-style",)))
+    s, e = _board(pc, ("thug", (6, 5)), faces={"Attack with": 18, "Climb": 19})
+    s.get("c1").hp = s.get("c1").hp_max = 400
+    climbed = _run(e, {"op": "check", "actor": "pc",
+                       "params": {"skill": "climb", "dc": {"band": "tough"},
+                                  "height_ft": 60}})
+    held = next(x for x in pc.effects if bs.CLIMBING in (x.tags or ()))
+    assert held.payload["at"] == pc.speed_feet // 2, _tells(climbed)
+    assert not pc.loses_dex_to_ac
+    pc.remove_effects(match=lambda x: bs.CLIMBING in (x.tags or ()))
+    new_turn(s)
+    s.positions["pc"] = (4, 5)
+    first = _run(e, _move(5, 5), _hit(weapon="unarmed", full_attack=True))
+    assert len([b for o in _of(first, "attack") for b in o.blows
+                if b["result"] == "hit"]) >= 2, _tells(first)
+    step = _run(e, _move(5, 6))
+    assert _of(step, "move")[-1].status == "resolved", _tells(step)
+    assert s.swift_spent.get("pc") == s.round
+
+
+# --- group 8: charge variants ---------------------------------------------------------------
+
+def test_charging_hurler_charges_to_throwing_range_and_throws():
+    """Charging Hurler (APG): "use the charge rules to make a thrown weapon attack ... you
+    must only move closer to your opponent, and you must end your movement within 30 feet
+    of that opponent", with the charge's +2. Measured before (its not_yet line): a charge's
+    walk always ended within melee reach, so a thrown charge was never laid."""
+    pc = _pc(feats=["Point-Blank Shot", "Charging Hurler"], weapons=["javelin", "javelin"])
+    s, e = _board(pc, ("thug", (20, 5)), at=(2, 5), faces={"Attack with": 10})
+    s.get("c1").hp = s.get("c1").hp_max = 400
+    res = _run(e, _hit(weapon="javelin", thrown=True, charge=True))
+    blow = _of(res, "attack")[-1]
+    assert blow.status == "resolved", _tells(res)
+    gap = e._gap_ft(pc, s.get("c1"))
+    assert 5 < gap <= 30, gap
+    roll = [r for r in blow.rolls if (r.label or "").startswith("Attack with")][0]
+    assert _named(roll, "charging") == 2
+    assert pc.has_state("buff.stance.charging")
+
+
+def test_improved_charging_hurler_throws_from_further_and_adds_two_damage_close():
+    """Improved Charging Hurler (APG): "your target can be at any range up to your
+    weapon's maximum range. If your target is within 30 feet, you gain a +2 bonus on damage
+    rolls." Measured before (its not_yet line): nothing of Charging Hurler existed to
+    widen. A javelin (30 ft increment) charges to end 10 ft on, far beyond 30 ft."""
+    pc = _pc(feats=["Point-Blank Shot", "Charging Hurler", "Improved Charging Hurler"],
+             weapons=["javelin", "javelin"])
+    s, e = _board(pc, ("thug", (28, 5)), at=(2, 5), faces={"Attack with": 15})
+    s.get("c1").hp = s.get("c1").hp_max = 400
+    res = _run(e, _hit(weapon="javelin", thrown=True, charge=True))
+    assert _of(res, "attack")[-1].status == "resolved", _tells(res)
+    assert tuple(s.positions["pc"])[:2] == (4, 5)
+    near = _pc(feats=["Point-Blank Shot", "Charging Hurler", "Improved Charging Hurler"],
+               weapons=["javelin"])
+    s, e = _board(near, ("thug", (12, 5)), at=(2, 5), faces={"Attack with": 15})
+    s.get("c1").hp = s.get("c1").hp_max = 400
+    res = _run(e, _hit(weapon="javelin", thrown=True, charge=True))
+    dmg = [r for o in _of(res, "attack") for r in o.rolls
+           if not (r.label or "").startswith(("Attack with", "Confirm"))]
+    assert any(_named(r, "Improved Charging Hurler") == 2 for r in dmg), _tells(res)

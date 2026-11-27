@@ -455,8 +455,26 @@
     ]
   },
   "improved-charging-hurler": {
-    "not_yet": [
-      "'When you use Charging Hurler, your target can be at any range ... If your target is within 30 feet, you gain a +2 bonus on damage rolls': Charging Hurler itself is lane b4-moves' (feat loop batch 4), and this lane has nothing of it to widen"
+    "tags": [
+      "charge.thrown.any-range"
+    ],
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "charge",
+          "weapon": {
+            "ranged": true
+          },
+          "range_ft": {
+            "lte": 30
+          }
+        },
+        "note": "Improved Charging Hurler: a thrown charge within 30 ft"
+      }
     ]
   },
   "sling-flail": {

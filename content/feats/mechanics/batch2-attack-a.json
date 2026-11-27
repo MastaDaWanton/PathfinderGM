@@ -590,8 +590,8 @@
     ]
   },
   "fast-crawl": {
-    "not_yet": [
-      "moving at half speed while prone, and a 5-foot step while crawling: no move asks whether the mover is prone, so a crawl is not priced or allowed by rule"
+    "tags": [
+      "movement.crawl.fast"
     ]
   },
   "friend-to-animals": {},

@@ -71,8 +71,14 @@ def is_step(scene, actor, start, end) -> bool:
         return False
     if not scene.in_encounter:
         return True
+    # Feat loop b7-moves: "You cannot take a 5-foot step while crawling" (CRB), unless Fast
+    # Crawl or Monkey Moves; and Monkey Moves' swift step after two unarmed hits.
+    from . import feat_moves
+
+    if feat_moves.crawling(actor) and not feat_moves.crawl_steps(actor):
+        return False
     if walked(scene, actor.ref) or actor.has_state("movement.stepped"):
-        return pack_attack(scene, actor)
+        return pack_attack(scene, actor) or feat_moves.monkey_step(scene, actor)
     return not _difficult(scene, actor, end)
 
 
@@ -100,8 +106,10 @@ def after_step_refusal(scene, actor, start, end) -> str:
         return ""
     if walked(scene, actor.ref) != "step":
         return ""
+    from . import feat_moves          # feat loop b7-moves: Monkey Moves' swift step
+
     if gridmod.distance(tuple(start)[:2], tuple(end)[:2]) <= gridmod.SQUARE_FT \
-            and pack_attack(scene, actor):
+            and (pack_attack(scene, actor) or feat_moves.monkey_step(scene, actor)):
         return ""
     return (f"{actor.name} took a 5-foot step this round, and no other movement may follow "
             f"it until their next turn.")
@@ -119,7 +127,11 @@ def record(engine, actor, start, end, feet: int = 0) -> str:
     kind = "move"
     if step and (before or actor.has_state("movement.stepped")):
         kind = "pack"
-        engine._spend_swift(actor, True, "Pack Attack")
+        if pack_attack(scene, actor):
+            engine._spend_swift(actor, True, "Pack Attack")
+        else:                      # feat loop b7-moves: Monkey Moves' swift step
+            engine._spend_swift(actor, False, "Monkey Moves")
+            actor.remove_effects(match=lambda e: e.key == "unarmed hits")
     elif step:
         kind = "step"
     if not hasattr(scene, "walked") or scene.walked is None:

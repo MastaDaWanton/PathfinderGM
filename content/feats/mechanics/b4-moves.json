@@ -146,8 +146,8 @@
     ]
   },
   "mounted-archery": {
-    "not_yet": [
-      "the mount's double move and run are not tracked (a ridden walk is the steed's one move op), so neither the book's -4/-8 on a rider's ranged attack nor this feat's halving of it is applied"
+    "tags": [
+      "mounted.archery.halved"
     ]
   },
   "charge-through": {
@@ -264,8 +264,8 @@
     ]
   },
   "charging-hurler": {
-    "not_yet": [
-      "'use the charge rules to make a thrown weapon attack ... end your movement within 30 feet': a charge's walk ends within melee reach (Engine._charge_path), so a thrown charge is never laid"
+    "tags": [
+      "charge.thrown"
     ]
   },
   "dimensional-assault": {

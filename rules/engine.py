@@ -6746,6 +6746,10 @@ class Engine:
             return self._provoked_by_casting(raw)
         if raw.get("op") == "use_item":
             return self._provoked_by_drinking(raw)
+        if raw.get("op") == "condition":       # feat loop b7-moves: standing up provokes
+            from . import feat_moves as _fm
+
+            return _fm.provoked_by_standing(self, raw)
         if raw.get("op") != "move":
             return []
 
@@ -7482,7 +7486,12 @@ class Engine:
         mover_actor = self.scene.actors.get(mover)
         # Step Up's price (`_step_up_after`): "you cannot take a 5-foot step during your
         # next turn" — a walk of one square is a move action then.
-        if int(feet) <= gridmod.SQUARE_FT and not (
+        # Feat loop b7-moves: a 5-foot crawl is a move action, not a step (CRB, Crawl).
+        from . import feat_moves as _fm
+
+        crawled = (mover_actor is not None and _fm.crawling(mover_actor)
+                   and not _fm.crawl_steps(mover_actor))
+        if int(feet) <= gridmod.SQUARE_FT and not crawled and not (
                 mover_actor is not None and mover_actor.has_state("movement.stepped")):
             return
         self._one_blow_left(mover, queue)
@@ -11670,7 +11679,10 @@ class Engine:
                 target_ac = sum(m.value for m in kept)
         # Sliding Axe Throw: "If the target is flat-footed ... this attack ignores any
         # bonuses to the target's AC from its shield."
-        if "sliding_axe_throw" in choices and flat_footed:
+        # Feat loop b7-moves: "flat-footed, running, or charging" — the run's and the
+        # charge's own states (rules/feat_moves.py).
+        if "sliding_axe_throw" in choices and (flat_footed or defender.has_state(
+                "state.moving.running") or defender.has_state("buff.stance.charging")):
             shield_ac = sum(m.value for m in defender.ac_modifiers(
                 weapon["category"], True, attacker=actor) if (m.type or "") == "shield")
             if shield_ac > 0:
@@ -12030,6 +12042,10 @@ class Engine:
                 # Feat loop b7-moves: Mounted Blade's added blow "has a -5 penalty".
                 if intent.params.get("reaction") == "mounted-blade":
                     atk_mods = atk_mods + [Modifier(-5, "Mounted Blade")]
+                # And a ranged attack from a double-moving or running mount (CRB).
+                from . import feat_moves as _fm_mount
+
+                atk_mods = atk_mods + _fm_mount.mounted_ranged(self, actor, weapon)
 
             # A crowd makes no attack roll. Pathfinder's troop subtype: instead of attacks,
             # "they deal automatic damage to any creature within reach or whose space they
@@ -13611,6 +13627,10 @@ class Engine:
         grid = self.scene.grid
         n = max(abs(b[0] - a[0]), abs(b[1] - a[1]))
         seen: set = set()
+        # Feat loop b7-moves: Dragon Style charges through difficult ground and allies.
+        from . import feat_moves as _fm
+
+        free = _fm.through_all(actor)
         for i in range(1, n + 1):
             anchor = (round(a[0] + (b[0] - a[0]) * i / n), round(a[1] + (b[1] - a[1]) * i / n))
             for p in gridmod.footprint(anchor, actor.size):
@@ -13619,10 +13639,10 @@ class Engine:
                 seen.add(p)
                 if not grid.passable(p):
                     return f"Something solid stands in the line of the charge at {p}."
-                if p in grid.difficult:
+                if p in grid.difficult and not free:
                     return (f"The line of the charge crosses difficult ground at {p}, and "
                             f"nothing may hinder a charge.")
-                if p in taken:
+                if p in taken and not (free and _fm._ally_at(self, actor, p)):
                     return (f"Somebody stands in the line of the charge at {p} — even an "
                             f"ally stops one.")
         return ""
@@ -13650,8 +13670,13 @@ class Engine:
         speed = int(getattr(actor, "speed_feet", 0) or 0)
         one_action = actor.has_state(states.ONE_ACTION_TURN)
         budget = speed if (spring or one_action or readied_charge) else 2 * speed
-        found = why or self._charge_path(actor, defender, weapon_key, budget,
-                                         straight=not spring)
+        # Feat loop b7-moves: Charging Hurler's thrown charge ends within throwing range.
+        from . import feat_moves as _fm
+
+        found = why or (_fm.thrown_charge_path(self, actor, defender, weapon_key, budget)
+                        if _fm.thrown_charge(actor, params) else
+                        self._charge_path(actor, defender, weapon_key, budget,
+                                          straight=not spring))
         if isinstance(found, str):
             raw["params"] = dict(params, charge_refused=found)
             return None
@@ -17052,6 +17077,14 @@ class Engine:
         ref = intent.params.get("who") or intent.actor
         actor = self.scene.get(ref)
         target = tuple(intent.params["square"])
+        # Feat loop b7-moves: a rider's walk is the steed's (`bodyskills.ridden_move`), so
+        # it is weighed against the steed's speed and body, never the rider's.
+        if actor is not None and not intent.params.get("who"):
+            from . import bodyskills as _bs
+
+            steed = _bs.mount_of(self.scene, actor)
+            if steed is not None:
+                actor, ref = steed, steed.ref
 
         if not self.scene.has_grid:
             raise IntentError(
@@ -17104,7 +17137,10 @@ class Engine:
         if start is None or not self.scene.in_encounter:
             return
 
-        budget = actor.speed_feet
+        # Feat loop b7-moves: a prone body crawls (5 ft, or half speed with Fast Crawl).
+        from . import feat_moves as _fm
+
+        budget = _fm.crawl_budget(actor, actor.speed_feet)
         # The route is found on the floor plan, (x, y); a square on a raised level is
         # (x, y, z) — the map writes the level into every square above the ground — and
         # looking that up in the flat table refused EVERY move on a map with a raised
@@ -17125,6 +17161,12 @@ class Engine:
         anywhere = grid.reachable(origin, 10_000, size=actor.size, occupied=occupied,
                                   swims=swims, easy_ft=easy)
         if flat in anywhere:
+            # Feat loop b7-moves: a straight walk past a double move, as the turn's whole
+            # action, is the run (rules/feat_moves.py `run_refusal`).
+            from . import feat_moves as _fm
+
+            if _fm.run_refusal(self, actor, start, target, anywhere) is None:
+                return
             # The square this round's movement gets them nearest it, named and carried as
             # the fix: live 2026-11-12, told only the distance, the plan proposed a square
             # 45-55 ft off seven times running and the turn fell to narration.
@@ -26071,6 +26113,13 @@ class Engine:
             woken = self._slap_awake(intent, target, key)
             if woken is not None:
                 return woken
+            # Feat loop b7-moves: getting up in a fight is a move action (Monkey Style's
+            # swift on DC 20 Acrobatics; rules/feat_moves.py `stand_up`).
+            from . import feat_moves as _fm
+
+            stood, stood_rolls, stood_said = _fm.stand_up(self, intent, target)
+            if stood is not None:
+                return stood
             gone = target.remove_effects(kind="condition",
                                          match=lambda e: e.key == key)
             named = CONDITIONS.get(key, {}).get("name", key).lower()
@@ -26078,8 +26127,9 @@ class Engine:
                 intent_id=intent.id, op="condition",
                 effects=[{"ref": target.ref, "kind": "condition", "condition": key,
                           "ends": True} for _ in gone],
+                rolls=list(stood_rolls),
                 tell=(f"{target.name} is no longer {named}." if gone
-                      else f"{target.name} was not {named}."),
+                      else f"{target.name} was not {named}.") + stood_said,
                 because=intent.because)
 
         if self._when_spares(target, intent.params.get("when")):
@@ -28575,8 +28625,10 @@ class Engine:
         if len(walks) > 1:
             return (f"{said[walks[0]]} and {said[walks[1]]} are each a whole round; choose "
                     f"one.")
+        from . import feat_moves as _fm      # feat loop b7-moves: Charging Hurler
+
         for c in walks + (["lunge"] if "lunge" in declared else []):
-            if ranged:
+            if ranged and not (c == "charge" and _fm.thrown_charge(actor, params)):
                 return f"{said[c]} is made with a melee weapon, not a {w['name']}."
         for c in walks:
             if full or params.get("manoeuvre") or params.get("coup_de_grace"):
@@ -34782,6 +34834,26 @@ class Engine:
                         tell=f"{actor.name} tries to climb onto {climb[0]} and does not "
                              f"get up (Climb {climbed.total} against DC {climb[1]}).",
                         rolls=[climbed], because=intent.because)
+            # Feat loop b7-moves: a walk past a double move is the run (rules/feat_moves.py):
+            # the round spent, the Constitution check past its limit, the running state.
+            from . import feat_moves as _fm
+
+            run_rolls: list = []
+            ran = False
+            if from_square is not None and not any(intent.params.get(k) for k in (
+                    "reaction", "closing_on", "charging")) and \
+                    intent.params.get("spring_left") is None:
+                run_cost = self._move_cost(ref, from_square, tuple(square))
+                if _fm.is_run(self, actor, run_cost):
+                    why = _fm.run_refusal(self, actor, from_square, tuple(square),
+                                          {tuple(square)[:2]: run_cost})
+                    if why:
+                        return self._refuse(intent, f"{actor.name} cannot run there: {why}.",
+                                            code="too_far")
+                    stopped, run_rolls = _fm.run_starts(self, intent, actor)
+                    if stopped is not None:
+                        return stopped
+                    ran = True
             self.scene.positions[ref] = tuple(square)
             bodyskills.carry_rider(self.scene, ref)
             self.scene.settle_levels()
@@ -34813,6 +34885,9 @@ class Engine:
             # somebody else from the player is said in feet, below.
             went = (f"{actor.name} moves {cost} ft" if cost is not None else
                     f"{actor.name} moves")
+            if ran:                                   # feat loop b7-moves
+                went = f"{actor.name} runs {cost} ft"
+                effect["run"] = True
             tell = f"{went}."
             # Where in the place, when the square is a fixture's (`fixtures.where_said`).
             from . import fixtures
@@ -34897,7 +34972,7 @@ class Engine:
             return Outcome(
                 intent_id=intent.id, op="move",
                 effects=[effect, *apart_fx],
-                rolls=[climbed] if climbed is not None else [],
+                rolls=([climbed] if climbed is not None else []) + list(run_rolls),
                 tell=tell,
                 because=intent.because,
             )
