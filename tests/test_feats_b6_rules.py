@@ -205,3 +205,62 @@ def test_haste_carries_its_tag_and_slow_time_does_not_stack_with_it():
     assert not [x for x in monk.effects if x.name == "Slow Time"], _tells(res)
     assert monk.has_state("buff.haste")
     assert sum(m.value for m in monk.attack_modifiers(monk.equipped or "unarmed")) == hit
+
+
+# --- Stalwart ----------------------------------------------------------------------------------
+
+def _stalwart(*more, level=8):
+    pc = _pc("fighter", level=level, feats=["Diehard", "Endurance", "Combat Expertise",
+                                            "Stalwart", *more], weapons=("longsword",))
+    pc.equipped = "longsword"
+    s, e = _board(pc, ("thug", (6, 5)))
+    return pc, s, e
+
+
+def test_stalwart_trades_combat_expertise_s_dodge_for_damage_reduction():
+    """ACG Stalwart: "you can forgo the dodge bonus to AC you would normally gain to instead
+    gain an equivalent amount of DR, to a maximum of DR 5/-, until the start of your next
+    turn." At base attack +8 Combat Expertise is +3 dodge: declared with Stalwart, the AC is
+    the plain AC and a blow is soaked by DR 3/—; a round later both are gone."""
+    pc, s, e = _stalwart()
+    ac = pc.ac()
+    _run(e, {"op": "attack", "actor": "pc", "target": "c1", "visibility": "hidden",
+             "params": {"combat_expertise": True, "stalwart": True}})
+    assert pc.ac() == ac
+    dr = pc.damage_reduction("slashing")
+    assert dr is not None and dr.amount == 3 and dr.bypass == "", dr
+    pc.tick_effects(1)
+    assert pc.damage_reduction("slashing") is None
+
+
+def test_improved_stalwart_doubles_it_and_total_defense_trades_too():
+    """Improved Stalwart (ACG): "Double the DR you gain from Stalwart, to a maximum of DR
+    10/-." Total defense's +4 dodge with the trade is DR 8/—; without Improved, DR 4/—."""
+    for more, want in (((), 4), (("Improved Stalwart",), 8)):
+        pc, s, e = _stalwart(*more, level=12)
+        res = _run(e, {"op": "total_defense", "actor": "pc", "params": {"stalwart": True}})
+        assert "stalwart" in _tells(res).lower(), _tells(res)
+        assert pc.damage_reduction("bludgeoning").amount == want
+
+
+def test_stalwart_dr_is_denied_with_the_dexterity_bonus():
+    """ACG: "If you are denied your Dexterity bonus to AC, you are also denied this DR." The
+    same trade, then flat-footed: no DR."""
+    pc, s, e = _stalwart()
+    _run(e, {"op": "total_defense", "actor": "pc", "params": {"stalwart": True}})
+    assert pc.damage_reduction("slashing").amount == 4
+    pc.add_condition("flat-footed", rounds=1)
+    assert pc.damage_reduction("slashing") is None
+
+
+def test_stalwart_is_on_the_declare_section():
+    """The combat bar's Declare section lists Stalwart beside Combat Expertise, and the
+    total defense trade as its own action (play/views.py `_attack_options`)."""
+    from play.views import _attack_options
+
+    pc, s, e = _stalwart()
+    ids = {o["id"]: o for o in _attack_options(pc)["options"]}
+    assert "stalwart" in ids and not ids["stalwart"]["why"], ids.get("stalwart")
+    assert ids["total_defense_stalwart"]["op"] == {"op": "total_defense",
+                                                   "params": {"stalwart": True}}
+    assert "DR 4/—" in ids["total_defense_stalwart"]["says"]

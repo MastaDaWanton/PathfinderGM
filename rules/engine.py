@@ -11639,6 +11639,10 @@ class Engine:
             state["tells"].extend(early_said + self._lay_attack_stances(
                 actor, () if intent.params.get("cleaving") else choices + guard,
                 defender=defender))
+            if "stalwart" in choices and not intent.params.get("cleaving"):
+                from . import stalwart     # feat loop b6-rules
+
+                state["tells"].extend(stalwart.convert(actor))
             if intent.params.get("lunge_tell"):
                 state["tells"].append(str(intent.params["lunge_tell"]))
             state["tells"].extend(self._lower_shield_for_bash(actor, weapon, off_key))
@@ -28708,12 +28712,18 @@ class Engine:
         effect = self.total_defense_effect(actor)
         actor.apply_effect(effect)
         n = effect.modifiers[0]["amount"]
+        # Feat loop b6-rules: Stalwart's trade (rules/stalwart.py).
+        from . import stalwart as stalwart_mod
+
+        traded = stalwart_mod.convert(actor) if intent.params.get("stalwart") \
+            and stalwart_mod.held(actor) else []
         return Outcome(
             intent_id=intent.id, op="total_defense",
             effects=[{"ref": actor.ref, "kind": "condition", "condition": "total defense",
                       "rounds": 1, "origin": "rule:total-defense"}],
             tell=f"{actor.name} gives up attacking to guard (total defense): +{n} armour "
-                 f"class until their next turn, and no attacks of opportunity.",
+                 f"class until their next turn, and no attacks of opportunity."
+                 + "".join(" " + t for t in traded),
             because=intent.because)
 
     # Crane Wing's tags (its feat document's): the wing itself, and Crane Riposte's

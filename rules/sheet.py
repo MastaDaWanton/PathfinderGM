@@ -451,7 +451,9 @@ ATTACK_CHOICES = ("power_attack", "deadly_aim", "piranha_strike", "combat_expert
                   # Feinting Flurry's feint for a flurry's first swing.
                   "tripping_twirl", "feinting_flurry", "gory_finish",
                   # Feat loop b5-maneuver: Fury's Snare's whip let go to entangle.
-                  "furys_snare")
+                  "furys_snare",
+                  # Feat loop b6-rules: Stalwart's dodge traded for DR (rules/stalwart.py).
+                  "stalwart")
 # The options nobody needs a feat for (combat bar round 2, 2026-11-22). CRB, Combat
 # ("Fighting Defensively as a Standard Action"): "You can choose to fight defensively when
 # attacking" — anyone, with any attack. Its numbers are `defensive_dodge` and the stance
@@ -495,7 +497,9 @@ ATTACK_CHOICE_FEATS = {"power_attack": "power-attack", "deadly_aim": "deadly-aim
                        "tripping_twirl": "tripping-twirl",
                        "feinting_flurry": "feinting-flurry", "gory_finish": "gory-finish",
                        # Feat loop b5-maneuver.
-                       "furys_snare": "fury-s-snare"}
+                       "furys_snare": "fury-s-snare",
+                       # Feat loop b6-rules.
+                       "stalwart": "stalwart"}
 
 _IMPLIED_GENDER = {"she": "woman", "he": "man"}
 
@@ -5459,7 +5463,14 @@ class Actor:
         # that nothing else bypasses differently (same bypass: 1/— onto a barbarian's
         # 1/— is 2/—). Best-only still picks among the results. Before 2026-10-30 the
         # paint's 1 beside a 7th-level barbarian's 1/— was best-of-two: still 1.
-        adders = [e for e in self.effects if e.kind == "damage_reduction"
+        # Feat loop b6-rules: Stalwart's "If you are denied your Dexterity bonus to AC, you
+        # are also denied this DR" - a `needs_dex` DR is not there while exposed.
+        exposed = self.loses_dex_to_ac
+
+        def off(e) -> bool:
+            return exposed and bool((e.payload or {}).get("needs_dex"))
+
+        adders = [e for e in self.effects if e.kind == "damage_reduction" and not off(e)
                   and str((e.payload or {}).get("stacks_with") or "") == "class"]
         for e in adders:
             d = dict(e.payload or {})
@@ -5489,7 +5500,7 @@ class Actor:
         for e in self.effects:
             if e.kind == "damage_reduction":
                 d = dict(e.payload or {})
-                if int(d.get("amount", 0) or 0) > 0 and wants(d):
+                if int(d.get("amount", 0) or 0) > 0 and wants(d) and not off(e):
                     pool.append(Reduction(int(d["amount"]),
                                           str(d.get("bypass") or ""),
                                           e.source or e.name))

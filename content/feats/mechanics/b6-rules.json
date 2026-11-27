@@ -13,7 +13,9 @@
     "tenacious-transmutation: APG: 'The DC of caster level checks to dispel or remove your transmutations increases by 2; even if the spell is negated, its effects persist for 1 additional round before dissipating' (rules/dispel.py `dc_of`, `_end`).",
     "atheist-abjurations: F&P: 'You gain a +2 bonus to your caster level whenever you use an abjuration spell to dispel or counter a divine spell'.",
     "umbral-spell: ISM: 'An umbral spell gains the darkness descriptor. As long as the spell is in effect, the creature or object affected radiates darkness in a 10-foot radius ... An umbral spell uses up a spell slot two levels higher' (rules/metamagic.py `umbral`, Engine._op_cast).",
-    "shadow-grasp: ISM: 'When you cast a spell with the darkness descriptor that affects an area, creatures in the area are entangled ... A Shadow Grasp spell uses up a slot one level higher' (Engine._shadow_grasp)."
+    "shadow-grasp: ISM: 'When you cast a spell with the darkness descriptor that affects an area, creatures in the area are entangled ... A Shadow Grasp spell uses up a slot one level higher' (Engine._shadow_grasp).",
+    "stalwart: ACG: 'While using the total defense action, fighting defensively action, or Combat Expertise, you can forgo the dodge bonus to AC you would normally gain to instead gain an equivalent amount of DR, to a maximum of DR 5/-, until the start of your next turn' (rules/stalwart.py).",
+    "improved-stalwart: ACG: 'Double the DR you gain from Stalwart, to a maximum of DR 10/-'."
   ],
   "improved-counterspell": {
     "tags": [
@@ -70,6 +72,14 @@
     "not_yet": [
       "'An entangled creature remains so as long as it is in the area of the spell and for 1 round after it leaves. A creature that leaves and reenters the area must make a new saving throw': the entangle is laid once, at the cast, for the spell's rounds; leaving and re-entering the darkness are not asked",
       "'If the spell allows spell resistance, failing to overcome a creature's spell resistance means it is not entangled': no spell resistance is rolled for the grasp (darkness and deeper darkness allow none)"
+    ]
+  },
+  "stalwart": {
+    "choice": "stalwart"
+  },
+  "improved-stalwart": {
+    "tags": [
+      "defence.stalwart.improved"
     ]
   }
 }

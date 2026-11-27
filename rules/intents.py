@@ -400,7 +400,9 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                     # Feat loop b4-maneuver (sheet.ATTACK_CHOICES).
                     "tripping_twirl", "feinting_flurry", "gory_finish",
                     # Feat loop b5-maneuver (sheet.ATTACK_CHOICES).
-                    "furys_snare"),
+                    "furys_snare",
+                    # Feat loop b6-rules (sheet.ATTACK_CHOICES): Stalwart.
+                    "stalwart"),
                    "player"),
     # `lethality` because a Blood Bender paying for an ability in non-lethal
     # damage and one taking a sword are not in the same trouble.
@@ -479,7 +481,8 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # Total defense (CRB, Combat): a standard action, +4 dodge AC (+6 with 3 ranks of
     # Acrobatics) and no attacks of opportunity until the next turn. Nothing to roll; the
     # combat bar's (`Engine._op_total_defense`), not offered to the reader.
-    "total_defense": ((), (), "hidden"),
+    # `stalwart`: Stalwart's trade of the dodge for DR (feat loop b6-rules).
+    "total_defense": ((), ("stalwart",), "hidden"),
     # Ready (CRB, Combat; feat loop b5-core): a trigger and an action from closed lists
     # (rules/readied.py TRIGGERS, ACTIONS); `patient` is Patient Strike's full-round
     # readying. The combat bar's (`Engine._op_ready`), never the reader's (CODE_ONLY_OPS).
@@ -1158,7 +1161,9 @@ FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "faile
                          "tripping_twirl", "feinting_flurry", "gory_finish",
                          "disengage", "squares_off",
                          # Feat loop b5-maneuver.
-                         "furys_snare"})
+                         "furys_snare",
+                         # Feat loop b6-rules.
+                         "stalwart"})
 from .skilluses import OWN_DOORS as _OWN_DOORS  # noqa: E402 — the uses with their own door
 
 

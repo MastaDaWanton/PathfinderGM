@@ -942,6 +942,14 @@ _OPTION_SHAPES = {
     "ready_counterspell": ("act", "Ready: counterspell",
                            "Your standard action held: name a foe's spell as it is cast and "
                            "answer it with the same spell or dispel magic."),
+    # Feat loop b6-rules: Stalwart (rules/stalwart.py), beside Fight defensively or Combat
+    # Expertise; and Total defense with the trade.
+    "stalwart": ("swing", "Stalwart",
+                 "With Fight defensively or Combat Expertise: the dodge bonus becomes DR/— "
+                 "until your next turn."),
+    "total_defense_stalwart": ("act", "Total defense (Stalwart)",
+                               "Guard with the dodge bonus traded for DR/— until your next "
+                               "turn: no attacks, and no attacks of opportunity."),
     "total_defense": ("act", "Total defense",
                       "Your standard action spent guarding: no attacks, and no attacks of "
                       "opportunity."),
@@ -969,7 +977,9 @@ _SAID_IN_WORDS = frozenset({"pinpoint_targeting", "furious_finish", "pushing_ass
                             "dragonslayer", "wingclipper",
                             # Feat loop b4-combat:
                             "punch_through", "deadly_finish", "butterfly_sting",
-                            "hamatulatsu", "cockatrice_strike"})
+                            "hamatulatsu", "cockatrice_strike",
+                            # Feat loop b6-rules: its number is the DR, not the sheet's.
+                            "stalwart"})
 
 
 def _signed(n: int) -> str:
@@ -1160,6 +1170,13 @@ def _attack_options(pc) -> dict:
     guard = Engine.total_defense_effect(pc)
     own("total_defense", _option_numbers(ac=twin(effect=guard).ac() - base_ac),
         action="standard", op={"op": "total_defense"})
+    from rules import stalwart as stalwart_mod   # feat loop b6-rules
+
+    if stalwart_mod.held(pc):
+        n = int(guard.modifiers[0]["amount"])
+        dr = min(10, 2 * n) if pc.has_state(stalwart_mod.IMPROVED) else min(5, n)
+        own("total_defense_stalwart", f"DR {dr}/— in place of +{n} dodge AC",
+            action="standard", op={"op": "total_defense", "params": {"stalwart": True}})
     feint = skilluses.row(skilluses.FEINT)
     own("feint", f"Bluff {_signed(skill('bluff'))} against the target's guard",
         action=skilluses._action_of(pc, feint),
