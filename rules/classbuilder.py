@@ -1163,7 +1163,9 @@ _LUCK_KEYS = frozenset({"reroll", "bonus", "ally_save", "on_reroll", "surge", "r
                         "per_day", "bonus_type", "against",
                         # Feat loop b4-other: a critical's confirmation against the
                         # bearer, a roll made twice, and the tag an entry holds while.
-                        "confirm_against", "twice", "while"})
+                        "confirm_against", "twice", "while",
+                        # Feat loop b5-other: take 10, a lent feat, a twice paid for.
+                        "take_ten", "lend", "spends"})
 
 
 def _luck_problems(at: str, entries) -> list[str]:
@@ -1191,6 +1193,13 @@ def _luck_problems(at: str, entries) -> list[str]:
             out.append(f"{where}.confirm_against: \"lowest\" or \"reroll\".")
         if "twice" in e and e["twice"] != "higher":
             out.append(f"{where}.twice: \"higher\".")
+        if "take_ten" in e and e["take_ten"] is not True:
+            out.append(f"{where}.take_ten: true.")
+        for k in ("lend", "spends"):
+            if k in e and not (isinstance(e[k], str) and e[k]):
+                out.append(f"{where}.{k}: a feat id, like \"inexplicable-luck\".")
+        if "spends" in e and "twice" not in e:
+            out.append(f"{where}.spends: rides a `twice` entry.")
         if "bonus" in e and (not isinstance(e["bonus"], dict) or not e["bonus"]
                              or set(e["bonus"]) - {"before", "after"}):
             out.append(f"{where}.bonus: {{\"before\": 8, \"after\": 4}}.")

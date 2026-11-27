@@ -43,6 +43,8 @@ SIDESTEP = "movement.sidestep"
 SIDESTEP_IMPROVED = "movement.sidestep.improved"
 LANDING_ROLL = "movement.landing-roll"
 LIGHTNING_STANCE = "movement.lightning-stance"
+WIND_STANCE = "movement.wind-stance"                  # feat loop b5-other
+EASY_SPENT = "movement.difficult.spent"               # feat loop b5-other
 WINGS = "reaction.reposition-failed-charger"
 SPIRITED_CHARGE = "charge.mounted.multiplied"
 MOUNTED = "state.position.mounted"
@@ -82,7 +84,9 @@ def after(engine, intent, outcome, twice: bool = False) -> tuple[list[dict], lis
     if not sc.in_encounter or outcome.status != "resolved":
         return [], []
     if intent.op == "move":
-        return [], _second_move(engine, intent, outcome, twice)
+        _spend_easy(engine, intent, outcome)
+        return [], (_second_move(engine, intent, outcome, twice)
+                    + _wind_stance(engine, intent, outcome, twice))
     if intent.op != "attack":
         return [], []
     more: list[dict] = []
@@ -132,6 +136,68 @@ def _second_move(engine, intent, outcome, twice: bool) -> list:
                     tell=f"{actor.name} moves so fast they blur (Lightning Stance): 50% "
                          f"concealment until their next turn.",
                     because="Lightning Stance")]
+
+
+def _wind_stance(engine, intent, outcome, twice: bool) -> list:
+    """Wind Stance (CRB): "If you move more than 5 feet this turn, you gain 20%
+    concealment for 1 round against ranged attacks" — laid on its holder by a walk past a
+    5-foot step, or a second move this turn (5 feet then 5 more is 10). The miss chance is
+    scoped to ranged blows (`when.weapon.ranged`, read by `Actor.concealment` with the
+    blow's own facts). Feat loop b5-other, on Lightning Stance's door."""
+    from .engine import Outcome
+
+    actor = engine.scene.actors.get(intent.actor or "")
+    if actor is None or not actor.has_state(WIND_STANCE):
+        return []
+    walked = _walked(outcome, actor.ref)
+    if walked <= gridmod.SQUARE_FT and not (twice and walked > 0):
+        return []
+    actor.apply_effect(ActiveEffect(
+        name="wind stance", kind="buff", key="wind stance",
+        source="Wind Stance", origin="rule:feat-wind-stance",
+        duration="rounds", rounds_left=1, tags=("buff.stance.wind",),
+        modifiers=[{"kind": "concealment", "target": "miss_chance", "amount": 20,
+                    "bonus_type": "", "note": "Wind Stance",
+                    "when": {"weapon": {"ranged": True}}}]))
+    return [Outcome(intent_id=intent.id, op="move", actor=actor.ref,
+                    effects=[{"ref": actor.ref, "kind": "buff", "buff": "wind stance",
+                              "rounds": 1, "origin": "rule:feat-wind-stance"}],
+                    tell=f"{actor.name} weaves as they move (Wind Stance): 20% concealment "
+                         f"against ranged attacks until their next turn.",
+                    because="Wind Stance")]
+
+
+def _spend_easy(engine, intent, outcome) -> None:
+    """Nimble Moves and Acrobatic Steps are "each round", not each move (feat loop
+    b5-other): a walk that crossed difficult ground on the allowance spends it until the
+    walker's next turn — a one-round `movement.difficult.spent` effect `Engine._easy_ft`
+    asks. Whether the allowance was used is the walk priced twice, with it and without.
+    shortcut: a walk that used part of the allowance spends all of it; upgrade if a walk
+    ever records the difficult squares it crossed."""
+    sc = engine.scene
+    actor = sc.actors.get(intent.actor or "")
+    grid = getattr(sc, "grid", None)
+    if actor is None or grid is None or actor.has_state(EASY_SPENT):
+        return
+    easy = engine._easy_ft(actor)
+    if easy <= 0 or easy >= gridmod.Grid.EASY_ALL:
+        return
+    went = next((e for e in outcome.effects or () if e.get("kind") == "position"
+                 and e.get("ref") == actor.ref and e.get("from") is not None
+                 and e.get("to") is not None), None)
+    if went is None:
+        return
+    start, end = tuple(went["from"])[:2], tuple(went["to"])[:2]
+    occupied = sc.occupied(ignore=actor.ref)
+    plain = grid.reachable(start, 10_000, size=actor.size, occupied=occupied).get(end)
+    eased = grid.reachable(start, 10_000, size=actor.size, occupied=occupied,
+                           easy_ft=easy).get(end)
+    if plain is None or eased is None or eased >= plain:
+        return
+    actor.apply_effect(ActiveEffect(
+        name="difficult ground crossed", kind="situation", key="difficult ground crossed",
+        source="Nimble Moves", origin="rule:feat-nimble-moves", duration="rounds",
+        rounds_left=1, tags=(EASY_SPENT,)))
 
 
 def _missed_by_melee(intent, outcome, actor) -> list[str]:

@@ -205,15 +205,31 @@
       },
       "self": {
         "tags": [
-          "meditation.held",
-          "meditation.combat"
+          "meditation.held.combat"
         ],
         "rounds": "level"
       },
-      "tell": "{name} drops into a moment of stillness in the middle of the fight.",
-      "not_yet": [
-        "'expend the +1 insight bonus granted from the Meditation Master feat to instead roll twice ... taking the better of the two results': the roll-twice luck offer and Meditation Master's +1 pool are lane b4-other's (`luck` `twice`, `while: meditation.held`) and meet only when both lanes are merged"
-      ]
+      "_b5_other": "Feat loop b5-other: the tag is `meditation.held.combat`, so every meditation feat's `meditation.held` still answers it and Meditative Concentration's 'for 1 round per character level after you perform combat meditation' can ask the combat meditation alone. The roll-twice clause is Combat Meditation's own feat document (b5-other.json, `luck.twice` with `spends`).",
+      "addons": [
+        {
+          "requires": "meditation.slow-time",
+          "name": "Slow Time",
+          "per_day": 1,
+          "unless_origin": "spell:haste",
+          "_source": "Slow Time (F&P): 'Once per day, when you meditate as a full-round action using the Combat Meditation feat, you gain the effects of haste for 1 round per 2 character levels. These effects do not stack with the haste spell' — haste's own terms (content/spells/mechanics/part-08.json).",
+          "self": {
+            "rounds": "max(1, floor(level / 2))",
+            "modifiers": [
+              {"type": "combat_mod", "target": "attack", "amount": 1, "bonus_type": "untyped"},
+              {"type": "combat_mod", "target": "ac", "amount": 1, "bonus_type": "dodge"},
+              {"type": "save_mod", "target": "ref", "amount": 1, "bonus_type": "dodge"},
+              {"type": "speed", "target": "land", "amount": 30, "bonus_type": "enhancement"},
+              {"type": "combat_mod", "target": "extra_attacks", "amount": 1, "bonus_type": "untyped", "when": {"full_attack": true}}
+            ]
+          }
+        }
+      ],
+      "tell": "{name} drops into a moment of stillness in the middle of the fight."
     }
   ]
 }

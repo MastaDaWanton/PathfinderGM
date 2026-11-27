@@ -441,3 +441,15 @@ Systems not in the game:
 - Altitude Affinity: altitude — no place says how high it lies, so neither acclimation nor
   "5,000 feet or higher" can be asked
 - Deadly Dealer: a deck of cards as thrown weapons (no card is a weapon in the gear)
+## Feat loop batch 5, lane b5-other
+
+Confirmed again, still waiting on what the batch 4 headings above name: Leadership,
+Additional Traits, Deep Drinker, Fast Drinker, Eclectic, Extra Discovery, Extra Revelation,
+Hero's Fortune, Luck of Heroes, Flagbearer, Conviction, Improved Learn Ranger Trap, Learn
+Ranger Trap (both printings), Trapper's Setup, Advanced Ranger Trap, Equipment Trick,
+Renown, Expert Trainer, Focused Worker, Dimensional Savant, Gunsmithing, Horse Master,
+Improved Stalwart, Monastic Legacy, Exploit Lore, Extra Arcana, Eyes of Judgment, Grant
+Initiative, Improved Monster Lore, Insightful Gaze, Oracular Intuition, Sin Seer.
+
+Dented Helm and Cloven Helm moved out of this list: each carries a document now whose
+`not_yet` names the helmet lane b5-core is building.

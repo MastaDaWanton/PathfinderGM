@@ -385,6 +385,56 @@ def after_hit(engine, intent, actor, defender, weapon_key, weapon, state, choice
 
     out += maneuver_feats.gory_finish(engine, actor, defender, choices, state)
     out += maneuver_feats.unseat(engine, intent, actor, defender, weapon_key, choices)
+    out += _ferocious_loyalty(engine, actor, defender)          # feat loop b5-other
+    return out
+
+
+LOYAL = "ferocious-loyalty"
+LOYAL_ORIGIN = "rule:feat-ferocious-loyalty"
+
+
+def _ferocious_loyalty(engine, actor, defender) -> list[dict]:
+    """Ferocious Loyalty (Blood of the Moon): "Whenever an ally with this feat is rendered
+    helpless or killed within 30 feet of you, you gain a +2 morale bonus on attack rolls
+    for 1 minute or until the foe responsible is rendered helpless or killed, whichever
+    comes first." Asked at the blow that does it: each holder on the fallen's side within
+    30 feet takes the +2 (10 rounds, `payload.foe` the striker), and a blow that fells a
+    foe somebody's +2 is held against ends it. shortcut: only a blow is seen to fell —
+    a spell that renders the ally helpless lays nothing; upgrade when a fall is an event
+    every door raises."""
+    from . import feats as feats_mod
+    from . import position as position_mod
+
+    down = defender.is_dead or defender.is_helpless
+    if not down:
+        return []
+    out: list[dict] = []
+    for ref, other in engine.scene.actors.items():
+        gone = other.remove_effects(match=lambda e: e.origin == LOYAL_ORIGIN and (
+            e.payload or {}).get("foe") == defender.ref)
+        if gone:
+            out.append({"effect": {"ref": ref, "kind": "effect_ended", "what": gone[0].name,
+                                   "origin": LOYAL_ORIGIN},
+                        "tell": f"{other.name}'s fury at {defender.name} is spent."})
+    if LOYAL not in feats_mod._held(defender):
+        return out
+    for ref, other in engine.scene.actors.items():
+        if other is defender or other is actor or other.is_down                 or LOYAL not in feats_mod._held(other)                 or not position_mod._same_side(engine.scene, ref, defender.ref):
+            continue
+        gap = engine._gap_ft(other, defender)
+        if gap is None or gap > 30:
+            continue
+        other.apply_effect(ActiveEffect(
+            name="ferocious loyalty", kind="buff", key="ferocious loyalty",
+            source="Ferocious Loyalty", origin=LOYAL_ORIGIN, duration="rounds",
+            rounds_left=10, payload={"foe": actor.ref},
+            modifiers=[{"kind": "combat_mod", "target": "attack", "amount": 2,
+                        "bonus_type": "morale"}]))
+        out.append({"effect": {"ref": ref, "kind": "buff", "buff": "ferocious loyalty",
+                               "rounds": 10, "foe": actor.ref, "origin": LOYAL_ORIGIN},
+                    "tell": f"{defender.name} falls, and {other.name} rounds on "
+                            f"{actor.name} in fury (Ferocious Loyalty): +2 to hit for a "
+                            f"minute."})
     return out
 
 
@@ -590,7 +640,8 @@ def precision_dice(engine, intent, actor, defender, weapon_key, weapon, state, p
             entries.append((doc, e))
     if not entries or precision.immune(defender) or precision.foiled(actor, defender):
         return []
-    chance = engine._concealment_of(actor, defender)[0]
+    chance = engine._concealment_of(
+        actor, defender, ranged=(weapon or {}).get("category") == "ranged")[0]
     if chance >= 50 or (chance and not actor.has_state(precision.THROUGH_CONCEALMENT)):
         return []
     ctx = blow_ctx(actor, weapon_key, weapon, defender)

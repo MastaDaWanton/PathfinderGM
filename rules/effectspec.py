@@ -630,6 +630,10 @@ VOCAB: dict[str, list[dict]] = {
         # Feet of difficult terrain crossed as normal in a move (Acrobatic Steps' 15),
         # read by `Engine._easy_ft` into `Grid.reachable(easy_ft=)`.
         ("difficult_ft", "Difficult terrain crossed as normal, in feet"),
+        # Feat loop b5-other: a world-class bench's check, scoped by `when.bench`
+        # (Brewmaster's Craft (alchemy) is the alchemist's bench), read by
+        # `tradecraft.bench_check_terms`.
+        ("bench_check", "A world-class bench's check"),
         # Feat loop b1, 2026-11-22: the caster level a spell is CAST at, read by
         # `casting.spell_caster_level` with the spell's roll context (school, spell,
         # energy, descriptor, subschool) — Spell Specialization's "treat your caster level
@@ -2560,6 +2564,12 @@ WHEN_KEYS: dict[str, str] = {
     # vehicle a driving check is made with (`Engine._helm`), "$pick" for the feat's own.
     "vehicle": "the vehicle a driving check is made with: \"sailing ship\" or \"$pick\" "
                "(Engine._helm)",
+    # Feat loop b5-other: Ferocious Loyalty's "any foe that currently threatens an ally
+    # who also has this feat" (sheet.Situation.ally_threatened).
+    "bench": "the world-class bench a check is made at: alchemist, blacksmith, enchanter, "
+             "leatherworker, herbalist (tradecraft.bench_check_terms)",
+    "ally_threatened": "the foe of the roll threatens an ally holding a feat: "
+                       "{\"feat\": \"ferocious-loyalty\"}; no board, no answer",
 }
 # `larger` / `smaller` (feat loop b2): size categories against the bearer's own, answered
 # by `classfeatures.holds` where the bearer is known (Risky Striker, Underfoot).
@@ -2660,9 +2670,6 @@ AGAINST: dict[str, str] = {
     # Feat loop b5-spells: Schooled Resolve's "Will saves against mind-affecting spells and
     # effects from vampires" (rules/spell_feats.py save_words).
     "vampire_mind": "a mind-affecting spell or effect of a vampire's",
-    # Feat loop b5-spells: Meditative Concentration's "a Fortitude save to resist a
-    # distraction effect (such as the distraction ability of a swarm)" (Engine._distraction).
-    "distraction": "a swarm's distraction, or another distraction effect",
     # Feat loop b5-spells: Smash's "Strength checks made to knock down or break open doors"
     # (Engine._op_break_in, dungeons' forced doors).
     "door": "a Strength check to break open a door",
@@ -2674,6 +2681,12 @@ AGAINST: dict[str, str] = {
     "illusion": "an illusion (the school)",
     "necromancy": "a necromancy (the school)",
     "transmutation": "a transmutation (the school)",
+    # Feat loop b5-other: Body Control's "effects that would make you fatigued or
+    # exhausted" — a spell landing either (`spell_against`) or a save whose failure lays
+    # one (`Engine._op_save`); Meditative Concentration's "a Fortitude save to resist a
+    # distraction effect (such as the distraction ability of a swarm)".
+    "fatigue": "a save against an effect that would leave you fatigued or exhausted",
+    "distraction": "a Fortitude save against a swarm's distraction (Engine._distraction)",
 }
 
 
@@ -2700,6 +2713,8 @@ def spell_against(spell) -> tuple[str, ...]:
         words.append("sleep")
     if _lands_condition(getattr(spell, "effects", None) or (), ("stunned", "staggered")):
         words.append("stun_or_stagger")                 # feat loop b4-maneuver
+    if _lands_condition(getattr(spell, "effects", None) or (), ("fatigued", "exhausted")):
+        words.append("fatigue")                         # feat loop b5-other
     if "divination" in words and "mind-affecting" in words:
         words.append("mind-reading")
     return tuple(words)
@@ -2810,6 +2825,11 @@ def when_problems(when, where: str = "when") -> list[str]:
                     or not str(want.get("state") or "").strip()):
                 out.append(f"{where}.ally_state is {{\"feat\": \"<a feat id>\", "
                            f"\"state\": \"<a tag>\"}}.")
+        elif key == "ally_threatened":
+            from . import feats as feats_mod
+
+            if not isinstance(want, dict) or set(want) != {"feat"}                     or str(want.get("feat") or "") not in feats_mod.all_feats():
+                out.append(f"{where}.ally_threatened is {{\"feat\": \"<a feat id>\"}}.")
         elif key == "flanking_with":
             from . import feats as feats_mod
 

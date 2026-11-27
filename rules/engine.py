@@ -8070,9 +8070,14 @@ class Engine:
         situations = self._distracted(actor, situations)
         ctx_of = casting.spell_context(spell, adjacent_allies=self._adjacent_allies(actor))
         for kind, dc, why in situations:
-            roll = self.dice.d20(actor.concentration_modifiers({**ctx_of, "casting": kind}),
-                                 label=f"Concentration ({why}, DC {dc})",
-                                 visibility="player" if actor.is_pc else "hidden")
+            cmods = actor.concentration_modifiers({**ctx_of, "casting": kind})
+            # Perfect Center (b5-other): taken 10 when 10 holds it, for the player too —
+            # this check never stops for the popup.
+            roll = self._take_ten(actor, "concentration", cmods, dc,
+                                  f"Concentration ({why}, DC {dc})")
+            if roll is None:
+                roll = self.dice.d20(cmods, label=f"Concentration ({why}, DC {dc})",
+                                     visibility="player" if actor.is_pc else "hidden")
             state["rolls"].append(roll.as_dict())
             if roll.total >= dc:
                 state["tells"].append(
@@ -10398,9 +10403,38 @@ class Engine:
                                    visibility="hidden").total
             rounds = _to_rounds(hours, "hour")
         cond = self._set_attitude(target, now, rounds, because or f"{skill} check")
+        regard_effects += self._betrayer_opening(actor, target, now)     # b5-other
         return (attitude_mod.said(target.name, was, now),
                 [{"ref": target.ref, "kind": "condition", "condition": now,
                   "rounds_left": cond.rounds_left}] + regard_effects)
+
+    def _betrayer_opening(self, actor, target, now: str) -> list[dict]:
+        """Betrayer (UC, feat loop b5-other): "When you succeed at a Diplomacy check to
+        change a creature's attitude, you can draw a weapon and make a single melee attack
+        against that creature as an immediate action. If you changed your target's
+        attitude to friendly or better, your target is considered flat-footed against
+        this attack. If the target survives, it takes a -2 penalty on its initiative
+        check for this combat." Laid on the swayed creature for the round the opening
+        lasts: a `state.exposed.betrayed` tag (denied Dexterity, the flat-footed reader)
+        when the step reached friendly, and the -2 on the initiative the blow's fight
+        rolls. The attack itself is the player's own declared blow, whose harm turns the
+        target hostile by the attitude rule every attack obeys (`attitude.harmed`); its
+        immediate action and the weapon drawn are not charged (owner call)."""
+        from . import attitude as attitude_mod
+
+        if not actor.has_state("betrayer.opening") or target is actor:
+            return []
+        warm = now in attitude_mod.TRACK and             attitude_mod.TRACK.index(now) >= attitude_mod.TRACK.index("friendly")
+        target.apply_effect(ActiveEffect(
+            name="betrayer's opening", kind="situation", key=f"betrayed.{actor.ref}",
+            source=f"{actor.name}'s Betrayer", origin="rule:feat-betrayer",
+            duration="rounds", rounds_left=1,
+            tags=(("state.exposed.betrayed",) if warm else ()) + ("betrayed.open",),
+            payload={"by": actor.ref},
+            modifiers=[{"kind": "combat_mod", "target": "initiative", "amount": -2,
+                        "bonus_type": "untyped", "note": "Betrayer"}]))
+        return [{"ref": target.ref, "kind": "situation", "what": "betrayer's opening",
+                 "by": actor.ref, "flat_footed": warm, "origin": "rule:feat-betrayer"}]
 
     def _cowed(self, actor, target, demand: str, because: str, remember, regard_effects):
         """Intimidate's Influence Attitude made (CRB p.99): the target "gives you the
@@ -10584,13 +10618,20 @@ class Engine:
         if spell_feats.origin_is_vampire(intent.origin):
             ctx = {**(ctx or {}), "against": spell_feats.save_words(
                 (ctx or {}).get("against") or (), origin=intent.origin)}
-        # A swarm's distraction (`_distraction` names its save so): Meditative
-        # Concentration's "a Fortitude save to resist a distraction effect".
-        if str(intent.origin or "").startswith("creature:") \
-                and getattr(intent, "origin_name", "") == "distraction":
+        # What the failure would lay, and a swarm's distraction (feat loop b5-other):
+        # Body Control's fatigue and Meditative Concentration's distraction, off the
+        # save's own params and the engine's stamp — never a word the model wrote.
+        more = ()
+        fails = intent.params.get("on_failure")
+        if isinstance(fails, dict) and str(fails.get("condition") or "").lower() \
+                in ("fatigued", "exhausted"):
+            more += ("fatigue",)
+        if intent.origin_name == "distraction" and save == "fort":
+            more += ("distraction",)
+        if more:
             got = (ctx or {}).get("against") or ()
             got = (got,) if isinstance(got, str) else tuple(got)
-            ctx = {**(ctx or {}), "against": got + ("distraction",)}
+            ctx = {**(ctx or {}), "against": got + more}
         # An unreliable cloak or ring that lends this save its bonus is used by the save
         # (`_save_gutters`): rolled once, kept across the dice popup.
         gut = partial.get("save_gutter")
@@ -11874,7 +11915,8 @@ class Engine:
                 # finds a creature that is not quite where it looks. Adding a fourth
                 # suspension stage to every swing to ask for it would cost more than it
                 # is worth. The number is stated in the tell either way.
-                chance, why = self._concealment_of(actor, defender)
+                chance, why = self._concealment_of(
+                    actor, defender, ranged=weapon.get("category") == "ranged")
                 # Seeking (CRB): "veers toward its target, negating any miss chances that
                 # would otherwise apply" — the `property.seeking` tag on the weapon's
                 # layer (law 1), on a ranged blow.
@@ -31804,7 +31846,7 @@ class Engine:
         # miss_chance_a_blow_does`).
         hidden_by = ""
         if hit:
-            chance, why = self._concealment_of(actor, target)
+            chance, why = self._concealment_of(actor, target, ranged=ranged)
             if chance:
                 miss = self.dice.roll("1d100", label=f"miss chance ({why})",
                                       visibility="hidden")
@@ -35137,21 +35179,27 @@ class Engine:
 
     # --- what a blow can see (alchemy lane C) --------------------------------------------
 
-    def _concealment_of(self, attacker, defender) -> tuple[int, str]:
+    def _concealment_of(self, attacker, defender,
+                        ranged: bool | None = None) -> tuple[int, str]:
         """The miss chance this attacker must beat against this defender: the defender's
         own (blur, invisibility), the light at the defender's square as the attacker sees
         it (`Scene.light_at`), and smoke or fog between them (`_fog_chance`). One reader,
         `Actor.concealment`, best source wins — the plan's "no second miss-chance path".
 
         And hidden by Stealth from this attacker: "treat you as if you had total
-        concealment" (CRB p.106) — the 50% a blow at a guessed square must also beat."""
+        concealment" (CRB p.106) — the 50% a blow at a guessed square must also beat.
+
+        `ranged`: whether the blow is a ranged one, for a miss chance only ranged attacks
+        meet (Wind Stance, feat loop b5-other); left out, such a miss chance is not met."""
         from . import awareness
 
         square = self.scene.positions.get(getattr(defender, "ref", ""))
         light = self.scene.light_at(square, viewer=attacker)
         got = defender.concealment(attacker, light=light,
                                    fog=self._fog_chance(attacker, defender),
-                                   light_ft=self._gap_ft(attacker, defender))
+                                   light_ft=self._gap_ft(attacker, defender),
+                                   ctx=None if ranged is None
+                                   else {"weapon": {"ranged": bool(ranged)}})
         # Any hiding, not only a Stealth check's: a scheme's `state.hidden` too — a blow at
         # a guessed square where the hidden NPC stands met no miss chance until 2026-10-30.
         if got[0] < 50 and attacker is not None and defender.has_state(awareness.HIDDEN) \
@@ -35756,7 +35804,7 @@ class Engine:
         hit = atk.natural != 1 and d20_succeeds(atk, ac)
         aimed_at = defender.name if defender is not None else "the spot"
         if hit and defender is not None:
-            chance, why = self._concealment_of(actor, defender)
+            chance, why = self._concealment_of(actor, defender, ranged=True)
             if chance:
                 miss = self.dice.roll("1d100", label=f"miss chance ({why})",
                                       visibility="hidden")
@@ -36193,7 +36241,8 @@ class Engine:
         # `state.hidden` alone — the rule written two ways (ponytail audit): a rogue
         # stabbing a blurred or fog-wrapped foe rolled both the 20% miss chance and her
         # sneak dice, and one who had found a hiding foe was still refused them.
-        chance = self._concealment_of(actor, defender)[0]
+        chance = self._concealment_of(
+            actor, defender, ranged=(weapon or {}).get("category") == "ranged")[0]
         # Shadow Strike (APG): "precision damage ... against targets with concealment (but
         # not total concealment)" — its document's tag, asked of the vocabulary.
         if 0 < chance < 50 and actor.has_state(precision_mod.THROUGH_CONCEALMENT):
@@ -38101,9 +38150,11 @@ class Engine:
         something the player could not have known, so it is printed, not raised.
         """
         for q in doc.get("requires") or ():
-            if not actor.has_state(str(q)):
-                return (f"{found.title()} needs {q} to hold on {actor.name}, "
-                        f"and it does not.")
+            # A list is any one of them (feat loop b5-other: Osyluth Guile's "fighting
+            # defensively or using the total defense action").
+            if not any(actor.has_state(str(t)) for t in (q if isinstance(q, list) else [q])):
+                return (f"{found.title()} needs {' or '.join(map(str, q)) if isinstance(q, list) else q}"
+                        f" to hold on {actor.name}, and it does not.")
         for q in doc.get("requires_not") or ():
             if actor.has_state(str(q)):
                 return f"{found.title()} cannot be used while {q} holds on {actor.name}."
@@ -38419,7 +38470,8 @@ class Engine:
         # the sentence is what the player reads.
         ca.ensure_pool(actor, doc)
         if doc.get("requires_said") and any(
-                not actor.has_state(str(q)) for q in doc.get("requires") or ()):
+                not any(actor.has_state(str(t)) for t in (q if isinstance(q, list) else [q]))
+                for q in doc.get("requires") or ()):
             return self._refuse(intent, f"Nothing takes hold. {name} works "
                                         f"{doc['requires_said']}.", code="ability_refused")
         refused = self._ability_refusal(actor, name, doc)
@@ -38685,6 +38737,8 @@ class Engine:
                                  f"{'beats' if won else 'does not beat'} {other.name}'s "
                                  f"{contest['against']} ({theirs.total}).")
                     if not won:
+                        records += self._contest_lost_by(actor, other, contest, mine.total,
+                                                         theirs.total, origin, shown, tells)
                         continue
                 dc_here = dc
                 if saving and other is not actor and doc.get("bonus_from"):
@@ -39401,7 +39455,7 @@ class Engine:
                            for r in records)
         for a in riders:
             mine = a.get("self") or {}
-            if mine.get("modifiers"):
+            if mine.get("modifiers") and not self._addon_withheld(actor, a, shown, tells):
                 mods = ca.modifiers(mine["modifiers"], actor)
                 rounds = ca.amount(mine.get("rounds"), actor, 1) or 1
                 name = str(a.get("name") or shown)
@@ -39426,6 +39480,53 @@ class Engine:
                     tells.append(f"{actor.name} recovers {got} hit points "
                                  f"({actor.hp}/{actor.hp_max}) ({a.get('name') or shown}).")
         return out
+
+    def _contest_lost_by(self, actor: Actor, other: Actor, contest: dict, mine: int,
+                         theirs: int, origin: str, shown: str, tells: list[str]) -> list:
+        """A contest lost badly (`contest.lost_by`, feat loop b5-other): `{"margin": 5,
+        "rounds": ..., "modifiers": [...]}` lays those terms on the user, against the one
+        contested, for the rounds — Rhetorical Flourish's "If you fail by 5 or more, you
+        instead take a -2 penalty on your next Diplomacy check against that creature"."""
+        from . import class_abilities as ca
+
+        worse = contest.get("lost_by") or {}
+        if not worse or theirs - mine < int(worse.get("margin", 5) or 5):
+            return []
+        mods = ca.modifiers(worse.get("modifiers"), actor)
+        for m in mods:
+            m["vs"] = other.ref
+        rounds = ca.amount(worse.get("rounds"), actor, 1) or 1
+        actor.apply_effect(ActiveEffect(
+            name=f"{shown} (fumbled)", kind="buff", source=f"{shown} on {other.name}",
+            origin=origin, duration="rounds", rounds_left=rounds, modifiers=mods))
+        tells.append(f"{actor.name} fumbles it: " + ", ".join(
+            f"{m['amount']:+d} {m['target']}" for m in mods) + f" against {other.name}.")
+        return [{"ref": actor.ref, "kind": "buff", "ability": shown, "modifiers": mods,
+                 "rounds": rounds, "vs": other.ref, "origin": origin}]
+
+    def _addon_withheld(self, actor: Actor, a: dict, shown: str, tells: list[str]) -> bool:
+        """Whether a feat addon's timed bonus is withheld this use (feat loop b5-other):
+        `unless_origin`, an effect already on the user from that document (Slow Time's
+        haste "do not stack with the haste spell"), or `per_day`, its uses a day spent
+        (Slow Time's "Once per day"), a pool named for the addon on the night's refresh.
+        A use left is spent here."""
+        from . import resources
+
+        name = str(a.get("name") or shown)
+        held = str(a.get("unless_origin") or "")
+        if held and any(str(e.origin or "") == held for e in actor.effects):
+            tells.append(f"{actor.name} is already under {held.split(':', 1)[-1]}; "
+                         f"{name} adds nothing to it.")
+            return True
+        per_day = int(a.get("per_day") or 0)
+        if per_day <= 0:
+            return False
+        pid = name.lower()
+        resources.define(actor, {"id": pid, "max": str(per_day), "refresh": "rest.night",
+                                 "source": name})
+        if not actor.spend_pool(pid, 1).get("ok"):
+            return True
+        return False
 
     def _class_ability_area(self, intent: Intent, actor: Actor, doc: dict, name: str):
         """Who a shaped area catches — a breath weapon's cone, a line, a burst laid away
@@ -42795,6 +42896,9 @@ class Engine:
             if kind:
                 prompt["luck"] = luck_mod.before_offers(actor, kind)
             raise _NeedsPlayerRoll(prompt, dict(extra_partial or {}))
+        ten = self._take_ten(actor, kind, mods, dc, label) if kind else None   # b5-other
+        if ten is not None:
+            return ten
         rolled = self.dice.d20(mods, label=label, visibility=intent.visibility)
         return self._luck_npc(actor, mods, label, dc, kind, rolled) if kind else rolled
 
@@ -42853,6 +42957,10 @@ class Engine:
                 before = choice
                 self._luck_note(actor, doc, f"{actor.name} calls on {doc['name']} before "
                                             f"the roll (+{int(entry['bonus']['before'])}).")
+            else:
+                face, ten = self._luck_chosen_first(actor, choice, kind, mods, label, face)
+                if ten is not None:
+                    return ten
         extra: list[Modifier] = []
         if before:
             doc, entry = luck_mod.find(actor, before, "bonus")
@@ -42939,6 +43047,7 @@ class Engine:
         """What follows a d20 once it stands: a held Surge of Success spent on it, a new
         one earned by a natural 20 on a save, and — a save failed — an ally's Lucky
         Halfling roll of the same save, taken in its place when it succeeds."""
+        roll = self._luck_lent(actor, kind, roll, dc)          # Bestow Luck (b5-other)
         if luck_mod.surge_terms(actor, kind):
             gone = actor.remove_effects(match=lambda e: luck_mod.SURGE in (e.tags or ()))
             for e in gone[:1]:
@@ -42966,6 +43075,64 @@ class Engine:
                 break
         return roll
 
+    # --- luck chosen before the die, and luck lent (feat loop b5-other) -----------------
+
+    def _luck_chosen_first(self, actor: Actor, choice: str, kind: str, mods, label: str,
+                           face: int) -> tuple[int, "Roll | None"]:
+        """(the face to go on with, a finished Roll or None) for a before-the-roll pick
+        that is not a bonus: Perfect Center's take 10 (the die is set aside: "take 10" is
+        no roll, so nothing after it can reroll it), or Combat Meditation's "roll twice
+        ... taking the better of the two results", paid with Meditation Master's +1. The
+        second die is the engine's, beside the player's own (Sure Grasp's shape)."""
+        doc, entry = luck_mod.find(actor, choice, "take_ten")
+        if doc and luck_mod.covers(entry, kind):
+            self._luck_note(actor, doc, f"{actor.name} takes 10 ({doc['name']}).")
+            return face, self.dice.given(10, list(mods),
+                                         label=f"{label} (taking 10, {doc['name']})")
+        doc, entry = luck_mod.find(actor, choice, "spends")
+        if doc and luck_mod.covers(entry, kind):
+            paid, paid_entry = luck_mod.paid_from(actor, entry)
+            if paid and luck_mod.spend(actor, paid, paid_entry):
+                other = self.dice.d20(list(mods), label=f"{label}, second die "
+                                      f"({doc['name']})", visibility="player")
+                self._luck_note(actor, doc, (
+                    f"{actor.name} spends {paid['name']} to roll twice ({doc['name']}): "
+                    f"{face} and {other.raw}, the better kept."))
+                return max(int(face), int(other.raw)), None
+        return face, None
+
+    def _take_ten(self, actor: Actor, kind: str, mods, dc, label: str) -> "Roll | None":
+        """Anybody but the player takes 10 when a `take_ten` feat lets them and 10 makes
+        the DC (Perfect Center), as the swimmer takes 10 when 10 makes it (`swim`): the
+        player chooses it on the popup instead (`_luck_chosen_first`)."""
+        doc = luck_mod.take_ten(actor, kind)
+        if doc is None or dc is None or int(dc or 0) <= 0 \
+                or 10 + sum(m.value for m in mods) < int(dc):
+            return None
+        self._luck_note(actor, doc, f"{actor.name} takes 10 ({doc['name']}).")
+        return self.dice.given(10, list(mods), label=f"{label} (taking 10, {doc['name']})")
+
+    def _luck_lent(self, actor: Actor, kind: str, roll: Roll, dc) -> Roll:
+        """Bestow Luck (ARG): an ally lends this creature Inexplicable Luck's +4 when the
+        roll falls short and four more would make it — the book's trigger, as every
+        creature but the player's own die is decided (`_luck_npc`); the ally's
+        immediate action is not counted (owner call). One lend a roll."""
+        if self._short(roll, dc, kind) is not True or self.scene is None:
+            return roll
+        for other, doc, lent, entry in luck_mod.lenders(actor, self.scene):
+            n = int(entry["bonus"]["after"])
+            if not luck_mod.covers(entry, kind) or roll.total + n < int(dc) \
+                    or not luck_mod.spend(other, lent, entry):
+                continue
+            self._luck_note(other, doc, f"{other.name} lends {actor.name} {lent['name']} "
+                                        f"({doc['name']}): +{n}.")
+            return Roll(die=roll.die, faces=list(roll.faces),
+                        modifiers=list(roll.modifiers) + [Modifier(
+                            n, f"{lent['name']} from {other.name}",
+                            str(entry.get("bonus_type") or ""))],
+                        label=roll.label, visibility=roll.visibility)
+        return roll
+
     @staticmethod
     def _easy_ft(actor) -> int:
         """Feet of difficult terrain this creature crosses as normal in a move (feat loop
@@ -42975,6 +43142,9 @@ class Engine:
         from . import places as places_mod
 
         easy = max(0, sum(m.value for m in actor._buff_mods("combat_mod", "difficult_ft")))
+        # "Each round" (b5-other): spent by an earlier walk this round (`feat_moves`).
+        if actor.has_state("movement.difficult.spent"):
+            easy = 0
         wild = places_mod.terrain_of(str(actor.at or "")) not in ("", "urban")
         if wild and actor.has_state("move.difficult.natural"):
             easy += gridmod.Grid.EASY_ALL

@@ -3054,7 +3054,8 @@ class Actor:
     # --- condition contributions --------------------------------------------------
 
     def concealment(self, attacker=None, *, light: str = "", fog: int = 0,
-                    light_ft: float | None = None) -> tuple[int, str]:
+                    light_ft: float | None = None,
+                    ctx: dict | None = None) -> tuple[int, str]:
         """The miss chance an attack against this creature must beat, and where it is from.
 
         Displacement, blur, entropic shield and blurred movement are *entirely* this and
@@ -3104,7 +3105,9 @@ class Actor:
         # kept an ability's ability_mod out of the score — and a cloak that blurs
         # its wearer had nowhere to reach at all. Still best-only: two 20% miss
         # chances are not 40% in 1e, and they are not 36% either.
-        for m in self._buff_mods("concealment", "miss_chance"):
+        # `ctx`: the blow's own facts, for a miss chance scoped to them — Wind Stance's
+        # "against ranged attacks" (feat loop b5-other, `{"weapon": {"ranged": true}}`).
+        for m in self._buff_mods("concealment", "miss_chance", ctx):
             if m.value > best:
                 best, why = m.value, m.source or "concealment"
         return best, why
@@ -9282,6 +9285,31 @@ class Situation:
             return True
         return False
 
+    def ally_threatened(self, want, foe=None) -> bool:
+        """Whether the foe of the roll threatens an ally of this creature who holds the
+        feat `want["feat"]` (feat loop b5-other: Ferocious Loyalty's "any foe that
+        currently threatens an ally who also has this feat"), anywhere on the board —
+        the foe's reach (`reactions.threatens`), not the bearer's. No board, no answer."""
+        from . import feats as feats_mod
+        from . import position as position_mod
+        from . import reactions as _reactions
+
+        if not isinstance(want, dict) or not want.get("feat") or foe is None:
+            return False
+        me = getattr(self.actor, "ref", None)
+        if self._placed(me) is None or self._placed(getattr(foe, "ref", None)) is None:
+            return False
+        for ref, other in (getattr(self.scene, "actors", {}) or {}).items():
+            if ref in (me, foe.ref) or other.is_down                     or not position_mod._same_side(self.scene, me, ref):
+                continue
+            spot = self._placed(ref)
+            if spot is None or not any((feats_mod.document(raw) or {}).get("id")
+                                       == want["feat"] for raw in other.feats or ()):
+                continue
+            if _reactions.threatens(self.scene, foe.ref, spot, other.size or "medium"):
+                return True
+        return False
+
     def ally_state(self, want) -> bool:
         """Whether another creature on this one's side of the fight holds the feat
         `want["feat"]` (by document id) and the state `want["state"]` (by prefix, law 1).
@@ -9484,6 +9512,11 @@ def _when_holds(when, ctx: dict | None) -> bool:
 
             if sit is None or foe is None or bool(want) is not _position.higher_than(
                     sit.scene, sit.actor, foe):
+                return False
+        elif key == "ally_threatened":
+            # Feat loop b5-other: Ferocious Loyalty's foe threatening a feat-holding ally.
+            sit = ctx.get("situation")
+            if sit is None or not sit.ally_threatened(want, ctx.get("target_actor")):
                 return False
         elif key == "ally_state":
             # An ally in the fight holding the feat and the state (feat loop b2): Horde
