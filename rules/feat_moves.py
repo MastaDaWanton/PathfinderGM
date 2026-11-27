@@ -37,6 +37,7 @@ one Step Up made before it (owner call, said in the lane report).
 from __future__ import annotations
 
 from . import grid as gridmod
+from . import stepping
 from .activeeffect import ActiveEffect
 
 SIDESTEP = "movement.sidestep"
@@ -85,16 +86,25 @@ def after(engine, intent, outcome, twice: bool = False) -> tuple[list[dict], lis
         return [], []
     if intent.op == "move":
         _spend_easy(engine, intent, outcome)
+        spend_allowance(engine, intent, outcome)          # feat loop b7-moves
         return [], (_second_move(engine, intent, outcome, twice)
-                    + _wind_stance(engine, intent, outcome, twice))
+                    + _wind_stance(engine, intent, outcome, twice)
+                    + _ride_by_walk(engine, intent, outcome))
+    if intent.op == "use_item":
+        said = _walk_earned(engine, intent, outcome)      # feat loop b7-moves: Wand Dancer
+        _wand_dancer_after(engine, intent)
+        return [], said
     if intent.op != "attack":
         return [], []
+    said = _walk_earned(engine, intent, outcome)          # feat loop b7-moves
+    _mark_pounce(engine, intent, outcome)
     more: list[dict] = []
+    more += _mounted_blade(engine, intent, outcome)
     more += _sidestep(engine, intent, outcome)
     more += _landing_roll(engine, intent, outcome)
     more += _wings(engine, intent, outcome)
     more += _wings_readied(engine, intent, outcome)          # feat loop b5-core
-    return more, []
+    return more, said
 
 
 def _walked(outcome, ref: str):
@@ -367,4 +377,416 @@ def _wings_readied(engine, intent, outcome) -> list[dict]:
                         "manoeuvre": "reposition"}}]
 
 
-__all__ = ["charge_multiple", "moved_already", "after"]
+# --- the turn's walking, split around an action (feat loop b7-moves) -------------------------
+#
+# CRB, Combat, Action Types: "In a normal round, you can perform a standard action and a move
+# action, or you can perform a full-round action"; a move in place of the standard is the
+# second. So a move, a blow and another move is three actions. Measured before this lane: a
+# fighter walked 30 ft, shot, and walked 30 ft more in one batch, every step resolved — the
+# only refusal after a blow was for a blow (`_standard_spent_refusal`), and nothing asked a
+# walk what the turn had left. Shot on the Run (CRB) is the book's exception: "As a
+# full-round action, you can move up to your speed and make a single ranged attack at any
+# point during your movement" — Normal: "You cannot move before and after an attack with a
+# ranged weapon". Its siblings say the same with other actions: Wand Dancer (UM) around a
+# spell trigger item, Ride-By Attack (CRB) after a mounted charge, Slaying Sprint (UC)
+# around a coup de grâce, and Tiger Pounce (UC) pays a half-speed move with the swift action.
+#
+# One shape for all of them: the walk still owed is an `ActiveEffect` on the walker for the
+# round (`key` "split walk", the feet in its payload), laid by the act that earns it and
+# spent by the walk that uses it, so nothing keeps a store and the round's end takes it
+# away. Spring Attack's `spring_left` is the same rule written into the queue before this
+# existed; it is left as it is, a walk the queue already holds.
+#
+# Prior art: Owlcat's Pathfinder CRPGs keep one move and one standard per turn and grey the
+# move out once both are spent; Foundry PF1 counts nothing (the GM does). Neither models
+# Shot on the Run beyond allowing the move — the remaining feet are this engine's own call.
+
+ALLOWANCE = "movement.allowance"           # the walk still owed this round
+SPLIT_KEY = "split walk"
+SHOT_ON_THE_RUN = "movement.split.ranged"
+WAND_DANCER = "movement.split.trigger"
+SLAYING_SPRINT = "movement.split.coup"
+RIDE_BY = "charge.mounted.ride-by"
+MOUNTED_BLADE = "charge.mounted.blade-follow"
+TIGER_POUNCE = "movement.pounce"
+POUNCE_MARK = "movement.pounced"          # .<ref>: hit this turn or last, on the hitter
+TIGER_STYLE = "style.tiger-style"
+
+
+def _half(feet: int) -> int:
+    return (int(feet) // 2 // gridmod.SQUARE_FT) * gridmod.SQUARE_FT
+
+
+def allowance(actor):
+    """The walk this actor is still owed this round (the "split walk" effect), or None."""
+    return next((e for e in actor.effects if e.key == SPLIT_KEY), None)
+
+
+def grant_walk(engine, actor, feet: int, source: str, origin: str,
+               line=None, intent_id: str = "") -> list:
+    """Lay the walk owed after an act, and say so; [] when there is nothing to walk."""
+    from .engine import Outcome
+
+    actor.remove_effects(match=lambda e: e.key == SPLIT_KEY)
+    feet = (max(0, int(feet)) // gridmod.SQUARE_FT) * gridmod.SQUARE_FT
+    if feet < gridmod.SQUARE_FT:
+        return []
+    payload = {"feet": feet, "round": engine.scene.round}
+    if line:
+        payload["line"] = [int(v) for v in line]
+    actor.apply_effect(ActiveEffect(
+        name="walk left", kind="situation", key=SPLIT_KEY, source=source, origin=origin,
+        duration="rounds", rounds_left=1, tags=(ALLOWANCE,), payload=payload))
+    return [Outcome(intent_id=intent_id, op="move", actor=actor.ref,
+                    effects=[{"ref": actor.ref, "kind": "walk_left", "feet": feet,
+                              "origin": origin}],
+                    tell=f"{actor.name} may still move {feet} ft this turn ({source}).",
+                    because=source)]
+
+
+def _on_line(line, here, end) -> bool:
+    """Whether `end` carries on the straight line `line` ([ax, ay, bx, by]) from `here`:
+    ahead of it, and within three quarters of a square of the line (a diagonal's rounding)."""
+    ax, ay, bx, by = line
+    dx, dy = bx - ax, by - ay
+    wx, wy = end[0] - here[0], end[1] - here[1]
+    length = (dx * dx + dy * dy) ** 0.5
+    if length == 0 or wx * dx + wy * dy <= 0:
+        return False
+    return abs(wx * dy - wy * dx) / length <= 0.75
+
+
+def no_move_left(engine, intent, actor, start, end):
+    """(sentence, code) refusing this walk, or None.
+
+    A walk after a move action and a blow (or a spent standard) this turn is a third
+    action; a walk the turn still owes (`allowance`) or a Tiger Pounce paid with the swift
+    action goes. Engine-spliced walks (a closing step, a charge, Spring Attack's rest, a
+    reaction) have their own rules and are not asked."""
+    sc = engine.scene
+    params = intent.params or {}
+    if not sc.in_encounter or start is None or tuple(start)[:2] == tuple(end)[:2] \
+            or params.get("reaction") or params.get("closing_on") \
+            or params.get("charging") or params.get("spring_left") is not None:
+        return None
+    cost = engine._move_cost(actor.ref, start, tuple(end))
+    cost = int(cost) if cost is not None else gridmod.distance(tuple(start)[:2],
+                                                              tuple(end)[:2])
+    owed = allowance(actor)
+    if owed is not None:
+        feet = int(owed.payload.get("feet") or 0)
+        if cost > feet:
+            return (f"{actor.name} has {feet} ft of walking left this turn ({owed.source}), "
+                    f"and {tuple(end)} is {cost} ft away.", "too_far")
+        line = owed.payload.get("line")
+        if line and not _on_line(line, tuple(start)[:2], tuple(end)[:2]):
+            return (f"{owed.source}'s walk after the blow carries on the straight line of "
+                    f"the charge, and {tuple(end)} is off it.", "off_the_line")
+        return None
+    rnd, ref = sc.round, actor.ref
+    rider = _rider_charged(engine, actor)
+    if rider is not None:
+        return (f"{rider.name} charged on {actor.name} this turn, and a charge is the whole "
+                f"round: no further movement until their next turn.", "standard_spent")
+    if sc.move_spent.get(ref) != rnd or (sc.standard_spent.get(ref) != rnd
+                                         and sc.swung.get(ref) != rnd):
+        return None
+    if _pounce(engine, actor, start, end, cost):
+        return None
+    return (f"{actor.name} has already used this turn's move and standard actions, and "
+            f"may not move again until their next turn.", "standard_spent")
+
+
+def refuse_before(engine, raw: dict):
+    """The walk at the head of the queue refused before anything is owed for it, or None.
+
+    Asked in `Engine._drive` ahead of the attacks of opportunity: measured while building
+    this, a walk refused inside `_op_move` had already drawn the adjacent thug's swing —
+    a free attack of opportunity for a move that never happened. The round's 5-foot step
+    rule (`stepping.after_step_refusal`) is asked here for the same reason."""
+    from . import bodyskills
+    from .engine import _intent_from_dict
+
+    sc = engine.scene
+    if raw.get("op") != "move" or not sc.in_encounter or not sc.has_grid:
+        return None
+    params = raw.get("params") or {}
+    square = params.get("square")
+    if square is None or params.get("reaction"):
+        return None
+    walker = sc.actors.get(str(params.get("who") or raw.get("actor") or ""))
+    if walker is None:
+        return None
+    steed = bodyskills.mount_of(sc, walker) if not params.get("who") else None
+    mover = steed or walker
+    start = sc.positions.get(mover.ref)
+    if start is None:
+        return None
+    intent = _intent_from_dict(raw)
+    stepped = stepping.after_step_refusal(sc, mover, start, tuple(square))
+    if stepped:
+        return engine._refuse(intent, stepped, code="stepped")
+    spent = no_move_left(engine, intent, mover, start, tuple(square))
+    if spent:
+        return engine._refuse(intent, spent[0], code=spent[1])
+    return None
+
+
+def _rider_charged(engine, steed):
+    """The rider who charged on this steed this round, or None: the charge was the
+    steed's whole round as much as the rider's (CRB, Mounted Combat)."""
+    from . import bodyskills
+
+    sc = engine.scene
+    rider = bodyskills.rider_of(sc, steed)
+    if rider is None or not rider.has_state("buff.stance.charging") \
+            or sc.standard_spent.get(rider.ref) != sc.round:
+        return None
+    return rider
+
+
+def spend_allowance(engine, intent, outcome) -> None:
+    """A walk that used the turn's owed feet spends it (all of it: the book's "total
+    distance" is one walk after the act)."""
+    params = intent.params or {}
+    if params.get("reaction") or params.get("closing_on") or params.get("charging"):
+        return
+    ref = params.get("who") or intent.actor
+    actor = engine.scene.actors.get(ref or "")
+    if actor is None or allowance(actor) is None or _walked(outcome, actor.ref) <= 0:
+        return
+    actor.remove_effects(match=lambda e: e.key == SPLIT_KEY)
+
+
+def _pounce(engine, actor, start, end, cost: int) -> bool:
+    """Tiger Pounce (UC): "once per round as a swift action, you can move up to half your
+    speed closer to a target you hit with an unarmed strike or made a successful combat
+    maneuver against on this turn or your last turn" — while in Tiger Style. Taken when the
+    turn has no move action left, so a move action is never traded for the swift unasked
+    (owner call). Spends the swift action."""
+    sc = engine.scene
+    if not actor.has_state(TIGER_POUNCE) or not actor.has_state(TIGER_STYLE) \
+            or cost > _half(actor.speed_feet):
+        return False
+    for ref in sc.actors:
+        there = sc.positions.get(ref)
+        if ref == actor.ref or there is None or not actor.has_state(f"{POUNCE_MARK}.{ref}"):
+            continue
+        if gridmod.distance(tuple(end)[:2], tuple(there)[:2]) \
+                < gridmod.distance(tuple(start)[:2], tuple(there)[:2]):
+            return engine._spend_swift(actor, False, "Tiger Pounce") is None
+    return False
+
+
+def _mark_pounce(engine, intent, outcome) -> None:
+    """An unarmed hit or a successful manoeuvre by a Tiger Pounce holder marks the foe for
+    this turn and the next (rounds_left 2 on the one round ticker)."""
+    from . import classfeatures
+
+    actor = engine.scene.actors.get(intent.actor or "")
+    if actor is None or not actor.has_state(TIGER_POUNCE):
+        return
+    params = intent.params or {}
+    if params.get("manoeuvre"):
+        won = [str(intent.target or "")] if outcome.verdict == "success" else []
+    elif classfeatures._unarmed_key(str(params.get("weapon") or "unarmed")):
+        won = [str(b.get("ref") or "") for b in outcome.blows or ()
+               if b.get("result") in ("hit", "critical")]
+    else:
+        won = []
+    for ref in dict.fromkeys(r for r in won if r):
+        actor.apply_effect(ActiveEffect(
+            name=f"pounce on {ref}", kind="situation", key=f"pounce-{ref}",
+            source="Tiger Pounce", origin="rule:feat-tiger-pounce", duration="rounds",
+            rounds_left=2, tags=(f"{POUNCE_MARK}.{ref}",)))
+
+
+def _walk_earned(engine, intent, outcome) -> list:
+    """The walk a split-walk feat owes after this act, laid and told (`grant_walk`)."""
+    from . import stepping
+
+    sc = engine.scene
+    params = intent.params or {}
+    actor = sc.actors.get(intent.actor or "")
+    if actor is None or params.get("reaction") or not sc.has_grid:
+        return []
+    walked = stepping.feet_walked(sc, actor.ref)
+    speed = int(actor.speed_feet)
+    if intent.op == "attack" and params.get("coup_de_grace"):
+        # Slaying Sprint: half speed in place of the 5-foot step, before or after the coup.
+        if actor.has_state(SLAYING_SPRINT) and not walked and _sprint_weapon(actor, params):
+            return grant_walk(engine, actor, _half(speed), "Slaying Sprint",
+                              "rule:feat-slaying-sprint", intent_id=intent.id)
+        return []
+    if intent.op == "attack" and actor.has_state(SHOT_ON_THE_RUN) and walked \
+            and stepping.walked(sc, actor.ref) == "move" \
+            and sc.standard_spent.get(actor.ref) != sc.round:
+        w = actor.weapon(params.get("weapon") or None) or {}
+        if str(w.get("category") or "").lower() == "ranged" or params.get("thrown"):
+            return grant_walk(engine, actor, speed - walked, "Shot on the Run",
+                              "rule:feat-shot-on-the-run", intent_id=intent.id)
+    if intent.op == "use_item" and actor.has_state(WAND_DANCER) \
+            and walked >= gridmod.SQUARE_FT and _spell_trigger(actor, params):
+        return grant_walk(engine, actor, speed - walked, "Wand Dancer",
+                          "rule:feat-wand-dancer", intent_id=intent.id)
+    return []
+
+
+def _sprint_weapon(actor, params) -> bool:
+    """Slaying Sprint: "only when wielding a light or one-handed weapon"."""
+    w = actor.weapon(params.get("weapon") or None) or {}
+    return str(w.get("category") or "melee").lower() != "ranged" and (
+        bool(w.get("light")) or int(w.get("hands", 1) or 1) <= 1)
+
+
+def coup_walk_ok(engine, actor, weapon_key: str) -> bool:
+    """Whether the walk already taken this round still leaves the coup de grâce its full
+    round: a 5-foot step does (CRB: a step may go with a full-round action), and with
+    Slaying Sprint one walk of no more than half speed does ("instead of taking a 5-foot
+    step"). Measured before this lane: a step then a coup was refused "already moved"."""
+    from . import stepping
+
+    sc = engine.scene
+    if sc.standard_spent.get(actor.ref) == sc.round:
+        return False
+    kind = stepping.walked(sc, actor.ref)
+    if kind == "step":
+        return True
+    return (kind == "move" and actor.has_state(SLAYING_SPRINT)
+            and _sprint_weapon(actor, {"weapon": weapon_key})
+            and stepping.feet_walked(sc, actor.ref) <= _half(actor.speed_feet))
+
+
+def _spell_trigger(actor, params) -> bool:
+    """Whether this use sets off a spell trigger item (a wand; rules/spellitems.py)."""
+    from . import spellitems
+
+    item = str(params.get("item") or "")
+    if not params.get("power") or not item:
+        return False
+    for rec in actor.item_records(item):
+        entry = spellitems.entry_of(rec)
+        if entry and entry.get("activation") == "trigger":
+            return True
+    return False
+
+
+def before(engine, raw: dict, queue: list) -> None:
+    """Waivers a walk needs before it is weighed for attacks of opportunity.
+
+    - Wand Dancer: "Your movement does not provoke attacks of opportunity from that
+      creature only" — the one the wand is aimed at, when this walk comes before a use of a
+      spell trigger item queued behind it (and the walk after a use, `_wand_dancer_after`).
+    - Ride-By Attack: "You and your mount do not provoke an attack of opportunity from the
+      opponent that you attack" — laid on rider and steed as the charge sets off, held for
+      the round so the walk after the blow is spared too.
+    Both are the tumble's waiver shape (`reactions.TUMBLED_PAST`, Spring Attack's)."""
+    from . import bodyskills, reactions
+
+    if raw.get("op") != "move" or not engine.scene.in_encounter:
+        return
+    sc = engine.scene
+    params = raw.get("params") or {}
+    actor = sc.actors.get(str(raw.get("actor") or ""))
+    if actor is None:
+        return
+    spared: list = []
+    if params.get("charging") == "charge" and params.get("closing_on") \
+            and actor.has_state(RIDE_BY) and actor.has_state(MOUNTED):
+        for who in (actor, bodyskills.mount_of(sc, actor)):
+            if who is not None:
+                spared.append((who, str(params["closing_on"]), "Ride-By Attack"))
+    if actor.has_state(WAND_DANCER) and not params.get("reaction"):
+        later = next((q for q in queue[1:] if q.get("actor") == actor.ref
+                      and q.get("op") == "use_item"), None)
+        if later is not None and _spell_trigger(actor, later.get("params") or {}):
+            aim = str((later.get("params") or {}).get("to") or later.get("target") or "")
+            if aim and aim != actor.ref:
+                spared.append((actor, aim, "Wand Dancer"))
+    for who, foe, source in spared:
+        _spare(who, foe, source)
+
+
+def _spare(who, foe: str, source: str) -> None:
+    from . import reactions
+
+    who.apply_effect(ActiveEffect(
+        name=f"unprovoking {foe}", kind="situation", key=f"spared-by-{foe}",
+        source=source, origin=f"rule:feat-{source.lower().replace(' ', '-')}",
+        duration="rounds", rounds_left=1, tags=(f"{reactions.TUMBLED_PAST}.{foe}",)))
+
+
+def _wand_dancer_after(engine, intent) -> None:
+    """Wand Dancer's waiver for the walk after the use: the creature the wand was aimed at."""
+    actor = engine.scene.actors.get(intent.actor or "")
+    params = intent.params or {}
+    aim = str(params.get("to") or intent.target or "")
+    if actor is None or not aim or aim == actor.ref or allowance(actor) is None \
+            or allowance(actor).source != "Wand Dancer":
+        return
+    _spare(actor, aim, "Wand Dancer")
+
+
+def _ride_by_walk(engine, intent, outcome) -> list:
+    """Ride-By Attack (CRB): "you may move and attack as if with a standard charge and then
+    move again (continuing the straight line of the charge). Your total movement for the
+    round can't exceed double your mounted speed." Laid on the steed when the charge's walk
+    is done: the walk after the blow is the steed's, on the charge's line."""
+    from . import bodyskills, stepping
+
+    params = intent.params or {}
+    if params.get("charging") != "charge":
+        return []
+    rider = engine.scene.actors.get(intent.actor or "")
+    if rider is None or not rider.has_state(RIDE_BY) or not rider.has_state(MOUNTED):
+        return []
+    steed = bodyskills.mount_of(engine.scene, rider)
+    if steed is None:
+        return []
+    went = next((e for e in outcome.effects or () if e.get("kind") == "position"
+                 and e.get("ref") == steed.ref and e.get("from") is not None), None)
+    if went is None:
+        return []
+    a, b = tuple(went["from"])[:2], tuple(went["to"])[:2]
+    left = 2 * int(steed.speed_feet) - stepping.feet_walked(engine.scene, steed.ref)
+    return grant_walk(engine, steed, left, "Ride-By Attack", "rule:feat-ride-by-attack",
+                      line=[*a, *b], intent_id=intent.id)
+
+
+def _mounted_blade(engine, intent, outcome) -> list[dict]:
+    """Mounted Blade (UC): "When you use the Ride-By Attack feat, if your attack hits, you
+    may also make an attack against a target adjacent to your original target. This
+    additional attack has a -5 penalty" (`_op_attack` reads the reaction's name). The
+    engine picks the nearest foe beside the first within the rider's reach (owner call, as
+    Cleave's next target is the engine's)."""
+    from . import position as position_mod
+
+    sc = engine.scene
+    params = intent.params or {}
+    rider = sc.actors.get(intent.actor or "")
+    if rider is None or not params.get("charge") or params.get("reaction") \
+            or not rider.has_state(MOUNTED_BLADE) or not rider.has_state(RIDE_BY) \
+            or not rider.has_state(MOUNTED) or not sc.has_grid:
+        return []
+    first = str(intent.target or "")
+    if not any(b.get("ref") == first and b.get("result") in ("hit", "critical")
+               for b in outcome.blows or ()):
+        return []
+    weapon = params.get("weapon") or None
+    for ref, foe in sc.actors.items():
+        if ref in (rider.ref, first) or foe.is_down or _friends(sc, ref, rider.ref) \
+                or (sc.distance_between(ref, first) or 99) > gridmod.SQUARE_FT \
+                or position_mod.out_of_reach(sc, rider, foe, weapon or "") is not None:
+            continue
+        return [{"op": "attack", "actor": rider.ref, "target": ref,
+                 "id": f"{intent.id}-mounted-blade",
+                 "visibility": "player" if rider.is_pc else "hidden",
+                 "because": f"{rider.name} carries the blade on into {foe.name} "
+                            f"(Mounted Blade)",
+                 "params": {"full_attack": False, "reaction": "mounted-blade",
+                            **({"weapon": weapon} if weapon else {})}}]
+    return []
+
+
+__all__ = ["charge_multiple", "moved_already", "after", "no_move_left", "allowance",
+           "grant_walk", "coup_walk_ok", "before"]

@@ -501,10 +501,8 @@
   },
   "slaying-sprint": {
     "tags": [
-      "coup_de_grace.unprovoking"
-    ],
-    "not_yet": [
-      "'move up to half your speed instead of taking a 5-foot step when taking a full-round action to perform a coup de grace': the coup still spends the move (Scene.move_spent), so no move follows it"
+      "coup_de_grace.unprovoking",
+      "movement.split.coup"
     ]
   },
   "surprising-combatant": {
@@ -533,8 +531,8 @@
     ]
   },
   "ride-by-attack": {
-    "not_yet": [
-      "moving after a mounted charge in the same line, and no attack of opportunity from the foe charged: the charge is lane b2-actions' machinery"
+    "tags": [
+      "charge.mounted.ride-by"
     ]
   },
   "snatch-arrows": {
@@ -633,8 +631,8 @@
     ]
   },
   "mounted-blade": {
-    "not_yet": [
-      "a second attack at -5 on a foe beside the first after a Ride-By Attack hit: Ride-By Attack is not built (the charge, lane b2-actions)"
+    "tags": [
+      "charge.mounted.blade-follow"
     ]
   },
   "circling-offense": {

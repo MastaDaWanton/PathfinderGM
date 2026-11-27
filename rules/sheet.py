@@ -454,7 +454,9 @@ ATTACK_CHOICES = ("power_attack", "deadly_aim", "piranha_strike", "combat_expert
                   # Feat loop b5-maneuver: Fury's Snare's whip let go to entangle.
                   "furys_snare",
                   # Feat loop b6-rules: Stalwart's dodge traded for DR (rules/stalwart.py).
-                  "stalwart")
+                  "stalwart",
+                  # Feat loop b7-moves: Tiger Pounce's Power Attack penalty moved to AC.
+                  "tiger_pounce")
 # The options nobody needs a feat for (combat bar round 2, 2026-11-22). CRB, Combat
 # ("Fighting Defensively as a Standard Action"): "You can choose to fight defensively when
 # attacking" — anyone, with any attack. Its numbers are `defensive_dodge` and the stance
@@ -500,7 +502,9 @@ ATTACK_CHOICE_FEATS = {"power_attack": "power-attack", "deadly_aim": "deadly-aim
                        # Feat loop b5-maneuver.
                        "furys_snare": "fury-s-snare",
                        # Feat loop b6-rules.
-                       "stalwart": "stalwart"}
+                       "stalwart": "stalwart",
+                       # Feat loop b7-moves.
+                       "tiger_pounce": "tiger-pounce"}
 
 _IMPLIED_GENDER = {"she": "woman", "he": "man"}
 

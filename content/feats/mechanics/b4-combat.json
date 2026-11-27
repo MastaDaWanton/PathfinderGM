@@ -430,8 +430,8 @@
     ]
   },
   "shot-on-the-run": {
-    "not_yet": [
-      "'As a full-round action, you can move up to your speed and make a single ranged attack at any point during your movement': a turn moves once, before or after its blow; no walk is split around a shot (Spring Attack's split walk is melee's, closing on its foe)"
+    "tags": [
+      "movement.split.ranged"
     ]
   },
   "critical-versatility": {

@@ -6242,12 +6242,25 @@ class Engine:
                     queue.pop(0)
                     outcomes.append(limited)
                     continue
+                # Feat loop b7-moves: a walk the turn has no action for, refused before
+                # it draws an attack of opportunity (rules/feat_moves.py).
+                from . import feat_moves as _fm
+
+                walked_out = _fm.refuse_before(self, raw)
+                if walked_out is not None:
+                    queue.pop(0)
+                    outcomes.append(walked_out)
+                    continue
             # Reactions are owed by the rules, not proposed by anyone, and they happen
             # *before* the action that provoked them completes: an attack of opportunity
             # lands as the creature leaves the square, so if it drops them they never
             # arrive. The flag is what stops the spliced reaction from provoking itself
             # forever — it is stripped before anything else sees the intent.
             if not raw.pop("_reacted", False):
+                # Feat loop b7-moves: a walk's waivers (Wand Dancer, Ride-By Attack).
+                from . import feat_moves as _fm
+
+                _fm.before(self, raw, queue)
                 # Feat loop b5-core: a readied attack goes in front with them (rules/readied.py).
                 fired = readied.before(self, raw) + self._reactions_before(raw)
                 if fired:
@@ -11257,6 +11270,11 @@ class Engine:
         if coup and partial.get("attack_state") is None and self.scene.in_encounter \
                 and not intent.params.get("reaction"):
             spent = self._coup_round_spent(actor)
+            # Feat loop b7-moves: a 5-foot step (or Slaying Sprint's half speed) leaves it.
+            from . import feat_moves as _fm
+
+            if spent and _fm.coup_walk_ok(self, actor, weapon_key):
+                spent = ""
             if spent:
                 return self._refuse(intent, spent)
             self._coup_provokes(intent, actor, defender, weapon_key)
@@ -12009,6 +12027,9 @@ class Engine:
                 # penalty to each attack" once the first miss was rerolled.
                 if state.get("second_chance") == "improved" and state["i"] > 0:
                     atk_mods = atk_mods + [Modifier(-5, "Improved Second Chance")]
+                # Feat loop b7-moves: Mounted Blade's added blow "has a -5 penalty".
+                if intent.params.get("reaction") == "mounted-blade":
+                    atk_mods = atk_mods + [Modifier(-5, "Mounted Blade")]
 
             # A crowd makes no attack roll. Pathfinder's troop subtype: instead of attacks,
             # "they deal automatic damage to any creature within reach or whose space they
@@ -28675,6 +28696,11 @@ class Engine:
         # to the round's later ranged attacks (`_op_attack`).
         ("deadly_aim", "deadly aim", "Deadly Aim",
          "{name} takes aim for the heavier shot (Deadly Aim) until their next turn."),
+        # Feat loop b7-moves: Tiger Pounce (UC), Power Attack's penalty on AC instead;
+        # Power Attack's "until your next turn", the AC side carried by the stance.
+        ("tiger_pounce", "tiger pounce", "Tiger Pounce",
+         "{name} throws their weight behind the blow (Tiger Pounce), guard open until "
+         "their next turn."),
     )
 
     @classmethod
@@ -34775,7 +34801,7 @@ class Engine:
             if not intent.params.get("reaction"):
                 from . import stepping
 
-                walk = stepping.record(self, actor, from_square, tuple(square))
+                walk = stepping.record(self, actor, from_square, tuple(square), cost or 0)
             effect = {"ref": ref, "kind": "position", "from": from_square,
                       "to": tuple(square), "feet": cost, "zone": zone}
             if walk in ("step", "pack"):

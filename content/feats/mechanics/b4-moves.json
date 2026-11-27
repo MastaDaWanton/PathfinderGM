@@ -227,8 +227,8 @@
     ]
   },
   "wand-dancer": {
-    "not_yet": [
-      "'you can move both before and after triggering the item, as long as the total distance moved is not greater than your speed ... does not provoke attacks of opportunity from that creature only': no split move is kept around a use"
+    "tags": [
+      "movement.split.trigger"
     ]
   },
   "patient-strike": {

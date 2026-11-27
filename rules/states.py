@@ -514,6 +514,7 @@ TAGS: dict[str, tuple[str, ...]] = {
     # as a one-round effect so the feat document's terms can ask for it by tag.
     "combat expertise": ("buff.stance.combat-expertise",),
     "deadly aim":       ("buff.stance.deadly-aim",),   # feat loop b6-partials
+    "tiger pounce":     ("buff.stance.tiger-pounce",),  # feat loop b7-moves
     "cleaving":         ("buff.stance.cleaving",),
     "two-weapon guard": ("buff.stance.two-weapon-guard",),
     # Feat loop b1: Bloody, Dazing and Stunning Assault, "its effects last until your

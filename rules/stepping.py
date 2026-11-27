@@ -33,6 +33,16 @@ from . import grid as gridmod
 PACK_ATTACK = "teamwork.pack-attack"
 
 
+def feet_walked(scene, ref: str) -> int:
+    """The feet this creature has walked this round (feat loop b7-moves): the third field
+    of `Scene.walked`, added up walk by walk, for the rules that cap a round's movement at
+    a speed (Shot on the Run, Wand Dancer, Ride-By Attack, Slaying Sprint)."""
+    got = (getattr(scene, "walked", None) or {}).get(ref)
+    if not got or int(got[0]) != int(scene.round) or len(got) < 3:
+        return 0
+    return int(got[2] or 0)
+
+
 def walked(scene, ref: str) -> str:
     """This round's movement so far: "" for none, "step" or "move"."""
     got = (getattr(scene, "walked", None) or {}).get(ref)
@@ -97,8 +107,9 @@ def after_step_refusal(scene, actor, start, end) -> str:
             f"it until their next turn.")
 
 
-def record(engine, actor, start, end) -> str:
-    """Write this round's movement; returns "step", "move" or "pack" (Pack Attack's)."""
+def record(engine, actor, start, end, feet: int = 0) -> str:
+    """Write this round's movement; returns "step", "move" or "pack" (Pack Attack's).
+    `feet`, what this walk cost, is added to the round's total (feat loop b7-moves)."""
     scene = engine.scene
     if not scene.in_encounter or start is None or end is None \
             or tuple(start)[:2] == tuple(end)[:2]:
@@ -114,5 +125,5 @@ def record(engine, actor, start, end) -> str:
     if not hasattr(scene, "walked") or scene.walked is None:
         scene.walked = {}
     scene.walked[actor.ref] = [scene.round, "move" if before == "move" or kind == "move"
-                               else "step"]
+                               else "step", feet_walked(scene, actor.ref) + int(feet or 0)]
     return kind
