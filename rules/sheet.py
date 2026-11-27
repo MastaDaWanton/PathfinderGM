@@ -4548,6 +4548,12 @@ class Actor:
         extra = [0] * int(self.weapon(weapon_key).get("extra_attacks", 0) or 0)
         if self.flat_attack is not None:
             return [0] + extra + bonus
+        # Feat loop b5-core: a crossbow whose reload takes an action fires once in a full
+        # attack (Rapid Reload's Normal, CRB); the extra shots would each need a reload.
+        from . import reloading
+
+        if reloading.one_shot(self, weapon_key or self.equipped or ""):
+            return [0]
         # A natural weapon never takes iteratives: "You do not receive additional natural
         # attacks for a high base attack bonus. Instead, you receive additional attack
         # rolls for multiple limb and body parts capable of making the attack" (CRB,

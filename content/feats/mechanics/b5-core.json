@@ -1,0 +1,12 @@
+{
+  "_about": [
+    "Feat loop, batch 5, lane b5-core (2026-11-26): feats the base rules built in this lane",
+    "finish that had no document in any lane's list. Each benefit is the book's (content/feats/feats.json,",
+    "checked against aonprd.com 2026-11-26)."
+  ],
+  "rapid-reload": {
+    "tags": [
+      "reload.rapid.$target"
+    ]
+  }
+}

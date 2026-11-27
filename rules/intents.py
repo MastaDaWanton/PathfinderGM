@@ -482,6 +482,9 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
     # (rules/readied.py TRIGGERS, ACTIONS); `patient` is Patient Strike's full-round
     # readying. The combat bar's (`Engine._op_ready`), never the reader's (CODE_ONLY_OPS).
     "ready": (("trigger", "action"), ("patient",), "hidden"),
+    # A crossbow loaded (feat loop b5-core, rules/reloading.py): spliced in front of a shot
+    # by the engine, never written by a model (CODE_ONLY_OPS).
+    "reload": ((), ("weapon",), "hidden"),
     # Entering a combat style (Ultimate Combat, Style Feats): a swift action, in a fight,
     # one style at a time. `style` is the style feat's id. The combat bar's
     # (`Engine._op_style`), never the reader's (CODE_ONLY_OPS).
@@ -947,8 +950,9 @@ CODE_ONLY_PARAMS = frozenset({"undecided", "not_here", "looks_in", "defending", 
 CODE_ONLY_OPS = frozenset({"job", "make", "craft", "greet", "commission", "harvest",
                            "disguise", "surrender", "bout", "live_off_land", "hunt",
                            "hex_move", "hex_enter", "style",
-                           # Feat loop b5-core: the combat bar's readied action.
-                           "ready"})
+                           # Feat loop b5-core: the combat bar's readied action, and
+                           # the reload the engine splices before a crossbow's shot.
+                           "ready", "reload"})
 # Ops only the author's own hand writes (`/cheat`, origin `author:`): left out of the
 # turn's op enum like the code-only ops, but offered to the cheat (`prompts.CHEAT_OPS`),
 # and refused by the engine from any other origin. `xp` since 2026-11-07 (audit #22): a

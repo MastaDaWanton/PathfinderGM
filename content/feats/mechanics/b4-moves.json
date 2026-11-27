@@ -169,8 +169,8 @@
     ]
   },
   "crossbow-mastery": {
-    "not_yet": [
-      "reloading is not modelled: a crossbow already fires every iterative of a full attack for anyone and never provokes for its reload, so the feat waives nothing the engine would have asked"
+    "tags": [
+      "reload.mastery"
     ]
   },
   "swap-places": {

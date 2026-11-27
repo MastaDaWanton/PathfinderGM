@@ -6154,6 +6154,16 @@ class Engine:
                     queue[0:0] = [draw] + maneuver_feats.wave_strike(self, raw, draw)
                     raw["_drawn"] = True
                     continue
+            # Feat loop b5-core: an unloaded crossbow's reload goes in front of the shot,
+            # after any draw, paid from the turn (rules/reloading.py). Asked once per blow.
+            if not partial and not raw.get("_reload_asked"):
+                from . import reloading
+
+                raw["_reload_asked"] = True
+                load = reloading.before(self, raw)
+                if load is not None:
+                    queue[0:0] = [load]
+                    continue
             # A blow one move short: the move goes in front of it as a real intent, so it
             # provokes through `_reactions_before` exactly as a declared move does, and
             # an attack of opportunity that drops the attacker stops the blow behind it
@@ -6255,6 +6265,9 @@ class Engine:
             # And a coup de grâce in a fight is the whole round (`_coup_paid`).
             if intent.op == "attack":
                 self._coup_paid(intent, outcome, queue)
+                from . import reloading          # feat loop b5-core: the bolt is gone
+
+                reloading.after(self, intent, outcome)
             # The surprise round's one action, spent where a later request can see it.
             self._one_action_paid(intent, outcome)
             # What a feat lets its bearer do on the back of this (`_riders_after`,
@@ -10918,6 +10931,14 @@ class Engine:
                 and not intent.params.get("coup_de_grace")
                 and not goods.ammo_carried(actor, ammo_families)):
             return self._refuse(intent, no_ammo)
+        # Feat loop b5-core: a crossbow whose reload was refused shoots nothing.
+        if partial.get("attack_state") is None and self.scene.in_encounter \
+                and not intent.params.get("manoeuvre"):
+            from . import reloading
+
+            unloaded = reloading.refusal(actor, weapon_key)
+            if unloaded:
+                return self._refuse(intent, unloaded, code="action_spent")
         # The floor under validate's reach check, for the lists it could not answer: a
         # move earlier in the list that fell short, a push that put the target out of
         # reach, an attack of opportunity that dropped the mover before they arrived.
@@ -28442,6 +28463,12 @@ class Engine:
             modifiers=[{"kind": "combat_mod", "target": "ac",
                         "amount": defensive_dodge(actor, total=True),
                         "bonus_type": "dodge", "note": "total defense"}])
+
+    def _op_reload(self, intent: Intent, partial: dict) -> Outcome:
+        """A crossbow loaded (CRB): spliced before a shot, rules/reloading.py (b5-core)."""
+        from . import reloading
+
+        return reloading.op_reload(self, intent)
 
     def _op_ready(self, intent: Intent, partial: dict) -> Outcome:
         """Ready (CRB, Combat): the combat bar's, rules/readied.py (feat loop b5-core)."""
