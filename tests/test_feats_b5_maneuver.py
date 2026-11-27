@@ -349,3 +349,86 @@ def test_blindsense_pinpoints_a_hider_unless_it_dampens_its_presence():
     assert awareness.senses(scene, thug, pc) == ""
     pc.feats = [f for f in pc.feats if f != "Dampen Presence"]
     assert awareness.senses(scene, thug, pc) == "pinpoint"
+
+
+# --- Divert Harm --------------------------------------------------------------------------
+
+def test_divert_harm_wrestles_an_adjacent_foe_into_the_fireball():
+    """Divert Harm (Bastards of Golarion): against an area attack that halves on a Reflex
+    save, "wrestle an adjacent foe into harm's way ... your opponent must attempt a Reflex
+    save against the attack in your place. If your opponent fails, it takes half damage
+    from the attack and you take none." Measured before: the rogue rolled her own save."""
+    from tests.test_audit_magic import _rogue, caster, fight, records, run, said, scene_with
+
+    pc = caster("wizard", 5, book=("fireball",))
+    rogue = _rogue()
+    rogue.feats = list(rogue.feats) + ["Divert Harm"]
+    pal = _rogue(ref="pal")
+    pal.name = "Tamsin"
+    pal.add_buff("save_mod", "ref", -40, source="test: always fails")
+    s, e = scene_with(pc, rogue, pal)
+    e._ensure_encounter("pc")
+    fight(s)
+    s.sides = {"pc": ["pc", "pal"], "them": ["rogue"]}
+    s.positions.update({"pc": (2, 2), "rogue": (10, 10), "pal": (11, 10)})
+    s.resync_zones()
+    for ref in s.actors:                    # past their first turn: not flat-footed
+        s.acted.add(ref) if isinstance(s.acted, set) else s.acted.append(ref)
+    res = run(e, "cast", spell="fireball", at=rogue.ref)
+    assert rogue.hp == 60, said(res)
+    assert "wrestles Tamsin into the" in said(res), said(res)
+    assert len([h for h in records(res, "damage") if h["ref"] == "pal"]) == 2
+
+
+# --- Team Pickpocketing, Stealth Synergy ------------------------------------------------
+
+def test_team_pickpocketing_lifts_a_loose_thing_while_the_partners_feint_holds():
+    """Team Pickpocketing (UC): "Whenever an ally with this feat succeeds a Bluff check to
+    feint an opponent, if you are adjacent to that creature, you can spend an immediate
+    action to make a Sleight of Hand check to pickpocket that opponent and gain a +4
+    bonus." Measured before: the feint landed and the ally's hands stayed empty."""
+    from tests.test_feats_b4_combat import _fight
+
+    scene, engine, pc, thug = _fight(feats=["Team Pickpocketing"],
+                                     ally=[((7, 11), ["Team Pickpocketing"])],
+                                     faces={"Bluff check": 20, "Kesst": 16})
+    ally = scene.actors["ally0"]
+    ally.ranks = {**(ally.ranks or {}), "sleight of hand": 2}
+    thug.goods = {"pouch of dice": 1}
+    res = engine.run(engine.validate([{"op": "check", "actor": "pc", "target": "c1",
+                                       "visibility": "hidden",
+                                       "params": {"skill": "bluff", "feint": True}}]))
+    said = _tells(res)
+    assert "Team Pickpocketing" in said, said
+    stolen = [e for o in res.outcomes for e in o.effects if e.get("kind") == "stolen"]
+    assert stolen and stolen[0]["ref"] == "ally0", said
+    assert not thug.goods.get("pouch of dice")
+    lift = [r for o in res.outcomes for r in o.rolls if "Sleight of Hand" in r.label]
+    assert lift and any(m.value == 4 for m in lift[0].modifiers)
+
+
+def test_stealth_synergy_lets_each_hider_keep_the_best_die():
+    """Stealth Synergy (UC): "whenever you and your allies make a Stealth check, you all
+    take the highest roll and add all your modifiers." The ally hid on a 3; Borin's 17
+    raises her result by 14, and his own check keeps his 17."""
+    from rules import awareness
+    from rules.activeeffect import ActiveEffect
+    from tests.test_feats_b4_combat import _fight
+
+    scene, engine, pc, thug = _fight(feats=["Stealth Synergy"],
+                                     ally=[((5, 10), ["Stealth Synergy"])],
+                                     faces={"Stealth check": 17})
+    ally = scene.actors["ally0"]
+    ally.apply_effect(ActiveEffect(name="Hidden", kind="condition",
+                                   key=awareness.SNEAKING_KEY, source=awareness.STEALTH_ORIGIN,
+                                   origin=awareness.STEALTH_ORIGIN,
+                                   tags=(awareness.SNEAKING,),
+                                   payload={"result": 10, "face": 3}))
+    from rules import maneuver_feats
+
+    roll = engine.dice.given(17, [], "Stealth check")
+    kept = maneuver_feats.stealth_synergy(engine, pc, roll)
+    assert kept.natural == 17
+    assert awareness.sneaking(ally).payload["result"] == 24
+    low = engine.dice.given(2, [], "Stealth check")
+    assert maneuver_feats.stealth_synergy(engine, pc, low).natural == 17

@@ -46,5 +46,23 @@
     "tags": [
       "stealth.vs-blindsense"
     ]
+  },
+  "divert-harm": {
+    "tags": [
+      "defense.divert-harm"
+    ],
+    "not_yet": [
+      "a class ability's area (a breath weapon, a blood burst) and the `save` op's hazards: only a cast's Reflex-half area reaches the wrestled foe"
+    ]
+  },
+  "team-pickpocketing": {
+    "tags": [
+      "teamwork.team-pickpocketing"
+    ]
+  },
+  "stealth-synergy": {
+    "tags": [
+      "teamwork.stealth-synergy"
+    ]
   }
 }

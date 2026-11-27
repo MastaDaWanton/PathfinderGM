@@ -1322,3 +1322,200 @@ def reach_waived(intent) -> bool:
     attack ("that attack targets the creature you used as cover")."""
     return intent.params.get(GIVEN_FACE) is not None \
         and str(intent.origin or "") == "rule:feat-body-shield"
+
+
+# --- Divert Harm -----------------------------------------------------------------------------
+
+DIVERT_HARM = "defense.divert-harm"
+
+
+def divert_harm(engine, target, spell, save_kind: str, save_effect: str, kind: str,
+                amount: int, dtype: str, area: bool, dc: int, state: dict):
+    """Divert Harm (Bastards of Golarion): "Whenever you are the target of an area-of-effect
+    attack that normally deals half damage on a successful Reflex save (such as a fireball
+    spell ...), you may, as an immediate action, wrestle an adjacent foe into harm's way
+    ... your opponent must attempt a Reflex save against the attack in your place. If your
+    opponent fails, it takes half damage from the attack and you take none; if it
+    succeeds, it takes no damage and you take damage as normal as though you'd failed your
+    saving throw (though this damage is still reduced by abilities such as improved
+    evasion) ... only on a foe within one size category of yourself."
+
+    What the target takes, or None when the feat is not used (the cast's own save then
+    runs). Decided once per target and kept in the cast's state, so a save popup that
+    brings the loop round again rolls nothing twice. Owner call, taking "may" as the
+    better odds: used when the foe's Reflex is worse than the bearer's own, since a foe
+    who saves leaves the bearer the whole blast. The foe's save is the engine's roll."""
+    from . import grid as gridmod
+    from .dice import d20_succeeds
+    from .position import _same_side
+
+    key = f"divert:{target.ref}"
+    if key in state:
+        return state[key]
+    state[key] = None
+    scene = engine.scene
+    if save_kind != "ref" or save_effect != "half" or kind != "damage" or not area \
+            or not target.has_state(DIVERT_HARM) or target.is_down or not scene.has_grid:
+        return None
+    here = scene.positions.get(target.ref)
+    if here is None:
+        return None
+
+    def ref_bonus(a) -> int:
+        return sum(m.value for m in a.save_modifiers("ref"))
+
+    foes = [o for r, o in scene.actors.items()
+            if o is not target and not o.is_down and r in scene.positions
+            and not _same_side(scene, target.ref, r) and abs(_size_steps(target, o)) <= 1
+            and gridmod.is_adjacent(tuple(here), target.size or "medium",
+                                    tuple(scene.positions[r]), o.size or "medium")]
+    foes.sort(key=ref_bonus)
+    if not foes or ref_bonus(foes[0]) >= ref_bonus(target):
+        return None
+    foe = foes[0]
+    name = _named_by_tag(target, DIVERT_HARM) or "Divert Harm"
+    if engine._pay_swift(target, name, immediate=True):
+        return None
+    roll = engine.dice.d20(foe.save_modifiers("ref", {"against": "spell"}),
+                           label=f"{foe.name} Reflex save ({name})", visibility="hidden")
+    state["rolls"].append(roll.as_dict())
+    made = d20_succeeds(roll, dc)
+    said = f"Reflex {roll.total} against DC {dc}"
+    if not made:
+        hit = engine._apply_damage(foe, max(0, amount // 2), dtype, traits=("area",))
+        hit["origin"] = f"rule:feat-{_slug(name)}"
+        state["effects"].append(hit)
+        state["tells"].append(f"{target.name} wrestles {foe.name} into the {spell.name} "
+                              f"({name}): {foe.name} fails ({said}) and takes {hit['amount']} "
+                              f"{hit['type']}; {target.name} takes none.")
+        state[key] = 0
+        return 0
+    share, evaded = engine._evasion(target, "ref", True, False)
+    taken = max(0, amount // 2) if share == "half" else amount
+    state["tells"].append(f"{target.name} wrestles {foe.name} into the {spell.name} "
+                          f"({name}), but {foe.name} twists clear ({said}) and "
+                          f"{target.name} takes the blast" + (f" — {evaded}" if evaded
+                                                               else "") + ".")
+    state[key] = taken
+    return taken
+
+
+# --- Team Pickpocketing ----------------------------------------------------------------------
+
+TEAM_PICKPOCKET = "teamwork.team-pickpocketing"
+
+
+def team_pickpocket(engine, feinter, target) -> tuple[list, list, list]:
+    """Team Pickpocketing (UC): "Whenever an ally with this feat succeeds a Bluff check to
+    feint an opponent, if you are adjacent to that creature, you can spend an immediate
+    action to make a Sleight of Hand check to pickpocket that opponent and gain a +4 bonus
+    on that attempt." (effects, tells, rolls) for each ally who does.
+
+    The check is Sleight of Hand's own (CRB: "DC 20 ... to lift a small object from a
+    person"; "the opponent [makes] a Perception check to notice the attempt", opposed),
+    trained only. What is lifted is what a steal would take that is not fastened
+    (`Engine._steal_choice`), moved by the steal's own door (`_outcome_take`: the thing in
+    the lifter's hands, still the victim's, on the props ledger). Owner call: taken
+    whenever the immediate action is free and something loose is there to lift."""
+    from .dice import Modifier
+    from .position import _same_side
+    from .sheet import IllegalSheet
+    from . import grid as gridmod
+
+    effects, tells, rolls = [], [], []
+    scene = engine.scene
+    if not feinter.has_state(TEAM_PICKPOCKET) or not scene.has_grid:
+        return effects, tells, rolls
+    there = scene.positions.get(target.ref)
+    for ref, ally in list(scene.actors.items()):
+        if ally is feinter or ally.is_down or not ally.has_state(TEAM_PICKPOCKET) \
+                or not _same_side(scene, feinter.ref, ref) or ref not in scene.positions \
+                or there is None or not gridmod.is_adjacent(
+                    tuple(scene.positions[ref]), ally.size or "medium", tuple(there),
+                    target.size or "medium"):
+            continue
+        loot = engine._steal_choice(target, "")
+        if not isinstance(loot, dict) or loot.get("fastened"):
+            continue
+        try:
+            mods = list(ally.skill_modifiers("sleight of hand"))
+        except IllegalSheet:
+            continue                              # trained only (CRB p.104)
+        name = _named_by_tag(ally, TEAM_PICKPOCKET) or "Team Pickpocketing"
+        if engine._pay_swift(ally, name, immediate=True):
+            continue
+        check = engine.dice.d20(mods + [Modifier(4, name)],
+                                label=f"{ally.name} Sleight of Hand ({name})",
+                                visibility="hidden")
+        try:
+            seen = engine.dice.d20(target.skill_modifiers("perception", opposed=True),
+                                   label=f"{target.name} Perception", visibility="hidden")
+        except IllegalSheet:
+            seen = None
+        rolls += [check] + ([seen] if seen is not None else [])
+        noticed = seen is not None and seen.total >= check.total
+        if check.total < 20:
+            tells.append(f"{ally.name} reaches for {target.name}'s {loot['label']} while "
+                         f"the feint holds them ({name}, Sleight of Hand {check.total} "
+                         f"against DC 20) and comes away empty.")
+            continue
+        from .tables import MANEUVERS
+
+        _, _, recs = engine._outcome_take(MANEUVERS["steal"], None, ally, target, 0, None, loot,
+                                          lambda *a, **k: "")
+        effects.extend(dict(r, origin=f"rule:feat-{_slug(name)}") for r in recs)
+        tells.append(f"{ally.name} lifts {target.name}'s {loot['label']} while the feint "
+                     f"holds them ({name}, Sleight of Hand {check.total} against DC 20)"
+                     + (f"; {target.name} feels it go." if noticed else
+                        f"; {target.name} never feels it."))
+    return effects, tells, rolls
+
+
+# --- Stealth Synergy -------------------------------------------------------------------------
+
+STEALTH_SYNERGY = "teamwork.stealth-synergy"
+
+
+def _sees_ally(actor, ally) -> bool:
+    """Whether a hider sees an ally beside it: a won Stealth hides from the other side,
+    not from the party that watched it slip away — only blindness or invisibility (unseen
+    by eyes that cannot see it) takes the ally from view."""
+    from . import awareness
+
+    if actor.has_state("state.senses.blinded"):
+        return False
+    return not ally.has_state(awareness.INVISIBLE) or awareness.sees_invisible(actor)
+
+
+def stealth_synergy(engine, actor, roll):
+    """Stealth Synergy (UC): "While you can see one or more allies who also have this feat,
+    whenever you and your allies make a Stealth check, you all take the highest roll and
+    add all your modifiers to Stealth." The d20s of the hiders who see each other: this
+    check keeps the best face among its own and those its allies hid with (the face is
+    kept in each hiding's payload, `Engine._stealth_lands`), and an ally's standing result
+    is raised to it when this one rolled higher. Returns the roll to use."""
+    from . import awareness
+    from .position import _same_side
+
+    if not actor.has_state(STEALTH_SYNERGY):
+        return roll
+    scene = engine.scene
+    mates = [o for r, o in scene.actors.items()
+             if o is not actor and not o.is_down and o.has_state(STEALTH_SYNERGY)
+             and _same_side(scene, actor.ref, r) and _sees_ally(actor, o)]
+    hiding = [(o, awareness.sneaking(o)) for o in mates]
+    hiding = [(o, e) for o, e in hiding if e is not None
+              and int((e.payload or {}).get("face") or 0) > 0]
+    if not hiding:
+        return roll
+    own = int(roll.natural or 0)
+    best = max([own] + [int(e.payload["face"]) for _, e in hiding])
+    for o, e in hiding:
+        face = int(e.payload["face"])
+        if best > face:
+            e.payload = dict(e.payload, face=best,
+                             result=int(e.payload.get("result") or 0) + best - face)
+    if best > own:
+        return engine.dice.given(best, list(roll.modifiers),
+                                 f"{roll.label} (Stealth Synergy: the best roll, {best})")
+    return roll

@@ -5502,6 +5502,9 @@ class Engine:
             return [], []
         had = awareness.sneaking(actor)
         payload = {"result": int(roll.total), "at": self.scene.at,
+                   # Feat loop b5-maneuver: the d20 kept, for Stealth Synergy's "take
+                   # the highest roll" (`maneuver_feats.stealth_synergy`).
+                   "face": int(roll.natural or 0),
                    "ends_when": dict(awareness.ENDS_ON_ATTACK),
                    # Who has already rolled against this hiding: the one it was opposed
                    # by. Everybody else here checks against the result at the end of the
@@ -9798,6 +9801,8 @@ class Engine:
             dc_shown=not opposed,
             kind=(f"ability.{ability}" if ability else f"skill.{str(skill).lower()}"),
         )
+        if str(skill).lower() == "stealth" and helped is None:
+            roll = maneuver_feats.stealth_synergy(self, actor, roll)    # feat loop b5
 
         margin = roll.total - resolved_dc.final
         verdict = "success" if margin >= 0 else "failure"
@@ -31275,7 +31280,14 @@ class Engine:
                         + ("positive energy harms it." if kind == "damage"
                            else "negative energy mends it."))
 
-            if save_kind:
+            # Feat loop b5-maneuver: Divert Harm's foe wrestled into the blast in the
+            # target's place (`maneuver_feats.divert_harm`): what the target takes, or None.
+            diverted = maneuver_feats.divert_harm(
+                self, target, spell, save_kind, save_effect, kind, amount, dtype,
+                bool(plan.get("area")), dc, state) if save_kind else None
+            if diverted is not None:
+                amount = diverted
+            if save_kind and diverted is None:
                 saved, save_roll = self._cast_save(intent, target, save_kind, dc, spell,
                                                    partial, state)
                 effect = save_effect
