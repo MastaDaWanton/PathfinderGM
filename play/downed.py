@@ -281,13 +281,11 @@ def _wait_it_out(campaign, pc) -> Outcome:
     alternative — routing these into the stable branch below — burns an hour of world
     clock, floors hit points at 1 and tells a petrified character they have come round.
     """
-    from rules import states
-
     scene = campaign.scene
     # Found by the same predicate that chose it, not by key. `blocking_key` falls back
     # to the effect's NAME when a document-declared state carries no key, and looking
     # that up as a key matched nothing — so a three-round hold read as permanent.
-    held = next((e for e in pc.effects if states.stops(e.tags)), None)
+    held = pc.blocking_effect()
     what = ((held.name if held else "") or pc.blocking_key()
             or "unable to move").lower()
     rounds = int(getattr(held, "rounds_left", 0) or 0) if held else 0

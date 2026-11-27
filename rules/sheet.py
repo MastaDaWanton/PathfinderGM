@@ -3014,15 +3014,27 @@ class Actor:
         document that declares its own `state.unable.*` tag stops actions without
         needing a row in the condition table.
         """
-        from . import states
-
         # Falls back to the name, then to a word, because the answer doubles as the
         # "" that means "nothing stops you". An effect carrying `state.unable.*` with no
         # key would otherwise block according to `has_state` and not according to
         # `can_act` — which is exactly the document-declared case `states.stops` promises
         # to serve.
-        return next((e.key or e.name or "unable to act" for e in self.effects
-                     if states.stops(e.tags, action)), "")
+        held = self.blocking_effect(action)
+        return (held.key or held.name or "unable to act") if held else ""
+
+    def blocking_effect(self, action: str = "any"):
+        """The effect stopping `action`, or None — the one `blocking_key` names.
+
+        Surprise last: it says whose turn it is, not what is wrong with the body. The
+        0.6.0 prover petrified a PC caught by a forage ambush, and the first stopping
+        effect in store order was the round's: "You are surprised and can only watch."
+        """
+        from . import states
+
+        stopping = [e for e in self.effects if states.stops(e.tags, action)]
+        return next((e for e in stopping if not any(
+            states.matches(t, states.SURPRISED) for t in e.tags)),
+            stopping[0] if stopping else None)
 
     def blocking_condition(self, action: str = "any") -> str | None:
         """The same answer as a display name, for a refusal the player reads."""

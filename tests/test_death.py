@@ -195,6 +195,33 @@ def test_an_endless_hold_is_said_plainly_and_costs_no_world_clock(scene):
     assert got.lines and "petrified" in got.lines[0]
 
 
+def test_a_statue_caught_by_an_ambush_is_named_a_statue(scene):
+    """The 0.6.0 packaged prover: a forage ambush had the PC surprised when the save was
+    petrified, and the reply named the round, not the stone — "You are surprised and can
+    only watch." `_wait_it_out` took the first stopping effect in store order, and the
+    surprise came first. Surprise says whose turn it is; petrified is what is wrong.
+    """
+    from rules import surprise
+
+    pc = scene.pc()
+    engine = Engine(scene, Dice(seed=6))
+    engine.run(engine.validate([
+        {"op": "begin_encounter", "params": {"sides": {"pc": ["pc"], "them": ["c1"]}}}
+    ]))
+    pc.add_condition(surprise.SURPRISED_KEY, rounds=1, source=surprise.ORIGIN,
+                     origin=surprise.ORIGIN)
+    pc.add_condition("petrified", source="the prover")
+
+    got = downed.resolve(FakeCampaign(scene))
+
+    assert got.state == "held" and not got.playable
+    assert got.lines == ["You are petrified and can only watch."], got.lines
+    assert pc.blocking_key() == "petrified"
+    # Alone, the surprise is still what holds them.
+    pc.remove_condition("petrified")
+    assert pc.blocking_key() == surprise.SURPRISED_KEY
+
+
 def test_a_hold_with_a_clock_is_waited_out(scene):
     """The other half: paralysis from a ghoul does end, and a character who cannot act
     still has to get to the far side of it. The one ticker moves the rounds."""
