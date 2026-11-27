@@ -342,6 +342,10 @@ def feint(engine, intent, actor, mods, partial):
     if partners:
         said += (f" Feint Partner: {_and(p.name for p in partners)}'s next blow at "
                  f"{target.name} finds the same opening.")
+    # Feat loop b5-maneuver: Team Pickpocketing's lift while the feint holds them.
+    lifted, lift_said, lift_rolls = maneuver_feats.team_pickpocket(engine, actor, target)
+    effects += lifted
+    said += "".join(f" {t}" for t in lift_said)
     if actor.has_state(out["greater_tag"]):
         target.apply_effect(ActiveEffect(
             name=f"off guard from {actor.name}'s feint", kind="situation",
@@ -352,8 +356,8 @@ def feint(engine, intent, actor, mods, partial):
                         "by": actor.ref, "origin": "rule:greater-feint"})
         said += (f" Greater Feint: until {actor.name}'s next turn {target.name} keeps no "
                  f"Dexterity against anybody.")
-    return _outcome(intent, rolls=[roll], dc_value=value, basis=basis, verdict="success",
-                    margin=margin, effects=effects, tell=said)
+    return _outcome(intent, rolls=[roll] + lift_rolls, dc_value=value, basis=basis,
+                    verdict="success", margin=margin, effects=effects, tell=said)
 
 
 # Feint Partner's tag (content/feats/mechanics/batch1-maneuvers.json), a teamwork feat:

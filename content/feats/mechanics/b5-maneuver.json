@@ -1,0 +1,68 @@
+{
+  "_about": [
+    "Feat loop, batch 5, lane b5-maneuver (2026-11-26): the manoeuvre and defence feats batch 4 did",
+    "not start. Each benefit is the book's (content/feats/feats.json, checked against aonprd.com",
+    "FeatDisplay 2026-11-26). The engine reads the tags in rules/maneuver_feats.py (feat loop b5",
+    "section) and rules/awareness.py; what still does not run is each document's `not_yet`."
+  ],
+  "bonebreaker": {},
+  "neckbreaker": {
+    "not_yet": [
+      "'a creature ... that has no discernible head and neck is immune': the bestiary says nothing of a body's shape, so only the creatures immune to critical hits (and the types Stunning Fist cannot affect) are spared"
+    ]
+  },
+  "favored-defense": {
+    "tags": [
+      "defense.favored-enemy"
+    ]
+  },
+  "blundering-defense": {
+    "tags": [
+      "defense.blundering"
+    ]
+  },
+  "fury-s-snare": {
+    "choice": "furys_snare",
+    "not_yet": [
+      "'Escaping the whip by making a Strength check means the whip gains the broken condition': the whip lies on the ground unbroken",
+      "'or by using a full-round action to disentangle himself': the escape op offers the two checks and no sure way out",
+      "'If the whip has a magical quality such as flaming, apply this quality's damage to the target every round on your turn': a dropped weapon's properties do nothing"
+    ]
+  },
+  "snoutgrip": {
+    "tags": [
+      "grapple.snoutgrip"
+    ],
+    "not_yet": [
+      "the held mouth's 'breath weapon': a creature's printed breath weapon does not run in the engine, and a class ability's breath (a draconic bloodline's) is not refused while the jaws are held"
+    ]
+  },
+  "body-shield": {
+    "tags": [
+      "grapple.body-shield"
+    ]
+  },
+  "dampen-presence": {
+    "tags": [
+      "stealth.vs-blindsense"
+    ]
+  },
+  "divert-harm": {
+    "tags": [
+      "defense.divert-harm"
+    ],
+    "not_yet": [
+      "the `save` op's Reflex-half dangers (a trap's or a hazard's save): only a cast spell's and a class ability's area reach the wrestled foe — a creature's printed breath weapon does not run at all"
+    ]
+  },
+  "team-pickpocketing": {
+    "tags": [
+      "teamwork.team-pickpocketing"
+    ]
+  },
+  "stealth-synergy": {
+    "tags": [
+      "teamwork.stealth-synergy"
+    ]
+  }
+}

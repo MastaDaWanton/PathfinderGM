@@ -918,6 +918,10 @@ _OPTION_SHAPES = {
     "tripping_twirl": ("strike", "Tripping Twirl",
                        "The whole round, quarterstaff in both hands: a trip at every foe "
                        "beside you."),
+    # Feat loop b5-maneuver.
+    "furys_snare": ("strike", "Fury's Snare",
+                    "A whip trip that lands lets the whip go to bind the fallen foe: "
+                    "entangled until they break or slip it."),
     "total_defense": ("act", "Total defense",
                       "Your standard action spent guarding: no attacks, and no attacks of "
                       "opportunity."),

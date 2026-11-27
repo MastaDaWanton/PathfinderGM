@@ -270,7 +270,40 @@ def senses(scene, observer, subject) -> str:
                 return "pinpoint"
             if gap <= 30:
                 best = "near"
+    # Feat loop b5-maneuver: blindsense and blindsight (UMR: blindsense "does not need to
+    # make Perception checks to notice and pinpoint the location of creatures within
+    # range"; blindsight the same, and more), from a tag (`sense.blindsight.60`) or the
+    # printed stat block's senses line, as `Actor.eyes` reads darkvision off it. Dampen
+    # Presence (Dungeoneer's Handbook): "You may use the Stealth skill to hide from any
+    # creature attempting to perceive you using blindsight or blindsense" — a hider
+    # holding its tag is not pinpointed by either while its won Stealth stands.
+    if subject.has_state(DAMPEN_PRESENCE) and sneaking(subject) is not None:
+        return best
+    for reach in _blind_ranges(observer):
+        if gap <= reach:
+            return "pinpoint"
     return best
+
+
+DAMPEN_PRESENCE = "stealth.vs-blindsense"
+
+
+def _blind_ranges(observer) -> list[int]:
+    """The ranges of this creature's blindsense and blindsight, in feet."""
+    import re
+
+    out = []
+    for tag in _tags_of(observer):
+        for sense in ("sense.blindsight", "sense.blindsense"):
+            if states.matches(tag, sense):
+                tail = tag[len(sense):].strip(".")
+                out.append(int(tail) if tail.isdigit() else 30)
+    try:
+        printed = str((observer._creature_doc() or {}).get("senses") or "").lower()
+    except Exception:  # noqa: BLE001 — a character has no stat block
+        printed = ""
+    out += [int(m.group(2)) for m in re.finditer(r"blind(sight|sense)\s+(\d+)", printed)]
+    return out
 
 
 def player_locates(scene, subject) -> bool:

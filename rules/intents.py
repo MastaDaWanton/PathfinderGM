@@ -398,7 +398,9 @@ OPS: dict[str, tuple[tuple[str, ...], tuple[str, ...], str]] = {
                     "butterfly_sting", "two_handed_throw", "hamatulatsu",
                     "cockatrice_strike",
                     # Feat loop b4-maneuver (sheet.ATTACK_CHOICES).
-                    "tripping_twirl", "feinting_flurry", "gory_finish"),
+                    "tripping_twirl", "feinting_flurry", "gory_finish",
+                    # Feat loop b5-maneuver (sheet.ATTACK_CHOICES).
+                    "furys_snare"),
                    "player"),
     # `lethality` because a Blood Bender paying for an ability in non-lethal
     # damage and one taking a sword are not in the same trouble.
@@ -1142,7 +1144,9 @@ FLAG_PARAMS = frozenset({"full_attack", "power_attack", "drain", "risky", "faile
                          "cockatrice_strike",
                          # Feat loop b4-maneuver.
                          "tripping_twirl", "feinting_flurry", "gory_finish",
-                         "disengage", "squares_off"})
+                         "disengage", "squares_off",
+                         # Feat loop b5-maneuver.
+                         "furys_snare"})
 from .skilluses import OWN_DOORS as _OWN_DOORS  # noqa: E402 — the uses with their own door
 
 

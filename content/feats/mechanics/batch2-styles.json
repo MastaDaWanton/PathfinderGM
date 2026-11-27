@@ -287,12 +287,52 @@
     ]
   },
   "djinni-style": {
-    "not_yet": [
-      "the extra Elemental Fist attempt, the Wisdom on electricity damage and the +2 dodge against attacks of opportunity while attempts remain: Elemental Fist: the feat has no engine yet (feat loop todo, 'other'), so its attempts, its energy and every clause built on it do not run"
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "pool.elemental fist",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "note": "one additional Elemental Fist attempt per day"
+      },
+      {
+        "type": "combat_mod",
+        "target": "elemental-fist.electricity.damage",
+        "formula": "max(0, wis_mod)",
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.djinni-style"
+          }
+        },
+        "note": "Wisdom on electricity damage rolls in the style (Elemental Fist's dice, Elemental Fist areas)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 2,
+        "bonus_type": "dodge",
+        "when": {
+          "opportunity": true,
+          "bearer": {
+            "state": "style.djinni-style",
+            "loses_dex": false,
+            "pool": "elemental fist"
+          }
+        },
+        "note": "+2 dodge against attacks of opportunity in the style while Elemental Fist attempts remain"
+      }
     ]
   },
   "djinni-spirit": {
     "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "pool.elemental fist",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "note": "one additional Elemental Fist attempt per day"
+      },
       {
         "type": "combat_mod",
         "target": "resist.electricity",
@@ -307,15 +347,26 @@
         "note": "electricity resistance in Djinni Style"
       }
     ],
-    "not_yet": [
-      "the extra Elemental Fist attempt and the Fortitude-or-deafened on its electricity: Elemental Fist: the feat has no engine yet (feat loop todo, 'other'), so its attempts, its energy and every clause built on it do not run"
+    "on_hit": [
+      {
+        "kind": "save_condition",
+        "condition": "deafened",
+        "save": "fort",
+        "dc": "10 + level // 2 + wis_mod",
+        "for": {
+          "dice": "1d4",
+          "unit": "round"
+        },
+        "when": {
+          "charge_energy": "electricity",
+          "bearer": {
+            "state": "style.djinni-style"
+          }
+        }
+      }
     ]
   },
-  "djinni-spin": {
-    "not_yet": [
-      "the whirlwind that spends two Elemental Fist attempts: Elemental Fist: the feat has no engine yet (feat loop todo, 'other'), so its attempts, its energy and every clause built on it do not run"
-    ]
-  },
+  "djinni-spin": {},
   "dragon-style": {
     "modifiers": [
       {
@@ -384,7 +435,7 @@
     ],
     "not_yet": [
       "shaken for 1d4 + Strength rounds on a critical hit or a Stunning Fist that lands: neither raises a rider a feat may add to",
-      "qualifying for Elemental Fist with one energy: Elemental Fist: the feat has no engine yet (feat loop todo, 'other'), so its attempts, its energy and every clause built on it do not run"
+      "qualifying for Elemental Fist without its prerequisites (and the one energy that leaves until they are met): the feat picker has no prerequisite waiver a feat can grant"
     ]
   },
   "dragon-roar": {
@@ -402,12 +453,49 @@
     ]
   },
   "efreeti-style": {
-    "not_yet": [
-      "the extra attempt, the Wisdom on fire damage and the 1d6 fire on a miss: Elemental Fist: the feat has no engine yet (feat loop todo, 'other'), so its attempts, its energy and every clause built on it do not run"
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "pool.elemental fist",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "note": "one additional Elemental Fist attempt per day"
+      },
+      {
+        "type": "combat_mod",
+        "target": "elemental-fist.fire.damage",
+        "formula": "max(0, wis_mod)",
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.efreeti-style"
+          }
+        },
+        "note": "Wisdom on fire damage rolls in the style (Elemental Fist's dice, Elemental Fist areas)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "elemental-fist.fire.miss",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.efreeti-style"
+          }
+        },
+        "note": "1d6 fire still dealt when the Elemental Fist blow misses"
+      }
     ]
   },
   "efreeti-stance": {
     "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "pool.elemental fist",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "note": "one additional Elemental Fist attempt per day"
+      },
       {
         "type": "combat_mod",
         "target": "resist.fire",
@@ -422,15 +510,21 @@
         "note": "fire resistance in Efreeti Style"
       }
     ],
-    "not_yet": [
-      "the extra attempt and the Reflex-or-catch-fire on its fire: Elemental Fist: the feat has no engine yet (feat loop todo, 'other'), so its attempts, its energy and every clause built on it do not run"
+    "on_hit": [
+      {
+        "kind": "catch_fire",
+        "save": "ref",
+        "dc": "10 + level // 2 + wis_mod",
+        "when": {
+          "charge_energy": "fire",
+          "bearer": {
+            "state": "style.efreeti-style"
+          }
+        }
+      }
     ]
   },
-  "efreeti-touch": {
-    "not_yet": [
-      "the cone of flame for two Elemental Fist attempts: Elemental Fist: the feat has no engine yet (feat loop todo, 'other'), so its attempts, its energy and every clause built on it do not run"
-    ]
-  },
+  "efreeti-touch": {},
   "janni-style": {
     "modifiers": [
       {
@@ -524,12 +618,55 @@
     ]
   },
   "marid-style": {
-    "not_yet": [
-      "the extra attempt, the Wisdom on cold damage and the extra 5 feet of reach with it: Elemental Fist: the feat has no engine yet (feat loop todo, 'other'), so its attempts, its energy and every clause built on it do not run"
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "pool.elemental fist",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "note": "one additional Elemental Fist attempt per day"
+      },
+      {
+        "type": "combat_mod",
+        "target": "elemental-fist.cold.damage",
+        "formula": "wis_mod",
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.marid-style"
+          }
+        },
+        "note": "Wisdom on cold damage rolls in the style (Elemental Fist's dice, Elemental Fist areas)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "reach",
+        "amount": 5,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": [
+              "style.marid-style",
+              "elemental-fist.cold"
+            ]
+          },
+          "weapon": {
+            "key": "unarmed"
+          }
+        },
+        "note": "+5 feet of unarmed reach with an Elemental Fist armed for cold, in the style"
+      }
     ]
   },
   "marid-spirit": {
     "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "pool.elemental fist",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "note": "one additional Elemental Fist attempt per day"
+      },
       {
         "type": "combat_mod",
         "target": "resist.cold",
@@ -544,15 +681,30 @@
         "note": "cold resistance in Marid Style"
       }
     ],
+    "on_hit": [
+      {
+        "kind": "save_condition",
+        "condition": "entangled",
+        "save": "fort",
+        "dc": "10 + level // 2 + wis_mod",
+        "for": {
+          "dice": "1d4",
+          "unit": "round"
+        },
+        "escape_dc": "15 + max(bab, monk_level)",
+        "when": {
+          "charge_energy": "cold",
+          "bearer": {
+            "state": "style.marid-style"
+          }
+        }
+      }
+    ],
     "not_yet": [
-      "the extra attempt and the Fortitude-or-entangled-in-ice on its cold: Elemental Fist: the feat has no engine yet (feat loop todo, 'other'), so its attempts, its energy and every clause built on it do not run"
+      "'The ice has hit points equal to three times your base attack bonus or monk level ... Destroying ... the ice ends the entangled condition': the ice is not an object anyone can strike; breaking it (the escape op against the break DC) is the way out"
     ]
   },
-  "marid-coldsnap": {
-    "not_yet": [
-      "the line of frigid water for two Elemental Fist attempts: Elemental Fist: the feat has no engine yet (feat loop todo, 'other'), so its attempts, its energy and every clause built on it do not run"
-    ]
-  },
+  "marid-coldsnap": {},
   "monkey-style": {
     "modifiers": [
       {
@@ -644,12 +796,49 @@
     ]
   },
   "shaitan-style": {
-    "not_yet": [
-      "the extra attempt, the Wisdom on acid damage and the 1d6 acid on a miss: Elemental Fist: the feat has no engine yet (feat loop todo, 'other'), so its attempts, its energy and every clause built on it do not run"
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "pool.elemental fist",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "note": "one additional Elemental Fist attempt per day"
+      },
+      {
+        "type": "combat_mod",
+        "target": "elemental-fist.acid.damage",
+        "formula": "max(0, wis_mod)",
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.shaitan-style"
+          }
+        },
+        "note": "Wisdom on acid damage rolls in the style (Elemental Fist's dice, Elemental Fist areas)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "elemental-fist.acid.miss",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.shaitan-style"
+          }
+        },
+        "note": "1d6 acid still dealt when the Elemental Fist blow misses"
+      }
     ]
   },
   "shaitan-skin": {
     "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "pool.elemental fist",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "note": "one additional Elemental Fist attempt per day"
+      },
       {
         "type": "combat_mod",
         "target": "resist.acid",
@@ -664,15 +853,26 @@
         "note": "acid resistance in Shaitan Style"
       }
     ],
-    "not_yet": [
-      "the extra attempt and the Reflex-or-staggered on its acid: Elemental Fist: the feat has no engine yet (feat loop todo, 'other'), so its attempts, its energy and every clause built on it do not run"
+    "on_hit": [
+      {
+        "kind": "save_condition",
+        "condition": "staggered",
+        "save": "ref",
+        "dc": "10 + level // 2 + wis_mod",
+        "for": {
+          "dice": "1",
+          "unit": "round"
+        },
+        "when": {
+          "charge_energy": "acid",
+          "bearer": {
+            "state": "style.shaitan-style"
+          }
+        }
+      }
     ]
   },
-  "shaitan-earthblast": {
-    "not_yet": [
-      "the column of acid for two Elemental Fist attempts: Elemental Fist: the feat has no engine yet (feat loop todo, 'other'), so its attempts, its energy and every clause built on it do not run"
-    ]
-  },
+  "shaitan-earthblast": {},
   "snapping-turtle-style": {
     "modifiers": [
       {

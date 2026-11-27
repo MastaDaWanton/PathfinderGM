@@ -1212,7 +1212,12 @@ def _luck_problems(at: str, entries) -> list[str]:
 # What a feat's `on_hit` may lay on the creature a melee blow just struck (feat loop b1,
 # 2026-11-22): the attack riders' own executors (`Engine._RIDERS`), each key it reads.
 _ON_HIT_KINDS = {"bleed": {"kind", "when", "amount"},
-                 "save_condition": {"kind", "when", "condition", "save", "dc", "for"},
+                 "save_condition": {"kind", "when", "condition", "save", "dc", "for",
+                                    # Feat loop b5-maneuver: a hold a check ends (Marid
+                                    # Spirit's ice, `maneuver_feats.escape_payload`).
+                                    "escape_dc"},
+                 # Feat loop b5-maneuver: Efreeti Stance (`maneuver_feats.rider_catch_fire`).
+                 "catch_fire": {"kind", "when", "save", "dc"},
                  # Feat loop b2 (`Engine._FEAT_RIDERS`): a free manoeuvre on the hit (Shield
                  # Slam, Shield Snag, Sliding Axe Throw), a free demoralize (Enforcer,
                  # Intimidating Confidence), a condition the hit lays (Footslasher), an
@@ -1312,7 +1317,9 @@ def _feat_funnel_targets() -> set[str]:
             prefix = node.get("bonus_from")
             if isinstance(prefix, str) and prefix.strip():
                 out.update({f"{prefix.strip()}.{k}"
-                            for k in ("dc", "damage", "range", "linger")})
+                            for k in ("dc", "damage", "range", "linger",
+                                      # Feat loop b5-maneuver: dice on a miss.
+                                      "miss")})
             for v in node.values():
                 walk(v)
         elif isinstance(node, list):

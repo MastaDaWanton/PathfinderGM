@@ -317,6 +317,10 @@ def after(engine, intent, actor, defender, key: str, verdict: str, weapon_key: s
         out["effects"].append(e)
         out["tells"].append(f"{engine.scene.actors[e['ref']].name} tramples "
                             f"{defender.name} where they fell (Trample).")
+    if key == "trip" and won and intent.params.get(FURYS_SNARE):
+        snare = furys_snare(engine, actor, defender, weapon_key)
+        for k in out:
+            out[k].extend(snare[k])
     if key == "trip" and intent.params.get("tripping_twirl"):
         out_twirl = _twirl(engine, intent, actor, defender)
         for k in out:
@@ -390,6 +394,13 @@ def choice_refusal(actor, weapon: dict, declared, params: dict) -> str:
         key = str(params.get("weapon") or actor.wielded_key() or "").strip().lower()
         if not has_weapon_focus(actor, key):
             return f"Gory Finish is made with a weapon {actor.name} has Weapon Focus in."
+    if FURYS_SNARE in declared:
+        # Feat loop b5-maneuver: Fury's Snare is a whip's trip.
+        if params.get("manoeuvre") not in (None, "", "trip"):
+            return "Fury's Snare is made with a trip; declare it with one."
+        key = str(params.get("weapon") or actor.wielded_key() or "").strip().lower()
+        if "whip" not in (key, str(weapon.get("crafted_base") or "")):
+            return "Fury's Snare is a trip made with a whip."
     if TWIRL in declared:
         if params.get("manoeuvre") not in (None, "", "trip"):
             return "Tripping Twirl is a trip at each foe beside you; declare it with a trip."
@@ -930,3 +941,587 @@ def field_repair_cost(actor, obj, cost_gp: float) -> float:
             or int((actor.ranks or {}).get("craft", 0) or 0) < 1:
         return cost_gp
     return 0.0
+
+
+# === Feat loop batch 5, lane b5-maneuver (2026-11-26) =====================================
+#
+# The elemental style feats finished on Elemental Fist (b4-combat's charge, pool
+# `elemental fist`), and the manoeuvre and defence feats of b5-maneuver.tsv. As above, the
+# engine reads documents' TAGS and fields here, never a feat's name.
+
+def fist_share(engine, actor, shown: str, rolls: list, tells: list):
+    """(amount, type) of the user's unarmed strike, rolled once for an area that deals
+    "your unarmed strike damage plus the [energy] damage from your Elemental Fist"
+    (Djinni Spin, Efreeti Touch, Marid Coldsnap, Shaitan Earthblast, UC/Champions of
+    Balance). The strike's own dice and its damage terms (`Actor.damage_modifiers`, the
+    one funnel the punch itself uses); bludgeoning, as an unarmed strike is."""
+    from .dice import stack
+
+    notation = actor.damage_dice("unarmed")
+    mods = list(stack(actor.damage_modifiers("unarmed")))
+    r = engine.dice.roll(notation, mods, label=f"{shown}: unarmed strike", visibility="player")
+    rolls.append(r)
+    total = max(1, r.total)
+    tells.append(f"The unarmed strike behind it: {notation} — {total}.")
+    return total, "bludgeoning"
+
+
+def escape_payload(actor, rule: dict) -> dict | None:
+    """The payload a save-or-condition rider lays when its hold is one a check ends
+    (`escape_dc`, a formula over the maker's sheet): Marid Spirit's "entangled in ice ...
+    a break DC of 15 + your base attack bonus or monk level, whichever is higher.
+    Destroying or breaking the ice ends the entangled condition." The `escape` op answers
+    it (`Engine._escape_spell_hold`: a combat manoeuvre or Escape Artist against the DC, a
+    standard action), as it answers a web. None when the rider names no escape."""
+    from . import resources
+
+    if not rule.get("escape_dc"):
+        return None
+    try:
+        dc = int(resources.evaluate(str(rule["escape_dc"]), actor))
+    except resources.FormulaError:
+        return None
+    return {"ends_when": {"escape": {"dc": dc}}}
+
+
+def rider_catch_fire(engine, intent, actor, defender, rule: dict, origin: str,
+                     state: dict) -> list[dict]:
+    """Efreeti Stance (UC): "Creatures that take fire damage from your Elemental Fist
+    attack must succeed at a Reflex save (DC 10 + 1/2 your character level + your Wis
+    modifier) or catch on fire." The catching is the engine's one clinging fire (the `burn`
+    op: 1d6 a round, put out by `extinguish` — Reflex DC 15, +4 rolling on the ground), for
+    1d4 rounds, the length the Burn rider gives a caught creature (`Engine._rider_burn`).
+    Owner call: the CRB's "Catching on Fire" burns until a save puts it out; the engine's
+    fire runs a counted number of rounds, so the Burn rider's 1d4 is taken."""
+    if defender.hp <= 0 or defender.is_dead:
+        return []
+    dc = int(rule.get("dc") or 10)
+    made, said = engine._rider_save(defender, str(rule.get("save") or "ref"), dc,
+                                    "Reflex save against catching fire", state,
+                                    attacker=actor)
+    word = str(rule.get("name") or rule.get("rider") or "the fire")
+    if made:
+        return [{"effect": {"ref": defender.ref, "kind": "rider_resisted", "rider": word,
+                            "origin": origin},
+                 "tell": f"{defender.name} does not catch fire ({said})."}]
+    got, said2 = set_alight(engine, actor, defender, origin, word, state)
+    return got + [{"effect": {"ref": defender.ref, "kind": "rider", "rider": word,
+                              "origin": origin},
+                   "tell": f"{defender.name} catches fire ({said}). {said2}".strip()}]
+
+
+def set_alight(engine, actor, defender, origin: str, word: str, state: dict):
+    """(effect/tell pairs, tell) for the engine's one clinging fire laid on `defender`: the
+    `burn` op (1d6 fire a round for 1d4 rounds, put out by `extinguish`), as the Burn
+    rider lays it. Shared by Efreeti Stance's rider and Efreeti Touch's cone."""
+    rounds = engine.dice.roll("1d4", label="burning rounds", visibility="hidden")
+    state.setdefault("rolls", []).append(rounds.as_dict())
+    res = engine._run_within(engine.validate([{
+        "op": "burn", "actor": defender.ref, "visibility": "hidden",
+        "because": f"{actor.name}'s {word}",
+        "params": {"to": defender.ref, "dice": "1d6", "damage_type": "fire",
+                   "rounds": max(1, rounds.total), "put_out_with": "ref",
+                   "put_out_dc": 15, "smother_bonus": 4},
+    }], origin=origin, origin_name=word))
+    out, said = [], []
+    for o in res:
+        out.extend({"effect": e, "tell": ""} for e in o.effects or [])
+        if o.tell:
+            said.append(o.tell)
+    return out, " ".join(said) or f"{defender.name} is alight."
+
+
+# --- Favored Defense, Blundering Defense: terms on the AC and CMD lines --------------------
+
+FAVORED_DEFENSE = "defense.favored-enemy"
+BLUNDERING = "defense.blundering"
+
+
+def favored_defense(defender, attacker) -> int:
+    """Favored Defense (APG): "Choose one of your favored enemy types. You add half your
+    favored enemy bonus to your CMD and as a dodge bonus to AC when attacked by a favored
+    enemy." The pick is the feat's parenthetical; the bonus is the ranger's own for that
+    pick (`classfeatures._picks`, the +2/+4 the class table paid), and the attacker must
+    be of it (`classfeatures.holds` with `$pick`, favored enemy's own reader). "Its effects
+    do not stack": the best one pick gives is the one taken. 0 when none applies."""
+    from . import classfeatures as cf
+
+    if attacker is None or not defender.has_state(FAVORED_DEFENSE):
+        return 0
+    wanted = [cf._enemy_clause(str(d["target"])) for d in _docs(defender)
+              if FAVORED_DEFENSE in (d.get("tags") or ()) and d.get("target")]
+    best = 0
+    for leaf, doc in cf.held(defender):
+        if str(doc.get("choice") or "") != "favored enemy":
+            continue
+        for pick, bonus in cf._picks(defender, leaf, doc):
+            if cf._enemy_clause(pick) in wanted and cf.holds(
+                    {"target": "$pick"}, defender, {"target_actor": attacker}, pick):
+                best = max(best, int(bonus or 0) // 2)
+    return best
+
+
+def _stance_dodge(bearer) -> int:
+    """The dodge bonus to AC the bearer has from fighting defensively or total defense:
+    the action's own (`sheet.defensive_dodge`, +2/+3 or +4/+6 by Acrobatics) and what
+    their feat documents add to it while that stance holds (Cautious Fighter's +2, a term
+    whose `when.bearer.state` is the stance). 0 in neither stance."""
+    from . import states
+    from .sheet import defensive_dodge
+
+    for tag, total in ((states.TOTAL_DEFENSE, True), (states.FIGHTING_DEFENSIVELY, False)):
+        if not bearer.has_state(tag):
+            continue
+        n = defensive_dodge(bearer, total=total)
+        for doc in _docs(bearer):
+            for m in doc.get("modifiers") or ():
+                if m.get("type") == "combat_mod" and m.get("target") == "ac" \
+                        and m.get("bonus_type") == "dodge" \
+                        and ((m.get("when") or {}).get("bearer") or {}).get("state") == tag:
+                    n += int(m.get("amount") or 0)
+        return n
+    return 0
+
+
+def blundering_defense(creature) -> int:
+    """Blundering Defense (ARG): "Whenever you fight defensively or use the total defense
+    action, allies gain a luck bonus to AC and CMD equal to 1/2 the dodge bonus you gain
+    from the action you are taking. Allies only gain this bonus while they are adjacent
+    to you." Asked of the ally's own AC line: the best a bearer beside them on the board
+    lends. No board, nobody stands adjacent (0)."""
+    from . import grid as gridmod
+    from .position import _same_side
+
+    scene = _scene()
+    if scene is None or not getattr(scene, "has_grid", False):
+        return 0
+    here = scene.positions.get(getattr(creature, "ref", ""))
+    if here is None:
+        return 0
+    best = 0
+    for ref, other in scene.actors.items():
+        if other is creature or other.is_down or not other.has_state(BLUNDERING) \
+                or ref not in scene.positions or not _same_side(scene, creature.ref, ref):
+            continue
+        if not gridmod.is_adjacent(tuple(here), creature.size or "medium",
+                                   tuple(scene.positions[ref]), other.size or "medium"):
+            continue
+        best = max(best, _stance_dodge(other) // 2)
+    return best
+
+
+def ac_terms(defender, attacker, loses_dex: bool) -> list:
+    """This lane's terms on the AC line: Favored Defense's dodge (lost with Dex, as every
+    dodge bonus is) and Blundering Defense's luck."""
+    from .dice import Modifier
+
+    out = []
+    n = 0 if loses_dex else favored_defense(defender, attacker)
+    if n:
+        out.append(Modifier(n, "Favored Defense", "dodge"))
+    n = blundering_defense(defender)
+    if n:
+        out.append(Modifier(n, "Blundering Defense (an ally's guard)", "luck"))
+    return out
+
+
+def cmd_terms(defender, attacker) -> list:
+    """Favored Defense's half bonus to CMD against a favored enemy's manoeuvre (untyped:
+    the feat names no type). Blundering Defense's luck reaches CMD through the AC line
+    (CRB: luck bonuses to AC apply to CMD)."""
+    from .dice import Modifier
+
+    n = favored_defense(defender, attacker)
+    return [Modifier(n, "Favored Defense")] if n else []
+
+
+
+# --- Fury's Snare --------------------------------------------------------------------------
+
+# The declared option (sheet.ATTACK_CHOICES, the feat document's `choice`): the book's "you
+# can choose to drop your whip" is the player's to declare, since it costs the weapon.
+FURYS_SNARE = "furys_snare"
+
+
+def furys_snare(engine, actor, defender, weapon_key: str) -> dict:
+    """Fury's Snare (Cheliax, Empire of Devils): "If you successfully use a whip to trip a
+    foe, you can choose to drop your whip. Your tripped target gains the entangled
+    condition. The target can break free of the whip by making a DC 10 Strength check or a
+    DC 15 Escape Artist check (add the enhancement bonus of the whip to these DCs)." The
+    whip is let go (`Engine._let_go`: it lies here, still its owner's) and the entangled
+    condition carries the two DCs the escape op reads (`escape.dc`, `escape.str_dc`)."""
+    out = {"effects": [], "tells": [], "rolls": []}
+    if defender.is_down or not engine._drops_in_hand(actor, weapon_key):
+        return out
+    enh = max([m.value for m in actor.attack_modifiers(weapon_key)
+               if (m.type or "") == "enhancement"] or [0])
+    rec = engine._let_go(actor, weapon_key)
+    defender.add_condition("entangled", None, source=f"{actor.name}'s whip",
+                           origin="rule:feat-fury-s-snare",
+                           payload={"ends_when": {"escape": {"dc": 15 + enh,
+                                                             "str_dc": 10 + enh}}})
+    out["effects"] += [{"ref": actor.ref, "kind": "dropped", "item": weapon_key,
+                        "prop": rec["name"], "from": "Fury's Snare",
+                        "origin": "rule:feat-fury-s-snare"},
+                       {"ref": defender.ref, "kind": "condition", "condition": "entangled",
+                        "origin": "rule:feat-fury-s-snare"}]
+    out["tells"].append(f"{actor.name} lets the whip go and it binds {defender.name} where "
+                        f"they fell (Fury's Snare): entangled until they break it (Strength "
+                        f"DC {10 + enh}) or slip it (Escape Artist DC {15 + enh}).")
+    return out
+
+
+# --- Snoutgrip, Body Shield: what the one attacked does about a blow -------------------------
+
+SNOUTGRIP = "grapple.snoutgrip"
+BODY_SHIELD = "grapple.body-shield"
+MOUTH_HELD = "state.silenced.mouth-held"
+# The d20 a redirected blow keeps, [face, total] (Body Shield's "using the same attack
+# roll"): a code-only param on the engine-written swing at the shield, never the model's.
+GIVEN_FACE = "body_shield_roll"
+
+
+def _bite(weapon_key: str, weapon: dict) -> bool:
+    return "bite" in (str(weapon_key or "").lower(),
+                      str((weapon or {}).get("name") or "").lower())
+
+
+def mouth_held(actor, weapon_key: str, weapon: dict) -> bool:
+    """Whether this swing is a bite from jaws a Snoutgrip holds shut."""
+    return _bite(weapon_key, weapon) and actor.has_state(MOUTH_HELD)
+
+
+def snoutgrip(engine, intent, actor, defender, weapon_key: str, weapon: dict) -> dict:
+    """Snoutgrip (Dragonslayer's Handbook): "As an immediate action, whenever an opponent up
+    to one size category larger than you misses you with its bite attack, you can attempt a
+    grapple with a -5 penalty on the check. If you succeed, you have grappled your opponent
+    and are holding its mouth shut, preventing it from using its bite attack, breath
+    weapon, or spells with a verbal component until it escapes your grapple. You may make
+    this grapple attempt even if the target is out of your reach."
+
+    The grapple is the free-manoeuvre door's (`_sub`: an engine-built manoeuvre, rolled by
+    the engine, no attack of opportunity — the feat needs Improved Grapple — and no reach
+    asked), paid with the immediate action. The held mouth rides the grapple condition
+    itself, as a chokehold's silence rides the pin, so it ends with the hold; `state.
+    silenced` is what refuses a spell with a verbal part. Owner call: taken whenever the
+    immediate action is free, as Snake Style's is."""
+    out = {"effects": [], "tells": [], "rolls": []}
+    if not _bite(weapon_key, weapon) or not defender.has_state(SNOUTGRIP) \
+            or defender.is_down or _size_steps(defender, actor) > 1 \
+            or engine._holds(defender, actor) or not engine.scene.in_encounter:
+        return out
+    name = _named_by_tag(defender, SNOUTGRIP) or "Snoutgrip"
+    if engine._pay_swift(defender, name, immediate=True):
+        return out
+    got = _sub(engine, intent, defender, actor, "grapple", SNOUTGRIP, name,
+               {"rider_bonus": -5})
+    out["rolls"].extend(got.rolls)
+    out["effects"].extend(got.effects)
+    out["tells"].append(f"{defender.name} lunges for the jaws as they snap shut on air "
+                        f"({name}): {got.tell}")
+    if got.verdict == "success":
+        from . import states
+
+        hold = next((e for e in actor.effects if engine._is_grapple(e)
+                     and str((e.payload or {}).get("by") or "") == defender.ref), None)
+        if hold is not None:
+            hold.tags = tuple(hold.tags or ()) + tuple(
+                t for t in states.tags_for("mouth held") if t not in (hold.tags or ()))
+            out["effects"].append({"ref": actor.ref, "kind": "condition",
+                                   "condition": "mouth held", "by": defender.ref,
+                                   "origin": "rule:feat-snoutgrip"})
+            out["tells"].append(f"{defender.name} clamps {actor.name}'s mouth shut: no "
+                                f"bite, no breath, no spoken spell while the hold lasts.")
+    return out
+
+
+def body_shield(engine, actor, defender, state: dict) -> tuple[int, str]:
+    """Body Shield (UC): "As an immediate action while you are grappling an adjacent
+    creature, you can make a grapple combat maneuver check against that creature to gain
+    cover against a single attack. If you are successful and the attack misses you, that
+    attack targets the creature you used as cover, using the same attack roll. You cannot
+    use this feat against a creature grappling you, and the cover you gain ends after the
+    attack you gained cover against is resolved."
+
+    (cover AC, the shield's ref) for this swing, decided once per swing and kept in the
+    attack's state. The shield is a creature the bearer holds (`Engine._holds`) and that
+    does not hold the bearer, beside them; the check is the bearer's grapple CMB against
+    its CMD, rolled by the engine (the immediate action is off the bearer's turn). Owner
+    call, as Snake Style's: used on the first blow each round while the immediate action
+    is free. Cover is +4 (CRB, Cover)."""
+    from . import grid as gridmod
+    from .dice import d20_succeeds
+
+    key = f"body_shield:{state['i']}"
+    if key in state:
+        return tuple(state[key])
+    state[key] = (0, "")
+    scene = engine.scene
+    if not defender.has_state(BODY_SHIELD) or defender.is_down or not scene.has_grid:
+        return state[key]
+    here = scene.positions.get(defender.ref)
+    shield = next((o for r, o in scene.actors.items()
+                   if o is not actor and o is not defender and not o.is_down
+                   and engine._holds(defender, o) and not engine._holds(o, defender)
+                   and here is not None and r in scene.positions
+                   and gridmod.is_adjacent(tuple(here), defender.size or "medium",
+                                           tuple(scene.positions[r]), o.size or "medium")),
+                  None)
+    if shield is None:
+        return state[key]
+    name = _named_by_tag(defender, BODY_SHIELD) or "Body Shield"
+    if engine._pay_swift(defender, name, immediate=True):
+        return state[key]
+    roll = engine.dice.d20(defender.cmb_modifiers("grapple", defender=shield),
+                           label=f"{defender.name} grapple ({name})", visibility="hidden")
+    state["rolls"].append(roll.as_dict())
+    cmd = shield.cmd()
+    if not d20_succeeds(roll, cmd):
+        state["tells"].append(f"{defender.name} tries to haul {shield.name} into the way "
+                              f"({name}, {roll.total} against CMD {cmd}) and cannot.")
+        return state[key]
+    state["tells"].append(f"{defender.name} hauls {shield.name} into the way ({name}, "
+                          f"{roll.total} against CMD {cmd}): cover, +4 to AC.")
+    state[key] = (4, shield.ref)
+    return state[key]
+
+
+def shield_struck(engine, actor, defender, weapon_key: str, natural: int,
+                  state: dict, total: int = 0) -> list[dict]:
+    """The blow Body Shield's cover turned aside, owed at the creature used as cover with
+    the same d20 (`GIVEN_FACE`) — an engine-written swing, next in the queue (the owed
+    swing door). A natural 1 misses everybody, so it is owed nobody."""
+    _, ref = state.get(f"body_shield:{state['i']}") or (0, "")
+    if not ref or ref not in engine.scene.actors or natural == 1:
+        return []
+    shield = engine.scene.actors[ref]
+    state["tells"].append(f"The blow meant for {defender.name} goes into {shield.name} "
+                          f"instead (Body Shield).")
+    return [{"ref": actor.ref, "kind": "owed_swing", "target": ref,
+             "origin": "rule:feat-body-shield",
+             "attack": {"op": "attack", "actor": actor.ref, "target": ref,
+                        "because": f"{defender.name}'s Body Shield",
+                        "visibility": "hidden", "origin": "rule:feat-body-shield",
+                        "params": {"weapon": weapon_key, "full_attack": False,
+                                   "reaction": "body-shield",
+                                   GIVEN_FACE: [int(natural), int(total)]}}}]
+
+
+def given_roll(engine, intent, label: str):
+    """The redirected blow's attack roll: the same face and the same total as the one that
+    missed the bearer, whatever this target's terms would have made of it."""
+    from .dice import Modifier
+
+    face, total = (list(intent.params.get(GIVEN_FACE) or ()) + [0, 0])[:2]
+    return engine.dice.given(int(face), [Modifier(int(total) - int(face),
+                                                  "the same attack roll (Body Shield)")],
+                             label)
+
+
+def reach_waived(intent) -> bool:
+    """A blow the engine wrote that lands whatever the gap: Body Shield's redirected
+    attack ("that attack targets the creature you used as cover")."""
+    return intent.params.get(GIVEN_FACE) is not None \
+        and str(intent.origin or "") == "rule:feat-body-shield"
+
+
+# --- Divert Harm -----------------------------------------------------------------------------
+
+DIVERT_HARM = "defense.divert-harm"
+
+
+def divert_harm(engine, target, spell, save_kind: str, save_effect: str, kind: str,
+                amount: int, dtype: str, area: bool, dc: int, state: dict):
+    """Divert Harm (Bastards of Golarion): "Whenever you are the target of an area-of-effect
+    attack that normally deals half damage on a successful Reflex save (such as a fireball
+    spell ...), you may, as an immediate action, wrestle an adjacent foe into harm's way
+    ... your opponent must attempt a Reflex save against the attack in your place. If your
+    opponent fails, it takes half damage from the attack and you take none; if it
+    succeeds, it takes no damage and you take damage as normal as though you'd failed your
+    saving throw (though this damage is still reduced by abilities such as improved
+    evasion) ... only on a foe within one size category of yourself."
+
+    What the target takes, or None when the feat is not used (the cast's own save then
+    runs). Decided once per target and kept in the cast's state, so a save popup that
+    brings the loop round again rolls nothing twice. Owner call, taking "may" as the
+    better odds: used when the foe's Reflex is worse than the bearer's own, since a foe
+    who saves leaves the bearer the whole blast. The foe's save is the engine's roll.
+    `spell` is the cast spell, or the name of a class ability's area (a breath weapon)."""
+    from . import grid as gridmod
+    from .dice import d20_succeeds
+    from .position import _same_side
+
+    key = f"divert:{target.ref}"
+    if key in state:
+        return state[key]
+    state[key] = None
+    scene = engine.scene
+    if save_kind != "ref" or save_effect != "half" or kind != "damage" or not area \
+            or not target.has_state(DIVERT_HARM) or target.is_down or not scene.has_grid:
+        return None
+    here = scene.positions.get(target.ref)
+    if here is None:
+        return None
+
+    def ref_bonus(a) -> int:
+        return sum(m.value for m in a.save_modifiers("ref"))
+
+    foes = [o for r, o in scene.actors.items()
+            if o is not target and not o.is_down and r in scene.positions
+            and not _same_side(scene, target.ref, r) and abs(_size_steps(target, o)) <= 1
+            and gridmod.is_adjacent(tuple(here), target.size or "medium",
+                                    tuple(scene.positions[r]), o.size or "medium")]
+    foes.sort(key=ref_bonus)
+    if not foes or ref_bonus(foes[0]) >= ref_bonus(target):
+        return None
+    foe = foes[0]
+    name = _named_by_tag(target, DIVERT_HARM) or "Divert Harm"
+    if engine._pay_swift(target, name, immediate=True):
+        return None
+    what = str(getattr(spell, "name", spell) or "blast")
+    roll = engine.dice.d20(foe.save_modifiers("ref", {"against": "spell"}
+                                              if hasattr(spell, "name") else None),
+                           label=f"{foe.name} Reflex save ({name})", visibility="hidden")
+    state["rolls"].append(roll.as_dict())
+    made = d20_succeeds(roll, dc)
+    said = f"Reflex {roll.total} against DC {dc}"
+    if not made:
+        hit = engine._apply_damage(foe, max(0, amount // 2), dtype, traits=("area",))
+        hit["origin"] = f"rule:feat-{_slug(name)}"
+        state["effects"].append(hit)
+        state["tells"].append(f"{target.name} wrestles {foe.name} into the {what} "
+                              f"({name}): {foe.name} fails ({said}) and takes {hit['amount']} "
+                              f"{hit['type']}; {target.name} takes none.")
+        state[key] = 0
+        return 0
+    share, evaded = engine._evasion(target, "ref", True, False)
+    taken = max(0, amount // 2) if share == "half" else amount
+    state["tells"].append(f"{target.name} wrestles {foe.name} into the {what} "
+                          f"({name}), but {foe.name} twists clear ({said}) and "
+                          f"{target.name} takes the blast" + (f" — {evaded}" if evaded
+                                                               else "") + ".")
+    state[key] = taken
+    return taken
+
+
+# --- Team Pickpocketing ----------------------------------------------------------------------
+
+TEAM_PICKPOCKET = "teamwork.team-pickpocketing"
+
+
+def team_pickpocket(engine, feinter, target) -> tuple[list, list, list]:
+    """Team Pickpocketing (UC): "Whenever an ally with this feat succeeds a Bluff check to
+    feint an opponent, if you are adjacent to that creature, you can spend an immediate
+    action to make a Sleight of Hand check to pickpocket that opponent and gain a +4 bonus
+    on that attempt." (effects, tells, rolls) for each ally who does.
+
+    The check is Sleight of Hand's own (CRB: "DC 20 ... to lift a small object from a
+    person"; "the opponent [makes] a Perception check to notice the attempt", opposed),
+    trained only. What is lifted is what a steal would take that is not fastened
+    (`Engine._steal_choice`), moved by the steal's own door (`_outcome_take`: the thing in
+    the lifter's hands, still the victim's, on the props ledger). Owner call: taken
+    whenever the immediate action is free and something loose is there to lift."""
+    from .dice import Modifier
+    from .position import _same_side
+    from .sheet import IllegalSheet
+    from . import grid as gridmod
+
+    effects, tells, rolls = [], [], []
+    scene = engine.scene
+    if not feinter.has_state(TEAM_PICKPOCKET) or not scene.has_grid:
+        return effects, tells, rolls
+    there = scene.positions.get(target.ref)
+    for ref, ally in list(scene.actors.items()):
+        if ally is feinter or ally.is_down or not ally.has_state(TEAM_PICKPOCKET) \
+                or not _same_side(scene, feinter.ref, ref) or ref not in scene.positions \
+                or there is None or not gridmod.is_adjacent(
+                    tuple(scene.positions[ref]), ally.size or "medium", tuple(there),
+                    target.size or "medium"):
+            continue
+        loot = engine._steal_choice(target, "")
+        if not isinstance(loot, dict) or loot.get("fastened"):
+            continue
+        try:
+            mods = list(ally.skill_modifiers("sleight of hand"))
+        except IllegalSheet:
+            continue                              # trained only (CRB p.104)
+        name = _named_by_tag(ally, TEAM_PICKPOCKET) or "Team Pickpocketing"
+        if engine._pay_swift(ally, name, immediate=True):
+            continue
+        check = engine.dice.d20(mods + [Modifier(4, name)],
+                                label=f"{ally.name} Sleight of Hand ({name})",
+                                visibility="hidden")
+        try:
+            seen = engine.dice.d20(target.skill_modifiers("perception", opposed=True),
+                                   label=f"{target.name} Perception", visibility="hidden")
+        except IllegalSheet:
+            seen = None
+        rolls += [check] + ([seen] if seen is not None else [])
+        noticed = seen is not None and seen.total >= check.total
+        if check.total < 20:
+            tells.append(f"{ally.name} reaches for {target.name}'s {loot['label']} while "
+                         f"the feint holds them ({name}, Sleight of Hand {check.total} "
+                         f"against DC 20) and comes away empty.")
+            continue
+        from .tables import MANEUVERS
+
+        _, _, recs = engine._outcome_take(MANEUVERS["steal"], None, ally, target, 0, None, loot,
+                                          lambda *a, **k: "")
+        effects.extend(dict(r, origin=f"rule:feat-{_slug(name)}") for r in recs)
+        tells.append(f"{ally.name} lifts {target.name}'s {loot['label']} while the feint "
+                     f"holds them ({name}, Sleight of Hand {check.total} against DC 20)"
+                     + (f"; {target.name} feels it go." if noticed else
+                        f"; {target.name} never feels it."))
+    return effects, tells, rolls
+
+
+# --- Stealth Synergy -------------------------------------------------------------------------
+
+STEALTH_SYNERGY = "teamwork.stealth-synergy"
+
+
+def _sees_ally(actor, ally) -> bool:
+    """Whether a hider sees an ally beside it: a won Stealth hides from the other side,
+    not from the party that watched it slip away — only blindness or invisibility (unseen
+    by eyes that cannot see it) takes the ally from view."""
+    from . import awareness
+
+    if actor.has_state("state.senses.blinded"):
+        return False
+    return not ally.has_state(awareness.INVISIBLE) or awareness.sees_invisible(actor)
+
+
+def stealth_synergy(engine, actor, roll):
+    """Stealth Synergy (UC): "While you can see one or more allies who also have this feat,
+    whenever you and your allies make a Stealth check, you all take the highest roll and
+    add all your modifiers to Stealth." The d20s of the hiders who see each other: this
+    check keeps the best face among its own and those its allies hid with (the face is
+    kept in each hiding's payload, `Engine._stealth_lands`), and an ally's standing result
+    is raised to it when this one rolled higher. Returns the roll to use."""
+    from . import awareness
+    from .position import _same_side
+
+    if not actor.has_state(STEALTH_SYNERGY):
+        return roll
+    scene = engine.scene
+    mates = [o for r, o in scene.actors.items()
+             if o is not actor and not o.is_down and o.has_state(STEALTH_SYNERGY)
+             and _same_side(scene, actor.ref, r) and _sees_ally(actor, o)]
+    hiding = [(o, awareness.sneaking(o)) for o in mates]
+    hiding = [(o, e) for o, e in hiding if e is not None
+              and int((e.payload or {}).get("face") or 0) > 0]
+    if not hiding:
+        return roll
+    own = int(getattr(roll, "natural", 0) or 0)
+    if not own:
+        return roll                     # a total with no die (a printed result) keeps it
+    best = max([own] + [int(e.payload["face"]) for _, e in hiding])
+    for o, e in hiding:
+        face = int(e.payload["face"])
+        if best > face:
+            e.payload = dict(e.payload, face=best,
+                             result=int(e.payload.get("result") or 0) + best - face)
+    if best > own:
+        return engine.dice.given(best, list(roll.modifiers),
+                                 f"{roll.label} (Stealth Synergy: the best roll, {best})")
+    return roll

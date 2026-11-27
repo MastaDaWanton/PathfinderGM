@@ -375,7 +375,10 @@ def _ally_want_problems(at: str, want) -> list[str]:
 SELF_KEYS = frozenset({"ends_when", "forbids", "modifiers", "natural_weapons", "rounds",
                        "strikes_as", "tags", "vs_target", "forgoes"})
 EFFECT_KEYS = frozenset({"condition", "modifiers", "on", "rounds", "skill_modifiers",
-                         "tags", "temp_hp", "vulnerable", "resave", "commanded"})
+                         "tags", "temp_hp", "vulnerable", "resave", "commanded",
+                         # Feat loop b5-maneuver: rounds rolled, a hold a check ends, a
+                         # clinging fire (Engine._class_effect_on).
+                         "rounds_dice", "escape_dc", "burn"})
 
 AREA_SHAPES = ("cone", "line", "burst")
 _AREA_WORDS = re.compile(r"^\s*(\d+)\s*-?\s*(?:foot|feet|ft\.?)\s*-?\s*(?:radius\s+)?"

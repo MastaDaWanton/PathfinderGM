@@ -2551,6 +2551,11 @@ WHEN_KEYS: dict[str, str] = {
     # flying", the board's own test (position.higher_than).
     "higher_ground": "whether the bearer stands on higher ground than the foe of the roll "
                      "(position.higher_than); no board, no answer",
+    # Feat loop b5-maneuver: the energy an armed charge dealt with the blow that just
+    # landed (Engine._feat_riders) — Djinni Spirit's "creatures that take electricity
+    # damage from your Elemental Fist attack": "electricity".
+    "charge_energy": "an energy a charge (Elemental Fist) dealt with this hit, for an "
+                     "on_hit rider: \"electricity\" (Engine._feat_riders)",
 }
 # `larger` / `smaller` (feat loop b2): size categories against the bearer's own, answered
 # by `classfeatures.holds` where the bearer is known (Risky Striker, Underfoot).

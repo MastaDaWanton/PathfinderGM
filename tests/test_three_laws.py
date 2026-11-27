@@ -244,6 +244,9 @@ _LITERAL_KEY_SITES = {
     # 2026-11-22 (round 2, body skills): a fall, a failed jump, a lost footing and a
     # throw from the saddle all write the one condition the book names, through `_prone`.
     "rules/bodyskills.py": (1, "prone, the book's word for every way a body falls"),
+    # Feat loop b5-maneuver: Fury's Snare writes the condition its text names, "Your
+    # tripped target gains the entangled condition".
+    "rules/maneuver_feats.py": (1, "entangled, the condition Fury's Snare's text names"),
 }
 
 

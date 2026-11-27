@@ -392,3 +392,29 @@ Systems not in the game:
 - Meditative Concentration, Perfect Center, Slow Time: Combat Meditation, lane
   b4-maneuver's in this batch (Perfect Center also needs taking 10 as a declared choice,
   which no check offers a player yet)
+
+## Feat loop batch 5, lane b5-maneuver
+
+Confirmed again (listed above, still waiting on the same thing): Rebounding Leap, Thoughtful
+Discernment, Adder Strike, Pinpoint Poisoner, Revelation Strike, Kobold Flood, Murderer's
+Circle, Focused Overseer, Dramatic Display, Dragoncrafting, Tandemevasion.
+
+A prerequisite nobody can take:
+
+- Greater Serpent Lash: Serpent Lash, which is not takeable (its prerequisite line does not
+  parse, so the picker never offers it), and every clause of the greater feat changes a
+  Serpent Lash manoeuvre
+- Dimensional Maneuvers: Dimensional Dervish's teleporting full attack, still a `not_yet`
+  in batch2-attack-a.json (Dimensional Savant waits on the same)
+- Net Trickery: net attacks (the net is unwieldable; Net Adept waits on the same)
+
+Systems not in the game:
+
+- Brutal Grappler: two creatures holding one in a grapple — a grapple has one holder, and
+  a second grapple at a held creature is the holder's maintain check
+- Disorienting Maneuver: tumbling through an opponent's space (CRB Acrobatics, DC = CMD
+  + 5); the tumble door moves past threatened squares only
+- Tactical Reposition: a push or reposition into a trap or hazard square never sets it off
+  (`_push_line` moves the body through `_put`, which asks no ward)
+- Undermine: difficult terrain for one creature alone — the board's difficult squares are
+  everybody's
