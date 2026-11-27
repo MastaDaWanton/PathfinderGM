@@ -557,7 +557,7 @@ These feats have no line in a feat document; their activated use carries one.
 
 ## Found on the way, not fixed
 
-- **Power Attack lasts until your next turn** (CRB: "its effects last until your next turn"), exactly as Deadly Aim does, but its document carries no line saying so: the -1/+2 rides the declared swing only. This lane gave Deadly Aim a one-round stance (`buff.stance.deadly-aim`); Power Attack needs the same, and touches every melee test that declares it, so it is left for its own change.
+- ~~**Power Attack lasts until your next turn**~~ BUILT by lane b7-fixes: a one-round stance (`buff.stance.power-attack`) laid by the declared swing, read by a later blow (an attack of opportunity included) and by `cmb_modifiers` for manoeuvres.
 - **The dirty trick's own removal** (CRB: a move action) is unbuilt, so Dirty Trick Master's and Improved Underhanded Teamwork's lines wait on a player action, which costs reader prompt budget.
 
 ## Finished by this lane
@@ -589,3 +589,18 @@ These feats have no line in a feat document; their activated use carries one.
 - `two-weapon-defense` (combat.json) (feat still partial): Fighting defensively or total defense with it (+2): neither action is built.
 - `power-attack` (core.json) (finished): touch attacks and effects that deal no hit-point damage are not excluded
 - `improved-unarmed-strike` (core.json) (finished): counts as armed: no attack of opportunity for attacking unarmed, and threatens with unarmed strikes (rules/reactions.py has no unarmed-provokes rule to waive)
+
+## Lane b7-fixes (2026-11-27)
+
+**Built:**
+
+- **Negative energy, one tag family** (owner ruling 2026-11-09): `energy.negative.heals` with `.spells` (Necromantic Affinity; every undead, by `states.type_tags`) and `.channel` (Death's Embrace). An inflict spell heals whoever holds the family. A cure harms only `.spells`. Channel's documents ask `.channel`. This replaces `channel.negative.heals` and `energy.negative.affinity`.
+- **Power Attack's stance** (above).
+- `cornugon-trip` (b7-fixes.json): FINISHED. A `throws.spiked-chain` tag gives the chain a 10-foot range increment (`Actor.weapon`). A thrown trip reaches five increments (`position.out_of_reach`). A failed thrown trip has no backfire, and the chain lands at the foe's feet.
+- `sorcerous-strike` (b7-fixes.json): FINISHED. Taken as "Sorcerous Strike (<power>)". An unarmed hit spends a swift action to splice the power's use at the foe, `delivered`, with no touch roll of its own.
+- `shatterspell` (content/class-abilities/feats-b7-fixes.json): FINISHED, with a shortcut. Spell Sunder's sunder check against CMD + 5 suppresses the strongest spell for 1 or 2 rounds, or dispels it at 10 or more (`dispel.sunder`). The uses per day are 1 + (BAB - 10) / 5. Shortcuts: suppression quiets the spell's modifiers but not its condition tags; an effect not on a creature (CMD 15 + caster level) is not aimed at; and the sunder check provokes nothing.
+- `lingering-spell` (b7-fixes.json): PARTIAL. The area is held for a round as a manifest and ward that spare whoever was already struck. Missing: the visual concealment, non-damage effects on entrants, and passing through the area without stopping in it.
+
+**Left:**
+
+- `stabbing-shot` (APG, elves): no document. A full attack would have to make its Rapid Shot slot a melee blow with a drawn arrow that pushes 5 feet on a hit. `Actor.attack_sequence` makes every slot of a bow's full attack with the bow, and no option swaps one slot for a different weapon or category.
