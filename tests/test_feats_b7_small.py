@@ -127,3 +127,51 @@ def test_surprise_strike_waives_fighting_defensively_s_penalty_on_one_roll():
     new_turn(s)
     roll = _rolls(_attack(e, fighting_defensively=True), "Attack with")[0]
     assert _named(roll, "Surprise Strike") == 0
+
+
+def test_blind_fight_takes_an_invisible_attacker_s_melee_edge_away():
+    """CRB, Blind-Fight: "An invisible attacker gets no advantages related to hitting you
+    in melee. That is, you don't lose your Dexterity bonus to Armor Class, and the
+    attacker doesn't get the usual +2 bonus for being invisible. The invisible attacker's
+    bonuses do still apply for ranged attacks." Measured before: nothing read the clause,
+    so an invisible thug denied the fighter his Dexterity and swung at +2 regardless."""
+    from tests.test_feats_b4_moves import _named, _rolls
+
+    def swing(feats):
+        pc = _pc("fighter", feats=feats)
+        s, e = _board(pc, ("thug", (6, 5)), faces={"Attack with": 12})
+        thug = s.actors["c1"]
+        thug.add_condition("invisible", 10)
+        roll = _rolls(_attack(e, by="c1", target="pc"), "Attack with")[0]
+        return e._unseen_attacker(pc, thug, melee=True), \
+            e._unseen_attacker(pc, thug, melee=False), _named(roll, "no invisible edge")
+
+    assert swing([]) == (True, True, 0)
+    assert swing(["Blind-Fight"]) == (False, True, -2)
+
+
+def test_extra_channel_gives_a_paladin_four_lay_on_hands_only_for_channelling():
+    """CRB, Extra Channel (Special): "If a paladin with the ability to channel positive
+    energy takes this feat, she can use lay on hands four additional times a day, but
+    only to channel positive energy." Measured before: nothing was added (her uses were
+    one pool). Now two channels are paid from the four extra uses, lay on hands itself
+    never touches them, and the third channel is paid from lay on hands."""
+    from tests._board import new_turn
+    from tests.test_feats_b4_moves import _use
+
+    pc = _pc("paladin", level=6, feats=["Extra Channel"])
+    pc.rebuild_pools()
+    s, e = _board(pc, ("thug", (8, 5)))
+    hands = pc.pool("lay on hands").current
+    assert pc.pool("extra channel").current == 4
+    for _ in range(2):
+        _use(e, "Channel Positive Energy")
+        new_turn(s)
+    assert pc.pool("extra channel").current == 0 and pc.pool("lay on hands").current == hands
+    _use(e, "Channel Positive Energy")
+    assert pc.pool("lay on hands").current == hands - 2
+
+    plain = _pc("paladin", level=6)
+    plain.rebuild_pools()
+    assert plain.pool("extra channel").maximum == 0
+    assert all(p["id"] != "extra channel" for p in plain.summary()["pools"])

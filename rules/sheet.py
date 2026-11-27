@@ -7980,7 +7980,9 @@ class Actor:
             "purse": dict(self.purse),
             "pools": [{"id": p.id, "current": p.current, "max": p.maximum,
                        "ready": p.ready, "cooldown_left": p.cooldown_left}
-                      for p in self.pools.values()],
+                      # Feat loop b7-small: a pool nothing fills (a paladin's extra
+                      # channel uses without the feat) is not a line on the panel.
+                      for p in self.pools.values() if p.maximum or p.current],
             "ac": self.ac(),
             "speed": self.speed_feet,
             "conditions": [{"key": c.key, "name": c.name, "rounds_left": c.rounds_left}

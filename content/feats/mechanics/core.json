@@ -228,10 +228,10 @@
   },
   "blind-fight": {
     "tags": [
-      "miss_chance.reroll.melee"
+      "miss_chance.reroll.melee",
+      "defense.unseen.melee"
     ],
     "not_yet": [
-      "an invisible attacker gets no advantage against you in melee (no +2, you keep your Dexterity bonus): nothing reads this clause, so whatever the attack path gives an unseen attacker it still gives against you",
       "no speed penalty for moving while you cannot see: movement under darkness is not slowed here"
     ]
   },

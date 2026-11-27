@@ -93,7 +93,7 @@
       "source": "CRB p.62 Channel Positive Energy: spends two uses of lay on hands; channels as a cleric of her paladin level (CRB p.40: 1d6 + 1d6 per two levels beyond 1st, 30-ft burst, Will DC 10 + 1/2 level + Cha for half).",
       "text": "Heal the living or harm the undead in a 30-ft burst; two uses of lay on hands.",
       "action": "standard",
-      "cost": {"pool": "lay on hands", "amount": 2},
+      "cost": {"pool": "lay on hands", "amount": 2, "first": "extra channel"},
       "affects": "all",
       "radius_ft": 30,
       "aim": "self",

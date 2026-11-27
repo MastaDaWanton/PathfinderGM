@@ -11571,7 +11571,8 @@ class Engine:
             current_moment().guttered.update(def_gutter)
 
         flat_footed = self._flat_footed(defender) or (
-            self._unseen_attacker(defender, actor)
+            self._unseen_attacker(defender, actor,
+                                  melee=weapon.get("category") != "ranged")
             and not self._pinpointed_shooter(defender, actor, weapon)) \
             or strike_feats.caught_off_guard(actor, defender, weapon_key, weapon)
         # Surprise Follow-Through (ARG): "When using Cleave or Great Cleave, the second foe
@@ -13084,6 +13085,11 @@ class Engine:
         if actor.has_state(awareness.INVISIBLE) \
                 and self._pinpointed_shooter(defender, actor, weapon):
             out = out + [Modifier(-2, f"pinpointed by {defender.name} (Improved Blind-Fight)")]
+        # Feat loop b7-small: Blind-Fight's "the attacker doesn't get the usual +2 bonus
+        # for being invisible" in melee (CRB).
+        elif actor.has_state(awareness.INVISIBLE) and weapon.get("category") != "ranged" \
+                and defender.has_state(self.BLIND_FIGHT_MELEE):
+            out = out + [Modifier(-2, f"no invisible edge on {defender.name} (Blind-Fight)")]
         # In the open water beside a ship: the water table's attack penalty, which the
         # sheet charges only for a wet PLACE (`Actor._water_penalty`) and cannot see here.
         if self.scene.afloat(actor.ref) and not actor.water_row():
@@ -14474,7 +14480,8 @@ class Engine:
             if isinstance(loot, str):
                 return self._refuse(intent, loot)
 
-        flat_footed = self._flat_footed(defender) or self._unseen_attacker(defender, actor)
+        flat_footed = self._flat_footed(defender) or self._unseen_attacker(
+            defender, actor, melee=True)                    # feat loop b7-small
         cmd_mods = defender.cmd_modifiers(
             flat_footed, maneuver=str(intent.params.get("manoeuvre") or "") or None,
             attacker=actor)
@@ -35662,7 +35669,11 @@ class Engine:
         feet = self._gap_ft(attacker, defender)
         return feet is None or int(feet) <= 30
 
-    def _unseen_attacker(self, defender, attacker) -> bool:
+    # Feat loop b7-small: Blind-Fight's "An invisible attacker gets no advantages related
+    # to hitting you in melee" (CRB), its document's tag.
+    BLIND_FIGHT_MELEE = "defense.unseen.melee"
+
+    def _unseen_attacker(self, defender, attacker, melee: bool = False) -> bool:
         """Whether `defender` is struck by somebody it cannot see, and so keeps no Dex.
 
         The invisible condition: it "ignores its opponent's Dexterity bonus to AC (if
@@ -35675,6 +35686,11 @@ class Engine:
         from . import awareness, classfeatures
 
         if attacker is None or defender is None or attacker is defender:
+            return False
+        # Blind-Fight: "you don't lose your Dexterity bonus to Armor Class" against an
+        # unseen melee attacker (CRB); "the invisible attacker's bonuses do still apply
+        # for ranged attacks". Owner call: the dark's unseen attacker counts as invisible.
+        if melee and defender.has_state(self.BLIND_FIGHT_MELEE):
             return False
         # Or blind in the dark: "In areas of darkness, creatures without darkvision are
         # effectively blinded" and a blinded creature "loses any Dexterity bonus to AC"
@@ -38672,6 +38688,19 @@ class Engine:
                        tell=" ".join(str(why).split()), because=intent.because,
                        code=code, for_a_person=for_a_person, fix=fix)
 
+    @staticmethod
+    def _cost_pool(actor: Actor, cost: dict) -> str:
+        """The pool a document's cost is paid from: its `first` pool while that holds the
+        whole amount, else its own. Feat loop b7-small, Extra Channel (CRB): a paladin
+        "can use lay on hands four additional times a day, but only to channel positive
+        energy" - a pool only the channel names, spent before her lay on hands."""
+        first = str(cost.get("first") or "")
+        if first:
+            held = actor.pool(first)
+            if held is not None and held.current >= int(cost.get("amount", 1) or 1):
+                return first
+        return str(cost["pool"])
+
     def _ability_refusal(self, actor: Actor, found: str, doc: dict) -> str:
         """Why this ability cannot be used right now, as a printable sentence — or "".
 
@@ -38697,6 +38726,7 @@ class Engine:
                     f"of {actor.name} {what}, and there is none.")
         cost = doc.get("cost") or {}
         if cost.get("pool"):
+            cost = dict(cost, pool=self._cost_pool(actor, cost))     # feat loop b7-small
             pool = actor.pool(str(cost["pool"]))
             need = int(cost.get("amount", 1) or 1)
             if pool is None or pool.current < need:
@@ -38836,6 +38866,7 @@ class Engine:
         spent = []
         cost = doc.get("cost") or {}
         if cost.get("pool"):
+            cost = dict(cost, pool=self._cost_pool(actor, cost))     # feat loop b7-small
             paid = actor.spend_pool(str(cost["pool"]), int(cost.get("amount", 1) or 1))
             spent.append({"ref": actor.ref, "kind": "resource", "pool": str(cost["pool"]),
                           "spent": paid.get("spent", 0), "left": paid.get("current", 0)})
@@ -39090,6 +39121,7 @@ class Engine:
         cost = doc.get("cost") or {}
         pool_start = None
         if cost.get("pool"):
+            cost = dict(cost, pool=self._cost_pool(actor, cost))     # feat loop b7-small
             pool = actor.pool(str(cost["pool"]))
             pool_start = pool.current if pool is not None else None
             paid = actor.spend_pool(str(cost["pool"]), int(cost.get("amount", 1) or 1))

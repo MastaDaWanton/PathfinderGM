@@ -47,6 +47,14 @@
    "starts": "max",
    "refresh": "rest.night",
    "_note": "Core p.61: half level + Cha mod uses; heals level/2 d6."
+  },
+  {
+   "id": "extra channel",
+   "from_level": 4,
+   "max": "0",
+   "starts": "max",
+   "refresh": "rest.night",
+   "_note": "Extra Channel (CRB): four more uses of lay on hands a day per feat, 'but only to channel positive energy' (its document's pool.extra channel +4); the channel spends them first."
   }
  ],
  "choices": [
