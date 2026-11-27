@@ -47,6 +47,10 @@ def test_wind_stance_conceals_against_ranged_blows_only_after_a_walk_past_five_f
     s, e = _board(pc, ("thug", (18, 18)))
     _run(e, {"op": "move", "actor": "pc", "params": {"square": [6, 5]}})
     assert e._concealment_of(s.actors["c1"], pc, ranged=True)[0] == 0
+    # The walk is next turn's: since b5-core nothing moves after the round's 5-foot step.
+    from tests._board import new_turn
+
+    new_turn(s)
     res = _run(e, {"op": "move", "actor": "pc", "params": {"square": [9, 5]}})
     assert "Wind Stance" in _tells(res)
     assert e._concealment_of(s.actors["c1"], pc, ranged=True)[0] == 20

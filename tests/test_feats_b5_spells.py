@@ -33,6 +33,8 @@ def test_the_lane_file_validates():
 
 def _cast(meta, foe_t, spell="cause-fear", seed=3):
     pc = caster(cls="sorcerer", level=17, book=(spell,), feats=META)
+    # Circle of death's 500 gp of diamond powder (b5-core: costly materials are carried).
+    pc.goods["costly spell components"] = 1000
     foe = instantiate(foe_t, name="the foe")
     s = Scene(location_id="5bbd0c40345f")
     s.add(pc)
