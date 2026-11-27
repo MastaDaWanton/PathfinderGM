@@ -38565,6 +38565,7 @@ class Engine:
             # is, and landed as its own type so a resistance meets only its own part.
             fist = maneuver_feats.fist_share(self, actor, shown, rolls, tells) \
                 if spec.get("unarmed") and total is not None else None
+            b5: dict = {"rolls": [], "effects": records, "tells": tells}   # Divert Harm
             for other in who:
                 share = total
                 each = doc
@@ -38629,7 +38630,18 @@ class Engine:
                     if scoped:
                         dc_here = dc + scoped
                         tells.append(f"Against {other.name} the DC is {dc_here}.")
-                if saving and other is not actor:
+                # Feat loop b5-maneuver: Divert Harm against a Reflex-half area (a breath
+                # weapon): the foe wrestled in saves in this creature's place.
+                diverted = maneuver_feats.divert_harm(
+                    self, other, shown, str(saving.get("save") or ""),
+                    str(saving.get("success") or "negates"),
+                    doc.get("roll_as") or spec.get("as") or "heal", share or 0,
+                    str(doc.get("damage_type") or spec.get("type") or "untyped"),
+                    area is not None or bool(doc.get("radius_ft")), dc_here, b5) \
+                    if saving and other is not actor and share is not None else None
+                if diverted is not None:
+                    share, failed = diverted, diverted > 0
+                if saving and other is not actor and diverted is None:
                     sv = str(saving.get("save", "will"))
                     sroll = self.dice.d20(other.save_modifiers(sv),
                                           label=f"{SAVES.get(sv, sv)} save against {shown}",
@@ -38747,7 +38759,7 @@ class Engine:
                             + f"{hit['type']}"
                             + (" energy" if hit["type"] in ("positive", "negative") else "")
                             + (f" ({hit['note']})." if hit["note"] else "."))
-                        if fist:
+                        if fist and share:
                             # Feat loop b5-maneuver: the unarmed strike's own share, halved
                             # with the energy's and landed as its own type.
                             part = fist[0] if share >= (total or 0) else fist[0] // 2
@@ -38760,6 +38772,7 @@ class Engine:
                 if (each.get("effect") or {}).get("on") == "failed" and not failed:
                     continue
                 records.extend(self._class_effect_on(actor, other, each, origin, shown, tells))
+            rolls.extend(_roll_from_dict(r) for r in b5["rolls"])
             # Whatever the document lifts, by tag query through the one door that ends
             # states (`Actor.clear_states`): Calming Touch's fatigue, fear and nausea.
             for other in landed:

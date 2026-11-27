@@ -52,7 +52,7 @@
       "defense.divert-harm"
     ],
     "not_yet": [
-      "a class ability's area (a breath weapon, a blood burst) and the `save` op's hazards: only a cast's Reflex-half area reaches the wrestled foe"
+      "the `save` op's Reflex-half dangers (a trap's or a hazard's save): only a cast spell's and a class ability's area reach the wrestled foe — a creature's printed breath weapon does not run at all"
     ]
   },
   "team-pickpocketing": {

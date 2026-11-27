@@ -432,3 +432,21 @@ def test_stealth_synergy_lets_each_hider_keep_the_best_die():
     assert awareness.sneaking(ally).payload["result"] == 24
     low = engine.dice.given(2, [], "Stealth check")
     assert maneuver_feats.stealth_synergy(engine, pc, low).natural == 17
+
+
+def test_divert_harm_meets_a_class_abilitys_reflex_half_area_too():
+    """The feat's own example is "dragon's breath weapon": a class ability's Reflex-half
+    area (Efreeti Touch's cone, here at a Divert Harm thug beside a weaker ally of the
+    monk's) goes through the same door as a fireball."""
+    from tests.test_feats_b4_combat import _fight
+
+    scene, engine, pc, thug = _monk(ELEMENTAL + ["Efreeti Style", "Efreeti Stance",
+                                                 "Efreeti Touch"], level=12,
+                                    ally=[((8, 11), [])])
+    thug.feats = list(thug.feats or []) + ["Divert Harm"]
+    ally = scene.actors["ally0"]
+    ally.add_buff("save_mod", "ref", -40, source="test: always fails")
+    _style(pc, "efreeti-style")
+    hp = thug.hp
+    out = _use(engine, "efreeti touch", to=thug.ref)
+    assert "wrestles" in out.tell and thug.hp == hp, out.tell

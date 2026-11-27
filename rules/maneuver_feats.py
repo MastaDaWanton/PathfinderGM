@@ -1344,7 +1344,8 @@ def divert_harm(engine, target, spell, save_kind: str, save_effect: str, kind: s
     runs). Decided once per target and kept in the cast's state, so a save popup that
     brings the loop round again rolls nothing twice. Owner call, taking "may" as the
     better odds: used when the foe's Reflex is worse than the bearer's own, since a foe
-    who saves leaves the bearer the whole blast. The foe's save is the engine's roll."""
+    who saves leaves the bearer the whole blast. The foe's save is the engine's roll.
+    `spell` is the cast spell, or the name of a class ability's area (a breath weapon)."""
     from . import grid as gridmod
     from .dice import d20_succeeds
     from .position import _same_side
@@ -1376,7 +1377,9 @@ def divert_harm(engine, target, spell, save_kind: str, save_effect: str, kind: s
     name = _named_by_tag(target, DIVERT_HARM) or "Divert Harm"
     if engine._pay_swift(target, name, immediate=True):
         return None
-    roll = engine.dice.d20(foe.save_modifiers("ref", {"against": "spell"}),
+    what = str(getattr(spell, "name", spell) or "blast")
+    roll = engine.dice.d20(foe.save_modifiers("ref", {"against": "spell"}
+                                              if hasattr(spell, "name") else None),
                            label=f"{foe.name} Reflex save ({name})", visibility="hidden")
     state["rolls"].append(roll.as_dict())
     made = d20_succeeds(roll, dc)
@@ -1385,14 +1388,14 @@ def divert_harm(engine, target, spell, save_kind: str, save_effect: str, kind: s
         hit = engine._apply_damage(foe, max(0, amount // 2), dtype, traits=("area",))
         hit["origin"] = f"rule:feat-{_slug(name)}"
         state["effects"].append(hit)
-        state["tells"].append(f"{target.name} wrestles {foe.name} into the {spell.name} "
+        state["tells"].append(f"{target.name} wrestles {foe.name} into the {what} "
                               f"({name}): {foe.name} fails ({said}) and takes {hit['amount']} "
                               f"{hit['type']}; {target.name} takes none.")
         state[key] = 0
         return 0
     share, evaded = engine._evasion(target, "ref", True, False)
     taken = max(0, amount // 2) if share == "half" else amount
-    state["tells"].append(f"{target.name} wrestles {foe.name} into the {spell.name} "
+    state["tells"].append(f"{target.name} wrestles {foe.name} into the {what} "
                           f"({name}), but {foe.name} twists clear ({said}) and "
                           f"{target.name} takes the blast" + (f" — {evaded}" if evaded
                                                                else "") + ".")
