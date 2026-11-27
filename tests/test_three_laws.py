@@ -475,7 +475,16 @@ _REACHES = {
     ("combat_mod", "natural_healing"): lambda a: _natural_healing(a),
     ("combat_mod", "healing_extra"): lambda a: a.healing_extra(),
     ("combat_mod", "difficult_ft"): lambda a: _easy_ft(a),
+    # Feat loop b5-other: a world-class bench's check (Brewmaster at the alchemist's).
+    ("combat_mod", "bench_check"): lambda a: _bench_check(a),
 }
+
+
+def _bench_check(a) -> int:
+    from rules import tradecraft
+
+    return sum(t["value"] for t in tradecraft.bench_check_terms(
+        a, 1, track="alchemist", name="Alchemist", ability="int"))
 
 
 def _wild_empathy(a) -> int:

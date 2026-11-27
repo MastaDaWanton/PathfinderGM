@@ -134,7 +134,7 @@ def test_shadow_strike_lets_sneak_dice_through_partial_concealment_only(monkeypa
     for feats, chance, want in (([], 20, False), (["Shadow Strike"], 20, True),
                                 (["Shadow Strike"], 50, False)):
         scene, engine, pc, thug = _fight("fixtures/pc-kesst.json", feats=feats)
-        monkeypatch.setattr(engine, "_concealment_of", lambda a, d, c=chance: (c, "blur"))
+        monkeypatch.setattr(engine, "_concealment_of", lambda a, d, c=chance, **_: (c, "blur"))
         dice, _why = engine._sneak_for(pc, thug, pc.weapon("rapier"), flat_footed=True)
         assert bool(dice) is want, (feats, chance)
 

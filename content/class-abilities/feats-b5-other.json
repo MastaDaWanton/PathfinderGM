@@ -9,7 +9,7 @@
       "feat": "osyluth-guile",
       "aliases": ["osyluth guile", "misdirect", "misdirect their attacks"],
       "level": 1,
-      "source": "Osyluth Guile (Cheliax, Empire of Devils): 'While you are fighting defensively or using the total defense action, select one opponent. Add your Charisma bonus to your AC as a dodge bonus against that opponent's melee attacks until your next turn. You cannot use this feat if you cannot see the selected opponent.' Selecting is a free action (owner call: the feat names no action); the 'cannot see' clause is not asked (shortcut: a foe aimed at is one the user located); 'until your next turn' is one round on the one ticker, the stances' approximation.",
+      "source": "Osyluth Guile: 'While you are fighting defensively or using the total defense action, select one opponent. Add your Charisma bonus to your AC as a dodge bonus against that opponent's melee attacks until your next turn. You cannot use this feat if you cannot see the selected opponent.' Selecting is a free action (owner call: the feat names no action); the 'cannot see' clause is not asked (shortcut: a foe aimed at is one the user located); 'until your next turn' is one round on the one ticker, the stances' approximation.",
       "text": "Free, while fighting defensively or in total defense: your Charisma bonus as dodge AC against one foe's melee attacks until your next turn.",
       "action": "free",
       "requires": [["buff.stance.fighting-defensively", "buff.stance.total-defense"]],

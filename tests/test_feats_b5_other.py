@@ -297,7 +297,7 @@ def test_helpless_prisoner_needs_bonds_and_buys_five_on_escape_artist():
 
 
 def test_osyluth_guile_is_charisma_dodge_against_one_foe_s_melee_while_defending():
-    """Cheliax: "While you are fighting defensively or using the total defense action,
+    """Osyluth Guile: "While you are fighting defensively or using the total defense action,
     select one opponent. Add your Charisma bonus to your AC as a dodge bonus against that
     opponent's melee attacks"."""
     pc = _pc("fighter", feats=["Osyluth Guile"])

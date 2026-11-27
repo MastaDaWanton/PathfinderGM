@@ -121,7 +121,8 @@ def bench_check_terms(actor, level: int, *, track: str, name: str, ability: str,
         # Brewmaster's "+2 bonus on Craft (alchemy)" — the alchemist's bench check is the
         # game's Craft (alchemy), the trade folded onto one Craft id).
         *([{"label": m.source, "value": m.value} for m in stack(actor._buff_mods(
-            "combat_mod", "bench_check", {"bench": track}))] if actor is not None else []),
+            "combat_mod", "bench_check", {"bench": track}))]
+          if hasattr(actor, "_buff_mods") else []),
     ]
 
 

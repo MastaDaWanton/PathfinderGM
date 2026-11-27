@@ -437,7 +437,7 @@ class _Percent(Dice):
 def test_blind_fight_rerolls_a_melee_miss_chance_once(monkeypatch):
     """"In melee, every time you miss because of concealment, you can reroll your miss
     chance percentile roll one time." The feat document's tag, read at the miss roll."""
-    monkeypatch.setattr(Engine, "_concealment_of", lambda self, a, d: (50, "blur"))
+    monkeypatch.setattr(Engine, "_concealment_of", lambda self, a, d, **_: (50, "blur"))
     for held, landed in ((("Blind-Fight",), True), ((), False)):
         s = Scene(location_id="5bbd0c40345f", grid=Grid(20, 20))
         s.add(_pc(*held), at=(5, 5))
