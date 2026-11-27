@@ -320,7 +320,7 @@
         }
       }
     ],
-    "tags": ["energy.negative.affinity"],
+    "tags": ["energy.negative.heals.spells"],
     "not_yet": [
       "the +2 against effects that cause negative levels, ability damage, drain or penalties"
     ]

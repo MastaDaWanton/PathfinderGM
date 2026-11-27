@@ -731,6 +731,18 @@ TYPE = "type"
 SUBTYPE = "subtype"
 CONSTRUCT = "type.construct"
 UNDEAD = "type.undead"
+# Feat loop b7-fixes: "negative energy heals this body" — one family, asked by prefix
+# (owner ruling 2026-11-09: inflict heals whoever negative energy heals, not only the
+# undead). Until b7 it was two unrelated tags: `channel.negative.heals` (Death's Embrace,
+# read by channel only) and `energy.negative.affinity` (Necromantic Affinity, read by the
+# cast loop beside `type.undead`), so an inflict wounded a Death's Embrace cleric.
+#   `.spells`  — inflict spells heal and cure spells harm, "as if you were an undead
+#                creature" (Necromantic Affinity; every undead, by `type_tags`);
+#   `.channel` — channelled negative energy heals instead of harming (Death's Embrace).
+# Inflict asks the root; cure asks `.spells`; channel's documents ask `.channel`.
+NEGATIVE_HEALS = "energy.negative.heals"
+NEGATIVE_HEALS_SPELLS = "energy.negative.heals.spells"
+NEGATIVE_HEALS_CHANNEL = "energy.negative.heals.channel"
 DESTROYED_AT_ZERO: tuple[str, ...] = (UNDEAD,)
 BROKEN_BELOW_ZERO: tuple[str, ...] = (CONSTRUCT,)
 
@@ -825,6 +837,8 @@ def type_tags(creature_type="", subtype="", immunities=()) -> tuple[str, ...]:
         bundle = TRAIT_TYPES.get(str(printed or "").strip().lower())
         if bundle and f"{TYPE}.{bundle}" not in out:
             out.append(f"{TYPE}.{bundle}")
+    if UNDEAD in out:
+        out.append(NEGATIVE_HEALS_SPELLS)       # "since undead are powered by negative energy"
     return tuple(out)
 
 

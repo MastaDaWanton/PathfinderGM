@@ -31489,12 +31489,14 @@ class Engine:
         # Worked out here, before spell resistance, because a turned cure is resisted:
         # "An undead creature can apply spell resistance" (CRB, Cure Light Wounds).
         turns = bool(dice) and spells_mod.turns_on_undead(spell, plan["kind"])
-        # Feat loop b6-partials: Necromantic Affinity's "damage caused by inflict spells
-        # heals you as if you were an undead creature, but you also take damage from cure
-        # spells" — its document's tag, asked beside the undead's.
-        turned = {r for r in live if turns and (
-            self.scene.actors[r].has_state(states.UNDEAD)
-            or self.scene.actors[r].has_state("energy.negative.affinity"))}
+        # Feat loop b7-fixes: one family (`states.NEGATIVE_HEALS`). An inflict turns on
+        # whoever negative energy heals — the undead, Necromantic Affinity, Death's
+        # Embrace (owner ruling 2026-11-09); a cure only on the `.spells` child, "as if
+        # you were an undead creature" (Necromantic Affinity; the undead hold it too).
+        mended_by = (states.NEGATIVE_HEALS if plan["kind"] == "damage"
+                     else states.NEGATIVE_HEALS_SPELLS)
+        turned = {r for r in live
+                  if turns and self.scene.actors[r].has_state(mended_by)}
         harmless = "harmless" in sr.lower()
         if spell.sr is True and (not harmless or (turned and plan["kind"] == "heal")):
             for ref in live:
@@ -31667,10 +31669,13 @@ class Engine:
                 told = state.setdefault("turned_told", [])
                 if target.ref not in told:
                     told.append(target.ref)
+                    it = "it" if target.has_state(states.UNDEAD) else "them"
                     state["tells"].append(
-                        f"{target.name} is undead: {spell.name}'s "
-                        + ("positive energy harms it." if kind == "damage"
-                           else "negative energy mends it."))
+                        (f"{target.name} is undead: " if it == "it" else
+                         f"{target.name} answers to negative energy: ")
+                        + f"{spell.name}'s "
+                        + (f"positive energy harms {it}." if kind == "damage"
+                           else f"negative energy mends {it}."))
 
             # Feat loop b5-maneuver: Divert Harm's foe wrestled into the blast in the
             # target's place (`maneuver_feats.divert_harm`): what the target takes, or None.
