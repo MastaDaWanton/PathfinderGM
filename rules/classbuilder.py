@@ -1220,7 +1220,8 @@ def _luck_problems(at: str, entries) -> list[str]:
 
 # What a feat's `on_hit` may lay on the creature a melee blow just struck (feat loop b1,
 # 2026-11-22): the attack riders' own executors (`Engine._RIDERS`), each key it reads.
-_ON_HIT_KINDS = {"bleed": {"kind", "when", "amount"},
+_ON_HIT_KINDS = {"bleed": {"kind", "when", "amount",
+                           "times"},        # Feat loop b7-small: Tiger Style's two turns
                  "save_condition": {"kind", "when", "condition", "save", "dc", "for",
                                     # Feat loop b5-maneuver: a hold a check ends (Marid
                                     # Spirit's ice, `maneuver_feats.escape_payload`).

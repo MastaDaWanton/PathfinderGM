@@ -12005,6 +12005,8 @@ class Engine:
                                                   off_light=off_light)
                 atk_mods = atk_mods + self._situational_attack_mods(
                     actor, defender, weapon, range_pen)
+                # Feat loop b7-small: Desperate Swing's -4, Surprise Strike's waiver.
+                atk_mods = atk_mods + strike_feats.desperate_terms(actor, intent, state)
                 # Improved Second Chance (APG): the rest of the attacks "albeit at a -5
                 # penalty to each attack" once the first miss was rerolled.
                 if state.get("second_chance") == "improved" and state["i"] > 0:
@@ -26903,15 +26905,24 @@ class Engine:
                                 "stacked": False, "origin": origin},
                      "tell": f"{actor.name} opens another wound on {defender.name}; it "
                              f"bleeds no worse than it already does."}]
+        tick = {"per": "round", "damage": amount, "damage_type": "untyped"}
+        # Feat loop b7-small: a bleed that runs a counted number of turns (Tiger Style's
+        # "at the start of his next two turns"), counted by the executor's `times_left`
+        # as a burn is — the round's tick runs before it, so a clock would end it early.
+        times = int(rule.get("times") or 0)
+        if times:
+            tick["times_left"] = times
         defender.apply_effect(ActiveEffect(
             name="Bleed", kind="condition", key="bleed", source=f"{actor.name}'s bleed",
             origin=origin, tags=states.tags_for("bleed"),
             payload={"stopped_by": "a DC 15 Heal check or any magical healing"},
-            periodic=[{"per": "round", "damage": amount, "damage_type": "untyped"}]))
+            periodic=[tick]))
+        span = (f"for {times} round{'' if times == 1 else 's'}, or" if times else "until")
         return [{"effect": {"ref": defender.ref, "kind": "condition", "condition": "bleed",
-                            "per_round": amount, "origin": origin},
+                            "per_round": amount, "origin": origin,
+                            **({"times": times} if times else {})},
                  "tell": f"{actor.name} leaves {defender.name} bleeding: {amount} damage "
-                         f"a round until a DC 15 Heal check or magical healing stops it."}]
+                         f"a round {span} a DC 15 Heal check or magical healing stops it."}]
 
     def _rider_burn(self, intent: Intent, actor: Actor, defender: Actor, rule: dict,
                     origin: str, state: dict) -> list[dict]:

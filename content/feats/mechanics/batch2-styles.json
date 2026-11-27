@@ -1032,8 +1032,18 @@
     "tags": [
       "unarmed.damage.slashing"
     ],
-    "not_yet": [
-      "the 1d4 bleed at the start of the foe's next two turns after a slashing unarmed critical: a bleed here runs until healed, and no bleed is laid for two turns only"
+    "on_hit": [
+      {
+        "kind": "bleed",
+        "amount": "1d4",
+        "times": 2,
+        "when": {
+          "critical": true,
+          "weapon": {
+            "key": "unarmed"
+          }
+        }
+      }
     ]
   },
   "tiger-claws": {
