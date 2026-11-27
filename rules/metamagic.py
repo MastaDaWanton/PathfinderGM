@@ -79,7 +79,16 @@ DOES = ("extend", "empower", "maximize", "enlarge", "silent", "still", "quicken"
         "heighten", "widen", "reach", "merciful", "intensify", "elemental", "pierce",
         "persist", "focus", "select", "disrupt", "ectoplasm", "rider", "echo", "tenebrous",
         # Feat loop b5-spells (2026-11-26): Threnodic, Coaxing, Thanatopic (`PIERCES`).
-        "threnodic", "coaxing", "thanatopic")
+        "threnodic", "coaxing", "thanatopic",
+        # Feat loop b6-rules (2026-11-27), Inner Sea Magic, aonprd FeatDisplay read that
+        # day: Umbral (+2): "An umbral spell gains the darkness descriptor. As long as the
+        # spell is in effect, the creature or object affected radiates darkness in a
+        # 10-foot radius ... You cannot use this feat on a spell with an instantaneous
+        # duration or a spell that does not target a creature or object"
+        # (`Engine._umbral`); Shadow Grasp (+1): "When you cast a spell with the darkness
+        # descriptor that affects an area, creatures in the area are entangled"
+        # (`Engine._cast_light`).
+        "umbral", "shadow_grasp")
 
 # Feat loop b5-spells, aonprd FeatDisplay pages read 2026-11-26:
 # - Threnodic (+2, UM): "This feat only works on mind-affecting spells. A threnodic spell
@@ -224,6 +233,14 @@ def _cost(doc: dict, fid: str, spell=None) -> int:
     return int(doc.get("levels", 0)) * (steps(fid) if doc.get("steps") else 1)
 
 
+def _darkens_an_area(spell) -> bool:
+    """A spell that lays magical darkness over ground (darkness, deeper darkness: the
+    `darkness` document), or one with a printed area (Shadow Grasp's "affects an area")."""
+    return bool(getattr(spell, "area_value", None) or str(getattr(spell, "area", "") or "")
+                .strip()) or any(isinstance(e, dict) and e.get("type") == "darkness"
+                                 for e in getattr(spell, "effects", None) or ())
+
+
 def _shadowy(spell) -> bool:
     words = {str(d).strip().lower() for d in getattr(spell, "descriptors", None) or ()}
     return bool(words & {"darkness", "shadow"}) \
@@ -285,6 +302,15 @@ def _not_for(does: str, spell, actor, spontaneous: bool, doc: dict | None = None
     if does == "tenebrous" and "light" in {str(d).strip().lower()
                                           for d in getattr(spell, "descriptors", None) or ()}:
         return "it has the light descriptor."
+    words = {str(d).strip().lower() for d in getattr(spell, "descriptors", None) or ()}
+    if does == "umbral":
+        if str((spell.duration_value or {}).get("kind") or "") == "instantaneous":
+            return "its duration is instantaneous."
+        if not str(getattr(spell, "targets", "") or "").strip():
+            return "it does not target a creature or object."
+    if does == "shadow_grasp" and not ("darkness" in words
+                                       and _darkens_an_area(spell)):
+        return "it is not a darkness spell that affects an area."
     if does in ("threnodic", "coaxing") and "mind-affecting" not in {
             str(d).strip().lower() for d in getattr(spell, "descriptors", None) or ()}:
         return "it is not a mind-affecting spell."
@@ -393,6 +419,8 @@ def apply(spell, actor, ids):
         out.components = [c for c in out.components if str(c).strip().upper() != "S"]
     if "quicken" in does:
         out.casting_time = "swift action"
+    if "umbral" in does:                        # feat loop b6-rules
+        out.descriptors = list(dict.fromkeys(list(out.descriptors or ()) + ["darkness"]))
     for d in does:                              # feat loop b5-spells
         if d in PIERCES:
             from .states import pierce_word
@@ -492,7 +520,9 @@ ADJECTIVE = {"extend": "extended", "empower": "empowered", "maximize": "maximize
              "ectoplasm": "ectoplasmic", "rider": "riding", "echo": "echoing",
              "tenebrous": "tenebrous",
              # Feat loop b5-spells:
-             "threnodic": "threnodic", "coaxing": "coaxing", "thanatopic": "thanatopic"}
+             "threnodic": "threnodic", "coaxing": "coaxing", "thanatopic": "thanatopic",
+             # Feat loop b6-rules:
+             "umbral": "umbral", "shadow_grasp": "grasping"}
 
 
 

@@ -1620,24 +1620,55 @@ class Scene:
 
         A `light` effect moves with whoever carries it (the sunrod struck in a hand, the
         torch a tindertwig lit), so its square is the carrier's square, read live."""
+        return [(spot, r, rr, name) for spot, r, rr, name, *_ in self._lit("light")]
+
+    def _lit(self, key: str) -> list[tuple]:
+        """Every carried `light` or `darkness` payload here: (square, radius, raised ring,
+        name, bright, magic level, steps). The magic level is the casting spell's (its
+        `dispel.stamp`), None for a light no spell made — a torch, a sunrod (feat loop
+        b6-rules: "magical light only does so if of a higher spell level", CRB)."""
+        from . import dispel as dispel_mod
+
         out = []
         for ref, actor in self.actors.items():
             pos = self.positions.get(ref)
             if pos is None:
                 continue
             for e in actor.effects:
-                lit = (e.payload or {}).get("light")
+                lit = (e.payload or {}).get(key)
                 if isinstance(lit, dict):
                     # Torch Handling (Dungeoneer's Handbook, feat loop b5-spells): "the
                     # radius of normal and increased illumination shed by any torch or
                     # mundane light source you carry increases by 10 feet" — a light an
                     # item lit (`item:` origin), never a spell's.
-                    more = 10 if str(e.origin or "").startswith("item:") \
-                        and actor.has_state(states.LIGHT_WIDER) else 0
+                    more = 10 if key == "light" and str(e.origin or "").startswith("item:")                         and actor.has_state(states.LIGHT_WIDER) else 0
+                    magic = int(dispel_mod.cast_of(e).get("level") or 0)                         if str(e.origin or "").startswith("spell:") else None
                     out.append((tuple(pos[:2]), int(lit.get("radius_ft") or 0) + more,
                                 int(lit.get("raised_ft") or 0) + more,
-                                e.name or "a light"))
+                                e.name or "a light", lit.get("bright") in ("yes", True),
+                                magic, int(lit.get("steps") or 1)))
         return out
+
+    def darkness_at(self, square) -> tuple[int, int]:
+        """Magical darkness over a square: (steps lowered, its spell level), (0, -1) where
+        none reaches. "This effect does not stack with itself or with any other effect that
+        creates darkness" (Umbral Spell; deeper darkness "does not stack with itself"):
+        the deepest one counts, and the highest spell level among those reaching."""
+        if square is None:
+            return 0, -1
+        here = (int(square[0]), int(square[1]))
+        steps, level = 0, -1
+        for spot, radius, _r, _n, _b, magic, n in self._lit("darkness"):
+            if gridmod.distance(spot, here) <= radius:
+                steps, level = max(steps, n), max(level, magic or 0)
+        return steps, level
+
+    def supernatural_dark(self, square) -> bool:
+        """Deeper darkness (CRB): "Areas of dim light and darkness become supernaturally
+        dark. This functions like darkness, but even creatures with darkvision cannot see
+        within it" — two steps over ground already dim or dark."""
+        steps, _ = self.darkness_at(square)
+        return steps >= 2 and self.LIGHT_LEVELS.index(self.ambient_light()) <= 1
 
     def light_at(self, square, viewer=None) -> str:
         """The light level at a square — "dark", "dim", "normal" or "bright" — as `viewer`
@@ -1652,9 +1683,19 @@ class Scene:
         color and detail under these conditions", which is this app's reading of what the
         doubling means under an unbounded sky. Darkvision is the attack's to ask
         (`Actor.concealment`), by distance.
+
+        Magical darkness (feat loop b6-rules; CRB darkness: "causes the illumination level
+        in the area to drop one step ... Nonmagical sources of light, such as torches and
+        lanterns, do not increase the light level in an area of darkness. Magical light
+        sources only increase the light level in an area if they are of a higher spell
+        level than darkness"): the ambient level lowered by its steps, and only a spell's
+        light of a higher level raises it again. Daylight's radius is bright.
         """
         levels = self.LIGHT_LEVELS
         level = levels.index(self.ambient_light())
+        dark_steps, dark_level = self.darkness_at(square)
+        if dark_steps:
+            level = max(0, level - dark_steps)
         eyes = viewer.eyes() if viewer is not None and hasattr(viewer, "eyes") else {}
         if eyes.get("low_light") and levels[level] == "dim":
             level = levels.index("normal")
@@ -1663,12 +1704,15 @@ class Scene:
         mult = 2 if eyes.get("low_light") else 1
         here = (int(square[0]), int(square[1]))
         best = level
-        for spot, radius, raised, _ in self.lights():
+        for spot, radius, raised, _, bright, magic, _n in self._lit("light"):
+            if dark_steps and (magic is None or magic <= dark_level):
+                continue
             feet = gridmod.distance(spot, here)
             if radius and feet <= radius * mult:
-                best = max(best, levels.index("normal"))
+                best = max(best, levels.index("bright" if bright else "normal"))
             elif raised and feet <= raised * mult:
-                best = max(best, min(level + 1, levels.index("normal")))
+                best = max(best, min(level + 1, levels.index("bright" if bright
+                                                             else "normal")))
         return levels[best]
 
     def sees_nothing(self, viewer, subject=None) -> bool:
@@ -1687,7 +1731,9 @@ class Scene:
             return False
         eyes = viewer.eyes() if hasattr(viewer, "eyes") else {}
         dark_ft = int(eyes.get("darkvision") or 0)
-        if not dark_ft:
+        # Feat loop b6-rules: deeper darkness's supernatural dark, where "even creatures
+        # with darkvision cannot see" (`Scene.supernatural_dark`).
+        if not dark_ft or self.supernatural_dark(self.positions.get(getattr(who, "ref", ""))):
             return True
         here = self.positions.get(getattr(viewer, "ref", ""))
         there = self.positions.get(getattr(who, "ref", ""))
@@ -31701,6 +31747,8 @@ class Engine:
                          "spared": dict(state.get("spared") or {}),
                          "area_measured": bool((state.get("area") or {}).get("measured"))})
         cast_ctx["buffs_said"] = {}
+        # Feat loop b6-rules: the copy's transforms, for Shadow Grasp (`_cast_light`).
+        cast_ctx["metamagic"] = tuple(getattr(spell, "metamagic_flags", None) or ())
         ran, said = self._run_specs(plan["riders"], cast_ctx)
         effects.extend(ran)
         tells.extend(said)
@@ -31712,6 +31760,15 @@ class Engine:
         # number a dispel check is made against (rules/dispel.py `stamp`).
         from . import dispel as dispel_mod
 
+        if metamagic.flag(spell, "umbral"):
+            # Umbral Spell (ISM): "the creature or object affected radiates darkness in a
+            # 10-foot radius, reducing illumination similar to the effects of the darkness
+            # spell" — on each creature it reached, for the spell's own rounds.
+            for ref in [r for r in live if r in self.scene.actors] or [actor.ref]:
+                got, words = self._cast_light({"type": "darkness", "radius_ft": 10,
+                                               "steps": 1}, {**cast_ctx, "targets": [ref]})
+                effects.extend(got)
+                tells.extend(words)
         dispel_mod.stamp(self.scene, actor, spell, cl, level, cast_ctx["origin"], live)
         state["rolls"].extend(r.as_dict() for r in cast_ctx.pop("dispel_rolls", ()))
 
@@ -32308,6 +32365,8 @@ class Engine:
     # +1 lands now, timed and typed, and says so.
 
     _EXECUTES = ("manifest", "summon", "spell_operation", "concealment", "object_damage",
+                 # Feat loop b6-rules: a spell's light or magical darkness (`_cast_light`).
+                 "light", "darkness",
                  "choose_one", "bundle", "attitude", "spell_resistance",
                  # The spells that affect metal (leatherworking plan §18.5). `touch_attack`
                  # is rolled before the dice (`_touches`) and does nothing as a rider; it is
@@ -32722,6 +32781,8 @@ class Engine:
             return self._summon(spec, ctx)
         if kind == "spell_operation":
             return self._spell_operation(spec, ctx)
+        if kind in ("darkness", "light"):
+            return self._cast_light(spec, ctx)
         if kind == "concealment":
             return self._conceal(spec, ctx)
         if kind == "object_damage":
@@ -33540,6 +33601,114 @@ class Engine:
                         owner.remove_effects(match=lambda e, h=holder: e is h)
                         break
         return {"what": what, "was": left, "now": getattr(holder, "rounds_left", None)}
+
+    def _cast_light(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
+        """A spell's light or magical darkness, carried by whoever it was cast on (the
+        touched object's bearer; the caster when cast at nobody) for the spell's rounds —
+        the `light`/`darkness` payload `Scene.light_at` reads (feat loop b6-rules).
+
+        A `light` spec runs on a cast only for a spell with the light descriptor: the
+        part-21 fire spells' light (a flaming sphere's) belongs where the fire is, and stays
+        told. The light/darkness interplay (CRB: light "counters or dispels any darkness
+        spell of equal or lower spell level", darkness likewise): a spell of the one
+        descriptor laid where a lower-or-equal spell of the other reaches dispels it and is
+        spent doing so (owner call, b6-rules: the newer spell is the one used to dispel)."""
+        from . import dispel as dispel_mod
+        from . import effectspec as fx
+
+        kind = str(spec.get("type") or "")
+        descriptors = {str(d).lower() for d in ctx.get("descriptors") or ()}
+        if kind == "light" and "light" not in descriptors:
+            return [], [fx.render(spec) + "."]
+        who = self._recipient(spec, ctx)
+        if who is None:
+            return [], []
+        level = int((ctx.get("vars") or {}).get("spell_level") or 0)
+        other = "darkness" if kind == "light" else "light"
+        square = self.scene.positions.get(who.ref)
+        if square is not None:
+            for ref, holder in list(self.scene.actors.items()):
+                pos = self.scene.positions.get(ref)
+                for e in list(holder.effects):
+                    zone = (e.payload or {}).get(other)
+                    if not isinstance(zone, dict) or pos is None                             or not str(e.origin or "").startswith("spell:")                             or int(dispel_mod.cast_of(e).get("level") or 0) > level:
+                        continue
+                    reach = int(zone.get("raised_ft") or zone.get("radius_ft") or 0)
+                    if gridmod.distance(tuple(pos[:2]), tuple(square[:2])) > reach:
+                        continue
+                    holder.remove_effects(match=lambda x, h=e: x is h)
+                    return ([{"kind": "dispelled", "ref": ref, "spell": e.source,
+                              "by": ctx.get("source"), "origin": ctx.get("origin")}],
+                            [f"{ctx.get('source')} meets {e.source} and the two cancel: "
+                             f"{e.source} is dispelled and {ctx.get('source')} spent."])
+        rounds = ctx.get("rounds")
+        if kind == "light":
+            payload = {"light": {"radius_ft": int(spec.get("radius_ft") or 0),
+                                 "raised_ft": int(spec.get("raised_ft") or 0),
+                                 "bright": str(spec.get("bright") or "no")}}
+        else:
+            payload = {"darkness": {"radius_ft": int(spec.get("radius_ft") or 20),
+                                    "steps": int(spec.get("steps") or 1)}}
+        if kind == "darkness" and "shadow_grasp" in (ctx.get("metamagic") or ()):
+            grasped = self._shadow_grasp(who, int(payload["darkness"]["radius_ft"]), ctx)
+        else:
+            grasped = ([], [])
+        who.apply_effect(ActiveEffect(
+            name=str(ctx.get("source") or kind), kind="effect",
+            key="light.carried" if kind == "light" else "darkness.radiating",
+            source=str(ctx.get("source") or kind), origin=str(ctx.get("origin") or ""),
+            duration="rounds" if rounds else "until-dismissed", rounds_left=rounds,
+            tags=("light.carried",) if kind == "light" else ("darkness.radiating",),
+            payload=payload))
+        body = payload[kind]
+        said = (f"Light spreads from {who.name}: {'bright' if body.get('bright') == 'yes' else 'normal'}"
+                f" to {body['radius_ft']} ft" + (f", brighter to {body['raised_ft']} ft"
+                                                  if body.get("raised_ft") else "")
+                if kind == "light" else
+                f"Darkness spreads from {who.name} to {body['radius_ft']} ft, the light "
+                f"lowered {'two steps' if body['steps'] == 2 else 'a step'}")
+        return ([{"kind": kind, "ref": who.ref, "rounds": rounds, "origin": ctx.get("origin"),
+                  **body}] + grasped[0], [said + f"{_span(rounds)}."] + grasped[1])
+
+    def _shadow_grasp(self, centre, radius: int, ctx: dict) -> tuple[list[dict], list[str]]:
+        """Shadow Grasp (ISM): "creatures in the area are entangled. If the spell allows a
+        saving throw, a successful save negates the entangle effect. If the spell does not
+        normally allow a save, a creature can make a Reflex save (DC = the spell's DC if it
+        had a saving throw) ... You are never impeded by the effects of your spells modified
+        by this feat." Everyone but the caster within the darkness's radius saves (the
+        spell's own save, else Reflex) or is entangled for the spell's rounds.
+
+        shortcut: the entangle lasts the spell's rounds wherever the creature goes, and the
+        save is the engine's die for a player too; the book's "as long as it is in the area
+        and for 1 round after it leaves" and the new save on re-entering need the area to
+        be asked on every move — upgrade with a darkness `manifest` when manifests can carry
+        light."""
+        caster = self.scene.actors.get(str(ctx.get("caster") or ""))
+        here = self.scene.positions.get(centre.ref)
+        if caster is None or here is None:
+            return [], []
+        save = str(ctx.get("spell_save") or "") or "ref"
+        save = save if save in ("fort", "ref", "will") else "ref"
+        dc = int(ctx.get("dc") or 10)
+        effects, caught = [], []
+        for ref, who in self.scene.actors.items():
+            pos = self.scene.positions.get(ref)
+            if ref == caster.ref or pos is None or who.is_dead                     or gridmod.distance(tuple(here[:2]), tuple(pos[:2])) > radius:
+                continue
+            roll = self.dice.d20(who.save_modifiers(save, {"against": ("spell",),
+                                                         "attacker_actor": caster}),
+                                 label=f"{who.name}'s {SAVES[save]} save against the grasping "
+                                       f"dark", visibility="hidden")
+            if d20_succeeds(roll, dc):
+                continue
+            who.add_condition("entangled", rounds=ctx.get("rounds"),
+                              source=f"{ctx.get('source')} (Shadow Grasp)",
+                              origin=str(ctx.get("origin") or ""))
+            effects.append({"kind": "condition", "ref": ref, "condition": "entangled",
+                            "rounds": ctx.get("rounds"), "origin": ctx.get("origin")})
+            caught.append(who.name)
+        return effects, ([f"Shadows grip {', '.join(caught)}: entangled (Shadow Grasp)."]
+                         if caught else [])
 
     def _conceal(self, spec: dict, ctx: dict) -> tuple[list[dict], list[str]]:
         """A miss chance, held as a buff so it expires on the clock everything else uses."""
@@ -35369,7 +35538,10 @@ class Engine:
         light = self.scene.light_at(square, viewer=attacker)
         got = defender.concealment(attacker, light=light,
                                    fog=self._fog_chance(attacker, defender),
-                                   light_ft=self._gap_ft(attacker, defender),
+                                   # Feat loop b6-rules: no darkvision reaches into
+                                   # deeper darkness's supernatural dark.
+                                   light_ft=10 ** 6 if self.scene.supernatural_dark(square)
+                                   else self._gap_ft(attacker, defender),
                                    ctx=None if ranged is None
                                    else {"weapon": {"ranged": bool(ranged)}})
         # Any hiding, not only a Stealth check's: a scheme's `state.hidden` too — a blow at

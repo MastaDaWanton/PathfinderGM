@@ -322,8 +322,13 @@
   "darkness": {
    "effects": [
     {
+     "type": "darkness",
+     "radius_ft": 20,
+     "steps": 1
+    },
+    {
      "type": "narrative",
-     "target": "The touched object radiates darkness to a 20-foot radius, dropping the light level in that area one step (bright to normal, normal to dim, dim to darkness). Nonmagical light cannot raise it, and magical light only does so if of a higher spell level. Covering the object blocks it. Counters or dispels any light spell of equal or lower level."
+     "target": "The darkness radiates from the touched object; covering it with something opaque blocks it. It has no effect where it is already dark."
     }
    ],
    "duration": {
@@ -333,7 +338,7 @@
     "dismissible": false
    },
    "converted_by": "read",
-   "notes": "The 20% and 50% miss chances in the prose are the general concealment rules for dim light and darkness, not numbers this spell confers, so they are not emitted as effects."
+   "notes": "The 20% and 50% miss chances in the prose are the general concealment rules for dim light and darkness, not numbers this spell confers, so they are not emitted as effects. Feat loop b6-rules (2026-11-27): the light model carries it (Scene.light_at, Engine._cast_light). Its light-or-darkness counter is the interplay there."
   },
   "darkvault": {
    "effects": [
@@ -446,8 +451,14 @@
   "daylight": {
    "effects": [
     {
+     "type": "light",
+     "radius_ft": 60,
+     "raised_ft": 120,
+     "bright": "yes"
+    },
+    {
      "type": "narrative",
-     "target": "The touched object sheds bright light in a 60-foot radius and raises the light level one step for a further 60 feet. Creatures that take penalties in bright light suffer them inside the 60-foot radius. It is not true sunlight for creatures damaged by sunlight. Covering the object blocks it; it counters or dispels any darkness spell of equal or lower level."
+     "target": "Creatures that take penalties in bright light suffer them inside the 60-foot radius. It is not true sunlight for creatures damaged by sunlight. Covering the object blocks it."
     }
    ],
    "duration": {
@@ -457,7 +468,7 @@
     "dismissible": false
    },
    "converted_by": "read",
-   "notes": ""
+   "notes": "Feat loop b6-rules (2026-11-27): the light model carries it (Scene.light_at, Engine._cast_light)."
   },
   "daywalker": {
    "effects": [
@@ -1281,8 +1292,13 @@
   "deeper-darkness": {
    "effects": [
     {
+     "type": "darkness",
+     "radius_ft": 60,
+     "steps": 2
+    },
+    {
      "type": "narrative",
-     "target": "The touched object radiates darkness to a 60-foot radius and lowers the light level by two steps: bright light becomes dim, normal light becomes darkness, and areas already dim or dark become supernaturally dark, where even creatures with darkvision cannot see. It does not stack with itself and counters or dispels any light spell of equal or lower level."
+     "target": "The darkness radiates from the touched object; covering it blocks it."
     }
    ],
    "duration": {
@@ -1292,7 +1308,7 @@
     "dismissible": false
    },
    "converted_by": "read",
-   "notes": "Blocking darkvision is a property of the area, not a condition on any creature, so the vocabulary cannot express it as an effect."
+   "notes": "The supernatural dark that darkvision cannot pierce is Scene.supernatural_dark. Feat loop b6-rules (2026-11-27): the light model carries it (Scene.light_at, Engine._cast_light)."
   },
   "defending-bone": {
    "effects": [
