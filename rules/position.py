@@ -242,6 +242,10 @@ def flanking_allies(scene, actor, defender, weapon=None) -> list:
         if flanking(tuple(here[:2]), tuple(ally[:2]),
                     tuple(there[:2]), defender.size):
             out.append(other)
+    if not out:                                   # Gang Up, Overwhelm (feat loop b4)
+        from . import strike_feats
+
+        out = strike_feats.flank_by_feat(scene, actor, defender, _same_side)
     return out
 
 

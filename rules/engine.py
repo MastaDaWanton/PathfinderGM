@@ -33,6 +33,7 @@ from . import dc as dc_mod
 from . import effectspec
 from . import metamagic
 from . import feat_events
+from . import strike_feats
 from . import finish_uses
 from . import foraging
 from . import ingredients as ing_mod
@@ -2479,6 +2480,10 @@ class Scene:
             who.remove_effects(match=lambda e: any(
                 states.matches(str(t), states.SURPRISED)
                 or states.matches(str(t), states.ONE_ACTION_TURN) for t in e.tags or ()))
+        # "For the duration of the encounter" (Flaying Critical, feat loop b4): the effects
+        # tagged to end with the fight end here, the one door.
+        for who in list(self.people.values()):
+            who.remove_effects(match=lambda e: strike_feats.ENDS_WITH_FIGHT in (e.tags or ()))
         # A combat style is a fight's stance (rules/styles.py): the next fight starts in
         # none, since a style "cannot be used before combat begins".
         from . import styles as _styles
@@ -4522,7 +4527,9 @@ class Engine:
                 why = actor.can_power_attack()
                 if why:
                     raise IntentError(f"attack: {why}", "legality", index, code="cannot_power_attack")
-            why = self._attack_choice_refusal(actor, key, intent.params)
+            why = self._attack_choice_refusal(actor, key, intent.params) \
+                or strike_feats.target_refusal(self, actor, self.scene.actors.get(
+                    (intent.targets() or [""])[0]), intent.params)      # feat loop b4
             if why:
                 raise IntentError(f"attack: {why}", "legality", index,
                                   code="cannot_choose")
@@ -7225,7 +7232,8 @@ class Engine:
         behind it is marked (`after_coup`) and refused in words — the `after_close` shape."""
         whole = intent.params.get("coup_de_grace") or (
             intent.params.get("charged") is not None
-            and (intent.params.get("charge") or intent.params.get("spring_attack")))
+            and (intent.params.get("charge") or intent.params.get("spring_attack"))) \
+            or strike_feats.whole_round(intent.params)          # feat loop b4
         if not self.scene.in_encounter or outcome.status != "resolved" \
                 or not whole or intent.params.get("reaction"):
             return
@@ -7566,6 +7574,9 @@ class Engine:
             out["effects"].append({"ref": defender.ref, "kind": "condition",
                                    "condition": "pinned", "from": "grapple", "by": actor.ref})
             out["tells"].append(f"{actor.name} pins {defender.name}.")
+            for piece in strike_feats.stunning_pin(self, actor, defender):   # feat loop b4
+                out["effects"].append(piece["effect"])
+                out["tells"].append(piece["tell"])
         if not actor.has_state("state.exposed.pinning"):
             actor.apply_effect(ActiveEffect(
                 name="pinning", kind="situation", key="pinning",
@@ -10901,6 +10912,14 @@ class Engine:
             if spent:
                 return self._refuse(intent, spent)
             self._coup_provokes(intent, actor, defender, weapon_key)
+        # Feat loop b4: Death or Glory, Punch Through, Cockatrice Strike are one attack
+        # as a full-round action, the round asked as the coup de grace asks it.
+        whole = strike_feats.whole_round(intent.params)
+        if whole and partial.get("attack_state") is None and self.scene.in_encounter \
+                and not intent.params.get("reaction"):
+            spent = self._coup_round_spent(actor, whole)
+            if spent:
+                return self._refuse(intent, spent)
         # Whether the one struck can tell who struck them (owner, Q34, for swords and
         # spells alike): a hidden attacker sniping from ten feet or more who keeps hidden
         # opens no fight and costs no attitude — `attitude.perceived` carries the rule and
@@ -11092,6 +11111,10 @@ class Engine:
             # key, so Strength stays on it (`damage_modifiers`). Before 2026-10-06 the
             # throw was a melee blow in every one of these but the range increment.
             weapon = dict(weapon, category="ranged", thrown=True)
+        # Hamatulatsu (ISWG): "Your unarmed attacks can deal either bludgeoning or piercing
+        # damage" - piercing when declared (feat loop b4).
+        if intent.params.get("hamatulatsu"):
+            weapon = dict(weapon, type="piercing")
         # Which kind of damage this swing deals: the weapon's own, unless the swing was
         # declared the other way (`lethality`), which costs the -4 `attack_modifiers`
         # charges. Measured 2026-09-27 before this was read: a punch took a thug from 13
@@ -11189,7 +11212,8 @@ class Engine:
 
         flat_footed = self._flat_footed(defender) or (
             self._unseen_attacker(defender, actor)
-            and not self._pinpointed_shooter(defender, actor, weapon))
+            and not self._pinpointed_shooter(defender, actor, weapon)) \
+            or strike_feats.caught_off_guard(actor, defender, weapon_key, weapon)
         # Surprise Follow-Through (ARG): "When using Cleave or Great Cleave, the second foe
         # you attack on your turn is denied its Dexterity bonus against you" — the first
         # blow the cleave carries on into (`cleaving` lists the one struck before it).
@@ -11282,8 +11306,10 @@ class Engine:
                 intent,
                 f"{defender.name} is behind total cover: there is no line to them from "
                 f"where {actor.name} is standing.")
-        cover_mods = position_mod.ac_mods(self.scene, actor, defender) \
-            + self._dark_ac_mods(defender, actor)
+        cover_mods = strike_feats.cover_kept(actor, weapon, position_mod.ac_mods(
+            self.scene, actor, defender)) + self._dark_ac_mods(defender, actor) \
+            + strike_feats.guard_against(defender, actor, weapon, weapon_key,
+                                         flat_footed or bool(flounders))
         if cover_mods:
             target_ac += sum(m.value for m in cover_mods)
             ac_parts.extend((m.source, m.value) for m in cover_mods)
@@ -11400,7 +11426,10 @@ class Engine:
         # rather than by the passive's name (audit 2026-11-22, law 1).
         repeat = next((g for g in leveling_mod.passive_grants(actor)
                        if isinstance(g.get("repeat_swings"), dict)), None)
+        # "A single melee attack" (feat loop b4: Death or Glory, Punch Through, Cockatrice
+        # Strike) is one blow, as a coup de grace is.
         if (not coup and not dancing and repeat
+                and not strike_feats.whole_round(intent.params)
                 and f"{actor.ref}>{defender.ref}" in self.scene.attacked):
             swift_extra = int(repeat["repeat_swings"].get("full" if full else "standard", 0)
                               or 0)
@@ -11628,11 +11657,17 @@ class Engine:
                     intent, actor, atk_mods, f"Attack with {weapon['name']}",
                     swing_ac, partial, state, "1d20", kind="attack",
                 )
+                if not dancing:                                   # Perfect Strike (b4)
+                    atk = strike_feats.perfect_strike(self, actor, weapon_key, weapon, atk,
+                                                      atk_mods, state)
                 state["rolls"].append(atk.as_dict())
                 natural = atk.natural
                 # Kept for the swing: vorpal asks "upon a roll of natural 20 (followed by
                 # a successful roll to confirm)" at the damage stage, a popup later.
                 state["natural"] = natural
+                if not dancing:                                   # feat loop b4
+                    strike_feats.after_roll(self, intent, actor, defender, weapon_key,
+                                            weapon, atk, state, swing_choices)
                 riposte = self._crane_after(actor, defender, wing, atk, swing_ac, state)
                 if riposte == "deflected":
                     state.setdefault("blows", []).append(
@@ -11710,6 +11745,11 @@ class Engine:
                 # Improved Blind-Fight (APG): "Your melee attacks ignore the miss chance for
                 # less than total concealment" — anything under total's 50% — the feat
                 # document's tag, asked of the vocabulary as Blind-Fight's reroll is.
+                # Improved Precise Shot (CRB): "the miss chance granted to targets by
+                # anything less than total concealment" - ranged, its tag (feat loop b4).
+                if chance and chance < 50 and weapon.get("category") == "ranged" \
+                        and actor.has_state(strike_feats.PRECISE_PAST_COVER):
+                    chance = 0
                 if chance and chance < 50 and weapon.get("category") != "ranged" \
                         and actor.has_state(states.IGNORES_PARTIAL_CONCEALMENT):
                     if not state.get("blind_fight_said"):
@@ -11734,8 +11774,10 @@ class Engine:
                     # time to see if you actually hit." The feat document's tag, asked of
                     # the vocabulary (2026-10-09); always taken, since a reroll of a miss
                     # can only help.
-                    if miss.total <= chance and weapon.get("category") != "ranged" \
-                            and actor.has_state("miss_chance.reroll.melee"):
+                    if miss.total <= chance and (
+                            (weapon.get("category") != "ranged"
+                             and actor.has_state("miss_chance.reroll.melee"))
+                            or strike_feats.bow_reroll(actor, weapon, weapon_key)):
                         miss = self.dice.roll("1d100",
                                               label=f"miss chance ({why}), rerolled",
                                               visibility="hidden")
@@ -11797,9 +11839,16 @@ class Engine:
                         swift_at += 1
                 # A threat is not a crit until it is confirmed — exactly the sort of step
                 # a person forgets mid-fight and code does not.
-                threat = natural is not None and natural >= weapon["crit_range"]
+                threat = natural is not None and natural >= strike_feats.threat_from(
+                    actor, defender, weapon)            # Slayer's Knack (feat loop b4)
                 state["stage"] = "confirm" if threat else "damage"
                 state["crit"] = False
+                # Butterfly's Sting (feat loop b4): an ally's mark lands this melee hit as
+                # a critical, confirmed without a roll.
+                if not dancing and strike_feats.stung_critical(self, actor, defender, weapon):
+                    state["stage"], state["crit"] = "damage", True
+                    state["tells"].append(f"{actor.name} strikes through the opening an "
+                                          f"ally left: a critical (Butterfly's Sting).")
 
             if state["stage"] == "confirm":
                 # Critical Focus's +4 (`Actor.confirm_modifiers`), on this roll alone.
@@ -11808,14 +11857,16 @@ class Engine:
                 # And the defender's (Snapping Turtle Shell's -4 against you, b2-styles).
                 confirm_mods = list(confirm_mods) + defender._buff_mods(
                     "combat_mod", "crit_confirm_against")
-                confirm = self._roll_or_suspend_stage(
-                    intent, actor, confirm_mods, f"Confirm critical ({weapon['name']})",
-                    swing_ac, partial, state, "1d20",
-                )
+                confirm = strike_feats.kept_confirm(self, confirm_mods, weapon, state) \
+                    or self._roll_or_suspend_stage(
+                        intent, actor, confirm_mods, f"Confirm critical ({weapon['name']})",
+                        swing_ac, partial, state, "1d20",
+                    )
                 state["rolls"].append(confirm.as_dict())
                 state["crit"] = confirm.total >= swing_ac
                 state["confirm_total"] = confirm.total     # Impact Critical Shot's CMD test
                 self._judge(confirm, state["crit"])
+                strike_feats.on_confirm(actor, defender, swing_choices, state)  # b4
                 if state["crit"]:
                     self._surge(actor, "a confirmed critical hit")
                     feat_events.crit_events(self, actor, defender, weapon_key, weapon,
@@ -12148,7 +12199,9 @@ class Engine:
                 amount, spared = feat_events.half_nonlethal(defender, amount, state,
                                                             lethality)
                 hit = self._apply_damage(defender, amount, weapon["type"],
-                                         traits=struck_as + attacker_traits(actor),
+                                         traits=struck_as + attacker_traits(actor)
+                                         + strike_feats.dr_traits(actor, defender,
+                                                                  weapon_key),
                                          lethality=lethality)
                 if spared:
                     bruise = self._apply_damage(defender, spared, weapon["type"],
@@ -12291,6 +12344,14 @@ class Engine:
                     state["effects"].append(extra["effect"])
                     if extra.get("tell"):
                         state["tells"].append(extra["tell"])
+                # Feat loop b4-combat (rules/strike_feats.py): Deadly Finish, Punch
+                # Through, Spear Dancer, Opening Volley, Hamatulatsu, Cockatrice Strike.
+                for extra in ([] if dancing else strike_feats.after_hit(
+                        self, intent, actor, defender, weapon_key, weapon, state,
+                        swing_choices)):
+                    state["effects"].append(extra["effect"])
+                    if extra.get("tell"):
+                        state["tells"].append(extra["tell"])
                 # A forged blade's own riders — a wyvern-blood quench on the first wound
                 # of the day, viridium on the crit (plan §12.4).
                 for extra in self._item_riders(actor, defender, weapon,
@@ -12309,6 +12370,10 @@ class Engine:
                         state["effects"].append(extra["effect"])
                         if extra.get("tell"):
                             state["tells"].append(extra["tell"])
+                # Death or Glory's answer, once the blow and its critical riders are all
+                # resolved: a foe they stopped has none (feat loop b4).
+                if "death_or_glory" in swing_choices:
+                    strike_feats.glory_settled(self, defender, state)
                 # The confirmation's total is this swing's alone: both of its readers
                 # (`_feat_after_hit`, `_crit_strike`) have had it, so the next swing starts
                 # without it (batch 2 merge: the first reader cleared it for the second).
@@ -12646,8 +12711,13 @@ class Engine:
         n = max(0, (int(feet) - 1) // inc)
         if not n:
             return None, ""
-        return Modifier(-2 * n, f"range ({int(feet)} ft: {n} increment"
-                                f"{'s' if n != 1 else ''} of {inc} ft past the first)"), ""
+        # Feat loop b4: Far Shot's "-1 penalty per full range increment", Distance
+        # Thrower's "with a thrown weapon, you reduce your penalty ... due to range by 2".
+        pen = strike_feats.range_penalty(actor, n, thrown)
+        if not pen:
+            return None, ""
+        return Modifier(pen, f"range ({int(feet)} ft: {n} increment"
+                             f"{'s' if n != 1 else ''} of {inc} ft past the first)"), ""
 
     def _thrown_lands(self, actor: Actor, defender: Actor, weapon_key: str,
                       weapon: dict) -> dict:
@@ -26244,7 +26314,9 @@ class Engine:
                          f"of opportunity for a round."}]
 
     # A critical feat's tag (its document's), in the order the book's riders are written.
-    CRITICAL_FEATS: ClassVar[tuple] = ("critical.bleeding", "critical.crippling")
+    CRITICAL_FEATS: ClassVar[tuple] = ("critical.bleeding", "critical.crippling",
+                                       # Feat loop b4-combat: the condition criticals.
+                                       *strike_feats.TAGS)
 
     def _critical_feat(self, actor: Actor, defender: Actor, weapon: dict) -> list[dict]:
         """A critical feat's rider on a confirmed critical hit (feat loop b1, 2026-11-22).
@@ -26320,6 +26392,7 @@ class Engine:
                                 f"speed for {rounds} round{'s' if rounds != 1 else ''}"
                                 + (f" (Fortitude {roll.total} against {dc} shortens it)."
                                    if saved else f" (Fortitude {roll.total} against {dc})." )})
+        out += strike_feats.critical_riders(self, actor, defender, held)   # feat loop b4
         return out
 
     def _rider_bleed(self, intent: Intent, actor: Actor, defender: Actor, rule: dict,
@@ -27962,6 +28035,9 @@ class Engine:
         ranged = w.get("category") == "ranged" or bool(params.get("thrown"))
         said = {c: c.replace("_", " ").title() for c in declared}
         why = feat_events.choice_refusal(actor, w, declared, params)    # feat loop b3
+        if why:
+            return why
+        why = strike_feats.choice_refusal(actor, w, declared, params)   # feat loop b4
         if why:
             return why
         for c in ("vital_strike", "cleave", "scorpion_style"):
@@ -35349,9 +35425,11 @@ class Engine:
                 self.scene, actor, defender, {"category": "ranged"})
         if feet and int(feet) > inc:
             n = (int(feet) - 1) // inc
-            mods = mods + [Modifier(-2 * n, f"range ({int(feet)} ft: {n} increment"
-                                            f"{'s' if n != 1 else ''} of {inc} ft past the "
-                                            f"first)")]
+            # The range rule's other copy: Far Shot and Distance Thrower reach a flask too.
+            pen = strike_feats.range_penalty(actor, n, True)
+            mods = mods + ([Modifier(pen, f"range ({int(feet)} ft: {n} increment"
+                                          f"{'s' if n != 1 else ''} of {inc} ft past the "
+                                          f"first)")] if pen else [])
         atk = self._roll_or_suspend_stage(intent, actor, mods, f"Throw {name}", ac,
                                           partial, state, "1d20")
         state["rolls"].append(atk.as_dict())
@@ -39575,7 +39653,9 @@ class Engine:
                 # now with the user's Wisdom; Jawbreaker's bleed), and Gorgon's Fist's
                 # "single unarmed melee attack" that no full attack carries.
                 **{k: charge[k] for k in ("target_requires", "target_requires_not",
-                                          "target_said", "no_damage", "single_attack")
+                                          "target_said", "no_damage", "single_attack",
+                                          # feat loop b4: Disorienting Blow, Perfect Strike
+                                          "adds_duration", "roll_twice")
                    if charge.get(k)},
                 **({"push_ft": int(doc["charge_push_ft"])} if doc.get("charge_push_ft")
                    else {}),
@@ -39604,7 +39684,8 @@ class Engine:
             if not c:
                 continue
             if c.get("weapons") and key not in c["weapons"] \
-                    and not (ki_focus and "unarmed" in c["weapons"]):
+                    and not (ki_focus and "unarmed" in c["weapons"]) \
+                    and not strike_feats.monk_weapon_carries(actor, key, e):   # b4
                 continue
             if c.get("category") and category and c["category"] != category:
                 continue
@@ -39736,8 +39817,17 @@ class Engine:
                 out.extend(self._charge_on_fail(defender, e, c["on_fail"], line))
                 if not c.get("condition"):
                     continue
-            defender.add_condition(str(c["condition"]), int(rounds) if rounds else None,
-                                   source=e.name, origin=e.origin)
+            # `adds_duration` (feat loop b4, Disorienting Blow): a running copy from the
+            # same document is lengthened, never replaced.
+            running = next((x for x in defender.effects if c.get("adds_duration")
+                            and x.origin == e.origin and x.key == c["condition"]
+                            and x.rounds_left is not None and rounds), None)
+            if running is not None:
+                running.rounds_left += int(rounds)
+                rounds = running.rounds_left
+            else:
+                defender.add_condition(str(c["condition"]), int(rounds) if rounds else None,
+                                       source=e.name, origin=e.origin)
             out.append({"effect": {"ref": defender.ref, "kind": "condition",
                                    "condition": c["condition"], "rounds": rounds,
                                    "from": e.name, "origin": e.origin,

@@ -1,0 +1,511 @@
+{
+  "_about": [
+    "Feat loop, batch 4, lane b4-combat (2026-11-26): the critical feats, shots and thrown",
+    "weapons, the monk's strike feats and the one-blow options. Each benefit is the book's",
+    "(content/feats/feats.json, checked against aonprd.com FeatDisplay 2026-11-26). The",
+    "engine reads the tags at the moment it already knows (rules/strike_feats.py); what",
+    "still does not run is each document's `not_yet`."
+  ],
+  "blinding-critical": {
+    "tags": [
+      "critical.blinding"
+    ],
+    "not_yet": [
+      "'creatures with more than two eyes' are spared: no stat block counts a creature's eyes, so only a creature immune to blindness is spared"
+    ]
+  },
+  "deafening-critical": {
+    "tags": [
+      "critical.deafening"
+    ]
+  },
+  "exhausting-critical": {
+    "tags": [
+      "critical.exhausting"
+    ]
+  },
+  "tiring-critical": {
+    "tags": [
+      "critical.tiring"
+    ]
+  },
+  "sickening-critical": {
+    "tags": [
+      "critical.sickening"
+    ]
+  },
+  "staggering-critical": {
+    "tags": [
+      "critical.staggering"
+    ]
+  },
+  "stunning-critical": {
+    "tags": [
+      "critical.stunning"
+    ]
+  },
+  "flaying-critical": {
+    "tags": [
+      "critical.flaying"
+    ]
+  },
+  "far-shot": {
+    "tags": [
+      "range.far-shot"
+    ]
+  },
+  "distance-thrower": {
+    "tags": [
+      "range.thrown.less-2"
+    ]
+  },
+  "improved-precise-shot": {
+    "tags": [
+      "shot.past-partial-cover"
+    ]
+  },
+  "elven-accuracy": {
+    "tags": [
+      "miss_chance.reroll.bow"
+    ]
+  },
+  "halfling-slinger": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 1,
+        "bonus_type": "racial",
+        "when": {
+          "weapon": {
+            "key": "sling"
+          }
+        },
+        "note": "Halfling Slinger: with a sling"
+      }
+    ]
+  },
+  "catch-off-guard": {
+    "tags": [
+      "proficiency.improvised.melee"
+    ]
+  },
+  "throw-anything": {
+    "tags": [
+      "proficiency.improvised.ranged"
+    ],
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 1,
+        "bonus_type": "circumstance",
+        "when": {
+          "weapon": {
+            "key": "splash"
+          }
+        },
+        "note": "Throw Anything: a thrown splash weapon"
+      }
+    ]
+  },
+  "gang-up": {
+    "tags": [
+      "flank.gang-up"
+    ]
+  },
+  "overwhelm": {
+    "tags": [
+      "flank.overwhelm"
+    ]
+  },
+  "desperate-battler": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 1,
+        "bonus_type": "morale",
+        "when": {
+          "alone_within": 10,
+          "weapon": {
+            "ranged": false
+          }
+        },
+        "note": "Desperate Battler: no ally within 10 feet, no aid another"
+      },
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "amount": 1,
+        "bonus_type": "morale",
+        "when": {
+          "alone_within": 10,
+          "weapon": {
+            "ranged": false
+          }
+        },
+        "note": "Desperate Battler: no ally within 10 feet, no aid another"
+      }
+    ]
+  },
+  "cornugon-shield": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 1,
+        "bonus_type": "shield",
+        "when": {
+          "bearer": {
+            "wielding": "spiked-chain"
+          }
+        },
+        "note": "Cornugon Shield: wielding a spiked chain"
+      },
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 2,
+        "bonus_type": "shield",
+        "when": {
+          "bearer": {
+            "wielding": "spiked-chain",
+            "state": "buff.stance.fighting-defensively"
+          }
+        },
+        "note": "Cornugon Shield: fighting defensively"
+      },
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 2,
+        "bonus_type": "shield",
+        "when": {
+          "bearer": {
+            "wielding": "spiked-chain",
+            "state": "buff.stance.total-defense"
+          }
+        },
+        "note": "Cornugon Shield: in total defense"
+      }
+    ]
+  },
+  "improved-cleaving-finish": {
+    "tags": [
+      "attack.cleaving-finish.unlimited"
+    ]
+  },
+  "greater-penetrating-strike": {
+    "tags": [
+      "dr.penetrating.greater"
+    ]
+  },
+  "slayer-s-knack": {
+    "tags": [
+      "crit.favored-enemy.doubled"
+    ]
+  },
+  "defensive-weapon-training": {
+    "tags": [
+      "ac.dodge.weapon-group"
+    ]
+  },
+  "martial-versatility": {},
+  "martial-mastery": {
+    "tags": [
+      "feat.weapon.whole-group"
+    ]
+  },
+  "spear-dancer": {
+    "tags": [
+      "hit.dazzle.two-handed-reach"
+    ]
+  },
+  "opening-volley": {
+    "tags": [
+      "hit.ranged.opens-melee"
+    ]
+  },
+  "death-or-glory": {
+    "choice": "death_or_glory",
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "formula": "4 + min(1, bab // 11) + min(1, bab // 16) + min(1, bab // 20)",
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "death_or_glory"
+        },
+        "note": "Death or Glory (the confirmation roll too: it is the attack roll's)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "formula": "4 + min(1, bab // 11) + min(1, bab // 16) + min(1, bab // 20)",
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "death_or_glory"
+        },
+        "note": "Death or Glory"
+      }
+    ]
+  },
+  "punch-through": {
+    "choice": "punch_through",
+    "tags": [
+      "dr.punch-through"
+    ]
+  },
+  "deadly-finish": {
+    "choice": "deadly_finish"
+  },
+  "reckless-aim": {
+    "choice": "reckless_aim",
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 2,
+        "bonus_type": "competence",
+        "when": {
+          "choice": "reckless_aim"
+        },
+        "note": "Reckless Aim"
+      }
+    ]
+  },
+  "butterfly-s-sting": {
+    "choice": "butterfly_sting"
+  },
+  "two-handed-thrower": {
+    "choice": "two_handed_throw",
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "formula": "max(0, str_mod) // 2",
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "two_handed_throw",
+          "weapon": {
+            "hands": 1
+          }
+        },
+        "note": "Two-Handed Thrower: 1-1/2 times Strength, thrown with both hands"
+      }
+    ],
+    "not_yet": [
+      "'If you also have the Quick Draw feat, you can throw two-handed weapons at your full normal rate of attacks': a throw is one attack an op (the weapon leaves the hand), so no full attack of throws is offered"
+    ]
+  },
+  "hamatulatsu": {
+    "choice": "hamatulatsu"
+  },
+  "cockatrice-strike": {
+    "choice": "cockatrice_strike"
+  },
+  "stunning-fist-adept": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "stunning-fist.dc",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "not_state": "style.mantis-style"
+          }
+        },
+        "note": "Stunning Fist Adept: not with Mantis Style's bonus"
+      },
+      {
+        "type": "combat_mod",
+        "target": "disorienting-blow.dc",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "not_state": "style.mantis-style"
+          }
+        },
+        "note": "Stunning Fist Adept: not with Mantis Style's bonus"
+      },
+      {
+        "type": "combat_mod",
+        "target": "gorgon's-fist.dc",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "not_state": "style.mantis-style"
+          }
+        },
+        "note": "Stunning Fist Adept: not with Mantis Style's bonus"
+      },
+      {
+        "type": "combat_mod",
+        "target": "crushing-blow.dc",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "not_state": "style.mantis-style"
+          }
+        },
+        "note": "Stunning Fist Adept: not with Mantis Style's bonus"
+      },
+      {
+        "type": "combat_mod",
+        "target": "jawbreaker.dc",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "not_state": "style.mantis-style"
+          }
+        },
+        "note": "Stunning Fist Adept: not with Mantis Style's bonus"
+      }
+    ]
+  },
+  "cornugon-stun": {
+    "tags": [
+      "charge.stunning-fist.monk-weapons"
+    ]
+  },
+  "stunning-pin": {
+    "tags": [
+      "grapple.pin.stunning-fist"
+    ]
+  },
+  "elemental-fist": {},
+  "perfect-strike": {},
+  "disorienting-blow": {},
+  "bullseye-shot": {},
+  "shield-master": {
+    "tags": [
+      "shield.bash.master"
+    ]
+  },
+  "prone-slinger": {
+    "tags": [
+      "prone.sling"
+    ]
+  },
+  "prone-shooter": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "attack": "melee",
+          "bearer": {
+            "state": "state.position.prone"
+          }
+        },
+        "note": "Prone Shooter: prone's -4 against melee is -2"
+      },
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "attack": "ranged",
+          "bearer": {
+            "state": "state.position.prone"
+          }
+        },
+        "note": "Prone Shooter: prone's +4 against ranged is +6"
+      }
+    ],
+    "not_yet": [
+      "'If you have been prone since the end of your last turn': the engine does not record when a creature went prone, so the benefit holds from the moment it is prone"
+    ]
+  },
+  "target-of-opportunity": {
+    "tags": [
+      "teamwork.target-of-opportunity"
+    ]
+  },
+  "shot-on-the-run": {
+    "not_yet": [
+      "'As a full-round action, you can move up to your speed and make a single ranged attack at any point during your movement': a turn moves once, before or after its blow; no walk is split around a shot (Spring Attack's split walk is melee's, closing on its foe)"
+    ]
+  },
+  "critical-versatility": {
+    "not_yet": [
+      "'Once per day, you can spend 1 hour practicing maneuvers to gain one single critical feat that you meet the prerequisites for ... until you choose to practice a different critical feat': no door grants a feat for a time, and no ability takes an hour"
+    ]
+  },
+  "enhanced-ki-throw": {
+    "not_yet": [
+      "'When using the Ki Throw feat, you can expend 1 ki point ... it takes damage as if you had hit it with an unarmed strike': Ki Throw's own throw is not built yet (its document's not_yet; Improved Ki Throw is lane b4-maneuver's), so there is no throw to amplify"
+    ]
+  },
+  "quivering-palm-adept": {
+    "not_yet": [
+      "'Add +2 to the saving throw DC against your quivering palm attacks': the monk's 15th-level quivering palm is a name on the class table with no ability document, so there is no DC to raise"
+    ]
+  },
+  "amplified-rage": {
+    "not_yet": [
+      "'Whenever you are raging and adjacent to a raging ally who also has this feat or flanking the same opponent as a raging ally with this feat, your morale bonuses to Strength and Constitution increase by +4': a rage's morale terms are laid when it begins and ability scores are read with no board in their context, so nothing re-reads where a raging ally stands"
+    ]
+  },
+  "improved-charging-hurler": {
+    "not_yet": [
+      "'When you use Charging Hurler, your target can be at any range ... If your target is within 30 feet, you gain a +2 bonus on damage rolls': Charging Hurler itself is lane b4-moves' (feat loop batch 4), and this lane has nothing of it to widen"
+    ]
+  },
+  "sling-flail": {
+    "not_yet": [
+      "'You can make melee attacks using your loaded sling ... treating it as a flail', the flail feats with it, and 'magical or masterwork ammunition loses its special properties after a single hit': a sling is a ranged weapon in every reader, and no option swings it"
+    ]
+  },
+  "quarterstaff-master": {
+    "not_yet": [
+      "'you can wield a quarterstaff as a one-handed weapon ... your other hand is free, and you cannot use the staff as a double weapon': the staff's two hands are the weapon row's, and no turn-start choice changes them",
+      "'You can take the feat Weapon Specialization in the quarterstaff even if you have no levels in fighter': a prerequisite is asked of the feat, never of the weapon it is taken in"
+    ]
+  },
+  "strike-back": {
+    "not_yet": [
+      "'You can ready an action to make a melee attack against any foe that attacks you in melee, even if the foe is outside of your reach': the engine has no readied actions"
+    ]
+  },
+  "net-adept": {
+    "not_yet": [
+      "a net treated as a one-handed melee reach weapon, no penalty unfolded, folded in a full-round action: the net row is unwieldable ('the rules have no net attack yet')"
+    ]
+  },
+  "net-and-trident": {
+    "not_yet": [
+      "the net as a one-handed ranged weapon beside a melee weapon, and +2 damage and +2 to confirm against an entangled foe: there is no net attack to throw"
+    ]
+  },
+  "performance-weapon-mastery": {
+    "not_yet": [
+      "every proficient weapon a performance weapon: Ultimate Combat's performance combat is not in the game"
+    ]
+  },
+  "siege-gunner": {
+    "not_yet": [
+      "no size penalty aiming a direct-fire siege weapon, a missed indirect shot misdirected 1 square per increment: siege weapons are not fired by the engine"
+    ]
+  },
+  "blighted-critical-mastery": {
+    "not_yet": [
+      "choosing the spellblight Blighted Critical applies: spellblights and Blighted Critical are not in the game"
+    ]
+  },
+  "painful-anchor": {
+    "not_yet": [
+      "4d8 + Charisma holy damage to an evil outsider teleporting or summoning in the anchoring aura: anchoring aura is the Oath against Fiends paladin's (an archetype; the content has no archetypes)"
+    ]
+  }
+}
