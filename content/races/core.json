@@ -118,11 +118,10 @@
       "modifiers": [
         {"type": "skill_mod", "target": "intimidate", "amount": 2, "bonus_type": "racial"}
       ],
-      "tags": ["race.half-orc", "sense.darkvision.60", "ferocity"],
+      "tags": ["race.half-orc", "sense.darkvision.60", "trait.orc-ferocity"],
       "budget": {},
-      "traits": ["darkvision 60 ft", "ferocity: keep fighting below 0", "+2 Intimidate"],
+      "traits": ["darkvision 60 ft", "orc ferocity: one more round below 0, once a day", "+2 Intimidate"],
       "languages": ["common", "orc"],
-      "not_yet": ["ferocity waits on the downed resolution reading the tag"],
       "origin": "core"
     },
     {

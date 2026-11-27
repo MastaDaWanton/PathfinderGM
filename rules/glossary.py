@@ -31,10 +31,16 @@ CORE = {
                       "unarmed, and the damage scales with level (the Fist column).",
     "darkvision": "See in total darkness, in black and white, to the listed range.",
     "darkvision 60 ft": "See in total darkness, in black and white, to 60 feet.",
-    "ferocity": "Below 0 hit points you stay conscious and may keep acting, though "
-                "staggered; you still die at the usual point.",
-    "ferocity: keep fighting below 0": "Below 0 hit points you stay conscious and may "
-                                       "keep acting, though staggered.",
+    # The Bestiary's universal monster rule (a boar, a summons with Ferocious Summons).
+    "ferocity": "Below 0 hit points the creature stays conscious and keeps fighting, "
+                "staggered and losing 1 hit point a round, until it dies at the usual point.",
+    # The racial trait (CRB Half-Orc, ARG race builder): `trait.orc-ferocity`.
+    "orc ferocity": "Once a day, when brought below 0 hit points but not killed, you fight "
+                    "on for one more round as if disabled; at the end of your next turn, "
+                    "unless healed above 0, you fall unconscious and begin dying.",
+    "orc ferocity: one more round below 0, once a day": "Once a day, when brought below "
+        "0 hit points but not killed, you fight on for one more round as if disabled; at "
+        "the end of your next turn, unless healed above 0, you fall unconscious and dying.",
     "fast movement": "A bonus to base land speed, already counted in the Speed line.",
     "trapfinding": "Perception to find, and Disable Device to disarm, traps of every "
                    "kind — including magical ones.",

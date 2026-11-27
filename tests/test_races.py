@@ -271,7 +271,7 @@ def test_evolutions_expand_into_the_grammar_and_cost_no_race_points():
     assert d["speed"] == 40 and d["speeds"] == {"land": 40, "fly": 40}
     assert [w["key"] for w in d["weapons"]] == ["claws"]
     assert {"type": "skill_mod", "target": "stealth", "amount": 8, "bonus_type": "racial"} in d["modifiers"]
-    assert "resist.fire.5" in d["tags"] and "immune.cold" in d["tags"] and "ferocity" in d["tags"]
+    assert "resist.fire.5" in d["tags"] and "immune.cold" in d["tags"] and "trait.orc-ferocity" in d["tags"]
     assert races.rp(doc) == 0 == races.rp({"name": "Bare", "choose": list(races.STANDARD_CHOOSE)})
     assert races.validate(doc) == []
     # A pick without its choice, and an attack without the body part it hangs off.
@@ -314,15 +314,16 @@ def test_immunity_resistance_and_ferocity_are_read_off_the_tags():
         pc.race = "built-one"
         assert pc.immune_to("cold") and not pc.immune_to("fire")
         assert pc.resistance("fire") == 5 and pc.resistance("acid") == 0
-        # Below 0 with ferocity: staggered and still in the fight, never dying (the
-        # Bestiary's universal rule, feat loop b5-core: it "loses 1 hit point each round"
-        # instead of bleeding out, rules/sheet.py `_ferocious`).
+        # Below 0 with the race's ferocity: Orc Ferocity's one round as if disabled,
+        # never the Bestiary's fight-on-forever (fix/orc-ferocity: b5-core read the
+        # evolution's tag as the monster rule; tests/test_orc_ferocity.py has the round).
         pc.hp = -2
         pc.apply_hp_state()
-        assert pc.has_condition("staggered") and not pc.has_condition("dying")
+        assert pc.has_condition("disabled") and not pc.has_condition("dying")
         assert not pc.has_condition("unconscious") and not pc.is_down
+        assert not pc.has_state("ferocity")
         pc.race = "human"
-        pc.remove_condition("staggered")
+        pc.remove_condition("disabled")
         pc.remove_effects(name="fighting on below 0")
         pc.apply_hp_state()
         assert pc.has_condition("unconscious")
