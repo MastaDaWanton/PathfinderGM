@@ -495,8 +495,8 @@ class Grid:
         Step's "ignore the effects of difficult terrain in natural environments" is all
         of it, `EASY_ALL`). Carried per path in the queue, as the diagonal is: which
         squares the allowance is spent on changes which route is cheapest (feat loop
-        b4-other). shortcut: the allowance is per move, not per round, so a double move
-        gets it twice; upgrade if a round's moves are ever priced together.
+        b4-other). Per round, not per move: a walk that used it spends it until the
+        walker's next turn (`feat_moves._spend_easy`, feat loop b5-other).
         """
         occupied = occupied or set()
         start = tuple(start)

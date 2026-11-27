@@ -1,0 +1,86 @@
+{
+  "class": "feat",
+  "_source": "Feat loop batch 5, lane b5-other (2026-11-26): the feats a character USES — a defensive misdirection against one foe, a Bluff that sets up a Diplomacy, a prisoner's plea. Each is had by a holder of the feat its `feat` names (rules/class_abilities.py), run by the one executor (`Engine._use_class_ability`). Benefit text from content/feats/feats.json, checked against aonprd.com FeatDisplay 2026-11-26.",
+  "_grammar": "rules/class_abilities.py, module docstring; `contest.lost_by` is Engine._contest_lost_by. The engine reads these fields and never these names.",
+  "abilities": [
+    {
+      "key": "osyluth guile",
+      "name": "Osyluth Guile",
+      "feat": "osyluth-guile",
+      "aliases": ["osyluth guile", "misdirect", "misdirect their attacks"],
+      "level": 1,
+      "source": "Osyluth Guile (Cheliax, Empire of Devils): 'While you are fighting defensively or using the total defense action, select one opponent. Add your Charisma bonus to your AC as a dodge bonus against that opponent's melee attacks until your next turn. You cannot use this feat if you cannot see the selected opponent.' Selecting is a free action (owner call: the feat names no action); the 'cannot see' clause is not asked (shortcut: a foe aimed at is one the user located); 'until your next turn' is one round on the one ticker, the stances' approximation.",
+      "text": "Free, while fighting defensively or in total defense: your Charisma bonus as dodge AC against one foe's melee attacks until your next turn.",
+      "action": "free",
+      "requires": [["buff.stance.fighting-defensively", "buff.stance.total-defense"]],
+      "requires_said": "while fighting defensively or using total defense",
+      "affects": "target",
+      "aim": "foe",
+      "self": {
+        "vs_target": true,
+        "rounds": "1",
+        "modifiers": [
+          {"type": "combat_mod", "target": "ac", "formula": "max(0, cha_mod)", "bonus_type": "dodge", "when": {"attack": "melee"}}
+        ]
+      },
+      "tell": "{name} turns the fight into a game of half-truths, every feint a lie."
+    },
+    {
+      "key": "rhetorical flourish",
+      "name": "Rhetorical Flourish",
+      "feat": "rhetorical-flourish",
+      "aliases": ["rhetorical flourish", "verbal misdirection", "misdirect the conversation"],
+      "level": 1,
+      "source": "Rhetorical Flourish (UC): 'When using the Diplomacy skill to make a request or change a creature's attitude, you can use verbal misdirection. To do so, make a Bluff check against that creature. If you succeed, you gain a +4 bonus on your next Diplomacy check against that creature if the check is made within the next minute. If you fail by 5 or more, you instead take a -2 penalty on your next Diplomacy check against that creature.' The creature's check is its Sense Motive; 'the next minute' is 10 rounds (shortcut: every Diplomacy against that creature in the minute, where the book says the next one — attitude moves once a day, so it is the next that matters).",
+      "text": "Bluff against a creature's Sense Motive: +4 on Diplomacy with them for a minute, or -2 if you fail by 5.",
+      "action": "free",
+      "affects": "target",
+      "aim": "foe",
+      "contest": {
+        "skill": "bluff",
+        "against": "sense motive",
+        "lost_by": {
+          "margin": 5,
+          "rounds": "10",
+          "modifiers": [
+            {"type": "skill_mod", "target": "diplomacy", "amount": -2, "bonus_type": "untyped"}
+          ]
+        }
+      },
+      "self": {
+        "vs_target": true,
+        "rounds": "10",
+        "modifiers": [
+          {"type": "skill_mod", "target": "diplomacy", "amount": 4, "bonus_type": "untyped"}
+        ]
+      },
+      "tell": "{name} talks in circles, steering the talk where they want it."
+    },
+    {
+      "key": "helpless prisoner",
+      "name": "Helpless Prisoner",
+      "feat": "helpless-prisoner",
+      "aliases": ["helpless prisoner", "plead", "play harmless"],
+      "level": 1,
+      "source": "Helpless Prisoner (Gnomes of Golarion): 'When you are restrained or imprisoned, you can make a Bluff check against any one creature within 30 feet in which you emphasize both your own harmlessness and the pain or inconvenience of your current condition ... If you win the check, the target does something intended to make you a little more comfortable-or at least shut you up-that gives you a +5 bonus on your next Escape Artist check.' Restrained is any `state.held` (bound, grappled, pinned, entangled); the creature's check is its Sense Motive; the +5 holds a minute (shortcut: every Escape Artist check in it, where the book says the next one). The Special's crueller jailer is the GM's discretion and is not run.",
+      "text": "While held: Bluff against a creature's Sense Motive within 30 ft; won, +5 on your Escape Artist for a minute.",
+      "action": "standard",
+      "requires": ["state.held"],
+      "requires_said": "while bound, grappled or otherwise held",
+      "affects": "target",
+      "aim": "foe",
+      "range_ft": 30,
+      "contest": {
+        "skill": "bluff",
+        "against": "sense motive"
+      },
+      "self": {
+        "rounds": "10",
+        "modifiers": [
+          {"type": "skill_mod", "target": "escape artist", "amount": 5, "bonus_type": "circumstance"}
+        ]
+      },
+      "tell": "{name} whimpers about the ropes and how little harm they could ever do."
+    }
+  ]
+}

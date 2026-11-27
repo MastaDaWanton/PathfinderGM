@@ -46,7 +46,19 @@ KINDS = ("reroll", "bonus", "ally_save", "on_reroll", "surge",
          #   the one struck; `Engine._confirm_against` asks);
          # * `{"twice": "higher", "rolls": ["skill.climb"]}` — Sure Grasp's "Roll twice ...
          #   and take the higher result" (`twice`, asked by the roll's own door).
-         "confirm_against", "twice")
+         "confirm_against", "twice",
+         # Feat loop b5-other (2026-11-26):
+         # * `{"take_ten": true, "rolls": ["skill", "concentration"]}` — Perfect Center's
+         #   "You can take 10 on any skill check or concentration check, even if it is not
+         #   normally allowed": a before-the-roll offer to the player, and anybody else
+         #   takes 10 when 10 makes it (`Engine._take_ten`), the swimmer's rule;
+         # * `{"lend": "inexplicable-luck"}` — Bestow Luck's "use your Inexplicable Luck
+         #   ability to grant an ally that can see and hear its benefit": the named
+         #   feat's after-the-roll bonus, from its own uses, on an ally's d20 (`lenders`).
+         # A `twice` entry with `spends` (Combat Meditation's "expend the +1 insight bonus
+         # granted from the Meditation Master feat to instead roll twice") is a choice
+         # made before the roll, paid from that feat's uses, never automatic.
+         "take_ten", "lend")
 
 
 def _entries(actor):
@@ -77,9 +89,54 @@ def confirm_against(actor, how: str) -> list:
 def twice(actor, kind: str, against=()):
     """The document whose `twice` entry covers this roll (Sure Grasp), or None."""
     for doc, entry in _entries(actor):
-        if entry.get("twice") and covers(entry, kind, against):
+        if entry.get("twice") and not entry.get("spends") and covers(entry, kind, against):
             return doc
     return None
+
+
+def paid_from(actor, entry: dict):
+    """(doc, entry) of the feat whose uses a `spends` entry draws on, with one left — or
+    (None, None). Combat Meditation spends Meditation Master's +1."""
+    for d, e in _entries(actor):
+        if d["id"] == entry.get("spends") and "bonus" in e and uses_left(actor, d, e):
+            return d, e
+    return None, None
+
+
+def take_ten(actor, kind: str):
+    """The document letting this creature take 10 on this roll, or None."""
+    for doc, entry in _entries(actor):
+        if entry.get("take_ten") and covers(entry, kind):
+            return doc
+    return None
+
+
+def lenders(actor, scene) -> list:
+    """(ally, lending doc, lent doc, lent entry) of the allies who may lend this creature
+    a feat's after-the-roll bonus (Bestow Luck), each with a use of it left and seen by
+    the creature it helps ("an ally that can see and hear")."""
+    from . import awareness, reactions, states
+
+    def party(c):
+        return c.is_pc or c.has_state(states.TRAVELS_WITH_YOU)
+
+    out = []
+    for other in scene.actors.values():
+        if other is actor or other.is_dead or other.is_down:
+            continue
+        if not (reactions._allied(scene, actor.ref, other.ref)
+                or (party(actor) and party(other))):
+            continue
+        if not awareness.sees(scene, actor, other):
+            continue
+        for doc, entry in _entries(other):
+            if not entry.get("lend"):
+                continue
+            lent, lent_entry = find(other, str(entry["lend"]), "bonus")
+            if lent and (lent_entry["bonus"] or {}).get("after") \
+                    and uses_left(other, lent, lent_entry):
+                out.append((other, doc, lent, lent_entry))
+    return out
 
 
 def covers(entry: dict, kind: str, against=()) -> bool:
@@ -140,6 +197,17 @@ def before_offers(actor, kind: str) -> list[dict]:
             out.append({"id": doc["id"], "name": doc["name"], "when": "before",
                         "amount": int(bonus["before"]),
                         "text": f"+{int(bonus['before'])} on this roll ({doc['name']})"})
+        # Feat loop b5-other: a roll made twice for another feat's use (Combat
+        # Meditation), and taking 10 (Perfect Center).
+        if entry.get("spends") and covers(entry, kind) and paid_from(actor, entry)[0]:
+            paid = paid_from(actor, entry)[0]
+            out.append({"id": doc["id"], "name": doc["name"], "when": "before",
+                        "kind": "twice",
+                        "text": f"Roll twice, keep the better ({doc['name']}, for "
+                                f"{paid['name']})"})
+        if entry.get("take_ten") and covers(entry, kind):
+            out.append({"id": doc["id"], "name": doc["name"], "when": "before",
+                        "kind": "take_ten", "text": f"Take 10 ({doc['name']})"})
     return out
 
 

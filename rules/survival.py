@@ -50,6 +50,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 MINUTES_PER_HOUR = 60
+NEEDS_HALF = "body.needs.half"            # Body Control (feat loop b5-other)
 HOURS_PER_DAY = 24
 
 # 1e: "A character can go without water for 1 day plus a number of hours equal to his
@@ -596,7 +597,10 @@ def daily_need(actor, need: str, biome: str = "") -> float:
     base = WATER_GALLONS_PER_DAY if need == "water" else FOOD_LB_PER_DAY
     if need == "water":
         base *= HOT_WATER.get((biome or "").strip().lower(), 1.0)
-    return base * (0.5 if small else 1.0)
+    # Body Control (F&P, feat loop b5-other): "You need only half as much food to avoid
+    # starvation, half as much water to avoid dehydration" — its document's tag.
+    frugal = bool(getattr(actor, "has_state", None)) and actor.has_state(NEEDS_HALF)
+    return base * (0.5 if small else 1.0) * (0.5 if frugal else 1.0)
 
 
 def _seen_to(need: str, live: bool, water: str) -> bool:

@@ -718,7 +718,11 @@ def test_combat_meditation_lays_the_meditation_for_a_round_a_level_wisdom_times_
     monk.abilities["wis"] = 14                          # +2: twice a day
     scene, e, thug = _bout(monk)
     out = _use(e, "Combat Meditation")
-    held = [x for x in monk.effects if "meditation.held" in (x.tags or ())]
+    # Asked by prefix (law 1): b5-other made the tag `meditation.held.combat`.
+    from rules import states as _states
+
+    held = [x for x in monk.effects
+            if any(_states.matches(str(t), "meditation.held") for t in x.tags or ())]
     assert held and held[0].rounds_left == monk.level, out.tell
     assert any(e.get("action") == "full-round" for e in out.effects)
     assert monk.pools["combat meditation"].current == 1

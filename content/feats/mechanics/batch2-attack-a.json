@@ -512,8 +512,17 @@
     ]
   },
   "nimble-moves": {
-    "not_yet": [
-      "5 feet of difficult terrain a round moved as normal terrain, and a 5-foot step into difficult terrain: nothing lifts difficult terrain's double cost for the first 5 feet a round (the move op prices it, rules/grid.py)"
+    "tags": [
+      "move.step.difficult"
+    ],
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "difficult_ft",
+        "amount": 5,
+        "bonus_type": "untyped",
+        "note": "CRB: 'Whenever you move, you may move through 5 feet of difficult terrain each round as if it were normal terrain' — per round (feat_moves._spend_easy); stacks with Acrobatic Steps for 20 (feat loop b5-other)"
+      }
     ]
   },
   "ride-by-attack": {

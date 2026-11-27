@@ -2551,6 +2551,10 @@ WHEN_KEYS: dict[str, str] = {
     # flying", the board's own test (position.higher_than).
     "higher_ground": "whether the bearer stands on higher ground than the foe of the roll "
                      "(position.higher_than); no board, no answer",
+    # Feat loop b5-other: Ferocious Loyalty's "any foe that currently threatens an ally
+    # who also has this feat" (sheet.Situation.ally_threatened).
+    "ally_threatened": "the foe of the roll threatens an ally holding a feat: "
+                       "{\"feat\": \"ferocious-loyalty\"}; no board, no answer",
 }
 # `larger` / `smaller` (feat loop b2): size categories against the bearer's own, answered
 # by `classfeatures.holds` where the bearer is known (Risky Striker, Underfoot).
@@ -2648,6 +2652,12 @@ AGAINST: dict[str, str] = {
     # Feat loop b4-other: Sure Grasp's "a Reflex save to avoid falling" — the jump's grab
     # at the far edge (bodyskills.jump), passed by the save that rolls it.
     "fall": "a Reflex save to avoid falling (bodyskills)",
+    # Feat loop b5-other: Body Control's "effects that would make you fatigued or
+    # exhausted" — a spell landing either (`spell_against`) or a save whose failure lays
+    # one (`Engine._op_save`); Meditative Concentration's "a Fortitude save to resist a
+    # distraction effect (such as the distraction ability of a swarm)".
+    "fatigue": "a save against an effect that would leave you fatigued or exhausted",
+    "distraction": "a Fortitude save against a swarm's distraction (Engine._distraction)",
 }
 
 
@@ -2674,6 +2684,8 @@ def spell_against(spell) -> tuple[str, ...]:
         words.append("sleep")
     if _lands_condition(getattr(spell, "effects", None) or (), ("stunned", "staggered")):
         words.append("stun_or_stagger")                 # feat loop b4-maneuver
+    if _lands_condition(getattr(spell, "effects", None) or (), ("fatigued", "exhausted")):
+        words.append("fatigue")                         # feat loop b5-other
     if "divination" in words and "mind-affecting" in words:
         words.append("mind-reading")
     return tuple(words)
@@ -2784,6 +2796,11 @@ def when_problems(when, where: str = "when") -> list[str]:
                     or not str(want.get("state") or "").strip()):
                 out.append(f"{where}.ally_state is {{\"feat\": \"<a feat id>\", "
                            f"\"state\": \"<a tag>\"}}.")
+        elif key == "ally_threatened":
+            from . import feats as feats_mod
+
+            if not isinstance(want, dict) or set(want) != {"feat"}                     or str(want.get("feat") or "") not in feats_mod.all_feats():
+                out.append(f"{where}.ally_threatened is {{\"feat\": \"<a feat id>\"}}.")
         elif key == "flanking_with":
             from . import feats as feats_mod
 

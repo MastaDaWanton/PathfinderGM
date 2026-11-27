@@ -104,8 +104,10 @@
         "note": "ARG: 'You gain an extra use per day of your Defiant Luck ability.'"
       }
     ],
-    "not_yet": [
-      "granting Inexplicable Luck's bonus to an ally who can see and hear you, as an immediate action: a creature's luck reaches only its own d20"
+    "luck": [
+      {
+        "lend": "inexplicable-luck"
+      }
     ]
   },
   "deathless-zealot": {
@@ -173,11 +175,26 @@
           }
         },
         "note": "starvation is a Constitution check in 1e (CRB p.444), so the feat's +1 lands there (owner call)"
+      },
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "fatigue",
+          "bearer": {
+            "state": "meditation.held"
+          }
+        },
+        "note": "feat loop b5-other: 'and effects that would make you fatigued or exhausted' (a save whose failure lays either, a spell landing either: effectspec AGAINST fatigue)"
       }
     ],
     "not_yet": [
-      "saves against effects that would make you fatigued or exhausted: a save does not say what its failure would leave",
-      "half as much food, water and sleep: the body's needs (rules/survival.py) and a night's eight hours are fixed"
+      "half as much sleep to heal injuries, avoid fatigue or exhaustion, and prepare spells: a night's rest is eight hours wherever it is taken (rules/survival.py, Actor.rest); half the food and water is built (`body.needs.half`, survival.daily_need)"
+    ],
+    "tags": [
+      "body.needs.half"
     ]
   },
   "bend-with-the-wind": {
@@ -509,9 +526,6 @@
         "bonus_type": "untyped",
         "note": "CRB: 'you may move through up to 15 feet of difficult terrain each round as if it were normal terrain'"
       }
-    ],
-    "not_yet": [
-      "stacking with Nimble Moves' 5 feet for 20: Nimble Moves' own document (batch2-attack-a.json) still carries no difficult_ft term; the allowance is per move, not per round"
     ]
   },
   "light-step": {

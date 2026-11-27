@@ -1,0 +1,125 @@
+{
+  "_about": [
+    "Feat loop batch 5, lane b5-other (2026-11-26): the meditation line finished, luck that",
+    "takes 10 or is lent, Wind Stance, the social openings and the teamwork leftovers. Text",
+    "read in content/feats/feats.json (aonprd.com FeatDisplay pages) 2026-11-26; the feats",
+    "whose class, race or system no player can take yet are in docs/feats-waiting-on-classes.md.",
+    "wind-stance: CRB: 'If you move more than 5 feet this turn, you gain 20% concealment for 1 round against ranged attacks' (rules/feat_moves.py `_wind_stance`).",
+    "combat-meditation: F&P: 'expend the +1 insight bonus granted from the Meditation Master feat to instead roll twice when attempting an ability check, attack roll, saving throw, or skill check, taking the better of the two results. You must decide to use this ability before the initial roll is made.' The meditation itself is the use in content/class-abilities/feats-b4-maneuver.json.",
+    "slow-time: F&P: 'Once per day, when you meditate as a full-round action using the Combat Meditation feat, you gain the effects of haste for 1 round per 2 character levels' — the addon on Combat Meditation's use (feats-b4-maneuver.json).",
+    "perfect-center: F&P: 'You can take 10 on any skill check or concentration check, even if it is not normally allowed due to strenuous circumstances.' The player's popup offers it; anybody else takes 10 when 10 makes it (Engine._take_ten).",
+    "osyluth-guile: Cheliax: the use in content/class-abilities/feats-b5-other.json.",
+    "rhetorical-flourish: UC: the use in content/class-abilities/feats-b5-other.json.",
+    "helpless-prisoner: GoG: the use in content/class-abilities/feats-b5-other.json.",
+    "betrayer: UC: a Diplomacy check that moves a creature's attitude opens it to the bearer's blow for the round (Engine._betrayer_opening).",
+    "ferocious-loyalty: The +2 after an ally with the feat falls within 30 feet: feat_events._ferocious_loyalty."
+  ],
+  "wind-stance": {
+    "tags": [
+      "movement.wind-stance"
+    ]
+  },
+  "combat-meditation": {
+    "luck": [
+      {
+        "twice": "higher",
+        "spends": "meditation-master",
+        "rolls": [
+          "attack",
+          "save",
+          "skill",
+          "ability"
+        ]
+      }
+    ]
+  },
+  "meditative-concentration": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "concentration",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "meditation.held.combat"
+          }
+        },
+        "note": "F&P: 'For 1 round per character level after you perform combat meditation, whenever you attempt a concentration check to avoid losing a spell or a Fortitude save to resist a distraction effect ... you gain a +4 bonus'"
+      },
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "distraction",
+          "bearer": {
+            "state": "meditation.held.combat"
+          }
+        }
+      }
+    ]
+  },
+  "slow-time": {
+    "tags": [
+      "meditation.slow-time"
+    ]
+  },
+  "perfect-center": {
+    "luck": [
+      {
+        "take_ten": true,
+        "rolls": [
+          "skill",
+          "concentration"
+        ]
+      }
+    ]
+  },
+  "osyluth-guile": {},
+  "rhetorical-flourish": {
+    "not_yet": [
+      "'retry a single failed Diplomacy check against a creature' at -4 on the Bluff: a creature's attitude is moved once a day (Scene.swayed), the owner's 2026-11-22 ruling, so a retried check has nowhere to land"
+    ]
+  },
+  "helpless-prisoner": {
+    "not_yet": [
+      "'If the creature knows you are dangerous, it adds a +4 bonus to its Sense Motive check': nothing records what a creature knows of the prisoner"
+    ]
+  },
+  "betrayer": {
+    "tags": [
+      "betrayer.opening"
+    ]
+  },
+  "ferocious-loyalty": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 1,
+        "bonus_type": "morale",
+        "when": {
+          "ally_threatened": {
+            "feat": "ferocious-loyalty"
+          }
+        },
+        "note": "Blood of the Moon: '+1 morale bonus on attack rolls against any foe that currently threatens an ally who also has this feat'"
+      }
+    ],
+    "not_yet": [
+      "an ally rendered helpless by anything but a blow (a spell's paralysis, a sleep): only the attack that fells is seen to do it"
+    ]
+  },
+  "cloven-helm": {
+    "not_yet": [
+      "every clause asks 'when wearing a helmet': no helmet is an item a sheet can wear (lane b5-core is building one)"
+    ]
+  },
+  "dented-helm": {
+    "not_yet": [
+      "every clause asks 'when wearing a helmet': no helmet is an item a sheet can wear (lane b5-core is building one)"
+    ]
+  }
+}
