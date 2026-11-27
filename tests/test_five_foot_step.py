@@ -75,3 +75,29 @@ def test_pack_attack_steps_after_a_walk_beside_an_ally_with_the_feat():
     res = _move(e, (7, 6))
     assert res.outcomes[-1].status == "resolved", _tells(res)
     assert s.swift_spent.get("pc") == s.round, "the step spends the immediate action"
+
+
+def test_a_second_move_spends_the_standard_and_the_blow_after_it_is_refused():
+    """CRB, Action Types: "You can take a move action in place of a standard action." Batch
+    4 measured two moves and a blow in one turn, and backed the rule out because the reach
+    refusal advised exactly that; b5-core changed the advice and landed the rule."""
+    pc = _pc("fighter", weapons=("longsword",))
+    pc.equipped = "longsword"
+    s, e = _board(pc, ("thug", (15, 5)))
+    _move(e, (9, 5))
+    assert s.standard_spent.get("pc") != s.round
+    _move(e, (14, 5))
+    assert s.standard_spent.get("pc") == s.round
+    res = _run(e, {"op": "attack", "actor": "pc", "target": "c1", "params": {}})
+    assert res.outcomes[-1].status == "refused", _tells(res)
+
+
+def test_a_step_after_a_draw_is_still_a_step_and_spends_no_standard():
+    """A draw spends the move action and moves nobody, so the one square after it is the
+    round's 5-foot step: no standard spent, no swing drawn."""
+    pc = _pc("fighter", weapons=("longsword",))
+    s, e = _board(pc, ("thug", (6, 5)))
+    s.move_spent["pc"] = s.round                   # the draw's move action
+    res = _move(e, (4, 5))
+    assert not _swung_at(res), _tells(res)
+    assert s.standard_spent.get("pc") != s.round

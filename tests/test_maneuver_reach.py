@@ -120,22 +120,28 @@ def test_a_plain_melee_swing_from_15_feet_is_refused_too():
 
 
 @pytest.mark.parametrize("key", sorted(MANEUVERS))
-def test_the_named_move_then_the_manoeuvre_resolves_in_one_list(key):
-    """The repair the refusal asks for. Validation sees the list before any of it runs,
-    so an attack after a move of its own attacker is left to the floor at resolution —
-    otherwise the fixed list would be refused for the distance it is about to close.
-    (The refusal that names the square is asked with the move action walked; the list
-    itself is the explicit move the engine has never gated.)"""
+def test_the_named_move_closes_in_and_the_manoeuvre_lands_next_turn(key):
+    """The repair the refusal asks for. With the move action walked, a second move is the
+    turn's standard action (CRB: "You can take a move action in place of a standard
+    action"; feat loop b5-core), so the square it names is closed to this turn and the
+    manoeuvre is made from it on the next. Until batch 5 the repair was "move there, then
+    strike" in one list — two move actions and a standard in one turn."""
+    from tests._board import new_turn
+
     scene, engine = _fight()
     _walked(scene)
     try:
         engine.validate([_attack({"manoeuvre": key})])
     except IntentError as exc:
         square = _named_square(str(exc))
+        assert "waits for the next turn" in str(exc)
     res = _finish(engine, engine.run(engine.validate([
-        {"op": "move", "actor": "pc", "params": {"square": list(square)}},
-        _attack({"manoeuvre": key})])))
+        {"op": "move", "actor": "pc", "params": {"square": list(square)}}])))
     assert res.outcomes[0].op == "move" and scene.get("pc") is not None
+    assert scene.standard_spent.get("pc") == scene.round, "the second move took it"
+    scene.round += 1
+    new_turn(scene)
+    res = _finish(engine, engine.run(engine.validate([_attack({"manoeuvre": key})])))
     swing = res.outcomes[-1]
     assert swing.op == "attack" and swing.status != "refused", swing.tell
     assert swing.rolls or swing.verdict, swing.tell
@@ -383,8 +389,10 @@ def test_the_panel_says_which_square_to_click_and_shows_no_json(panel):
     `{"op": "move", "actor": "pc", "params": {"square": [6, 8]}}` in red under the
     prose. The panel is read by a person; the square is named the way the map names it.
     Since the close-and-strike ruling (2026-09-29) the strike alone closes and lands
-    when one move reaches, so the refusal is read with the move action walked. The
-    explicit move-and-strike list after it is the panel's own and still resolves."""
+    when one move reaches, so the refusal is read with the move action walked — and then
+    (feat loop b5-core) a second move takes the standard action, so the page says the
+    strike waits for the next turn, and the door refuses a walk-and-strike before the
+    walk is spent."""
     client, cm = panel
     scene = cm.current().scene
     _walked(scene)
@@ -393,19 +401,22 @@ def test_the_panel_says_which_square_to_click_and_shows_no_json(panel):
     r = _post(client, [{"op": "attack", "target": "c1", "params": {}}])
     assert r.status_code == 400
     said = r.json()["error"]
-    assert "15 ft away" in said and "Click square" in said
+    assert "15 ft away" in said and "strike on the next" in said
     assert "{" not in said and '"op"' not in said
     # The square by the board's own name (playtest 2026-11-20 #9), read back by the
     # engine's own reader of those names.
     from rules import fixtures
 
-    got = re.search(r"Click square ([A-Z]+[0-9]+)", said)
+    got = re.search(r"square ([A-Z]+[0-9]+)", said)
     square = list(fixtures.square_said(scene.grid, got.group(1)))
-    # And doing what it says works: the panel's own move-and-strike list.
+    # A walk and a strike after the move is spent: refused at the door, nothing walked.
     r = _post(client, [{"op": "move", "params": {"zone": "near", "square": square}},
                        {"op": "attack", "target": "c1", "params": {}}])
+    assert r.status_code == 400 and "standard action" in r.json()["error"], r.json()
+    assert scene.distance_between("pc", "c1") == 15
+    # The walk alone is the turn's to take.
+    r = _post(client, [{"op": "move", "params": {"zone": "near", "square": square}}])
     assert r.status_code == 200, r.json()
-    assert r.json()["awaiting"], "the strike is waiting on the player's own d20"
 
 
 def test_a_move_and_strike_that_cannot_land_is_refused_before_anything_moves(panel):

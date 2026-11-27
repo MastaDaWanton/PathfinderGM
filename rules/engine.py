@@ -12945,6 +12945,22 @@ class Engine:
                 f'[{x}, {y}]}}}}')
         speed = int(getattr(actor, "speed_feet", 0) or 0)
         far = self.scene.in_encounter and speed and cost > speed
+        # Feat loop b5-core: after the turn's move action a second walk is the standard
+        # action ("You can take a move action in place of a standard action", CRB), so the
+        # walk and the strike are two turns, and the advice says so.
+        moved = self.scene.in_encounter \
+            and self.scene.move_spent.get(actor.ref) == self.scene.round
+        if moved and voice == "person":
+            from . import fixtures as _fixtures
+
+            return (f"{_sentence(fault)} {actor.name} has already moved this turn; moving "
+                    f"on to square {_fixtures.square_name((x, y))} ({cost} ft) takes the "
+                    f"standard action too, so close in this turn and strike on the next.")
+        if moved:
+            return (f"{fault} {actor.name} has already moved this turn: a second move takes "
+                    f"the standard action, so the strike waits for the next turn. To close "
+                    f"in now — to square [{x}, {y}], {cost} ft — write {step} with no "
+                    f"attack after it, or take another action.")
         if voice == "person":
             # By the name the board prints (`fixtures.square_name`), never x,y: the player
             # reads E6 on the board's edge (playtest 2026-11-20 #9).
@@ -34144,12 +34160,15 @@ class Engine:
                     and not intent.params.get("reaction"):
                 self.scene.move_spent[ref] = self.scene.round
             # Feat loop b5-core: the round's walking, for the 5-foot step's rules.
+            walk = ""
             if not intent.params.get("reaction"):
                 from . import stepping
 
-                stepping.record(self, actor, from_square, tuple(square))
+                walk = stepping.record(self, actor, from_square, tuple(square))
             effect = {"ref": ref, "kind": "position", "from": from_square,
                       "to": tuple(square), "feet": cost, "zone": zone}
+            if walk in ("step", "pack"):
+                effect["step"] = True     # the 5-foot step: no move action (b5-core)
             # The feet walked, never the zone: "Pip moves to near (15 ft)" was read live as
             # near somebody (2026-11-12), and "The second lizard moves to near, out in open
             # ground." went onto the page word for word (playtest 2026-11-20 #107). The zone

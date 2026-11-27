@@ -1287,6 +1287,31 @@ def _strike_out_of_reach(scene, pc, raw: list) -> str:
     return ""
 
 
+def _strike_after_two_moves(scene, pc, raw: list) -> str:
+    """The sentence that refuses a walk and a blow when the turn's move action is already
+    spent, or "" (feat loop b5-core). The walk would be the second move action, paid with
+    the standard (CRB, Action Types), and the blow behind it would be refused after the
+    walk — the move spent and the blow lost, the shape `_strike_out_of_reach` exists to
+    stop. A one-square walk that is the round's 5-foot step leaves the blow alone."""
+    from rules import stepping
+
+    if not scene.in_encounter or scene.move_spent.get(pc.ref) != scene.round:
+        return ""
+    here = scene.positions.get(pc.ref) if scene.has_grid else None
+    walked = False
+    for r in raw:
+        p = r.get("params") or {}
+        if r.get("op") == "move" and p.get("square") is not None and here is not None:
+            to = tuple(p["square"])
+            walked = walked or not stepping.is_step(scene, pc, here, to)
+            here = to
+        elif r.get("op") == "attack" and walked and not p.get("reaction"):
+            return ("You have already moved this turn: another move takes your standard "
+                    "action, so there is no blow after it. Move now and strike next turn, "
+                    "or strike from where you stand.")
+    return ""
+
+
 def _move_after_full_round(scene, pc, raw: list) -> str:
     """The sentence that refuses a panel turn walking further than a 5-foot step AFTER a
     full-round action, or "".
@@ -4530,7 +4555,8 @@ def combat_act(request):
     # spend the move and lose the blow (the owner's report of 2026-11-01: "move to (5,4);
     # strike giant rot grub", 25 ft from (5,4), the move walked and the blow refused).
     # And the order the player chose (2026-11-06): a walk after a full-round action.
-    stop = _strike_out_of_reach(scene, pc, raw) or _move_after_full_round(scene, pc, raw)
+    stop = _strike_out_of_reach(scene, pc, raw) or _move_after_full_round(scene, pc, raw) \
+        or _strike_after_two_moves(scene, pc, raw)
     if stop:
         return JsonResponse({"error": stop}, status=400)
 
