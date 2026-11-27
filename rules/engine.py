@@ -33701,10 +33701,11 @@ class Engine:
                                        f"dark", visibility="hidden")
             if d20_succeeds(roll, dc):
                 continue
-            who.add_condition("entangled", rounds=ctx.get("rounds"),
+            who.add_condition(metamagic.GRASP_CONDITION, rounds=ctx.get("rounds"),
                               source=f"{ctx.get('source')} (Shadow Grasp)",
                               origin=str(ctx.get("origin") or ""))
-            effects.append({"kind": "condition", "ref": ref, "condition": "entangled",
+            effects.append({"kind": "condition", "ref": ref,
+                            "condition": metamagic.GRASP_CONDITION,
                             "rounds": ctx.get("rounds"), "origin": ctx.get("origin")})
             caught.append(who.name)
         return effects, ([f"Shadows grip {', '.join(caught)}: entangled (Shadow Grasp)."]

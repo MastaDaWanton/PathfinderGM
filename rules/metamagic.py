@@ -89,6 +89,8 @@ DOES = ("extend", "empower", "maximize", "enlarge", "silent", "still", "quicken"
         # descriptor that affects an area, creatures in the area are entangled"
         # (`Engine._cast_light`).
         "umbral", "shadow_grasp")
+# What Shadow Grasp lays on a creature in its darkness that fails the save.
+GRASP_CONDITION = "entangled"
 
 # Feat loop b5-spells, aonprd FeatDisplay pages read 2026-11-26:
 # - Threnodic (+2, UM): "This feat only works on mind-affecting spells. A threnodic spell
