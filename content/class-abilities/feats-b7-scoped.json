@@ -160,6 +160,26 @@
         ]
       },
       "tell": "{name} turns a shoulder of plate across {target}, armour shared between them."
+    },
+    {
+      "key": "mantis wisdom touch",
+      "name": "Mantis Wisdom Touch",
+      "feat": "mantis-wisdom",
+      "aliases": [
+        "mantis wisdom touch",
+        "mantis wisdom",
+        "lift my stunning fist",
+        "undo my stunning fist"
+      ],
+      "level": 1,
+      "source": "Mantis Wisdom (Ultimate Combat): 'You can also use a standard action and a successful melee touch attack to remove any Stunning Fist effect you have applied to a target.' Each Stunning Fist condition carries who laid it (payload.by, Engine._deliver_charges); lifts_mine removes those of the user's own.",
+      "text": "Standard, melee touch: remove the Stunning Fist effects you laid on the one touched.",
+      "action": "standard",
+      "affects": "target",
+      "attack": "melee touch",
+      "reach_ft": 5,
+      "lifts_mine": "stunning fist",
+      "tell": "{name} presses two fingers to {target}, and the knot the blow tied lets go."
     }
   ]
 }

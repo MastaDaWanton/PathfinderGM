@@ -1562,6 +1562,7 @@ def _state(c) -> dict:
     from rules import houserules as houserules_mod
     from rules import residency
     from rules import schemes as schemes_mod
+    from rules.engine import Engine
 
     # The one answer to what the purse's coin is called here (`goods.coins_here`), the
     # same the engine's tells read: the room's tell said Saltmakers' while this said
@@ -1687,6 +1688,9 @@ def _state(c) -> dict:
                  "glued": bool(a.has_state("state.held.glued")),
                  # Held in a grapple, for the bar's Break free (`escape`, CRB p.200).
                  "grappled": bool(a.held_in_grapple),
+                 # Hampered by a dirty trick, for the bar's Shake off (`escape` how=trick,
+                 # feat loop b7-scoped).
+                 "tricked": Engine.trick_action(a),
                  "conditions": _shown_conditions(a)}
                 for r, a in shown.items()
             ],
@@ -7036,6 +7040,22 @@ def _run_npc_turns(c, agent, limit: int = 12) -> None:
                 "kind": "npc-turn", "ref": ref, "morale": True,
                 "outcomes": [o.as_dict() for o in broke]}))
             continue
+        # A dirty trick shaken off as the turn begins (feat loop b7-scoped,
+        # `Engine.trick_turn`): the action is spent, the rest of the turn planned after.
+        try:
+            shook = engine.trick_turn(ref)
+        except (IntentError, ValueError, KeyError) as exc:
+            c.turn_log.append({"kind": "npc-turn", "ref": ref,
+                               "error": f"trick: {str(exc)[:400]}"})
+            shook = None
+        if shook is not None and not shook.awaiting:
+            for o in shook.outcomes:
+                if o.tell:
+                    c.transcript.append({"who": "gm", "kind": "consequence",
+                                         "text": _plain_tells(c, [o])})
+            c.turn_log.append(history_mod.stamp(c, {
+                "kind": "npc-turn", "ref": ref, "trick": True,
+                "outcomes": [o.as_dict() for o in shook.outcomes]}))
         # A creature holding somebody in a grapple spends its turn keeping the hold (CRB
         # p.200: "you must continue to make a check each round, as a standard action, to
         # maintain the hold"), rolled by the engine — the grab's damage on a kept hold, the

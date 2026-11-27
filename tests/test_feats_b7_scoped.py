@@ -264,3 +264,62 @@ def test_luck_not_against_keeps_dauntless_destiny_off_a_trap_save():
     entry = {"reroll": "natural_1", "rolls": ["save", "attack"], "not_against": ["trap"]}
     assert luck.covers(entry, "save.ref", ("spell",))
     assert not luck.covers(entry, "save.ref", ("trap",))
+
+
+# --- group 21: an action that removes a dirty trick's condition --------------------------------
+
+def test_a_worsened_dirty_trick_costs_the_foe_a_standard_action_to_shake_off():
+    """Dirty Trick Master: the worsened condition "lasts for the duration of the dirty trick
+    ... or until the opponent uses a standard action to remove the condition". Measured
+    before: no action removed a dirty trick's condition at all. The thug, shaken by an
+    earlier trick, is made frightened; on its turn it spends its standard action (not its
+    move) to shake it off (`Engine.trick_turn`)."""
+    pc = _pc("fighter", feats=["Improved Dirty Trick", "Dirty Trick Master"])
+    s, e = _board(pc, ("thug", (6, 5)), faces={"": 19})
+    thug = s.actors["c1"]
+    thug.add_condition("shaken", rounds=2, source="dirty trick by the test",
+                       origin="rule:dirty-trick")
+    res = _attack(e, target="c1", manoeuvre="dirty trick", trick="shaken")
+    assert thug.has_condition("frightened"), _tells(res)
+    assert e.trick_action(thug) == "standard"
+    s.turn = 1
+    res = e.trick_turn("c1")
+    assert res is not None and not thug.has_condition("frightened"), _tells(res)
+    assert s.standard_spent.get("c1") == s.round and s.move_spent.get("c1") != s.round
+
+
+def test_the_player_shakes_off_a_trick_as_a_move_action_and_its_rider_goes_with_it():
+    """APG, Dirty Trick: "Removing the condition requires the target to spend a move
+    action"; Improved Underhanded Teamwork: "If the foe uses an action to remove the first
+    condition, it also removes the condition imposed by your immediate action". The bar's
+    Shake off sends `escape` how=trick; both conditions go, the move action is spent."""
+    pc = _pc("fighter")
+    s, e = _board(pc, ("thug", (6, 5)))
+    first = pc.add_condition("dazzled", rounds=3, source="dirty trick by the thug 1",
+                             origin="rule:dirty-trick")
+    pc.add_condition("sickened", rounds=2, source="dirty trick by the thug 2",
+                     origin="rule:dirty-trick", payload={"rides_with": first.key})
+    from tests.test_feats_b4_moves import _run
+
+    res = _run(e, {"op": "escape", "actor": "pc", "params": {"how": "trick"}})
+    assert res.outcomes[-1].status == "resolved", _tells(res)
+    assert not pc.has_condition("dazzled") and not pc.has_condition("sickened")
+    assert s.move_spent.get("pc") == s.round
+
+
+def test_mantis_wisdom_lifts_only_the_stunning_fist_its_holder_laid():
+    """Mantis Wisdom (UC): "use a standard action and a successful melee touch attack to
+    remove any Stunning Fist effect you have applied to a target." Measured before: no door
+    removed a condition by its giver's touch. The thug's stun laid by Kesst goes; the
+    fatigue another monk's Stunning Fist laid stays."""
+    pc = _pc("monk", feats=["Improved Unarmed Strike", "Stunning Fist", "Mantis Style",
+                            "Mantis Wisdom"])
+    s, e = _board(pc, ("thug", (6, 5)), faces={"Mantis Wisdom Touch": 19})
+    thug = s.actors["c1"]
+    thug.add_condition("stunned", rounds=1, source="Stunning Fist",
+                       origin="ability:feat/stunning fist", payload={"by": "pc"})
+    thug.add_condition("fatigued", rounds=3, source="Stunning Fist",
+                       origin="ability:monk/stunning fist", payload={"by": "c9"})
+    out = _use(e, "Mantis Wisdom Touch", to="c1")
+    assert out.status == "resolved", out.tell
+    assert not thug.has_condition("stunned") and thug.has_condition("fatigued")

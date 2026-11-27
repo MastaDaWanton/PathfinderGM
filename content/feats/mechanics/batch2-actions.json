@@ -137,17 +137,11 @@
   "improved-underhanded-teamwork": {
     "tags": [
       "teamwork.underhanded.improved"
-    ],
-    "not_yet": [
-      "the foe's action to remove the first condition does not also remove the second (no action removes a dirty trick's condition yet)"
     ]
   },
   "dirty-trick-master": {
     "tags": [
       "maneuver.dirty-trick.master"
-    ],
-    "not_yet": [
-      "the worsened condition's \"until the opponent uses a standard action to remove the condition\" ending is not offered (no action removes a dirty trick's condition yet)"
     ]
   },
   "bull-rush-strike": {

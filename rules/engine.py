@@ -7701,6 +7701,22 @@ class Engine:
             origin=str(held.origin or "rule:held-save"),
             origin_name=source))
 
+    def trick_turn(self, ref: str) -> Resolution | None:
+        """A creature hampered by a dirty trick shakes it off as its turn begins (feat
+        loop b7-scoped) — APG: "Removing the condition requires the target to spend a move
+        action"; Dirty Trick Master's worsened one a standard (`_shake_off_trick`). Owner
+        call, taking the book as written: a creature that can act always spends the action
+        on it, as a table's GM would; the rest of its turn is planned after. None for the
+        player (the bar's Shake off), or when no trick holds it, or it cannot act."""
+        actor = self.scene.actors.get(ref)
+        if actor is None or actor.is_pc or actor.is_down or not self.dirty_tricks(actor) \
+                or actor.blocking_key("escape"):
+            return None
+        return self.run(self.validate([{
+            "op": "escape", "actor": ref, "visibility": "hidden",
+            "params": {"how": "trick"},
+            "because": f"{actor.name} shakes off the dirty trick"}], origin=self.DIRTY_TRICK))
+
     def grapple_turn(self, ref: str) -> Resolution | None:
         """A creature's turn while it holds somebody: the maintaining check, as its
         standard action (CRB p.200), through the one manoeuvre door — so its dice, its
@@ -8114,12 +8130,64 @@ class Engine:
             out.effects[:0] = posted[0].effects
         return out
 
+    # The provenance a dirty trick's condition carries (`_outcome_trick`).
+    DIRTY_TRICK = "rule:dirty-trick"
+
+    @classmethod
+    def dirty_tricks(cls, actor: Actor) -> list:
+        """The dirty tricks' conditions on this creature, by their stamp (the table's
+        Shake off asks it too, play/views.py)."""
+        return [e for e in actor.effects if e.kind == "condition" and e.rounds_left
+                and e.origin == cls.DIRTY_TRICK]
+
+    @classmethod
+    def trick_action(cls, actor: Actor) -> str:
+        """The action shaking off this creature's worst dirty trick costs, or "" (none)."""
+        tricks = cls.dirty_tricks(actor)
+        if not tricks:
+            return ""
+        return "standard" if any((e.payload or {}).get("worsened") for e in tricks) else "move"
+
+    def _shake_off_trick(self, intent: Intent, actor: Actor) -> "Outcome | None":
+        """A dirty trick's condition removed by the one it hampers (feat loop b7-scoped),
+        through the `escape` door the reader already has, so no reader route was added.
+
+        APG, Dirty Trick: "Removing the condition requires the target to spend a move
+        action." Dirty Trick Master's worsened condition lasts "until the opponent uses a
+        standard action to remove the condition"; Improved Underhanded Teamwork: "If the
+        foe uses an action to remove the first condition, it also removes the condition
+        imposed by your immediate action" (`payload.rides_with`). The worst is shaken off
+        first — a worsened one, then the longest. None when no trick hampers them."""
+        tricks = self.dirty_tricks(actor)
+        if not tricks:
+            return None
+        first = max(tricks, key=lambda e: (bool((e.payload or {}).get("worsened")),
+                                           int(e.rounds_left or 0)))
+        action = self.trick_action(actor)
+        late = self._spend_ability_action(intent, actor, action, "shaking off a dirty trick")
+        if late is not None:
+            return late
+        gone = actor.remove_effects(match=lambda e: e is first or (
+            any(e is t for t in tricks) and (e.payload or {}).get("rides_with") == first.key))
+        names = [str(e.key) for e in gone]
+        return Outcome(
+            intent_id=intent.id, op="escape", verdict="success",
+            effects=[{"ref": actor.ref, "kind": "condition_removed", "conditions": names,
+                      "origin": "rule:dirty-trick", "action": action}],
+            tell=f"{actor.name} spends a {action} action shaking off the dirty trick: no "
+                 f"longer {_and_list(names)}.", because=intent.because)
+
     def _op_escape(self, intent: Intent, partial: dict) -> Outcome:
         """`escape`: the held creature breaks the grapple holding it (`_escape_from`)."""
         actor = self.scene.actors.get(intent.actor or "") or self.scene.pc()
         if actor is None:
             return self._refuse(intent, "There is nobody here to break free.",
                                 code="not_grappled")
+        if str(intent.params.get("how") or "") == "trick":
+            # The bar's Shake off (feat loop b7-scoped): the trick, even while held.
+            shaken = self._shake_off_trick(intent, actor)
+            if shaken is not None:
+                return shaken
         holder = self._grappler_of(actor)
         wanted = self.scene.actors.get(str(intent.target or "")) if intent.target else None
         if wanted is not None and self._holds(wanted, actor):
@@ -8129,6 +8197,10 @@ class Engine:
             if stuck is not None:
                 return self._escape_spell_hold(intent, actor, stuck, partial,
                                                str(intent.params.get("how") or ""))
+            # A dirty trick's condition, shaken off (feat loop b7-scoped, `_shake_off_trick`).
+            shaken = self._shake_off_trick(intent, actor)
+            if shaken is not None:
+                return shaken
             # Held by the watch, not by a grapple (rules/trial.py): out of the cell, or out
             # of the escort's hands on the walk to the gallows.
             from . import trial as trial_mod
@@ -15077,12 +15149,22 @@ class Engine:
         prev = next((e for e in defender.effects if e.rounds_left and str(
             e.source or "").startswith(f"{m['name']} by ")), None)
         worse = self._DIRTY_WORSE.get(str(prev.key)) if prev is not None else None
+        payload: dict = {}
         if worse and actor.has_state("maneuver.dirty-trick.master"):
             rounds += int(prev.rounds_left or 0)
             defender.remove_effects(match=lambda e, p=prev: e is p)
             trick = worse
+            # "... or until the opponent uses a standard action to remove the condition"
+            # (feat loop b7-scoped: `_shake_off_trick` reads it).
+            payload["worsened"] = True
+        elif prev is not None and intent.params.get("reaction") == \
+                "improved-underhanded-teamwork":
+            # "If the foe uses an action to remove the first condition, it also removes
+            # the condition imposed by your immediate action" (feat loop b7-scoped).
+            payload["rides_with"] = str(prev.key)
         defender.add_condition(trick, rounds=rounds,
-                               source=f"{m['name']} by {actor.name}")
+                               source=f"{m['name']} by {actor.name}",
+                               origin=self.DIRTY_TRICK, payload=payload or None)
         return (say(m["effect"], False, trick=trick,
                     rounds=f"{rounds} round{'' if rounds == 1 else 's'}"), [],
                 [{"ref": defender.ref, "kind": "condition", "condition": trick,
@@ -39510,6 +39592,19 @@ class Engine:
                         records.append({"ref": other.ref, "kind": "condition_removed",
                                         "conditions": gone, "origin": origin})
                         tells.append(f"{other.name} is no longer {_and_list(gone)}.")
+                # `lifts_mine` (feat loop b7-scoped): what the user's own uses of that
+                # ability laid on them — Mantis Wisdom's "remove any Stunning Fist effect
+                # you have applied to a target", by its stamp and its giver (`payload.by`).
+                mine = str(doc.get("lifts_mine") or "")
+                if mine:
+                    gone = [str(e.key) for e in other.remove_effects(match=lambda e: (
+                        e.payload or {}).get("by") == actor.ref
+                        and str(e.origin or "").split("/", 1)[-1] == mine)]
+                    records.append({"ref": other.ref, "kind": "condition_removed",
+                                    "conditions": gone, "origin": origin})
+                    tells.append(f"{other.name} is no longer {_and_list(gone)}." if gone
+                                 else f"Nothing {actor.name} laid with {mine} holds "
+                                      f"{other.name}.")
             removes = doc.get("removes") or {}
             if removes:
                 lifts = _mercy_lifts(actor, removes, ca)
@@ -41167,8 +41262,11 @@ class Engine:
                 running.rounds_left += int(rounds)
                 rounds = running.rounds_left
             else:
+                # `by`: who laid it, so its giver's touch may lift it (Mantis Wisdom,
+                # feat loop b7-scoped: a document's `lifts_mine`).
                 defender.add_condition(str(c["condition"]), int(rounds) if rounds else None,
-                                       source=e.name, origin=e.origin)
+                                       source=e.name, origin=e.origin,
+                                       payload={"by": actor.ref})
             out.append({"effect": {"ref": defender.ref, "kind": "condition",
                                    "condition": c["condition"], "rounds": rounds,
                                    "from": e.name, "origin": e.origin,

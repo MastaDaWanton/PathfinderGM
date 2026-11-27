@@ -385,7 +385,9 @@ DOC_KEYS = frozenset({
     "favored_sort", "understood",
     # Feat loop b7-scoped: the suit's weight class the user must wear (Extend the
     # Bulwark's "wearing medium or heavy armor"; Engine._ability_refusal).
-    "armour"})
+    "armour",
+    # Feat loop b7-scoped: lifts what the user's own uses of an ability laid (Mantis Wisdom).
+    "lifts_mine"})
 
 
 def _ally_want_problems(at: str, want) -> list[str]:
