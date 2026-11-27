@@ -170,10 +170,8 @@
   },
   "boar-style": {
     "tags": [
-      "unarmed.tear-flesh"
-    ],
-    "not_yet": [
-      "slashing damage with your unarmed strikes (a free action to change): an unarmed strike's damage type is fixed"
+      "unarmed.tear-flesh",
+      "unarmed.damage.slashing"
     ]
   },
   "boar-shred": {
@@ -1031,8 +1029,11 @@
         "note": "Tiger Style"
       }
     ],
+    "tags": [
+      "unarmed.damage.slashing"
+    ],
     "not_yet": [
-      "slashing damage with your unarmed strikes, and the 1d4 bleed on two turns after a slashing critical: an unarmed strike's damage type is fixed"
+      "the 1d4 bleed at the start of the foe's next two turns after a slashing unarmed critical: a bleed here runs until healed, and no bleed is laid for two turns only"
     ]
   },
   "tiger-claws": {

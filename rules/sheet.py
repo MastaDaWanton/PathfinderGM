@@ -398,6 +398,7 @@ def _trait_word(text) -> str:
 # attack roll asks `has_state` and never looks for the feat by name.
 STRIKES_EITHER_WAY = "lethality.either.unarmed"
 LETHALITY_EITHER = "lethality.either"
+UNARMED_DAMAGE = "unarmed.damage"     # + .slashing / .piercing (feat loop b6-partials)
 PULLS_BLUDGEONING = "lethality.nonlethal.bludgeoning"     # Bludgeoner (feat loop b3)
 UNTIL_REST = "duration.until-rest"                         # gone at the next rest (b3)
 # Feat loop b4-other: Meditation Master's document tag, and the 24 hours a meditation lays.
@@ -3503,6 +3504,19 @@ class Actor:
                 and (self.has_state(STRIKES_EITHER_WAY)
                      or self.has_state(classfeatures.UNARMED_STRIKE)):
             row = dict(row, nonlethal=False)
+        # Feat loop b6-partials: Boar Style's "bludgeoning damage or slashing damage with
+        # your unarmed strikes", Snake Style's and Boar Ferocity's piercing, Tiger Style's
+        # slashing — a document tag `unarmed.damage.<type>`. The fist stays bludgeoning
+        # and strikes as each named type too (a damage reduction naming one is passed),
+        # the book's "changing damage type is a free action" taken as always the better.
+        if str(row.get("name", "")).lower().startswith("unarmed strike") \
+                and not (row.get("stat_block") or row.get("natural")
+                         or row.get("granted_by")):
+            kinds = [str(t).rsplit(".", 1)[-1] for t in self.standing_tags()
+                     if str(t).startswith(UNARMED_DAMAGE + ".")]
+            have = list(row.get("strikes_as") or ())
+            if any(k not in have for k in kinds):
+                row = dict(row, strikes_as=have + [k for k in kinds if k not in have])
         if not self.char_class or row.get("stat_block") or row.get("natural") \
                 or row.get("granted_by"):
             return row
@@ -5507,7 +5521,13 @@ class Actor:
         # source its own Reduction so best-only still holds.
         for m in self._buff_mods("combat_mod", "dr"):
             pool.append(Reduction(int(m.value), "", m.source))
-        usable = [r for r in pool if r.amount > 0 and not r.bypassed_by(traits)]
+        # Feat loop b6-partials: the blow's own physical type passes a DR naming it (CRB,
+        # Damage Reduction: a skeleton's DR 5/bludgeoning is "overcome by bludgeoning
+        # weapons"). Measured before: only `strikes_as` traits were asked, so a mace met
+        # the skeleton's full 5 and a slashing fist had nothing to change.
+        own = tuple(w for w in ("bludgeoning", "piercing", "slashing")
+                    if w in str(dtype or "").lower())
+        usable = [r for r in pool if r.amount > 0 and not r.bypassed_by(tuple(traits) + own)]
         # A blow that passes DR by its own rule rather than by what it is made of: a
         # smite "bypasses any DR the creature might possess" (CRB p.61), Artificer's Touch
         # "bypasses an amount of damage reduction ... equal to your cleric level" (CRB

@@ -340,3 +340,34 @@ def test_prone_shooter_counts_from_the_end_of_the_prone_body_s_own_turn():
     assert pc.ac("ranged") == standing + 4
     assert s.advance_turn() == "c1"
     assert pc.ac("ranged") == standing + 6
+
+
+# --- what a blow is made of ------------------------------------------------------------------
+
+def test_a_blow_s_own_damage_type_passes_a_reduction_naming_it():
+    """CRB, Damage Reduction: DR 5/bludgeoning is overcome by bludgeoning weapons. Measured
+    before: `damage_reduction` asked the blow's `strikes_as` traits only, so a club met a
+    skeleton's full 5 exactly as a sword did."""
+    from rules.engine import Scene
+
+    s = Scene(location_id="5bbd0c40345f")
+    bones = instantiate("skeleton", scene=s)
+    assert bones.damage_reduction("bludgeoning") is None
+    assert bones.damage_reduction("slashing").amount == 5
+
+
+def test_boar_style_s_fist_cuts_past_a_zombie_s_slashing_reduction():
+    """UC Boar Style: "You can deal bludgeoning damage or slashing damage with your unarmed
+    strikes"; Snake Style and Boar Ferocity add piercing. Before: a fist was bludgeoning
+    whatever the style. The zombie's DR 5/slashing meets a plain fist and not Boar Style's."""
+    from rules.engine import Scene
+
+    s = Scene(location_id="5bbd0c40345f")
+    zombie = instantiate("zombie", scene=s)
+    for feats, gets_past in (([], False), (["Boar Style"], True), (["Snake Style"], False)):
+        pc = _pc("monk", feats=["Improved Unarmed Strike", *feats], equipped="unarmed")
+        fist = pc.weapon("unarmed")
+        passed = zombie.damage_reduction(fist["type"], tuple(fist.get("strikes_as") or ()))
+        assert (passed is None) is gets_past, feats
+    snake = _pc("monk", feats=["Snake Style"], equipped="unarmed").weapon("unarmed")
+    assert "piercing" in snake["strikes_as"]
