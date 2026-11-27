@@ -220,8 +220,8 @@
         }
       }
     ],
-    "not_yet": [
-      "halving a Disruptive foe's increase to the concentration DC (no foe's feat raises that DC here yet)"
+    "tags": [
+      "casting.shielded"
     ]
   },
   "allied-spellcaster": {

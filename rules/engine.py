@@ -8222,10 +8222,13 @@ class Engine:
             # the enemy's location and are capable of taking an attack of opportunity"
             # (feat loop b2) — `_disrupted_by`.
             near = self._disrupted_by(actor)
-            situations.append(("defensively", 15 + 2 * level + (4 if near else 0),
+            raised = (2 if near is not None and self._shielded_from(actor, near) else 4) \
+                if near is not None else 0
+            situations.append(("defensively", 15 + 2 * level + raised,
                                "casting defensively"
-                               + (f" within {near.name}'s reach (Disruptive)" if near
-                                  else "")))
+                               + (f" within {near.name}'s reach (Disruptive"
+                                  + (", halved by a shielding ally" if raised == 2 else "")
+                                  + ")" if near else "")))
         if actor.has_state("state.held.grappled") or actor.has_state("state.held.pinned"):
             holder = self._grappler_of(actor)
             if holder is not None:
@@ -8520,6 +8523,24 @@ class Engine:
 
     # Disruptive's tag (its feat document, feat loop b2).
     DISRUPTS_DEFENSIVE_CASTING = "reactions.disrupts.casting-defensively"
+
+    def _shielded_from(self, caster, foe) -> bool:
+        """Shielded Caster (UM): "If an enemy threatening you both has the Disruptive feat
+        or another ability that increases concentration check DCs, that increase is
+        halved" — the caster holding the feat, an adjacent ally holding it too, and the
+        foe threatening that ally's square as well (feat loop b7-small); the feat's
+        document tag, `casting.shielded`."""
+        def holds(who):
+            return who.has_state("casting.shielded")
+
+        if not holds(caster):
+            return False
+        for ally in self._adjacent_allies(caster):
+            spot = self.scene.positions.get(ally.ref)
+            if holds(ally) and spot is not None and reactions.threatens(
+                    self.scene, foe.ref, tuple(spot[:2])):
+                return True
+        return False
 
     def _disrupted_by(self, caster) -> "Actor | None":
         """The first foe holding Disruptive who threatens this caster's square, knows where

@@ -375,3 +375,27 @@ def test_smell_fear_reads_a_frightened_subject_with_perception():
     b = _run(engine, {**_check("sense motive"), "target": calm.ref})[0]
     assert a.rolls[0].label.startswith("Perception check"), a.rolls[0].label
     assert b.rolls[0].label.startswith("Sense Motive check")
+
+
+def test_shielded_caster_halves_a_disruptive_foe_s_increase():
+    """UM, Shielded Caster: "If an enemy threatening you both has the Disruptive feat or
+    another ability that increases concentration check DCs, that increase is halved."
+    Measured before: DC 21 beside a Disruptive thug, shielded or not. With an ally who
+    holds the feat beside her and in the thug's reach too, DC 19; the ally out of the
+    thug's reach, DC 21 again."""
+    from tests.test_feats_computed import Loaded, _board as cast_board, _cast, _wizard
+
+    def dc(ally_at):
+        pc = _wizard("Shielded Caster")
+        s, e = cast_board(pc, Loaded(12))
+        s.actors["c1"].feats = ["Disruptive"]
+        friend = _pc("fighter", feats=["Shielded Caster"])
+        friend.ref, friend.kind = "a1", "npc"
+        s.add(friend, at=ally_at)
+        s.sides = {"us": ["pc", "a1"], "them": ["c1"]}
+        res = _cast(e, defensively=True)
+        return [r for r in res.outcomes[0].rolls if r.label.startswith("Concentration")][0]
+
+    shielded = dc((6, 6))                 # beside her, beside the thug
+    assert "DC 19" in shielded.label, shielded.label
+    assert "DC 21" in dc((4, 4)).label    # beside her, out of the thug's reach
