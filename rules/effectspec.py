@@ -630,6 +630,10 @@ VOCAB: dict[str, list[dict]] = {
         # Feet of difficult terrain crossed as normal in a move (Acrobatic Steps' 15),
         # read by `Engine._easy_ft` into `Grid.reachable(easy_ft=)`.
         ("difficult_ft", "Difficult terrain crossed as normal, in feet"),
+        # Feat loop b5-other: a world-class bench's check, scoped by `when.bench`
+        # (Brewmaster's Craft (alchemy) is the alchemist's bench), read by
+        # `tradecraft.bench_check_terms`.
+        ("bench_check", "A world-class bench's check"),
         # Feat loop b1, 2026-11-22: the caster level a spell is CAST at, read by
         # `casting.spell_caster_level` with the spell's roll context (school, spell,
         # energy, descriptor, subschool) — Spell Specialization's "treat your caster level
@@ -2553,6 +2557,8 @@ WHEN_KEYS: dict[str, str] = {
                      "(position.higher_than); no board, no answer",
     # Feat loop b5-other: Ferocious Loyalty's "any foe that currently threatens an ally
     # who also has this feat" (sheet.Situation.ally_threatened).
+    "bench": "the world-class bench a check is made at: alchemist, blacksmith, enchanter, "
+             "leatherworker, herbalist (tradecraft.bench_check_terms)",
     "ally_threatened": "the foe of the roll threatens an ally holding a feat: "
                        "{\"feat\": \"ferocious-loyalty\"}; no board, no answer",
 }

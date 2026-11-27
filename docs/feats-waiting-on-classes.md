@@ -389,6 +389,18 @@ Systems not in the game:
   stance's dodge bonus for DR is not built)
 - Dimensional Savant: Dimensional Dervish's teleporting full attack, still a `not_yet` in
   batch2-attack-a.json
-- Meditative Concentration, Perfect Center, Slow Time: Combat Meditation, lane
-  b4-maneuver's in this batch (Perfect Center also needs taking 10 as a declared choice,
-  which no check offers a player yet)
+- (Meditative Concentration, Perfect Center and Slow Time were listed here; feat loop
+  batch 5, lane b5-other, built all three on Combat Meditation and a take-10 luck offer.)
+
+## Feat loop batch 5, lane b5-other
+
+Confirmed again, still waiting on what the batch 4 headings above name: Leadership,
+Additional Traits, Deep Drinker, Fast Drinker, Eclectic, Extra Discovery, Extra Revelation,
+Hero's Fortune, Luck of Heroes, Flagbearer, Conviction, Improved Learn Ranger Trap, Learn
+Ranger Trap (both printings), Trapper's Setup, Advanced Ranger Trap, Equipment Trick,
+Renown, Expert Trainer, Focused Worker, Dimensional Savant, Gunsmithing, Horse Master,
+Improved Stalwart, Monastic Legacy, Exploit Lore, Extra Arcana, Eyes of Judgment, Grant
+Initiative, Improved Monster Lore, Insightful Gaze, Oracular Intuition, Sin Seer.
+
+Dented Helm and Cloven Helm moved out of this list: each carries a document now whose
+`not_yet` names the helmet lane b5-core is building.

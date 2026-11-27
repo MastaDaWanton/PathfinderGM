@@ -345,3 +345,16 @@ def test_ferocious_loyalty_against_a_foe_threatening_a_loyal_ally_then_two_when_
     thug.add_condition("unconscious", 10, source="test")
     feat_events._ferocious_loyalty(e, pc, thug)
     assert not [x for x in pc.effects if x.origin == feat_events.LOYAL_ORIGIN]
+
+
+def test_brewmaster_is_two_on_the_alchemist_s_bench_check_only():
+    """ARG: "+2 bonus on Craft (alchemy)" — the alchemist's bench check is the game's
+    Craft (alchemy); the forge's check gets nothing."""
+    from rules import alchemist, tradecraft
+
+    scene, engine, pc = _luck_pc("Brewmaster")
+    terms = alchemist.check_terms(pc, 1)
+    assert {"label": "Brewmaster", "value": 2} in terms
+    forge = tradecraft.bench_check_terms(pc, 1, track="blacksmith", name="Blacksmith",
+                                         ability="str")
+    assert not any(t["label"] == "Brewmaster" for t in forge)

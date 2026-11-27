@@ -117,6 +117,11 @@ def bench_check_terms(actor, level: int, *, track: str, name: str, ability: str,
         *bench_terms(actor, track),
         # Cooperative Crafting's +2 circumstance (feat loop b4-crafting, rules/cooperative.py).
         *(cooperative.terms(actor) if actor is not None else []),
+        # A feat's term on this bench's check, through the funnel (feat loop b5-other:
+        # Brewmaster's "+2 bonus on Craft (alchemy)" — the alchemist's bench check is the
+        # game's Craft (alchemy), the trade folded onto one Craft id).
+        *([{"label": m.source, "value": m.value} for m in stack(actor._buff_mods(
+            "combat_mod", "bench_check", {"bench": track}))] if actor is not None else []),
     ]
 
 

@@ -91,6 +91,9 @@
   "betrayer": {
     "tags": [
       "betrayer.opening"
+    ],
+    "not_yet": [
+      "the blow 'as an immediate action' before anybody else acts: an attack out of a fight opens one through the battle gate and initiative is rolled first, so the blow comes on the bearer's turn (the -2 initiative is laid in time for that roll)"
     ]
   },
   "ferocious-loyalty": {
@@ -120,6 +123,44 @@
   "dented-helm": {
     "not_yet": [
       "every clause asks 'when wearing a helmet': no helmet is an item a sheet can wear (lane b5-core is building one)"
+    ]
+  },
+  "brewmaster": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "bench_check",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bench": "alchemist"
+        },
+        "note": "ARG: '+2 bonus on Craft (alchemy) and Profession (brewer) checks' — the alchemist's bench check is the game's Craft (alchemy)"
+      }
+    ],
+    "not_yet": [
+      "Profession (brewer)'s +2: Profession is one skill id (the trades fold, 2026-10-07), and a Profession check does not say which trade it is made in",
+      "'+1 to the DC of any ingested poison you create': no bench makes an ingested poison"
+    ]
+  },
+  "mystic-stride": {
+    "not_yet": [
+      "moving at full speed through enchanted thorns, briars and overgrowth, entangling or not: woodland stride itself is not built (the druid's and ranger's grant is a name on the class table), and no magical vegetation is terrain the move prices"
+    ]
+  },
+  "in-harm-s-way": {
+    "not_yet": [
+      "intercepting a successful attack on the ally your aid another guards, taking its full damage and riders as an immediate action: the attack loop resolves a blow on the one defender it was aimed at, and nothing hands a landed blow to another body"
+    ]
+  },
+  "tribe-mentality": {
+    "not_yet": [
+      "both rolling the save against one compulsion or emotion effect and either using either result: a cast's saves are rolled target by target, and no save sees an ally's roll of the same effect"
+    ]
+  },
+  "babble-peddler": {
+    "not_yet": [
+      "the Bluff to trade a worthless object for a better one, the attitude worsening on a failure by 5, and the opposed Appraise after: no door swaps held items between the player and a creature by a check"
     ]
   }
 }
