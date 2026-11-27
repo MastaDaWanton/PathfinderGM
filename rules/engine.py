@@ -12749,8 +12749,12 @@ class Engine:
                 hit = self._apply_damage(defender, amount, weapon["type"],
                                          traits=struck_as + attacker_traits(actor)
                                          + strike_feats.dr_traits(actor, defender,
-                                                                  weapon_key),
+                                                                  weapon_key)
+                                         # Feat loop b7-scoped: Clustered Shots' one DR.
+                                         + strike_feats.clustered_traits(
+                                             actor, defender, weapon, state, full),
                                          lethality=lethality)
+                strike_feats.clustered_spent(actor, defender, weapon, state, full, hit)
                 if spared:
                     bruise = self._apply_damage(defender, spared, weapon["type"],
                                                 traits=struck_as + attacker_traits(actor),

@@ -392,6 +392,32 @@ PUNCHED = "rule:feat-punch-through"
 CLEAVING_FINISH_UNLIMITED = "attack.cleaving-finish.unlimited"   # Improved Cleaving Finish
 
 
+PLANAR_HUNTER = "dr.planar-hunter"            # feat loop b7-scoped
+CLUSTERED = "dr.clustered-shots"
+
+
+def clustered_traits(actor, defender, weapon, state, full: bool) -> tuple[str, ...]:
+    """Clustered Shots (UC): "When you use a full-attack action to make multiple ranged
+    weapon attacks against the same opponent, total the damage from all hits before
+    applying that opponent's damage reduction." Measured before: each hit met the
+    reduction alone, so four arrows of 6 into DR 5 dealt 4. Totalled first is the same
+    sum as each hit passing the DR its predecessors already absorbed: `ignores_dr:<n>`,
+    n the reduction spent so far on this foe (`clustered_spent`)."""
+    from .sheet import IGNORES_DR
+
+    if not full or weapon.get("category") != "ranged" or not actor.has_state(CLUSTERED):
+        return ()
+    spent = int((state.get("clustered") or {}).get(defender.ref, 0))
+    return (f"{IGNORES_DR}:{spent}",) if spent else ()
+
+
+def clustered_spent(actor, defender, weapon, state, full: bool, hit: dict) -> None:
+    if not full or weapon.get("category") != "ranged" or not actor.has_state(CLUSTERED):
+        return
+    book = state.setdefault("clustered", {})
+    book[defender.ref] = int(book.get(defender.ref, 0)) + int(hit.get("reduced") or 0)
+
+
 def dr_traits(actor, defender, weapon_key) -> tuple[str, ...]:
     from . import feat_events
     from .sheet import IGNORES_DR, IGNORES_TYPED_DR, current_moment
@@ -399,6 +425,18 @@ def dr_traits(actor, defender, weapon_key) -> tuple[str, ...]:
     out: list[str] = []
     if actor.has_state(GREATER_PENETRATING) and feat_events.has_weapon_focus(actor, weapon_key):
         out += [f"{IGNORES_TYPED_DR}:10", f"{IGNORES_DR}:5"]
+    # Feat loop b7-scoped: Planar Hunter (Planar Adventures) — "When you are on one of the
+    # planes you've selected as a favored terrain ... You also ignore up to 5 points of
+    # damage reduction when making weapon attacks against outsiders native to that plane,
+    # except for damage reduction without a type". The clause its +2 to hit already asks
+    # (`classfeatures.holds`): a planar favoured terrain, an outsider.
+    if actor.has_state(PLANAR_HUNTER):
+        from . import classfeatures
+
+        if classfeatures.holds({"bearer": {"terrain": "planes"},
+                                "target": {"type": "outsider"}}, actor,
+                               {"target_actor": defender}):
+            out.append(f"{IGNORES_TYPED_DR}:5")
     scene = getattr(current_moment(), "scene", None)
     if scene is not None and actor.has_state(PUNCH_THROUGH):
         from . import position

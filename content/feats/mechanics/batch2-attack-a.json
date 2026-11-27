@@ -656,8 +656,8 @@
     ]
   },
   "clustered-shots": {
-    "not_yet": [
-      "damage reduction applied once to the total of a full attack's ranged hits on one foe: each hit meets the reduction alone"
+    "tags": [
+      "dr.clustered-shots"
     ]
   },
   "deceptive-exchange": {

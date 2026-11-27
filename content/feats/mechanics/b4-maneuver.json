@@ -226,8 +226,10 @@
       }
     ],
     "not_yet": [
-      "'ignore up to 5 points of damage reduction ... except damage reduction without a type': a feat lends no DR-passing trait to a blow",
       "'against extraplanar creatures you ... identify as being from one of your planar favored terrains ... regardless of what plane you or they are on': no creature records the plane it is native to"
+    ],
+    "tags": [
+      "dr.planar-hunter"
     ]
   }
 }

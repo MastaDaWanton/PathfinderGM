@@ -392,3 +392,51 @@ def test_wall_of_flesh_s_cmd_step_is_the_size_table_s_not_a_flat_one():
             got = [m.value for m in pc.cmd_modifiers() if "Wall of Flesh" in m.source
                    or "one size larger" in m.source]
         assert got == [want], (size, [(m.source, m.value) for m in pc.cmd_modifiers()])
+
+
+# --- group 38: damage reduction passed by a feat ----------------------------------------------
+
+def _dr_hits(feats, full=True):
+    pc = _pc("fighter", feats=feats, weapons=["longbow"], equipped="longbow",
+             goods={"arrows": 40})
+    s, e = _board(pc, ("thug", (8, 5)), faces={"Attack": 18, "Damage": 8})
+    thug = s.actors["c1"]
+    thug.hp = thug.hp_max = 200
+    thug.apply_effect(ActiveEffect(name="DR", kind="damage_reduction",
+                                   payload={"amount": 5, "bypass": ""}))
+    res = _attack(e, target="c1", weapon="longbow", full_attack=full)
+    return [x for o in res.outcomes for x in o.effects or ()
+            if x.get("ref") == "c1" and "reduced" in x], res
+
+
+def test_clustered_shots_meets_the_reduction_once_across_a_full_attack():
+    """Clustered Shots (UC): "total the damage from all hits before applying that
+    opponent's damage reduction." Measured before: each arrow met DR 5 alone (two hits,
+    10 soaked). Now the full attack's hits soak 5 between them; without the feat, 10."""
+    hits, res = _dr_hits(["Clustered Shots"])
+    assert len(hits) >= 2, _tells(res)
+    assert sum(int(h["reduced"]) for h in hits) == 5
+    plain, res = _dr_hits([])
+    assert sum(int(h["reduced"]) for h in plain) == 5 * len(plain)
+
+
+def test_planar_hunter_passes_five_of_a_typed_reduction_against_an_outsider_only(monkeypatch):
+    """Planar Hunter: "ignore up to 5 points of damage reduction when making weapon attacks
+    against outsiders native to that plane, except for damage reduction without a type".
+    Measured before: a feat lent no DR-passing trait to a blow."""
+    from rules import strike_feats
+
+    pc = _pc("ranger", feats=["Planar Hunter"])
+    s, e = _board(pc, ("thug", (6, 5)))
+    thug = s.actors["c1"]
+    import rules.classfeatures as cf
+
+    with monkeypatch.context() as m:
+        m.setattr(cf, "holds", lambda when, actor, ctx, pick="": True)  # a plane, an outsider
+        traits = strike_feats.dr_traits(pc, thug, "longsword")
+    for bypass, left in (("good", 5), ("", 10)):
+        thug.effects = [x for x in thug.effects if x.kind != "damage_reduction"]
+        thug.apply_effect(ActiveEffect(name="DR", kind="damage_reduction",
+                                       payload={"amount": 10, "bypass": bypass}))
+        assert thug.damage_reduction("slashing", traits=traits).amount == left
+    assert strike_feats.dr_traits(pc, thug, "longsword") == ()      # on no plane: nothing
