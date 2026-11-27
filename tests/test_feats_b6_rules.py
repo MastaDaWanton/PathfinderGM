@@ -488,3 +488,16 @@ def test_a_bane_against_humans_finds_a_half_elf_unless_neither_elf_nor_human():
     half.feats = list(half.feats) + ["Exile's Path", "Seen and Unseen", "Neither Elf nor Human"]
     assert not _when_holds(when, {"target_actor": half})
     assert not _when_holds(when, {"target_actor": _pc("fighter", race="dwarf")})
+
+
+def test_demon_grafter_is_two_on_heal_regarding_an_outsider_only():
+    """AP 74 Demon Grafter: "+2 bonus on Heal checks regarding evil outsiders". The term
+    holds when the Heal check is made at an outsider, not at a man."""
+    from rules.bestiary import instantiate
+
+    pc = _pc("cleric", level=8, feats=["Demonologist", "Demon Grafter"])
+    s, e = _board(pc, ("thug", (8, 5)))
+    imp = instantiate("dretch", scene=s, name="the dretch")
+    named = lambda who: sum(m.value for m in pc.skill_modifiers(
+        "heal", ctx={"target_actor": who}) if m.source == "Demon Grafter")
+    assert named(imp) == 2 and named(s.actors["c1"]) == 0

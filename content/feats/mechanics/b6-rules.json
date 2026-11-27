@@ -21,7 +21,8 @@
     "rhino-charge: APG: 'You may ready a charge, though you may only move up to your speed on the charge' (rules/readied.py READY_CHARGE, Engine._charge_before) — b4-moves' document, finished here.",
     "antagonize: UM: Diplomacy or Intimidate, a standard action, DC 10 + HD + Wis; flustered (-2 on attacks at others for a minute) or enraged (turns on you next turn), once a day a target (rules/antagonize.py).",
     "bouncing-spell: APG: a single-target spell with no effect (spell resistance, or a save that negates) redirected as a swift action to another creature in range (Engine._bounce); +1 level.",
-    "neither-elf-nor-human: ARG: 'You are not considered elven or human for the purpose of harmful spells or effects based on your type, like a bane weapon or a ranger's favored enemy' — against Elf Blood, which the lane made real for every half-elf (rules/sheet.py `_is_of_kind`)."
+    "neither-elf-nor-human: ARG: 'You are not considered elven or human for the purpose of harmful spells or effects based on your type, like a bane weapon or a ranger's favored enemy' — against Elf Blood, which the lane made real for every half-elf (rules/sheet.py `_is_of_kind`).",
+    "demon-grafter: AP 74: 'You gain a +2 bonus on Heal checks regarding evil outsiders or creatures that already have a demonic graft' — the +2 against an outsider (alignment holds against any until it is tracked, the owner's 2026-10-05 ruling)."
   ],
   "improved-counterspell": {
     "tags": [
@@ -113,6 +114,25 @@
   "neither-elf-nor-human": {
     "tags": [
       "harm.not-elf-or-human"
+    ]
+  },
+  "demon-grafter": {
+    "modifiers": [
+      {
+        "type": "skill_mod",
+        "target": "heal",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "target": {
+            "type": "outsider",
+            "alignment": "evil"
+          }
+        }
+      }
+    ],
+    "not_yet": [
+      "'or creatures that already have a demonic graft' and 'you can create demonic implants ... as if you had the Craft Wondrous Item feat, using your ranks in Heal as your caster level': no demonic graft or implant is an item or a state in the game"
     ]
   }
 }
