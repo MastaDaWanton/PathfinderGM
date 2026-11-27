@@ -15156,12 +15156,12 @@ class Engine:
         done = [self._moved(defender.ref, before, m)] if moved else []
         clause = self._moved_clause(m, say, moved, want, done[0]["feet"] if done else 0)
         if moved < want and m.get("name") == "bull rush":
-            slam, said = self._raging_throw_slam(actor, defender, step)
+            slam, said = self._bull_rush_slam(actor, defender, step)
             done.extend(slam)
             clause += said
         return (clause, [], done)
 
-    RAGING_THROW = "bull_rush.slam.raging"          # feat loop b7-small, its document's tag
+    BULL_RUSH_SLAM = "bull_rush.slam"               # feat loop b7-small, its document's tag
 
     @staticmethod
     def _feat_use_holds(actor, tag: str) -> bool:
@@ -15179,7 +15179,7 @@ class Engine:
                  for q in doc.get("requires") or ()]
         return all(actor.has_state(str(q)) for q in wants)
 
-    def _raging_throw_slam(self, actor, defender, step) -> tuple[list[dict], str]:
+    def _bull_rush_slam(self, actor, defender, step) -> tuple[list[dict], str]:
         """Raging Throw (UC): "if you bull rush an opponent into a square another creature
         occupies or into a solid object, the opponent and the creature or object take
         bludgeoning damage equal to your Strength modifier + your Constitution modifier"
@@ -15189,12 +15189,17 @@ class Engine:
         Feat loop b7-small: before it the push stopped and nobody was hurt."""
         from .grid import footprint
 
-        if not actor.has_state(self.RAGING_THROW) or not self._feat_use_holds(
-                actor, self.RAGING_THROW):
+        if not actor.has_state(self.BULL_RUSH_SLAM) or not self._feat_use_holds(
+                actor, self.BULL_RUSH_SLAM):
             return [], ""
         n = actor.ability_mod("str") + actor.ability_mod("con")
         if n <= 0:
             return [], ""
+        from . import feats as feats_mod
+
+        feat = next(d for d in (feats_mod.document(f) for f in actor.feats or ())
+                    if d and self.BULL_RUSH_SLAM in (d.get("tags") or ()))
+        origin = f"rule:feat-{feat['id']}"
         here = self.scene.positions[defender.ref]
         nxt = (here[0] + step[0], here[1] + step[1])
         ahead = set(footprint(nxt, defender.size))
@@ -15205,10 +15210,10 @@ class Engine:
         out = []
         for who in struck:
             hit = self._apply_damage(who, n, "bludgeoning")
-            hit["origin"] = "rule:feat-raging-throw"
+            hit["origin"] = origin
             out.append(hit)
         names = _and_list([w.name for w in struck])
-        return out, f"; the slam hurts {names} for {n} bludgeoning each (Raging Throw)"
+        return out, f"; the slam hurts {names} for {n} bludgeoning each ({feat['name']})"
 
     def _outcome_drag(self, m, intent, actor, defender, margin, weapon_key, loot, say):
         want = 1 + max(0, margin) // 5

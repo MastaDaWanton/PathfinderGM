@@ -275,7 +275,7 @@ def test_raging_throw_slams_a_bull_rushed_foe_into_the_one_behind_it():
         return hp[0] - thug.hp, hp[1] - other.hp, n, out.tell
 
     a, b, n, tell = shove(True)
-    assert a == n and b == n and "Raging Throw" in tell, tell
+    assert a == n and b == n and "the slam hurts" in tell, tell
     assert shove(False)[:2] == (0, 0)
 
 

@@ -183,6 +183,9 @@ def test_no_class_shows_a_pool_with_nothing_to_spend_it():
                 if class_abilities._has_it(pc, doc):
                     spent |= {str((doc.get(s) or {}).get("pool") or "").lower()
                               for s in ("cost", "drain")}
+                    # A cost's `first` pool is spent by it too (feat loop b7-small:
+                    # the paladin's Extra Channel uses, spent by her channel).
+                    spent.add(str((doc.get("cost") or {}).get("first") or "").lower())
             for path in pc.paths:
                 det = leveling.path_detail(cid, path)
                 for name in leveling.usable_names(pc):

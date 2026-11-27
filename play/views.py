@@ -954,6 +954,12 @@ _OPTION_SHAPES = {
     "stalwart": ("swing", "Stalwart",
                  "With Fight defensively or Combat Expertise: the dodge bonus becomes DR/— "
                  "until your next turn."),
+    # Feat loop b7-small.
+    "two_weapon_feint": ("full", "Two-Weapon Feint",
+                         "With two weapons: a feint in place of the first main-hand blow."),
+    "impact_bull_rush": ("swing", "Impact push",
+                         "A ranged critical that beats the foe's guard drives it back "
+                         "instead of knocking it down."),
     "total_defense_stalwart": ("act", "Total defense (Stalwart)",
                                "Guard with the dodge bonus traded for DR/— until your next "
                                "turn: no attacks, and no attacks of opportunity."),
