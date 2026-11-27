@@ -193,10 +193,20 @@ def fall(engine, actor, feet: int, *, deliberate: bool = False, may_fly: bool = 
     damage" — never "if you are falling due to a failed Fly check" (`may_fly`). Damage
     from a fall leaves the body prone. Whatever held it on the wall or the ledge ends."""
     from .intents import Intent
+    from . import feat_moves
 
+    # Feat loop b7-moves: the monk's slow fall, beside a wall (asked while still on it).
+    slowed = feat_moves.slow_fall_ft(actor) if feat_moves.beside_wall(engine, actor) else 0
     actor.remove_effects(match=lambda e: any(t.startswith((CLIMBING, BALANCING))
                                              for t in e.tags or ()))
     rolls, effects, said = [], [], []
+    if slowed and feet >= 10:
+        eased = max(0, int(feet) - slowed)
+        said.append(f"{actor.name} slows the fall against the wall (slow fall): it lands "
+                    f"as a fall of {eased} ft.")
+        effects.append({"ref": actor.ref, "kind": "slow_fall", "feet": int(feet),
+                        "as_feet": eased, "origin": "class:monk/slow-fall"})
+        feet = eased
     if may_fly and actor.movement_modes().get("fly") and feet >= 10:
         r = row("skill.fly.soft-landing")
         roll = _roll(engine, actor, _skill_mods(actor, "fly"), "Fly check (break the fall)")
@@ -206,8 +216,8 @@ def fall(engine, actor, feet: int, *, deliberate: bool = False, may_fly: bool = 
                 f"{actor.name} {why} and catches the air before the ground (Fly "
                 f"{roll.total} against DC {r['dc']}): no harm done."]
     if feet < 10:
-        return rolls, [{"ref": actor.ref, "kind": "fall", "feet": feet}], [
-            f"{actor.name} {why}, too short a drop to hurt."]
+        return rolls, effects + [{"ref": actor.ref, "kind": "fall", "feet": feet}], [
+            f"{actor.name} {why}, too short a drop to hurt."] + said
     out = engine._op_hazard(Intent(op="hazard", actor=actor.ref, because=why, params={
         "rule": "falling", "distance_ft": min(200, int(feet)), "to": actor.ref,
         **({"deliberate": True} if deliberate else {})}), {})

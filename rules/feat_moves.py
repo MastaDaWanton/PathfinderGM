@@ -1362,5 +1362,54 @@ def thrown_increment(actor, inc: int, thrown: bool) -> int:
     return inc * 2 if thrown and inc and raging_hurler(actor) else inc
 
 
+
+# --- the monk's slow fall (feat loop b7-moves; ledger group 23) ------------------------------
+#
+# CRB, Monk (aonprd.com/ClassDisplay.aspx?ItemName=Monk, read 2026-11-27): "Slow Fall (Ex):
+# At 4th level or higher, a monk within arm's reach of a wall can use it to slow his
+# descent. When first gaining this ability, he takes damage as if the fall were 20 feet
+# shorter than it actually is. The monk's ability to slow his fall (that is, to reduce the
+# effective distance of the fall when next to a wall) improves with his monk level until at
+# 20th level he can use a nearby wall to slow his descent and fall any distance without
+# harm." The distance is the class table's own ladder ("slow fall 20 ft" .. "slow fall any
+# distance"), read by `classfeatures.rungs`, never a number written here. Measured before:
+# slow fall was a name on the class table and a fall beside a wall hurt a 20th-level monk
+# as it hurt anybody.
+#
+# Within arm's reach of a wall: falling off a climb (the wall it was on), or a square
+# beside a solid one on the board (owner call: no wall is assumed off the board).
+
+SLOW_FALL = "class.slow-fall"
+ANY_DISTANCE = 10_000
+
+
+def slow_fall_ft(actor) -> int:
+    """The feet this body's slow fall takes off a fall beside a wall (0 for none)."""
+    from . import classfeatures
+
+    if not actor.has_state(SLOW_FALL) or not actor.char_class:
+        return 0
+    ladder = classfeatures.rungs(actor.char_class, actor.level, "slow-fall")
+    if ladder and "any distance" in str(ladder[-1]).lower():
+        return ANY_DISTANCE
+    return classfeatures.number(actor.char_class, actor.level, "slow-fall")
+
+
+def beside_wall(engine, actor) -> bool:
+    """A wall within arm's reach: on one (climbing), or a solid square beside it."""
+    from . import bodyskills
+
+    if actor.has_state(bodyskills.CLIMBING):
+        return True
+    sc = engine.scene
+    grid = getattr(sc, "grid", None)
+    spot = sc.positions.get(actor.ref) if sc is not None else None
+    if grid is None or spot is None:
+        return False
+    x, y = tuple(spot)[:2]
+    return any(grid.inside((x + dx, y + dy)) and not grid.passable((x + dx, y + dy))
+               for dx in (-1, 0, 1) for dy in (-1, 0, 1) if dx or dy)
+
+
 __all__ = ["charge_multiple", "moved_already", "after", "no_move_left", "allowance",
            "grant_walk", "coup_walk_ok", "before"]

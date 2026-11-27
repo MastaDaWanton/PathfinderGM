@@ -157,12 +157,12 @@
   },
   "cloud-step": {
     "not_yet": [
-      "'air walk ... up to half your slow fall distance': the monk's slow fall is a class-table name only (no distance is read), and no move walks on air"
+      "'air walk ... up to half your slow fall distance': the slow fall distance is read now (rules/feat_moves.py slow_fall_ft), but no move walks on air across a gap or up off the ground"
     ]
   },
   "spider-step": {
     "not_yet": [
-      "'move up to half your slow fall distance ... across a wall or ceiling ... or even water': slow fall has no distance in the engine, and the grid's walls and water stay impassable to a walker"
+      "'move up to half your slow fall distance ... across a wall or ceiling ... or even water': the slow fall distance is read now (rules/feat_moves.py slow_fall_ft), but the board's walls stay solid and its water is swum, so no walk crosses them"
     ]
   },
   "crossbow-mastery": {

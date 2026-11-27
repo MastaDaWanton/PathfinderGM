@@ -749,3 +749,26 @@ def test_raging_hurler_throws_two_handed_as_a_standard_and_doubles_the_increment
     assert blow.status == "resolved", _tells(res)
     roll = [r for r in blow.rolls if (r.label or "").startswith("Attack with")][0]
     assert _named(roll, "range") == 0, roll.as_dict()
+
+
+# --- group 23: the monk's slow fall ---------------------------------------------------------
+
+def test_a_monks_slow_fall_shortens_a_fall_beside_a_wall_by_the_class_ladder():
+    """CRB, Monk, Slow Fall: "a monk within arm's reach of a wall ... takes damage as if the
+    fall were 20 feet shorter" at 4th level, improving "until at 20th level he can ... fall
+    any distance without harm." Measured before (Spider Step's and Cloud Step's not_yet
+    lines): slow fall was a name on the class table, with no distance read."""
+    from rules import bodyskills as bs
+
+    for level, feet, left in ((4, 30, 10), (20, 200, 0), (8, 30, 0)):
+        pc = _pc(cls="monk", level=level)
+        s, e = _board(pc, ("thug", (20, 20)), at=(5, 5))
+        s.grid.blocked.add((4, 5))
+        assert feat_moves.slow_fall_ft(pc) in (20, 40, feat_moves.ANY_DISTANCE)
+        rolls, fx, said = bs.fall(e, pc, feet)
+        slow = [x for x in fx if x.get("kind") == "slow_fall"]
+        assert slow and slow[0]["as_feet"] == left, (level, said)
+    pc = _pc(cls="monk", level=4)
+    s, e = _board(pc, ("thug", (20, 20)), at=(5, 5))
+    rolls, fx, said = bs.fall(e, pc, 30)                 # no wall in arm's reach
+    assert not [x for x in fx if x.get("kind") == "slow_fall"]
