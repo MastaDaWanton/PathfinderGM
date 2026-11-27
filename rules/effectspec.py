@@ -2512,7 +2512,8 @@ WHEN_KEYS: dict[str, str] = {
               "alignment or a property's choice (sheet._when_holds)",
     "attacker": "whoever made the blow, by type or subtype (sheet._when_holds)",
     "weapon": "the weapon's own fields: category, hands, light, finessable, key, ranged, "
-              "slashing_or_piercing, strength_share (1.5, 1 or 0.5: Actor.strength_share)"
+              "slashing_or_piercing, slashing, strength_share (1.5, 1 or 0.5: "
+              "Actor.strength_share)"
               " (sheet._when_holds)",
     "choice": "an attack option the player declared, such as power_attack",
     "against": "what the save or check is against, one of AGAINST: spell, poison, fear, "

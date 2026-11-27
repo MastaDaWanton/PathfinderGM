@@ -1040,7 +1040,8 @@
         "when": {
           "critical": true,
           "weapon": {
-            "key": "unarmed"
+            "key": "unarmed",
+            "slashing": true
           }
         }
       }

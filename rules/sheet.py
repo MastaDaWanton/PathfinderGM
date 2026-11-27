@@ -6792,6 +6792,9 @@ class Actor:
         # Feat loop b5-spells: Legacy of the Crusade's "good-aligned weapons" — the weapon
         # strikes as good (a holy weapon's layer, an aligned blade's `strikes_as`).
         weapon["good"] = "good" in (w.get("strikes_as") or ())
+        # Feat loop b7-small: Tiger Style's "your slashing unarmed strike" — the type's
+        # word, or a fist that strikes as slashing (`unarmed.damage.slashing`).
+        weapon["slashing"] = "slashing" in str(w.get("type") or "").lower()             or "slashing" in (w.get("strikes_as") or ())
         # Feat loop b6-partials: Power Attack's "cannot be used with touch attacks or
         # effects that do not deal hit point damage" (CRB) — a printed touch, and a
         # printed blow whose damage is to an ability (a shadow's Strength touch).
