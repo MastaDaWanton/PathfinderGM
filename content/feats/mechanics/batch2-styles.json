@@ -158,18 +158,14 @@
         "bonus_type": "untyped",
         "when": {
           "bearer": {
-            "state": "buff.stance.lunging",
+            "state": "buff.stance.lunging.standard",
             "load": [
               "light"
             ]
           }
         },
-        "note": "Monkey Lunge: no -2 AC for lunging, under a light load"
+        "note": "Monkey Lunge: no -2 AC for a standard action's lunge, under a light load"
       }
-    ],
-    "not_yet": [
-      "only when the lunge is a standard action: the AC term holds after a full attack's lunge too",
-      "it waits on Lunge's stance (lane b2-actions, `buff.stance.lunging`): until that merges no lunge lays it"
     ]
   },
   "boar-style": {
@@ -539,10 +535,19 @@
           "flanked": true
         },
         "note": "Janni Style: a flanker gains only +1"
+      },
+      {
+        "type": "combat_mod",
+        "target": "charge_ac",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "style.janni-style"
+          }
+        },
+        "note": "Janni Style: only -1 AC for charging (feat loop b6-partials)"
       }
-    ],
-    "not_yet": [
-      "only -1 AC for charging: no charge's AC penalty in this branch (lane b2-actions' charge_ac)"
     ]
   },
   "janni-tempest": {

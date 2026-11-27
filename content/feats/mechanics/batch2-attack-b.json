@@ -200,10 +200,7 @@
     "tags": ["skill.heal.combat-medic"]
   },
   "improved-snap-shot": {
-    "tags": ["threat.ranged.15"],
-    "not_yet": [
-      "the tag is the shape lane b2-attack-a's Snap Shot reader asks (`reactions.ranged_threat`, threat.ranged.<feet>); until that lane merges nothing in this branch reads it"
-    ]
+    "tags": ["threat.ranged.15"]
   },
   "trick-riding": {
     "tags": ["skill.ride.trick-riding"]

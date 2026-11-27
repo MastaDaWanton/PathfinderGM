@@ -330,7 +330,31 @@ def after(engine, intent, actor, defender, key: str, verdict: str, weapon_key: s
         out_twirl = _twirl(engine, intent, actor, defender)
         for k in out:
             out[k].extend(out_twirl[k])
+    # Feat loop b6-partials: Under and Over (APG): "If an opponent larger than you attempts
+    # to grapple you and fails, you may make a trip attack as an immediate action against
+    # that opponent with a +2 bonus. This does not provoke an attack of opportunity." The
+    # one grappled at answers: its immediate action (refused flat-footed, `_spend_swift`).
+    if key == "grapple" and rolled and not won and defender.has_state(UNDER_AND_OVER) \
+            and _size_steps(defender, actor) > 0 and not defender.is_down \
+            and not engine._holds(actor, defender):
+        name = _named_by_tag(defender, UNDER_AND_OVER)
+        why = engine._spend_swift(defender, True, name)
+        if why:
+            out["tells"].append(f"{name}: {why}")
+        else:
+            got = _sub(engine, intent, defender, actor, "trip", UNDER_AND_OVER, name,
+                       {"rider_bonus": 2})
+            out["rolls"].extend(got.rolls)
+            doc = next((d for d in _docs(defender) if UNDER_AND_OVER in (d.get("tags") or ())),
+                       {"id": "under-and-over"})
+            out["effects"].extend(dict(e, origin=e.get("origin") or f"rule:feat-{doc['id']}")
+                                  for e in got.effects)
+            out["tells"].append(f"{name}: {got.tell}")
     return out
+
+
+# Under and Over's tag (its feat document, feat loop b6-partials).
+UNDER_AND_OVER = "maneuver.after-grappled.trip"
 
 
 # Ki Throw's tag (its feat document, feat loop b5-core).

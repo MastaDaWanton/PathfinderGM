@@ -254,11 +254,19 @@
         "bonus_type": "shield",
         "when": {"bearer": {"state": "buff.stance.two-weapon-guard"}},
         "note": "while wielding two weapons: the round of a two-weapon full attack"
+      },
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 2,
+        "bonus_type": "shield",
+        "when": {"bearer": {"state": ["buff.stance.two-weapon-guard",
+                                      "buff.stance.fighting-defensively"]}},
+        "note": "fighting defensively with two weapons (feat loop b6-partials)"
       }
     ],
     "not_yet": [
-      "Wielding two weapons is known only on the round a two-weapon full attack is declared; a turn spent otherwise with two weapons in hand gives no +1.",
-      "Fighting defensively or total defense with it (+2): neither action is built."
+      "Wielding two weapons is known only on the round a two-weapon full attack is declared; a turn spent otherwise with two weapons in hand gives no +1, and total defense (a standard action with no blow, so no second weapon is declared) gives no +2."
     ]
   },
   "double-slice": {

@@ -436,10 +436,21 @@ def punch_through(actor, defender, dealt: int) -> list[dict]:
 # parenthetical; a row a keen edge or Improved Critical already doubled
 # (`crit_range_printed`) is left as it is.
 SLAYERS_KNACK = "crit.favored-enemy.doubled"
+# Feat loop b6-partials: Jaguar Pounce (Sargava): "When making a charge or using Spring
+# Attack against an opponent who is flat-footed or helpless, you treat your first melee
+# attack against that target as if you had the Improved Critical feat." The engine says
+# when the blow is that one (`pounce`); one doubling only, as Improved Critical's own.
+POUNCE_CRITICAL = "crit.pounce.flat-footed"
 
 
-def threat_from(actor, defender, weapon: dict) -> int:
+def threat_from(actor, defender, weapon: dict, pounce: bool = False) -> int:
     low = int(weapon.get("crit_range") or 20)
+    if pounce and weapon.get("crit_range_printed") is None \
+            and str(weapon.get("category") or "") != "ranged" \
+            and actor.has_state(POUNCE_CRITICAL):
+        from .sheet import doubled_threat
+
+        return doubled_threat(low, 2)
     if defender is None or weapon.get("crit_range_printed") is not None \
             or not actor.has_state(SLAYERS_KNACK):
         return low

@@ -517,11 +517,7 @@
       "skill.perception.take-20.move"
     ]
   },
-  "arcane-armor-mastery": {
-    "not_yet": [
-      "a swift action to cut the round's arcane spell failure by 20% in place of Arcane Armor Training's 10%: Arcane Armor Training itself is lane b2-attack-b's, and the swift-action budget lane b2-actions'"
-    ]
-  },
+  "arcane-armor-mastery": {},
   "nimble-moves": {
     "tags": [
       "move.step.difficult"
@@ -557,9 +553,7 @@
     ]
   },
   "under-and-over": {
-    "not_yet": [
-      "an immediate-action trip at +2 against a larger foe whose grapple failed, provoking nothing: the immediate-action budget is lane b2-actions'"
-    ]
+    "tags": ["maneuver.after-grappled.trip"]
   },
   "cleave-through": {
     "not_yet": [
@@ -567,13 +561,19 @@
     ]
   },
   "giant-killer": {
-    "not_yet": [
-      "Goblin Cleaver's extra Cleave attacks on creatures one size larger or smaller (lane b2-attack-b's feat), and their +2 circumstance against humanoids (giant)"
+    "tags": ["attack.cleave.any-smaller.upto-1"],
+    "modifiers": [
+      {"type": "combat_mod", "target": "attack", "amount": 2, "bonus_type": "circumstance",
+       "when": {"choice": "cleaving_on", "target": {"subtype": "giant"}},
+       "note": "on Goblin Cleaver's additional attacks against humanoids (giant)"}
     ]
   },
   "orc-hewer": {
-    "not_yet": [
-      "Goblin Cleaver's extra Cleave attacks on creatures your size or smaller (lane b2-attack-b's feat), and their +2 circumstance against humanoids (orc)"
+    "tags": ["attack.cleave.any-smaller.upto-0"],
+    "modifiers": [
+      {"type": "combat_mod", "target": "attack", "amount": 2, "bonus_type": "circumstance",
+       "when": {"choice": "cleaving_on", "target": {"subtype": "orc"}},
+       "note": "on Goblin Cleaver's additional attacks against humanoids (orc)"}
     ]
   },
   "archon-diversion": {
@@ -647,9 +647,7 @@
     ]
   },
   "jaguar-pounce": {
-    "not_yet": [
-      "the first melee attack of a charge or Spring Attack against a flat-footed or helpless foe threatens as Improved Critical: charge and Spring Attack are lane b2-actions'"
-    ]
+    "tags": ["crit.pounce.flat-footed"]
   },
   "broken-wing-gambit": {
     "not_yet": [

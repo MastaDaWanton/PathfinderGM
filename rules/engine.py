@@ -12107,8 +12107,13 @@ class Engine:
                         swift_at += 1
                 # A threat is not a crit until it is confirmed — exactly the sort of step
                 # a person forgets mid-fight and code does not.
+                # Feat loop b6-partials: the first blow of a charge or Spring Attack at a
+                # foe flat-footed or helpless (Jaguar Pounce).
+                pounce = state["i"] == 0 and bool(
+                    intent.params.get("charge") or intent.params.get("spring_attack")) \
+                    and (self._flat_footed(defender) or defender.is_helpless)
                 threat = natural is not None and natural >= strike_feats.threat_from(
-                    actor, defender, weapon)            # Slayer's Knack (feat loop b4)
+                    actor, defender, weapon, pounce=pounce)  # Slayer's Knack (feat loop b4)
                 state["stage"] = "confirm" if threat else "damage"
                 state["crit"] = False
                 # Butterfly's Sting (feat loop b4): an ally's mark lands this melee hit as
@@ -14145,6 +14150,15 @@ class Engine:
             # made" — laid before the reach is measured, so the closing step and the blow
             # both see the longer reach; its tell rides the blow (`lunge_tell`, code only).
             said = self._lay_attack_stances(actor, ("lunge",), defender=defender)
+            # Feat loop b6-partials: Monkey Lunge's "As a standard action, you can use the
+            # Lunge feat ... without suffering a penalty to your AC" — a lunge on a single
+            # attack carries a child tag its document asks. shortcut: a full attack cut to
+            # one blow by a closing step below still reads as full; upgrade if it matters.
+            if not intent.params.get("full_attack"):
+                actor.apply_effect(ActiveEffect(
+                    name="lunging standard", kind="buff", key="lunging standard",
+                    source="Lunge", origin="rule:lunging", duration="rounds",
+                    rounds_left=1, tags=states.tags_for("lunging standard")))
             raw["params"] = dict(raw.get("params") or {}, lunge_tell=" ".join(said))
             intent = _intent_from_dict(raw)
         if (intent.params.get("charge") or intent.params.get("spring_attack")) \
@@ -28925,10 +28939,18 @@ class Engine:
             # Goblin Cleaver (ARG): "you may take your additional attacks against any
             # creature smaller than you that you threaten; your targets need not be
             # adjacent to one another" — the document's tag (feat loop b2).
+            # Feat loop b6-partials: Orc Hewer's "your size or smaller" and Giant Killer's
+            # "one size category larger than you or smaller" widen it — the largest
+            # `attack.cleave.any-smaller.upto-<steps>` the bearer's documents hold.
+            upto = max([-1] + [int(str(t).rsplit("-", 1)[-1])
+                               for t in actor.standing_tags()
+                               if str(t).startswith("attack.cleave.any-smaller.upto-")])
+            # Any square of the body, not only its anchor: a Large foe beside the bearer
+            # has its corner square 10 ft off.
             wider = actor.has_state("attack.cleave.any-smaller") \
-                and classfeatures.size_steps(actor, foe) < 0 \
-                and reactions_mod.threatens(self.scene, actor.ref,
-                                            self.scene.positions[ref], foe.size)
+                and classfeatures.size_steps(actor, foe) <= upto \
+                and any(reactions_mod.threatens(self.scene, actor.ref, sq, foe.size)
+                        for sq in grid_mod.footprint(self.scene.positions[ref], foe.size))
             if not wider and grid_mod.distance_between(
                     tuple(here), defender.size, tuple(self.scene.positions[ref]),
                     foe.size) > grid_mod.SQUARE_FT:

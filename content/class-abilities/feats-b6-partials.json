@@ -1,0 +1,32 @@
+{
+  "class": "feat",
+  "_source": "Feat loop b6, lane b6-partials (2026-11-27): the activated feats this lane finished from a not_yet line. Each is had by a holder of the feat its `feat` names (rules/class_abilities.py), run by the one executor (`Engine._use_class_ability`), and spends its declared action (`Engine._spend_ability_action`). Benefit text from content/feats/feats.json, checked against aonprd.com FeatDisplay 2026-11-27.",
+  "_grammar": "rules/class_abilities.py, module docstring. The engine reads these fields and never these names.",
+  "abilities": [
+    {
+      "key": "arcane armor mastery",
+      "name": "Arcane Armor Mastery",
+      "feat": "arcane-armor-mastery",
+      "aliases": [
+        "arcane armor mastery",
+        "arcane armour mastery"
+      ],
+      "level": 1,
+      "source": "Arcane Armor Mastery (CRB): 'As a swift action, reduce the arcane spell failure chance due to the armor you are wearing by 20% for any spells you cast this round. This bonus replaces, and does not stack with, the bonus granted by Arcane Armor Training.' The armour's share only, and the larger of the two reductions (rules/armour.py spell_failure).",
+      "text": "Swift action: 20% less arcane spell failure from your armour this round.",
+      "action": "swift",
+      "self": {
+        "rounds": "1",
+        "modifiers": [
+          {
+            "type": "combat_mod",
+            "target": "spell_failure",
+            "amount": -20,
+            "bonus_type": "untyped"
+          }
+        ]
+      },
+      "tell": "{name} settles the armour for the gestures to come, closer than training alone allows."
+    }
+  ]
+}

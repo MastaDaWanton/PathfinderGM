@@ -533,6 +533,8 @@ TAGS: dict[str, tuple[str, ...]] = {
     # `reach.extended`: the one prefix `reactions._reach_more` asks before it reads any
     # `reach` term — reach is asked per square, and the funnel is not free.
     "lunging":        ("buff.stance.lunging", "reach.extended.lunge"),
+    # Feat loop b6-partials: a lunge made as a standard action (Monkey Lunge asks it).
+    "lunging standard": ("buff.stance.lunging.standard",),
     "combat patrol":  ("buff.stance.combat-patrol", "reach.extended.patrol"),
     "pinning":        ("buff.stance.pinning", "state.exposed.pinning"),
     "choked":         ("state.silenced.choked",),
