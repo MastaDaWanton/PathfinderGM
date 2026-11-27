@@ -399,3 +399,32 @@ def test_shielded_caster_halves_a_disruptive_foe_s_increase():
     shielded = dc((6, 6))                 # beside her, beside the thug
     assert "DC 19" in shielded.label, shielded.label
     assert "DC 21" in dc((4, 4)).label    # beside her, out of the thug's reach
+
+
+def test_a_chokehold_runs_the_suffocation_ladder_out_of_water():
+    """UC, Chokehold: the pinned foe "cannot breathe"; CRB, Suffocation: "A character who
+    has no air to breathe can hold her breath for 2 rounds per point of Constitution",
+    then Constitution checks, then unconscious, dying, dead. Measured before: the breath
+    clock ran only under water, so a choked thug breathed on for ever. Now each round in
+    the hold is a round of breath; past it the check, failed, leaves him limp; let go,
+    the clock stops."""
+    from rules import water
+    from tests.test_feats_b2_actions import _attack as act, _grappling, _run as run2
+
+    scene, engine, pc, thug = _grappling(feats=["Chokehold"])
+    run2(engine, act(manoeuvre="grapple", chokehold=True))
+    assert thug.has_state("state.silenced.choked")
+    before = thug.held_breath_rounds
+    scene.initiative = [("pc", 20), ("c1", 10)]
+    scene.turn = 1
+    scene._next_able()                                   # the top of the next round
+    assert thug.held_breath_rounds == before + 1
+    thug.held_breath_rounds = water.breath_rounds(thug) + 1
+    from tests.test_feats_b4_moves import _Faces
+
+    engine.dice = _Faces({"": 1})                        # the check fails
+    said = " ".join(engine.breathe())
+    assert "chokes for air, and goes limp" in said and thug.hp == 0, said
+    engine._end_grapple(thug, pc, "test")
+    engine.breathe()
+    assert thug.held_breath_rounds == 0

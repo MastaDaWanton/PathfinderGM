@@ -171,6 +171,18 @@ def _drowning_ground(actor) -> bool:
     return not water.breathes_water(actor)
 
 
+CHOKED = "state.silenced.choked"
+
+
+def _airless(actor) -> bool:
+    """Whether this creature has no air to breathe: under water it cannot breathe, or
+    held in a chokehold — "cannot breathe or speak" (UC, Chokehold) — which the book's
+    suffocation rule runs the drowning ladder for (CRB, Environment, Suffocation: "A
+    character who has no air to breathe can hold her breath for 2 rounds per point of
+    Constitution", then the same checks). Feat loop b7-small."""
+    return _drowning_ground(actor) or actor.has_state(CHOKED)
+
+
 class _Here(Mapping):
     """Who is in the party's place: a read-only view over `Scene.people`.
 
@@ -1246,6 +1258,11 @@ class Scene:
                         {"kind": "pool_ready", "ref": a.ref, "pool": pid}
                         for pid in a.tick_pools(1))
                     self.hazards.extend(self._drain_periodic(a))
+                    # Feat loop b7-small: a round in a chokehold is a round of held breath
+                    # (`_airless`); `Engine.breathe` rolls the ladder. Water's own clock
+                    # is the swim's and the stretch's.
+                    if a.has_state(CHOKED) and not _drowning_ground(a):
+                        a.held_breath_rounds += 1
                 # Appended, for the reason the next comment gives about `hazards`, and
                 # it was left as an assignment when that one was fixed. One call now
                 # skips up to twenty rounds looking for somebody able to act, so only
@@ -1975,7 +1992,7 @@ class Scene:
             # the Constitution check that follows it rolls dice and belongs to the
             # engine (`Engine.breathe`). Surfacing resets it, because breathing is what
             # holding your breath stops being.
-            if _drowning_ground(a):
+            if _airless(a):
                 a.held_breath_rounds += rounds
             elif a.held_breath_rounds or a.drown_failures:
                 a.held_breath_rounds = 0
@@ -15146,6 +15163,22 @@ class Engine:
 
     RAGING_THROW = "bull_rush.slam.raging"          # feat loop b7-small, its document's tag
 
+    @staticmethod
+    def _feat_use_holds(actor, tag: str) -> bool:
+        """Whether the state a feat's activated use asks (`requires` on its document in
+        content/class-abilities, the feat named by its `feat`) holds on the bearer — for
+        a feat whose other clause works under the same state (Raging Throw's "While
+        raging"). Read off the documents of the feats granting `tag`, never a name."""
+        from . import class_abilities, feats as feats_mod
+
+        granting = {d["id"] for d in (feats_mod.document(f) for f in actor.feats or ())
+                    if d and tag in (d.get("tags") or ())}
+        wants = [q for kind in class_abilities.documents().values()
+                 for doc in kind.get("abilities") or ()
+                 if str(doc.get("feat") or "") in granting
+                 for q in doc.get("requires") or ()]
+        return all(actor.has_state(str(q)) for q in wants)
+
     def _raging_throw_slam(self, actor, defender, step) -> tuple[list[dict], str]:
         """Raging Throw (UC): "if you bull rush an opponent into a square another creature
         occupies or into a solid object, the opponent and the creature or object take
@@ -15156,7 +15189,8 @@ class Engine:
         Feat loop b7-small: before it the push stopped and nobody was hurt."""
         from .grid import footprint
 
-        if not actor.has_state(self.RAGING_THROW) or not actor.has_state("buff.stance.rage"):
+        if not actor.has_state(self.RAGING_THROW) or not self._feat_use_holds(
+                actor, self.RAGING_THROW):
             return [], ""
         n = actor.ability_mod("str") + actor.ability_mod("con")
         if n <= 0:
@@ -17782,8 +17816,16 @@ class Engine:
         """
         tells: list[str] = []
         for a in list(self.scene.people.values()):
-            if not _drowning_ground(a) or a.has_state("state.down.dead"):
+            if not _airless(a) and (a.held_breath_rounds or a.drown_failures) \
+                    and not a.has_state("state.down.dead"):
+                # Air again — a chokehold let go (feat loop b7-small): the held breath
+                # is over, as surfacing ends it in `Scene.advance`; a body already gone
+                # limp keeps its rung (`drown_failures`) and its hit points.
+                a.held_breath_rounds = 0
                 continue
+            if not _airless(a) or a.has_state("state.down.dead"):
+                continue
+            choked = not _drowning_ground(a)
             limit = water.breath_rounds(a)
             if a.held_breath_rounds <= limit and not a.drown_failures:
                 continue
@@ -17815,7 +17857,8 @@ class Engine:
                 # file. The three laws hold the count here to a ceiling that may only
                 # fall, and they are right to.
                 tells.extend(f"{a.name} " + t for t in
-                             ["breathes water, and goes limp."])
+                             ["chokes for air, and goes limp." if choked
+                              else "breathes water, and goes limp."])
                 a.apply_hp_state()
                 continue
             # Past the first failure it is not a check any more, it is a countdown.
@@ -17823,11 +17866,13 @@ class Engine:
             if a.drown_failures == 2:
                 a.hp = -1
                 a.apply_hp_state()
-                tells.append(f"{a.name} is dying, and nobody down here can help them.")
+                tells.append(f"{a.name} is dying for want of air." if choked else
+                             f"{a.name} is dying, and nobody down here can help them.")
             else:
                 a.hp = -max(1, a.ability_score("con"))
                 a.apply_hp_state()
-                tells.append(f"{a.name} has drowned.")
+                tells.append(f"{a.name} has suffocated." if choked else
+                             f"{a.name} has drowned.")
         return tells
 
     def _resolve_dying(self, a: Actor) -> list[str]:

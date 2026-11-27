@@ -193,9 +193,6 @@
   "chokehold": {
     "tags": [
       "grapple.chokehold"
-    ],
-    "not_yet": [
-      "the choked foe does not hold its breath or begin suffocating (the breath clock runs only under water)"
     ]
   },
   "pinning-knockout": {
