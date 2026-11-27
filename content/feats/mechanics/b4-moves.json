@@ -146,8 +146,8 @@
     ]
   },
   "mounted-archery": {
-    "not_yet": [
-      "the mount's double move and run are not tracked (a ridden walk is the steed's one move op), so neither the book's -4/-8 on a rider's ranged attack nor this feat's halving of it is applied"
+    "tags": [
+      "mounted.archery.halved"
     ]
   },
   "charge-through": {
@@ -157,12 +157,12 @@
   },
   "cloud-step": {
     "not_yet": [
-      "'air walk ... up to half your slow fall distance': the monk's slow fall is a class-table name only (no distance is read), and no move walks on air"
+      "'air walk ... up to half your slow fall distance': the slow fall distance is read now (rules/feat_moves.py slow_fall_ft), but no move walks on air across a gap or up off the ground"
     ]
   },
   "spider-step": {
     "not_yet": [
-      "'move up to half your slow fall distance ... across a wall or ceiling ... or even water': slow fall has no distance in the engine, and the grid's walls and water stay impassable to a walker"
+      "'move up to half your slow fall distance ... across a wall or ceiling ... or even water': the slow fall distance is read now (rules/feat_moves.py slow_fall_ft), but the board's walls stay solid and its water is swum, so no walk crosses them"
     ]
   },
   "crossbow-mastery": {
@@ -171,8 +171,8 @@
     ]
   },
   "swap-places": {
-    "not_yet": [
-      "'you can move into your ally's square ... your ally moves into your previous space as an immediate action': a move into an occupied square is refused, and no swap is spliced"
+    "tags": [
+      "teamwork.swap-places"
     ]
   },
   "teleport-tactician": {
@@ -227,8 +227,8 @@
     ]
   },
   "wand-dancer": {
-    "not_yet": [
-      "'you can move both before and after triggering the item, as long as the total distance moved is not greater than your speed ... does not provoke attacks of opportunity from that creature only': no split move is kept around a use"
+    "tags": [
+      "movement.split.trigger"
     ]
   },
   "patient-strike": {
@@ -264,8 +264,8 @@
     ]
   },
   "charging-hurler": {
-    "not_yet": [
-      "'use the charge rules to make a thrown weapon attack ... end your movement within 30 feet': a charge's walk ends within melee reach (Engine._charge_path), so a thrown charge is never laid"
+    "tags": [
+      "charge.thrown"
     ]
   },
   "dimensional-assault": {

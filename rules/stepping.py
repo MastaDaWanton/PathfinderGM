@@ -33,6 +33,16 @@ from . import grid as gridmod
 PACK_ATTACK = "teamwork.pack-attack"
 
 
+def feet_walked(scene, ref: str) -> int:
+    """The feet this creature has walked this round (feat loop b7-moves): the third field
+    of `Scene.walked`, added up walk by walk, for the rules that cap a round's movement at
+    a speed (Shot on the Run, Wand Dancer, Ride-By Attack, Slaying Sprint)."""
+    got = (getattr(scene, "walked", None) or {}).get(ref)
+    if not got or int(got[0]) != int(scene.round) or len(got) < 3:
+        return 0
+    return int(got[2] or 0)
+
+
 def walked(scene, ref: str) -> str:
     """This round's movement so far: "" for none, "step" or "move"."""
     got = (getattr(scene, "walked", None) or {}).get(ref)
@@ -61,8 +71,14 @@ def is_step(scene, actor, start, end) -> bool:
         return False
     if not scene.in_encounter:
         return True
+    # Feat loop b7-moves: "You cannot take a 5-foot step while crawling" (CRB), unless Fast
+    # Crawl or Monkey Moves; and Monkey Moves' swift step after two unarmed hits.
+    from . import feat_moves
+
+    if feat_moves.crawling(actor) and not feat_moves.crawl_steps(actor):
+        return False
     if walked(scene, actor.ref) or actor.has_state("movement.stepped"):
-        return pack_attack(scene, actor)
+        return pack_attack(scene, actor) or feat_moves.monkey_step(scene, actor)
     return not _difficult(scene, actor, end)
 
 
@@ -90,15 +106,18 @@ def after_step_refusal(scene, actor, start, end) -> str:
         return ""
     if walked(scene, actor.ref) != "step":
         return ""
+    from . import feat_moves          # feat loop b7-moves: Monkey Moves' swift step
+
     if gridmod.distance(tuple(start)[:2], tuple(end)[:2]) <= gridmod.SQUARE_FT \
-            and pack_attack(scene, actor):
+            and (pack_attack(scene, actor) or feat_moves.monkey_step(scene, actor)):
         return ""
     return (f"{actor.name} took a 5-foot step this round, and no other movement may follow "
             f"it until their next turn.")
 
 
-def record(engine, actor, start, end) -> str:
-    """Write this round's movement; returns "step", "move" or "pack" (Pack Attack's)."""
+def record(engine, actor, start, end, feet: int = 0) -> str:
+    """Write this round's movement; returns "step", "move" or "pack" (Pack Attack's).
+    `feet`, what this walk cost, is added to the round's total (feat loop b7-moves)."""
     scene = engine.scene
     if not scene.in_encounter or start is None or end is None \
             or tuple(start)[:2] == tuple(end)[:2]:
@@ -108,11 +127,15 @@ def record(engine, actor, start, end) -> str:
     kind = "move"
     if step and (before or actor.has_state("movement.stepped")):
         kind = "pack"
-        engine._spend_swift(actor, True, "Pack Attack")
+        if pack_attack(scene, actor):
+            engine._spend_swift(actor, True, "Pack Attack")
+        else:                      # feat loop b7-moves: Monkey Moves' swift step
+            engine._spend_swift(actor, False, "Monkey Moves")
+            actor.remove_effects(match=lambda e: e.key == "unarmed hits")
     elif step:
         kind = "step"
     if not hasattr(scene, "walked") or scene.walked is None:
         scene.walked = {}
     scene.walked[actor.ref] = [scene.round, "move" if before == "move" or kind == "move"
-                               else "step"]
+                               else "step", feet_walked(scene, actor.ref) + int(feet or 0)]
     return kind

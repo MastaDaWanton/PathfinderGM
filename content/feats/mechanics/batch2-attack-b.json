@@ -60,9 +60,6 @@
     ],
     "on_hit": [
       {"kind": "maneuver", "maneuver": "trip", "when": {"choice": "sliding_axe_throw"}}
-    ],
-    "not_yet": [
-      "ignores the shield of a target that is running or charging: the engine knows a flat-footed target (built) but holds no running or charging state yet (lane b2-actions builds the charge)"
     ]
   },
   "shield-slam": {

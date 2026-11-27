@@ -2728,6 +2728,9 @@ AGAINST: dict[str, str] = {
     # Feat loop b6-rules: Atheist Abjurations' "+2 bonus to your caster level whenever you
     # use an abjuration spell to dispel or counter a divine spell" (rules/dispel.py).
     "dispel_divine": "a dispel check made with an abjuration against a divine spell",
+    # Feat loop b7-moves: Endurance's "Constitution checks made to continue running"
+    # (rules/feat_moves.py run_starts).
+    "running": "a Constitution check to keep running past the Constitution score's rounds",
 }
 
 

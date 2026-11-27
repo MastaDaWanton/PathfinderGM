@@ -43,5 +43,8 @@ def new_turn(scene) -> None:
     loop b4 a class ability spends its declared action (`Engine._spend_ability_action`), so
     a wild shape and a cast are two standard actions and cannot share a turn. Since b5-core
     the round's walk is recorded too (`Scene.walked`: nothing moves after a 5-foot step)."""
-    for ledger in (scene.move_spent, scene.standard_spent, scene.swift_spent, scene.walked):
+    # Feat loop b7-moves: and the round's swing (`Scene.swung`), which a walk after a move
+    # and a blow now asks.
+    for ledger in (scene.move_spent, scene.standard_spent, scene.swift_spent, scene.walked,
+                   scene.swung):
         ledger.clear()

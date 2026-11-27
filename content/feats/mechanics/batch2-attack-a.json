@@ -501,10 +501,8 @@
   },
   "slaying-sprint": {
     "tags": [
-      "coup_de_grace.unprovoking"
-    ],
-    "not_yet": [
-      "'move up to half your speed instead of taking a 5-foot step when taking a full-round action to perform a coup de grace': the coup still spends the move (Scene.move_spent), so no move follows it"
+      "coup_de_grace.unprovoking",
+      "movement.split.coup"
     ]
   },
   "surprising-combatant": {
@@ -533,8 +531,8 @@
     ]
   },
   "ride-by-attack": {
-    "not_yet": [
-      "moving after a mounted charge in the same line, and no attack of opportunity from the foe charged: the charge is lane b2-actions' machinery"
+    "tags": [
+      "charge.mounted.ride-by"
     ]
   },
   "snatch-arrows": {
@@ -556,8 +554,8 @@
     "tags": ["maneuver.after-grappled.trip"]
   },
   "cleave-through": {
-    "not_yet": [
-      "a free 5-foot step between Cleave's attacks that brings a new foe into reach: Cleave's extra blows are chosen from those threatened when it is declared"
+    "tags": [
+      "attack.cleave.step"
     ]
   },
   "giant-killer": {
@@ -592,8 +590,8 @@
     ]
   },
   "fast-crawl": {
-    "not_yet": [
-      "moving at half speed while prone, and a 5-foot step while crawling: no move asks whether the mover is prone, so a crawl is not priced or allowed by rule"
+    "tags": [
+      "movement.crawl.fast"
     ]
   },
   "friend-to-animals": {},
@@ -633,8 +631,8 @@
     ]
   },
   "mounted-blade": {
-    "not_yet": [
-      "a second attack at -5 on a foe beside the first after a Ride-By Attack hit: Ride-By Attack is not built (the charge, lane b2-actions)"
+    "tags": [
+      "charge.mounted.blade-follow"
     ]
   },
   "circling-offense": {
@@ -701,8 +699,11 @@
     ]
   },
   "raging-hurler": {
+    "tags": [
+      "throw.raging"
+    ],
     "not_yet": [
-      "while raging: two-handed weapons thrown as a standard action, thrown range increments doubled, improvised objects picked up as part of the throw"
+      "picking up an unattended object within reach as part of the attack action to throw it: an improvised throw is of a thing already held or on the shelf (Engine._improvised_held), and no object on the ground is picked up by the throw"
     ]
   },
   "school-strike": {

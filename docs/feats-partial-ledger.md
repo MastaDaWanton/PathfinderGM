@@ -78,6 +78,12 @@ Buildable by the book; size L. Finishes 9, touches 9. One turn holds one move be
 - `tiger-pounce` (batch2-styles.json): Power Attack's penalty taken on AC instead of the attack roll, and the swift move of half your speed toward a foe you hit: no option moves Power Attack's penalty, and a swift move is not priced
 - `wand-dancer` (b4-moves.json): 'you can move both before and after triggering the item, as long as the total distance moved is not greater than your speed ... does not provoke attacks of opportunity from that creature only': no split move is kept around a use
 
+**Lane feats/b7-moves (2026-11-27).** Built: the turn's walking is priced (a walk after a move action and a blow is a third action, refused before it can provoke), and the walk a feat still owes after its act is a one-round `split walk` effect (rules/feat_moves.py). Finished: `shot-on-the-run`, `wand-dancer`, `slaying-sprint`, `tiger-pounce` (its Power Attack-on-AC option too), `cleave-through`. Left, with the reason:
+- `cartwheel-dodge`: the move is the player's immediate action on somebody else's turn, to a square of their choosing; no prompt stops a save for a square, and the engine choosing one that provokes was refused.
+- `combat-patrol`: the walk spliced in front of a patrol's attack of opportunity (with the round's total held to speed) is not built; the widened ring is.
+- `cut-your-losses`: there is no withdraw action (a withdraw is two moves here), so there is no withdraw to pick up during.
+- `disengaging-flourish`: the Bluff against every threatening foe and the move it buys are not built (Disengaging Feint's single feint is).
+
 ### 2. Movement modes priced on the board (crawl, climb, stand up, slow fall distance, air walk, woodland stride, darkness slowing)
 
 Buildable by the book; size L. Finishes 8, touches 9.
@@ -92,6 +98,15 @@ Buildable by the book; size L. Finishes 8, touches 9.
 - `mystic-stride` (b5-other.json): moving at full speed through enchanted thorns, briars and overgrowth, entangling or not: woodland stride itself is not built (the druid's and ranger's grant is a name on the class table), and no magical vegetation is terrain the move prices
 - `spider-step` (b4-moves.json): 'move up to half your slow fall distance ... across a wall or ceiling ... or even water': slow fall has no distance in the engine, and the grid's walls and water stay impassable to a walker
 - `swap-places` (b4-moves.json): 'you can move into your ally's square ... your ally moves into your previous space as an immediate action': a move into an occupied square is refused, and no swap is spliced
+
+**Lane feats/b7-moves (2026-11-27).** Built: a prone body crawls (5 ft a move action, its step provokes, no 5-foot step), standing up is a move action that provokes, a walk unable to see is half speed, and Swap Places trades squares. Finished: `fast-crawl`, `monkey-style`, `swap-places`; Blind-Fight's speed line and Monkey Moves' crawl, half-speed climb, Dexterity on the wall and swift step. Left:
+- `blind-fight`: the invisible attacker's melee advantages (not this group).
+- `crippling-critical` (both lines): the engine still halves land speed only and keeps no flight manoeuvrability.
+- `monkey-moves`: a 5-foot step by climbing or jumping (a climb is a check where the body stands, not a square walked).
+- `monkey-shine`: one square holds one creature; entering a foe's space is not built.
+- `mystic-stride`: woodland stride itself is not built, and no spell lays magical vegetation on the board.
+- `spider-step`: slow fall's distance is read now (group 23), but the board's walls stay solid and its water is swum.
+- The Acrobatics DC 10 check to move faster than half speed while blinded is not offered (a body may always take half speed).
 
 ### 3. Owned by lane feats/b6-rules right now (dispel, Ki Throw follow-ups, readied charge, Stunning Fist variants, helmets)
 
@@ -164,6 +179,10 @@ Buildable by the book; size M. Finishes 5, touches 6.
 - `janni-rush` (batch2-styles.json): the running start on every jump and the doubled unarmed dice on a jumping charge: there is no jumping charge
 - `sliding-axe-throw` (batch2-attack-b.json): ignores the shield of a target that is running or charging: the engine knows a flat-footed target (built) but holds no running or charging state yet (lane b2-actions builds the charge)
 
+**Lane feats/b7-moves (2026-11-27).** Built: the thrown charge, Dragon Style's line through difficult ground and allies (charge and run), and the running state (group 40). Finished: `charging-hurler`, `improved-charging-hurler`, `sliding-axe-throw`; Dragon Style's charge line. Left:
+- `charge-through`: the overrun spliced into the charge's path, and the charge stopped in front of a foe that holds, are not built (the queue would need the walk split around a free manoeuvre).
+- `janni-rush`: there is no jump inside a charge.
+
 ### 9. Teamwork feats that read an ally's position and feats (both have the feat, ally in the foe's reach, provoked from the partner)
 
 Buildable by the book; size M. Finishes 5, touches 6.
@@ -228,6 +247,9 @@ Buildable by the book; size L. Finishes 4, touches 4.
 - `mounted-archery` (b4-moves.json): the mount's double move and run are not tracked (a ridden walk is the steed's one move op), so neither the book's -4/-8 on a rider's ranged attack nor this feat's halving of it is applied
 - `mounted-blade` (batch2-attack-a.json): a second attack at -5 on a foe beside the first after a Ride-By Attack hit: Ride-By Attack is not built (the charge, lane b2-actions)
 - `ride-by-attack` (batch2-attack-a.json): moving after a mounted charge in the same line, and no attack of opportunity from the foe charged: the charge is lane b2-actions' machinery
+
+**Lane feats/b7-moves (2026-11-27).** Built: a rider's walk is weighed against the steed's speed and body; a mounted charge ends the steed's round; the steed's double move and run are read for the rider's ranged attacks. Finished: `ride-by-attack`, `mounted-blade`, `mounted-archery`. Left:
+- `cavalry-formation`: mounts sharing squares. Found on the way: a Large mount's charge is laid from the rider's anchor square (`Engine._charge_path` measures the rider's reach and footprint), so a charge whose last square would put the horse's body on the foe is refused "no route"; the tests set the foe where the anchor works.
 
 ### 15. Spell-like abilities from a feat (school SLA 3/day, foe's Disruptive raising concentration)
 
@@ -313,6 +335,10 @@ Buildable by the book; size M. Finishes 3, touches 3. The monk is playable; thes
 - `quivering-palm-adept` (b4-combat.json): 'Add +2 to the saving throw DC against your quivering palm attacks': the monk's 15th-level quivering palm is a name on the class table with no ability document, so there is no DC to raise
 - `quivering-palm-versatility` (b4-moves.json): the monk's quivering palm is a class-table name only: no use of it exists for the coma, memory loss or pain to replace
 
+**Lane feats/b7-moves (2026-11-27).** Built: slow fall, by the class table's own ladder ("slow fall 20 ft" .. "any distance"), beside a wall (off a climb, or a solid square in reach). Left:
+- `cloud-step`, `spider-step`: the distance is read; no walk on air, walls or water.
+- `quivering-palm-adept`, `quivering-palm-versatility`: quivering palm is not built. It needs a mark the charge lays without a save, a later "will it" use, and death through `Actor.die` from an ability document; the charge grammar can only add a condition, and a `dead` condition there would bypass the one door death is written through. Stopped here rather than half-built.
+
 ### 24. Net attacks (ranged touch, entangle, trailing rope, folding)
 
 Buildable by the book; size M. Finishes 3, touches 3. The net row is unwieldable today.
@@ -337,6 +363,8 @@ Buildable by the book; size M. Finishes 3, touches 3. Abundant step itself is un
 - `dimensional-dervish` (batch2-attack-a.json): a full attack split by abundant step or dimension door teleports between the attacks (Dimensional Assault is lane b2-attack-b's)
 - `teleport-tactician` (b4-moves.json): a teleport in a fight (dimension door, abundant step) moves nobody on the grid as a provoking act; no attack of opportunity is asked of it
 
+**Lane feats/b7-moves (2026-11-27).** Not started: abundant step and dimension door moving a body on the grid (a cast or ability with a square), and so all three feats, wait. The group's size was larger than its M: a teleport needs a square param on `cast`/`use_ability` (reader and bar), the "no other actions until your next turn" rule, and the provocation Teleport Tactician adds.
+
 ### 27. A full attack of thrown weapons (Quick Draw's full rate, two-handed throws)
 
 Buildable by the book; size M. Finishes 2, touches 3. A throw is one attack an op today (Engine._op_attack thrown_any).
@@ -344,6 +372,8 @@ Buildable by the book; size M. Finishes 2, touches 3. A throw is one attack an o
 - `quick-draw` (core.json): throws weapons at the full rate of attacks: a thrown weapon is one throw a turn (Engine._op_attack thrown_any)
 - `raging-hurler` (batch2-attack-a.json): while raging: two-handed weapons thrown as a standard action, thrown range increments doubled, improvised objects picked up as part of the throw
 - `two-handed-thrower` (b4-combat.json): 'If you also have the Quick Draw feat, you can throw two-handed weapons at your full normal rate of attacks': a throw is one attack an op (the weapon leaves the hand), so no full attack of throws is offered
+
+**Lane feats/b7-moves (2026-11-27).** Built: Quick Draw throws at the full rate (one carried weapon a throw, each landing); a two-handed throw is a full-round action without Two-Handed Thrower; Raging Hurler's standard-action two-handed throw and doubled increment while raging; a stated iterative throw without Quick Draw is refused. Finished: `two-handed-thrower`; Quick Draw's full-rate line. Left: `raging-hurler`'s improvised object picked up as part of the throw; Quick Draw's hidden-weapon draw (group 16).
 
 ### 28. Fear that fails or is re-saved (bonus against its source, turn-start re-save stepping fear down)
 
@@ -437,6 +467,8 @@ Buildable by the book; size S. Finishes 1, touches 2.
 
 - `endurance` (core.json): Constitution checks to continue running: running is not an action here
 - `run` (b5-spells.json): running itself, at five (or four) times speed while keeping the Dexterity bonus to AC: the engine has no run action, only moves and charges
+
+**Lane feats/b7-moves (2026-11-27).** Built: a single straight walk past a double move, as the turn's first act, is the run (four times speed, three in heavy armour or load; the Run feat one more and Dexterity kept), with the Constitution checks past the Constitution score's rounds and the minute's rest. Finished: `run`; Endurance's running line (+4, `against: running`).
 
 ### 41. Breath held and suffocation out of water (chokehold)
 
@@ -589,3 +621,11 @@ These feats have no line in a feat document; their activated use carries one.
 - `two-weapon-defense` (combat.json) (feat still partial): Fighting defensively or total defense with it (+2): neither action is built.
 - `power-attack` (core.json) (finished): touch attacks and effects that deal no hit-point damage are not excluded
 - `improved-unarmed-strike` (core.json) (finished): counts as armed: no attack of opportunity for attacking unarmed, and threatens with unarmed strikes (rules/reactions.py has no unarmed-provokes rule to waive)
+
+## Finished by lane feats/b7-moves (2026-11-27)
+
+Before (integrate/feats-b6 89d9fa80): 238 lines on 199 feats. After: 218 lines on 183 feats. 16 feats finished, 20 lines removed and 4 rewritten to name only what is left. Each is proved through the engine in `tests/test_feats_b7_moves.py`.
+
+- Finished: `charging-hurler`, `cleave-through`, `fast-crawl`, `improved-charging-hurler`, `monkey-style`, `mounted-archery`, `mounted-blade`, `ride-by-attack`, `run`, `shot-on-the-run`, `slaying-sprint`, `sliding-axe-throw`, `swap-places`, `tiger-pounce`, `two-handed-thrower`, `wand-dancer`.
+- A line gone, the feat still partial for another group: `blind-fight` (speed), `dragon-style` (charge and run through), `endurance` (running), `quick-draw` (full rate).
+- Rewritten to what is left: `monkey-moves`, `raging-hurler`, `spider-step`, `cloud-step`.

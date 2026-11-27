@@ -951,6 +951,10 @@ _OPTION_SHAPES = {
                           "begins a spell."),
     # Feat loop b6-rules: Stalwart (rules/stalwart.py), beside Fight defensively or Combat
     # Expertise; and Total defense with the trade.
+    # Feat loop b7-moves: Tiger Pounce, beside Power Attack in Tiger Style.
+    "tiger_pounce": ("swing", "Tiger Pounce",
+                     "With Power Attack in Tiger Style: the penalty comes off your AC until "
+                     "your next turn, not off the blow."),
     "stalwart": ("swing", "Stalwart",
                  "With Fight defensively or Combat Expertise: the dodge bonus becomes DR/— "
                  "until your next turn."),

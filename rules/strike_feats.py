@@ -549,6 +549,12 @@ def choice_refusal(actor, w: dict, declared, params) -> str:
                 or params.get("off_hand"):
             return (f"{actor.name} needs both hands free of a shield or a second weapon "
                     f"to throw two-handed.")
+    # Feat loop b7-moves: Tiger Pounce (UC) "While using the Tiger Style feat, you can apply
+    # the penalty from Power Attack to your AC instead of attack rolls".
+    if "tiger_pounce" in declared and (not params.get("power_attack") or ranged
+                                       or not actor.has_state("style.tiger-style")):
+        return ("Tiger Pounce moves Power Attack's penalty onto AC: declare it with Power "
+                "Attack, on a melee blow, in Tiger Style.")
     for c, name in (("cockatrice_strike", "Cockatrice Strike"), ("hamatulatsu", "Hamatulatsu")):
         if c in declared and not unarmed_key:
             return f"{name} is an unarmed strike, not a blow with a {w['name']}."

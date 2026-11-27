@@ -144,11 +144,19 @@
         "when": {
           "against": "heat"
         }
+      },
+      {
+        "type": "combat_mod",
+        "target": "con_check",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "running"
+        }
       }
     ],
     "not_yet": [
       "Swim checks to resist nonlethal damage from exhaustion: the engine makes no hourly Swim check for a long swim",
-      "Constitution checks to continue running: running is not an action here",
       "Constitution checks against a forced march: a journey walks eight hours a day and never marches past them",
       "Fortitude saves against suffocation: the only lack of air the engine models is water, and drowning is a Constitution check, which the breath clause covers",
       "sleeping in light or medium armour without becoming fatigued: the engine has no rule that fatigues anybody for sleeping in armour"
@@ -228,11 +236,11 @@
   },
   "blind-fight": {
     "tags": [
-      "miss_chance.reroll.melee"
+      "miss_chance.reroll.melee",
+      "movement.blind.full-speed"
     ],
     "not_yet": [
-      "an invisible attacker gets no advantage against you in melee (no +2, you keep your Dexterity bonus): nothing reads this clause, so whatever the attack path gives an unseen attacker it still gives against you",
-      "no speed penalty for moving while you cannot see: movement under darkness is not slowed here"
+      "an invisible attacker gets no advantage against you in melee (no +2, you keep your Dexterity bonus): nothing reads this clause, so whatever the attack path gives an unseen attacker it still gives against you"
     ]
   },
   "spell-penetration": {
@@ -469,7 +477,6 @@
       "action.draw.free"
     ],
     "not_yet": [
-      "throws weapons at the full rate of attacks: a thrown weapon is one throw a turn (Engine._op_attack thrown_any)",
       "draws a hidden weapon as a move action: there is no hidden-weapon Sleight of Hand roll"
     ]
   },

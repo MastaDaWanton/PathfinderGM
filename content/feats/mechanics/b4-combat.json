@@ -296,8 +296,8 @@
         "note": "Two-Handed Thrower: 1-1/2 times Strength, thrown with both hands"
       }
     ],
-    "not_yet": [
-      "'If you also have the Quick Draw feat, you can throw two-handed weapons at your full normal rate of attacks': a throw is one attack an op (the weapon leaves the hand), so no full attack of throws is offered"
+    "tags": [
+      "throw.two-handed"
     ]
   },
   "hamatulatsu": {
@@ -430,8 +430,8 @@
     ]
   },
   "shot-on-the-run": {
-    "not_yet": [
-      "'As a full-round action, you can move up to your speed and make a single ranged attack at any point during your movement': a turn moves once, before or after its blow; no walk is split around a shot (Spring Attack's split walk is melee's, closing on its foe)"
+    "tags": [
+      "movement.split.ranged"
     ]
   },
   "critical-versatility": {
@@ -455,8 +455,26 @@
     ]
   },
   "improved-charging-hurler": {
-    "not_yet": [
-      "'When you use Charging Hurler, your target can be at any range ... If your target is within 30 feet, you gain a +2 bonus on damage rolls': Charging Hurler itself is lane b4-moves' (feat loop batch 4), and this lane has nothing of it to widen"
+    "tags": [
+      "charge.thrown.any-range"
+    ],
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "damage",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "choice": "charge",
+          "weapon": {
+            "ranged": true
+          },
+          "range_ft": {
+            "lte": 30
+          }
+        },
+        "note": "Improved Charging Hurler: a thrown charge within 30 ft"
+      }
     ]
   },
   "sling-flail": {
