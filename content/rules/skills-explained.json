@@ -208,7 +208,7 @@
         {"text": "Rear a wild animal: DC 15 + its Hit Dice and a year, and never tried twice. In this game the animal must be at least indifferent and travel with you, as the world has no young to raise.",
          "file": "rules/animals.py", "find": "def rear(engine, intent, actor, partial):", "use": "skill.handle-animal.rear"},
         {"text": "Wild empathy (druid, ranger): d20 + your level + Charisma to improve an animal's attitude as Diplomacy does a person's, within 30 feet, in a minute. A magical beast of an animal's wits is at -4. Diplomacy cannot reach an animal.",
-         "file": "rules/animals.py", "find": "def wild_empathy(engine, intent, actor, target, partial):", "use": "skill.handle-animal.wild-empathy"},
+         "file": "rules/animals.py", "find": "def wild_empathy(engine, intent, actor, target, partial, how: str = \"diplomacy\"):", "use": "skill.handle-animal.wild-empathy"},
         {"text": "Untrained, a Charisma check can handle or push a domestic animal or your own companion, but cannot teach, train or rear.",
          "file": "rules/animals.py", "find": "def _mods(actor, animal, *, untrained_ok: bool):", "use": "skill.handle-animal.handle"}
       ],

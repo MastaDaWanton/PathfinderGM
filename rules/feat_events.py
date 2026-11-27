@@ -380,6 +380,11 @@ def after_hit(engine, intent, actor, defender, weapon_key, weapon, state, choice
     out += _hold_the_blade(engine, intent, actor, defender, weapon, state, melee, dealt)
     out += push_after_hit(engine, actor, defender, choices, state,
                           bool(intent.params.get("power_attack")))
+    # Feat loop b4-maneuver: Gory Finish's demoralize behind a blow that fells.
+    from . import maneuver_feats
+
+    out += maneuver_feats.gory_finish(engine, actor, defender, choices, state)
+    out += maneuver_feats.unseat(engine, intent, actor, defender, weapon_key, choices)
     return out
 
 

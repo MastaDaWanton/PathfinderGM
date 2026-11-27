@@ -251,6 +251,11 @@ def feint(engine, intent, actor, mods, partial):
                                       f"away (Disengaging Feint). Nothing is rolled.")
     if disengage:
         action = "standard"
+    # Feat loop b4-maneuver: a feint Feinting Flurry or Wave Strike made (rules/
+    # maneuver_feats.py) is paid with the flurry's first swing, or the swift action.
+    from . import maneuver_feats
+
+    action = maneuver_feats.feint_action(intent, action)
     spent = _no_action_left(engine, actor, action, "a feint")
     if spent:
         return engine._refuse(intent, spent + " Nothing is rolled.", code="action_spent")
@@ -291,23 +296,30 @@ def feint(engine, intent, actor, mods, partial):
             name=f"slipping away from {target.name}", kind="situation",
             key=f"tumble-{target.ref}", source=TUMBLE_SOURCE, origin="rule:feat-disengaging-feint",
             duration="rounds", rounds_left=1, tags=(f"{UNPROVOKING}.{target.ref}",)))
+        # Feat loop b4-maneuver: Disengaging Shot's one blow before stepping away.
+        shot = maneuver_feats.disengaging_shot(engine, actor, target)
         return _outcome(intent, rolls=[roll], dc_value=value, basis=basis,
                         verdict="success", margin=margin,
                         effects=[{"ref": actor.ref, "kind": "tumble", "past": target.ref,
-                                  "origin": "rule:feat-disengaging-feint"}],
+                                  "origin": "rule:feat-disengaging-feint"}] + shot,
                         tell=f"{actor.name} feints at {target.name} and makes the bluff "
                              f"check{dc_mod.by(margin)}: {target.name} lunges at the "
                              f"opening, and {actor.name} can step away without a swing "
-                             f"from them.")
+                             f"from them." + (" First, one blow at the opening "
+                                              "(Disengaging Shot)." if shot else ""))
     target.apply_effect(ActiveEffect(
         name=f"feinted by {actor.name}", kind="situation", key=f"feinted-by-{actor.ref}",
         source=FEINT_SOURCE, origin="rule:feint", duration="rounds",
         # shortcut: the round ticker runs at the top of the round, so 2 lasts through the
         # feinter's next turn and a little past it; a per-turn clock would end it exactly.
-        rounds_left=int(out["rounds"]), tags=(f"{FEINTED}.{actor.ref}",),
+        rounds_left=1 if maneuver_feats.whole_turn(intent, actor) else int(out["rounds"]),
+        tags=(f"{FEINTED}.{actor.ref}",),
         payload={"by": actor.ref,
                  **({"until_hit": True} if actor.has_state(RAGE_STANCE)
-                    and actor.has_state(unforbidden_tag("bluff", "feint")) else {})}))
+                    and actor.has_state(unforbidden_tag("bluff", "feint")) else {}),
+                 # Feat loop b4-maneuver: Improved Feinting Flurry's whole turn.
+                 **({"whole_turn": True} if maneuver_feats.whole_turn(intent, actor)
+                    else {})}))
     effects = [{"ref": target.ref, "kind": "condition", "condition": "feinted",
                 "by": actor.ref, "origin": "rule:feint"}]
     said = (f"{actor.name} feints at {target.name}{cost} and makes the bluff "
@@ -386,7 +398,8 @@ def spend_feint(defender, attacker, landed: bool = False) -> None:
     Golarion): its effect carries `until_hit`, and only a blow that landed spends it."""
     tag = f"{FEINTED}.{attacker.ref}"
     defender.remove_effects(match=lambda e: tag in (e.tags or ()) and (
-        landed or not (e.payload or {}).get("until_hit")))
+        landed or not (e.payload or {}).get("until_hit"))
+        and not (e.payload or {}).get("whole_turn"))       # feat loop b4-maneuver
 
 
 # A skill use let through an effect's ban on its skill (`Engine._forbidden_skill`):

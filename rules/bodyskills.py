@@ -1018,7 +1018,11 @@ def mounted_combat(engine, attacker, defender, atk, state) -> str:
                                             for e in rider.effects) else ""),
         source="feat:mounted-combat", origin="feat:mounted-combat", duration="rounds",
         rounds_left=1))
-    roll = _roll(engine, rider, _skill_mods(rider, "ride"), "Ride check (Mounted Combat)")
+    # Feat loop b4-maneuver: Mounted Shield's shield bonus on this Ride check too.
+    from . import maneuver_feats
+
+    roll = _roll(engine, rider, _skill_mods(rider, "ride") + maneuver_feats.shield_on_ride(rider),
+                 "Ride check (Mounted Combat)")
     state["rolls"].append(roll.as_dict())
     if roll.total > atk.total:
         return (f"{rider.name} turns {defender.name} from the blow (Mounted Combat: Ride "
@@ -1132,6 +1136,14 @@ def _treat(engine, intent, actor, mods, partial, *, key: str):
         spent = _no_action_left(engine, actor, "standard", "treating poison")
         if spent:
             return engine._refuse(intent, spent + " Nothing is rolled.", code="action_spent")
+    # Feat loop b4-maneuver: Siphon Poison draws a fresh injury poison out instead.
+    from . import maneuver_feats
+
+    if kind == "poison":
+        drawn = maneuver_feats.siphon_poison(engine, intent, actor, patient, aff, mods,
+                                             partial)
+        if drawn is not None:
+            return drawn
     held = (aff.payload or {}).get("affliction") or {}
     value = int(held.get("dc") or 10)
     save = str(held.get("save") or "fort")

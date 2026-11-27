@@ -278,6 +278,10 @@ def feat_rank_name(skill: str) -> str:
 # extra`): the ranks in the skill the term lands on, in any named skill, and the adjacent
 # allies holding the same feat. The validator probes formulas with these.
 FEAT_FORMULA_NAMES = ("ranks", "allies", "allies_threatening", "weapon_dice",
+                      # Feat loop b4-maneuver: allies holding the feat who flank the roll's
+                      # foe with you, and the consecutive rounds of this manoeuvre at it
+                      # (Topple Foe; rules/maneuver_feats.py keeps the streak).
+                      "allies_flanking", "streak",
                       *(feat_rank_name(s) for s in SKILLS))
 # A feat's class-skill grant, `skill.class.$target` bound to each pick (`class_skills`).
 FEAT_CLASS_SKILL = "skill.class."
@@ -411,7 +415,10 @@ ATTACK_CHOICES = ("power_attack", "deadly_aim", "piranha_strike", "combat_expert
                   # Feat loop b4-combat: the one-blow options of rules/strike_feats.py.
                   "death_or_glory", "punch_through", "deadly_finish", "reckless_aim",
                   "butterfly_sting", "two_handed_throw", "hamatulatsu",
-                  "cockatrice_strike")
+                  "cockatrice_strike",
+                  # Feat loop b4-maneuver: Tripping Twirl's trip at every adjacent foe,
+                  # Feinting Flurry's feint for a flurry's first swing.
+                  "tripping_twirl", "feinting_flurry", "gory_finish")
 # The options nobody needs a feat for (combat bar round 2, 2026-11-22). CRB, Combat
 # ("Fighting Defensively as a Standard Action"): "You can choose to fight defensively when
 # attacking" — anyone, with any attack. Its numbers are `defensive_dodge` and the stance
@@ -450,7 +457,10 @@ ATTACK_CHOICE_FEATS = {"power_attack": "power-attack", "deadly_aim": "deadly-aim
                           "butterfly_sting": "butterfly-s-sting",
                           "two_handed_throw": "two-handed-thrower",
                           "hamatulatsu": "hamatulatsu",
-                          "cockatrice_strike": "cockatrice-strike"}}
+                          "cockatrice_strike": "cockatrice-strike"},
+                       # Feat loop b4-maneuver.
+                       "tripping_twirl": "tripping-twirl",
+                       "feinting_flurry": "feinting-flurry", "gory_finish": "gory-finish"}
 
 _IMPLIED_GENDER = {"she": "woman", "he": "man"}
 
@@ -1981,7 +1991,10 @@ class Actor:
         eff = ActiveEffect(
             name=name, kind="affliction", key=key, source=source, origin=origin,
             tags=states.tags_for(key),
-            payload={"id": ident, "affliction": dict(aff)},
+            payload={"id": ident, "affliction": dict(aff),
+                     # Feat loop b4-maneuver: when it was taken, for Siphon Poison's "within
+                     # the first 2 rounds" (rules/maneuver_feats.py `contracted_at`).
+                     **_contracted_at()},
             periodic=[{"per": "round", "affliction": {
                 "wait": max(1, int(onset_rounds or every_rounds)),
                 "every": max(1, int(every_rounds)),
@@ -4764,6 +4777,10 @@ class Actor:
             mods = [m for m in mods if m.source != "Dex"] + [Modifier(-5, "Dex 0 (helpless)")]
             if against == "melee":
                 mods.append(Modifier(-4, "helpless, against melee"))
+        # Feat loop b4-maneuver: a rider's shield lent to the steed (Mounted Shield).
+        from . import maneuver_feats
+
+        mods.extend(maneuver_feats.lent_shield(self))
         return stack(mods)
 
     def _ac_context(self, against: str, attacker=None, opportunity: bool = False) -> dict:
@@ -6795,6 +6812,11 @@ class Actor:
         if "allies_threatening" in text:
             out["allies_threatening"] = len(self.allies_threatening_with(
                 fid, (ctx or {}).get("target_actor")))
+        if "allies_flanking" in text or "streak" in text:
+            # Feat loop b4-maneuver (Topple Foe): rules/maneuver_feats.py answers both.
+            from . import maneuver_feats
+
+            out.update(maneuver_feats.formula_names(self, fid, (ctx or {}).get("target_actor")))
         if "allies" in text:
             out["allies"] = len(self.adjacent_allies_with(fid))
         if "weapon_dice" in text:
@@ -9096,6 +9118,17 @@ class Situation:
         return True
 
 
+def _contracted_at() -> dict:
+    """The round and clock an affliction is taken at, when there is a moment (b4)."""
+    m = _MOMENT.get()
+    scene = getattr(m, "scene", None)
+    if scene is None:
+        return {}
+    return {"contracted": {"round": int(getattr(scene, "round", 0) or 0),
+                           "clock": int(getattr(scene, "clock_minutes", 0) or 0),
+                           "fight": bool(getattr(scene, "in_encounter", False))}}
+
+
 def situation_of(actor) -> Situation | None:
     m = _MOMENT.get()
     return Situation(actor, m.scene) if m is not None else None
@@ -9185,6 +9218,14 @@ def _when_holds(when, ctx: dict | None) -> bool:
 
                     if not casting.is_caster(defender) or (
                             "arcane" if armour_mod.is_arcane(defender) else "divine") != value:
+                        return False
+                    continue
+                if field_name == "rocky_ground":
+                    # Undermining Exploit's "opponents that are located in rocky, difficult
+                    # terrain" (feat loop b4-maneuver): a difficult square on stony ground.
+                    from . import maneuver_feats
+
+                    if maneuver_feats.on_rocky_ground(defender) is not bool(value):
                         return False
                     continue
                 if field_name == "aloft":

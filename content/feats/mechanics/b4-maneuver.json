@@ -1,0 +1,219 @@
+{
+  "_about": [
+    "Feat loop, batch 4, lane b4-maneuver (2026-11-26): the combat-manoeuvre feats and the",
+    "skill-use feats beside them. Each benefit is the book's (content/feats/feats.json, checked",
+    "against aonprd.com FeatDisplay 2026-11-26). The manoeuvre feats are read by",
+    "rules/maneuver_feats.py off their tags (roll twice, a trip weapon, a follow-up after the",
+    "manoeuvre, a streak at one foe); what still does not run is each document's `not_yet`."
+  ],
+  "tandem-trip": {
+    "tags": [
+      "maneuver.twice.trip.with-ally"
+    ]
+  },
+  "topple-foe": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "formula": "min(4, 1 + streak) + max(0, allies_flanking - 1) * min(4, 2 + streak)",
+        "bonus_type": "untyped",
+        "scope": {
+          "maneuver": "trip"
+        },
+        "when": {
+          "target": {
+            "larger": true
+          },
+          "flanking_with": {
+            "feat": "topple-foe"
+          }
+        },
+        "note": "+1 with one flanking ally who has Topple Foe, +2 more for each other; +1 per ally each consecutive round tripping the same foe, +4 per ally at most"
+      }
+    ]
+  },
+  "tripping-staff": {
+    "tags": [
+      "weapon.trip-feature.quarterstaff"
+    ]
+  },
+  "tripping-twirl": {
+    "choice": "tripping_twirl"
+  },
+  "binding-throw": {
+    "tags": [
+      "maneuver.after-trip.grapple"
+    ]
+  },
+  "spinning-throw": {
+    "tags": [
+      "maneuver.after-trip.bull-rush"
+    ],
+    "not_yet": [
+      "'If the bull rush fails, you can use the Ki Throw feat as normal' and the Improved Ki Throw throw into a secondary target's space: Ki Throw's own throw into a threatened square does not run yet (its document's not_yet)"
+    ]
+  },
+  "break-guard": {
+    "tags": [
+      "maneuver.after-disarm.strike"
+    ]
+  },
+  "feinting-flurry": {
+    "choice": "feinting_flurry"
+  },
+  "improved-feinting-flurry": {
+    "tags": [
+      "skill.bluff.feint.flurry-turn"
+    ]
+  },
+  "wave-strike": {
+    "tags": [
+      "skill.bluff.feint.wave-strike"
+    ]
+  },
+  "disengaging-shot": {
+    "tags": [
+      "skill.bluff.feint.disengaging-shot"
+    ]
+  },
+  "hard-headed": {
+    "modifiers": [
+      {
+        "type": "save_mod",
+        "target": "fort",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "stun_or_stagger"
+        },
+        "note": "saves against spells and special abilities that stagger or stun"
+      },
+      {
+        "type": "save_mod",
+        "target": "ref",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "stun_or_stagger"
+        },
+        "note": "saves against spells and special abilities that stagger or stun"
+      },
+      {
+        "type": "save_mod",
+        "target": "will",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "stun_or_stagger"
+        },
+        "note": "saves against spells and special abilities that stagger or stun"
+      }
+    ],
+    "not_yet": [
+      "'+1 bonus on attack rolls and combat maneuver checks made using a helmet': no helmet in the game's gear is a weapon to attack or manoeuvre with"
+    ]
+  },
+  "human-spirit": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "skill_ranks",
+        "formula": "min(4, level)",
+        "bonus_type": "untyped",
+        "note": "1 bonus skill rank, and another each Hit Die after, four at most"
+      }
+    ]
+  },
+  "siphon-poison": {
+    "tags": [
+      "skill.heal.siphon-poison"
+    ]
+  },
+  "greater-wild-empathy": {
+    "tags": [
+      "class.wild-empathy.intimidate",
+      "class.wild-empathy.reaches.$target"
+    ],
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "wild_empathy",
+        "amount": 2,
+        "bonus_type": "insight",
+        "note": "+2 insight on wild empathy checks"
+      }
+    ]
+  },
+  "undermining-exploit": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 4,
+        "bonus_type": "insight",
+        "when": {
+          "target": {
+            "rocky_ground": true
+          }
+        },
+        "note": "+4 insight on combat maneuvers against foes on rocky, difficult ground"
+      }
+    ]
+  },
+  "gory-finish": {
+    "choice": "gory_finish"
+  },
+  "mounted-shield": {
+    "tags": [
+      "mount.shield-shared"
+    ]
+  },
+  "trample": {
+    "tags": [
+      "mount.trample"
+    ]
+  },
+  "unseat": {
+    "tags": [
+      "mount.unseat"
+    ]
+  },
+  "cypher-script": {
+    "tags": [
+      "spellbook.cypher-script"
+    ]
+  },
+  "field-repair": {
+    "tags": [
+      "craft.field-repair"
+    ],
+    "not_yet": [
+      "'If you spend a day, the item regains 1 hit point plus one-quarter of its original hit points': mending here is an hour a point, and no day's rate is offered beside it",
+      "the misfired firearm, mishapped siege engine and fragile weapon's Craft check to lift broken: none of the three is in the game's gear"
+    ]
+  },
+  "planar-hunter": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "terrain": "planes"
+          },
+          "target": {
+            "type": "outsider"
+          }
+        },
+        "note": "+2 on weapon attack rolls against outsiders while on a planar favored terrain"
+      }
+    ],
+    "not_yet": [
+      "'ignore up to 5 points of damage reduction ... except damage reduction without a type': a feat lends no DR-passing trait to a blow",
+      "'against extraplanar creatures you ... identify as being from one of your planar favored terrains ... regardless of what plane you or they are on': no creature records the plane it is native to"
+    ]
+  }
+}

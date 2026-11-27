@@ -465,7 +465,23 @@ _REACHES = {
     # Feat loop b3: an animal companion's effective druid level (Boon Companion), read by
     # `animal_companion.effective_level` with an offset that leaves room under the cap.
     ("combat_mod", "companion_level"): lambda a: _companion_level(a),
+    # Feat loop b4-maneuver: skill ranks a feat adds (Human Spirit), read by
+    # `leveling.skill_ranks` into the total a character may place.
+    ("combat_mod", "skill_ranks"): lambda a: _skill_ranks(a),
+    ("combat_mod", "wild_empathy"): lambda a: _wild_empathy(a),
 }
+
+
+def _wild_empathy(a) -> int:
+    from rules import animals
+
+    return sum(m.value for m in animals.empathy_mods(a))
+
+
+def _skill_ranks(a) -> int:
+    from rules import leveling
+
+    return leveling.skill_ranks(a)["total"]
 
 
 def _companion_level(a) -> int:

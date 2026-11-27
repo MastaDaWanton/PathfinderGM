@@ -55,6 +55,7 @@ from .activeeffect import ActiveEffect
 from .guards import Guard, Packet
 from .dice import Dice, Modifier, Roll, d20_succeeds, natural_said
 from . import luck as luck_mod
+from . import maneuver_feats                 # feat loop b4-maneuver
 from .grid import Grid
 from . import hazards
 from . import deeds
@@ -6135,7 +6136,8 @@ class Engine:
             if not partial and not drawn:
                 draw = self._draw_before(raw)
                 if draw is not None:
-                    queue[0:0] = [draw]
+                    # Wave Strike's swift feint behind the draw (feat loop b4-maneuver).
+                    queue[0:0] = [draw] + maneuver_feats.wave_strike(self, raw, draw)
                     raw["_drawn"] = True
                     continue
             # A blow one move short: the move goes in front of it as a real intent, so it
@@ -6145,6 +6147,14 @@ class Engine:
             # on a resume, which is the same blow part-way through its dice.
             # Whirlwind Attack: one blow at each foe in reach, each its own intent
             # (`_whirlwind_before`), or the refusal in place of the one declared.
+            # Feinting Flurry's feint, in front of the flurry it forgoes a swing of
+            # (feat loop b4-maneuver, rules/maneuver_feats.py).
+            if not partial and not raw.get("_ffeint"):
+                ahead = maneuver_feats.feint_before(self, raw)
+                if ahead:
+                    raw["_ffeint"] = True
+                    queue[0:0] = ahead
+                    continue
             if not partial and raw.get("op") == "attack" \
                     and (raw.get("params") or {}).get("whirlwind_attack"):
                 whirl = self._whirlwind_before(raw)
@@ -10852,7 +10862,7 @@ class Engine:
         # held by the goo — and the refusal is printed right before this. Until 2026-10-16
         # a named weapon was swung straight off the belt, the one in hand never put away.
         if partial.get("attack_state") is None and not dancing and intent.params.get(
-                "weapon"):
+                "weapon") and not intent.params.get(maneuver_feats.OFF_HAND_SWING):
             off_belt = self._needs_drawing(actor, weapon_key)
             if off_belt:
                 name = actor.weapon(weapon_key).get("name", off_belt)
@@ -11203,7 +11213,9 @@ class Engine:
             # One blow is the whole full-round action: no iteratives, and no manoeuvre
             # riding it — a trip is not a way to finish somebody.
             full = False
-        elif intent.params.get("manoeuvre"):
+        elif intent.params.get("manoeuvre") or intent.params.get(maneuver_feats.TWIRL):
+            # Tripping Twirl, declared from the bar as its own strike, is a trip (b4).
+            intent.params.setdefault("manoeuvre", "trip")
             if partial.get("attack_state") is None:
                 why = self._maneuver_slot_refusal(intent, actor)
                 if why:
@@ -11429,6 +11441,8 @@ class Engine:
         off_from = len(actor.attack_plan(weapon_key, True, choices)) if off_key else None
         hands = ([("primary" if n < off_from else "off") for n in range(len(sequence))]
                  if off_from is not None and full else [""] * len(sequence))
+        # Feinting Flurry forgoes the flurry's first swing for its feint (feat loop b4).
+        sequence, hands = maneuver_feats.drop_first_swing(intent, sequence, hands)
         # One swing at a stated iterative. The combat panel lets a Blood Bender replace
         # any attack in a full attack with an ability, so the remaining weapon swings
         # arrive one op each, still carrying their own -5/-10 — a mixed full attack
@@ -14120,6 +14134,8 @@ class Engine:
                 roll = self._roll_or_suspend_stage(
                     intent, actor, mods, f"{m['name'].title()} (CMB)", cmd, partial,
                     state, "1d20",
+                    # Feat loop b4-maneuver: Tandem Trip's two dice, the better kept.
+                    twice=maneuver_feats.twice(self, actor, defender, key),
                 )
                 state["cmb"] = roll.as_dict()
             # A natural 20 always succeeds and a natural 1 always fails, whatever the
@@ -14279,6 +14295,11 @@ class Engine:
                     effects.append({"ref": actor.ref, "kind": "dropped",
                                     "item": weapon_key, "prop": rec["name"],
                                     "from": f"failed {m['name']}"})
+            # A trip weapon let go instead of falling (feat loop b4-maneuver).
+            elif m.get("backfire") and margin <= -10 and not rider \
+                    and maneuver_feats.backfire_spared(self, intent, actor, defender, key,
+                                                       weapon_key, bits, effects):
+                pass
             # Trip UMR: "If the attempt fails, the creature is not tripped in return."
             elif m.get("backfire") and margin <= -10 and not rider:
                 bits.append(maneuver_text(m["backfire"], actor.name, defender.name) + ".")
@@ -14288,6 +14309,13 @@ class Engine:
                     effects.append({"ref": actor.ref, "kind": "condition",
                                     "condition": back, "from": f"failed {m['name']}"})
 
+        # Feat loop b4-maneuver: what a held feat makes of this manoeuvre — a follow-up,
+        # a second trip, a streak kept (rules/maneuver_feats.py).
+        more = maneuver_feats.after(self, intent, actor, defender, key, verdict, weapon_key,
+                                    roll is not None)
+        effects.extend(more["effects"])
+        bits.extend(t for t in more["tells"] if t)
+        extra_rolls.extend(more["rolls"])
         crossed = self._hp_state_effects(defender)
         effects.extend(crossed)
         return Outcome(
@@ -16125,6 +16153,8 @@ class Engine:
         points = obj.hp_max - obj.hp
         hours = points * int(r["hours_per_point"])
         cost_gp = round(tradecraft.price_gp(owner, name) * float(r["cost_fraction"]), 2)
+        # Feat loop b4-maneuver: Field Repair mends a broken thing with no raw material.
+        cost_gp = maneuver_feats.field_repair_cost(actor, obj, cost_gp)
         cost_cp = int(round(cost_gp * 100))
         if goods.in_copper(actor.purse) < cost_cp:
             return self._refuse(
@@ -28107,6 +28137,9 @@ class Engine:
         why = strike_feats.choice_refusal(actor, w, declared, params)   # feat loop b4
         if why:
             return why
+        why = maneuver_feats.choice_refusal(actor, w, declared, params)  # feat loop b4
+        if why:
+            return why
         for c in ("vital_strike", "cleave", "scorpion_style"):
             if c in declared and full:
                 return (f"{said[c]} is the attack action — one blow — and cannot ride a "
@@ -39729,7 +39762,9 @@ class Engine:
                 **{k: charge[k] for k in ("target_requires", "target_requires_not",
                                           "target_said", "no_damage", "single_attack",
                                           # feat loop b4: Disorienting Blow, Perfect Strike
-                                          "adds_duration", "roll_twice")
+                                          "adds_duration", "roll_twice",
+                                          # Feat loop b4-maneuver: Neckbreaker's.
+                                          "holding_target", "no_larger")
                    if charge.get(k)},
                 **({"push_ft": int(doc["charge_push_ft"])} if doc.get("charge_push_ft")
                    else {}),
@@ -39737,7 +39772,10 @@ class Engine:
                 **({"on_fail": {"modifiers": ca.modifiers(
                     (charge["on_fail"] or {}).get("modifiers"), actor),
                     "rounds": (charge["on_fail"] or {}).get("rounds"),
-                    "bleed": (charge["on_fail"] or {}).get("bleed")}}
+                    "bleed": (charge["on_fail"] or {}).get("bleed"),
+                    # Feat loop b4-maneuver: Bonebreaker's and Neckbreaker's ability
+                    # damage, the score the player's choice names (`charge_ability`).
+                    **maneuver_feats.charge_ability_damage(doc, charge["on_fail"] or {})}}
                    if charge.get("on_fail") else {})}
 
     @staticmethod
@@ -39833,7 +39871,8 @@ class Engine:
             c = e.payload["charge"]
             if c.get("on_charge") and not charging:
                 continue                  # Radiant Charge waits for a charge's blow
-            unfit = self._charge_unfit(c, defender, full)
+            unfit = self._charge_unfit(c, defender, full) or maneuver_feats.charge_unfit(
+                self, actor, c, defender)                # feat loop b4-maneuver
             if unfit and c.get("pays"):
                 continue                  # paid on the hit: nothing chosen, nothing spent
             actor.remove_effects(match=lambda x, e=e: x is e)
@@ -39869,7 +39908,8 @@ class Engine:
                                        "what": e.name, "origin": e.origin},
                             "tell": f"{immune}, and {e.name} finds nothing to stun."})
                 continue
-            roll = self.dice.d20(defender.save_modifiers(c["save"]),
+            roll = self.dice.d20(defender.save_modifiers(
+                c["save"], ctx=maneuver_feats.charge_save_ctx(c)),   # feat loop b4
                                  label=f"{SAVES.get(c['save'], c['save'])} save against "
                                        f"{e.name}", visibility=visibility)
             made = d20_succeeds(roll, int(c["dc"]))
@@ -40048,6 +40088,9 @@ class Engine:
         due to Crushing Blow" — one effect by the blow's origin, laid again rather than
         added to; Jawbreaker's "1d4 points of bleed damage". Through the one applicator."""
         out: list[dict] = []
+        if spec.get("ability_damage"):
+            out.extend(maneuver_feats.charge_ability_hit(self, defender, e,
+                                                         spec["ability_damage"], line))
         if spec.get("modifiers"):
             defender.remove_effects(match=lambda x: x.origin == e.origin
                                     and x.key == e.name.lower())
@@ -42281,9 +42324,13 @@ class Engine:
     def _roll_or_suspend_stage(
         self, intent: Intent, actor: Actor, mods: list[Modifier], label: str,
         dc: int | None, partial: dict, state: dict, notation: str,
-        state_key: str = "attack_state", kind: str = "",
+        state_key: str = "attack_state", kind: str = "", twice: str = "",
     ) -> Roll:
         """One stage of a multi-stage intent: roll it, or hand it to the player and stop.
+
+        `twice` names a feat that has this d20 rolled twice and the better kept (feat loop
+        b4-maneuver, Tandem Trip): the player is asked for a second die, anybody else's is
+        rolled again (`_twice`).
 
         `kind` names a d20 roll for the luck feats (`rules/luck.py`): "attack" for the
         swing's to-hit. Left out, a roll no luck reaches (damage, the confirmation).
@@ -42311,6 +42358,9 @@ class Engine:
                         intent, actor, mods, label, dc, partial, kind, {state_key: state},
                         True))
                 face = partial.pop("player_face")
+                if twice and notation.strip() == "1d20":
+                    face = self._twice_face(intent, actor, mods, label, dc, state,
+                                            state_key, twice, face)
                 return self._took(self.dice.given_total(face, notation, mods, label=label))
             count, faces, _ = self.dice.parse(notation)
             raise _NeedsPlayerRoll(
@@ -42330,7 +42380,34 @@ class Engine:
                 {state_key: state},
             )
         rolled = self.dice.roll(notation, mods, label=label, visibility=intent.visibility)
+        if twice and notation.strip() == "1d20":
+            other = self.dice.roll(notation, mods, label=f"{label}, second die ({twice})",
+                                   visibility=intent.visibility)
+            self._luck_note(actor, {"id": twice.lower().replace(" ", "-")},
+                            f"{actor.name} rolls twice ({twice}): {rolled.raw} and "
+                            f"{other.raw}, the better kept.")
+            rolled = other if other.total > rolled.total else rolled
         return self._luck_npc(actor, mods, label, dc, kind, rolled) if lucky else rolled
+
+    def _twice_face(self, intent: Intent, actor: Actor, mods, label: str, dc, state: dict,
+                    state_key: str, twice: str, face: int) -> int:
+        """The player's two faces for a roll-twice d20 (feat loop b4-maneuver): the first
+        is kept in the stage's state and a second die asked for; the better of the two is
+        the face rolled with. Told behind the op, as luck is."""
+        first = state.pop("twice_first", None)
+        if first is None:
+            state["twice_first"] = int(face)
+            raise _NeedsPlayerRoll(
+                {"label": f"{label} — second die ({twice})", "die": "1d20",
+                 "actor": actor.name, "min": 1, "max": 20,
+                 "modifier": sum(m.value for m in mods),
+                 "breakdown": [m.as_dict() for m in mods], "dc": dc,
+                 "because": self._roll_why(intent, actor), "intent_id": intent.id},
+                {state_key: state})
+        self._luck_note(actor, {"id": twice.lower().replace(" ", "-")},
+                        f"{actor.name} rolls twice ({twice}): {first} and {face}, the "
+                        f"better kept.")
+        return max(int(first), int(face))
 
     def _roll_why(self, intent: Intent, actor: Actor) -> str:
         """The dice popup's subtitle for a roll the player makes: the plan's `because`,

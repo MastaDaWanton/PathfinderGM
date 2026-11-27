@@ -330,3 +330,23 @@ features.
 - Murderer's Circle: performance combat checks (Ultimate Combat), as Savage Display
 - Focused Overseer: downtime capital (Ultimate Campaign's Purchasing Capital), which the
   game does not keep
+## Feat loop batch 4, lane b4-maneuver
+
+Class, race or class feature no player can take:
+
+- Kobold Flood: race kobold (Kobold Groundling, Kobold Style)
+- Gunsmithing: firearms and the gunslinger (no firearm is in the game's gear)
+- Advanced Ranger Trap: the ranger trap class feature (not on the ranger document)
+- Exploit Lore, Improved Monster Lore: the monster lore class feature (inquisitor)
+- Grant Initiative: cunning initiative (inquisitor)
+- Insightful Gaze: stern gaze (inquisitor)
+- Oracular Intuition: the mystery class feature (oracle)
+- Eclectic: multiclassing (a second favored class)
+
+Systems not in the game:
+
+- Dramatic Display: performance combat checks (Ultimate Combat), as Savage Display
+- Focused Worker: Ultimate Campaign's downtime capital (Goods, Influence, Labor, Magic)
+- Dragoncrafting: dragoncraft items and their harvest table
+- Tandemevasion: a dragon's breath weapon and tail sweep; a creature's special attacks
+  other than its printed riders do not run
