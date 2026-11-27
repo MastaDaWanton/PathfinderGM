@@ -4866,6 +4866,9 @@ class Actor:
         from . import maneuver_feats
 
         mods.extend(maneuver_feats.lent_shield(self))
+        from . import spell_feats                       # feat loop b5-spells
+
+        mods.extend(spell_feats.covering(self))
         return stack(mods)
 
     def _ac_context(self, against: str, attacker=None, opportunity: bool = False) -> dict:

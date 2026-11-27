@@ -31677,10 +31677,15 @@ class Engine:
             intent, actor, mods,
             f"Caster level check against {target.name}'s spell resistance", sr,
             partial, state, "1d20", state_key="cast_state")
+        from . import spell_feats                       # Spell Chain (b5-spells)
+
+        roll = spell_feats.chained(self, actor, target, roll)
         state["rolls"].append(roll.as_dict())
         beat = roll.total >= sr
         self._judge(roll, beat)
         done[target.ref] = beat
+        if beat:
+            spell_feats.chain_mark(actor, target)
         held = "" if whose == "its own" else f", from {whose}"
         if pierced:
             held += ", 5 lower against a piercing spell"
@@ -38614,7 +38619,10 @@ class Engine:
                         tells.append(f"Against {other.name} the DC is {dc_here}.")
                 if saving and other is not actor:
                     sv = str(saving.get("save", "will"))
-                    sroll = self.dice.d20(other.save_modifiers(sv),
+                    # A shaped area is an area of effect (feat loop b5-spells: Covering
+                    # Shield's "Reflex saves against area of effect attacks").
+                    sroll = self.dice.d20(other.save_modifiers(
+                        sv, {"against": ("area",)} if area is not None else None),
                                           label=f"{SAVES.get(sv, sv)} save against {shown}",
                                           visibility=intent.visibility or "player")
                     rolls.append(sroll)

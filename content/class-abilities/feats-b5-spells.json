@@ -13,7 +13,7 @@
         "guard my back"
       ],
       "level": 1,
-      "source": "Improved Back to Back (UC): 'While you are adjacent to an ally who is flanked and also has this feat, you can spend a swift action to gain a +2 bonus to AC against all flankers until the start of your next turn.' The ally is asked on the board (`feat_events.ally_holds`, `flanked` and `feat`); the bonus answers an attacker who flanks the bearer (owner call: the flankers are the ones flanking you).",
+      "source": "Improved Back to Back (UC): 'While you are adjacent to an ally who is flanked and also has this feat, you can spend a swift action to gain a +2 bonus to AC against all flankers until the start of your next turn.' The ally is asked on the board (`feat_events.ally_holds`, `flanked` and `feat`); the bonus (the feat document's, asked on the AC line with the board's flank) answers an attacker who flanks the bearer (owner call: the flankers are the ones flanking you).",
       "text": "Swift action, beside a flanked ally with this feat: +2 AC against flankers until your next turn.",
       "action": "swift",
       "requires_ally": {
@@ -25,17 +25,6 @@
         "rounds": "1",
         "tags": [
           "buff.stance.improved-back-to-back"
-        ],
-        "modifiers": [
-          {
-            "type": "combat_mod",
-            "target": "ac",
-            "amount": 2,
-            "bonus_type": "untyped",
-            "when": {
-              "flanked": true
-            }
-          }
         ]
       },
       "tell": "{name} sets a shoulder to an ally's and turns to face the ones closing in."

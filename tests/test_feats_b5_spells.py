@@ -310,3 +310,134 @@ def test_smell_fear_finds_the_frightened_by_scent():
     pc.feats = ["Smell Fear"]
     assert _sum(pc.skill_modifiers("perception", ctx={"target_actor": thug}),
                 "Smell Fear") == 0
+
+
+# --- the board: Covering Defense, Improved Back to Back -------------------------------------
+
+def _line(*names_feats, foes=()):
+    from rules.grid import Grid
+    from tests.test_feats_batch1_modifiers import _pc as _fighter
+
+    s = Scene(location_id="5bbd0c40345f", grid=Grid(20, 20))
+    us = []
+    for name, feats_, extra in names_feats:
+        a = _fighter(feats_, name=name, **extra)
+        a.ref = name.lower()
+        s.add(a)
+        us.append(a)
+    them = [s.add(instantiate(t, scene=s, name=f"{t} {i + 1}")) for i, t in enumerate(foes)]
+    s.sides = {"us": [a.ref for a in us], "them": [t.ref for t in them]}
+    s.initiative = [(a.ref, 20 - i) for i, a in enumerate(us + them)]
+    s.round, s.turn = 1, 0
+    return s, Engine(s, Dice(seed=3)), us, them
+
+
+def test_covering_defense_lends_the_shield_as_cover_under_total_defense():
+    """APG: "When you use the total defense action while using a light, heavy, or tower
+    shield, you can provide a cover bonus to AC against all attacks to an adjacent ally
+    your size or smaller ... equal to your shield's shield bonus ... until the beginning
+    of your next turn." Through the engine: the guard's total_defense op, then the ally's
+    AC has +2 cover from a heavy shield; stepped away, nothing."""
+    from rules.sheet import situated
+
+    s, e, (guard, ward), (thug,) = _line(
+        ("Guard", ["Shield Focus", "Covering Defense"], {"shield": "heavy shield"}),
+        ("Ward", [], {}), foes=["thug"])
+    s.positions.update({guard.ref: (5, 5), ward.ref: (5, 6), thug.ref: (9, 9)})
+    with situated(s):
+        before = ward.ac(attacker=thug)
+        e.run(e.validate([{"op": "total_defense", "actor": guard.ref, "because": "test"}]))
+        assert ward.ac(attacker=thug) == before + 2
+        s.positions[ward.ref] = (12, 12)
+        assert ward.ac(attacker=thug) == before
+
+
+def test_improved_back_to_back_needs_a_flanked_ally_with_the_feat():
+    """UC: "While you are adjacent to an ally who is flanked and also has this feat, you
+    can spend a swift action to gain a +2 bonus to AC against all flankers until the start
+    of your next turn." Refused beside an ally nobody flanks; beside a flanked one, +2
+    against the one flanking the bearer."""
+    from rules.sheet import situated
+
+    feats_ = ["Back to Back", "Improved Back to Back"]
+    s, e, (a, ally), (t1, t2, t3, t4) = _line(("Ava", feats_, {}), ("Bo", feats_, {}),
+                                              foes=["thug"] * 4)
+    s.positions.update({a.ref: (5, 5), ally.ref: (5, 6), t1.ref: (12, 12), t2.ref: (14, 14),
+                        t3.ref: (16, 16), t4.ref: (18, 18)})
+    raw = {"op": "use_ability", "actor": a.ref, "because": "test",
+           "params": {"ability": "Improved Back to Back"}}
+    with situated(s):
+        out = e.run(e.validate([raw])).outcomes[-1]
+        assert "flanked" in out.tell and not a.has_state("buff.stance.improved-back-to-back")
+        s.positions.update({t1.ref: (4, 5), t2.ref: (6, 5),          # Ava flanked
+                            t3.ref: (4, 6), t4.ref: (6, 6)})         # and Bo
+        before = a.ac(attacker=t1)
+        out = e.run(e.validate([raw])).outcomes[-1]
+        assert a.has_state("buff.stance.improved-back-to-back"), out.tell
+        assert a.ac(attacker=t1) == before + 2
+
+
+# --- Run, Spell Chain, Secret Signs ----------------------------------------------------------
+
+def test_run_adds_four_to_a_jump_with_a_running_start_only():
+    """CRB: "If you make a jump after a running start ... a +4 bonus on your Acrobatics
+    check" — out of a fight the jumper has the room for a run-up (`bodyskills._run_up`)."""
+    from rules import bodyskills
+
+    pc = _wren(["Run"])
+    assert _sum(bodyskills._run_term(pc, True), "Run (a running start)") == 4
+    assert bodyskills._run_term(pc, False) == []
+    assert bodyskills._run_term(_wren([]), True) == []
+
+
+def test_spell_chain_hands_the_next_holder_a_second_die():
+    """Demon Hunter's Handbook: after a holder's successful check against a target's spell
+    resistance, "the next ally who also has this feat ... can roll twice ... taking the
+    better result. This benefit must be used within 1 round". The mark is spent by the
+    next holder, and an ally without the feat neither gets nor spends it."""
+    a = _wren(["Spell Penetration", "Spell Chain"])
+    a.ref = "ava"
+    b = _wren(["Spell Penetration", "Spell Chain"])
+    b.ref = "bo"
+    plain = _wren([])
+    plain.ref = "cy"
+    foe = instantiate("thug", name="the thug")
+    s = Scene(location_id="5bbd0c40345f")
+    for x in (a, b, plain, foe):
+        s.add(x)
+    s.sides = {"us": ["ava", "bo", "cy"], "them": [foe.ref]}
+    e = Engine(s, Dice(seed=4))
+    spell_feats.chain_mark(a, foe)
+    assert foe.has_state(spell_feats.CHAINED)
+    first = e.dice.d20([], label="Caster level check")
+    assert spell_feats.chained(e, plain, foe, first) is first
+    assert foe.has_state(spell_feats.CHAINED)
+    got = spell_feats.chained(e, b, foe, first)
+    assert got.total >= first.total and not foe.has_state(spell_feats.CHAINED)
+    spell_feats.chain_mark(plain, foe)
+    assert not foe.has_state(spell_feats.CHAINED)
+
+
+def test_secret_signs_hides_a_somatic_casting_and_slows_its_reading():
+    """ISWG: "Spellcraft checks made to identify any spell you cast that has somatic
+    components take a -2 penalty", and a spell of somatic components only must first be
+    noticed on Perception against the caster's Sleight of Hand."""
+    from rules import skilluses
+    from rules.engine import Outcome
+
+    caster_ = instantiate("thug", name="the hedge witch")
+    caster_.feats = ["Secret Signs"]
+    pc = _wren([])
+    s = Scene(location_id="5bbd0c40345f")
+    s.add(pc)
+    s.add(caster_)
+    e = Engine(s, Dice(seed=1))
+    out = Outcome(intent_id="x", op="cast", tell="")
+    out.rolls = []
+    burning = spells.get("burning-hands")                     # V, S
+    assert [m.value for m in skilluses._secret_signs(e, out, caster_, burning, pc)] == [-2]
+    assert skilluses._secret_signs(e, out, _wren([]), burning, pc) == []
+    caster_.ranks["sleight of hand"] = 30
+    somatic = next(sp for sp in spells.all_spells().values()
+                   if [str(c).upper() for c in sp.components or ()] == ["S"])
+    assert skilluses._secret_signs(e, out, caster_, somatic, pc) is None

@@ -75,11 +75,8 @@
             "shield": true
           }
         },
-        "note": "Dragonslayer's Handbook: 'a bonus on Reflex saves against area of effect attacks equal to your shield's base bonus to armor class plus any bonuses granted by feats or class abilities' (Actor._shield_ac_for_feats); no enhancement"
+        "note": "Dragonslayer's Handbook: 'a bonus on Reflex saves against area of effect attacks equal to your shield's base bonus to armor class plus any bonuses granted by feats or class abilities' (Actor._shield_ac_for_feats); no enhancement; a spell's area and a class ability's shaped area both pass `area`"
       }
-    ],
-    "not_yet": [
-      "an area attack that is not a spell (a breath weapon): only a spell's save says it is against an area"
     ]
   },
   "schooledresolve": {
@@ -249,5 +246,39 @@
       "the once-a-day reroll of a save against an effect that would put the light out: nothing in the engine puts out a carried light"
     ]
   },
-  "improved-back-to-back": {}
+  "improved-back-to-back": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "ac",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "flanked": true,
+          "bearer": {
+            "state": "buff.stance.improved-back-to-back"
+          }
+        },
+        "note": "UC: '+2 bonus to AC against all flankers until the start of your next turn', while the swift action's one-round stance holds (content/class-abilities/feats-b5-spells.json)"
+      }
+    ]
+  },
+  "run": {
+    "tags": [
+      "jump.running.run"
+    ],
+    "not_yet": [
+      "running itself, at five (or four) times speed while keeping the Dexterity bonus to AC: the engine has no run action, only moves and charges"
+    ]
+  },
+  "spell-chain": {
+    "tags": [
+      "chain.spell"
+    ]
+  },
+  "covering-defense": {
+    "tags": [
+      "guard.covering-defense"
+    ]
+  }
 }
