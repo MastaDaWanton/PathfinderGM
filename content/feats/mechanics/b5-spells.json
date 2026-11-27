@@ -172,8 +172,8 @@
         "note": "APG: '+4 bonus on Perception checks to detect creatures with the shaken, frightened, or panicked conditions using scent' (awareness.check names the one looked for)"
       }
     ],
-    "not_yet": [
-      "using Perception in place of Sense Motive against a frightened subject or one covering up fear: a check is rolled with its own skill"
+    "tags": [
+      "skill.sense-motive.by-perception.fear"
     ]
   },
   "cold-celerity": {

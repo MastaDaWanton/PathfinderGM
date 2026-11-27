@@ -105,10 +105,19 @@
         "when": {
           "against": "spell_resistance"
         }
+      },
+      {
+        "type": "skill_mod",
+        "target": "spellcraft",
+        "amount": 2,
+        "bonus_type": "racial",
+        "when": {
+          "skill_use": "identify-item"
+        },
+        "note": "Spellcraft checks made to identify the properties of magic items"
       }
     ],
     "not_yet": [
-      "the +2 racial on Spellcraft to identify a magic item's properties (the identify door takes the skill's plain modifiers)",
       "the alternative of an elven trait that replaces elven magic"
     ]
   },

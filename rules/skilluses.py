@@ -888,6 +888,7 @@ def asks_the_world(intent) -> bool:
 # --- Sense Motive -----------------------------------------------------------------------------
 
 _DOMINATING = frozenset({"dominate-person", "dominate-monster", "dominate-animal"})
+SMELL_FEAR = "skill.sense-motive.by-perception.fear"     # feat loop b7-small, its doc's tag
 
 
 def _enchanted_by(target):
@@ -945,8 +946,16 @@ def sense_motive(engine, intent, actor, mods, partial):
     spell, dominated = _enchanted_by(target)
     hiding = schemes_mod.keeps_secret(engine.scene, target.ref)
     hunch = dc(HUNCH, target)
+    # Smell Fear (APG): "use Perception in place of Sense Motive" against a subject that is
+    # shaken, frightened or panicked or hides its fear — the fear's tag, which a hidden
+    # fear carries too; the better of the two is read (feat loop b7-small).
+    read_with = "Sense Motive"
+    if actor.has_state(SMELL_FEAR) and target.has_state("state.fear"):
+        nose = actor.skill_modifiers("perception", ctx={"target_actor": target})
+        if sum(m.value for m in nose) > sum(m.value for m in mods):
+            mods, read_with = nose, "Perception"
     roll = engine._roll_or_suspend(intent, actor, list(mods),
-                                   label=f"Sense Motive check (reading {target.name})",
+                                   label=f"{read_with} check (reading {target.name})",
                                    dc=hunch, partial=partial, dc_shown=False)
     actor.apply_effect(ActiveEffect(
         name=f"read {target.name}", kind="knowledge", key=f"sensed-{target.ref}",

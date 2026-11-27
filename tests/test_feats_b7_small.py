@@ -338,3 +338,40 @@ def test_cold_celerity_quickens_its_bearer_in_severe_cold():
     plain, *_ = _exposed(["Cold Celerity"], "cold")
     assert not any(e.origin == "rule:cold" and e.key == "cold-quickened"
                    for e in plain.effects)
+
+
+def test_elven_spirit_adds_two_to_spellcraft_identifying_an_item():
+    """Half-elf, Elven Spirit: "a +2 racial bonus on Spellcraft checks made to identify
+    the properties of magic items." Measured before: the identify door took the skill's
+    plain modifiers. The check that names an item now carries the use, and the use the
+    +2; a Spellcraft check naming no item does not."""
+    from rules.engine import Engine
+    from rules.intents import Intent
+
+    pc = _pc("wizard", feats=["Elven Spirit"], race="half-elf", ranks={"spellcraft": 4})
+    study = Intent(op="check", actor="pc", params={"skill": "spellcraft", "item": "ring"})
+    plain = Intent(op="check", actor="pc", params={"skill": "spellcraft"})
+    ctx = Engine._skill_use_ctx(study, "spellcraft")
+    assert ctx == {"skill_use": "identify-item"}
+    with_use = sum(m.value for m in pc.skill_modifiers("spellcraft", ctx=ctx))
+    without = sum(m.value for m in pc.skill_modifiers(
+        "spellcraft", ctx=Engine._skill_use_ctx(plain, "spellcraft")))
+    assert with_use - without == 2
+
+
+def test_smell_fear_reads_a_frightened_subject_with_perception():
+    """APG, Smell Fear: use "Perception in place of Sense Motive" against a subject that
+    is shaken, frightened or panicked or hides its fear. Measured before: the read was
+    always Sense Motive. A nose far keener than the eye for lies reads the shaken man by
+    Perception; the calm one still by Sense Motive."""
+    from tests.test_skill_uses_mind import _check, _here, _person, _run
+
+    scene, engine, pc = _here(rest=10)
+    pc.feats = list(pc.feats) + ["Smell Fear"]
+    pc.ranks = dict(pc.ranks or {}, perception=8)
+    afraid, calm = _person(scene, "Orrin"), _person(scene, "Wen")
+    afraid.add_condition("shaken", 10)
+    a = _run(engine, {**_check("sense motive"), "target": afraid.ref})[0]
+    b = _run(engine, {**_check("sense motive"), "target": calm.ref})[0]
+    assert a.rolls[0].label.startswith("Perception check"), a.rolls[0].label
+    assert b.rolls[0].label.startswith("Sense Motive check")

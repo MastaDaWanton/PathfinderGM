@@ -10153,6 +10153,10 @@ class Engine:
         use = next((flag for (named, flag) in skilluses.OWN_DOORS
                     if named == said and intent.params.get(flag)), "")
         opposed = intent.params.get("opposed_by")
+        # Feat loop b7-small: a magic item's properties studied (`skilluses.identify_item`),
+        # Elven Spirit's "Spellcraft checks made to identify the properties of magic items".
+        if not use and said == "spellcraft" and intent.params.get("item"):
+            use = "identify-item"
         if not use and said == "bluff":
             if intent.params.get("diversion"):
                 use = "diversion"
