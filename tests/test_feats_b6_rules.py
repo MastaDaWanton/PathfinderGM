@@ -323,3 +323,63 @@ def test_dented_and_cloven_helm_add_to_ac_against_confirmation_only_while_a_helm
     assert against() == -2
     dwarf.feats = [f for f in dwarf.feats if f != "Cloven Helm"]
     assert against() == -1
+
+
+# --- the Ki Throw line ---------------------------------------------------------------------------
+
+def _thrower(*more, faces=None):
+    pc = _pc("monk", level=10, feats=("Improved Unarmed Strike", "Improved Trip", "Ki Throw",
+                                      "Improved Bull Rush", *more))
+    pc.equipped = "unarmed"
+    pc.armour = "none"
+    s, e = _board(pc, ("thug", (6, 5)), ("thug", (5, 6)), faces=faces or {"Trip": 20})
+    return pc, s, e
+
+
+def _throw(e, square):
+    return _run(e, {"op": "attack", "actor": "pc", "target": "c1", "visibility": "hidden",
+                    "params": {"manoeuvre": "trip", "weapon": "unarmed", "square": square}})
+
+
+def test_improved_ki_throw_throws_into_a_foes_square_and_knocks_it_down():
+    """APG: "you may throw your target into any square you threaten that is occupied by
+    another creature. Make a bull rush combat maneuver check with a -4 penalty against the
+    secondary target. If this check succeeds, the thrown creature lands prone in the
+    secondary target's square, while the secondary target is pushed back and knocked prone".
+    Before: a throw at an occupied square was refused ("can only be thrown into an open
+    square"). With the feat and a high bull rush, thug 1 lands where thug 2 stood, and thug
+    2 is pushed a square and prone."""
+    for more, thrown in (((), False), (("Improved Ki Throw",), True)):
+        pc, s, e = _thrower(*more, faces={"Trip": 20, "Kesst Vayr's bull rush": 20})
+        res = _throw(e, [5, 6])
+        said = _tells(res)
+        one, two = s.actors["c1"], s.actors["c2"]
+        assert (tuple(s.positions["c1"])[:2] == (5, 6)) is thrown, said
+        if thrown:
+            assert "-4" in " ".join(str(m.as_dict()) for o in res.outcomes for r in o.rolls
+                                    for m in r.modifiers or ()), said
+            assert two.has_state("state.position.prone") and \
+                tuple(s.positions["c2"])[:2] != (5, 6), said
+
+
+def test_a_failed_improved_ki_throw_lands_beside_the_secondary_target():
+    """APG: "If the check fails, the thrown creature lands prone in the nearest square you
+    threaten adjacent to the secondary target." Thug 2 keeps its square."""
+    pc, s, e = _thrower("Improved Ki Throw", faces={"Trip": 20, "Kesst Vayr's bull rush": 1})
+    res = _throw(e, [5, 6])
+    assert tuple(s.positions["c2"])[:2] == (5, 6)
+    assert tuple(s.positions["c1"])[:2] != (6, 5), _tells(res)
+    assert not s.actors["c2"].has_state("state.position.prone")
+
+
+def test_enhanced_ki_throw_spends_a_ki_point_for_unarmed_damage_on_landing():
+    """APG: "you can expend 1 ki point ... If your ki throw succeeds, when the target hits
+    the ground, it takes damage as if you had hit it with an unarmed strike." Measured
+    before: no ki spent, no damage — the b4 document's not_yet."""
+    pc, s, e = _thrower("Enhanced Ki Throw")
+    thug = s.actors["c1"]
+    thug.hp_max = thug.hp = 200
+    ki = pc.pool("ki").current
+    res = _throw(e, [4, 5])
+    assert pc.pool("ki").current == ki - 1, _tells(res)
+    assert thug.hp < 200 and "Enhanced Ki Throw" in _tells(res)

@@ -287,7 +287,12 @@ def after(engine, intent, actor, defender, key: str, verdict: str, weapon_key: s
                 got = _sub(engine, intent, actor, defender, "bull rush",
                            AFTER_TRIP_BULL_RUSH, name)
                 take(got, AFTER_TRIP_BULL_RUSH)
-                if got.verdict == "success" and not defender.is_down \
+                into = _spun_into(engine, intent, actor, defender) \
+                    if got.verdict == "success" else None
+                if into is not None:
+                    for k in out:
+                        out[k].extend(into[k])
+                elif got.verdict == "success" and not defender.is_down \
                         and not defender.has_state("state.position.prone"):
                     from . import bodyskills
 
@@ -365,23 +370,142 @@ def ki_throw(engine, intent, actor, defender) -> dict:
             and not feet <= set(gridmod.threatened_squares(
                 scene.positions[actor.ref], actor.size, reach=gridmod.SQUARE_FT)):
         why = "a square the thrower threatens"
-    elif feet & set(taken) or not all(scene.grid.inside(q) and scene.grid.passable(q)
-                                      for q in feet):
+    elif not all(scene.grid.inside(q) and scene.grid.passable(q) for q in feet):
+        why = "an open square"
+    elif feet & set(taken):
+        if actor.has_state(IMPROVED_KI_THROW):
+            # Feat loop b6-rules: Improved Ki Throw's throw into a creature's square.
+            return _thrown_into(engine, actor, defender, to, feet, start, out)
         why = "an open square"
     if why:
         out["tells"].append(f"Ki Throw: {defender.name} can only be thrown into {why}, and "
                             f"falls where they stood.")
         return out
-    scene.positions[defender.ref] = to + tuple(start[2:3])
-    scene.settle_levels()
-    scene.resync_zones()
+    _land(engine, actor, defender, to, start, out)
+    return out
+
+
+# Feat loop b6-rules: the Ki Throw line's tags (each its feat document's).
+IMPROVED_KI_THROW = "maneuver.ki-throw.improved"
+ENHANCED_KI_THROW = "maneuver.ki-throw.enhanced"
+
+
+def _land(engine, actor, defender, to, start, out, why: str = "Ki Throw") -> None:
+    """The thrown creature set down at `to`, and Enhanced Ki Throw's landing (APG: "you
+    can expend 1 ki point to amplify the force of your attack. If your ki throw succeeds,
+    when the target hits the ground, it takes damage as if you had hit it with an unarmed
+    strike"). Owner call (b6-rules): the ki is spent whenever a throw lands and a point is
+    left — the feat has no other use, and the combat bar has no per-throw toggle."""
     from . import fixtures
 
+    scene = engine.scene
+    scene.positions[defender.ref] = tuple(to) + tuple(start[2:3])
+    scene.settle_levels()
+    scene.resync_zones()
     out["effects"].append({"ref": defender.ref, "kind": "position", "from": start,
                            "to": scene.positions[defender.ref],
                            "origin": "rule:feat-ki-throw"})
     out["tells"].append(f"{actor.name} throws {defender.name} down into "
-                        f"{fixtures.square_name(to)} (Ki Throw).")
+                        f"{fixtures.square_name(to)} ({why}).")
+    if not actor.has_state(ENHANCED_KI_THROW) or defender.is_dead:
+        return
+    if not actor.spend_pool("ki", 1).get("ok"):
+        out["tells"].append(f"{actor.name} has no ki left to drive the throw home "
+                            f"(Enhanced Ki Throw).")
+        return
+    from .dice import stack
+
+    mods = stack(actor.damage_modifiers("unarmed", defender=defender))
+    roll = engine.dice.roll(actor.damage_dice("unarmed"), mods,
+                            label=f"{actor.name}'s Enhanced Ki Throw damage",
+                            visibility="hidden")
+    out["rolls"].append(roll)
+    hit = engine._apply_damage(defender, max(1, roll.total), "bludgeoning",
+                               lethality="lethal" if actor.has_state("lethality.either.unarmed")
+                               or actor.has_state("class.unarmed-strike") else "nonlethal")
+    hit["origin"] = "rule:feat-enhanced-ki-throw"
+    out["effects"].append(hit)
+    out["tells"].append(f"{defender.name} hits the ground for {hit['amount']} (Enhanced Ki "
+                        f"Throw, 1 ki).")
+
+
+def _spun_into(engine, intent, actor, defender):
+    """Spinning Throw (UC) with Improved Ki Throw: "a successful bull rush allows you to
+    push the opponent into a space secondary targets occupy. You resolve this effect as if
+    you used the Improved Ki Throw feat to throw the opponent into that space" — the trip's
+    named square, when another creature stands in it; None otherwise."""
+    from . import grid as gridmod
+
+    scene = engine.scene
+    square = (intent.params or {}).get("square")
+    if square is None or not actor.has_state(IMPROVED_KI_THROW) or not scene.has_grid \
+            or defender.ref not in scene.positions:
+        return None
+    to = tuple(int(v) for v in list(square)[:2])
+    feet = set(gridmod.footprint(to, defender.size))
+    if not feet & set(scene.occupied(ignore=defender.ref)):
+        return None
+    out = {"effects": [], "tells": [], "rolls": []}
+    return _thrown_into(engine, actor, defender, to, feet,
+                        tuple(scene.positions[defender.ref]), out)
+
+
+def _thrown_into(engine, actor, defender, to, feet, start, out) -> dict:
+    """Improved Ki Throw (APG): "you may throw your target into any square you threaten that
+    is occupied by another creature. Make a bull rush combat maneuver check with a -4
+    penalty against the secondary target. If this check succeeds, the thrown creature lands
+    prone in the secondary target's square, while the secondary target is pushed back and
+    knocked prone in an adjacent square. If the check fails, the thrown creature lands
+    prone in the nearest square you threaten adjacent to the secondary target. If you throw
+    a Large or larger creature into an area containing multiple secondary targets, you take
+    an additional penalty of -4 on your combat maneuver check for each target after the
+    first." One roll, against each secondary target's CMD."""
+    from . import bodyskills
+    from . import grid as gridmod
+    from . import reactions
+    from .dice import Modifier
+
+    scene = engine.scene
+    others = [a for ref, a in scene.actors.items()
+              if ref not in (actor.ref, defender.ref) and ref in scene.positions
+              and set(gridmod.footprint(tuple(scene.positions[ref][:2]), a.size)) & feet]
+    from .tables import SIZE_ORDER
+
+    size = str(defender.size or "medium").lower()
+    big = size in SIZE_ORDER and SIZE_ORDER.index(size) >= SIZE_ORDER.index("large")
+    penalty = -4 - (4 * (len(others) - 1) if big else 0)
+    roll = engine.dice.d20(list(actor.cmb_modifiers("bull rush", defender=others[0]))
+                           + [Modifier(penalty, "Improved Ki Throw")],
+                           label=f"{actor.name}'s bull rush (Improved Ki Throw)",
+                           visibility="hidden")
+    out["rolls"].append(roll)
+    cmds = [sum(m.value for m in o.cmd_modifiers(maneuver="bull rush", attacker=actor))
+            for o in others]
+    if roll.total >= max(cmds):
+        here = scene.positions[actor.ref]
+        for o in others:
+            there = scene.positions[o.ref]
+            step = (max(-1, min(1, there[0] - here[0])), max(-1, min(1, there[1] - here[1])))
+            engine._push_line(o.ref, step if step != (0, 0) else (1, 0), 1)
+            bodyskills._prone(o, f"{actor.name}'s Improved Ki Throw",
+                              "rule:feat-improved-ki-throw")
+            out["effects"].append({"ref": o.ref, "kind": "condition", "condition": "prone",
+                                   "origin": "rule:feat-improved-ki-throw"})
+        out["tells"].append(f"{', '.join(o.name for o in others)} "
+                            f"{'is' if len(others) == 1 else 'are'} knocked back and down "
+                            f"({roll.total} against CMD {max(cmds)}).")
+        _land(engine, actor, defender, to, start, out, "Improved Ki Throw")
+        return out
+    # Failed: the nearest open threatened square beside the secondary target.
+    zone = set(reactions.threatened_by(scene, actor.ref, defender.size))
+    taken = scene.occupied(ignore=defender.ref)
+    near = sorted((q for q in zone if q not in taken and scene.grid.inside(q)
+                   and scene.grid.passable(q)
+                   and any(gridmod.distance(q, f) <= gridmod.SQUARE_FT for f in feet)),
+                  key=lambda q: (gridmod.distance(q, to), q))
+    out["tells"].append(f"The bull rush fails ({roll.total} against CMD {max(cmds)}).")
+    if near:
+        _land(engine, actor, defender, near[0], start, out, "Improved Ki Throw")
     return out
 
 
