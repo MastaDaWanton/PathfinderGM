@@ -57,10 +57,14 @@
         "amount": 2,
         "bonus_type": "untyped",
         "note": "CRB: 'You can channel energy two additional times per day.'"
+      },
+      {
+        "type": "combat_mod",
+        "target": "pool.extra channel",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "note": "CRB: a paladin 'can use lay on hands four additional times a day, but only to channel positive energy' (spent first by her channel)"
       }
-    ],
-    "not_yet": [
-      "A paladin's version: four more uses of lay on hands that may only be spent channelling positive energy. Her uses are one pool, so these are not added."
     ]
   },
   "improved-channel": {

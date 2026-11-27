@@ -181,14 +181,40 @@
     ]
   },
   "desperate-swing": {
-    "not_yet": [
-      "'Once per day, you can make a single melee attack while taking the total defense action' at -4: total defense spends the standard action and the blow is refused; no daily option lets it through",
-      "'+4 bonus on critical confirmation rolls made while fighting defensively or making an attack of opportunity using this feat'"
+    "tags": [
+      "reactions.total-defense.desperate"
+    ],
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "crit_confirm",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "buff.stance.fighting-defensively"
+          }
+        },
+        "note": "Desperate Swing, fighting defensively"
+      },
+      {
+        "type": "combat_mod",
+        "target": "crit_confirm",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "bearer": {
+            "state": "buff.stance.total-defense"
+          },
+          "choice": "opportunity"
+        },
+        "note": "Desperate Swing"
+      }
     ]
   },
   "surprise-strike": {
-    "not_yet": [
-      "'take no penalty on the attack roll' of Desperate Swing's attack: Desperate Swing does not run"
+    "tags": [
+      "attack.penalty-waived.surprise-strike"
     ]
   },
   "tenacious-survivor": {

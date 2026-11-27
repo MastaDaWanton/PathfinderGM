@@ -1037,9 +1037,9 @@ CATEGORIES: list[Category] = [
             ], engine=False,
                 blocked="Recorded, counted and shown to the GM with what it costs — −1 "
                         "on every attack, save, skill and ability check, −5 hit points, "
-                        "−1 caster level, each. Not applied: a negative level moves "
-                        "eight different numbers on the sheet at once and applying seven "
-                        "of them would be worse than applying none."),
+                        "−1 caster level, each. A creature's energy drain lays them "
+                        "(rules/drain.py, feat loop b7-small); a spell's or an item's "
+                        "document of this type is not yet run by its executor."),
         ]),
 
     Category(
@@ -2512,7 +2512,8 @@ WHEN_KEYS: dict[str, str] = {
               "alignment or a property's choice (sheet._when_holds)",
     "attacker": "whoever made the blow, by type or subtype (sheet._when_holds)",
     "weapon": "the weapon's own fields: category, hands, light, finessable, key, ranged, "
-              "slashing_or_piercing, strength_share (1.5, 1 or 0.5: Actor.strength_share)"
+              "slashing_or_piercing, slashing, strength_share (1.5, 1 or 0.5: "
+              "Actor.strength_share)"
               " (sheet._when_holds)",
     "choice": "an attack option the player declared, such as power_attack",
     "against": "what the save or check is against, one of AGAINST: spell, poison, fear, "
@@ -2650,6 +2651,9 @@ AGAINST: dict[str, str] = {
     "breath": "the Constitution check to keep holding one's breath (Engine.breathe)",
     "forced_march": "the hourly Constitution check past eight hours of travel a day "
                     "(survival.forced_march)",
+    # Feat loop b7-small: Endurance's "Swim checks made to resist nonlethal damage from
+    # exhaustion" (CRB).
+    "swim_exhaustion": "the hourly Swim check of a long swim (Engine._an_hour_swum)",
     "spell_resistance": "the caster level check to overcome spell resistance "
                         "(Engine._resists)",
     # 2026-11-22, lane F: a spell's save is against its school, subschool and descriptors

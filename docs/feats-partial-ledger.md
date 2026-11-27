@@ -258,7 +258,6 @@ Buildable by the book; size S. Finishes 4, touches 4.
 - `domain-strike` (b3-divine.json): Delivering the chosen domain power through a successful unarmed strike as a swift action: no use of a domain power rides a blow yet, so the feat does nothing.
 - `mystic-tattoo` (batch1-spells.json): the school's spell-like ability three times a day
 - `school-strike` (batch2-attack-a.json): a swift action after an unarmed hit to deliver a chosen one-target arcane school power: the swift budget is lane b2-actions', and school powers are not aimed through a blow
-- `shielded-caster` (batch1-spells.json): halving a Disruptive foe's increase to the concentration DC (no foe's feat raises that DC here yet)
 
 ### 16. New skill-use rows (secret messages, take 10 on monster lore, Perception for Sense Motive, aid another on Knowledge, identify a magic item's properties, hidden-weapon draw)
 
@@ -266,10 +265,8 @@ Buildable by the book; size S. Finishes 3, touches 6. content/rules/skill-uses.j
 
 - `collective-recollection` (batch2-attack-a.json): a free-action aid another on an ally's trained Knowledge check within 30 feet, sharing what it learns
 - `demonologist` (batch1-modifiers.json): taking 10 on Knowledge checks to identify demons: the check is always rolled
-- `elven-spirit` (batch1-spells.json): the +2 racial on Spellcraft to identify a magic item's properties (the identify door takes the skill's plain modifiers)
 - `quick-draw` (core.json): draws a hidden weapon as a move action: there is no hidden-weapon Sleight of Hand roll
 - `secret-signs` (b5-spells.json): the +4 on Bluff checks to pass secret messages: Bluff has no secret-message use (content/rules/skill-uses.json)
-- `smell-fear` (b5-spells.json): using Perception in place of Sense Motive against a frightened subject or one covering up fear: a check is rolled with its own skill
 
 ### 17. Per-round attack history (first unarmed strike of the round, what the last blow hit, two Stunning Fist attempts in one blow)
 
@@ -322,9 +319,6 @@ Buildable by the book; size S. Finishes 3, touches 4. The CRB's own move action 
 
 Buildable by the book; size M. Finishes 3, touches 4. hazards.json models one cold band and one heat row; the CRB's environment chapter defines the rest.
 
-- `cold-celerity` (b5-spells.json): the same bonuses in severe cold (below 0 F): the engine models one cold band (below 40 F, hazards.json cold), not severe cold
-- `desert-dweller` (batch1-modifiers.json): extreme heat treated as severe and severe as very hot: the engine's heat is one row (very hot, above 90 F), with no severe or extreme tier to step down
-- `rugged-northerner` (b4-other.json): severe and extreme cold stepping down a band: the engine models one cold band (below 40 F, hazards.json cold), which the feat already shrugs off
 - `storm-lashed` (batch1-modifiers.json): rain's visibility and Perception penalties, and the high winds' Perception penalty and size for wind: the engine charges no weather penalty to either, so there is nothing to reduce
 
 ### 23. Unbuilt monk class features a feat raises (quivering palm, slow fall distance)
@@ -474,7 +468,6 @@ Buildable by the book; size S. Finishes 1, touches 2.
 
 Buildable by the book; size S. Finishes 1, touches 2.
 
-- `chokehold` (batch2-actions.json): the choked foe does not hold its breath or begin suffocating (the breath clock runs only under water)
 - `endurance` (core.json): Fortitude saves against suffocation: the only lack of air the engine models is water, and drowning is a Constitution check, which the breath clause covers
 
 ### 42. Perform and Profession kinds (the trades fold, 2026-10-07)
@@ -508,7 +501,7 @@ Needs the owner's design call; size M. Finishes 1, touches 1.
 
 Buildable by the book; size L. Finishes 1, touches 1. Enervation and energy drain are narrative today.
 
-- `thanatopic-spell` (b5-spells.json): negative levels and energy drain passing a death ward, and an undead's automatic save to shed them after 24 hours: the engine lays no negative levels (enervation and its kin are narrative, energy drain is reported, not applied)
+- `thanatopic-spell` (b5-spells.json): negative levels and energy drain passing a death ward, and an undead's automatic save to shed them after 24 hours: negative levels are laid now (rules/drain.py) but only by a creature's energy drain — enervation, energy drain and their kin are narrative spell documents, so no spell lays one for the copy to make thanatopic
 
 ### 47. A feat that waives another feat's prerequisite
 
@@ -521,45 +514,33 @@ Buildable by the book; size S. Finishes 0, touches 2.
 
 Buildable by the book; size M. Finishes 0, touches 1. Each is a CRB rule with no engine door yet; run and suffocation also unblock others.
 
-- `endurance` (core.json): Constitution checks against a forced march: a journey walks eight hours a day and never marches past them
-- `endurance` (core.json): Swim checks to resist nonlethal damage from exhaustion: the engine makes no hourly Swim check for a long swim
 - `endurance` (core.json): sleeping in light or medium armour without becoming fatigued: the engine has no rule that fatigues anybody for sleeping in armour
 
 ### 49. Single small book rules, each its own (listed line by line below)
 
 Buildable by the book; size S. Finishes 24, touches 32. Each is one rule; listed per line below.
 
-- `blind-fight` (core.json): an invisible attacker gets no advantage against you in melee (no +2, you keep your Dexterity bonus): nothing reads this clause, so whatever the attack path gives an unseen attacker it still gives against you
 - `bloatmage-initiate` (batch1-spells.json): the bloated body's constant medium load (max Dex +3, armour check penalty -3, slower speed)
 - `boar-shred` (batch2-styles.json): the extra 1d6 bleed at the start of the torn foe's turn: a second bleed of the same kind does not stack with tear flesh's 2d6 by the book, and nothing distinguishes it
 - `body-control` (b4-other.json): half as much sleep to heal injuries, avoid fatigue or exhaustion, and prepare spells: a night's rest is eight hours wherever it is taken (rules/survival.py, Actor.rest); half the food and water is built (`body.needs.half`, survival.daily_need)
 - `create-reliquary-arms-and-shields` (b4-crafting.json): the holy symbol: no cast asks a caster for a divine focus (spell components other than V are not checked), so the reliquary serving as one changes no roll
 - `deceptive-exchange` (batch2-attack-a.json): handing the feinted foe a held one-handed object in place of denying its Dexterity
-- `desperate-swing` (b4-moves.json): '+4 bonus on critical confirmation rolls made while fighting defensively or making an attack of opportunity using this feat'
-- `desperate-swing` (b4-moves.json): 'Once per day, you can make a single melee attack while taking the total defense action' at -4: total defense spends the standard action and the blow is refused; no daily option lets it through
 - `elephant-stomp` (b4-moves.json): 'instead of moving through your opponent's space and knocking her prone, you may stop ... and make one attack with an unarmed strike or a natural weapon ... as an immediate action': the overrun's outcome always moves through and knocks prone
-- `extra-channel` (pools.json): A paladin's version: four more uses of lay on hands that may only be spent channelling positive energy. Her uses are one pool, so these are not added.
 - `ferocious-loyalty` (b5-other.json): an ally rendered helpless by anything but a blow (a spell's paralysis, a sleep): only the attack that fells is seen to do it
 - `field-repair` (b4-maneuver.json): 'If you spend a day, the item regains 1 hit point plus one-quarter of its original hit points': mending here is an hour a point, and no day's rate is offered beside it
 - `greater-whip-mastery` (b4-moves.json): the trip half of 'never drop it': a trip weapon is never dropped to avoid a backfire in the engine, so only the failed disarm's drop is refused
-- `impact-critical-shot` (batch2-attack-a.json): the bull rush in place of the trip ('push your opponent back as if from the bull rush combat maneuver ... you cannot move with the target'): the engine always takes the trip
-- `improved-two-weapon-feint` (batch2-attack-a.json): forgoing the first primary-hand attack of a two-weapon full attack to feint, the foe denied Dexterity for the rest of your turn
 - `inexplicable-luck` (batch2-styles.json): initiative, concentration and the saves a hazard rolls for you (cold, heat): only the attack roll, a save the turn or a spell calls for, and a skill or ability check carry luck
 - `jawbreaker` (batch2-attack-a.json): 'unable to use its mouth to attack, speak clearly, and employ verbal spell components' until the bleed ends: nothing asks for a working mouth
 - `planar-wild-shape` (b3-martial.json): the template's damage reduction (5/evil or /good at 5-10 Hit Dice, 10/ at 11+), its spell resistance (CR + 5) and its once-a-day smite: the energy resistances and darkvision 60 ft are laid
-- `raging-throw` (b3-martial.json): 'if you bull rush an opponent into a square another creature occupies or into a solid object, the opponent and the creature or object take bludgeoning damage equal to your Strength modifier + your Constitution modifier': the push stops at what blocks it and nobody is hurt
 - `rapid-grappler` (b4-moves.json): 'Whenever you use Greater Grapple to successfully maintain a grapple as a move action': Greater Grapple's move-action maintenance is not built (core.json carries only its +2), so there is no maintenance to follow with a swift check
 - `ricochet-splash-weapon` (b4-moves.json): 'Whenever your splash weapon misses and the misdirection roll indicates it lands in a square occupied by a creature': a missed flask's landing square is not rolled onto another creature for a second attack
 - `shield-snag` (batch2-attack-b.json): +4 on Strength checks to avoid being blown away by a strong wind: the engine rolls the wind only against fliers (bodyskills.fly), never a Strength check on the ground
 - `shield-wall` (b4-other.json): sharing an adjacent ally's tower-shield total cover when an attack passes through its edge: total cover from a tower shield is not modelled
 - `snake-style` (batch1-modifiers.json): the immediate-action Sense Motive is rolled by the engine for the player too, on the first attack each round, rather than asked
 - `stage-combatant` (b4-other.json): an attack that deals no damage at all (a stage blow): no attack declares itself harmless
-- `surprise-strike` (b4-moves.json): 'take no penalty on the attack roll' of Desperate Swing's attack: Desperate Swing does not run
 - `tenacious-survivor` (b4-moves.json): 'your soul lingers in your body for a number of rounds equal to your Constitution bonus ... You can be healed by magic as if you were alive': death by hit points is final at once (Actor.die), and no lingering state answers a heal
-- `tiger-style` (batch2-styles.json): the 1d4 bleed at the start of the foe's next two turns after a slashing unarmed critical: a bleed here runs until healed, and no bleed is laid for two turns only
 - `torch-handling` (b5-spells.json): the once-a-day reroll of a save against an effect that would put the light out: nothing in the engine puts out a carried light
 - `two-weapon-defense` (combat.json): Wielding two weapons is known only on the round a two-weapon full attack is declared; a turn spent otherwise with two weapons in hand gives no +1, and total defense (a standard action with no blow, so no second weapon is declared) gives no +2.
-- `two-weapon-feint` (batch2-attack-a.json): forgoing the first primary-hand attack of a two-weapon full attack to make a feint
 - `witty-feint` (batch2-attack-a.json): a dodge bonus to AC against the feinted foe equal to your weapon training bonus, in place of denying his Dexterity: nothing reads the weapon training bonus for the weapon in hand by itself
 - `wolf-trip` (b4-moves.json): 'While using Wolf Style, whenever you successfully trip a creature, as a free action you may choose an available square adjacent to you for the tripped creature to land prone in': a trip leaves the creature where it stood
 
@@ -643,3 +624,27 @@ Before (integrate/feats-b6 89d9fa80): 238 lines on 199 feats. After: 218 lines o
 **Left:**
 
 - `stabbing-shot` (APG, elves): no document. A full attack would have to make its Rapid Shot slot a melee blow with a drawn arrow that pushes 5 feet on a hit. `Actor.attack_sequence` makes every slot of a bow's full attack with the bow, and no option swaps one slot for a different weapon or category.
+
+## Batch 7, lane b7-small (2026-11-27)
+
+Branch feats/b7-small off integrate/feats-b6 89d9fa80. Measured on that base: 238 `not_yet` lines on 199 feats; after the lane, 219 lines on 185 feats. 14 feats finished and 19 lines removed (one more rewritten); each is proved through the engine in `tests/test_feats_b7_small.py`. The finished lines are gone from the groups above.
+
+**Finished** (no `not_yet` left): Chokehold (41), Cold Celerity, Desert Dweller, Rugged Northerner (22), Desperate Swing, Surprise Strike, Extra Channel (the paladin's), Impact Critical Shot, Raging Throw, Tiger Style, Two-Weapon Feint, Improved Two-Weapon Feint (49), Shielded Caster (15), Smell Fear (16).
+
+**Lines removed, feat still partial:** Blind-Fight's unseen melee attacker (the darkness speed line is group 2's); Elven Spirit's +2 to identify an item (the alternative elven trait is left); Endurance's hourly swim and forced march (the forced-march line was stale: `survival.forced_march` has rolled it, +4 included, since 2026-11-21).
+
+**Machinery built:** a bleed rider that runs a counted number of turns (`times`); a cost's `first` pool (paladin's channel-only uses); severe and extreme cold and heat rows with `saves_per_unit`, `lethal_per_save` and a `milder` band step; a choked creature on the breath clock (`_airless`, the suffocation ladder); `rules/drain.py`, negative levels as one effect each, with the day-on save; Smell Fear's Perception read; the `identify-item` skill use; Two-Weapon Feint as Feinting Flurry's shape; the `impact_bull_rush` and `two_weapon_feint` declared options; `swim_exhaustion` in AGAINST; `slashing` in a roll's weapon fields.
+
+**Left in this lane's groups, with the reason:**
+
+- 13 Metamagic: all four lines left. Elemental Spell's energy chosen at the cast and its half-and-half split need a cast-time choice the casting panel and the reader do not carry (a new param costs reader prompt budget); ethereal and the incorporeal 50% need states the engine lacks; Toppling on a push needs a spell push that is a manoeuvre; Disruptive Spell on spell-like abilities needs an SLA concentration door.
+- 15 Spell-like abilities: Mystic Tattoo's school SLA, Domain Strike and School Strike are left (no school or domain power rides a blow; no feat grants a daily SLA document).
+- 16 Skill-use rows: Secret Signs, Collective Recollection and Quick Draw's hidden weapon each need a new player route (reader prompt budget); Demonologist's take 10 needs a luck entry scoped to the creature identified (the second line, the Abyss, waits anyway).
+- 18 Weapon handling: not started (sling as flail, one-handed quarterstaff, earth breaker with skull shield, torch as weapon all change weapon rows and the attack's hand count).
+- 22 Weather: Storm-Lashed's rain and wind penalties and Shield Snag's ground wind check need weather on the scene; the engine still models none.
+- 24 Nets: not started, so Net Adept and Net and Trident stay on docs/feats-waiting-on-classes.md.
+- 35 Use Magic Device: not started.
+- 46 Negative levels: a creature's energy drain is applied; Thanatopic Spell stays partial (line rewritten) because enervation, energy drain and their kin are narrative spell documents, so no spell lays a level for the copy to pierce a death ward with. Not built either: level-dependent variables beyond caster level, and the 5 current hit points coming back when a level is shed.
+- 47 Prerequisite waivers: not started (both feats keep other lines).
+- 48 Endurance: running (group 40), Fortitude against suffocation (no effect in the engine rolls one; the book's suffocation is the Constitution ladder, which the breath clause covers) and sleeping in armour (needs the owner's call: nothing takes armour off at night, so the book's rule would fatigue every armoured sleeper).
+- 49 Single small rules: 8 of the 24 finishable feats done (Tiger Style, Desperate Swing, Surprise Strike, Extra Channel, Impact Critical Shot, Raging Throw, Two-Weapon Feint, Improved Two-Weapon Feint), plus Blind-Fight's line. The rest are left as listed above.

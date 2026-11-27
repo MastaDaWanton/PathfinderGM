@@ -591,6 +591,12 @@ def choice_refusal(actor, weapon: dict, declared, params: dict) -> str:
     if "feinting_flurry" in declared and ("flurry" not in declared
                                           or not params.get("full_attack")):
         return "Feinting Flurry is made with a flurry of blows, as a full attack."
+    # Feat loop b7-small: "While using Two-Weapon Fighting to make melee attacks" (UC).
+    if TWO_WEAPON_FEINT in declared and (
+            not params.get("full_attack") or not params.get("off_hand")
+            or weapon.get("category") == "ranged"):
+        return ("Two-Weapon Feint is made in a two-weapon full attack in melee, an "
+                "off-hand weapon named.")
     if GORY in declared:
         from .feat_events import has_weapon_focus
 
@@ -696,6 +702,14 @@ WAVE_STRIKE = "skill.bluff.feint.wave-strike"
 DISENGAGING_SHOT = "skill.bluff.feint.disengaging-shot"
 IN_FLURRY = "in_flurry"
 SWIFT_FEINT = "swift_feint"
+# Feat loop b7-small: Two-Weapon Feint (UC) — "While using Two-Weapon Fighting to make
+# melee attacks, you can forgo your first primary-hand melee attack to make a Bluff check
+# to feint an opponent" — the flurry's shape with the two-weapon full attack; Improved
+# Two-Weapon Feint's "denied his Dexterity bonus to AC until the end of your turn" is
+# Improved Feinting Flurry's (aonprd.com FeatDisplay, read 2026-11-27).
+TWO_WEAPON_FEINT = "two_weapon_feint"
+TWO_WEAPON_TURN = "skill.bluff.feint.two-weapon-turn"   # Improved Two-Weapon Feint
+IN_TWO_WEAPON = "in_two_weapon"
 
 
 def _feint_raw(raw: dict, flag: str, because: str) -> dict:
@@ -710,8 +724,11 @@ def feint_before(engine, raw: dict) -> list[dict]:
     flurry: "While using flurry of blows to make melee attacks, you can forgo your first
     attack to make a Bluff check to feint." [] when the blow declares none."""
     params = raw.get("params") or {}
-    if raw.get("op") != "attack" or not params.get(FEINTING_FLURRY) \
-            or not params.get("full_attack") or not raw.get("target"):
+    if raw.get("op") != "attack" or not params.get("full_attack") or not raw.get("target"):
+        return []
+    if params.get(TWO_WEAPON_FEINT) and params.get("off_hand"):     # feat loop b7-small
+        return [_feint_raw(raw, IN_TWO_WEAPON, "Two-Weapon Feint")]
+    if not params.get(FEINTING_FLURRY):
         return []
     return [_feint_raw(raw, IN_FLURRY, "Feinting Flurry")]
 
@@ -744,7 +761,7 @@ def wave_strike(engine, raw: dict, draw: dict) -> list[dict]:
 
 def feint_action(intent, action: str) -> str:
     """The action an engine-written feint is paid with."""
-    if intent.params.get(IN_FLURRY):
+    if intent.params.get(IN_FLURRY) or intent.params.get(IN_TWO_WEAPON):
         return "none"
     if intent.params.get(SWIFT_FEINT):
         return "swift"
@@ -755,7 +772,8 @@ def whole_turn(intent, actor) -> bool:
     """Improved Feinting Flurry (Dragon Empires Primer): "While using Feinting Flurry, if
     you successfully feint, your opponent is denied its Dexterity bonus to AC until the
     end of your turn" — the feint's effect is not spent by the first blow."""
-    return bool(intent.params.get(IN_FLURRY)) and actor.has_state(FLURRY_TURN)
+    return (bool(intent.params.get(IN_FLURRY)) and actor.has_state(FLURRY_TURN)) or (
+        bool(intent.params.get(IN_TWO_WEAPON)) and actor.has_state(TWO_WEAPON_TURN))
 
 
 def drop_first_swing(intent, sequence: list, hands: list) -> tuple[list, list]:
@@ -763,6 +781,11 @@ def drop_first_swing(intent, sequence: list, hands: list) -> tuple[list, list]:
     if intent.params.get(FEINTING_FLURRY) and intent.params.get("full_attack") \
             and len(sequence) > 1:
         return sequence[1:], hands[1:]
+    # Two-Weapon Feint: the first PRIMARY-hand attack (feat loop b7-small).
+    if intent.params.get(TWO_WEAPON_FEINT) and intent.params.get("full_attack") \
+            and "primary" in hands and len(sequence) > 1:
+        i = hands.index("primary")
+        return sequence[:i] + sequence[i + 1:], hands[:i] + hands[i + 1:]
     return sequence, hands
 
 

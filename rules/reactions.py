@@ -127,7 +127,10 @@ def reactions_for(actor) -> list[Reaction]:
     # Slow Reactions' "cannot make attacks of opportunity for 1 round" (CRB rogue talent):
     # a timed effect's tag, gone when the effect ends (`Engine._sneak_riders`).
     if actor.has_state("reactions.none"):
-        return []
+        # Feat loop b7-small: Desperate Swing's once-a-day attack in total defense.
+        from .strike_feats import desperate_open
+
+        return [attack_of_opportunity(actor)] if desperate_open(actor) else []
     return [attack_of_opportunity(actor)]
 
 

@@ -170,11 +170,10 @@ carried now.
 | attach | 10 |
 | blood drain | 1 |
 
-**Reported, not applied (398):**
+**Reported, not applied (358):**
 
 | reason | count |
 |---|---:|
-| energy drain: negative levels are not applied (see below) | 40 |
 | a poison on a made weapon: the dose is gear | 30 |
 | natural poison with no printed definition | 30 |
 | disease with no printed definition | 28 |
@@ -184,10 +183,13 @@ carried now.
 
 ## Not done, on purpose or not yet
 
-- **Energy drain.** A negative level moves eight numbers at once, and `effectspec`'s
-  `negative_level` type records the decision not to apply seven of them. The rider asks
-  the immunity and reports. Applying negative levels whole is its own piece of work, and
-  so is the drainer's 5 temporary hit points.
+- **Energy drain — BUILT 2026-11-27** (feat loop b7-small, `rules/drain.py`). Each
+  negative level is its own effect: -1 on attacks, CMB, CMD, saves, skill and ability
+  checks, initiative and caster level, -5 hit points (total and current), twice the
+  levels on a confirmed critical, the drainer +5 temporary hit points each for an hour,
+  death at levels equal to Hit Dice, and the one Fortitude save a day on that sheds the
+  level or makes it permanent. Not built: other level-dependent variables, and spells
+  that lay negative levels (enervation and its kin stay narrative documents).
 - **Maintaining a grapple — BUILT 2026-11-01** (fix/combat-grapple-abilities). The grab
   writes the hold onto the held one's condition (`hold_weapon`, `hold_bonus`, `hold_then`);
   on the holder's later turns `Engine.grapple_turn` rolls the maintaining check (CMB +5,

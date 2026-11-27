@@ -1093,3 +1093,64 @@ def glory_settled(engine, defender, state) -> None:
         engine.scene.swift_spent.pop(defender.ref, None)
         return
     state["tells"].extend(said)
+
+
+# --- Desperate Swing and Surprise Strike (feat loop b7-small, 2026-11-27) --------------------
+#
+# ARG, halfling (aonprd.com FeatDisplay, read 2026-11-27). Desperate Swing: "Once per day,
+# you can make a single melee attack while taking the total defense action. You take a -4
+# penalty on attack rolls when making this attack. You also gain a +4 bonus on critical
+# confirmation rolls made while fighting defensively or making an attack of opportunity
+# using this feat." Surprise Strike: "Once per day, when fighting defensively or making an
+# attack of opportunity while taking the total defense action with the Desperate Swing
+# feat, you take no penalty on the attack roll." The single attack is the attack of
+# opportunity total defense otherwise bars (Surprise Strike's own words); each feat's day
+# is a pool named for it, refreshed by a night's rest, as the luck feats' are.
+DESPERATE_SWING = "reactions.total-defense.desperate"
+SURPRISE_STRIKE = "attack.penalty-waived.surprise-strike"
+
+
+def _daily(actor, pid: str, name: str):
+    from . import resources
+
+    return resources.define(actor, {"id": pid, "max": "1", "refresh": "rest.night",
+                                    "source": name})
+
+
+def desperate_open(actor) -> bool:
+    """Whether the day's Desperate Swing lets an attack of opportunity through total
+    defense: total defense is the only thing barring reactions, and the use is left."""
+    if not actor.has_state(DESPERATE_SWING):
+        return False
+    barring = [e for e in actor.effects if any(
+        str(t) == "reactions.none" or str(t).startswith("reactions.none.") for t in e.tags)]
+    return bool(barring) and all(e.key == "total defense" for e in barring) \
+        and _daily(actor, "desperate-swing", "Desperate Swing").current > 0
+
+
+def desperate_terms(actor, intent, state) -> list:
+    """The swing's own terms, once per attack (`state` survives a suspended roll): the
+    -4 and the day spent for an attack of opportunity made in total defense, and Surprise
+    Strike's once-a-day waiver of that penalty or of fighting defensively's on the first
+    roll. Surprise Strike is spent on the first roll it can waive (owner call: the book
+    gives no moment to choose)."""
+    from .dice import Modifier
+    from .states import FIGHTING_DEFENSIVELY
+
+    if "desperate" not in state:
+        swing = intent.params.get("reaction") == "attack_of_opportunity" \
+            and actor.has_state("buff.stance.total-defense") and desperate_open(actor)
+        if swing:
+            actor.spend_pool("desperate-swing", 1)
+        penalised = swing or (actor.has_state(FIGHTING_DEFENSIVELY) and not state.get("i"))
+        waived = penalised and actor.has_state(SURPRISE_STRIKE) and _daily(
+            actor, "surprise-strike", "Surprise Strike").current > 0
+        if waived:
+            actor.spend_pool("surprise-strike", 1)
+        state["desperate"] = {"swing": swing, "waived": waived}
+    held = state["desperate"]
+    if held["waived"] and not state.get("i"):
+        # Fighting defensively's -4 is the round's stance (`Engine._stance_terms`); the
+        # waiver answers it on this roll alone, and a desperate swing never takes its own.
+        return [] if held["swing"] else [Modifier(4, "Surprise Strike (no penalty)")]
+    return [Modifier(-4, "Desperate Swing")] if held["swing"] else []

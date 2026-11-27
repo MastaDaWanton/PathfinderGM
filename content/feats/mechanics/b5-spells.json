@@ -23,7 +23,7 @@
       "levels": 2
     },
     "not_yet": [
-      "negative levels and energy drain passing a death ward, and an undead's automatic save to shed them after 24 hours: the engine lays no negative levels (enervation and its kin are narrative, energy drain is reported, not applied)"
+      "negative levels and energy drain passing a death ward, and an undead's automatic save to shed them after 24 hours: negative levels are laid now (rules/drain.py) but only by a creature's energy drain — enervation, energy drain and their kin are narrative spell documents, so no spell lays one for the copy to make thanatopic"
     ]
   },
   "guardian-of-the-wild": {
@@ -172,8 +172,8 @@
         "note": "APG: '+4 bonus on Perception checks to detect creatures with the shaken, frightened, or panicked conditions using scent' (awareness.check names the one looked for)"
       }
     ],
-    "not_yet": [
-      "using Perception in place of Sense Motive against a frightened subject or one covering up fear: a check is rolled with its own skill"
+    "tags": [
+      "skill.sense-motive.by-perception.fear"
     ]
   },
   "cold-celerity": {
@@ -204,9 +204,6 @@
           }
         }
       }
-    ],
-    "not_yet": [
-      "the same bonuses in severe cold (below 0 F): the engine models one cold band (below 40 F, hazards.json cold), not severe cold"
     ]
   },
   "torch-handling": {

@@ -189,10 +189,12 @@ def test_a_printed_creature_keeps_its_situational_feat_terms():
 
 def test_endurance_says_which_clauses_still_wait_and_on_what():
     waits = " ".join(feats.document("endurance")["not_yet"]).lower()
-    # Feat loop b7-moves: running is built (rules/feat_moves.py run_starts), its line gone.
-    for clause in ("swim", "forced march", "suffocation", "armour"):
+    # Feat loop b7-moves built running (rules/feat_moves.py run_starts); b7-small the hourly
+    # swim's +4 (`swim_exhaustion`), and the forced march's has run since 2026-11-21.
+    for clause in ("suffocation", "armour"):
         assert clause in waits, clause
-    assert "running" not in waits
+    for built in ("running", "swim", "forced march"):
+        assert built not in waits, built
 
 
 # --- Combat Casting and concentration -----------------------------------------------------

@@ -988,6 +988,11 @@ def _validate_grants(d: dict, path: dict, at: str, resolved_names: set,
                     f"{', '.join(sorted(pool_ids))}.")
             if _int(got.get("amount", 1)) is None:
                 problems.append(f"{gat}.{field_name}: amount must be a number.")
+            # Feat loop b7-small: the pool paid from first (Extra Channel's paladin uses).
+            if got.get("first") is not None and pool_ids \
+                    and str(got["first"]).lower() not in pool_ids:
+                problems.append(f"{gat}.{field_name}.first: this class declares no pool "
+                                f"called {got['first']!r}.")
         for i, spec in enumerate(doc.get("modifiers") or []):
             if not isinstance(spec, dict) or \
                     str(spec.get("type", "")) not in _MOD_TYPES:
@@ -1220,7 +1225,8 @@ def _luck_problems(at: str, entries) -> list[str]:
 
 # What a feat's `on_hit` may lay on the creature a melee blow just struck (feat loop b1,
 # 2026-11-22): the attack riders' own executors (`Engine._RIDERS`), each key it reads.
-_ON_HIT_KINDS = {"bleed": {"kind", "when", "amount"},
+_ON_HIT_KINDS = {"bleed": {"kind", "when", "amount",
+                           "times"},        # Feat loop b7-small: Tiger Style's two turns
                  "save_condition": {"kind", "when", "condition", "save", "dc", "for",
                                     # Feat loop b5-maneuver: a hold a check ends (Marid
                                     # Spirit's ice, `maneuver_feats.escape_payload`).

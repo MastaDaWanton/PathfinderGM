@@ -171,6 +171,18 @@ def _drowning_ground(actor) -> bool:
     return not water.breathes_water(actor)
 
 
+CHOKED = "state.silenced.choked"
+
+
+def _airless(actor) -> bool:
+    """Whether this creature has no air to breathe: under water it cannot breathe, or
+    held in a chokehold — "cannot breathe or speak" (UC, Chokehold) — which the book's
+    suffocation rule runs the drowning ladder for (CRB, Environment, Suffocation: "A
+    character who has no air to breathe can hold her breath for 2 rounds per point of
+    Constitution", then the same checks). Feat loop b7-small."""
+    return _drowning_ground(actor) or actor.has_state(CHOKED)
+
+
 class _Here(Mapping):
     """Who is in the party's place: a read-only view over `Scene.people`.
 
@@ -1246,6 +1258,11 @@ class Scene:
                         {"kind": "pool_ready", "ref": a.ref, "pool": pid}
                         for pid in a.tick_pools(1))
                     self.hazards.extend(self._drain_periodic(a))
+                    # Feat loop b7-small: a round in a chokehold is a round of held breath
+                    # (`_airless`); `Engine.breathe` rolls the ladder. Water's own clock
+                    # is the swim's and the stretch's.
+                    if a.has_state(CHOKED) and not _drowning_ground(a):
+                        a.held_breath_rounds += 1
                 # Appended, for the reason the next comment gives about `hazards`, and
                 # it was left as an assignment when that one was fixed. One call now
                 # skips up to twenty rounds looking for somebody able to act, so only
@@ -1975,7 +1992,7 @@ class Scene:
             # the Constitution check that follows it rolls dice and belongs to the
             # engine (`Engine.breathe`). Surfacing resets it, because breathing is what
             # holding your breath stops being.
-            if _drowning_ground(a):
+            if _airless(a):
                 a.held_breath_rounds += rounds
             elif a.held_breath_rounds or a.drown_failures:
                 a.held_breath_rounds = 0
@@ -8256,10 +8273,13 @@ class Engine:
             # the enemy's location and are capable of taking an attack of opportunity"
             # (feat loop b2) — `_disrupted_by`.
             near = self._disrupted_by(actor)
-            situations.append(("defensively", 15 + 2 * level + (4 if near else 0),
+            raised = (2 if near is not None and self._shielded_from(actor, near) else 4) \
+                if near is not None else 0
+            situations.append(("defensively", 15 + 2 * level + raised,
                                "casting defensively"
-                               + (f" within {near.name}'s reach (Disruptive)" if near
-                                  else "")))
+                               + (f" within {near.name}'s reach (Disruptive"
+                                  + (", halved by a shielding ally" if raised == 2 else "")
+                                  + ")" if near else "")))
         if actor.has_state("state.held.grappled") or actor.has_state("state.held.pinned"):
             holder = self._grappler_of(actor)
             if holder is not None:
@@ -8554,6 +8574,24 @@ class Engine:
 
     # Disruptive's tag (its feat document, feat loop b2).
     DISRUPTS_DEFENSIVE_CASTING = "reactions.disrupts.casting-defensively"
+
+    def _shielded_from(self, caster, foe) -> bool:
+        """Shielded Caster (UM): "If an enemy threatening you both has the Disruptive feat
+        or another ability that increases concentration check DCs, that increase is
+        halved" — the caster holding the feat, an adjacent ally holding it too, and the
+        foe threatening that ally's square as well (feat loop b7-small); the feat's
+        document tag, `casting.shielded`."""
+        def holds(who):
+            return who.has_state("casting.shielded")
+
+        if not holds(caster):
+            return False
+        for ally in self._adjacent_allies(caster):
+            spot = self.scene.positions.get(ally.ref)
+            if holds(ally) and spot is not None and reactions.threatens(
+                    self.scene, foe.ref, tuple(spot[:2])):
+                return True
+        return False
 
     def _disrupted_by(self, caster) -> "Actor | None":
         """The first foe holding Disruptive who threatens this caster's square, knows where
@@ -10187,6 +10225,10 @@ class Engine:
         use = next((flag for (named, flag) in skilluses.OWN_DOORS
                     if named == said and intent.params.get(flag)), "")
         opposed = intent.params.get("opposed_by")
+        # Feat loop b7-small: a magic item's properties studied (`skilluses.identify_item`),
+        # Elven Spirit's "Spellcraft checks made to identify the properties of magic items".
+        if not use and said == "spellcraft" and intent.params.get("item"):
+            use = "identify-item"
         if not use and said == "bluff":
             if intent.params.get("diversion"):
                 use = "diversion"
@@ -11627,7 +11669,8 @@ class Engine:
             current_moment().guttered.update(def_gutter)
 
         flat_footed = self._flat_footed(defender) or (
-            self._unseen_attacker(defender, actor)
+            self._unseen_attacker(defender, actor,
+                                  melee=weapon.get("category") != "ranged")
             and not self._pinpointed_shooter(defender, actor, weapon)) \
             or strike_feats.caught_off_guard(actor, defender, weapon_key, weapon)
         # Surprise Follow-Through (ARG): "When using Cleave or Great Cleave, the second foe
@@ -12067,6 +12110,8 @@ class Engine:
                                                   off_light=off_light)
                 atk_mods = atk_mods + self._situational_attack_mods(
                     actor, defender, weapon, range_pen)
+                # Feat loop b7-small: Desperate Swing's -4, Surprise Strike's waiver.
+                atk_mods = atk_mods + strike_feats.desperate_terms(actor, intent, state)
                 # Improved Second Chance (APG): the rest of the attacks "albeit at a -5
                 # penalty to each attack" once the first miss was rerolled.
                 if state.get("second_chance") == "improved" and state["i"] > 0:
@@ -12820,7 +12865,8 @@ class Engine:
                 # Smash's demoralize, Dreadful Carnage's at a fall, Two-Weapon Rend, Impact
                 # Critical Shot (`_feat_after_hit`).
                 for extra in ([] if dancing else self._feat_after_hit(
-                        actor, defender, weapon, power, hand, state)):
+                        actor, defender, weapon, power, hand, state,
+                        push=bool(intent.params.get("impact_bull_rush")))):
                     state["effects"].append(extra["effect"])
                     if extra.get("tell"):
                         state["tells"].append(extra["tell"])
@@ -13154,6 +13200,11 @@ class Engine:
         if actor.has_state(awareness.INVISIBLE) \
                 and self._pinpointed_shooter(defender, actor, weapon):
             out = out + [Modifier(-2, f"pinpointed by {defender.name} (Improved Blind-Fight)")]
+        # Feat loop b7-small: Blind-Fight's "the attacker doesn't get the usual +2 bonus
+        # for being invisible" in melee (CRB).
+        elif actor.has_state(awareness.INVISIBLE) and weapon.get("category") != "ranged" \
+                and defender.has_state(self.BLIND_FIGHT_MELEE):
+            out = out + [Modifier(-2, f"no invisible edge on {defender.name} (Blind-Fight)")]
         # In the open water beside a ship: the water table's attack penalty, which the
         # sheet charges only for a wet PLACE (`Actor._water_penalty`) and cannot see here.
         if self.scene.afloat(actor.ref) and not actor.water_row():
@@ -14574,7 +14625,8 @@ class Engine:
             if isinstance(loot, str):
                 return self._refuse(intent, loot)
 
-        flat_footed = self._flat_footed(defender) or self._unseen_attacker(defender, actor)
+        flat_footed = self._flat_footed(defender) or self._unseen_attacker(
+            defender, actor, melee=True)                    # feat loop b7-small
         cmd_mods = defender.cmd_modifiers(
             flat_footed, maneuver=str(intent.params.get("manoeuvre") or "") or None,
             attacker=actor)
@@ -15212,11 +15264,69 @@ class Engine:
         if not self._both_on_the_map(actor, defender):
             return self._unmapped(m, actor, defender, want, say, breaks_reach=True)
         before = self.scene.positions[defender.ref]
-        moved = self._push_line(defender.ref, self._heading(actor.ref, defender.ref),
-                                want)
+        step = self._heading(actor.ref, defender.ref)
+        moved = self._push_line(defender.ref, step, want)
         done = [self._moved(defender.ref, before, m)] if moved else []
-        return (self._moved_clause(m, say, moved, want,
-                                   done[0]["feet"] if done else 0), [], done)
+        clause = self._moved_clause(m, say, moved, want, done[0]["feet"] if done else 0)
+        if moved < want and m.get("name") == "bull rush":
+            slam, said = self._bull_rush_slam(actor, defender, step)
+            done.extend(slam)
+            clause += said
+        return (clause, [], done)
+
+    BULL_RUSH_SLAM = "bull_rush.slam"               # feat loop b7-small, its document's tag
+
+    @staticmethod
+    def _feat_use_holds(actor, tag: str) -> bool:
+        """Whether the state a feat's activated use asks (`requires` on its document in
+        content/class-abilities, the feat named by its `feat`) holds on the bearer — for
+        a feat whose other clause works under the same state (Raging Throw's "While
+        raging"). Read off the documents of the feats granting `tag`, never a name."""
+        from . import class_abilities, feats as feats_mod
+
+        granting = {d["id"] for d in (feats_mod.document(f) for f in actor.feats or ())
+                    if d and tag in (d.get("tags") or ())}
+        wants = [q for kind in class_abilities.documents().values()
+                 for doc in kind.get("abilities") or ()
+                 if str(doc.get("feat") or "") in granting
+                 for q in doc.get("requires") or ()]
+        return all(actor.has_state(str(q)) for q in wants)
+
+    def _bull_rush_slam(self, actor, defender, step) -> tuple[list[dict], str]:
+        """Raging Throw (UC): "if you bull rush an opponent into a square another creature
+        occupies or into a solid object, the opponent and the creature or object take
+        bludgeoning damage equal to your Strength modifier + your Constitution modifier"
+        — while raging, as the feat's first sentence holds. The blocking square is the
+        one the push could not enter (`_push_line` stops at wall or somebody); a wall
+        has no hit points here, so only a creature beside the opponent is hurt with it.
+        Feat loop b7-small: before it the push stopped and nobody was hurt."""
+        from .grid import footprint
+
+        if not actor.has_state(self.BULL_RUSH_SLAM) or not self._feat_use_holds(
+                actor, self.BULL_RUSH_SLAM):
+            return [], ""
+        n = actor.ability_mod("str") + actor.ability_mod("con")
+        if n <= 0:
+            return [], ""
+        from . import feats as feats_mod
+
+        feat = next(d for d in (feats_mod.document(f) for f in actor.feats or ())
+                    if d and self.BULL_RUSH_SLAM in (d.get("tags") or ()))
+        origin = f"rule:feat-{feat['id']}"
+        here = self.scene.positions[defender.ref]
+        nxt = (here[0] + step[0], here[1] + step[1])
+        ahead = set(footprint(nxt, defender.size))
+        struck = [defender] + [
+            who for ref, who in self.scene.actors.items()
+            if ref not in (defender.ref, actor.ref) and ref in self.scene.positions
+            and ahead & set(footprint(tuple(self.scene.positions[ref][:2]), who.size))]
+        out = []
+        for who in struck:
+            hit = self._apply_damage(who, n, "bludgeoning")
+            hit["origin"] = origin
+            out.append(hit)
+        names = _and_list([w.name for w in struck])
+        return out, f"; the slam hurts {names} for {n} bludgeoning each ({feat['name']})"
 
     def _outcome_drag(self, m, intent, actor, defender, margin, weapon_key, loot, say):
         want = 1 + max(0, margin) // 5
@@ -17821,7 +17931,8 @@ class Engine:
         DC 20 Swim check or take 1d6 points of nonlethal damage from fatigue" (CRB Swim).
         One copy for every long swim: the water beside a ship or in a lake hour on hour
         (`swim`), the swim out to a ship lying off (`_swim_out`), a wreck (`_wreck`)."""
-        margin, _ten = self._swim_margin(a, list(a.skill_modifiers("swim")),
+        margin, _ten = self._swim_margin(a, list(a.skill_modifiers(
+            "swim", ctx={"against": "swim_exhaustion"})),           # feat loop b7-small
                                          water.HOURLY_DC, rough, fight, what="Swim, an hour in")
         if margin >= 0:
             return []
@@ -17847,8 +17958,16 @@ class Engine:
         """
         tells: list[str] = []
         for a in list(self.scene.people.values()):
-            if not _drowning_ground(a) or a.has_state("state.down.dead"):
+            if not _airless(a) and (a.held_breath_rounds or a.drown_failures) \
+                    and not a.has_state("state.down.dead"):
+                # Air again — a chokehold let go (feat loop b7-small): the held breath
+                # is over, as surfacing ends it in `Scene.advance`; a body already gone
+                # limp keeps its rung (`drown_failures`) and its hit points.
+                a.held_breath_rounds = 0
                 continue
+            if not _airless(a) or a.has_state("state.down.dead"):
+                continue
+            choked = not _drowning_ground(a)
             limit = water.breath_rounds(a)
             if a.held_breath_rounds <= limit and not a.drown_failures:
                 continue
@@ -17880,7 +17999,8 @@ class Engine:
                 # file. The three laws hold the count here to a ceiling that may only
                 # fall, and they are right to.
                 tells.extend(f"{a.name} " + t for t in
-                             ["breathes water, and goes limp."])
+                             ["chokes for air, and goes limp." if choked
+                              else "breathes water, and goes limp."])
                 a.apply_hp_state()
                 continue
             # Past the first failure it is not a check any more, it is a countdown.
@@ -17888,11 +18008,13 @@ class Engine:
             if a.drown_failures == 2:
                 a.hp = -1
                 a.apply_hp_state()
-                tells.append(f"{a.name} is dying, and nobody down here can help them.")
+                tells.append(f"{a.name} is dying for want of air." if choked else
+                             f"{a.name} is dying, and nobody down here can help them.")
             else:
                 a.hp = -max(1, a.ability_score("con"))
                 a.apply_hp_state()
-                tells.append(f"{a.name} has drowned.")
+                tells.append(f"{a.name} has suffocated." if choked else
+                             f"{a.name} has drowned.")
         return tells
 
     def _resolve_dying(self, a: Actor) -> list[str]:
@@ -26778,7 +26900,7 @@ class Engine:
     IMPACT_CRITICAL = "critical.ranged.impact"                     # Impact Critical Shot
 
     def _feat_after_hit(self, actor: Actor, defender: Actor, weapon: dict, power: bool,
-                        hand: str, state: dict) -> list[dict]:
+                        hand: str, state: dict, push: bool = False) -> list[dict]:
         """A held feat's free action once a blow has landed (feat loop b2, 2026-11-22).
 
         - Cornugon Smash (Cheliax): "When you damage an opponent with a Power Attack, you
@@ -26838,6 +26960,9 @@ class Engine:
                             "tell": f"{actor.name}'s two blades rend {defender.name} for "
                                     f"{more['amount']} more (Two-Weapon Rend)."})
         if state.get("crit") and weapon.get("category") == "ranged" \
+                and actor.has_state(self.IMPACT_CRITICAL) and defender.hp > 0 and push:
+            out.extend(self._impact_push(actor, defender, int(state.get("confirm_total") or 0)))
+        elif state.get("crit") and weapon.get("category") == "ranged" \
                 and actor.has_state(self.IMPACT_CRITICAL) and defender.hp > 0:
             total = int(state.get("confirm_total") or 0)
             cmd = defender.cmd()
@@ -26858,6 +26983,44 @@ class Engine:
                             "tell": f"{defender.name} takes the shot's impact standing "
                                     f"({total} against CMD {cmd})."})
         return out
+
+    def _impact_push(self, actor: Actor, defender: Actor, total: int) -> list[dict]:
+        """Impact Critical Shot's other half (APG): "you can push your opponent back as if
+        from the bull rush combat maneuver ... If you choose to bull rush, you cannot move
+        with the target" — declared with the shot (`impact_bull_rush`), the confirmation
+        roll against the bull rush CMD, the bull rush's own size limit and its push
+        (`_outcome_push`, 5 feet and 5 more per 5 it beats the CMD). Feat loop b7-small:
+        before it, the shot always tripped."""
+        from .tables import SIZE_ORDER
+
+        m, origin = MANEUVERS["bull rush"], "rule:feat-impact-critical-shot"
+        order = list(SIZE_ORDER)
+        try:
+            too_big = m.get("size_limit") is not None and order.index(
+                defender.size or "medium") - order.index(actor.size or "medium") \
+                > int(m["size_limit"])
+        except ValueError:
+            too_big = False
+        cmd = sum(x.value for x in defender.cmd_modifiers(
+            self._flat_footed(defender), maneuver="bull rush", attacker=actor))
+        if too_big or total <= cmd:
+            return [{"effect": {"ref": defender.ref, "kind": "rider_resisted",
+                                "rider": "impact", "origin": origin},
+                     "tell": f"{defender.name} takes the shot's impact standing "
+                             f"({total} against CMD {cmd})."}]
+
+        def say(template: str, capital: bool = True, **values) -> str:
+            return maneuver_text(template, actor.name, defender.name, capital=capital,
+                                 **values)
+
+        clause, _extra, done = self._outcome_push(m, None, actor, defender, total - cmd,
+                                                  None, None, say)
+        for d in done:
+            d.setdefault("origin", origin)
+        return [{"effect": done[0] if done else {"ref": defender.ref, "kind": "rider",
+                                                 "rider": "impact", "origin": origin},
+                 "tell": f"The shot's impact ({total} against CMD {cmd}) drives "
+                         f"{defender.name} back: {clause}."}]
 
     def _free_demoralize(self, actor: Actor, foes: list, why: str) -> list[dict]:
         """One Intimidate roll, read against each foe with its own size terms and DC (CRB
@@ -27047,15 +27210,24 @@ class Engine:
                                 "stacked": False, "origin": origin},
                      "tell": f"{actor.name} opens another wound on {defender.name}; it "
                              f"bleeds no worse than it already does."}]
+        tick = {"per": "round", "damage": amount, "damage_type": "untyped"}
+        # Feat loop b7-small: a bleed that runs a counted number of turns (Tiger Style's
+        # "at the start of his next two turns"), counted by the executor's `times_left`
+        # as a burn is — the round's tick runs before it, so a clock would end it early.
+        times = int(rule.get("times") or 0)
+        if times:
+            tick["times_left"] = times
         defender.apply_effect(ActiveEffect(
             name="Bleed", kind="condition", key="bleed", source=f"{actor.name}'s bleed",
             origin=origin, tags=states.tags_for("bleed"),
             payload={"stopped_by": "a DC 15 Heal check or any magical healing"},
-            periodic=[{"per": "round", "damage": amount, "damage_type": "untyped"}]))
+            periodic=[tick]))
+        span = (f"for {times} round{'' if times == 1 else 's'}, or" if times else "until")
         return [{"effect": {"ref": defender.ref, "kind": "condition", "condition": "bleed",
-                            "per_round": amount, "origin": origin},
+                            "per_round": amount, "origin": origin,
+                            **({"times": times} if times else {})},
                  "tell": f"{actor.name} leaves {defender.name} bleeding: {amount} damage "
-                         f"a round until a DC 15 Heal check or magical healing stops it."}]
+                         f"a round {span} a DC 15 Heal check or magical healing stops it."}]
 
     def _rider_burn(self, intent: Intent, actor: Actor, defender: Actor, rule: dict,
                     origin: str, state: dict) -> list[dict]:
@@ -27229,20 +27401,40 @@ class Engine:
 
     def _rider_energy_drain(self, intent: Intent, actor: Actor, defender: Actor,
                             rule: dict, origin: str, state: dict) -> list[dict]:
-        """Energy drain is NOT applied, and says so (as a record, not a tell: nothing
-        happened to the body). A negative level moves eight numbers at once — every
-        attack, save, skill and ability check, CMB and CMD, five hit points, a caster
-        level — and `effectspec`'s `negative_level` type records the owner-level decision
-        that applying seven of them is worse than applying none. Its immunity is still
-        asked, so the record is right about who it could never have touched."""
+        """Energy drain (UMR), applied since feat loop b7-small (rules/drain.py): the
+        printed negative levels, "twice the listed number" on a confirmed critical, each
+        its own effect with the one Fortitude save a day on (the printed DC, else 10 + half
+        racial HD + Charisma, `_printed_dc`) — "a failure makes it permanent" — and "a
+        draining creature gains 5 temporary hit points for each negative level it
+        inflicts", "for a maximum of 1 hour". Its immunity is asked first. Before it the
+        rider was a record saying negative levels were not applied."""
+        from . import drain
+
         blocked = states.immune_to(defender, "energy drain")
-        return [{"effect": {"ref": defender.ref, "kind": "rider_unsupported",
-                            "rider": "energy drain", "levels": rule.get("levels"),
-                            "dc": rule.get("dc"), "origin": origin,
-                            "why": (f"immune ({blocked})" if blocked else
-                                    "negative levels are not applied by the engine "
-                                    "(effectspec negative_level, engine=False)")},
-                 "tell": ""}]
+        if blocked:
+            return [{"effect": {"ref": defender.ref, "kind": "rider_refused",
+                                "rider": "energy drain", "origin": origin,
+                                "why": f"immune ({blocked})"},
+                     "tell": f"{defender.name} is untouched by the drain."}]
+        levels = str(rule.get("levels") or "1").strip()
+        if "d" in levels:
+            roll = self.dice.roll(levels, label=f"Energy drain ({levels} negative levels)",
+                                  visibility="hidden")
+            state.setdefault("rolls", []).append(roll.as_dict())
+            n = roll.total
+        else:
+            n = int(levels) if levels.isdigit() else 1
+        n = max(1, n) * (2 if state.get("crit") else 1)
+        recs = drain.lay(defender, n, self._printed_dc(actor, rule),
+                         f"{actor.name}'s energy drain", origin, once=True)
+        if not actor.is_dead:
+            actor.gain_temp_hp(5 * n, source=f"{defender.name}'s drained life",
+                               rounds=600, origin=origin)
+        out = [{"effect": r, "tell": ""} for r in recs[1:]]
+        return [{"effect": recs[0] if recs else {"ref": defender.ref, "kind": "rider",
+                                                 "rider": "energy drain", "origin": origin},
+                 "tell": drain.said(recs, defender.name)
+                 + f" {actor.name} feeds on it ({5 * n} temporary hit points)."}] + out
 
     _RIDERS: ClassVar[dict] = {
         "maneuver": _rider_maneuver,
@@ -35913,7 +36105,11 @@ class Engine:
         feet = self._gap_ft(attacker, defender)
         return feet is None or int(feet) <= 30
 
-    def _unseen_attacker(self, defender, attacker) -> bool:
+    # Feat loop b7-small: Blind-Fight's "An invisible attacker gets no advantages related
+    # to hitting you in melee" (CRB), its document's tag.
+    BLIND_FIGHT_MELEE = "defense.unseen.melee"
+
+    def _unseen_attacker(self, defender, attacker, melee: bool = False) -> bool:
         """Whether `defender` is struck by somebody it cannot see, and so keeps no Dex.
 
         The invisible condition: it "ignores its opponent's Dexterity bonus to AC (if
@@ -35926,6 +36122,11 @@ class Engine:
         from . import awareness, classfeatures
 
         if attacker is None or defender is None or attacker is defender:
+            return False
+        # Blind-Fight: "you don't lose your Dexterity bonus to Armor Class" against an
+        # unseen melee attacker (CRB); "the invisible attacker's bonuses do still apply
+        # for ranged attacks". Owner call: the dark's unseen attacker counts as invisible.
+        if melee and defender.has_state(self.BLIND_FIGHT_MELEE):
             return False
         # Or blind in the dark: "In areas of darkness, creatures without darkvision are
         # effectively blinded" and a blinded creature "loses any Dexterity bonus to AC"
@@ -38923,6 +39124,19 @@ class Engine:
                        tell=" ".join(str(why).split()), because=intent.because,
                        code=code, for_a_person=for_a_person, fix=fix)
 
+    @staticmethod
+    def _cost_pool(actor: Actor, cost: dict) -> str:
+        """The pool a document's cost is paid from: its `first` pool while that holds the
+        whole amount, else its own. Feat loop b7-small, Extra Channel (CRB): a paladin
+        "can use lay on hands four additional times a day, but only to channel positive
+        energy" - a pool only the channel names, spent before her lay on hands."""
+        first = str(cost.get("first") or "")
+        if first:
+            held = actor.pool(first)
+            if held is not None and held.current >= int(cost.get("amount", 1) or 1):
+                return first
+        return str(cost["pool"])
+
     def _ability_refusal(self, actor: Actor, found: str, doc: dict) -> str:
         """Why this ability cannot be used right now, as a printable sentence — or "".
 
@@ -38948,6 +39162,7 @@ class Engine:
                     f"of {actor.name} {what}, and there is none.")
         cost = doc.get("cost") or {}
         if cost.get("pool"):
+            cost = dict(cost, pool=self._cost_pool(actor, cost))     # feat loop b7-small
             pool = actor.pool(str(cost["pool"]))
             need = int(cost.get("amount", 1) or 1)
             if pool is None or pool.current < need:
@@ -39087,6 +39302,7 @@ class Engine:
         spent = []
         cost = doc.get("cost") or {}
         if cost.get("pool"):
+            cost = dict(cost, pool=self._cost_pool(actor, cost))     # feat loop b7-small
             paid = actor.spend_pool(str(cost["pool"]), int(cost.get("amount", 1) or 1))
             spent.append({"ref": actor.ref, "kind": "resource", "pool": str(cost["pool"]),
                           "spent": paid.get("spent", 0), "left": paid.get("current", 0)})
@@ -39341,6 +39557,7 @@ class Engine:
         cost = doc.get("cost") or {}
         pool_start = None
         if cost.get("pool"):
+            cost = dict(cost, pool=self._cost_pool(actor, cost))     # feat loop b7-small
             pool = actor.pool(str(cost["pool"]))
             pool_start = pool.current if pool is not None else None
             paid = actor.spend_pool(str(cost["pool"]), int(cost.get("amount", 1) or 1))
@@ -42684,6 +42901,14 @@ class Engine:
         down: a sleeper knocked out by the cold is the moment the player must be told,
         not an hour count to finish rolling."""
         row = hazards.get(rule) or {}
+        # Feat loop b7-small: a band the bearer treats as one step milder (Rugged
+        # Northerner's "treat extreme cold ... as severe cold" and severe as cold, Desert
+        # Dweller's "one step less severe") is rolled as the row it steps down to.
+        milder = row.get("milder") or {}
+        if milder.get("tag") and target.has_state(str(milder["tag"])) \
+                and hazards.get(str(milder.get("to") or "")):
+            rule = str(milder["to"])
+            row = hazards.get(rule) or {}
         save = row.get("save") or {}
         rolls, effects = [], []
         if not save:
@@ -42701,19 +42926,44 @@ class Engine:
                                     f"{row.get('against') or rule}: endure elements.")
         # Desert Dweller (ISWG): "You are not impacted at all by very hot conditions" —
         # the one heat this row models (above 90° F); its document's tag.
-        if str(row.get("against") or rule) == "heat" \
-                and target.has_state(states.HEAT_UNHINDERED):
+        if rule == "heat" and target.has_state(states.HEAT_UNHINDERED):
             return rolls, effects, (f"{target.name} is at home in the heat and feels "
                                     f"none of it.")
         # Rugged Northerner (ISWG, feat loop b4-other): "not impacted at all by normal
         # cold weather conditions" — so no frostbite and no fatigue from it either.
-        if str(row.get("against") or rule) == "cold" \
-                and target.has_state(states.COLD_UNHINDERED):
+        # The normal band only (feat loop b7-small): severe and extreme cold step down a
+        # band for the feat (`milder`) and are felt.
+        if rule == "cold" and target.has_state(states.COLD_UNHINDERED):
             return rolls, effects, (f"{target.name} is at home in the cold and feels "
                                     f"none of it.")
-        failed = taken = 0
+        # Cold Celerity (People of the North): "When you are in conditions of severe cold
+        # (below 0° F), you gain a +2 bonus on initiative checks" and the attack bonus — the
+        # quickened state laid for the exposure's whole stretch (feat loop b7-small).
+        from .sheet import COLD_QUICKENED, COLD_QUICKENS
+
+        if row.get("severe_cold") and target.has_state(COLD_QUICKENS):
+            target.apply_effect(ActiveEffect(
+                name="quickened by the cold", kind="buff", key="cold-quickened",
+                source="severe cold", origin=f"rule:{rule}", duration="rounds",
+                rounds_left=int(hours) * 600, tags=(COLD_QUICKENED,)))
+        failed = taken = burned = 0
         made = 0
-        for i in range(max(0, int(hours))):
+        # Severe and extreme bands save more than once an hour (`saves_per_unit`: every
+        # 10 minutes, every minute, every 5), and the extreme ones burn lethally between
+        # saves with no save at all (`lethal_per_save`), CRB Cold and Heat Dangers.
+        every = max(1, int(row.get("saves_per_unit") or 1))
+        lethal = str(row.get("lethal_per_save") or "")
+        for i in range(max(0, int(hours)) * every):
+            if lethal:
+                burn = self.dice.roll(lethal, label=f"{row.get('name', rule)} (no save)",
+                                      visibility="hidden")
+                rolls.append(burn)
+                hit = self._apply_damage(target, burn.total, str(row.get("type", "untyped")))
+                hit["origin"] = f"rule:{rule}"
+                effects.append(hit)
+                burned += int(hit.get("amount", 0) or 0)
+                if target.is_down or target.hp <= 0:
+                    break
             dc = int(save.get("dc", 15)) + i * int(save.get("rises", 1))
             roll = self.dice.d20(target.save_modifiers(str(save.get("save", "fort")), ctx),
                                  label=f"{row.get('name', rule)} (Fortitude, DC {dc})",
@@ -42741,6 +42991,10 @@ class Engine:
         # The condition is the row's to name (`fatigues`), asked by tag, so this site adds
         # no literal condition key to the engine (tests/test_three_laws.py).
         cond = str(row.get("fatigues") or "")
+        # Rugged Northerner: "you do not become fatigued by frostbite or hypothermia".
+        if cond and str(row.get("against") or "") == "cold" \
+                and target.has_state(states.COLD_UNHINDERED):
+            cond = ""
         if taken and cond and not any(target.has_state(t) for t in states.tags_for(cond)):
             target.add_condition(cond, source=str(row.get("name", rule)))
             effects.append({"ref": target.ref, "kind": "condition", "condition": cond,
@@ -42758,6 +43012,8 @@ class Engine:
         danger = str(row.get("against") or rule)
         line += (f", {taken} nonlethal damage and {harm} ({cond or 'harmed'})." if taken
                  else f"; the {danger} did not get in.")
+        if burned:
+            line += f" The {row.get('name', rule)} itself deals {burned} lethal damage."
         line += self._hp_state_tell(crossed)
         return rolls, effects, line
 

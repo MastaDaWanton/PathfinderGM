@@ -329,8 +329,8 @@
   "warleader-s-rage": {},
   "raging-brutality": {},
   "raging-throw": {
-    "not_yet": [
-      "'if you bull rush an opponent into a square another creature occupies or into a solid object, the opponent and the creature or object take bludgeoning damage equal to your Strength modifier + your Constitution modifier': the push stops at what blocks it and nobody is hurt"
+    "tags": [
+      "bull_rush.slam"
     ]
   },
   "natural-spell": {

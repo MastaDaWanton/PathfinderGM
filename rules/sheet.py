@@ -456,7 +456,10 @@ ATTACK_CHOICES = ("power_attack", "deadly_aim", "piranha_strike", "combat_expert
                   # Feat loop b6-rules: Stalwart's dodge traded for DR (rules/stalwart.py).
                   "stalwart",
                   # Feat loop b7-moves: Tiger Pounce's Power Attack penalty moved to AC.
-                  "tiger_pounce")
+                  "tiger_pounce",
+                  # Feat loop b7-small: Two-Weapon Feint's feint for the first blow,
+                  # Impact Critical Shot's bull rush in place of its trip.
+                  "two_weapon_feint", "impact_bull_rush")
 # The options nobody needs a feat for (combat bar round 2, 2026-11-22). CRB, Combat
 # ("Fighting Defensively as a Standard Action"): "You can choose to fight defensively when
 # attacking" — anyone, with any attack. Its numbers are `defensive_dodge` and the stance
@@ -504,7 +507,10 @@ ATTACK_CHOICE_FEATS = {"power_attack": "power-attack", "deadly_aim": "deadly-aim
                        # Feat loop b6-rules.
                        "stalwart": "stalwart",
                        # Feat loop b7-moves.
-                       "tiger_pounce": "tiger-pounce"}
+                       "tiger_pounce": "tiger-pounce",
+                       # Feat loop b7-small.
+                       "two_weapon_feint": "two-weapon-feint",
+                       "impact_bull_rush": "impact-critical-shot"}
 
 _IMPLIED_GENDER = {"she": "woman", "he": "man"}
 
@@ -1925,6 +1931,34 @@ class Actor:
                             out.append({"kind": "effect_ended", "ref": self.ref,
                                         "what": e.name or "the fire",
                                         "origin": e.origin})
+                elif isinstance(p.get("shed_save"), dict):
+                    # Feat loop b7-small: a temporary negative level's "new saving throw to
+                    # remove the negative level each day" (rules/drain.py), made with
+                    # the body's own modifiers, the levels' penalties among them.
+                    from .dice import d20_succeeds
+
+                    want = p["shed_save"]
+                    if dice is None:
+                        continue
+                    for _ in range(times):
+                        roll = dice.d20(self.save_modifiers(str(want.get("save") or "fort")),
+                                        label=f"Fortitude save to shed a {source}",
+                                        visibility="hidden")
+                        if d20_succeeds(roll, int(want.get("dc") or 0)):
+                            if self.remove_effects(match=lambda x, e=e: x is e):
+                                out.append({"kind": "effect_ended", "ref": self.ref,
+                                            "what": source, "origin": e.origin,
+                                            "roll": roll.total, "dc": want.get("dc")})
+                            break
+                        if want.get("or_permanent"):
+                            # Energy drain (UMR): "a failure makes it permanent" — the one
+                            # save spent, the level kept with no save left to make.
+                            e.periodic = [q for q in e.periodic if q is not p]
+                            e.payload = dict(e.payload or {}, permanent=True)
+                            out.append({"kind": "negative_level_permanent", "ref": self.ref,
+                                        "what": source, "origin": e.origin,
+                                        "roll": roll.total, "dc": want.get("dc")})
+                            break
                 elif isinstance(p.get("effect"), dict):
                     for _ in range(times):
                         out.extend(self._periodic_effect(p["effect"], source, e.origin, dice))
@@ -6801,6 +6835,9 @@ class Actor:
         # Feat loop b5-spells: Legacy of the Crusade's "good-aligned weapons" — the weapon
         # strikes as good (a holy weapon's layer, an aligned blade's `strikes_as`).
         weapon["good"] = "good" in (w.get("strikes_as") or ())
+        # Feat loop b7-small: Tiger Style's "your slashing unarmed strike" — the type's
+        # word, or a fist that strikes as slashing (`unarmed.damage.slashing`).
+        weapon["slashing"] = "slashing" in str(w.get("type") or "").lower()             or "slashing" in (w.get("strikes_as") or ())
         # Feat loop b6-partials: Power Attack's "cannot be used with touch attacks or
         # effects that do not deal hit point damage" (CRB) — a printed touch, and a
         # printed blow whose damage is to an ability (a shadow's Strength touch).
@@ -8023,7 +8060,9 @@ class Actor:
             "purse": dict(self.purse),
             "pools": [{"id": p.id, "current": p.current, "max": p.maximum,
                        "ready": p.ready, "cooldown_left": p.cooldown_left}
-                      for p in self.pools.values()],
+                      # Feat loop b7-small: a pool nothing fills (a paladin's extra
+                      # channel uses without the feat) is not a line on the panel.
+                      for p in self.pools.values() if p.maximum or p.current],
             "ac": self.ac(),
             "speed": self.speed_feet,
             "conditions": [{"key": c.key, "name": c.name, "rounds_left": c.rounds_left}
