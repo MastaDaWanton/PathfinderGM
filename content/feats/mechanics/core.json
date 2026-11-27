@@ -249,10 +249,8 @@
   },
   "diehard": {
     "tags": [
-      "dying.stabilises"
-    ],
-    "not_yet": [
-      "acting as if disabled while below 0 hit points (staggered, a standard action costing 1 hit point): the sheet offers no such choice, so a Diehard character below 0 is unconscious and stable"
+      "dying.stabilises",
+      "dying.fights-on"
     ]
   },
   "toughness": {

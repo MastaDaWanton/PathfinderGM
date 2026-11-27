@@ -440,9 +440,6 @@
           }
         }
       }
-    ],
-    "not_yet": [
-      "the `dying.fights-on` tag is carried here because core.json's Diehard document (another lane's file) does not carry it yet: plain Diehard should fight on too"
     ]
   },
   "deathless-master": {
