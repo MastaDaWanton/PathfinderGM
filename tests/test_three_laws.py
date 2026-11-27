@@ -470,7 +470,14 @@ _REACHES = {
     ("combat_mod", "dr"): lambda a: getattr(a.damage_reduction("slashing"), "amount", 0),
     ("combat_mod", "natural_healing"): lambda a: _natural_healing(a),
     ("combat_mod", "healing_extra"): lambda a: a.healing_extra(),
+    ("combat_mod", "difficult_ft"): lambda a: _easy_ft(a),
 }
+
+
+def _easy_ft(a) -> int:
+    from rules.engine import Engine
+
+    return Engine._easy_ft(a)
 
 
 def _natural_healing(a) -> int:

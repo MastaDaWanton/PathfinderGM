@@ -627,6 +627,9 @@ VOCAB: dict[str, list[dict]] = {
         # (Fast Healer, `Actor.rest` and `Engine._fast_healer`).
         ("natural_healing", "Natural healing doubled (any term)"),
         ("healing_extra", "Hit points added to rest and magical healing"),
+        # Feet of difficult terrain crossed as normal in a move (Acrobatic Steps' 15),
+        # read by `Engine._easy_ft` into `Grid.reachable(easy_ft=)`.
+        ("difficult_ft", "Difficult terrain crossed as normal, in feet"),
         # Feat loop b1, 2026-11-22: the caster level a spell is CAST at, read by
         # `casting.spell_caster_level` with the spell's roll context (school, spell,
         # energy, descriptor, subschool) — Spell Specialization's "treat your caster level

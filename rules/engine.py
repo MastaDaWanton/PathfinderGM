@@ -16566,20 +16566,21 @@ class Engine:
             # Straight up or down its own column: no floor to cross (`_move_cost` costs
             # the climb), and `reachable` omits the square you stand on.
             return
+        easy = self._easy_ft(actor)
         routes = grid.reachable(origin, budget, size=actor.size, occupied=occupied,
-                                swims=swims)
+                                swims=swims, easy_ft=easy)
         if flat in routes:
             return
         # Distinguish "too far" from "no way through". They lead to different next moves:
         # one wants a double move, the other wants a different route.
         anywhere = grid.reachable(origin, 10_000, size=actor.size, occupied=occupied,
-                                  swims=swims)
+                                  swims=swims, easy_ft=easy)
         if flat in anywhere:
             # The square this round's movement gets them nearest it, named and carried as
             # the fix: live 2026-11-12, told only the distance, the plan proposed a square
             # 45-55 ft off seven times running and the turn fell to narration.
             back = grid.reachable(flat, 10_000, size=actor.size, occupied=occupied,
-                                  swims=swims)
+                                  swims=swims, easy_ft=easy)
             toward = min((p for p in routes if p in back), default=None,
                          key=lambda p: (back[p], -routes[p], p))
             fix, said = None, ""
@@ -34350,7 +34351,8 @@ class Engine:
                 occupied -= set(gridmod.footprint(there, size))
             reach = self.scene.grid.reachable(
                 here, 10_000, size=size, occupied=occupied,
-                swims=self._swims(self.scene.actors[ref], there))
+                swims=self._swims(self.scene.actors[ref], there),
+                easy_ft=self._easy_ft(self.scene.actors[ref]))
             flat = reach.get(there)
             if flat is None:
                 return None
@@ -42503,6 +42505,20 @@ class Engine:
                     return theirs
                 break
         return roll
+
+    @staticmethod
+    def _easy_ft(actor) -> int:
+        """Feet of difficult terrain this creature crosses as normal in a move (feat loop
+        b4-other, `Grid.reachable(easy_ft=)`): the `difficult_ft` terms (Acrobatic Steps'
+        15), and all of it in a natural environment for a `move.difficult.natural` holder
+        (Light Step) — anywhere a place reads as wild, not a settlement's streets."""
+        from . import places as places_mod
+
+        easy = max(0, sum(m.value for m in actor._buff_mods("combat_mod", "difficult_ft")))
+        wild = places_mod.terrain_of(str(actor.at or "")) not in ("", "urban")
+        if wild and actor.has_state("move.difficult.natural"):
+            easy += gridmod.Grid.EASY_ALL
+        return easy
 
     @staticmethod
     def _fast_healer(target: Actor, healed: int, origin: str) -> int:

@@ -595,3 +595,21 @@ def test_shield_wall_raises_ac_by_the_ally_s_shield():
         finally:
             _MOMENT.reset(token)
         assert got == want, ally_shield
+
+
+def test_acrobatic_steps_and_light_step_cross_difficult_ground_as_normal():
+    """CRB Acrobatic Steps: "move through up to 15 feet of difficult terrain each round as
+    if it were normal terrain". APG Light Step: "ignore the effects of difficult terrain in
+    natural environments". Nimble Moves' not_yet measured it: nothing lifted difficult
+    terrain's double cost. A band of bramble six squares deep: 60 ft for anybody, 45 with the
+    first three easy, 30 with all of them."""
+    from rules.grid import Grid
+
+    grid = Grid(20, 20)
+    grid.difficult = {(x, y) for x in range(1, 7) for y in range(20)}
+    end = (6, 5)
+    assert grid.reachable((0, 5), 100)[end] == 60
+    assert grid.reachable((0, 5), 100, easy_ft=15)[end] == 45
+    assert grid.reachable((0, 5), 100, easy_ft=Grid.EASY_ALL)[end] == 30
+    scene, engine, pc = _luck_pc("Acrobatic Steps")
+    assert engine._easy_ft(pc) == 15

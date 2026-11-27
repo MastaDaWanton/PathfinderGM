@@ -502,5 +502,24 @@
       "aura.wide.charm",
       "aura.lasts.charm"
     ]
+  },
+  "acrobatic-steps": {
+    "modifiers": [
+      {
+        "type": "combat_mod",
+        "target": "difficult_ft",
+        "amount": 15,
+        "bonus_type": "untyped",
+        "note": "CRB: 'you may move through up to 15 feet of difficult terrain each round as if it were normal terrain'"
+      }
+    ],
+    "not_yet": [
+      "stacking with Nimble Moves' 5 feet for 20: Nimble Moves' own document (batch2-attack-a.json) still carries no difficult_ft term; the allowance is per move, not per round"
+    ]
+  },
+  "light-step": {
+    "tags": [
+      "move.difficult.natural"
+    ]
   }
 }
