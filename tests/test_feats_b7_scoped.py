@@ -139,3 +139,52 @@ def test_caustic_slur_makes_a_favoured_enemy_power_attack_the_gnome_until_the_fi
     assert rolled and _named(rolled[0], "Caustic Slur") == -step, _tells(res)
     s.end_encounter()
     assert not any(m.get("vs") == "pc" for x in near.effects for m in x.modifiers)
+
+
+# --- group 9: teamwork feats that read an ally's position and feats -------------------------
+
+def _reaction_by(res, ref):
+    return [o for o in res.outcomes if o.op == "attack" and any(
+        b.get("ref") for b in (o.blows or ())) and (o.tell or "").startswith(
+        {"pc": "Kesst", "ally": "Lia"}[ref])]
+
+
+def test_paired_opportunists_shares_the_swing_a_trip_owes_the_partner():
+    """Paired Opportunists (APG): "Enemies that provoke attacks of opportunity from your
+    ally also provoke attacks of opportunity from you so long as you threaten them."
+    Measured before: who was owed a swing was asked of each watcher alone, so the thug's
+    untrained trip at Kesst drew Kesst's swing and nobody else's. Now Lia, who threatens the
+    thug and holds the feat, swings too; without the feat she does not."""
+    for feats, expect in ((["Paired Opportunists"], True), ([], False)):
+        pc = _pc("fighter", feats=["Paired Opportunists"])
+        ally = _ally(feats=feats)
+        s, e = _board(pc, ("thug", (6, 5)), allies=[(ally, (6, 6))],
+                      faces={"Attack": 2, "Damage": 1})
+        s.turn = 2
+        res = _attack(e, by="c1", target="pc", manoeuvre="trip")
+        assert bool(_reaction_by(res, "pc")), _tells(res)
+        assert bool(_reaction_by(res, "ally")) is expect, _tells(res)
+
+
+def test_extend_the_bulwark_lends_half_the_armour_bonus_and_takes_the_user_s():
+    """Extend the Bulwark (UC): "you may give your ally a circumstance bonus to her AC
+    equal to half the armor bonus provided by your armor ... During this round, you gain
+    no bonus to your AC from your armor." Measured before: nothing (the feat's not_yet).
+    In a breastplate (+6): Lia +3, Kesst -6; refused in light armour or for an ally
+    without the feat."""
+    pc = _pc("fighter", feats=["Extend the Bulwark"], armour="breastplate")
+    ally = _ally(feats=["Extend the Bulwark"])
+    s, e = _board(pc, ("thug", (8, 8)), allies=[(ally, (5, 6))])
+    bonus = int(pc.armour_stats()["ac"])
+    assert bonus == 6
+    mine, hers = pc.ac(), ally.ac()
+    out = _use(e, "Extend the Bulwark", to="ally")
+    assert out.status == "resolved", out.tell
+    assert (pc.ac(), ally.ac()) == (mine - bonus, hers + bonus // 2)
+    lone = _ally(ref="lone")
+    s.add(lone, at=(4, 5))
+    assert _use(e, "Extend the Bulwark", to="lone").status == "refused"
+    pc2 = _pc("fighter", feats=["Extend the Bulwark"], armour="leather")
+    s2, e2 = _board(pc2, ("thug", (8, 8)), allies=[(_ally(feats=["Extend the Bulwark"]),
+                                                    (5, 6))])
+    assert "medium or heavy" in _use(e2, "Extend the Bulwark", to="ally").tell

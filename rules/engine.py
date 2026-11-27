@@ -6756,6 +6756,41 @@ class Engine:
             skilluses.spend_tumble(mover)    # a tumble covers the one move it was rolled for
         return self._swings_at(ref, fired, why="movement")
 
+    PAIRED = "teamwork.paired-opportunists"
+
+    def _paired_partners(self, ref: str, fired: list) -> list:
+        """Paired Opportunists (APG): "Enemies that provoke attacks of opportunity from your
+        ally also provoke attacks of opportunity from you so long as you threaten them
+        (even if the situation or an ability would normally deny you the attack of
+        opportunity). This does not allow you to take more than one attack of opportunity
+        against a creature for a given action." Each watcher owed a swing who holds the
+        feat lends it to every partner of its side holding it too who threatens the
+        provoker and is not already owed one for this action. Before (feat loop b6): who
+        was owed a swing was asked of each watcher alone (`rules/reactions.py`)."""
+        if not self.scene.has_grid or ref not in self.scene.positions:
+            return fired
+        from .position import _same_side
+
+        owed = {w for w, _r in fired}
+        lenders = [w for w in owed if (self.scene.actors.get(w) is not None
+                                       and self.scene.actors[w].has_state(self.PAIRED))]
+        if not lenders:
+            return fired
+        provoker = self.scene.actors.get(ref)
+        body = (provoker.size if provoker is not None else None) or "medium"
+        squares = gridmod.footprint(tuple(self.scene.positions[ref][:2]), body)
+        more = []
+        for pref, partner in self.scene.actors.items():
+            if pref in owed or pref == ref or partner.is_down \
+                    or not partner.has_state(self.PAIRED) \
+                    or not any(_same_side(self.scene, pref, w) for w in lenders) \
+                    or not reactions.reactions_for(partner) \
+                    or not any(reactions.threatens(self.scene, pref, q, body) for q in squares):
+                continue
+            more.append((pref, reactions.attack_of_opportunity(partner)))
+            owed.add(pref)
+        return fired + more
+
     def _swings_at(self, ref: str, fired, why: str = "") -> list[dict]:
         """The reaction intents owed to `ref` by these (watcher, reaction) pairs, each
         off its watcher's allowance (`_spend_reaction`).
@@ -6764,6 +6799,7 @@ class Engine:
         spliced swing as `provoked_by` (engine-written, never parsed), which the AC it is
         rolled against asks — Mobility's +4 (`Actor.ac_modifiers`)."""
         out: list[dict] = []
+        fired = self._paired_partners(ref, list(fired))       # feat loop b7-scoped
         for watcher, reaction in fired:
             if not self._spend_reaction(watcher, reaction.budget):
                 continue
@@ -6915,8 +6951,8 @@ class Engine:
                 self._holds(actor, target_actor) or self._holds(target_actor, actor)):
             return []
         out: list[dict] = []
-        for watcher, reaction in reactions.provoked_by_maneuver(
-                self.scene, actor_ref, target_ref, str(params["manoeuvre"])):
+        for watcher, reaction in self._paired_partners(actor_ref, reactions.provoked_by_maneuver(
+                self.scene, actor_ref, target_ref, str(params["manoeuvre"]))):
             if not self._spend_reaction(watcher, reaction.budget):
                 continue
             out.append({
@@ -38729,6 +38765,16 @@ class Engine:
 
             if classfeatures.free_hands(actor) < int(doc["hands_free"]):
                 return f"{found.title()} needs a free hand, and {actor.name} has none."
+        if doc.get("armour"):
+            # Feat loop b7-scoped: "If you are wearing medium or heavy armor" (Extend the
+            # Bulwark), the suit's weight class (`classfeatures.bearer_facts`).
+            from . import classfeatures
+
+            worn = classfeatures.bearer_facts(actor)["armour"]
+            if worn not in [str(w).lower() for w in doc["armour"]]:
+                return (f"{found.title()} needs {' or '.join(map(str, doc['armour']))} "
+                        f"armour on {actor.name}, who wears "
+                        f"{'none' if worn == 'none' else worn + ' armour'}.")
         # A price paid when the blow lands (`charge.pays`): nothing to arm with an empty
         # pool (Crusader's Fist, Radiant Charge).
         pays = (doc.get("charge") or {}).get("pays") or {}

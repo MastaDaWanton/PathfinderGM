@@ -127,8 +127,8 @@
         "note": "Paired Opportunists: +4 on attacks of opportunity beside a partner"
       }
     ],
-    "not_yet": [
-      "'Enemies that provoke attacks of opportunity from your ally also provoke attacks of opportunity from you so long as you threaten them (even if the situation or an ability would normally deny you the attack of opportunity)': who is owed a swing is asked of each watcher alone (rules/reactions.py), never shared with a partner"
+    "tags": [
+      "teamwork.paired-opportunists"
     ]
   },
   "wolf-trip": {

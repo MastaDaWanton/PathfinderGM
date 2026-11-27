@@ -126,6 +126,40 @@
         }
       },
       "tell": "{name} finds the one thing about their kind that stings, and says it."
+    },
+    {
+      "key": "extend the bulwark",
+      "name": "Extend the Bulwark",
+      "feat": "extend-the-bulwark",
+      "aliases": [
+        "extend the bulwark",
+        "share my armour",
+        "share my armor",
+        "cover my ally"
+      ],
+      "level": 1,
+      "source": "Extend the Bulwark (Ultimate Combat, teamwork): 'If you are wearing medium or heavy armor and are adjacent to an ally who also has this feat, as a free action, you may give your ally a circumstance bonus to her AC equal to half the armor bonus provided by your armor. This bonus lasts for 1 round. During this round, you gain no bonus to your AC from your armor.' The ally must hold the feat (target_requires its tag); the user's own armour bonus is answered by an equal penalty for the round.",
+      "text": "Free, in medium or heavy armour: an adjacent ally with the feat gains half your armour bonus as circumstance AC for a round; you lose your armour's AC.",
+      "action": "free",
+      "affects": "ally",
+      "reach_ft": 5,
+      "armour": ["medium", "heavy"],
+      "target_requires": ["teamwork.extend-the-bulwark"],
+      "target_requires_said": "an ally who also has Extend the Bulwark",
+      "self": {
+        "rounds": "1",
+        "modifiers": [
+          {"type": "combat_mod", "target": "ac", "formula": "-armour_ac", "bonus_type": "untyped"}
+        ]
+      },
+      "effect": {
+        "rounds": "1",
+        "modifiers": [
+          {"type": "combat_mod", "target": "ac", "formula": "armour_ac // 2",
+           "bonus_type": "circumstance"}
+        ]
+      },
+      "tell": "{name} turns a shoulder of plate across {target}, armour shared between them."
     }
   ]
 }

@@ -608,8 +608,8 @@
     ]
   },
   "extend-the-bulwark": {
-    "not_yet": [
-      "a free action giving an adjacent ally with the feat half your armour bonus as circumstance AC for a round while you lose it"
+    "tags": [
+      "teamwork.extend-the-bulwark"
     ]
   },
   "collective-recollection": {

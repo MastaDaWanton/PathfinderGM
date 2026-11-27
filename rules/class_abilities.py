@@ -382,7 +382,10 @@ DOC_KEYS = frozenset({
     # (Archon Style), and the user's own last hit it answers (Broken Wing Gambit).
     "aims_foe", "after_hit",
     # Feat loop b7-scoped: only the favoured enemies of the aimed one's sort (Caustic Slur).
-    "favored_sort", "understood"})
+    "favored_sort", "understood",
+    # Feat loop b7-scoped: the suit's weight class the user must wear (Extend the
+    # Bulwark's "wearing medium or heavy armor"; Engine._ability_refusal).
+    "armour"})
 
 
 def _ally_want_problems(at: str, want) -> list[str]:

@@ -106,6 +106,10 @@ def variables(actor) -> Mapping:
         # as the sheet is (`feats._check`'s class_level).
         "monk_level": lambda: (actor.level if str(getattr(actor, "char_class", "") or "")
                                .strip().lower() == "monk" else 0),
+        # Feat loop b7-scoped: the worn suit's armour bonus (Extend the Bulwark's "half
+        # the armor bonus provided by your armor"); 0 with none on or nothing to read.
+        "armour_ac": lambda: (int((actor.armour_stats() or {}).get("ac") or 0)
+                              if hasattr(actor, "armour_stats") else 0),
     }
 
     # A branching class tiers its abilities against its own track rather than against
