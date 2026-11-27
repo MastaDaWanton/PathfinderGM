@@ -323,3 +323,72 @@ def test_mantis_wisdom_lifts_only_the_stunning_fist_its_holder_laid():
     out = _use(e, "Mantis Wisdom Touch", to="c1")
     assert out.status == "resolved", out.tell
     assert not thug.has_condition("stunned") and thug.has_condition("fatigued")
+
+
+# --- group 28: fear that fails ------------------------------------------------------------------
+
+def test_focused_discipline_turns_a_saved_fear_into_two_against_its_caster():
+    """Focused Discipline (Champions of Valor): "Whenever a fear effect targets you and fails
+    to affect you (either because of a successful saving throw ...), you gain a +2 morale
+    bonus on attack rolls, weapon damage rolls, and CMB checks against the creature that
+    attempted to use the fear affect on you for 1 round." Measured before: a saved cause
+    fear left nothing. Now +2/+2/+2 against the caster alone, for the round."""
+    from rules import spells as spells_mod
+
+    pc = _pc("fighter", feats=["Focused Discipline"])
+    s, e = _board(pc, ("thug", (6, 5)), ("thug", (9, 9)))
+    caster, other = s.actors["c1"], s.actors["c2"]
+    state = {"tells": []}
+    assert e._resolve_after_save(pc, caster, spells_mod.get("cause-fear"), True, state)
+    terms = [(m["target"], m["amount"], m["vs"]) for x in pc.effects for m in x.modifiers
+             if x.origin == "rule:feat-focused-discipline"]
+    assert sorted(terms) == [("attack", 2, "c1"), ("cmb", 2, "c1"), ("damage", 2, "c1")]
+    assert "Focused Discipline" in state["tells"][-1]
+    state = {"tells": []}
+    pc2 = _pc("fighter", feats=["Focused Discipline"])
+    e._resolve_after_save(pc2, caster, spells_mod.get("cause-fear"), False, state)
+    assert not any(x.origin == "rule:feat-focused-discipline" for x in pc2.effects)
+    assert other is not caster
+
+
+# --- group 31: effective size for manoeuvre size limits and CMD steps -----------------------
+
+def test_wall_of_flesh_makes_the_bearer_too_big_for_a_goblin_s_trip():
+    """Wall of Flesh (APG): "When adjacent to an ally with this feat, you're considered one
+    size category larger for determining CMD and the way combat maneuvers and abilities
+    affect you." Measured before: the size limit read the body's own size, so a Small
+    goblin could trip a Medium wall beside its partner. Now it is refused as too large; a
+    lone bearer is tripped as before."""
+    import pytest
+
+    from rules.intents import IntentError
+
+    def trip(with_partner):
+        pc = _pc("fighter", feats=["Wall of Flesh"])
+        allies = [(_ally(feats=["Wall of Flesh"] if with_partner else []), (5, 6))]
+        s, e = _board(pc, ("goblin", (6, 5)), allies=allies)
+        s.turn = 2
+        return e, e.validate
+    e, validate = trip(True)
+    with pytest.raises(IntentError, match="size category"):
+        validate([{"op": "attack", "actor": "c1", "target": "pc", "because": "test",
+                   "params": {"manoeuvre": "trip"}}])
+    e, validate = trip(False)
+    assert validate([{"op": "attack", "actor": "c1", "target": "pc", "because": "test",
+                      "params": {"manoeuvre": "trip"}}])
+
+
+def test_wall_of_flesh_s_cmd_step_is_the_size_table_s_not_a_flat_one():
+    """Measured before: the CMD step was +1 whatever the size; a Diminutive bearer counting
+    as Tiny gains +2 by CRB Table 8-1 (-4 to -2), a Medium one +1."""
+    from rules.sheet import situated
+
+    for size, want in (("diminutive", 2), ("medium", 1)):
+        pc = _pc("fighter", feats=["Wall of Flesh"])
+        pc.size = size
+        s, e = _board(pc, ("goblin", (9, 9)), allies=[(_ally(feats=["Wall of Flesh"]),
+                                                       (5, 6))])
+        with situated(s):
+            got = [m.value for m in pc.cmd_modifiers() if "Wall of Flesh" in m.source
+                   or "one size larger" in m.source]
+        assert got == [want], (size, [(m.source, m.value) for m in pc.cmd_modifiers()])

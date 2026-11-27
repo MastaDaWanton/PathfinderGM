@@ -76,6 +76,17 @@ class _Lazy(Mapping):
         return len(self._names)
 
 
+def _cmd_size_up(size) -> int:
+    """The CMD a body gains for counting one size category larger (`cmd_size_up`)."""
+    from .tables import SIZE_ORDER, SIZES
+
+    size = str(size or "medium").lower()
+    if size not in SIZE_ORDER or size == SIZE_ORDER[-1]:
+        return 0
+    up = SIZE_ORDER[SIZE_ORDER.index(size) + 1]
+    return SIZES[up]["cmb_cmd"] - SIZES[size]["cmb_cmd"]
+
+
 def _class_ids() -> list[str]:
     """Every class id as a formula word ("blood bending" → blood_bending)."""
     try:
@@ -110,6 +121,10 @@ def variables(actor) -> Mapping:
         # the armor bonus provided by your armor"); 0 with none on or nothing to read.
         "armour_ac": lambda: (int((actor.armour_stats() or {}).get("ac") or 0)
                               if hasattr(actor, "armour_stats") else 0),
+        # Feat loop b7-scoped: what one size category larger adds to CMD (CRB Table 8-1's
+        # special size modifier: +1 from Small or Medium, +2 from Tiny, +4 from Diminutive)
+        # — Wall of Flesh's "considered one size category larger for determining CMD".
+        "cmd_size_up": lambda: _cmd_size_up(getattr(actor, "size", "medium")),
     }
 
     # A branching class tiers its abilities against its own track rather than against

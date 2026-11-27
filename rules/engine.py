@@ -4694,7 +4694,10 @@ class Engine:
                 limit = m.get("size_limit")
                 if limit is not None:
                     try:
-                        gap = SIZE_ORDER.index(defender.size) - SIZE_ORDER.index(actor.size)
+                        # Feat loop b7-scoped: the size manoeuvres treat each as
+                        # (`_maneuver_size`: Wall of Flesh, Powerful Shape).
+                        gap = SIZE_ORDER.index(self._maneuver_size(defender)) \
+                            - SIZE_ORDER.index(self._maneuver_size(actor))
                     except ValueError:
                         gap = 0
                     if gap > limit:
@@ -14091,8 +14094,8 @@ class Engine:
             m = MANEUVERS[key]
             limit = m.get("size_limit")
             try:
-                if limit is not None and order.index(defender.size or "medium") - order.index(
-                        actor.size or "medium") > int(limit):
+                if limit is not None and order.index(self._maneuver_size(defender)) \
+                        - order.index(self._maneuver_size(actor)) > int(limit):
                     continue
             except ValueError:
                 pass
@@ -26503,7 +26506,8 @@ class Engine:
         if key not in MANEUVERS:
             return []
         try:
-            gap = SIZE_ORDER.index(defender.size) - SIZE_ORDER.index(actor.size)
+            gap = SIZE_ORDER.index(self._maneuver_size(defender)) \
+                - SIZE_ORDER.index(self._maneuver_size(actor))     # feat loop b7-scoped
         except ValueError:
             gap = 0
         if rule.get("any_size"):
@@ -32156,6 +32160,30 @@ class Engine:
     def _steeled_tag(caster) -> str:
         return f"immune.fear.from.{caster.ref}"
 
+    FOCUSED = "fear.shrugged.focused"            # Focused Discipline's document tag
+
+    def _fear_shrugged(self, target: Actor, caster: Actor, state: dict) -> None:
+        """Focused Discipline (feat loop b7-scoped): "Whenever a fear effect targets you
+        and fails to affect you (either because of a successful saving throw or because
+        of immunity to fear), you gain a +2 morale bonus on attack rolls, weapon damage
+        rolls, and CMB checks against the creature that attempted to use the fear affect
+        on you for 1 round." Laid scoped to the caster (`vs`), through the one
+        applicator. Before: the bonus was never laid (its not_yet)."""
+        if not target.has_state(self.FOCUSED) or caster is target:
+            return
+        target.remove_effects(match=lambda e: e.origin == "rule:feat-focused-discipline"
+                              and e.key == f"focused:{caster.ref}")
+        target.apply_effect(ActiveEffect(
+            name=f"focused against {caster.name}", kind="buff", key=f"focused:{caster.ref}",
+            source="Focused Discipline", origin="rule:feat-focused-discipline",
+            duration="rounds", rounds_left=1,
+            modifiers=[{"kind": "combat_mod", "target": t, "amount": 2,
+                        "bonus_type": "morale", "vs": caster.ref}
+                       for t in ("attack", "damage", "cmb")]))
+        state["tells"].append(f"{target.name} turns the fear back on {caster.name}: +2 to "
+                              f"attack, damage and manoeuvres against them for a round "
+                              f"(Focused Discipline).")
+
     def _resolve_after_save(self, target: Actor, caster, spell, saved: bool,
                             state: dict) -> bool:
         """What a feat does once a save against a spell stands (feat loop b4-other).
@@ -32175,7 +32203,10 @@ class Engine:
         if "fear" in against and target.has_state(self._steeled_tag(caster)):
             state["tells"].append(f"{target.name} has faced {caster.name}'s fear before "
                                   f"and it finds no hold (Stoic).")
+            self._fear_shrugged(target, caster, state)
             return True
+        if "fear" in against and (saved or states.immune_to(target, "fear")):
+            self._fear_shrugged(target, caster, state)
         if saved and "fear" in against and target.has_state(self.STOIC):
             target.apply_effect(ActiveEffect(
                 name=f"steeled against {caster.name}", kind="situation",
@@ -34409,6 +34440,29 @@ class Engine:
         return metamagic.apply(out, actor, meta)
 
     # --- feat loop b1 (2026-11-22): metamagic at the cast's readers --------------------
+
+    # Feat loop b7-scoped: the feats that make a body count one size larger for how
+    # combat manoeuvres and size-based special attacks treat it.
+    WALL_OF_FLESH = "size.wall-of-flesh"
+    POWERFUL_SHAPE = "size.powerful-shape"
+
+    def _maneuver_size(self, creature: Actor) -> str:
+        """The size a manoeuvre's size limit (and a grab's, a swallow's) reads for this
+        creature: its own, one category larger beside an ally who holds Wall of Flesh too
+        (APG: "When adjacent to an ally with this feat, you're considered one size category
+        larger for determining CMD and the way combat maneuvers and abilities affect
+        you"), or in wild shape with Powerful Shape ("any size-based special attacks you
+        use or that are used against you (such as grab, swallow whole, and trample)").
+        Before: the body's own size, so a foe two sizes up still tripped the wall."""
+        from .tables import SIZE_ORDER
+
+        size = creature.size if creature.size in SIZE_ORDER else "medium"
+        up = (creature.has_state(self.POWERFUL_SHAPE) and creature.has_state("form.animal")) \
+            or (creature.has_state(self.WALL_OF_FLESH) and any(
+                a.has_state(self.WALL_OF_FLESH) for a in self._adjacent_allies(creature)))
+        if up and size != SIZE_ORDER[-1]:
+            return SIZE_ORDER[SIZE_ORDER.index(size) + 1]
+        return size
 
     def _adjacent_allies(self, actor: Actor) -> list:
         """Everyone on `actor`'s side standing within 5 feet, awake: the teamwork feats'
