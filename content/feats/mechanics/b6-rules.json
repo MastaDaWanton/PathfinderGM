@@ -20,7 +20,8 @@
     "improved-ki-throw: APG: 'you may throw your target into any square you threaten that is occupied by another creature. Make a bull rush combat maneuver check with a -4 penalty against the secondary target' (rules/maneuver_feats.py `_thrown_into`); Enhanced Ki Throw's landing damage and Spinning Throw's Improved Ki Throw clause are b4's documents, finished here (`_land`, `_spun_into`).",
     "rhino-charge: APG: 'You may ready a charge, though you may only move up to your speed on the charge' (rules/readied.py READY_CHARGE, Engine._charge_before) — b4-moves' document, finished here.",
     "antagonize: UM: Diplomacy or Intimidate, a standard action, DC 10 + HD + Wis; flustered (-2 on attacks at others for a minute) or enraged (turns on you next turn), once a day a target (rules/antagonize.py).",
-    "bouncing-spell: APG: a single-target spell with no effect (spell resistance, or a save that negates) redirected as a swift action to another creature in range (Engine._bounce); +1 level."
+    "bouncing-spell: APG: a single-target spell with no effect (spell resistance, or a save that negates) redirected as a swift action to another creature in range (Engine._bounce); +1 level.",
+    "neither-elf-nor-human: ARG: 'You are not considered elven or human for the purpose of harmful spells or effects based on your type, like a bane weapon or a ranger's favored enemy' — against Elf Blood, which the lane made real for every half-elf (rules/sheet.py `_is_of_kind`)."
   ],
   "improved-counterspell": {
     "tags": [
@@ -108,5 +109,10 @@
       "does": "bounce",
       "levels": 1
     }
+  },
+  "neither-elf-nor-human": {
+    "tags": [
+      "harm.not-elf-or-human"
+    ]
   }
 }

@@ -470,3 +470,21 @@ def test_antagonize_by_intimidate_turns_the_foe_on_the_antagonist_and_a_miss_doe
     assert sum(m.value for m in compulsion.penalty_against(s.actors["c1"], "c2")) == -4
     pc, s, e, res = _antagonist("intimidate", 1, ranks=0)
     assert compulsion.penalty_against(s.actors["c1"], "c2") == [], _tells(res)
+
+
+# --- Neither Elf nor Human -----------------------------------------------------------------------
+
+def test_a_bane_against_humans_finds_a_half_elf_unless_neither_elf_nor_human():
+    """CRB Elf Blood: "Half-elves count as both elves and humans for any effect related to
+    race" — measured before, a half-elf answered neither (no subtype tag), so a human-bane
+    blade or a favored enemy (human) never reached one, and Neither Elf nor Human had
+    nothing to undo. Now a `when: {"target": {"subtype": "human"}}` term holds against a
+    half-elf, and not against one with the feat (ARG)."""
+    from rules.sheet import _when_holds
+
+    when = {"target": {"subtype": "human"}}
+    half = _pc("fighter", level=12, race="half-elf")
+    assert _when_holds(when, {"target_actor": half})
+    half.feats = list(half.feats) + ["Exile's Path", "Seen and Unseen", "Neither Elf nor Human"]
+    assert not _when_holds(when, {"target_actor": half})
+    assert not _when_holds(when, {"target_actor": _pc("fighter", race="dwarf")})

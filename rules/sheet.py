@@ -9054,7 +9054,18 @@ def _is_of_kind(actor, field_name: str, value) -> bool:
     """Whether this creature is of the type (or subtype) named — any of a list (celestial
     bronze's "magical beast" or "monstrous humanoid") — by tag prefix (law 1)."""
     wanted = value if isinstance(value, (list, tuple)) else [value]
+    if field_name == "subtype" and any(_kind_leaf(v) in ("elf", "human") for v in wanted) \
+            and actor.has_state("race.half-elf"):
+        # Feat loop b6-rules. Elf Blood (CRB, half-elf): "Half-elves count as both elves
+        # and humans for any effect related to race"; Neither Elf nor Human (ARG) undoes it
+        # "for the purpose of harmful spells or effects based on your type, like a bane
+        # weapon or a ranger's favored enemy" — and this reader is asked of the creature a
+        # roll is made AGAINST, which is the harmful case.
+        return not actor.has_state(NEITHER_ELF_NOR_HUMAN)
     return any(actor.has_state(f"{field_name}.{_kind_leaf(v)}") for v in wanted)
+
+
+NEITHER_ELF_NOR_HUMAN = "harm.not-elf-or-human"   # Neither Elf nor Human's tag
 
 
 # What an ally's aura makes a creature immune to, by the aura's tag and radius (feat loop
