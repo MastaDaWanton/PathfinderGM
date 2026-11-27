@@ -1927,6 +1927,34 @@ class Actor:
                             out.append({"kind": "effect_ended", "ref": self.ref,
                                         "what": e.name or "the fire",
                                         "origin": e.origin})
+                elif isinstance(p.get("shed_save"), dict):
+                    # Feat loop b7-small: a temporary negative level's "new saving throw to
+                    # remove the negative level each day" (rules/drain.py), made with
+                    # the body's own modifiers, the levels' penalties among them.
+                    from .dice import d20_succeeds
+
+                    want = p["shed_save"]
+                    if dice is None:
+                        continue
+                    for _ in range(times):
+                        roll = dice.d20(self.save_modifiers(str(want.get("save") or "fort")),
+                                        label=f"Fortitude save to shed a {source}",
+                                        visibility="hidden")
+                        if d20_succeeds(roll, int(want.get("dc") or 0)):
+                            if self.remove_effects(match=lambda x, e=e: x is e):
+                                out.append({"kind": "effect_ended", "ref": self.ref,
+                                            "what": source, "origin": e.origin,
+                                            "roll": roll.total, "dc": want.get("dc")})
+                            break
+                        if want.get("or_permanent"):
+                            # Energy drain (UMR): "a failure makes it permanent" — the one
+                            # save spent, the level kept with no save left to make.
+                            e.periodic = [q for q in e.periodic if q is not p]
+                            e.payload = dict(e.payload or {}, permanent=True)
+                            out.append({"kind": "negative_level_permanent", "ref": self.ref,
+                                        "what": source, "origin": e.origin,
+                                        "roll": roll.total, "dc": want.get("dc")})
+                            break
                 elif isinstance(p.get("effect"), dict):
                     for _ in range(times):
                         out.extend(self._periodic_effect(p["effect"], source, e.origin, dice))

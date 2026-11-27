@@ -27252,20 +27252,40 @@ class Engine:
 
     def _rider_energy_drain(self, intent: Intent, actor: Actor, defender: Actor,
                             rule: dict, origin: str, state: dict) -> list[dict]:
-        """Energy drain is NOT applied, and says so (as a record, not a tell: nothing
-        happened to the body). A negative level moves eight numbers at once — every
-        attack, save, skill and ability check, CMB and CMD, five hit points, a caster
-        level — and `effectspec`'s `negative_level` type records the owner-level decision
-        that applying seven of them is worse than applying none. Its immunity is still
-        asked, so the record is right about who it could never have touched."""
+        """Energy drain (UMR), applied since feat loop b7-small (rules/drain.py): the
+        printed negative levels, "twice the listed number" on a confirmed critical, each
+        its own effect with the one Fortitude save a day on (the printed DC, else 10 + half
+        racial HD + Charisma, `_printed_dc`) — "a failure makes it permanent" — and "a
+        draining creature gains 5 temporary hit points for each negative level it
+        inflicts", "for a maximum of 1 hour". Its immunity is asked first. Before it the
+        rider was a record saying negative levels were not applied."""
+        from . import drain
+
         blocked = states.immune_to(defender, "energy drain")
-        return [{"effect": {"ref": defender.ref, "kind": "rider_unsupported",
-                            "rider": "energy drain", "levels": rule.get("levels"),
-                            "dc": rule.get("dc"), "origin": origin,
-                            "why": (f"immune ({blocked})" if blocked else
-                                    "negative levels are not applied by the engine "
-                                    "(effectspec negative_level, engine=False)")},
-                 "tell": ""}]
+        if blocked:
+            return [{"effect": {"ref": defender.ref, "kind": "rider_refused",
+                                "rider": "energy drain", "origin": origin,
+                                "why": f"immune ({blocked})"},
+                     "tell": f"{defender.name} is untouched by the drain."}]
+        levels = str(rule.get("levels") or "1").strip()
+        if "d" in levels:
+            roll = self.dice.roll(levels, label=f"Energy drain ({levels} negative levels)",
+                                  visibility="hidden")
+            state.setdefault("rolls", []).append(roll.as_dict())
+            n = roll.total
+        else:
+            n = int(levels) if levels.isdigit() else 1
+        n = max(1, n) * (2 if state.get("crit") else 1)
+        recs = drain.lay(defender, n, self._printed_dc(actor, rule),
+                         f"{actor.name}'s energy drain", origin, once=True)
+        if not actor.is_dead:
+            actor.gain_temp_hp(5 * n, source=f"{defender.name}'s drained life",
+                               rounds=600, origin=origin)
+        out = [{"effect": r, "tell": ""} for r in recs[1:]]
+        return [{"effect": recs[0] if recs else {"ref": defender.ref, "kind": "rider",
+                                                 "rider": "energy drain", "origin": origin},
+                 "tell": drain.said(recs, defender.name)
+                 + f" {actor.name} feeds on it ({5 * n} temporary hit points)."}] + out
 
     _RIDERS: ClassVar[dict] = {
         "maneuver": _rider_maneuver,

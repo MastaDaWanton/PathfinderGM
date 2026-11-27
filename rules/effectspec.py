@@ -1037,9 +1037,9 @@ CATEGORIES: list[Category] = [
             ], engine=False,
                 blocked="Recorded, counted and shown to the GM with what it costs — −1 "
                         "on every attack, save, skill and ability check, −5 hit points, "
-                        "−1 caster level, each. Not applied: a negative level moves "
-                        "eight different numbers on the sheet at once and applying seven "
-                        "of them would be worse than applying none."),
+                        "−1 caster level, each. A creature's energy drain lays them "
+                        "(rules/drain.py, feat loop b7-small); a spell's or an item's "
+                        "document of this type is not yet run by its executor."),
         ]),
 
     Category(

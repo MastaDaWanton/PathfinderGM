@@ -461,3 +461,67 @@ def test_endurance_reaches_the_forced_march_check():
         return toll.checks[0]["total"]
 
     assert total(["Endurance"]) - total([]) == 4
+
+
+# --- negative levels (ledger group 46) ------------------------------------------------------
+
+def _drained(faces):
+    pc = _pc("fighter", level=6)
+    pc.hp_max = pc.hp = 60                                # standing through the drain
+    s, e = _board(pc, ("wight", (6, 5)), faces=faces)
+    return s, e, pc, s.actors["c1"]
+
+
+def test_a_wight_s_slam_lays_a_negative_level_through_the_funnel():
+    """Bestiary, Wight: "Energy drain (1 level, DC 14)"; Energy Drain and Negative Levels:
+    "a cumulative -1 penalty on all ability checks, attack rolls, combat maneuver checks,
+    Combat Maneuver Defense, saving throws, and skill checks", "reduces its current and
+    total hit points by 5", and the drainer "gains 5 temporary hit points". Measured
+    before: the rider was a record reading "negative levels are not applied by the
+    engine", and the struck fighter's numbers never moved."""
+    s, e, pc, wight = _drained({"Attack with": 18, "Confirm": 1})
+    before = {"attack": sum(m.value for m in pc.attack_modifiers()),
+              "fort": sum(m.value for m in pc.save_modifiers("fort")),
+              "cmd": pc.cmd(), "hp_max": pc.hp_max,
+              "climb": sum(m.value for m in pc.skill_modifiers("climb"))}
+    res = _attack(e, by="c1", target="pc")
+    assert pc.has_state("state.drained.negative-level"), _tells(res)
+    assert "negative level" in _tells(res)
+    after = {"attack": sum(m.value for m in pc.attack_modifiers()),
+             "fort": sum(m.value for m in pc.save_modifiers("fort")),
+             "cmd": pc.cmd(), "hp_max": pc.hp_max,
+             "climb": sum(m.value for m in pc.skill_modifiers("climb"))}
+    assert {k: after[k] - before[k] for k in before} == {
+        "attack": -1, "fort": -1, "cmd": -1, "hp_max": -5, "climb": -1}
+    assert wight.temp_hp == 5
+
+
+def test_energy_drain_s_one_save_a_day_on_sheds_it_or_makes_it_permanent():
+    """UMR, Energy Drain: after 24 hours "the affected creature must make a Fortitude
+    save ... A success removes that level harmlessly, and a failure makes it permanent"
+    (each level its own save). Measured before: nothing was laid to save against."""
+    from rules import drain
+    from tests.test_feats_b4_moves import _Faces
+
+    for face, kept in ((20, 0), (1, 1)):
+        pc = _pc("fighter", level=6)
+        drain.lay(pc, 1, 14, "a wight's energy drain", "creature:wight", once=True)
+        pc.run_periodic("day", 1, _Faces({"": face}))
+        assert drain.count(pc) == kept
+        if kept:
+            left = next(e for e in pc.effects if e.key == drain.KEY)
+            assert left.payload["permanent"] and not left.periodic
+            pc.run_periodic("day", 1, _Faces({"": 20}))
+            assert drain.count(pc) == 1                 # no save left to make
+
+
+def test_negative_levels_equal_to_hit_dice_kill():
+    """"If a creature's negative levels equal or exceed its total Hit Dice, it dies.\""""
+    from rules import drain
+
+    pc = _pc("fighter", level=3)
+    pc.hp_max = pc.hp = 60
+    drain.lay(pc, 2, 14, "drain", "author:test")
+    assert not pc.is_dead
+    drain.lay(pc, 1, 14, "drain", "author:test")
+    assert pc.is_dead
