@@ -6320,6 +6320,10 @@ class Actor:
         from . import gear as _gear
 
         out.extend(_gear.tags(self))
+        # Feat loop b6-rules: a helmet worn, `gear.helmet` (rules/helmet.py).
+        from . import helmet as _helmet
+
+        out.extend(_helmet.tags(self))
         # What is worn and wielded gives (enchanting contracts §4): a sense while worn —
         # goggles of night's `sense.darkvision` — and every bound property's
         # `property.<id>` tag on the suit, the shield and the weapon in hand, which a

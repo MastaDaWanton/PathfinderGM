@@ -299,3 +299,27 @@ def test_a_monk_keeps_one_stunning_fist_at_monk_level_uses():
     monk = _monk(["Stunning Fist"])
     docs = [d for d in class_abilities._docs_for(monk) if d.get("key") == "stunning fist"]
     assert len(docs) == 1 and docs[0]["class"] == "monk"
+
+
+# --- the worn helmet -----------------------------------------------------------------------------
+
+def test_dented_and_cloven_helm_add_to_ac_against_confirmation_only_while_a_helmet_is_worn():
+    """Dwarves of Golarion: "When wearing a helmet, you add +1 to your AC against critical
+    hit confirmation rolls" (Dented Helm; Cloven Helm's "stacks with Dented Helm"). Before
+    this lane no helmet was a thing a sheet could wear, and both documents were not_yet. A
+    leather cap in the head slot carries `gear.helmet`; the confirming roll against the
+    wearer is -1, -2 with both feats; with the cap off, nothing."""
+    from rules import helmet
+
+    dwarf = _pc("fighter", level=12, race="dwarf",
+                feats=["Hard-Headed", "Dented Helm", "Cloven Helm"])
+
+    def against():
+        return sum(m.value for m in dwarf._buff_mods("combat_mod", "crit_confirm_against"))
+
+    assert not dwarf.has_state(helmet.TAG) and against() == 0
+    dwarf.wear({"name": "Leather Cap", "slot": "head", "base": "cap"})
+    assert dwarf.has_state(helmet.TAG)
+    assert against() == -2
+    dwarf.feats = [f for f in dwarf.feats if f != "Cloven Helm"]
+    assert against() == -1

@@ -15,7 +15,8 @@
     "umbral-spell: ISM: 'An umbral spell gains the darkness descriptor. As long as the spell is in effect, the creature or object affected radiates darkness in a 10-foot radius ... An umbral spell uses up a spell slot two levels higher' (rules/metamagic.py `umbral`, Engine._op_cast).",
     "shadow-grasp: ISM: 'When you cast a spell with the darkness descriptor that affects an area, creatures in the area are entangled ... A Shadow Grasp spell uses up a slot one level higher' (Engine._shadow_grasp).",
     "stalwart: ACG: 'While using the total defense action, fighting defensively action, or Combat Expertise, you can forgo the dodge bonus to AC you would normally gain to instead gain an equivalent amount of DR, to a maximum of DR 5/-, until the start of your next turn' (rules/stalwart.py).",
-    "improved-stalwart: ACG: 'Double the DR you gain from Stalwart, to a maximum of DR 10/-'."
+    "improved-stalwart: ACG: 'Double the DR you gain from Stalwart, to a maximum of DR 10/-'.",
+    "stunning-fist: CRB: 'You may attempt a stunning attack once per day for every four levels you have attained' — any class's, content/class-abilities/feats-b6-rules.json; the monk's own document stands in its place."
   ],
   "improved-counterspell": {
     "tags": [
@@ -81,5 +82,6 @@
     "tags": [
       "defence.stalwart.improved"
     ]
-  }
+  },
+  "stunning-fist": {}
 }
