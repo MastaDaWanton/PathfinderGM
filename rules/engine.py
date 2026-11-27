@@ -41383,18 +41383,22 @@ class Engine:
             # Stunning Fist attempt against an opponent while using this style, that
             # opponent is also shaken for a number of rounds equal to 1d4 + your Strength
             # bonus" — the critical half is the feat's own `on_hit` rider (feat loop
-            # b7-scoped); this is the Stunning Fist half.
+            # b7-scoped); this is the Stunning Fist half — any armed blow whose failed save
+            # laid its condition (owner call: those are Stunning Fist and the feats built
+            # on its attempts; the engine names no class ability).
+            from . import morale
+
+            shaken = morale.SHAKEN_KEY
             if actor.has_state(self.SHAKEN_ON_STUN) and actor.has_state("style.dragon-style") \
-                    and str(e.origin or "").split("/", 1)[-1] == "stunning fist" \
                     and not defender.is_down \
-                    and not states.immune_to(defender, "fear", "shaken"):
+                    and not states.immune_to(defender, "fear", shaken):
                 n = self._rider_rounds(actor, {"rider": "Dragon Ferocity",
                                                "rounds": "max(0, str_mod)",
                                                "rounds_roll": "1d4"})
-                defender.add_condition("shaken", n, source=f"{actor.name}'s dragon ferocity",
+                defender.add_condition(shaken, n, source=f"{actor.name}'s dragon ferocity",
                                        origin="rule:feat-dragon-ferocity")
                 out.append({"effect": {"ref": defender.ref, "kind": "condition",
-                                       "condition": "shaken", "rounds": n,
+                                       "condition": shaken, "rounds": n,
                                        "origin": "rule:feat-dragon-ferocity"},
                             "tell": f"{defender.name} is shaken for {n} round"
                                     f"{'s' if n != 1 else ''} (Dragon Ferocity)."})
