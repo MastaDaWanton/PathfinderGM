@@ -6660,7 +6660,8 @@ class Engine:
             # Feat loop b5-core: a ranged attack or a whip's lash provokes (rules/shooting.py).
             from . import shooting
 
-            return shooting.provoked(self, raw) + self._bodyguards(raw)
+            return shooting.provoked(self, raw) + self._bodyguards(raw) \
+                + self._provoked_by_unarmed(raw)
         if raw.get("op") == "cast":
             return self._provoked_by_casting(raw)
         if raw.get("op") == "use_item":
@@ -6763,6 +6764,19 @@ class Engine:
         ref = str(effect.get("ref") or "")
         return self._swings_at(ref, reactions.provoked_by_entering(
             self.scene, ref, tuple(effect["from"]), tuple(effect["to"])), why="movement")
+
+    def _provoked_by_unarmed(self, raw: dict) -> list[dict]:
+        """Feat loop b6-partials. CRB, Unarmed Attacks: "Attacking unarmed provokes an
+        attack of opportunity from the character you attack, provided she is armed" —
+        waived by Improved Unarmed Strike (`reactions.fights_unarmed` asks who is armed).
+        A swing made as a reaction provokes nothing."""
+        params = raw.get("params") or {}
+        target = raw.get("target")
+        target_ref = (target[0] if target else None) if isinstance(target, list) else target
+        if params.get("reaction") or not target_ref or not raw.get("actor"):
+            return []
+        return self._swings_at(str(raw["actor"]), reactions.provoked_by_unarmed(
+            self.scene, str(raw["actor"]), str(target_ref), params.get("weapon")))
 
     def _provoked_by_maneuver(self, raw: dict) -> list[dict]:
         """The attack of opportunity a combat manoeuvre owes its target, unless the
@@ -31346,7 +31360,12 @@ class Engine:
         # Worked out here, before spell resistance, because a turned cure is resisted:
         # "An undead creature can apply spell resistance" (CRB, Cure Light Wounds).
         turns = bool(dice) and spells_mod.turns_on_undead(spell, plan["kind"])
-        turned = {r for r in live if turns and self.scene.actors[r].has_state(states.UNDEAD)}
+        # Feat loop b6-partials: Necromantic Affinity's "damage caused by inflict spells
+        # heals you as if you were an undead creature, but you also take damage from cure
+        # spells" — its document's tag, asked beside the undead's.
+        turned = {r for r in live if turns and (
+            self.scene.actors[r].has_state(states.UNDEAD)
+            or self.scene.actors[r].has_state("energy.negative.affinity"))}
         harmless = "harmless" in sr.lower()
         if spell.sr is True and (not harmless or (turned and plan["kind"] == "heal")):
             for ref in live:

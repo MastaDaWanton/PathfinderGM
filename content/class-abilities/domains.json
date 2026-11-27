@@ -70,8 +70,7 @@
                               "formula": "max(1, floor(level / 2))",
                               "when": {"weapon": {"key": "unarmed"}}}]},
       "tell": "{name}'s hands harden like wood.",
-      "tell_off": "{name}'s hands soften again.",
-      "not_yet": ["No attack of opportunity for striking unarmed: no rule makes an unarmed strike provoke yet, so there is nothing to waive (Improved Unarmed Strike's own line says the same)."]
+      "tell_off": "{name}'s hands soften again."
     },
     {
       "key": "might of the gods", "ability_type": "su", "power": "might of the gods",

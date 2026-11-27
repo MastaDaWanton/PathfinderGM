@@ -320,9 +320,9 @@
         }
       }
     ],
+    "tags": ["energy.negative.affinity"],
     "not_yet": [
-      "the +2 against effects that cause negative levels, ability damage, drain or penalties",
-      "inflict spells healing the bearer and cure spells harming them"
+      "the +2 against effects that cause negative levels, ability damage, drain or penalties"
     ]
   },
   "bloatmage-initiate": {

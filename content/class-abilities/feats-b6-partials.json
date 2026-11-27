@@ -27,6 +27,28 @@
         ]
       },
       "tell": "{name} settles the armour for the gestures to come, closer than training alone allows."
+    },
+    {
+      "key": "lower spell resistance",
+      "name": "Lower Spell Resistance",
+      "feat": "focused-disbelief",
+      "aliases": [
+        "lower spell resistance",
+        "lower my spell resistance",
+        "lower my disbelief",
+        "open myself to the blessing"
+      ],
+      "level": 1,
+      "source": "Focused Disbelief (UM): 'You can lower this resistance for 1 round as a standard action.' Read by Actor.spell_resistance_rating, which answers 0 while the round's `sr.lowered` holds.",
+      "text": "Standard action: your spell resistance is lowered for a round, so an ally's divine spell lands.",
+      "action": "standard",
+      "self": {
+        "rounds": "1",
+        "tags": [
+          "sr.lowered"
+        ]
+      },
+      "tell": "{name} lets the doubt go for a moment, open to the gods' magic."
     }
   ]
 }

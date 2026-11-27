@@ -176,9 +176,6 @@
       {"type": "combat_mod", "target": "spell_resistance", "formula": "11 + level",
        "bonus_type": "untyped", "when": {"against": "divine_spell"},
        "note": "only against the divine spells Divine Defiance covers"}
-    ],
-    "not_yet": [
-      "lowering the resistance for 1 round as a standard action: the engine has no way to lower spell resistance, so an ally's divine spell still meets it"
     ]
   },
   "cut-your-losses": {

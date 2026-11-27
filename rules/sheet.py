@@ -1407,6 +1407,11 @@ class Actor:
                 continue                        # "12 + caster_level" is a spell's, unbound
             if n > best:
                 best, why = n, f"the {name}"
+        # Feat loop b6-partials: lowered for the round (CRB, Spell Resistance: "A creature
+        # can voluntarily lower its spell resistance ... a standard action"), an effect's
+        # tag on the one ticker; Focused Disbelief's use lays it.
+        if best and self.has_state("sr.lowered"):
+            return 0, ""
         return best, why
 
     def fortification(self) -> tuple[int, str]:
@@ -6718,6 +6723,12 @@ class Actor:
         # Feat loop b5-spells: Legacy of the Crusade's "good-aligned weapons" — the weapon
         # strikes as good (a holy weapon's layer, an aligned blade's `strikes_as`).
         weapon["good"] = "good" in (w.get("strikes_as") or ())
+        # Feat loop b6-partials: Power Attack's "cannot be used with touch attacks or
+        # effects that do not deal hit point damage" (CRB) — a printed touch, and a
+        # printed blow whose damage is to an ability (a shadow's Strength touch).
+        printed = w.get("stat_block") or {}
+        weapon["touch"] = bool(printed.get("touch"))
+        weapon["hp_damage"] = not printed.get("ability")
         rec = w.get("crafted_record")
         if isinstance(rec, dict):
             weapon["key"] = str(w.get("crafted_base") or key)

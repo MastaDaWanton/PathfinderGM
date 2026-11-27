@@ -353,7 +353,9 @@
         "when": {
           "choice": "power_attack",
           "weapon": {
-            "category": "melee"
+            "category": "melee",
+            "touch": false,
+            "hp_damage": true
           }
         }
       },
@@ -374,7 +376,9 @@
         "when": {
           "choice": "power_attack",
           "weapon": {
-            "category": "melee"
+            "category": "melee",
+            "touch": false,
+            "hp_damage": true
           }
         }
       },
@@ -387,6 +391,8 @@
           "choice": "power_attack",
           "weapon": {
             "category": "melee",
+            "touch": false,
+            "hp_damage": true,
             "strength_share": 1.5
           }
         }
@@ -400,13 +406,12 @@
           "choice": "power_attack",
           "weapon": {
             "category": "melee",
+            "touch": false,
+            "hp_damage": true,
             "strength_share": 0.5
           }
         }
       }
-    ],
-    "not_yet": [
-      "touch attacks and effects that deal no hit-point damage are not excluded"
     ]
   },
   "combat-reflexes": {
@@ -457,9 +462,6 @@
   "improved-unarmed-strike": {
     "tags": [
       "lethality.either.unarmed"
-    ],
-    "not_yet": [
-      "counts as armed: no attack of opportunity for attacking unarmed, and threatens with unarmed strikes (rules/reactions.py has no unarmed-provokes rule to waive)"
     ]
   },
   "quick-draw": {

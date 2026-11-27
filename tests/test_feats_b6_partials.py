@@ -181,3 +181,104 @@ def test_under_and_over_is_not_offered_flat_footed_or_without_the_feat():
     assert _rolls(res, "Grapple (CMB)") and not _rolls(res, "Trip (CMB)")
     s, e, pc, res = _grappled_at(["Agile Maneuvers", "Under and Over"], acted=False)
     assert not _rolls(res, "Trip (CMB)") and "flat-footed" in _tells(res)
+
+
+# --- single book rules ---------------------------------------------------------------------
+
+def test_power_attack_is_not_taken_on_a_touch_or_a_blow_that_harms_no_hit_points():
+    """CRB: "You can only choose to use this feat when making an attack with a melee
+    weapon ... Power Attack cannot be used with touch attacks or effects that do not deal
+    hit point damage." Before: a shadow given Power Attack swung its Strength-draining
+    incorporeal touch at -2 for +4 damage. The ogre's greatclub still pays and gains."""
+    from rules.engine import Scene
+
+    s = Scene(location_id="5bbd0c40345f")
+    for template, gains in (("shadow", False), ("ogre", True)):
+        foe = instantiate(template, scene=s)
+        foe.feats = list(foe.feats) + ["Power Attack"]
+        key = foe.wielded_key()
+        hit = [m for m in foe.attack_modifiers(key, choices=("power_attack",))
+               if m.source.startswith("Power Attack")]
+        harm = [m for m in foe.damage_modifiers(key, choices=("power_attack",))
+                if m.source.startswith("Power Attack")]
+        assert bool(hit) is gains and bool(harm) is gains, template
+
+
+def test_an_unarmed_body_threatens_nothing_and_its_punch_provokes_the_armed():
+    """CRB, Unarmed Attacks: "An unarmed character can't take attacks of opportunity" and
+    "Attacking unarmed provokes an attack of opportunity from the character you attack,
+    provided she is armed." Improved Unarmed Strike: "you are considered to be armed even
+    when you are unarmed." Before: a fist threatened like a sword and a punch drew
+    nothing, so the feat's clause had nothing to waive. The thug's club is armed."""
+    pc = _pc("fighter", equipped="unarmed")
+    s, e = _board(pc, ("thug", (6, 5)))
+    assert not reactions.threatens(s, "pc", (6, 5))
+    res = _attack(e, weapon="unarmed")
+    assert [o for o in res.outcomes if o.actor == "c1" and o.op == "attack"], _tells(res)
+    pc2 = _pc("fighter", feats=["Improved Unarmed Strike"], equipped="unarmed")
+    s2, e2 = _board(pc2, ("thug", (6, 5)))
+    assert reactions.threatens(s2, "pc", (6, 5))
+    res2 = _attack(e2, weapon="unarmed")
+    assert not [o for o in res2.outcomes if o.actor == "c1" and o.op == "attack"]
+
+
+def test_a_monk_a_clawed_body_and_a_printed_block_are_armed():
+    from rules.engine import Scene
+
+    assert not reactions.fights_unarmed(_pc("monk", equipped="unarmed"))
+    s = Scene(location_id="5bbd0c40345f")
+    for template in ("wolf", "ogre", "ghoul"):
+        assert not reactions.fights_unarmed(instantiate(template, scene=s)), template
+
+
+def test_necromantic_affinity_is_mended_by_an_inflict_and_hurt_by_a_cure():
+    """Necromantic Affinity: "damage caused by inflict spells heals you as if you were an
+    undead creature, but you also take damage from cure spells." Before: the cast loop
+    turned the spell on `type.undead` alone, so the holder was wounded by an inflict."""
+    from tests.test_audit_magic import _cleric, records, run, said, scene_with
+
+    pc = _cleric()
+    pc.feats = list(pc.feats) + ["Necromantic Affinity"]
+    s, e = scene_with(pc)
+    pc.hp = 3
+    res = run(e, "cast", spell="inflict-light-wounds", at="pc")
+    assert pc.hp > 3, said(res)
+    assert records(res, "heal")
+    before = pc.hp
+    run(e, "cast", spell="cure-light-wounds", at="pc")
+    assert pc.hp < before
+
+
+def test_focused_disbelief_is_lowered_for_a_round_as_a_standard_action():
+    """UM: "You can lower this resistance for 1 round as a standard action." Before: no
+    way to lower it, so a friendly cleric's cure met the holder's SR 19."""
+    from tests.test_feats_b4_moves import _use
+
+    pc = _pc("fighter", feats=["Divine Defiance", "Focused Disbelief"])
+    s, e = _board(pc, ("thug", (12, 5)))
+    divine = {"against": ("spell", "divine_spell")}
+    assert pc.spell_resistance_rating(divine)[0] == 19
+    out = _use(e, "Lower Spell Resistance")
+    assert out.status == "resolved", out.tell
+    assert pc.spell_resistance_rating(divine)[0] == 0
+    assert s.standard_spent.get("pc") == s.round
+    pc.tick_effects(1)
+    assert pc.spell_resistance_rating(divine)[0] == 19
+
+
+def test_lookout_s_lifted_holder_acts_at_the_ally_s_roll_less_one():
+    """APG Lookout: "If you would normally be denied the ability to act in the surprise
+    round, your initiative is equal to your initiative roll or the roll of your ally -1,
+    whichever is lower." Before: the lifted holder kept its own roll, here 25 over the
+    ally's 12, and went first."""
+    from rules import surprise
+    from tests.test_feats_b4_other import _fight
+
+    scene, engine, pc, thug = _fight(feats=["Lookout"], ally=((7, 11), ["Lookout"]))
+    scene.initiative = [("ally", 25), ("c1", 15), ("pc", 12)]
+    scene.turn = 1
+    sides = {"pc": ["pc", "ally"], "them": ["c1"]}
+    aware, unaware = ["c1", "pc"], ["ally"]
+    surprise._lookouts(engine, sides, aware, unaware)
+    assert scene.initiative == [("c1", 15), ("pc", 12), ("ally", 11)]
+    assert scene.turn_holder() == "c1"

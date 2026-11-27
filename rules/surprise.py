@@ -223,8 +223,8 @@ def _lookouts(engine, sides: dict, aware: list, unaware: list) -> set:
     round without the aid of this feat, you may take both a standard and a move action
     (or a full-round action)". Moves each unaware holder beside an aware one into `aware`
     (in place) and returns the holders who keep a whole turn (no `surprise round`).
-    shortcut: the initiative clause ("equal to your initiative roll or the roll of your
-    ally -1, whichever is lower") is not applied; the turn order is the one rolled."""
+    A holder lifted in takes "your initiative roll or the roll of your ally -1, whichever
+    is lower" (`_lookout_initiative`, feat loop b6-partials; the best-placed partner's)."""
     scene = engine.scene
     side_of = {r: s for s, refs in sides.items() for r in refs}
     own = list(aware)
@@ -241,10 +241,29 @@ def _lookouts(engine, sides: dict, aware: list, unaware: list) -> set:
             full.add(r)
     for r in list(unaware):
         me = scene.actors[r]
-        if me.has_state(LOOKOUT) and awareness.can_perceive(me) and partners(r):
+        mates = partners(r) if me.has_state(LOOKOUT) and awareness.can_perceive(me) else []
+        if mates:
             unaware.remove(r)
             aware.append(r)
+            _lookout_initiative(scene, r, mates)
     return full
+
+
+def _lookout_initiative(scene, ref: str, mates: list) -> None:
+    """The lifted holder's place in the order: the lower of its own roll and its ally's
+    less one. The order is re-sorted (stable, so ties keep the rolled order) and the turn
+    index follows whoever held it."""
+    order = dict(scene.initiative)
+    if ref not in order or not any(m in order for m in mates):
+        return
+    new = min(int(order[ref]), max(int(order[m]) for m in mates if m in order) - 1)
+    if new == int(order[ref]):
+        return
+    holder = scene.turn_holder()
+    scene.initiative = sorted(((r, new if r == ref else v) for r, v in scene.initiative),
+                              key=lambda rv: -int(rv[1]))
+    if holder is not None:
+        scene.turn = next(i for i, (r, _) in enumerate(scene.initiative) if r == holder)
 
 
 def tell(scene, record: dict) -> str:

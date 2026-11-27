@@ -217,7 +217,7 @@ def threatened_by(scene, watcher_ref: str, body: str = "medium") -> set:
     # Threatening a square is about being able to swing into it.
     if anchor is None or watcher is None or watcher.blocking_key("attack"):
         return set()
-    if disarmed_and_empty_handed(scene, watcher):
+    if disarmed_and_empty_handed(scene, watcher) or fights_unarmed(watcher):
         return set()
     reach = _reach_of(watcher)
     gap = reach_gap(watcher)
@@ -290,6 +290,64 @@ def disarmed_and_empty_handed(scene, actor) -> bool:
         return False
     feats = [actor._feat_name(str(f)) for f in (getattr(actor, "feats", ()) or ())]
     return "improved unarmed strike" not in feats
+
+
+def fights_unarmed(actor, key: str | None = None) -> bool:
+    """An unarmed body in the book's sense: fists, no Improved Unarmed Strike.
+
+    CRB, Combat, Unarmed Attacks: "Striking for damage with punches, kicks, and head butts
+    is much like attacking with a melee weapon, except ... An unarmed character can't take
+    attacks of opportunity", and "Attacking unarmed provokes an attack of opportunity from
+    the character you attack, provided she is armed." Improved Unarmed Strike: "you are
+    considered to be armed even when you are unarmed" — its document's tag (the lethality
+    one it already lays), as the monk's and the Blood Bender's class strike. A body with
+    natural weapons — a race's claws, a borrowed form's bite, a printed block's attacks —
+    is armed. Feat loop b6-partials: until it, `_reach_of` left the rule out because the
+    bestiary fights with empty weapon lists; it asks the PRINT now, so it does not."""
+    try:
+        key = str(key or actor.wielded_key() or "unarmed").strip().lower()
+    except Exception:  # noqa: BLE001 - a body with nothing it can name
+        return False
+    if key not in ("unarmed", "unarmed strike"):
+        return False
+    from . import classfeatures
+    from .sheet import STRIKES_EITHER_WAY
+
+    if actor.has_state(STRIKES_EITHER_WAY) or actor.has_state(classfeatures.UNARMED_STRIKE):
+        return False
+    if (actor.weapon(key) or {}).get("stat_block") or getattr(actor, "flat_attack", None) \
+            is not None:
+        return False
+    if any(isinstance(e.payload, dict) and e.payload.get("natural_weapons")
+           for e in getattr(actor, "effects", ()) or ()):
+        return False
+    from . import animal_companion, feats as feats_mod
+
+    doc = animal_companion.natural_weapon_doc(actor) or (
+        actor._race_doc() if hasattr(actor, "_race_doc") else None) or {}
+    if doc.get("weapons") or any((feats_mod.document(f) or {}).get("natural_weapons")
+                                 for f in getattr(actor, "feats", ()) or ()):
+        return False
+    return True
+
+
+def provoked_by_unarmed(scene, actor_ref: str, target_ref: str,
+                        weapon_key: str | None = None) -> list[tuple[str, Reaction]]:
+    """The attack of opportunity an unarmed blow owes the armed one it is aimed at
+    (`fights_unarmed`'s rule), asked as `provoked_by_maneuver` asks it: the target alone,
+    if it threatens a square the attacker fills, sees it, and is not on its side."""
+    actor = scene.actors.get(actor_ref)
+    target = scene.actors.get(target_ref)
+    anchor = scene.positions.get(actor_ref)
+    if not scene.has_grid or actor is None or target is None or anchor is None \
+            or actor_ref == target_ref or not fights_unarmed(actor, weapon_key):
+        return []
+    if _allied(scene, target_ref, actor_ref) or _cannot_see(scene, target_ref, actor_ref):
+        return []
+    zone = threatened_by(scene, target_ref, actor.size)
+    if not any(sq in zone for sq in gridmod.footprint((anchor[0], anchor[1]), actor.size)):
+        return []
+    return [(target_ref, r) for r in reactions_for(target) if r.fires_on("provoking_action")]
 
 
 def _own_weapons_off(scene, actor) -> list[str]:
