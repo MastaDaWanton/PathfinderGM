@@ -395,6 +395,8 @@ class Campaign:
             "swung": (dict(self.scene.swung), {}),
             # The round a swift or immediate action spent (feat loop b2): the same reason.
             "swift_spent": (dict(self.scene.swift_spent), {}),
+            # The round's walking (feat loop b5-core, the 5-foot step): the same reason.
+            "walked": ({k: list(v) for k, v in self.scene.walked.items()}, {}),
             # What the player last struck with this fight (`Scene.means`, 2026-10-09):
             # saved for the reason `move_spent` is, a fight put down mid-turn.
             "means": ({k: dict(v) for k, v in self.scene.means.items()}, {}),
@@ -507,6 +509,8 @@ class Campaign:
                             (s.get("standard_spent") or {}).items()},
             swung={k: int(v) for k, v in (s.get("swung") or {}).items()},
             swift_spent={k: int(v) for k, v in (s.get("swift_spent") or {}).items()},
+            walked={k: [int(v[0]), str(v[1])] for k, v in (s.get("walked") or {}).items()
+                    if isinstance(v, (list, tuple)) and len(v) == 2},
             means={k: dict(v) for k, v in (s.get("means") or {}).items()
                    if isinstance(v, dict)},
             turn=s.get("turn", -1),

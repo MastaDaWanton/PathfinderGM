@@ -338,6 +338,12 @@ class Scene:
     # off-turn may set one round ahead (`Engine._spend_swift`). `move_spent`'s shape and
     # reason: no second ticker, a stale entry is a round that is not this one.
     swift_spent: dict[str, int] = field(default_factory=dict)
+    # Feat loop b5-core: the round each combatant last moved on the grid, and whether that
+    # round's first movement was the 5-foot step — [round, "step" | "move"]
+    # (rules/stepping.py). `move_spent` cannot say it: a draw spends the move action and
+    # moves nobody, and "you can't take a 5-foot step in the same round that you move any
+    # distance" asks about the feet. `move_spent`'s shape and reason: no second ticker.
+    walked: dict[str, list] = field(default_factory=dict)
     # What the player's character last struck with this encounter — the weapon and the
     # lethality their own words chose — and what was in hand then, by ref. A blow that
     # names no means carries on with these (`Engine._standing_means`), as a standing action
@@ -2514,6 +2520,7 @@ class Scene:
         self.standard_spent = {}
         self.swung = {}
         self.swift_spent = {}
+        self.walked = {}                 # feat loop b5-core
         self.sides = {}
         # The battlefield does NOT go with the fight any more (item 28, 2026-09-19): the
         # ground belongs to the place, the party is standing on it before and after, and
@@ -2695,6 +2702,7 @@ class Scene:
         self.move_spent.pop(ref, None)
         self.standard_spent.pop(ref, None)
         self.swift_spent.pop(ref, None)
+        self.walked.pop(ref, None)       # feat loop b5-core
         self.spawn_feet.pop(ref, None)
         # Leaked by three of the four old depart doors and persisted, so a stale age was
         # waiting for whoever wore the ref next; with refs never reused it is merely
@@ -34078,6 +34086,14 @@ class Engine:
                         intent, f"Spring Attack's walk is {actor.name}'s speed in all, and "
                                 f"{left} ft of it is left after the blow; {tuple(square)} "
                                 f"is {cost} ft away.", code="too_far")
+            # Feat loop b5-core: no movement after the round's 5-foot step (rules/stepping.py).
+            if not intent.params.get("reaction"):
+                from . import stepping
+
+                stepped = stepping.after_step_refusal(self.scene, actor, from_square,
+                                                      tuple(square))
+                if stepped:
+                    return self._refuse(intent, stepped, code="stepped")
             bumped = self._unseen_in_the_way(actor, from_square, tuple(square))
             if bumped is not None:
                 square = bumped[1]
@@ -34127,6 +34143,11 @@ class Engine:
                     and tuple(from_square) != tuple(square) \
                     and not intent.params.get("reaction"):
                 self.scene.move_spent[ref] = self.scene.round
+            # Feat loop b5-core: the round's walking, for the 5-foot step's rules.
+            if not intent.params.get("reaction"):
+                from . import stepping
+
+                stepping.record(self, actor, from_square, tuple(square))
             effect = {"ref": ref, "kind": "position", "from": from_square,
                       "to": tuple(square), "feet": cost, "zone": zone}
             # The feet walked, never the zone: "Pip moves to near (15 ft)" was read live as

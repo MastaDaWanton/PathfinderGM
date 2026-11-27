@@ -422,8 +422,12 @@ def provoked_by_move(scene, mover_ref: str, start, end) -> list[tuple[str, React
         return []
 
     # A five-foot step provokes nothing. Measured rather than declared, because a GM that
-    # has to remember to say "this is a step" will not.
-    if gridmod.distance(tuple(start), tuple(end)) <= gridmod.SQUARE_FT:
+    # has to remember to say "this is a step" will not. Feat loop b5-core: measured by the
+    # step's rules, not its length alone (rules/stepping.py) — a square more after a walk,
+    # or into difficult terrain, is movement and provokes as movement does.
+    from . import stepping
+
+    if stepping.is_step(scene, mover, start, end):
         return []
 
     left = set(gridmod.footprint(tuple(start), mover.size))

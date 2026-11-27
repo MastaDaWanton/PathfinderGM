@@ -292,8 +292,8 @@
     ]
   },
   "pack-attack": {
-    "not_yet": [
-      "'you can spend an immediate action to take a 5-foot step, even if you have otherwise moved this round': the engine does not refuse a 5-foot step after a move (reactions.provoked_by_move measures the step alone), so there is nothing to allow"
+    "tags": [
+      "teamwork.pack-attack"
     ]
   },
   "rapid-grappler": {
