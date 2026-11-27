@@ -364,7 +364,7 @@ def test_racial_traits_reach_the_sheet():
     pc.race = "half-orc"
     names = [t["name"] for t in full_sheet(pc)["traits"]]
     assert "darkvision 60 ft" in names
-    assert "ferocity: keep fighting below 0" in names
+    assert "orc ferocity: one more round below 0, once a day" in names
     # One source with the forge, so a trait shown at creation is the trait shown after:
     # the race document's own lines (rules/races.py), which the forge card shows too.
     assert names == races.document("half-orc")["trait_lines"]

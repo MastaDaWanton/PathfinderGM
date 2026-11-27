@@ -66,8 +66,10 @@ from __future__ import annotations
 # `has_state("sense.darkvision")` is the one a dark room will ask. The race string on
 # the sheet is the store, never the question. The readers that exist today:
 # `immune.<energy>` and `resist.<energy>.<n>` in `Actor.immune_to` / `resistance`,
-# `ferocity` in `Actor.apply_hp_state`, `move.<mode>.<ft>` and `sense.*` on the sheet's
-# body block and in the narrator's brief, `proficient.*` in `Actor.is_proficient`. An
+# `trait.orc-ferocity` (the racial once-a-day round) and `ferocity` (the Bestiary's
+# universal rule — summons, companions; never a race's) in `Actor.apply_hp_state`,
+# `move.<mode>.<ft>` and `sense.*` on the sheet's body block and in the narrator's
+# brief, `proficient.*` in `Actor.is_proficient`. An
 # eidolon evolution (content/races/evolutions.json) grants these through the race
 # document's `expand`; what has no reader yet is on its `not_yet` line.
 #

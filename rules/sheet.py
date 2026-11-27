@@ -353,6 +353,14 @@ FIGHTS_UNSTAGGERED = "deathless.unstaggered"
 FIGHTS_UNSTRAINED = "deathless.unstrained"
 FIGHTS_STRAINED_BY_TWO = "deathless.two-actions"
 FIGHTING_ON = "state.fighting-on"
+# Orc Ferocity, the RACIAL trait (CRB Half-Orc; ARG race builder "Ferocity"): once a day,
+# one more round as if disabled below 0, then unconscious and dying. Its own root, not a
+# child of the Bestiary's `ferocity` (which fights on until -Con): a prefix question for
+# `ferocity` must never answer for a half-orc. Measured before: feat loop b5-core read
+# the race's bare `ferocity` as the monster rule and every half-orc PC fought on forever.
+# A race document still carrying the bare tag is translated in `races.normalise`.
+ORC_FEROCITY = "trait.orc-ferocity"
+ORC_FEROCITY_SPENT = "spent.orc-ferocity"
 # What counts as magic for it: effects a spell or a ward put there (the provenance stamp,
 # stage 8). A herbal tea's buff (`item:<herb>`) is chemistry and stays; a class ability's
 # rage stays (the owner named buffs and wards).
@@ -7265,11 +7273,19 @@ class Actor:
             # below 0 as Diehard does, staggered, losing a point a round (`_ferocious`).
             ferocious = not fights_on and self.hp < 0 and self.has_state("ferocity") \
                 and not self.has_state("state.down.unconscious") and not self.drown_failures
+            # Orc Ferocity: the day's one round, or the round already running (its
+            # `FIGHTING_ON` held); spent, a second fall that day falls as anybody does.
+            orc = not fights_on and not ferocious and self.hp < 0 \
+                and self.has_state(ORC_FEROCITY) \
+                and (not self.has_state(ORC_FEROCITY_SPENT) or self.has_state(FIGHTING_ON)) \
+                and not self.has_state("state.down.unconscious") and not self.drown_failures
             if ferocious:
                 changed.extend(self._ferocious())
+            elif orc:
+                changed.extend(self._orc_ferocity())
             elif fights_on:
                 changed.extend(self._fight_on())
-            fights_on = fights_on or ferocious
+            fights_on = fights_on or ferocious or orc
             if fights_on:
                 pass
             elif self.has_state("ferocity"):
@@ -7277,6 +7293,11 @@ class Actor:
                     self.add_condition("staggered", source="ferocity")
                     changed.append("staggered")
             elif not self.has_condition("unconscious"):
+                # A body that was fighting on "as if disabled" (Orc Ferocity's round run
+                # out) is not disabled once it falls: the rung is left behind.
+                from . import states as _st
+
+                self.remove_condition(_st.DISABLED_KEY)
                 self.add_condition("unconscious", source="hit points")
                 changed.append("unconscious")
             # Stabilising once keeps you stable; fresh damage starts it again. Not at
@@ -7317,6 +7338,36 @@ class Actor:
                 tags=(FIGHTING_ON, "recovery.hit-points"),
                 periodic=[{"damage": "1", "damage_type": "untyped"}]))
             out.append("fighting on")
+        return out
+
+    def _orc_ferocity(self) -> list[str]:
+        """Orc Ferocity (CRB, Half-Orc): "Once per day, when a half-orc is brought below 0
+        hit points but not killed, he can fight on for 1 more round as if disabled. At the
+        end of his next turn, unless brought to above 0 hit points, he immediately falls
+        unconscious and begins dying." Disabled (its strain is `Engine._disabled_strain`'s,
+        asked of `FIGHTING_ON`), never staggered, the day's use marked under
+        `recovery.rest`. The round ends with the bearer's next turn (`ends_when`
+        `end_of_next_turn`, `Scene._next_able`); two round boundaries are the backstop for
+        a body never given a turn. Healing above 0 sweeps it with `recovery.hit-points`."""
+        from . import states
+
+        out = []
+        if not self.has_state(FIGHTING_ON):
+            if not self.has_state(ORC_FEROCITY_SPENT):
+                self.apply_effect(ActiveEffect(
+                    name="orc ferocity spent", kind="situation", key="orc-ferocity-spent",
+                    source="Orc Ferocity (today's)", origin="rule:orc-ferocity",
+                    tags=(ORC_FEROCITY_SPENT, "recovery.rest")))
+            self.apply_effect(ActiveEffect(
+                name="fighting on below 0", kind="situation", key="orc-ferocity",
+                source="Orc Ferocity", origin="rule:orc-ferocity",
+                duration="rounds", rounds_left=2,
+                tags=(FIGHTING_ON, "recovery.hit-points"),
+                payload={"ends_when": {"end_of_next_turn": True}}))
+            out.append("orc ferocity")            # told (`Engine._STATE_SAID`), law 3
+        if not self.has_state("state.impaired.disabled"):
+            self.add_condition(states.DISABLED_KEY, source="Orc Ferocity")
+            out.append(states.DISABLED_KEY)
         return out
 
     def _fight_on(self) -> list[str]:

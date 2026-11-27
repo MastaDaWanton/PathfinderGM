@@ -1206,6 +1206,10 @@ class Scene:
         # which is right: the successor's turn belongs to the round already running.
         first = 0 if self.turn_is_next else 1
         self.turn_is_next = False
+        # Leaving a slot is the end of its holder's turn: what lasts "until the end of
+        # your next turn" (Orc Ferocity) goes now, and the body is read again.
+        if first and 0 <= self.turn < len(self.initiative):
+            self.hazards.extend(self._turn_ended(self.initiative[self.turn][0]))
         for step in range(first, len(self.initiative) + first):
             reached = self.turn + step
             nxt = reached % len(self.initiative)
@@ -1235,6 +1239,9 @@ class Scene:
                     had = list(a.effects)
                     if a.tick_effects(1):
                         self.hazards.extend(_ended_records(a, had))
+                        # What ran out may have been holding the body up (Orc
+                        # Ferocity's backstop): the hit-point ladder is asked again.
+                        self.hazards.extend(a.hp_state_records())
                     self.hazards.extend(
                         {"kind": "pool_ready", "ref": a.ref, "pool": pid}
                         for pid in a.tick_pools(1))
@@ -1269,6 +1276,7 @@ class Scene:
             # slot stops the walk as a downed player's does, and the popup is the turn.
             if (halt_on is not None and ref == halt_on) or self.held_pc(ref):
                 self.turn = nxt          # their slot, able or not (`advance_turn`)
+                self._turn_begun(ref)
                 return ref
             # The one caller that wants "can act now" rather than "still in the fight":
             # a stunned combatant stays in the initiative order and on the panel, and
@@ -1277,8 +1285,34 @@ class Scene:
             if self.conscious(ref) and self.actors[ref].can_act():
                 self.turn = nxt
                 self.acted.add(ref)
+                self._turn_begun(ref)
                 return ref
         return None                      # nobody able this pass
+
+    @staticmethod
+    def _ends_next_turn(e) -> bool:
+        return bool(((e.payload or {}).get("ends_when") or {}).get("end_of_next_turn"))
+
+    def _turn_begun(self, ref: str) -> None:
+        """Arm each `ends_when.end_of_next_turn` effect on `ref`: this is that next turn."""
+        for e in getattr(self.people.get(ref), "effects", ()):
+            if self._ends_next_turn(e):
+                e.payload["turn_begun"] = True
+
+    def _turn_ended(self, ref: str) -> list[dict]:
+        """End what lasted until the end of `ref`'s next turn, armed by `_turn_begun` (a
+        turn already running when it was laid is not the next one), through the
+        applicator, and read the body again: Orc Ferocity's round run out is "falls
+        unconscious and begins dying" unless healed above 0 meanwhile."""
+        who = self.people.get(ref)
+        if who is None:
+            return []
+        had = list(who.effects)
+        gone = who.remove_effects(match=lambda e: self._ends_next_turn(e)
+                                  and e.payload.get("turn_begun"))
+        if not gone:
+            return []
+        return _ended_records(who, had) + who.hp_state_records()
 
     def held_pc(self, ref: str):
         """The player's hold that a save on their turn may end — the first effect on them
@@ -1794,6 +1828,8 @@ class Scene:
             if names:
                 # Which effects went, by identity, so each record carries its origin.
                 told.extend(_ended_records(a, had))
+                # Orc Ferocity's round run out with nobody's turn to end it: the body falls.
+                told.extend(a.hp_state_records())
             pools = a.tick_pools(rounds)
             ended.extend(f"{a.name}: {pid} is ready" for pid in pools)
             told.extend({"kind": "pool_ready", "ref": a.ref, "pool": pid} for pid in pools)
@@ -44034,6 +44070,9 @@ _STATE_SAID = {
     "broken": "{name} is broken: inert, but not destroyed",
     # Diehard's choice taken below 0 (`Actor._fight_on`, feat loop b4-other).
     "fighting on": "{name} fights on below 0 hit points, refusing to fall",
+    # Orc Ferocity (`Actor._orc_ferocity`): the day's one round, and only one.
+    "orc ferocity": "{name} fights on below 0 hit points by sheer ferocity, for one more "
+                    "round before the body gives out",
 }
 # The Bestiary's word for an undead creature at 0, and a construct past -10.
 _DESTROYED_SAID = "is destroyed"

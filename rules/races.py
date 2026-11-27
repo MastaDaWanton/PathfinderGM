@@ -87,7 +87,7 @@ TAG_RP: dict[str, tuple[int, str]] = {
     "natural.armor.1": (2, "+1 natural armour"),
     "amphibious": (2, "breathes air and water"),
     "hold-breath": (1, "holds breath for four times Con rounds"),
-    "ferocity": (4, "ferocity: keep fighting below 0"),
+    "trait.orc-ferocity": (4, "orc ferocity: one more round below 0, once a day"),
     "weakness.light-blindness": (-2, "light blindness"),
     "weakness.light-sensitivity": (-1, "light sensitivity"),
     "weakness.vulnerable.sunlight": (-2, "vulnerable to sunlight"),
@@ -723,6 +723,11 @@ def normalise(entry: dict) -> dict:
             got = [ln.strip() for ln in got.replace(",", chr(10)).split(chr(10))]
         d[key] = [str(x).strip() for x in (got or []) if str(x).strip()]
     d["tags"] = [t.lower() for t in d["tags"]]
+    # A race's bare `ferocity` is the racial trait (Orc Ferocity, once a day), never the
+    # Bestiary's universal rule that tag now means: saved homebrew cards and world drafts
+    # written before the split still say it (fix/orc-ferocity, rules/sheet.py ORC_FEROCITY).
+    d["tags"] = list(dict.fromkeys("trait.orc-ferocity" if t == "ferocity" else t
+                                   for t in d["tags"]))
     # Fast healing said in the card's own shapes, converted once here into the one tag
     # play reads (`fast_healing`): a trait line that says nothing else ("Fast healing 5"),
     # and a `fast_healing` effect document — the effects vocabulary every other bench

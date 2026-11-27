@@ -260,7 +260,7 @@ KINDS: dict[str, Kind] = {
                        "maneuver=bull rush|trip'."),
             Field("tags", "Tags", type="textarea",
                   help="One per line: sense.darkvision.60, sense.low-light, "
-                       "immune.sleep.magic, move.fly.30, natural.claws, ferocity. Priced "
+                       "immune.sleep.magic, move.fly.30, natural.claws, trait.orc-ferocity. Priced "
                        "from the Race Builder where it names them."),
             Field("budget", "Extra feats and ranks", type="textarea",
                   help="'feats +1', 'ranks +1' — a human's two lines."),
