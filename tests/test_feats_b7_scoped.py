@@ -440,3 +440,24 @@ def test_planar_hunter_passes_five_of_a_typed_reduction_against_an_outsider_only
                                        payload={"amount": 10, "bypass": bypass}))
         assert thug.damage_reduction("slashing", traits=traits).amount == left
     assert strike_feats.dr_traits(pc, thug, "longsword") == ()      # on no plane: nothing
+
+
+# --- group 36: demoralize off a trigger ------------------------------------------------------
+
+def test_boar_ferocity_demoralizes_the_foe_whose_flesh_is_torn():
+    """Boar Ferocity (UC): "While using Boar Style, whenever you tear an opponent's flesh,
+    you can spend a free action to make an Intimidate check to demoralize that opponent."
+    Measured before: no door demoralized as a free action off the tear (the feat's
+    not_yet). Now the tear's second hit carries a free Demoralize, through the one door."""
+    from tests.test_feats_b2_styles import Faces, _enter, _fight, _monk, _run as _run2
+
+    pc = _monk("boar style", "boar ferocity", level=8, ranks={"intimidate": 3})
+    scene, engine, pc, thug = _fight(pc)
+    thug.hp = thug.hp_max = 400
+    _enter(engine, "boar-style")
+    engine.dice = Faces([18, 18], match="Attack")
+    res = _run2(engine, [{"op": "attack", "actor": "pc", "target": thug.ref,
+                          "visibility": "hidden",
+                          "params": {"full_attack": True, "weapon": "unarmed"}}])
+    assert any(x.get("kind") == "demoralize" and x.get("from") == "Boar Ferocity"
+               for o in res.outcomes for x in o.effects or ()), _tells(res)

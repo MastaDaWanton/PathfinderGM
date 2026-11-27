@@ -207,12 +207,19 @@
   },
   "boar-ferocity": {
     "modifiers": [
-      {"type": "skill_mod", "target": "intimidate", "amount": 2, "bonus_type": "untyped",
-       "when": {"against": "demoralize"}}
+      {
+        "type": "skill_mod",
+        "target": "intimidate",
+        "amount": 2,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "demoralize"
+        }
+      }
     ],
-    "tags": ["unarmed.damage.piercing"],
-    "not_yet": [
-      "demoralize as a free action on tearing flesh (Boar Style tears it, b2-styles): no door demoralizes as a free action off a hit"
+    "tags": [
+      "unarmed.damage.piercing",
+      "demoralize.on-tear"
     ]
   },
   "motivating-display": {

@@ -26753,6 +26753,12 @@ class Engine:
                 out.extend(self._rider_bleed(intent, actor, defender,
                                              {"amount": "2d6", "rider": "torn flesh"},
                                              "rule:feat-boar-style", state))
+                # Boar Ferocity (UC): "While using Boar Style, whenever you tear an
+                # opponent's flesh, you can spend a free action to make an Intimidate check
+                # to demoralize that opponent" — taken, as the free demoralizes are
+                # (`_free_demoralize`, feat loop b7-scoped).
+                if actor.has_state(self.DEMORALIZE_ON_TEAR) and not defender.is_down:
+                    out.extend(self._free_demoralize(actor, [defender], "Boar Ferocity"))
         seen: set[str] = set()
         for raw in actor.feats:
             doc = feats_mod.document(raw)
@@ -26791,6 +26797,7 @@ class Engine:
     # document's tag, asked with `has_state` — never the feat's name.
     DEMORALIZE_ON_POWER_HIT = "demoralize.on-hit.power-attack"     # Cornugon Smash
     DEMORALIZE_ON_DROP = "demoralize.on-drop"                      # Dreadful Carnage
+    DEMORALIZE_ON_TEAR = "demoralize.on-tear"          # Boar Ferocity (feat loop b7-scoped)
     TWO_WEAPON_REND = "two_weapon.rend"                            # Two-Weapon Rend
     IMPACT_CRITICAL = "critical.ranged.impact"                     # Impact Critical Shot
 
