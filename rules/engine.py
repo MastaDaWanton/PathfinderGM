@@ -6771,6 +6771,33 @@ class Engine:
         return self._swings_at(ref, reactions.provoked_by_entering(
             self.scene, ref, tuple(effect["from"]), tuple(effect["to"])), why="movement")
 
+    # Feat loop b6-partials: a creature that may not attack one other — Friend to Animals'
+    # "Animals who fail the save cannot attack you unless you attack them or one of their
+    # allies first", Invoke Primal Instinct's contempt ("ignoring you unless you attack
+    # them"). The held creature carries `attack.withheld.<ref>` (a class ability's effect,
+    # `$user` written as the user's ref); one tag per protected creature, asked by prefix.
+    WITHHELD = "attack.withheld"
+
+    def _withheld_refusal(self, intent: Intent, actor: Actor, defender: Actor):
+        """Lift what this attack breaks, then refuse the attack a withheld creature makes.
+
+        An attack BY the protected creature on the held one, or on one of its allies, ends
+        the hold on every such creature (the book's "unless you attack them or one of
+        their allies first"). An attack by the held creature on the one it is held from is
+        refused with the reason; a reaction is not exempt, since it is an attack."""
+        from .reactions import _allied
+
+        mark = f"{self.WITHHELD}.{actor.ref}"
+        for ref, other in self.scene.actors.items():
+            if other.has_state(mark) and (ref == defender.ref
+                                          or _allied(self.scene, ref, defender.ref)):
+                other.remove_effects(match=lambda e: mark in (e.tags or ()))
+        if actor.has_state(f"{self.WITHHELD}.{defender.ref}"):
+            return self._refuse(intent, f"{actor.name} will not attack {defender.name}: "
+                                        f"it holds back until {defender.name} attacks "
+                                        f"first.", code="attack_withheld")
+        return None
+
     def _provoked_by_unarmed(self, raw: dict) -> list[dict]:
         """Feat loop b6-partials. CRB, Unarmed Attacks: "Attacking unarmed provokes an
         attack of opportunity from the character you attack, provided she is armed" —
@@ -10943,6 +10970,10 @@ class Engine:
             return self._aid_another(intent, actor, defender, partial)
         if intent.params.get("stand_still") and intent.params.get("reaction"):
             return self._stand_still(intent, actor, defender, partial)
+        if partial.get("attack_state") is None:
+            withheld = self._withheld_refusal(intent, actor, defender)
+            if withheld is not None:
+                return withheld
         # A dancing weapon's own round (`_dance`): the blade swings, not its loosener — so
         # nothing of the loosener's but their base attack bonus rides it (no Strength, no
         # feats, no sneak attack, no charged blow), and nothing stops it but the reach.
@@ -39979,7 +40010,9 @@ class Engine:
             other.apply_effect(ActiveEffect(
                 name=shown, kind="buff", source=source, origin=origin,
                 duration="rounds" if rounds else "until-dismissed", rounds_left=rounds,
-                tags=tuple(str(t) for t in spec.get("tags") or ()), modifiers=mods))
+                # `$user`: the user's ref (feat loop b6-partials, `attack.withheld.$user`).
+                tags=tuple(str(t).replace("$user", actor.ref)
+                           for t in spec.get("tags") or ()), modifiers=mods))
             other._follow_con(before)
             out.append({"ref": other.ref, "kind": "buff", "ability": shown,
                         "modifiers": mods, "rounds": rounds, "origin": origin})

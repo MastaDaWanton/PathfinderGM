@@ -394,11 +394,7 @@
       "handle.birds-of-prey"
     ]
   },
-  "invoke-primal-instinct": {
-    "not_yet": [
-      "'If you choose contempt, the targets consider you harmless for 1 minute, ignoring you unless you attack them': nothing makes a creature pass over one it holds harmless, so only fear is offered"
-    ]
-  },
+  "invoke-primal-instinct": {},
   "hamatula-grasp": {
     "not_yet": [
       "the whole feat: the impaled foe's grapple check with the impaling weapon is not offered yet (Hamatula Strike's own not_yet), so neither its lighter -2 nor its +1d6 has a roll to ride"

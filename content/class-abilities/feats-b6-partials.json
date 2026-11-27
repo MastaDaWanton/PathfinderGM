@@ -49,6 +49,27 @@
         ]
       },
       "tell": "{name} lets the doubt go for a moment, open to the gods' magic."
+    },
+    {
+      "key": "friend to animals",
+      "name": "Friend to Animals",
+      "feat": "friend-to-animals",
+      "aliases": [
+        "friend to animals",
+        "calm the animals",
+        "befriend the animals"
+      ],
+      "level": 1,
+      "source": "Friend to Animals (Animal Archive): 'As a standard action you can require all animals within 30 feet to make a Will saving throw. Animals who fail the save cannot attack you unless you attack them or one of their allies first. The DC of the Will save is equal to 10 + half your character level + your Charisma modifier.' The held animal carries attack.withheld.<you> (Engine._withheld_refusal refuses its attack on you and lifts it when you attack it or its ally).",
+      "text": "Standard: animals within 30 feet save (Will) or cannot attack you until you attack them or theirs.",
+      "action": "standard",
+      "ability_type": "ex",
+      "affects": "all",
+      "radius_ft": 30,
+      "only": {"type": ["animal"]},
+      "save": {"save": "will", "dc": "10 + floor(level / 2) + cha_mod", "success": "negates"},
+      "effect": {"tags": ["attack.withheld.$user"], "on": "failed"},
+      "tell": "{name} meets the animals' eyes, slow and unafraid."
     }
   ]
 }

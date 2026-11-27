@@ -596,11 +596,7 @@
       "moving at half speed while prone, and a 5-foot step while crawling: no move asks whether the mover is prone, so a crawl is not priced or allowed by rule"
     ]
   },
-  "friend-to-animals": {
-    "not_yet": [
-      "a standard action: animals within 30 feet save (Will) or cannot attack you until you or your allies attack them — no state yet refuses a creature's attack on one named ref"
-    ]
-  },
+  "friend-to-animals": {},
   "witty-feint": {
     "not_yet": [
       "a dodge bonus to AC against the feinted foe equal to your weapon training bonus, in place of denying his Dexterity: nothing reads the weapon training bonus for the weapon in hand by itself"

@@ -371,3 +371,64 @@ def test_boar_style_s_fist_cuts_past_a_zombie_s_slashing_reduction():
         assert (passed is None) is gets_past, feats
     snake = _pc("monk", feats=["Snake Style"], equipped="unarmed").weapon("unarmed")
     assert "piercing" in snake["strikes_as"]
+
+
+# --- a creature held from attacking one other --------------------------------------------------
+
+def _wolf_board(feats):
+    pc = _pc("ranger", feats=feats)
+    s, e = _board(pc, ("wolf", (6, 5)), ("thug", (12, 12)))
+    return pc, s, e
+
+
+def test_friend_to_animals_stops_a_wolf_that_fails_until_the_holder_strikes():
+    """Animal Archive: "Animals who fail the save cannot attack you unless you attack them
+    or one of their allies first." Before: no state refused a creature's attack on one
+    named creature. The wolf fails (a natural 1): its bite at the ranger is refused with
+    the reason; the ranger's own blow lifts it, and the next bite comes."""
+    from tests.test_feats_b4_moves import _use
+
+    pc, s, e = _wolf_board(["Friend to Animals"])
+    e.dice.faces["Will"] = 1
+    out = _use(e, "Friend to Animals")
+    assert out.status == "resolved", out.tell
+    wolf, thug = s.actors["c1"], s.actors["c2"]
+    assert wolf.has_state("attack.withheld.pc") and not thug.has_state("attack.withheld")
+    s.turn = 1
+    bite = _attack(e, by="c1", target="pc")
+    assert bite.outcomes[0].status == "refused" and "will not attack" in bite.outcomes[0].tell
+    s.turn = 0
+    _attack(e, target="c1")
+    assert not wolf.has_state("attack.withheld.pc")
+
+
+def test_friend_to_animals_is_lifted_by_a_blow_at_the_animal_s_ally():
+    from tests.test_feats_b4_moves import _use
+
+    pc, s, e = _wolf_board(["Friend to Animals"])
+    e.dice.faces["Will"] = 1
+    _use(e, "Friend to Animals")
+    s.positions["c2"] = (5, 6)
+    _attack(e, target="c2")
+    assert not s.actors["c1"].has_state("attack.withheld.pc")
+
+
+def test_invoke_primal_instinct_s_contempt_holds_the_thug_back_a_minute():
+    """Gnomes of Golarion: "If you choose contempt, the targets consider you harmless for 1
+    minute, ignoring you unless you attack them." Before: only fear was offered. The thug
+    fails: ten rounds of attack.withheld.pc, no fear; fear stays the default."""
+    from rules import classes, resources
+    from tests.test_feats_b3_martial import _fight, _use as _use3
+
+    scene, engine, pc, thug = _fight(feats=["Invoke Primal Instinct"], cls="druid", level=6,
+                                     faces={"Invoke Primal Instinct: Bluff": 20,
+                                            "Will save": 1})
+    for p in classes.get("druid").get("pools") or ():
+        resources.define(pc, p)
+    pc.ranks["bluff"] = 1
+    pc.armour, pc.shield = "none", ""
+    out = _use3(engine, "Invoke Primal Instinct (contempt)")
+    assert out.status != "refused", out.tell
+    assert thug.has_state("attack.withheld.pc") and not thug.has_state("state.fear")
+    held = next(e for e in thug.effects if "attack.withheld.pc" in e.tags)
+    assert held.rounds_left == 10
