@@ -201,8 +201,9 @@ def test_unknown_feat_is_carried_as_flavour_and_says_so():
         "name": "test", "kind": "pc", "class": "rogue", "level": 1,
         "abilities": {"str": 10, "dex": 14, "con": 10, "int": 10, "wis": 10, "cha": 10},
         # A feat with neither a document nor a reader: Combat Reflexes, the old
-        # example, gained a document in stage 8 and is applied now.
-        "hp": 8, "ranks": {"stealth": 1}, "feats": ["Acrobatic Steps"],
+        # example, gained a document in stage 8 and is applied now; Acrobatic Steps, the
+        # next, in feat loop b4.
+        "hp": 8, "ranks": {"stealth": 1}, "feats": ["Leadership"],
     }
     a = from_dict(build)
     assert "carried as flavour" in a.notes

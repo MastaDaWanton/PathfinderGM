@@ -613,3 +613,30 @@ def test_acrobatic_steps_and_light_step_cross_difficult_ground_as_normal():
     assert grid.reachable((0, 5), 100, easy_ft=Grid.EASY_ALL)[end] == 30
     scene, engine, pc = _luck_pc("Acrobatic Steps")
     assert engine._easy_ft(pc) == 15
+
+
+def test_exorcists_rebuttal_turns_a_rerolled_compulsion_back_on_its_caster():
+    """DHH: "If you use your Improved Iron Will feat to reroll a Will save against a
+    compulsion effect and successfully save against the effect, the creature that created
+    the effect ... takes 1d4 points of Wisdom damage." Failed on 2, rerolled to 20: the
+    hedge wizard's Wisdom takes the damage; with no reroll, nothing."""
+    from rules import spells
+    from tests.test_skill_uses_mind import _here, _wizard
+
+    for faces, hurt in (([2, 20], True), ([20], False)):
+        scene, engine, pc = _here(rest=10)
+        pc.feats = list(pc.feats) + ["Iron Will", "Improved Iron Will", "Exorcist's Rebuttal"]
+        wiz = _wizard(scene)
+        wiz.level = 5
+        wiz.spellbook = list(wiz.spellbook) + ["hold-person"]
+        wiz.prepared = dict(wiz.prepared, **{"hold-person": 2})
+        engine.dice = Faces(faces, match="Will save")
+        spell = spells.get("hold-person")
+        from rules.intents import Intent
+
+        intent = Intent(op="cast", actor="c2", target="pc", visibility="hidden",
+                        params={"spell": "hold-person"})
+        state = {"rolls": [], "tells": [], "effects": []}
+        saved, _ = engine._cast_save(intent, pc, "will", 15, spell, {}, state)
+        assert saved
+        assert bool(wiz.ability_damage.get("wis")) == hurt, faces
