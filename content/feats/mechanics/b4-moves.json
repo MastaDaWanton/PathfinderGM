@@ -286,8 +286,10 @@
     ]
   },
   "improved-whip-mastery": {
+    "tags": [
+      "threat.whip"
+    ],
     "not_yet": [
-      "'you threaten the area of your natural reach plus 5 feet': the whip already threatens as a reach weapon (rules/reactions.py reach_with), though the book says a whip threatens nothing",
       "grasping a Small or Tiny object with a melee touch at AC 10, and swinging from the whip as a grappling hook"
     ]
   },

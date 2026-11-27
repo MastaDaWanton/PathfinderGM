@@ -224,6 +224,13 @@ def threatened_by(scene, watcher_ref: str, body: str = "medium") -> set:
     shot = ranged_threat(watcher)
     if shot is not None:
         reach, gap = shot, False
+    # Feat loop b5-core: the whip (CRB, Weapon Descriptions): "you don't threaten the area
+    # into which you can make an attack" — until Improved Whip Mastery (UC): "you threaten
+    # the area of your natural reach plus 5 feet" (`WHIP_THREAT`, its document's tag).
+    elif _wields_whip(watcher):
+        if not watcher.has_state(WHIP_THREAT):
+            return set()
+        reach, gap = gridmod.natural_reach(watcher.size) + gridmod.SQUARE_FT, False
     if reach <= 0:
         return set()
     flat = gridmod.threatened_squares(anchor, watcher.size, reach=reach)
@@ -296,6 +303,16 @@ def _own_weapons_off(scene, actor) -> list[str]:
 # 5 feet of you" (UC). The feet are the tag's leaf, so a feat that widens it (Improved
 # Snap Shot's 15 feet) is a document line: the longest held is the one that counts.
 RANGED_THREAT = "threat.ranged"
+
+
+# Improved Whip Mastery's tag (feat loop b5-core).
+WHIP_THREAT = "threat.whip"
+
+
+def _wields_whip(actor) -> bool:
+    from . import shooting
+
+    return shooting._base(actor, actor.equipped or "") == "whip"
 
 
 def ranged_threat(actor) -> int | None:

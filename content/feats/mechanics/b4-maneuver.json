@@ -108,10 +108,27 @@
           "against": "stun_or_stagger"
         },
         "note": "saves against spells and special abilities that stagger or stun"
+      },
+      {
+        "type": "combat_mod",
+        "target": "attack",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "scope": {
+          "weapon": "helmet-dwarven-boulder"
+        },
+        "note": "ARG: attack rolls made using a helmet (the dwarven boulder helmet, the helmet the weapons table carries)"
+      },
+      {
+        "type": "combat_mod",
+        "target": "cmb",
+        "amount": 1,
+        "bonus_type": "untyped",
+        "scope": {
+          "weapon": "helmet-dwarven-boulder"
+        },
+        "note": "ARG: combat maneuver checks made using a helmet"
       }
-    ],
-    "not_yet": [
-      "'+1 bonus on attack rolls and combat maneuver checks made using a helmet': no helmet in the game's gear is a weapon to attack or manoeuvre with"
     ]
   },
   "human-spirit": {
