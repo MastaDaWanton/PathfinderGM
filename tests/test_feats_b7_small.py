@@ -428,3 +428,36 @@ def test_a_chokehold_runs_the_suffocation_ladder_out_of_water():
     engine._end_grapple(thug, pc, "test")
     engine.breathe()
     assert thug.held_breath_rounds == 0
+
+
+def test_endurance_adds_four_to_a_long_swim_s_hourly_check():
+    """CRB, Endurance: "+4 bonus on ... Swim checks made to resist nonlethal damage from
+    exhaustion". Measured before: the hourly Swim check (`Engine._an_hour_swum`, DC 20 or
+    1d6 nonlethal) read the skill's plain modifiers, so Endurance gave nothing there."""
+    from tests.test_swim_checks import _face, _in_the_water
+
+    def hourly(feats):
+        s, e, pc, _shark, _at = _in_the_water()
+        pc.feats = list(feats)
+        seen = []
+        _face(e, 25, seen)
+        e._an_hour_swum(pc, "calm")
+        return next(total for label, total, _ in seen if "an hour in" in label)
+
+    assert hourly(["Endurance"]) - hourly([]) == 4
+
+
+def test_endurance_reaches_the_forced_march_check():
+    """CRB, Endurance: "+4 ... Constitution checks made to avoid nonlethal damage from a
+    forced march". The ledger line said a journey never marched past eight hours; the
+    forced march has been built since 2026-11-21 (`survival.forced_march`), so the line
+    was stale. The check carries the +4."""
+    from rules import survival
+    from tests.test_feats_b4_moves import _Faces
+
+    def total(feats):
+        pc = _pc("fighter", feats=feats)
+        toll, said = survival.forced_march(pc, 1, _Faces({"": 10}))
+        return toll.checks[0]["total"]
+
+    assert total(["Endurance"]) - total([]) == 4

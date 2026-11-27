@@ -144,12 +144,20 @@
         "when": {
           "against": "heat"
         }
+      },
+      {
+        "type": "skill_mod",
+        "target": "swim",
+        "amount": 4,
+        "bonus_type": "untyped",
+        "when": {
+          "against": "swim_exhaustion"
+        },
+        "note": "Swim checks made to resist nonlethal damage from exhaustion (the hourly check of a long swim)"
       }
     ],
     "not_yet": [
-      "Swim checks to resist nonlethal damage from exhaustion: the engine makes no hourly Swim check for a long swim",
       "Constitution checks to continue running: running is not an action here",
-      "Constitution checks against a forced march: a journey walks eight hours a day and never marches past them",
       "Fortitude saves against suffocation: the only lack of air the engine models is water, and drowning is a Constitution check, which the breath clause covers",
       "sleeping in light or medium armour without becoming fatigued: the engine has no rule that fatigues anybody for sleeping in armour"
     ]

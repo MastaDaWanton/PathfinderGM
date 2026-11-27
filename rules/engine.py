@@ -17790,7 +17790,8 @@ class Engine:
         DC 20 Swim check or take 1d6 points of nonlethal damage from fatigue" (CRB Swim).
         One copy for every long swim: the water beside a ship or in a lake hour on hour
         (`swim`), the swim out to a ship lying off (`_swim_out`), a wreck (`_wreck`)."""
-        margin, _ten = self._swim_margin(a, list(a.skill_modifiers("swim")),
+        margin, _ten = self._swim_margin(a, list(a.skill_modifiers(
+            "swim", ctx={"against": "swim_exhaustion"})),           # feat loop b7-small
                                          water.HOURLY_DC, rough, fight, what="Swim, an hour in")
         if margin >= 0:
             return []

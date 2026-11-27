@@ -2650,6 +2650,9 @@ AGAINST: dict[str, str] = {
     "breath": "the Constitution check to keep holding one's breath (Engine.breathe)",
     "forced_march": "the hourly Constitution check past eight hours of travel a day "
                     "(survival.forced_march)",
+    # Feat loop b7-small: Endurance's "Swim checks made to resist nonlethal damage from
+    # exhaustion" (CRB).
+    "swim_exhaustion": "the hourly Swim check of a long swim (Engine._an_hour_swum)",
     "spell_resistance": "the caster level check to overcome spell resistance "
                         "(Engine._resists)",
     # 2026-11-22, lane F: a spell's save is against its school, subschool and descriptors
