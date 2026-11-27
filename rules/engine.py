@@ -13541,14 +13541,18 @@ class Engine:
         params = dict(intent.params)
         spring = bool(params.get("spring_attack")) and not params.get("charge")
         what = "Spring Attack" if spring else "a charge"
-        why = self._coup_round_spent(actor, what, "Nothing is rolled.")
+        # Feat loop b6-rules: a readied charge (Rhino Charge, rules/readied.py) was paid
+        # for when it was readied, and runs "up to your speed" only.
+        readied_charge = params.get("reaction") == "readied" and not spring
+        why = "" if readied_charge else self._coup_round_spent(actor, what,
+                                                                "Nothing is rolled.")
         # Spring Attack: "You cannot use this ability to attack a foe that is adjacent to
         # you at the start of your turn" — read at the action (the turn's first act).
         if not why and actor.blocking_key("move"):
             why = f"{actor.name} cannot move, and {what} is a move."
         speed = int(getattr(actor, "speed_feet", 0) or 0)
         one_action = actor.has_state(states.ONE_ACTION_TURN)
-        budget = speed if (spring or one_action) else 2 * speed
+        budget = speed if (spring or one_action or readied_charge) else 2 * speed
         found = why or self._charge_path(actor, defender, weapon_key, budget,
                                          straight=not spring)
         if isinstance(found, str):
@@ -14203,8 +14207,9 @@ class Engine:
             said = self._lay_attack_stances(actor, ("lunge",), defender=defender)
             raw["params"] = dict(raw.get("params") or {}, lunge_tell=" ".join(said))
             intent = _intent_from_dict(raw)
+        # Feat loop b6-rules: a readied charge (Rhino Charge) walks too.
         if (intent.params.get("charge") or intent.params.get("spring_attack")) \
-                and not intent.params.get("reaction"):
+                and intent.params.get("reaction") in (None, "", "readied"):
             return self._charge_before(raw, intent, actor, defender, weapon_key)
         found = self._closing_step(intent, actor, defender, weapon_key)
         if found is None:

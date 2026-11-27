@@ -46,9 +46,12 @@ TRIGGERS = {
     "casts": "a foe begins casting a spell",
     "charges_me": "a foe charges them",
 }
-# What may be readied: a single attack, or a counterspell (CRB, Magic, Counterspells).
-# A readied charge is Rhino Charge's alone (`READY_CHARGE`), and not built (see the report).
-ACTIONS = ("attack", "counterspell")
+# What may be readied: a single attack, or a counterspell (CRB, Magic, Counterspells), and
+# a charge — Rhino Charge's alone (`READY_CHARGE`; feat loop b6-rules): "You may ready a
+# charge, though you may only move up to your speed on the charge" (APG).
+ACTIONS = ("attack", "counterspell", "charge")
+READY_CHARGE = "ready.charge"
+ATTACKS = ("attack", "charge")             # the readied actions that swing
 # Feat tags read here, each a feat document's `tags` line:
 STRIKE_BACK = "ready.strike-back"      # Strike Back (CRB): a melee foe out of reach
 PATIENT = "ready.patient"              # Patient Strike: readied as a full-round action
@@ -85,6 +88,10 @@ def refusal(actor, trigger: str, action: str, patient: bool = False) -> str:
             return f"{actor.name} casts no spells to counter one with."
         if trigger != "casts":
             return "A counterspell is readied against a foe beginning a spell."
+    if action == "charge" and not actor.has_state(READY_CHARGE):
+        return "Only Rhino Charge readies a charge."
+    if action == "charge" and trigger == "enters_reach":
+        return "A charge is readied against a foe's attack, charge or spell, not its walk."
     if patient and (action != "attack" or not actor.has_state(PATIENT)):
         return "Only Patient Strike readies an attack as a full-round action."
     return ""
@@ -102,7 +109,7 @@ def effect(actor, trigger: str, action: str, patient: bool, rnd: int) -> ActiveE
 
 
 def said(action: str, trigger: str) -> str:
-    what = "a counterspell" if action == "counterspell" else "an attack"
+    what = {"counterspell": "a counterspell", "charge": "a charge"}.get(action, "an attack")
     return f"{what} for when {TRIGGERS.get(trigger, trigger)}"
 
 
@@ -176,6 +183,8 @@ def _taken(engine, actor, maker_ref: str) -> None:
 
 def _blow(engine, actor, e, foe_ref: str, because: str, **params) -> dict:
     extra = {"patient_readied": True} if (e.payload or {}).get("patient") else {}
+    if (e.payload or {}).get("action") == "charge":
+        extra["charge"] = True             # Rhino Charge: up to speed (`_charge_before`)
     return {"op": "attack", "actor": actor.ref, "target": foe_ref, "because": because,
             "params": {"full_attack": False, "reaction": "readied", **extra, **params},
             "visibility": "player" if actor.is_pc else "hidden"}
@@ -208,11 +217,13 @@ def before(engine, raw: dict) -> list[dict]:
             return []
         for trigger in (("charges_me",) if charging else ()) + ("attacks_me",):
             for a, e in _foes_holding(engine, maker, trigger):
-                if a.ref not in aimed or (e.payload or {}).get("action") != "attack":
+                if a.ref not in aimed or (e.payload or {}).get("action") not in ATTACKS:
                     continue
                 if any(x.get("actor") == a.ref for x in out):
                     continue
-                if _reaches(engine, a, foe):
+                if (e.payload or {}).get("action") == "charge":
+                    extra = {}
+                elif _reaches(engine, a, foe):
                     # Set against the charge; "braced" only with a brace weapon, the one
                     # the book's double damage is for (`weapons.has_trait`).
                     extra = {"vs_charge": True} if trigger == "charges_me" else {}
@@ -232,9 +243,9 @@ def before(engine, raw: dict) -> list[dict]:
     elif op == "cast":
         caster = scene.actors.get(maker)
         for a, e in _foes_holding(engine, maker, "casts"):
-            if (e.payload or {}).get("action") != "attack" or caster is None:
+            if (e.payload or {}).get("action") not in ATTACKS or caster is None:
                 continue
-            if not _ranged(a) and not _reaches(engine, a, caster):
+            if (e.payload or {}).get("action") == "attack" and not _ranged(a)                     and not _reaches(engine, a, caster):
                 continue
             out.append(_blow(engine, a, e, maker,
                              f"{a.name}'s readied attack as {caster.name} begins a spell"))

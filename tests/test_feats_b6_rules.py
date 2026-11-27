@@ -383,3 +383,34 @@ def test_enhanced_ki_throw_spends_a_ki_point_for_unarmed_damage_on_landing():
     res = _throw(e, [4, 5])
     assert pc.pool("ki").current == ki - 1, _tells(res)
     assert thug.hp < 200 and "Enhanced Ki Throw" in _tells(res)
+
+
+# --- the readied charge ------------------------------------------------------------------------
+
+def test_rhino_charge_readies_a_charge_that_moves_up_to_speed():
+    """APG Rhino Charge: "You may ready a charge, though you may only move up to your speed
+    on the charge." Before: the b4 not_yet, "the engine has no readied action", and since
+    b5-core only an attack or a counterspell could be readied. Without the feat the readied
+    charge is refused; with it, a caster 25 feet off who begins a spell is charged and
+    struck first; one 45 feet off is past the fighter's speed and is not reached."""
+    plain = _pc("fighter", feats=("Power Attack", "Improved Bull Rush"), weapons=("longsword",))
+    s, e = _board(plain, ("thug", (10, 5)))
+    assert _ready(e, trigger="casts", action="charge").outcomes[-1].status == "refused"
+    for x, reached in ((10, True), (14, False)):
+        pc = _pc("fighter", feats=("Power Attack", "Improved Bull Rush", "Rhino Charge"),
+                 weapons=("longsword",))
+        pc.equipped = "longsword"
+        s, e = _board(pc, ("thug", (x, 5)), faces={"Kesst": 18})
+        foe = _caster("c1")
+        s.people.pop("c1"); s.add(foe, at=(x, 5))
+        res = _ready(e, trigger="casts", action="charge")
+        assert res.outcomes[-1].status == "resolved", _tells(res)
+        _thugs_turn(s)
+        res = _run(e, {"op": "cast", "actor": "c1", "target": "pc", "visibility": "hidden",
+                       "params": {"spell": "magic-missile"}})
+        mine = [o for o in res.outcomes if o.actor == "pc" and o.op == "attack"
+                and o.status == "resolved"]
+        assert bool(mine) is reached, _tells(res)
+        if reached:
+            assert [o.actor for o in res.outcomes].index("pc") < \
+                [o.actor for o in res.outcomes].index("c1"), _tells(res)
